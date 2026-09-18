@@ -45,9 +45,18 @@
 
 ## 参考项目
 
-行为参考：`../nonebot_plugin_xiuxian_2_pmv_upstream`（远端 `main` 的干净克隆）。
-原目录 `../nonebot_plugin_xiuxian_2_pmv` 保留了本地实验改动，不作为本方案的
-证据。新项目以干净主分支的运行时观察和本仓库文档为准，不直接复制实现文件。
+行为参考必须来自 GitHub 远端 `main` 的**独立干净克隆**。参考目录不是本仓库
+的必需文件；使用前先执行：
+
+```bash
+git clone --branch main --single-branch \
+  https://github.com/liyw0205/nonebot_plugin_xiuxian_2_pmv.git \
+  ../nonebot_plugin_xiuxian_2_pmv_upstream
+```
+
+原目录 `../nonebot_plugin_xiuxian_2_pmv` 可能包含本地重构或未提交改动，严禁
+作为参考证据。若独立目录不存在，goal 必须先创建它；不能通过读取同名旧目录
+来代替。新项目以干净主分支的运行时观察和本仓库文档为准，不直接复制实现文件。
 
 ## 当前仓库状态
 
