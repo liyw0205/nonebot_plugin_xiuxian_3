@@ -1,0 +1,1 @@
+"""NoneBot adapter package; no SDK import or matcher registration at import time."""

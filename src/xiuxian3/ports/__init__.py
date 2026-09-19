@@ -1,0 +1,1 @@
+"""Protocols owned by the application/domain boundary."""

@@ -1,0 +1,1 @@
+"""Feature declarations are activated by the composition root."""

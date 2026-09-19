@@ -1,0 +1,1 @@
+"""Application use cases will be added as vertical slices."""

@@ -1,0 +1,1 @@
+"""External adapters; they translate into application DTOs."""

@@ -1,0 +1,1 @@
+"""Pure domain types; this package must not import platform or persistence code."""

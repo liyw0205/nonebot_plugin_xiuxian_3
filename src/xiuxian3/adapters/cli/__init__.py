@@ -1,0 +1,1 @@
+"""CLI adapter skeleton for migrations, backups and diagnostics."""

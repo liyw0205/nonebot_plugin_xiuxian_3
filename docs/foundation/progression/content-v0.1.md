@@ -1,0 +1,85 @@
+# v0.1 境界内容基线：凡人至筑基十层
+
+本文件遵守 [版本内容开发合同](../../content-development-contract.md) 和[境界十层与段位规范](layers.md)。
+
+- `content_version`：`content-0.1`
+- `rule_version`：`progression-0.1.1`
+- 开放写用例：`progression.start_cultivation`、`progression.settle_cultivation`、`progression.advance_layer`、`progression.breakthrough_qi_gathering`、`progression.breakthrough_foundation`、`progression.recover_weakness`。
+- 角色在 `player.enter_cultivation` 成功后进入 `qi_sensing` L1（感气一层/入门）；`mortal` 没有修为资产，不能创建修炼或突破 operation。
+
+本文件是首版实际开放内容，不是预留表。十层的完整阈值、段位推导和迁移语义以 `layers.md` 为唯一权威。
+
+## 1. 首版开放境界
+
+| `realm_key` | 名称 | 可用层数 | 跨境条件 | 解锁方向 |
+|:--|:--|:--|:--|:--|
+| `mortal` | 凡人 | 0 | 完成入道后进入感气 L1 | 新手城、采集、打工、居所、灵田、城镇委托、基础交易 |
+| `qi_sensing` | 感气 | L1–L10 | L10 混元 + 总修为 >=1,360 | 修炼、基础功法、近郊战斗、常驻经营 |
+| `qi_gathering` | 聚气 | L1–L10 | L10 混元 + 总修为 >=4,260 | 基础装备、炼丹/炼器/布阵、宗门申请、洞天入口 |
+| `foundation` | 筑基 | L1–L10 | v0.1 只开放成长；金丹突破为 `closed` | 雾隐洞天一层、正式悬赏、宗门贡献、基础 PVE |
+| `golden_core` | 金丹 | `placeholder` | v0.2 才开放 | 不得作 v0.1 前置/奖励/地点结果 |
+| `nascent_soul` | 元婴 | `placeholder` | v0.3 才开放 | 不得作 v0.1 前置/奖励/地点结果 |
+
+展示段位由层数推导：L1–L3 入门、L4–L6 稳固、L7–L9 圆满、L10 混元。L9 仍是圆满而非跨境资格；只有 L10 可以创建跨境突破会话。
+
+### 首版层数门槛
+
+| `realm_key` | L1 | L2 | L3 | L4 | L5 | L6 | L7 | L8 | L9 | L10 混元 |
+|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| `qi_sensing` | 0 | 80 | 170 | 280 | 410 | 560 | 730 | 920 | 1130 | 1360 |
+| `qi_gathering` | 0 | 180 | 380 | 620 | 900 | 1220 | 1580 | 1980 | 2420 | 2900 |
+| `foundation` | 0 | 420 | 900 | 1480 | 2180 | 3000 | 3950 | 5050 | 6300 | 7700 |
+
+## 2. 修炼会话：`progression.start_cultivation`
+
+| `mode_key` | 前置 | 费用 | 持续时间 | 基础修为 | 冷却/次数 |
+|:--|:--|:--|:--|--:|:--|
+| `cultivate.breathing` | 感气 L1 以上、地点允许 | 2 体力 | 10 分钟 | 40 | 每角色同时 1 个 |
+| `cultivate.spirit_spring` | 感气 L1、位于 `xuantian.spirit_field` | 3 体力 | 15 分钟 | 70 | 每日 4 次 |
+| `cultivate.seclusion` | 聚气 L1、无队伍/战斗/生产锁 | 6 体力、2 精力 | 30 分钟 | 170 | 每日 2 次 |
+
+开始时冻结角色、`realm_key`、`realm_layer`、悟性、地点环境、道途、功法、状态、体力/精力、`rule_version`。结算公式：`floor(base_exp * training_rate_bp * environment_bp * state_bp / 1000000000000)`；倍率均为 bp，默认环境/状态为 10000。修炼没有随机池；结果只由已保存快照决定。
+
+结算先增加 `realm_cultivation` 和 `total_cultivation`，再只读计算可晋层的最高下一层；不会自动跳层。`progression.advance_layer` 必须使用独立 operation 逐层结算，确保 L3/L6/L9/L10 的内容解锁可审计。
+
+会话状态：`created -> running -> settled | cancelled | expired`。未到结束时间返回 `CULTIVATION_NOT_READY`；超过结束时间 24 小时可由恢复任务按原快照结算。只允许在 `created` 取消并返还全部体力/精力；`running` 后不可取消。重复 operation/结算返回同一会话与结果。
+
+## 3. 同境晋层：`progression.advance_layer`
+
+输入：`player_id`、目标层数（只能是当前层 +1）、`operation_id`。前置：active、无互斥会话、当前 `realm_cultivation` 达到层数阈值。成功仅改 `realm_layer` 和派生显示段位，不消耗材料、不随机、不扣修为。
+
+| 层数 | 段位 | 首版解锁 |
+|:--|:--|:--|
+| L3 | 入门完成 | 道途指导、常驻经营第二类服务预览 |
+| L6 | 稳固完成 | `cultivate.seclusion`（聚气以上）、宗门常规任务资格 |
+| L9 | 圆满 | 突破预览、精英/洞天准备提示；不能突破 |
+| L10 | 混元 | 对应跨境突破可预览；只有满足所有材料/总修为/状态时才可开始 |
+
+相同 operation 回放同一层数；目标非下一层、阈值不足或 L10 后再晋层返回 `REALM_LAYER_INVALID` 或 `REALM_CULTIVATION_INSUFFICIENT`，不改资产。
+
+## 4. 聚气与筑基突破
+
+| 目标 | `operation_type` | 必需材料/资源 | 基础成功率 | 准备加成 | 最终范围 |
+|:--|:--|:--|--:|:--|:--|
+| `qi_gathering` | `progression.breakthrough_qi_gathering` | `item.pill.focus_low` 1、`item.herb.spirit_leaf` 3、灵石 100 | 8,000 bp | 匹配灵根地点 +500 bp、宗门引导 +300 bp | 8,000–9,000 bp |
+| `foundation` | `progression.breakthrough_foundation` | `item.pill.foundation_draft` 1、`item.mat.array_sand` 3、`item.ore.ironstone` 3、灵石 500 | 7,500 bp | 道基质量 `//10`（最多 1,000 bp）、匹配功法 +300 bp、阵法辅助 +300 bp | 7,500–9,000 bp |
+
+两种突破都要求当前境界 L10 混元、总修为达到上表门槛、`status=active`、未处于战斗/生产/移动/修炼/虚弱；会话锁分别为 3 分钟与 5 分钟。开始时冻结 L10 属性、道途、功法、地点、材料、辅助项与 `random_pool=breakthrough.<target>.v0.1`。仅 `roll_bp < success_bp` 成功；相同 operation 永远回放同一 `roll_bp`。
+
+| 结果 | 聚气 | 筑基 |
+|:--|:--|:--|
+| 成功 | 进入 `qi_gathering` L1；`realm_cultivation=0`；发 `progression.reward.qi_gathering_entry`：灵石 80、体力 5 | 进入 `foundation` L1；`realm_cultivation=0`；发 `progression.reward.foundation_entry`：世界功勋 50、`item.cave_pass_basic` 1 |
+| 失败（无保护） | 消耗材料/灵石；感气 `realm_cultivation` 保留 80%；`weakness` 2h；下次 +300 bp，最多 +900 bp | 消耗材料/灵石；聚气修为保留 70%；`weakness` 6h；下次 +400 bp，最多 +1,200 bp |
+| 失败（保护） | `item.pill.qi_guard` 仅失败时消耗；修为保留 90%，虚弱 30m | `item.pill.foundation_guard` 仅失败时消耗；修为保留 85%，虚弱 2h |
+
+失败后修为夹断为 `0..L10 threshold`，层数保持 L10；不降境、不删除道途/物品/地点。`weakness` 期间普通修炼收益 -2000 bp，拒绝新突破与雾隐洞天；到期自动恢复，或消耗疗伤丹 1、灵石 50 提前恢复。提前恢复不清除失败保底。
+
+## 5. 失败、权限、关闭与验收
+
+错误：`REALM_MISMATCH`、`REALM_LAYER_INSUFFICIENT`、`REALM_LAYER_INVALID`、`REALM_CULTIVATION_INSUFFICIENT`、`CULTIVATION_INSUFFICIENT`、`BREAKTHROUGH_BUSY`、`WEAKNESS_ACTIVE`、`MATERIAL_INSUFFICIENT`、`BREAKTHROUGH_LOCATION_FORBIDDEN`、`CONTENT_CLOSED`。角色本人可创建；管理员只能读取快照或执行独立恢复用例。
+
+记录：旧/新境界和层数、段位派生值、总/境内修为、success/roll bp、保底前后、材料/保护丹、虚弱期限、内容/规则版本和来源快照。关闭 v0.1 时不建新会话；已 `preparing` 的会话按原版本完成或在未扣成本时取消。恢复不得重抽突破随机或双发奖励。
+
+验收：凡人不能修炼；L1–L10 阈值逐层正确；L9 不可突破而 L10 可预览；地点/材料/资源不足无变化；运行中会话不重复创建；保护丹不提高概率；失败保留比例准确且只应用一次；文本和按钮共用 application 用例；历史会话仍按 `progression-0.1.1` 结算。
+
+首版不开放金丹、元婴、化神、炼虚、合道、渡劫和飞升的可执行内容。

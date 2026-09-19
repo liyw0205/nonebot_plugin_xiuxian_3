@@ -28,6 +28,7 @@ backups/
 *.token
 
 # IDE and OS
+.hermes/
 .idea/
 .vscode/
 .DS_Store

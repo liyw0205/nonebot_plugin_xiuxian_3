@@ -1,0 +1,1 @@
+"""Web adapter skeleton; routes will call application use cases."""

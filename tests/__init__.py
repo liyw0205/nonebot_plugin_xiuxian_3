@@ -1,0 +1,1 @@
+"""Isolated test package for xiuxian3."""
