@@ -55,6 +55,14 @@ class CompleteIntroCommand:
     operation_id: str
 
 
+@dataclass(frozen=True, slots=True)
+class EnterCultivationCommand:
+    player_id: str
+    path_key: str
+    subprofession_key: str | None
+    operation_id: str
+
+
 def _digest(command: RegisterPlayerCommand) -> str:
     payload = json.dumps(
         {"actor_id": command.actor_id, "nickname": command.nickname},
@@ -350,6 +358,99 @@ class CompleteIntro:
                     guide_state_json=json.dumps(guide_state, ensure_ascii=False, sort_keys=True),
                 )
                 unit.players.update(updated)
+            payload = _player_payload(updated)
+            unit.operations.complete(
+                OperationRecord(
+                    operation=operation,
+                    status=OperationStatus.APPLIED,
+                    started_at=claim.record.started_at,
+                    ended_at=self._clock.now(),
+                    result_digest=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                    result_payload=payload,
+                )
+            )
+            return Result.success(updated)
+
+
+class EnterCultivation:
+    """Select the first path and enter qi sensing layer one."""
+
+    PATH_SKILLS = {
+        "body": "skill.body.heavy_strike",
+        "spell": "skill.spell.water_bolt",
+        "device": "skill.device.scout_doll",
+        "demonic": "skill.demonic.pain_exchange",
+        "beast": "skill.beast.partial_transform",
+        "support": "skill.support.quick_assessment",
+    }
+    SUBPROFESSIONS = frozenset({"alchemy", "artifice", "formation"})
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, *, clock) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+
+    def execute(self, command: EnterCultivationCommand) -> Result[Player]:
+        skill_key = self.PATH_SKILLS.get(command.path_key)
+        if skill_key is None:
+            return Result.failure(Error(ErrorCode.INVALID_INPUT, "道途无效"))
+        if command.path_key == "support" and command.subprofession_key not in self.SUBPROFESSIONS:
+            return Result.failure(Error(ErrorCode.INVALID_INPUT, "辅修必须选择炼丹、炼器或布阵"))
+        operation = Operation(
+            operation_id=command.operation_id,
+            request_type="player.enter_cultivation",
+            actor_id=command.player_id,
+            target_id=command.player_id,
+            input_digest=hashlib.sha256(
+                json.dumps(
+                    {
+                        "player_id": command.player_id,
+                        "path_key": command.path_key,
+                        "subprofession_key": command.subprofession_key,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode("utf-8")
+            ).hexdigest(),
+            rule_version="player-onboarding-v0.1.0",
+        )
+        with self._unit_of_work() as unit:
+            try:
+                claim = unit.operations.claim(operation, self._clock.now())
+            except OperationConflictError:
+                return Result.failure(Error(ErrorCode.CONFLICT, "该 operation 已被不同请求占用"))
+            if claim.replay:
+                return _result_from_record(claim.record)
+            player = unit.players.get_by_player_id(command.player_id)
+            if player is None:
+                return Result.failure(Error(ErrorCode.NOT_FOUND, "角色不存在"))
+            if player.stage != "seeker":
+                return Result.failure(Error(ErrorCode.PLAYER_STAGE_CONFLICT, "当前阶段不能入道"))
+            inventory = json.loads(player.inventory_json or "{}")
+            inventory["item.manual.basic_qi"] = inventory.get("item.manual.basic_qi", 0) + 1
+            known_skills = json.loads(player.known_skills_json or "[]")
+            known_skills.append(skill_key)
+            if command.path_key == "device":
+                inventory["item.tool.basic_hammer"] = inventory.get("item.tool.basic_hammer", 0) + 1
+            elif command.path_key == "support":
+                if command.subprofession_key == "alchemy":
+                    inventory["item.tool.basic_furnace"] = inventory.get("item.tool.basic_furnace", 0) + 1
+                elif command.subprofession_key == "formation":
+                    inventory["item.mat.array_sand"] = inventory.get("item.mat.array_sand", 0) + 3
+                else:
+                    inventory["item.tool.basic_hammer"] = inventory.get("item.tool.basic_hammer", 0) + 1
+            updated = replace(
+                player,
+                stage="cultivator",
+                realm="感气",
+                realm_key="qi_sensing",
+                realm_layer=1,
+                spirit_stones=player.spirit_stones + 200,
+                path_key=command.path_key,
+                subprofession_key=command.subprofession_key,
+                inventory_json=json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                known_skills_json=json.dumps(known_skills, ensure_ascii=False),
+            )
+            unit.players.update(updated)
             payload = _player_payload(updated)
             unit.operations.complete(
                 OperationRecord(

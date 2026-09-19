@@ -345,6 +345,15 @@ def _player_from_row(row: sqlite3.Row) -> Player:
             else None
         ),
         guide_state_json=row["guide_state_json"] if "guide_state_json" in row.keys() else "{}",
+        realm_key=row["realm_key"] if "realm_key" in row.keys() else "mortal",
+        realm_layer=int(row["realm_layer"]) if "realm_layer" in row.keys() else 0,
+        path_key=row["path_key"] if "path_key" in row.keys() else None,
+        subprofession_key=(
+            row["subprofession_key"] if "subprofession_key" in row.keys() else None
+        ),
+        known_skills_json=(
+            row["known_skills_json"] if "known_skills_json" in row.keys() else "[]"
+        ),
     )
 
 
@@ -382,8 +391,9 @@ class SQLitePlayerRepository:
                 player_id, external_id, nickname, realm, level,
                 cultivation, spirit_stones, stamina, status,
                 platform, platform_user_id, scene, stage, location_key,
-                energy, inventory_json, qualification_snapshot_id, guide_state_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                energy, inventory_json, qualification_snapshot_id, guide_state_json,
+                realm_key, realm_layer, path_key, subprofession_key, known_skills_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 player.player_id,
@@ -404,6 +414,11 @@ class SQLitePlayerRepository:
                 player.inventory_json,
                 player.qualification_snapshot_id,
                 player.guide_state_json,
+                player.realm_key,
+                player.realm_layer,
+                player.path_key,
+                player.subprofession_key,
+                player.known_skills_json,
             ),
         )
 
@@ -414,7 +429,8 @@ class SQLitePlayerRepository:
                 cultivation = ?, spirit_stones = ?, stamina = ?, status = ?,
                 platform = ?, platform_user_id = ?, scene = ?, stage = ?,
                 location_key = ?, energy = ?, inventory_json = ?,
-                qualification_snapshot_id = ?, guide_state_json = ?
+                qualification_snapshot_id = ?, guide_state_json = ?, realm_key = ?,
+                realm_layer = ?, path_key = ?, subprofession_key = ?, known_skills_json = ?
             WHERE player_id = ?
             """,
             (
@@ -435,6 +451,11 @@ class SQLitePlayerRepository:
                 player.inventory_json,
                 player.qualification_snapshot_id,
                 player.guide_state_json,
+                player.realm_key,
+                player.realm_layer,
+                player.path_key,
+                player.subprofession_key,
+                player.known_skills_json,
                 player.player_id,
             ),
         )

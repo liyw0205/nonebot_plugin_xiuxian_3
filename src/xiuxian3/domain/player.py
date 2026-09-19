@@ -29,6 +29,11 @@ class Player:
     inventory_json: str = "{}"
     qualification_snapshot_id: str | None = None
     guide_state_json: str = "{}"
+    realm_key: str = "mortal"
+    realm_layer: int = 0
+    path_key: str | None = None
+    subprofession_key: str | None = None
+    known_skills_json: str = "[]"
     platform: str = "legacy"
     platform_user_id: str = ""
     scene: str = "unknown"
@@ -105,6 +110,11 @@ class Player:
             inventory_json=str(value.get("inventory_json", "{}")),
             qualification_snapshot_id=value.get("qualification_snapshot_id"),
             guide_state_json=str(value.get("guide_state_json", "{}")),
+            realm_key=str(value.get("realm_key", "mortal")),
+            realm_layer=int(value.get("realm_layer", 0)),
+            path_key=value.get("path_key"),
+            subprofession_key=value.get("subprofession_key"),
+            known_skills_json=str(value.get("known_skills_json", "[]")),
             platform=str(value.get("platform", "legacy")),
             platform_user_id=str(value.get("platform_user_id", value["external_id"])),
             scene=str(value.get("scene", "unknown")),
