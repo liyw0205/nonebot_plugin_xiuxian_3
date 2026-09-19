@@ -2,21 +2,29 @@
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from ..application.player import (
+    CreatePlayerCommand,
     GetPlayerInfo,
     GetPlayerInfoQuery,
-    RegisterPlayer,
-    RegisterPlayerCommand,
 )
 from ..domain.player import Player
+from ..domain.result import Result
 from ..adapters.contracts import CommandContext, ReplyPlan
+
+
+class PlayerCreator(Protocol):
+    def execute(self, command: CreatePlayerCommand) -> Result[Player]:
+        """Create or replay the minimum new-user identity mapping."""
+        ...
 
 
 class PlayerCommandAdapter:
     REGISTER_COMMANDS = frozenset({"我要修仙", "重入仙途"})
     INFO_COMMANDS = frozenset({"我的修仙信息", "我的状态", "我的 id", "我的ID"})
 
-    def __init__(self, register: RegisterPlayer, info: GetPlayerInfo) -> None:
+    def __init__(self, register: PlayerCreator, info: GetPlayerInfo) -> None:
         self._register = register
         self._info = info
 
@@ -26,9 +34,12 @@ class PlayerCommandAdapter:
             return ReplyPlan("无法确认你的身份或会话场景，当前请求不会改变资产。")
         if command in self.REGISTER_COMMANDS:
             result = self._register.execute(
-                RegisterPlayerCommand(
-                    actor_id=context.actor_id,
-                    operation_id=f"message:{context.message_id}",
+                CreatePlayerCommand(
+                    platform="onebot_v11",
+                    platform_user_id=context.actor_id,
+                    scene=context.scene.value,
+                    nickname=context.actor_id,
+                    operation_id=f"player.create:onebot_v11:{context.actor_id}",
                 )
             )
             if not result.ok:
@@ -46,12 +57,18 @@ class PlayerCommandAdapter:
 
     @staticmethod
     def _registration_text(player: Player) -> str:
-        return f"修仙角色创建成功：{player.player_id}，境界：{player.realm}。"
+        return (
+            f"修仙角色创建成功：{player.player_id}\n"
+            f"阶段：新用户（{player.stage}）\n"
+            f"地点：{player.location_key}\n"
+            "当前无灵石、体力和修为，请先执行寻仙问道。"
+        )
 
     @staticmethod
     def _info_text(player: Player) -> str:
         return (
             f"角色：{player.nickname}（{player.external_id}）\n"
+            f"阶段：{player.stage}\n"
             f"境界：{player.realm}\n"
             f"等级：{player.level}\n"
             f"修为：{player.cultivation}\n"

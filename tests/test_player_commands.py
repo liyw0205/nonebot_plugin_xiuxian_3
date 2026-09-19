@@ -7,7 +7,7 @@ from pathlib import Path
 
 from xiuxian3.adapters.commands import PlayerCommandAdapter
 from xiuxian3.adapters.contracts import CommandContext, MessageCapability, Scene
-from xiuxian3.application.player import GetPlayerInfo, RegisterPlayer
+from xiuxian3.application.player import CreatePlayer, GetPlayerInfo
 from xiuxian3.infrastructure.deterministic import FixedClock, SequenceIdGenerator
 from xiuxian3.infrastructure.sqlite import SQLiteDatabase, SQLiteUnitOfWork
 
@@ -18,7 +18,7 @@ class PlayerCommandTests(unittest.TestCase):
         database = SQLiteDatabase(Path(self.directory.name) / "game.sqlite3")
         clock = FixedClock(datetime(2026, 1, 1, tzinfo=UTC))
         self.adapter = PlayerCommandAdapter(
-            RegisterPlayer(
+            CreatePlayer(
                 lambda: SQLiteUnitOfWork(database),
                 clock=clock,
                 ids=SequenceIdGenerator(["player-1"]),

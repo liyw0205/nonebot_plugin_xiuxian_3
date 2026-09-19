@@ -325,6 +325,17 @@ def _player_from_row(row: sqlite3.Row) -> Player:
         spirit_stones=int(row["spirit_stones"]),
         stamina=int(row["stamina"]),
         status=PlayerStatus(row["status"]),
+        platform=row["platform"] if "platform" in row.keys() else "legacy",
+        platform_user_id=(
+            row["platform_user_id"]
+            if "platform_user_id" in row.keys() and row["platform_user_id"]
+            else row["external_id"]
+        ),
+        scene=row["scene"] if "scene" in row.keys() else "unknown",
+        stage=row["stage"] if "stage" in row.keys() else "mortal",
+        location_key=(
+            row["location_key"] if "location_key" in row.keys() else "xuantian.new_town"
+        ),
     )
 
 
@@ -341,13 +352,21 @@ class SQLitePlayerRepository:
         ).fetchone()
         return _player_from_row(row) if row is not None else None
 
+    def get_by_platform_identity(self, platform: str, platform_user_id: str) -> Player | None:
+        row = self._connection.execute(
+            "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+            (platform, platform_user_id),
+        ).fetchone()
+        return _player_from_row(row) if row is not None else None
+
     def add(self, player: Player) -> None:
         self._connection.execute(
             """
             INSERT INTO players(
                 player_id, external_id, nickname, realm, level,
-                cultivation, spirit_stones, stamina, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                cultivation, spirit_stones, stamina, status,
+                platform, platform_user_id, scene, stage, location_key
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 player.player_id,
@@ -359,5 +378,10 @@ class SQLitePlayerRepository:
                 player.spirit_stones,
                 player.stamina,
                 player.status.value,
+                player.platform,
+                player.platform_user_id,
+                player.scene,
+                player.stage,
+                player.location_key,
             ),
         )

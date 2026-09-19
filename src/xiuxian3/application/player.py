@@ -30,9 +30,32 @@ class GetPlayerInfoQuery:
     actor_id: str
 
 
+@dataclass(frozen=True, slots=True)
+class CreatePlayerCommand:
+    platform: str
+    platform_user_id: str
+    scene: str
+    nickname: str
+    operation_id: str
+
+
 def _digest(command: RegisterPlayerCommand) -> str:
     payload = json.dumps(
         {"actor_id": command.actor_id, "nickname": command.nickname},
+        ensure_ascii=False,
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _create_digest(command: CreatePlayerCommand) -> str:
+    payload = json.dumps(
+        {
+            "platform": command.platform,
+            "platform_user_id": command.platform_user_id,
+            "scene": command.scene,
+            "nickname": command.nickname,
+        },
         ensure_ascii=False,
         sort_keys=True,
     ).encode("utf-8")
@@ -56,6 +79,73 @@ def _result_from_record(record: OperationRecord) -> Result[Player]:
     if record.error_code == ErrorCode.CONFLICT.value:
         return Result.failure(Error(ErrorCode.CONFLICT, "该 operation 已被拒绝"))
     return Result.failure(Error(ErrorCode.INTERNAL, "operation 仍在处理中", retryable=True))
+
+
+class CreatePlayer:
+    """Create only the new-user identity mapping required by the v0.1 contract."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, *, clock, ids: IdGenerator) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+        self._ids = ids
+
+    def execute(self, command: CreatePlayerCommand) -> Result[Player]:
+        if not command.platform or not command.platform_user_id or not command.operation_id:
+            return Result.failure(Error(ErrorCode.INVALID_INPUT, "平台、用户身份和 operation_id 不能为空"))
+        if not command.scene or not command.nickname.strip():
+            return Result.failure(Error(ErrorCode.INVALID_INPUT, "场景和昵称不能为空"))
+        operation = Operation(
+            operation_id=command.operation_id,
+            request_type="player.create",
+            actor_id=f"{command.platform}:{command.platform_user_id}",
+            target_id=f"{command.platform}:{command.platform_user_id}",
+            input_digest=_create_digest(command),
+            rule_version="player-onboarding-v0.1.0",
+        )
+        with self._unit_of_work() as unit:
+            try:
+                claim = unit.operations.claim(operation, self._clock.now())
+            except OperationConflictError:
+                return Result.failure(Error(ErrorCode.CONFLICT, "该 operation 已被不同请求占用"))
+            if claim.replay:
+                return _result_from_record(claim.record)
+            existing = unit.players.get_by_platform_identity(
+                command.platform,
+                command.platform_user_id,
+            )
+            if existing is not None:
+                payload = _player_payload(existing)
+                unit.operations.complete(
+                    OperationRecord(
+                        operation=operation,
+                        status=OperationStatus.APPLIED,
+                        started_at=claim.record.started_at,
+                        ended_at=self._clock.now(),
+                        result_digest=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                        result_payload=payload,
+                    )
+                )
+                return Result.success(existing)
+            player = Player.new_identity(
+                player_id=self._ids.new_id(),
+                platform=command.platform,
+                platform_user_id=command.platform_user_id,
+                scene=command.scene,
+                nickname=command.nickname.strip(),
+            )
+            unit.players.add(player)
+            payload = _player_payload(player)
+            unit.operations.complete(
+                OperationRecord(
+                    operation=operation,
+                    status=OperationStatus.APPLIED,
+                    started_at=claim.record.started_at,
+                    ended_at=self._clock.now(),
+                    result_digest=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                    result_payload=payload,
+                )
+            )
+            return Result.success(player)
 
 
 class RegisterPlayer:
@@ -126,7 +216,9 @@ class GetPlayerInfo:
         if not query.actor_id:
             return Result.failure(Error(ErrorCode.INVALID_INPUT, "身份不能为空"))
         with self._unit_of_work() as unit:
-            player = unit.players.get_by_external_id(query.actor_id)
+            player = unit.players.get_by_platform_identity("onebot_v11", query.actor_id)
+            if player is None:
+                player = unit.players.get_by_external_id(query.actor_id)
         if player is None:
             return Result.failure(Error(ErrorCode.NOT_FOUND, "尚未注册修仙角色"))
         return Result.success(player)

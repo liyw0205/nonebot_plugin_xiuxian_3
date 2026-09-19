@@ -25,6 +25,11 @@ class Player:
     spirit_stones: int
     stamina: int
     status: PlayerStatus
+    platform: str = "legacy"
+    platform_user_id: str = ""
+    scene: str = "unknown"
+    stage: str = "mortal"
+    location_key: str = "xuantian.new_town"
 
     def __post_init__(self) -> None:
         if not self.player_id or not self.external_id or not self.nickname:
@@ -48,6 +53,34 @@ class Player:
             spirit_stones=0,
             stamina=100,
             status=PlayerStatus.ACTIVE,
+            platform_user_id=external_id,
+        )
+
+    @classmethod
+    def new_identity(
+        cls,
+        *,
+        player_id: str,
+        platform: str,
+        platform_user_id: str,
+        scene: str,
+        nickname: str,
+    ) -> "Player":
+        return cls(
+            player_id=player_id,
+            external_id=f"{platform}:{platform_user_id}",
+            nickname=nickname,
+            realm="凡人",
+            level=1,
+            cultivation=0,
+            spirit_stones=0,
+            stamina=0,
+            status=PlayerStatus.ACTIVE,
+            platform=platform,
+            platform_user_id=platform_user_id,
+            scene=scene,
+            stage="new_user",
+            location_key="xuantian.new_town",
         )
 
     @classmethod
@@ -62,4 +95,9 @@ class Player:
             spirit_stones=int(value["spirit_stones"]),
             stamina=int(value["stamina"]),
             status=PlayerStatus(str(value["status"])),
+            platform=str(value.get("platform", "legacy")),
+            platform_user_id=str(value.get("platform_user_id", value["external_id"])),
+            scene=str(value.get("scene", "unknown")),
+            stage=str(value.get("stage", "mortal")),
+            location_key=str(value.get("location_key", "xuantian.new_town")),
         )
