@@ -32,13 +32,14 @@ class SQLiteOperationLedgerTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_migrations_are_applied_once(self) -> None:
-        self.assertEqual(self.database.migrate(), (1,))
+        expected_versions = tuple(migration.version for migration in sqlite_module._migration_set())
+        self.assertEqual(self.database.migrate(), expected_versions)
         self.assertEqual(self.database.migrate(), ())
         with self.database.connect() as connection:
             version = connection.execute(
                 "SELECT MAX(version) FROM schema_migrations"
             ).fetchone()[0]
-            self.assertEqual(version, 1)
+            self.assertEqual(version, expected_versions[-1])
             self.assertIsNotNone(
                 connection.execute(
                     "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operation_ledger'"

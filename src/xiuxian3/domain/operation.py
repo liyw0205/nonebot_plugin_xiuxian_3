@@ -7,6 +7,10 @@ from datetime import datetime
 from enum import Enum
 
 
+class OperationConflictError(RuntimeError):
+    """Raised when an operation ID is reused with different immutable input."""
+
+
 class OperationStatus(str, Enum):
     ACCEPTED = "accepted"
     APPLIED = "applied"

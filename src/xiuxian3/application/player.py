@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Callable
 
-from ..domain.operation import Operation, OperationRecord, OperationStatus
+from ..domain.operation import Operation, OperationConflictError, OperationRecord, OperationStatus
 from ..domain.player import Player
 from ..domain.result import Error, ErrorCode, Result
 from ..ports.id_generator import IdGenerator
@@ -80,7 +80,10 @@ class RegisterPlayer:
         )
         now = self._clock.now()
         with self._unit_of_work() as unit:
-            claim = unit.operations.claim(operation, now)
+            try:
+                claim = unit.operations.claim(operation, now)
+            except OperationConflictError:
+                return Result.failure(Error(ErrorCode.CONFLICT, "该 operation 已被不同请求占用"))
             if claim.replay:
                 return _result_from_record(claim.record)
             existing = unit.players.get_by_external_id(command.actor_id)

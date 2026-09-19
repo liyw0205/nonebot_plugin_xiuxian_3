@@ -11,7 +11,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Self
 
-from ..domain.operation import Operation, OperationRecord, OperationStatus
+from ..domain.operation import Operation, OperationConflictError, OperationRecord, OperationStatus
 from ..domain.player import Player, PlayerStatus
 
 
@@ -21,10 +21,6 @@ class SQLitePersistenceError(RuntimeError):
 
 class MigrationError(SQLitePersistenceError):
     """Raised when migrations are missing, invalid or changed after applying."""
-
-
-class OperationConflictError(SQLitePersistenceError):
-    """Raised when an operation ID is reused with different immutable input."""
 
 
 class OperationStateError(SQLitePersistenceError):

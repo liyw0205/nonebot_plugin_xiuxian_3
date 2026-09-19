@@ -12,6 +12,7 @@ from xiuxian3.domain.operation import Operation, OperationStatus
 from xiuxian3.infrastructure.backup import BackupIntegrityError, SQLiteBackupManager
 from xiuxian3.infrastructure.paths import PathBoundaryError, RuntimePaths
 from xiuxian3.infrastructure.sqlite import SQLiteDatabase, SQLiteUnitOfWork
+from xiuxian3.infrastructure import sqlite as sqlite_module
 
 pytestmark = pytest.mark.integration
 
@@ -58,7 +59,10 @@ class SQLiteBackupTests(unittest.TestCase):
         metadata = json.loads(artifact.metadata_path.read_text(encoding="utf-8"))
         self.assertEqual(metadata["backup_id"], "baseline")
         self.assertEqual(metadata["sha256"], artifact.sha256)
-        self.assertEqual(metadata["schema_version"], 1)
+        expected_schema_version = max(
+            migration.version for migration in sqlite_module._migration_set()
+        )
+        self.assertEqual(metadata["schema_version"], expected_schema_version)
         self.assertEqual(artifact.database_path.parent, self.paths.resolve("backups"))
 
         self._write_operation("after")
