@@ -28,6 +28,7 @@ class Player:
     energy: int = 0
     inventory_json: str = "{}"
     qualification_snapshot_id: str | None = None
+    guide_state_json: str = "{}"
     platform: str = "legacy"
     platform_user_id: str = ""
     scene: str = "unknown"
@@ -103,6 +104,7 @@ class Player:
             energy=int(value.get("energy", 0)),
             inventory_json=str(value.get("inventory_json", "{}")),
             qualification_snapshot_id=value.get("qualification_snapshot_id"),
+            guide_state_json=str(value.get("guide_state_json", "{}")),
             platform=str(value.get("platform", "legacy")),
             platform_user_id=str(value.get("platform_user_id", value["external_id"])),
             scene=str(value.get("scene", "unknown")),

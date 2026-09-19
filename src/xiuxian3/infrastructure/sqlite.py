@@ -344,6 +344,7 @@ def _player_from_row(row: sqlite3.Row) -> Player:
             if "qualification_snapshot_id" in row.keys()
             else None
         ),
+        guide_state_json=row["guide_state_json"] if "guide_state_json" in row.keys() else "{}",
     )
 
 
@@ -381,8 +382,8 @@ class SQLitePlayerRepository:
                 player_id, external_id, nickname, realm, level,
                 cultivation, spirit_stones, stamina, status,
                 platform, platform_user_id, scene, stage, location_key,
-                energy, inventory_json, qualification_snapshot_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                energy, inventory_json, qualification_snapshot_id, guide_state_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 player.player_id,
@@ -402,6 +403,7 @@ class SQLitePlayerRepository:
                 player.energy,
                 player.inventory_json,
                 player.qualification_snapshot_id,
+                player.guide_state_json,
             ),
         )
 
@@ -412,7 +414,7 @@ class SQLitePlayerRepository:
                 cultivation = ?, spirit_stones = ?, stamina = ?, status = ?,
                 platform = ?, platform_user_id = ?, scene = ?, stage = ?,
                 location_key = ?, energy = ?, inventory_json = ?,
-                qualification_snapshot_id = ?
+                qualification_snapshot_id = ?, guide_state_json = ?
             WHERE player_id = ?
             """,
             (
@@ -432,6 +434,7 @@ class SQLitePlayerRepository:
                 player.energy,
                 player.inventory_json,
                 player.qualification_snapshot_id,
+                player.guide_state_json,
                 player.player_id,
             ),
         )

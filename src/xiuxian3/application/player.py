@@ -47,6 +47,14 @@ class StartSeekingCommand:
     operation_id: str
 
 
+@dataclass(frozen=True, slots=True)
+class CompleteIntroCommand:
+    player_id: str
+    guide_key: str
+    service_key: str | None
+    operation_id: str
+
+
 def _digest(command: RegisterPlayerCommand) -> str:
     payload = json.dumps(
         {"actor_id": command.actor_id, "nickname": command.nickname},
@@ -254,6 +262,94 @@ class StartSeeking:
                 qualification_snapshot_id=snapshot_id,
             )
             unit.players.update(updated)
+            payload = _player_payload(updated)
+            unit.operations.complete(
+                OperationRecord(
+                    operation=operation,
+                    status=OperationStatus.APPLIED,
+                    started_at=claim.record.started_at,
+                    ended_at=self._clock.now(),
+                    result_digest=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                    result_payload=payload,
+                )
+            )
+            return Result.success(updated)
+
+
+class CompleteIntro:
+    """Complete one mortal onboarding guide item, then enter seeker."""
+
+    GUIDE_KEYS = frozenset({"read_world", "gather_blood_grass", "choose_service"})
+    SERVICE_KEYS = frozenset({"alchemy", "artifice", "formation"})
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, *, clock, random_source: RandomSource) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+        self._random = random_source
+
+    def execute(self, command: CompleteIntroCommand) -> Result[Player]:
+        if command.guide_key not in self.GUIDE_KEYS or not command.operation_id:
+            return Result.failure(Error(ErrorCode.INVALID_INPUT, "引导键或 operation_id 无效"))
+        if command.guide_key == "choose_service" and command.service_key not in self.SERVICE_KEYS:
+            return Result.failure(Error(ErrorCode.INVALID_INPUT, "教学服务无效"))
+        operation = Operation(
+            operation_id=command.operation_id,
+            request_type="player.complete_intro",
+            actor_id=command.player_id,
+            target_id=command.player_id,
+            input_digest=hashlib.sha256(
+                json.dumps(
+                    {
+                        "player_id": command.player_id,
+                        "guide_key": command.guide_key,
+                        "service_key": command.service_key,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode("utf-8")
+            ).hexdigest(),
+            rule_version="player-onboarding-v0.1.0",
+        )
+        with self._unit_of_work() as unit:
+            try:
+                claim = unit.operations.claim(operation, self._clock.now())
+            except OperationConflictError:
+                return Result.failure(Error(ErrorCode.CONFLICT, "该 operation 已被不同请求占用"))
+            if claim.replay:
+                return _result_from_record(claim.record)
+            player = unit.players.get_by_player_id(command.player_id)
+            if player is None:
+                return Result.failure(Error(ErrorCode.NOT_FOUND, "角色不存在"))
+            if player.stage != "mortal":
+                return Result.failure(Error(ErrorCode.PLAYER_STAGE_CONFLICT, "当前阶段不能完成凡人引导"))
+            guide_state = json.loads(player.guide_state_json or "{}")
+            if command.guide_key in guide_state:
+                updated = player
+            else:
+                inventory = json.loads(player.inventory_json or "{}")
+                stamina = player.stamina
+                energy = player.energy
+                if command.guide_key == "gather_blood_grass":
+                    if stamina < 2:
+                        return Result.failure(Error(ErrorCode.INSUFFICIENT_RESOURCE, "体力不足"))
+                    stamina -= 2
+                    inventory["item.herb.blood_grass"] = inventory.get("item.herb.blood_grass", 0) + 1 + self._random.randbelow(2)
+                elif command.guide_key == "choose_service":
+                    if energy < 2:
+                        return Result.failure(Error(ErrorCode.INSUFFICIENT_RESOURCE, "精力不足"))
+                    energy -= 2
+                    guide_state["service_key"] = command.service_key
+                guide_state[command.guide_key] = True
+                stage = "seeker" if all(guide_state.get(key) for key in self.GUIDE_KEYS) else player.stage
+                updated = replace(
+                    player,
+                    stage=stage,
+                    stamina=stamina,
+                    energy=energy,
+                    inventory_json=json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    guide_state_json=json.dumps(guide_state, ensure_ascii=False, sort_keys=True),
+                )
+                unit.players.update(updated)
             payload = _player_payload(updated)
             unit.operations.complete(
                 OperationRecord(
