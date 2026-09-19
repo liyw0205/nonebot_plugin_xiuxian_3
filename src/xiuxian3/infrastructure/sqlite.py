@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
 from pathlib import Path
+from collections.abc import Mapping
 from types import TracebackType
 from typing import Self
 
@@ -336,6 +337,13 @@ def _player_from_row(row: sqlite3.Row) -> Player:
         location_key=(
             row["location_key"] if "location_key" in row.keys() else "xuantian.new_town"
         ),
+        energy=int(row["energy"]) if "energy" in row.keys() else 0,
+        inventory_json=row["inventory_json"] if "inventory_json" in row.keys() else "{}",
+        qualification_snapshot_id=(
+            row["qualification_snapshot_id"]
+            if "qualification_snapshot_id" in row.keys()
+            else None
+        ),
     )
 
 
@@ -352,6 +360,13 @@ class SQLitePlayerRepository:
         ).fetchone()
         return _player_from_row(row) if row is not None else None
 
+    def get_by_player_id(self, player_id: str) -> Player | None:
+        row = self._connection.execute(
+            "SELECT * FROM players WHERE player_id = ?",
+            (player_id,),
+        ).fetchone()
+        return _player_from_row(row) if row is not None else None
+
     def get_by_platform_identity(self, platform: str, platform_user_id: str) -> Player | None:
         row = self._connection.execute(
             "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
@@ -365,8 +380,9 @@ class SQLitePlayerRepository:
             INSERT INTO players(
                 player_id, external_id, nickname, realm, level,
                 cultivation, spirit_stones, stamina, status,
-                platform, platform_user_id, scene, stage, location_key
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                platform, platform_user_id, scene, stage, location_key,
+                energy, inventory_json, qualification_snapshot_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 player.player_id,
@@ -383,5 +399,70 @@ class SQLitePlayerRepository:
                 player.scene,
                 player.stage,
                 player.location_key,
+                player.energy,
+                player.inventory_json,
+                player.qualification_snapshot_id,
             ),
         )
+
+    def update(self, player: Player) -> None:
+        self._connection.execute(
+            """
+            UPDATE players SET external_id = ?, nickname = ?, realm = ?, level = ?,
+                cultivation = ?, spirit_stones = ?, stamina = ?, status = ?,
+                platform = ?, platform_user_id = ?, scene = ?, stage = ?,
+                location_key = ?, energy = ?, inventory_json = ?,
+                qualification_snapshot_id = ?
+            WHERE player_id = ?
+            """,
+            (
+                player.external_id,
+                player.nickname,
+                player.realm,
+                player.level,
+                player.cultivation,
+                player.spirit_stones,
+                player.stamina,
+                player.status.value,
+                player.platform,
+                player.platform_user_id,
+                player.scene,
+                player.stage,
+                player.location_key,
+                player.energy,
+                player.inventory_json,
+                player.qualification_snapshot_id,
+                player.player_id,
+            ),
+        )
+
+    def add_qualification_snapshot(self, snapshot: Mapping[str, object]) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO qualification_snapshots(
+                snapshot_id, player_id, spirit_root, body, spirit, insight, root,
+                agility, fortune, random_pool, result_digest, operation_id, rule_version
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                snapshot["snapshot_id"],
+                snapshot["player_id"],
+                snapshot["spirit_root"],
+                snapshot["body"],
+                snapshot["spirit"],
+                snapshot["insight"],
+                snapshot["root"],
+                snapshot["agility"],
+                snapshot["fortune"],
+                snapshot["random_pool"],
+                snapshot["result_digest"],
+                snapshot["operation_id"],
+                snapshot["rule_version"],
+            ),
+        )
+
+    def get_qualification_snapshot(self, snapshot_id: str) -> sqlite3.Row | None:
+        return self._connection.execute(
+            "SELECT * FROM qualification_snapshots WHERE snapshot_id = ?",
+            (snapshot_id,),
+        ).fetchone()

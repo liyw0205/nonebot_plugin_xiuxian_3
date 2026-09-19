@@ -25,6 +25,9 @@ class Player:
     spirit_stones: int
     stamina: int
     status: PlayerStatus
+    energy: int = 0
+    inventory_json: str = "{}"
+    qualification_snapshot_id: str | None = None
     platform: str = "legacy"
     platform_user_id: str = ""
     scene: str = "unknown"
@@ -36,7 +39,7 @@ class Player:
             raise ValueError("player identity and nickname are required")
         if self.level < 1:
             raise ValueError("player level must be positive")
-        if min(self.cultivation, self.spirit_stones, self.stamina) < 0:
+        if min(self.cultivation, self.spirit_stones, self.stamina, self.energy) < 0:
             raise ValueError("player assets cannot be negative")
         if not self.realm:
             raise ValueError("player realm is required")
@@ -52,6 +55,7 @@ class Player:
             cultivation=0,
             spirit_stones=0,
             stamina=100,
+            energy=0,
             status=PlayerStatus.ACTIVE,
             platform_user_id=external_id,
         )
@@ -75,6 +79,7 @@ class Player:
             cultivation=0,
             spirit_stones=0,
             stamina=0,
+            energy=0,
             status=PlayerStatus.ACTIVE,
             platform=platform,
             platform_user_id=platform_user_id,
@@ -95,6 +100,9 @@ class Player:
             spirit_stones=int(value["spirit_stones"]),
             stamina=int(value["stamina"]),
             status=PlayerStatus(str(value["status"])),
+            energy=int(value.get("energy", 0)),
+            inventory_json=str(value.get("inventory_json", "{}")),
+            qualification_snapshot_id=value.get("qualification_snapshot_id"),
             platform=str(value.get("platform", "legacy")),
             platform_user_id=str(value.get("platform_user_id", value["external_id"])),
             scene=str(value.get("scene", "unknown")),

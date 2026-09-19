@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Callable
 
@@ -12,6 +12,7 @@ from ..domain.operation import Operation, OperationConflictError, OperationRecor
 from ..domain.player import Player
 from ..domain.result import Error, ErrorCode, Result
 from ..ports.id_generator import IdGenerator
+from ..ports.random_source import RandomSource
 from ..ports.unit_of_work import UnitOfWork
 
 
@@ -36,6 +37,13 @@ class CreatePlayerCommand:
     platform_user_id: str
     scene: str
     nickname: str
+    operation_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class StartSeekingCommand:
+    player_id: str
+    spirit_root: str
     operation_id: str
 
 
@@ -146,6 +154,118 @@ class CreatePlayer:
                 )
             )
             return Result.success(player)
+
+
+class StartSeeking:
+    """Run the one-time qualification ceremony and onboarding reward."""
+
+    VALID_ROOTS = frozenset({"metal", "wood", "water", "fire", "earth"})
+    QUALIFICATION_KEYS = ("body", "spirit", "insight", "root", "agility", "fortune")
+
+    def __init__(
+        self,
+        unit_of_work: UnitOfWorkFactory,
+        *,
+        clock,
+        random_source: RandomSource,
+        ids: IdGenerator | None = None,
+    ) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+        self._random = random_source
+        self._ids = ids
+
+    def get_player(self, player_id: str) -> Player:
+        with self._unit_of_work() as unit:
+            player = unit.players.get_by_player_id(player_id)
+        if player is None:
+            raise LookupError(player_id)
+        return player
+
+    def execute(self, command: StartSeekingCommand) -> Result[Player]:
+        if command.spirit_root not in self.VALID_ROOTS or not command.operation_id:
+            return Result.failure(Error(ErrorCode.INVALID_INPUT, "灵根倾向或 operation_id 无效"))
+        operation = Operation(
+            operation_id=command.operation_id,
+            request_type="player.start_seeking",
+            actor_id=command.player_id,
+            target_id=command.player_id,
+            input_digest=hashlib.sha256(
+                json.dumps(
+                    {"player_id": command.player_id, "spirit_root": command.spirit_root},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode("utf-8")
+            ).hexdigest(),
+            rule_version="player-onboarding-v0.1.0",
+        )
+        with self._unit_of_work() as unit:
+            try:
+                claim = unit.operations.claim(operation, self._clock.now())
+            except OperationConflictError:
+                return Result.failure(Error(ErrorCode.CONFLICT, "该 operation 已被不同请求占用"))
+            if claim.replay:
+                return _result_from_record(claim.record)
+            player = unit.players.get_by_player_id(command.player_id)
+            if player is None:
+                return Result.failure(Error(ErrorCode.NOT_FOUND, "角色不存在"))
+            if player.stage != "new_user":
+                return Result.failure(Error(ErrorCode.SEEKING_ALREADY_DONE, "角色已经完成寻仙问道"))
+
+            values = {key: 5 for key in self.QUALIFICATION_KEYS}
+            remaining = 30
+            while remaining:
+                available = [key for key in self.QUALIFICATION_KEYS if values[key] < 15]
+                key = available[self._random.randbelow(len(available))]
+                values[key] += 1
+                remaining -= 1
+            result_digest = hashlib.sha256(
+                json.dumps(values, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+            snapshot_id = (
+                self._ids.new_id()
+                if self._ids is not None
+                else f"qualification:{command.operation_id}"
+            )
+            snapshot = {
+                "snapshot_id": snapshot_id,
+                "player_id": player.player_id,
+                "spirit_root": command.spirit_root,
+                **values,
+                "random_pool": "qualification.v0.1",
+                "result_digest": result_digest,
+                "operation_id": command.operation_id,
+                "rule_version": "player-onboarding-v0.1.0",
+            }
+            unit.players.add_qualification_snapshot(snapshot)
+            updated = replace(
+                player,
+                stage="mortal",
+                spirit_stones=100,
+                stamina=30,
+                energy=30,
+                inventory_json=json.dumps(
+                    {
+                        "item.food.coarse_spirit_rice": 3,
+                        "item.herb.blood_grass": 3,
+                    },
+                    sort_keys=True,
+                ),
+                qualification_snapshot_id=snapshot_id,
+            )
+            unit.players.update(updated)
+            payload = _player_payload(updated)
+            unit.operations.complete(
+                OperationRecord(
+                    operation=operation,
+                    status=OperationStatus.APPLIED,
+                    started_at=claim.record.started_at,
+                    ended_at=self._clock.now(),
+                    result_digest=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                    result_payload=payload,
+                )
+            )
+            return Result.success(updated)
 
 
 class RegisterPlayer:

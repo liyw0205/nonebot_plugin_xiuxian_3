@@ -14,6 +14,8 @@ class ErrorCode(str, Enum):
     CONFLICT = "conflict"
     COOLDOWN = "cooldown"
     INSUFFICIENT_RESOURCE = "insufficient_resource"
+    PLAYER_STAGE_CONFLICT = "player_stage_conflict"
+    SEEKING_ALREADY_DONE = "seeking_already_done"
     INTERNAL = "internal"
 
 
