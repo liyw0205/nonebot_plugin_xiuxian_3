@@ -7,7 +7,7 @@
 - 开放写用例：`progression.start_cultivation`、`progression.settle_cultivation`、`progression.advance_layer`、`progression.breakthrough_qi_gathering`、`progression.breakthrough_foundation`、`progression.recover_weakness`。
 - 角色在 `player.enter_cultivation` 成功后进入 `qi_sensing` L1（感气一层/入门）；`mortal` 没有修为资产，不能创建修炼或突破 operation。
 
-本文件是首版实际开放内容，不是预留表。十层的完整阈值、段位推导和迁移语义以 `layers.md` 为唯一权威。
+本文件是 `content-0.1` 的历史开放快照。首版完整范围、境界路线和跨域依赖以[完整内容开发总表](../../content-development.md)为准；十层的阈值、段位推导和迁移语义以 `layers.md` 为公式权威。若与总表冲突，先修总表，再生成新的快照。
 
 ## 1. 首版开放境界
 

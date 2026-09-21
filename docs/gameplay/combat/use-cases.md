@@ -2,14 +2,17 @@
 
 ## 用例
 
-`start_battle`、`submit_action`、`resolve_battle`、`claim_battle_reward`、`replay_battle`。
+`start_battle`、`run_turn`（服务端内部）、`resolve_battle`、`claim_battle_reward`、`replay_battle`。
 
-`submit_action` 只接收战斗 ID、行动者、技能键、目标、客户端序号和 operation ID；服务端计算伤害和状态。
+战斗开始后由服务端自动选择合法技能和目标并推进回合。聊天客户端不能提交攻击、防御、
+技能、目标、伤害或结算结果；`run_turn` 只供内部 worker/application 调用，并记录自动
+策略版本、随机池和 operation ID。
 
 ## 错误码
 
-`BATTLE_NOT_FOUND`、`BATTLE_BUSY`、`NOT_ACTIVE_TURN`、`SKILL_NOT_AVAILABLE`、`TARGET_INVALID`、`RESOURCE_INSUFFICIENT`、`BATTLE_EXPIRED`、`BATTLE_ALREADY_SETTLED`。
+`BATTLE_NOT_FOUND`、`BATTLE_BUSY`、`SKILL_NOT_AVAILABLE`、`TARGET_INVALID`、`RESOURCE_INSUFFICIENT`、`BATTLE_EXPIRED`、`BATTLE_ALREADY_SETTLED`。
 
 ## 验收
 
-伪造伤害值被忽略；非当前行动者不改变状态；行动重试不重复扣资源；超时释放角色锁；奖励领取不重复生成资产。
+客户端伪造伤害/技能/目标被拒绝；自动行动重试不重复扣资源；超时和断线释放角色锁；
+PvP 结果使用所有参与者的开始快照并可回放；奖励领取不重复生成资产。

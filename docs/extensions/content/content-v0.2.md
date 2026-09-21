@@ -13,7 +13,7 @@ registered_placeholders_added: [nascent_soul]
 
 ## 1. v0.2 新增开放内容
 
-| kind | 稳定键 | 权威文件 |
+| kind | 稳定键 | 对应快照（总表裁决） |
 |:--|:--|:--|
 | milestone | `milestone.foundation_late` | progression v0.2 |
 | realm | `golden_core` | progression v0.2 |
@@ -21,7 +21,7 @@ registered_placeholders_added: [nascent_soul]
 | route | `route.cloud_to_mist2`、`route.cloud_to_abyss_intro`、`route.cloud_return` | world v0.2 |
 | mode | `explore.cloud_mine`、`explore.cloud_boat_trial`、`explore.mist_grotto_2` | exploration v0.2 |
 | enemy | `enemy.cloud_beast`、`enemy.sect_traitor`、`enemy.mist_elite` | combat v0.2 |
-| recipe | `recipe.pill.foundation_guard`、`recipe.pill.core_condense`、`recipe.weapon.cloud_sword`、`recipe.array.mist_barrier`、`recipe.food.cloud_tea` | production v0.2 |
+| recipe | `recipe.pill.golden_core_guard`、`recipe.pill.core_condense`、`recipe.weapon.cloud_sword`、`recipe.array.mist_barrier`、`recipe.food.cloud_tea` | production v0.2 |
 | item | `item.pill.core_condense`、`item.material.cloud_iron`、`item.cave_pass_advanced`、`item.token.faction_seal` 等 v0.2 表项 | items v0.2 |
 | quest | `quest.prepare_nascent_soul`、`quest.demon_intro`、`quest.beast_intro` | events/quests v0.2 |
 | event/season | `event.cloud_mine_rush`、`event.mist_guardian`、`season.foundation` | events v0.2 |

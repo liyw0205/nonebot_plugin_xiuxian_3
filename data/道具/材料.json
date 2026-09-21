@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "items-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "item",
+  "records": [
+    {
+      "name": "粗糙灵米",
+      "item_type": "food",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "restore_choice",
+          "resources": [
+            "stamina",
+            "energy"
+          ],
+          "amount": 3,
+          "cooldown_seconds": 600
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.food.coarse_spirit_rice"
+    },
+    {
+      "name": "止血草",
+      "item_type": "herb",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "healing"
+          ]
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.herb.blood_grass"
+    },
+    {
+      "name": "灵叶",
+      "item_type": "herb",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "qi",
+            "cultivation"
+          ]
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.herb.spirit_leaf"
+    },
+    {
+      "name": "铁石",
+      "item_type": "ore",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "artifice",
+            "foundation"
+          ]
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.ore.ironstone"
+    },
+    {
+      "name": "木材",
+      "item_type": "material",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "artifice",
+            "device"
+          ]
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.mat.wood"
+    },
+    {
+      "name": "阵砂",
+      "item_type": "material",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "formation",
+            "foundation"
+          ]
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.mat.array_sand"
+    },
+    {
+      "name": "灵米饭",
+      "item_type": "food",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "restore_choice",
+          "resources": [
+            "stamina",
+            "energy"
+          ],
+          "amount": 5,
+          "cooldown_seconds": 600
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.food.spirit_rice"
+    }
+  ],
+  "category": "材料",
+  "schema": "xiuxian.content"
+}

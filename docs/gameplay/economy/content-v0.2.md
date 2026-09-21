@@ -21,6 +21,6 @@
 
 ## 3. 宗门仓库兑换
 
-`sect.exchange.<offer_key>` 每成员每天最多 5 次，需宗门成员与仓库权限。v0.2 开放：`sect.exchange.cloud_iron`（贡献 20 -> 云铁 2）、`sect.exchange.foundation_guard`（贡献 50 -> 护基丹 1）、`sect.exchange.array_sand`（贡献 10 -> 阵砂 5）。兑换先锁宗门库存和个人贡献，再原子转移；库存/贡献不足不部分扣。
+`sect.exchange.<offer_key>` 每成员每天最多 5 次，需宗门成员与仓库权限。v0.2 开放：`sect.exchange.cloud_iron`（贡献 20 -> 云铁 2）、`sect.exchange.golden_core_guard`（贡献 50 -> 护金丹 1）、`sect.exchange.array_sand`（贡献 10 -> 阵砂 5）。兑换先锁宗门库存和个人贡献，再原子转移；库存/贡献不足不部分扣。
 
 错误：`PURCHASE_ORDER_CAP`、`PURCHASE_ITEM_FORBIDDEN`、`PURCHASE_ESCROW_INSUFFICIENT`、`PURCHASE_DELIVERY_EXPIRED`、`SECT_EXCHANGE_DAILY_CAP`、`SECT_STOCK_INSUFFICIENT`。关闭后求购单按过期释放，宗门兑换停止新建。验收：买方手续费锁定/过期全返；两卖方不双成交；明确 item 键校验；宗门库存与贡献同事务；日上限幂等。

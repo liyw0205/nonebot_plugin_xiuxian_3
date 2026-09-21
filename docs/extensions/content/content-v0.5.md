@@ -12,7 +12,7 @@ open_realms_added: [void_refining]
 
 ## 1. v0.5 新增开放内容
 
-| kind | 稳定键 | 权威文件 |
+| kind | 稳定键 | 对应快照（总表裁决） |
 |:--|:--|:--|
 | realm/milestone | `void_refining`、`milestone.void_refining_late` | progression v0.5 |
 | location/route | `void.first_route`、`void.archive_ruins`、`void.sect_fortress`、`cave.time_garden`、`void.void_market` | world v0.5 |

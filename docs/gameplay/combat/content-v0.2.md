@@ -1,6 +1,6 @@
 # v0.2 战斗内容基线：金丹精英与双人协作
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.2`，`rule_version=combat-0.2.0`。开放单人精英战和最多 2 人协作 PVE；PVP 继续 `locked`。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.2`，`rule_version=combat-0.2.0`。开放自动回合单人精英战和最多 2 人协作 PVE；PvP 继续 `locked`。玩家不提交攻击、防御、技能或目标，服务端按快照和策略自动推进。
 
 | `enemy_key` | 准入 | 气血/攻击/先手 | 阶段与机制 | 胜利池/保底 |
 |:--|:--|:--|:--|:--|

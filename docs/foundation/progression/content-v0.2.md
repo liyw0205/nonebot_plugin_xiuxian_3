@@ -19,12 +19,12 @@
 
 ## 2. 金丹突破：`progression.breakthrough_golden_core`
 
-输入：`player_id`、可选保护丹 `use_foundation_guard`、`operation_id`。开始时冻结角色、`Progression`、属性快照、道途状态、装备、地点、材料、规则和随机池；结算引用 `random_pool=breakthrough.golden_core.v0.2`。
+输入：`player_id`、可选保护丹 `use_golden_core_guard`、`operation_id`。开始时冻结角色、`Progression`、属性快照、道途状态、装备、地点、材料、规则和随机池；结算引用 `random_pool=breakthrough.golden_core.v0.2`。
 
 | 项目 | 固定值 |
 |:--|--:|
 | 必需材料 | `item.pill.core_condense` 1、`item.material.cloud_iron` 3 |
-| 可选保护 | `item.pill.foundation_guard` 1；仅降低失败损失，不增加成功率 |
+| 可选保护 | `item.pill.golden_core_guard` 1；仅降低失败损失，不增加成功率 |
 | 灵石手续费 | 1,000 |
 | 行动锁 | 5 分钟，状态 `preparing`；重复请求返回处理中或已结算结果 |
 | 基础成功率 | 4,000 bp |

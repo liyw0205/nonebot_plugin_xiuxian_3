@@ -20,4 +20,4 @@ suspended --admin_restore--> 原状态快照
 
 凡人允许采集、打工、拜访、基础交易和生活任务；禁止完整功法、高风险战斗和高阶地点。
 
-具体引导键、初始资源、道途键、失败和重复 operation 语义以 [v0.1 内容基线](content-v0.1.md) 为准。
+具体引导键、初始资源、道途键、失败和重复 operation 语义以[完整内容开发总表](../../content-development.md)为准；`content-v0.1.md` 仅保存 `content-0.1` 快照。

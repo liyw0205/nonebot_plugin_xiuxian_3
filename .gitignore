@@ -16,7 +16,12 @@ dist/
 .env
 .env.*
 !.env.example
-data/
+data/*
+!data/.gitkeep
+!data/内容清单.json
+!data/*/
+data/*/*
+!data/*/*.json
 runtime/
 logs/
 backups/

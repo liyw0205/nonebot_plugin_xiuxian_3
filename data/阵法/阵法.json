@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "items-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "item",
+  "records": [
+    {
+      "name": "基础聚灵阵",
+      "item_type": "array",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "time_bound",
+      "bind_duration_seconds": 86400,
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "production_duration_multiplier_bp",
+          "value": 9000,
+          "scope": "bound_order"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.array.gathering_basic"
+    }
+  ],
+  "category": "阵法",
+  "schema": "xiuxian.content"
+}

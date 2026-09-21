@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "items-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "item",
+  "records": [
+    {
+      "name": "低阶疗伤丹",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "restore_hp_bp",
+          "value": 3000,
+          "uses_per_battle": 1
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.healing_low"
+    },
+    {
+      "name": "焦点丹",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "cultivation_state_bp",
+          "value": 1000,
+          "scope": "one_session"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.focus_low"
+    },
+    {
+      "name": "聚气护脉丹",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_failure_protection",
+          "target": "qi_gathering",
+          "cultivation_retention_bp": 9000,
+          "weakness_seconds": 1800
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.qi_guard"
+    },
+    {
+      "name": "筑基丹",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_requirement",
+          "target": "foundation"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.foundation_draft"
+    },
+    {
+      "name": "筑基护脉丹",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_failure_protection",
+          "target": "foundation",
+          "cultivation_retention_bp": 8500,
+          "weakness_seconds": 7200
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.foundation_guard"
+    }
+  ],
+  "category": "丹药",
+  "schema": "xiuxian.content"
+}

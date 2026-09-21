@@ -12,7 +12,7 @@ open_realms_added: [soul_transformation]
 
 ## 1. v0.4 新增开放内容
 
-| kind | 稳定键 | 权威文件 |
+| kind | 稳定键 | 对应快照（总表裁决） |
 |:--|:--|:--|
 | realm/milestone | `soul_transformation`、`milestone.soul_transformation_late` | progression v0.4 |
 | domain | 六条 `domain.*` 领域键 | paths v0.4 |

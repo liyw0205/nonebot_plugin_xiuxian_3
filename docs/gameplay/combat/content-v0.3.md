@@ -1,6 +1,6 @@
 # v0.3 战斗内容基线：元婴跨界副本与阵营战
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.3`，`rule_version=combat-0.3.0`。开放 2–5 人界隙副本、阵营战和固定规则切磋；切磋无灵石/物品/修为奖励。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.3`，`rule_version=combat-0.3.0`。开放自动回合 2–5 人界隙副本、阵营战和固定规则 PvP 切磋；切磋无灵石/物品/修为奖励。玩家不提交战斗行动，服务端按双方快照和策略自动推进。
 
 | `enemy_key` | 场景 | 气血/攻击 | 核心机制 | 奖励 |
 |:--|:--|:--|:--|:--|

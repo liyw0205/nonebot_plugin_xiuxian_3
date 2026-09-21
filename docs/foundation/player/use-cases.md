@@ -2,17 +2,17 @@
 
 ## 用例
 
-- `create_player(platform, platform_user_id, scene, operation_id)` -> `player_id`、`stage=new_user`。
+- `create_player(platform, platform_user_id, scene, dao_name?, operation_id)` -> `player_id`、`dao_name`、`stage=new_user`。
 - `start_seeking(player_id, root_affinity, operation_id)` -> 资质快照、新手资源和 `stage=mortal`。
 - `swap_qualification_stats(player_id, left_key, right_key, operation_id)` -> 一次属性交换后的快照引用。
 - `complete_intro(player_id, guide_key, operation_id)` -> 当前引导进度；三项均完成才进入 `seeker`。
 - `enter_cultivation(player_id, path_key, subprofession_key, operation_id)` -> 道途、可选主辅修和 `stage=cultivator`。
-- `rename_player(player_id, new_name, operation_id)` -> 名称和冷却。
+- `rename_player(player_id, dao_name, operation_id)` -> 道号和改名状态。
 - `get_profile(player_id)` -> 只读状态 DTO。
 
 ## 错误码
 
-`PLAYER_NOT_FOUND`、`PLAYER_ALREADY_EXISTS`、`PLAYER_STAGE_CONFLICT`、`PLAYER_SUSPENDED`、`SEEKING_ALREADY_DONE`、`NAME_INVALID`、`NAME_TAKEN`、`OPERATION_CONFLICT`。
+`PLAYER_NOT_FOUND`、`PLAYER_ALREADY_EXISTS`、`PLAYER_STAGE_CONFLICT`、`PLAYER_SUSPENDED`、`SEEKING_ALREADY_DONE`、`INVALID_DAO_NAME`、`DAO_NAME_TAKEN`、`RENAME_CARD_REQUIRED`、`OPERATION_CONFLICT`。
 
 ## 验收
 
@@ -22,5 +22,7 @@
 - 未完成三项凡人引导时，选择道途拒绝且无资产变化。
 - `support` 未提供有效主辅修时入道拒绝，不发放入道奖励。
 - 暂停角色可读不可写；改名失败不写名称历史。
+- `开始修仙 <道号>` 校验长度和全局唯一性；不填写时保持未命名。
+- 未命名角色第一次使用 `修仙改名 <道号>` 不消耗改名卡；已有道号再次修改必须拥有改名卡。
 
-稳定内容键、数值、奖励与完整失败语义见 [v0.1 内容基线](content-v0.1.md)。
+稳定内容键、数值、奖励与完整失败语义见[完整内容开发总表](../../content-development.md)；`content-v0.1.md` 仅用于复原 `content-0.1` 快照。

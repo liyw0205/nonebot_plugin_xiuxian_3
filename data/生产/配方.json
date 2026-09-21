@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "production-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "recipe",
+  "records": [
+    {
+      "name": "炼制低阶疗伤丹",
+      "profession": "alchemy",
+      "requirements": [
+        {
+          "type": "profession_level",
+          "value": 1
+        },
+        {
+          "type": "realm_any",
+          "values": [
+            "qi_gathering",
+            "alchemy_teaching"
+          ]
+        }
+      ],
+      "inputs": [
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 2
+        },
+        {
+          "item_key": "item.food.coarse_spirit_rice",
+          "quantity": 1
+        }
+      ],
+      "tool": {
+        "item_key": "item.tool.basic_furnace",
+        "durability_cost_bp": 100
+      },
+      "energy_cost": 4,
+      "duration_seconds": 30,
+      "outputs": [
+        {
+          "item_key": "item.pill.healing_low",
+          "quantity": 1,
+          "quality_bonus_at_bp": 8000,
+          "bonus_quantity": 1
+        }
+      ],
+      "daily_limit": 8,
+      "failure": {
+        "input_refund_bp": 5000,
+        "produces_output": false
+      },
+      "key": "recipe.pill.healing_low",
+      "status": "active"
+    },
+    {
+      "name": "炼制焦点丹",
+      "profession": "alchemy",
+      "requirements": [
+        {
+          "type": "profession_level",
+          "value": 1
+        },
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 1
+        }
+      ],
+      "inputs": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 2
+        },
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 1
+        }
+      ],
+      "tool": {
+        "item_key": "item.tool.basic_furnace",
+        "durability_cost_bp": 100
+      },
+      "energy_cost": 5,
+      "duration_seconds": 45,
+      "outputs": [
+        {
+          "item_key": "item.pill.focus_low",
+          "quantity": 1
+        }
+      ],
+      "daily_limit": 6,
+      "failure": {
+        "input_refund_bp": 5000,
+        "produces_output": false
+      },
+      "key": "recipe.pill.focus_low",
+      "status": "active"
+    },
+    {
+      "name": "锻造木纹剑",
+      "profession": "artifice",
+      "requirements": [
+        {
+          "type": "profession_level",
+          "value": 1
+        },
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 1
+        }
+      ],
+      "inputs": [
+        {
+          "item_key": "item.ore.ironstone",
+          "quantity": 2
+        },
+        {
+          "item_key": "item.mat.wood",
+          "quantity": 2
+        }
+      ],
+      "tool": {
+        "item_key": "item.tool.basic_hammer",
+        "durability_cost_bp": 100
+      },
+      "energy_cost": 5,
+      "duration_seconds": 60,
+      "outputs": [
+        {
+          "item_key": "item.weapon.wood_sword",
+          "quantity": 1,
+          "durability_bp_min": 8000,
+          "durability_formula": {
+            "quality_divisor": 5
+          }
+        }
+      ],
+      "daily_limit": 4,
+      "failure": {
+        "input_refund_bp": 5000,
+        "produces_output": false
+      },
+      "key": "recipe.weapon.wood_sword",
+      "status": "active"
+    },
+    {
+      "name": "布置基础聚灵阵",
+      "profession": "formation",
+      "requirements": [
+        {
+          "type": "profession_level",
+          "value": 1
+        },
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 1
+        },
+        {
+          "type": "location_any",
+          "values": [
+            "xuantian.spirit_field",
+            "xuantian.array_hall"
+          ]
+        }
+      ],
+      "inputs": [
+        {
+          "item_key": "item.mat.array_sand",
+          "quantity": 2
+        }
+      ],
+      "currency_cost": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 20
+      },
+      "energy_cost": 6,
+      "duration_seconds": 90,
+      "outputs": [
+        {
+          "item_key": "item.array.gathering_basic",
+          "quantity": 1,
+          "effect_bp": 500,
+          "duration_seconds": 86400
+        }
+      ],
+      "daily_limit": 3,
+      "failure": {
+        "input_refund": [
+          {
+            "item_key": "item.mat.array_sand",
+            "quantity": 1
+          }
+        ],
+        "currency_refund_bp": 0,
+        "produces_output": false
+      },
+      "key": "recipe.array.gathering_basic",
+      "status": "active"
+    },
+    {
+      "name": "烹饪灵米饭",
+      "profession": "cooking",
+      "requirements": [
+        {
+          "type": "teaching",
+          "key": "guide.choose_service"
+        }
+      ],
+      "inputs": [
+        {
+          "item_key": "item.food.coarse_spirit_rice",
+          "quantity": 2
+        }
+      ],
+      "energy_cost": 2,
+      "duration_seconds": 15,
+      "outputs": [
+        {
+          "item_key": "item.food.spirit_rice",
+          "quantity": 2
+        }
+      ],
+      "daily_limit": 10,
+      "failure": {
+        "input_refund": [
+          {
+            "item_key": "item.food.coarse_spirit_rice",
+            "quantity": 1
+          }
+        ],
+        "produces_output": false
+      },
+      "key": "recipe.food.spirit_rice",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

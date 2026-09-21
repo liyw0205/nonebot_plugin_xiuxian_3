@@ -6,8 +6,9 @@
 `https://github.com/liyw0205/nonebot_plugin_xiuxian_2_pmv` 的代码复制或目录改名。上游公开文档用于通用玩法
 参考，上游魔改适配器用于兼容层复用；境界、道途、数值、数据模型和命令都在本仓库重新决定。
 
-当前阶段：**世界观、玩法与数值基线设计**。仓库已经具备基础工程骨架，
-后续开发应以总设计文档为产品依据，逐个完成可测试的垂直切片。
+当前阶段：**世界观、玩法与数值基线设计**。仓库已具备可运行的基础框架和
+“开始修仙”与“寻仙问道”首个用户用例，后续开发应以总设计文档为产品依据，逐个完成可测试的
+垂直切片。
 
 ## 目标
 
@@ -29,10 +30,13 @@ QQ 官方适配器、消息投递和路由兼容层的复用来源。具体边�
 | 文档 | 内容 |
 |:--|:--|
 | [修仙 3 文档索引](docs/index.md) | 全部基础、玩法、扩展和工程文档入口 |
+| [完整内容开发总表](docs/content-development.md) | 首版 MVP、全部境界、功能路线、稳定键依赖和切片验收唯一权威 |
 | [修仙 3 总设计](docs/xiuxian3-design.md) | 世界观、境界、道途、辅修、数值和首版范围 |
 | [目标架构](docs/architecture.md) | 模块边界、依赖方向和启动生命周期 |
 | [适配器与 Web](docs/adapters-and-web.md) | OneBot/QQ 消息归一化、Web API 与权限 |
 | [运行与安全](docs/operations.md) | 配置、任务、备份、日志和安全边界 |
+| [运行基础框架](docs/runtime-framework.md) | SQLite/WAL、寻仙问道和多适配器接入 |
+| [消息与文案规范](docs/messaging-copywriting.md) | Markdown 消息、适配器降级和用户可见文案 |
 | [测试策略](docs/testing.md) | 测试分层、验收门槛和回滚演练 |
 
 ## 开发约定
@@ -62,6 +66,6 @@ git clone --branch main --single-branch \
 
 ## 当前仓库状态
 
-当前以 `docs/xiuxian3-design.md` 作为玩法和数值设计入口；后续实现按总设计
-拆分垂直切片。完整文档按 `docs/index.md` 组织；每个阶段形成独立、可测试、
-可回滚的提交。
+当前以 `docs/content-development.md` 作为内容、境界和功能范围入口，以
+`docs/xiuxian3-design.md` 作为跨系统设计总纲；后续实现按总表和实施计划拆分
+垂直切片。完整文档按 `docs/index.md` 组织；每个阶段形成独立、可测试、可回滚的提交。

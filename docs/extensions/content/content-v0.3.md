@@ -12,7 +12,7 @@ open_realms_added: [nascent_soul]
 
 ## 1. v0.3 新增开放内容
 
-| kind | 稳定键 | 权威文件 |
+| kind | 稳定键 | 对应快照（总表裁决） |
 |:--|:--|:--|
 | milestone | `milestone.nascent_soul_late` | progression v0.3 |
 | realm | `nascent_soul` | progression v0.3 |

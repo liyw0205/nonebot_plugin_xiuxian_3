@@ -1,5 +1,8 @@
 # 扩展：数据与内容配置
 
+内容范围、首版开关和完整境界/功能路线以[完整内容开发总表](content-development.md)为准；
+本文只说明运行时数据格式、加载校验和发布边界。
+
 ## 1. 两类数据
 
 ### 规则数据
@@ -12,23 +15,20 @@
 
 ## 2. 内容文件
 
-建议使用版本化 JSON/YAML 或数据库种子，目录按领域拆分：
+建议使用版本化 JSON/YAML 或数据库种子，目录按领域拆分，路径是运行时约定而不是版本目录：
 
 ```text
-data/content/
-  world/
-  progression/
-  paths/
-  skills/
-  items/
-  recipes/
-  quests/
-  events/
-  rewards/
-  livelihood/
+data/
+  内容清单.json
+  境界/境界.json
+  装备/法器.json
+  道具/材料.json
+  生产/配方.json
+  ...
 ```
 
-每个文件包含 schema 版本、内容版本、更新时间和定义列表。稳定键使用字符串，不使用上游 ID 区间。
+每个文件包含 schema 版本、内容版本、更新时间、`kind` 和 `records`。每条记录
+使用统一的 `key` 字段；稳定键使用字符串，不使用上游 ID 区间。
 
 ## 3. 加载校验
 
@@ -84,11 +84,13 @@ Web 编辑只能修改白名单字段，并生成草稿、校验、预览、发�
 
 ```json
 {
+  "schema": "xiuxian.content",
   "schema_version": 1,
   "content_version": "content-2026-01",
   "rule_version": "rules-v1",
   "generated_at": "2026-01-01T00:00:00Z",
-  "definitions": []
+  "kind": "item",
+  "records": [{"key": "item.weapon.wood_sword", "name": "木纹剑"}]
 }
 ```
 

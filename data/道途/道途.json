@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "paths-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "path",
+  "records": [
+    {
+      "name": "体修",
+      "passive": {
+        "key": "trait.body_temper",
+        "effect": {
+          "type": "multiplier_bp",
+          "target": "body_to_hp",
+          "value": 11500
+        }
+      },
+      "active_skill": "skill.body.heavy_strike",
+      "state": {
+        "key": "battle_spirit",
+        "max": 100,
+        "survival_threshold": 100
+      },
+      "key": "body",
+      "status": "active"
+    },
+    {
+      "name": "法修",
+      "passive": {
+        "key": "trait.spell.spirit_focus",
+        "effect": {
+          "type": "multiplier_bp",
+          "target": "spell_base",
+          "value": 11000
+        }
+      },
+      "active_skill": "skill.spell.water_bolt",
+      "state": {
+        "key": "spell_cooldown",
+        "default_rounds": 1
+      },
+      "key": "spell",
+      "status": "active"
+    },
+    {
+      "name": "器修",
+      "passive": {
+        "key": "trait.device.maintenance",
+        "effect": {
+          "type": "multiplier_bp",
+          "target": "equipment_durability_cost",
+          "value": 8000
+        }
+      },
+      "active_skill": "skill.device.scout_doll",
+      "state": {
+        "key": "device_control",
+        "max": 1
+      },
+      "key": "device",
+      "status": "active"
+    },
+    {
+      "name": "魔修",
+      "passive": {
+        "key": "trait.demonic.blood_contract",
+        "effect": {
+          "type": "multiplier_bp",
+          "target": "low_health_damage",
+          "value": 12000
+        }
+      },
+      "active_skill": "skill.demonic.pain_exchange",
+      "state": {
+        "key": "corruption",
+        "per_use": 12
+      },
+      "key": "demonic",
+      "status": "active"
+    },
+    {
+      "name": "妖修",
+      "passive": {
+        "key": "trait.beast.wild_sense",
+        "effect": {
+          "type": "multiplier_bp",
+          "target": "exploration_discovery",
+          "value": 11000
+        }
+      },
+      "active_skill": "skill.beast.partial_transform",
+      "state": {
+        "key": "shapeshift_stability",
+        "per_use": -5
+      },
+      "key": "beast",
+      "status": "active"
+    },
+    {
+      "name": "辅修",
+      "passive": {
+        "key": "trait.support.craft_memory",
+        "effect": {
+          "type": "multiplier_bp",
+          "target": "production_proficiency_gain",
+          "value": 11500
+        }
+      },
+      "active_skill": "skill.support.quick_assessment",
+      "state": {
+        "key": "daily_energy_extra_cost",
+        "per_use": 2
+      },
+      "key": "support",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

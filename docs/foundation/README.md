@@ -11,7 +11,9 @@
 
 每个域目录的 README 是入口；model、workflow、use-cases 是实现细节。
 
-全部 `content-v*.md` 同时遵守 [版本内容开发合同](../content-development-contract.md)。内容文件显式定义稳定键、数值和版本覆盖；未写字段采用合同中的事务、随机、失败、权限、观测和回滚规则。
+全部 `content-v*.md` 都是历史发布快照，遵守 [版本内容开发合同](../content-development-contract.md)。
+基础域的开放边界、完整境界路线和首版裁决以[完整内容开发总表](../content-development.md)为准；
+内容文件只记录对应快照的稳定键和数值。
 
 ## v0.1 内容入口
 

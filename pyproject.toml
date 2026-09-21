@@ -14,18 +14,20 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+nonebot = ["nonebot2>=2.4"]
+onebot = ["nonebot-adapter-onebot>=2.4.6"]
+qq = ["nonebot-adapter-qq>=1.7.1"]
 
 [project.scripts]
-xiuxian3 = "xiuxian3.__main__:main"
+xiuxian3 = "nonebot_plugin_xiuxian_3.__main__:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-xiuxian3 = ["migrations/*.sql"]
+where = ["."]
+include = ["nonebot_plugin_xiuxian_3*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["test"]
+pythonpath = ["."]
 addopts = "-ra"
 markers = [
   "integration: uses a temporary persistence boundary",

@@ -9,7 +9,8 @@
 | `platform_user_id` | 原样保存，不做数值化 |
 | `status` | `active`、`suspended`、`deleted` |
 | `stage` | `new_user`、`mortal`、`seeker`、`cultivator` |
-| `name` | 1-24 字符，按规则唯一 |
+| `dao_name` | 可空；非空时最多 7 个字，全局唯一；初始为未命名 |
+| `nickname` | 平台昵称，仅用于内部身份记录，不展示给玩家 |
 | `qualification_snapshot_id` | 寻仙后生成，不覆盖 |
 | `path_key` | 首要道途，可空 |
 | `location_key` | 当前地点 |

@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "combat-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "skill",
+  "records": [
+    {
+      "name": "基础攻击",
+      "owner_type": "player",
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 10000
+      },
+      "cost": {},
+      "cooldown_rounds": 0,
+      "key": "skill.basic_attack",
+      "status": "active"
+    },
+    {
+      "name": "重击",
+      "owner_type": "player",
+      "path_key": "body",
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 14000,
+        "scaling_stat": "body"
+      },
+      "cost": {
+        "resource_key": "battle_spirit",
+        "amount": 10
+      },
+      "cooldown_rounds": 1,
+      "key": "skill.body.heavy_strike",
+      "status": "active"
+    },
+    {
+      "name": "水箭",
+      "owner_type": "player",
+      "path_key": "spell",
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 15000,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "mana",
+        "amount": 18
+      },
+      "cooldown_rounds": 1,
+      "key": "skill.spell.water_bolt",
+      "status": "active"
+    },
+    {
+      "name": "侦查机关",
+      "owner_type": "player",
+      "path_key": "device",
+      "target": "self",
+      "effect": {
+        "type": "summon",
+        "entity_key": "device.scout_doll",
+        "attack_multiplier_bp": 5000,
+        "duration_rounds": 3
+      },
+      "cost": {
+        "resource_key": "mana",
+        "amount": 12
+      },
+      "cooldown_rounds": 0,
+      "uses_per_battle": 1,
+      "key": "skill.device.scout_doll",
+      "status": "active"
+    },
+    {
+      "name": "痛苦交换",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 4500
+      },
+      "cost": {
+        "resource_key": "hp_percent_bp",
+        "amount": 800
+      },
+      "cooldown_rounds": 2,
+      "requirements": [
+        {
+          "type": "hp_percent_bp_min",
+          "value": 2000
+        }
+      ],
+      "key": "skill.demonic.pain_exchange",
+      "status": "active"
+    },
+    {
+      "name": "半化形",
+      "owner_type": "player",
+      "path_key": "beast",
+      "target": "self",
+      "effect": {
+        "type": "stat_bonus_bp",
+        "stat": "agility",
+        "value": 2000,
+        "duration_rounds": 3
+      },
+      "cost": {
+        "resource_key": "beast_power",
+        "amount": 5
+      },
+      "cooldown_rounds": 3,
+      "side_effect": {
+        "state_key": "shapeshift_stability",
+        "delta": -5
+      },
+      "key": "skill.beast.partial_transform",
+      "status": "active"
+    },
+    {
+      "name": "快速鉴定",
+      "owner_type": "player",
+      "path_key": "support",
+      "target": "self",
+      "effect": {
+        "type": "next_item_or_device_effect_bp",
+        "value": 1000
+      },
+      "cost": {
+        "resource_key": "energy",
+        "amount": 2
+      },
+      "cooldown_rounds": 0,
+      "uses_per_battle": 1,
+      "key": "skill.support.quick_assessment",
+      "status": "active"
+    },
+    {
+      "name": "木桩轻击",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 10000
+      },
+      "cost": {},
+      "cooldown_rounds": 0,
+      "key": "enemy_skill.dummy_tap",
+      "status": "active"
+    },
+    {
+      "name": "抓挠",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 11000
+      },
+      "cost": {},
+      "cooldown_rounds": 0,
+      "hit_bonus_bp": 300,
+      "key": "enemy_skill.scratch",
+      "status": "active"
+    },
+    {
+      "name": "冲撞",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 15000
+      },
+      "cost": {},
+      "cooldown_rounds": 2,
+      "key": "enemy_skill.charge",
+      "status": "active"
+    },
+    {
+      "name": "刀波",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 13000,
+        "status": {
+          "key": "bleeding",
+          "duration_rounds": 2
+        }
+      },
+      "cost": {},
+      "cooldown_rounds": 0,
+      "key": "enemy_skill.blade_wave",
+      "status": "active"
+    },
+    {
+      "name": "雾盾",
+      "owner_type": "enemy",
+      "target": "self",
+      "effect": {
+        "type": "shield_max_hp_bp",
+        "value": 8000,
+        "duration_rounds": 2
+      },
+      "cost": {},
+      "cooldown_rounds": 0,
+      "key": "enemy_skill.mist_shield",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

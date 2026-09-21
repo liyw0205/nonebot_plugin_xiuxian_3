@@ -1,7 +1,14 @@
 # 数据内容域：内容包
 
-内容包结构：`schema_version`、`content_version`、`rule_version`、生成时间和 definitions。
+本文件说明运行时包格式；完整的内容范围、首版开关和全部境界路线以
+[完整内容开发总表](../../content-development.md)为准。`content-v*.md` 仅是发布快照，
+不得在这里新增与总表冲突的玩法定义。
 
-目录：`world/`、`progression/`、`paths/`、`skills/`、`items/`、`recipes/`、`quests/`、`events/`、`rewards/`、`livelihood/`。
+运行时配置由 `data/内容清单.json` 索引，领域文件结构统一为
+`schema_version`、`content_version`、`rule_version`、生成时间、`kind` 和
+`records`。每条记录使用 `key`，代码通过内容加载器按 `(kind, key)` 查询。
+
+目录：`境界/`、`道途/`、`技能/`、`装备/`、`道具/`、`阵法/`、`战斗/`、`生产/`、
+`任务/`、`事件/`、`奖励/`、`生活/`、`灵兽/`。
 
 稳定键使用字符串。内容定义引用地点、技能、物品、配方和奖励池时必须可解析，不能执行代码、SQL、模板或文件路径。

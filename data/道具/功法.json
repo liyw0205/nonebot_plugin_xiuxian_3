@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "items-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "item",
+  "records": [
+    {
+      "name": "基础引气诀",
+      "item_type": "manual",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "qi_sensing"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.manual.basic_qi"
+    }
+  ],
+  "category": "功法",
+  "schema": "xiuxian.content"
+}

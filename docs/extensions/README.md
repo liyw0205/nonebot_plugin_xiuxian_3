@@ -8,7 +8,9 @@
 
 每个域目录的 README 是入口；细节文件按模型、流程、用例或专项职责拆分。
 
-全部 `content-v*.md` 同时遵守 [版本内容开发合同](../content-development-contract.md)。扩展只包含平台适配、Web 运营和数据内容；修仙3不提供媒体、WebDAV、第三方账号、小游戏或独立娱乐积分等娱乐子系统。
+全部 `content-v*.md` 都是历史发布快照，遵守 [版本内容开发合同](../content-development-contract.md)。
+扩展域的完整路线、首版能力和发布边界以[完整内容开发总表](../content-development.md)为准；
+扩展只包含平台适配、Web 运营和数据内容；修仙3不提供媒体、WebDAV、第三方账号、小游戏或独立娱乐积分等娱乐子系统。
 
 ## v0.1 内容入口
 

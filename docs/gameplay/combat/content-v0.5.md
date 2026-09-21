@@ -1,6 +1,6 @@
 # v0.5 战斗内容基线：炼虚虚空副本与宗门战争机关
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.5`，`rule_version=combat-0.5.0`。开放 2–5 人虚空副本和 5 人跨服宗门战；创建时冻结虚力、锚、抗性、不稳定、服务器/宗门、规则版本和敌人池。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.5`，`rule_version=combat-0.5.0`。开放自动回合 2–5 人虚空副本和 5 人跨服宗门战；创建时冻结虚力、锚、抗性、不稳定、服务器/宗门、规则版本和敌人池。玩家不提交战斗行动，服务端按快照和策略自动推进。
 
 | `enemy_key` | 气血/攻击 | 阶段机制 | 胜利池 |
 |:--|:--|:--|:--|

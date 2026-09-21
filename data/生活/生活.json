@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "livelihood-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "livelihood",
+  "records": [
+    {
+      "name": "青石镇客房",
+      "requirements": [
+        {
+          "type": "stage_min",
+          "stage": "mortal"
+        }
+      ],
+      "rent": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 20,
+        "period_business_days": 3
+      },
+      "capacity": {
+        "rest_slots": 1,
+        "storage_slots": 10
+      },
+      "key": "residence.town_room",
+      "record_type": "residence",
+      "status": "active"
+    },
+    {
+      "name": "小院",
+      "requirements": [
+        {
+          "type": "reputation",
+          "reputation_key": "local.xuantian.new_town",
+          "min": 40
+        }
+      ],
+      "rent": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 80,
+        "period_days": 7
+      },
+      "capacity": {
+        "rest_slots": 2,
+        "plots": 1,
+        "storage_slots": 20
+      },
+      "key": "residence.courtyard",
+      "record_type": "residence",
+      "status": "active"
+    },
+    {
+      "name": "止血草",
+      "requirements": [
+        {
+          "type": "residence_plot",
+          "status": "active"
+        }
+      ],
+      "seed": {
+        "item_key": "item.herb.blood_grass",
+        "quantity": 1
+      },
+      "growth_seconds": 14400,
+      "maintenance": {
+        "energy": 1,
+        "minimum_count": 1
+      },
+      "harvest": [
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 3
+        }
+      ],
+      "unmaintained_harvest": [
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 1
+        }
+      ],
+      "daily_limit": 2,
+      "key": "crop.blood_grass",
+      "record_type": "crop",
+      "status": "active"
+    },
+    {
+      "name": "灵叶",
+      "requirements": [
+        {
+          "type": "residence_key",
+          "value": "residence.courtyard"
+        }
+      ],
+      "seed": {
+        "item_key": "item.herb.spirit_leaf",
+        "quantity": 1
+      },
+      "growth_seconds": 28800,
+      "maintenance": {
+        "energy": 2,
+        "minimum_count": 2
+      },
+      "harvest": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 3
+        },
+        {
+          "item_key": "item.mat.array_sand",
+          "quantity_range": [
+            0,
+            1
+          ]
+        }
+      ],
+      "unmaintained_harvest": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 1
+        }
+      ],
+      "daily_limit": 1,
+      "key": "crop.spirit_leaf",
+      "record_type": "crop",
+      "status": "active"
+    },
+    {
+      "name": "止血草供应",
+      "inputs": [
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 3
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 18,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 3,
+        "service_reputation": 1
+      },
+      "stock": 200,
+      "duration_seconds": 43200,
+      "key": "town_commission.herb_supply",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "工具修缮",
+      "inputs": [
+        {
+          "item_key": "item.mat.wood",
+          "quantity": 2
+        },
+        {
+          "item_key": "item.ore.ironstone",
+          "quantity": 1
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 25,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 4,
+        "service_reputation": 1
+      },
+      "stock": 120,
+      "duration_seconds": 43200,
+      "key": "town_commission.repair_tools",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "灵米饭供应",
+      "inputs": [
+        {
+          "item_key": "item.food.spirit_rice",
+          "quantity": 2
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 20,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 3,
+        "service_reputation": 1
+      },
+      "stock": 150,
+      "duration_seconds": 43200,
+      "key": "town_commission.meal_service",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "教学采集协助",
+      "requirements": [
+        {
+          "type": "service_reputation",
+          "min": 10
+        }
+      ],
+      "cost": {
+        "stamina": 3
+      },
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 15
+      },
+      "daily_limit": 3,
+      "key": "service.gather_help",
+      "record_type": "service",
+      "status": "active"
+    },
+    {
+      "name": "烹饪服务",
+      "requirements": [
+        {
+          "type": "teaching",
+          "key": "guide.choose_service"
+        }
+      ],
+      "cost": {
+        "energy": 2,
+        "inputs": [
+          {
+            "item_key": "item.food.spirit_rice",
+            "quantity": 2
+          }
+        ]
+      },
+      "daily_limit": 5,
+      "key": "service.cook_meal",
+      "record_type": "service",
+      "status": "active"
+    },
+    {
+      "name": "青石镇至近郊短途运输",
+      "requirements": [
+        {
+          "type": "stage_min",
+          "stage": "mortal"
+        }
+      ],
+      "cost": {
+        "stamina": 2
+      },
+      "duration_seconds": 600,
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 12,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 2
+      },
+      "daily_limit": 3,
+      "delay_chance_bp": 1000,
+      "delay_seconds": 600,
+      "key": "route.new_town_outskirts",
+      "record_type": "route",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

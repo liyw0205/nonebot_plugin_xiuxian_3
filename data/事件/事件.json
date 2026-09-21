@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "events-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "event",
+  "records": [
+    {
+      "name": "灵泉事件",
+      "status": "open",
+      "location_key": "xuantian.spirit_field",
+      "duration_seconds": 1800,
+      "schedule": {
+        "weekdays": [
+          3,
+          7
+        ],
+        "local_time": "20:00"
+      },
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 1
+        }
+      ],
+      "contribution": {
+        "source_item_key": "item.herb.spirit_leaf",
+        "per_quantity": 1,
+        "max_per_player": 30
+      },
+      "global_goal": {
+        "item_key": "item.herb.spirit_leaf",
+        "quantity": 100
+      },
+      "claim": {
+        "min_contribution": 10,
+        "window_seconds": 86400,
+        "reward_key": "reward.event.spirit_spring.base",
+        "completion_bonus_key": "reward.event.spirit_spring.completion"
+      },
+      "key": "event.spirit_spring"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

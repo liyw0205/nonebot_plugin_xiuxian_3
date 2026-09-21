@@ -4,7 +4,7 @@
 
 | `recipe_key` | 前置/地点 | 输入 | 工具/精力/时长 | 成功产出 | 限制 |
 |:--|:--|:--|:--|:--|:--|
-| `recipe.pill.foundation_guard` | `alchemy` 3、金丹、炼丹房 | 灵叶 3、`item.material.cloud_iron` 1、血草 2 | 炉，8 精力，120 秒 | `item.pill.foundation_guard` 1 | 每日 4；质量 <6000 失败 |
+| `recipe.pill.golden_core_guard` | `alchemy` 3、金丹、炼丹房 | 灵叶 3、`item.material.cloud_iron` 1、血草 2 | 炉，8 精力，120 秒 | `item.pill.golden_core_guard` 1 | 每日 4；质量 <6000 失败 |
 | `recipe.pill.core_condense` | `alchemy` 4、金丹 | 灵叶 5、云铁 2、洞天材料 2 | 炉，10 精力，180 秒 | `item.pill.core_condense` 1 | 每日 2；绑定 |
 | `recipe.weapon.cloud_sword` | `artifice` 3、金丹、炼器台 | 云铁 4、阵砂 1、木材 2 | 锤，10 精力，180 秒 | `item.weapon.cloud_sword` 1 | 每日 2；耐久 `8500+quality/10` |
 | `recipe.array.mist_barrier` | `formation` 3、阵堂/洞天二层 | 阵砂 5、灵石 100、灵叶 2 | 12 精力，240 秒 | `item.array.mist_barrier` 1 | 每日 2；覆盖半径 1 地点、12 小时 |

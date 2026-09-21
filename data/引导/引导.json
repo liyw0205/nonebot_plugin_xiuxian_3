@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "player-onboarding-v0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "guide",
+  "records": [
+    {
+      "name": "阅读世界说明",
+      "status": "active",
+      "operation": "guide.read_world",
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "mortal"
+        }
+      ],
+      "cost": {},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "world_read"
+      },
+      "key": "guide.read_world"
+    },
+    {
+      "name": "教学采集止血草",
+      "status": "active",
+      "operation": "guide.gather_blood_grass",
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "mortal"
+        },
+        {
+          "type": "location",
+          "location_key": "xuantian.outskirts"
+        }
+      ],
+      "cost": {
+        "resource_key": "stamina",
+        "amount": 2
+      },
+      "failure_refund": {
+        "resource_key": "stamina",
+        "amount": 1
+      },
+      "repeatable": false,
+      "random_pool": "gather.v0.1",
+      "output": {
+        "item_key": "item.herb.blood_grass",
+        "quantity_range": [
+          1,
+          2
+        ]
+      },
+      "key": "guide.gather_blood_grass"
+    },
+    {
+      "name": "选择生产教学",
+      "status": "active",
+      "operation": "guide.choose_service",
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "mortal"
+        }
+      ],
+      "cost": {
+        "resource_key": "energy",
+        "amount": 2
+      },
+      "options": [
+        "alchemy",
+        "artifice",
+        "formation"
+      ],
+      "preview_does_not_consume": true,
+      "repeatable": false,
+      "output": {
+        "type": "teaching_unlock",
+        "key": "selected_service"
+      },
+      "key": "guide.choose_service"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

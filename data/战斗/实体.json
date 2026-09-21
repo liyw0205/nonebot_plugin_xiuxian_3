@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "combat-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "entity",
+  "records": [
+    {
+      "name": "侦查机关",
+      "entity_type": "summoned_device",
+      "status": "active",
+      "owner_path_key": "device",
+      "max_instances": 1,
+      "combat": {
+        "attack_multiplier_bp": 5000,
+        "duration_rounds": 3
+      },
+      "key": "device.scout_doll"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

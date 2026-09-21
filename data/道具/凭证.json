@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "items-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "item",
+  "records": [
+    {
+      "name": "雾隐洞天一层凭证",
+      "item_type": "credential",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "location_access",
+          "location_key": "cave.mist_grotto",
+          "consume_on": "travel_created"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.cave_pass_basic"
+    },
+    {
+      "name": "道途更换令",
+      "item_type": "token",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "path_change_permission",
+          "min_realm": "foundation",
+          "admin_test_only": true
+        }
+      ],
+      "requirements": [],
+      "status": "admin_only",
+      "key": "item.token.change_path"
+    },
+    {
+      "name": "体质重塑令",
+      "item_type": "token",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "constitution_reset",
+          "cooldown_seconds": 2592000
+        }
+      ],
+      "requirements": [],
+      "status": "admin_only",
+      "key": "item.token.constitution_reset"
+    },
+    {
+      "name": "改名卡",
+      "item_type": "token",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "rename_permission",
+          "consume_on": "player.rename"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.token.rename_card"
+    }
+  ],
+  "category": "凭证",
+  "schema": "xiuxian.content"
+}

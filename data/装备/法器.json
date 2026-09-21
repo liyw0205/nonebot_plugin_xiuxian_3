@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "items-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "item",
+  "records": [
+    {
+      "name": "木纹剑",
+      "item_type": "weapon",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "durability_bp": 10000,
+      "equipment_slot": "weapon",
+      "effects": [
+        {
+          "type": "flat_stat",
+          "stat": "physical_damage",
+          "value": 5
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.weapon.wood_sword"
+    }
+  ],
+  "category": "法器",
+  "schema": "xiuxian.content"
+}

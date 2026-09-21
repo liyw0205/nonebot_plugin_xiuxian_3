@@ -1,6 +1,6 @@
 # v0.4 战斗内容基线：化神领域战
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.4`，`rule_version=combat-0.4.0`。开放最多 3 人领域战；会话创建时保存各领域、能量、力量、污染/血脉、地点和对抗快照。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.4`，`rule_version=combat-0.4.0`。开放自动回合最多 3 人领域战；会话创建时保存各领域、能量、力量、污染/血脉、地点和对抗快照。玩家不提交战斗行动，服务端按快照和策略自动推进。
 
 | `enemy_key` | 气血/攻击 | 机制 | 胜利产出 |
 |:--|:--|:--|:--|

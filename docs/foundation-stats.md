@@ -161,7 +161,7 @@ ready -> invalid
   "sources": [
     {"kind": "realm", "key": "qi_gathering", "value": 40},
     {"kind": "base_stat", "key": "body", "value": 160},
-    {"kind": "equipment", "key": "item.basic_robe", "value": 48}
+    {"kind": "equipment", "key": "item.armor.cotton_robe", "value": 48}
   ]
 }
 ```

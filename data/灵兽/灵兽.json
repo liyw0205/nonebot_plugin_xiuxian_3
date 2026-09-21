@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "companions-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "companion",
+  "records": [
+    {
+      "name": "木鼠",
+      "kind": "beast",
+      "source": [
+        "xuantian.outskirts",
+        "story.mainline.xuantian"
+      ],
+      "level_range": [
+        1,
+        10
+      ],
+      "feed_item_key": "item.food.coarse_spirit_rice",
+      "feed_experience": 10,
+      "effect": {
+        "type": "exploration_discovery_bp",
+        "value": 200,
+        "cap": 10000
+      },
+      "capacity_per_player": 3,
+      "key": "beast.wood_rat",
+      "status": "active"
+    },
+    {
+      "name": "竹鹿",
+      "kind": "mount",
+      "source": [
+        "story.mainline.xuantian"
+      ],
+      "level_range": [
+        1,
+        5
+      ],
+      "transport_experience": 5,
+      "effect": {
+        "type": "transport_duration_multiplier_bp",
+        "value_per_level": 300
+      },
+      "stamina": 20,
+      "capacity_per_player": 1,
+      "key": "mount.bamboo_deer",
+      "status": "active"
+    },
+    {
+      "name": "小型灵兽行囊",
+      "kind": "beast_gear",
+      "source": [
+        "production"
+      ],
+      "source_status": "pending_recipe_key",
+      "instance_mode": "unique",
+      "durability_bp": 1000,
+      "effect": {
+        "type": "carry_capacity",
+        "value": 5
+      },
+      "key": "beast.gear.sack_small",
+      "status": "active"
+    },
+    {
+      "name": "竹鹿鞍具",
+      "kind": "mount_tack",
+      "source": [
+        "story.mainline.xuantian",
+        "production"
+      ],
+      "instance_mode": "unique",
+      "durability_bp": 1000,
+      "effect": {
+        "type": "transport_stamina_cost_delta",
+        "value": -1
+      },
+      "key": "mount.tack.bamboo_saddle",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

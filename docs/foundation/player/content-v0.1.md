@@ -1,6 +1,6 @@
 # v0.1 角色、新手与入道内容基线
 
-本文件是角色域 v0.1 的具体内容权威，遵守[版本内容开发合同](../../content-development-contract.md)。它定义新用户、寻仙问道、凡人、求道者、六大道途与辅修的首版顺序、稳定键、数值、奖励和失败规则。`model.md`、`workflow.md`、`use-cases.md` 提供结构合同；冲突时以本文件的流程与数值为准，并在同一变更中修正文档。
+本文件是角色域 `content-0.1` 的历史发布快照，遵守[版本内容开发合同](../../content-development-contract.md)。完整范围、首版边界和跨域依赖以[完整内容开发总表](../../content-development.md)为准；本文件只记录该快照的稳定键、数值、奖励和失败参数。若与总表冲突，先修总表，再生成新的快照。
 
 `rule_version`：`player-onboarding-v0.1.0`
 `content_version`：`content-0.1`
@@ -36,10 +36,11 @@ new_user
 
 ## 3. 创建角色：`player.create`
 
-输入：`platform`、`platform_user_id`、场景、展示昵称、`operation_id`。
+输入：`platform`、`platform_user_id`、场景、平台昵称（仅内部记录）、可选 `dao_name`、`operation_id`。
 
-- 稳定 operation：`player.create:<platform>:<platform_user_id>`；适配器消息 ID 只能作为请求去重键，不能替代跨重试的业务 operation。
+- 稳定 operation：由适配器事件 ID绑定 `player.create` 输入；相同事件重试回放原结果，缺少事件 ID时使用请求 ID。
 - 成功：创建 `player_id`、`stage=new_user`、`status=active`、`location_key=xuantian.new_town`。
+- `dao_name` 为空时展示为未命名；非空道号最多 7 个字且全局不可重复。
 - 重复相同 operation：返回原 `player_id` 和原状态。
 - 相同平台身份使用新 operation：返回已有玩家资料，不创建第二角色；这属于幂等成功，不新增资产或奖励。
 - 不创建钱包余额、体力、精力、背包物品、资质或道途。
@@ -123,7 +124,9 @@ new_user
 | 命令/按钮意图 | application 用例 | 写入 | 说明 |
 |:--|:--|:--|:--|
 | `开始修仙` | `player.create` | 有 | 创建最小身份；可改为平台欢迎按钮 |
+| `开始修仙 <道号>` | `player.create` | 有 | 建角时直接取道号；道号最多 7 个字且不可重复 |
 | `寻仙问道` | `player.start_seeking` | 有 | 生成/回放资质快照 |
+| `修仙改名 <道号>` | `player.rename` | 有 | 未命名角色首次改名免费，之后需要改名卡 |
 | `我的资质` | `player.get_qualification` | 无 | 展示六维、灵根和一次调整资格 |
 | `完成引导` | `player.complete_intro` | 有 | 只完成当前可验证的引导项 |
 | `选择道途 <path_key>` | `player.enter_cultivation` | 有 | 文本与按钮同用例 |
@@ -131,7 +134,7 @@ new_user
 
 命令名、别名和按钮 payload 在真正接入 NoneBot/QQ 前冻结为 manifest fixture；本文件仅定义意图与用例，不承诺上游旧命令兼容。
 
-资料卡最低显示：角色 ID、阶段、公共境界、当前层数（1–10）、派生段位（入门/稳固/圆满/混元）、境内/总修为、灵根、六维摘要、首要道途、主辅修、玄天界当前位置、灵石、体力、精力、当前引导和可执行下一步。图片、Markdown 或键盘发送失败时退化为文本，不能改变角色或重放写 operation。
+资料卡最低显示：道号、阶段、公共境界、当前层数（1–10）、派生段位（入门/稳固/圆满/混元）、境内/总修为、灵根、六维摘要、首要道途、主辅修、玄天界当前位置、灵石、体力、精力、当前引导和可执行下一步；不展示平台用户 ID。图片、Markdown 或键盘发送失败时退化为文本，不能改变角色或重放写 operation。
 
 ## 8. 观测、回滚与验收
 

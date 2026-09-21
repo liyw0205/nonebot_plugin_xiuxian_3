@@ -13,7 +13,7 @@ registered_placeholders: [golden_core, nascent_soul]
 
 ## 1. 开放定义集合
 
-| kind | 必须存在的稳定键 | 权威文件 |
+| kind | 必须存在的稳定键 | 对应快照（总表裁决） |
 |:--|:--|:--|
 | realm | `mortal`、`qi_sensing`、`qi_gathering`、`foundation` | `foundation/progression/content-v0.1.md` |
 | path | `body`、`spell`、`device`、`demonic`、`beast`、`support` | `foundation/paths/content-v0.1.md` |

@@ -17,7 +17,7 @@
 
 | 榜单 | 积分来源 | 前三奖励 |
 |:--|:--|:--|
-| `ranking.realm` | 聚气突破 +100、筑基 perfect +30 | `item.pill.foundation_guard` 3/2/1 |
+| `ranking.realm` | 聚气突破 +100、筑基 perfect +30 | `item.pill.golden_core_guard` 3/2/1 |
 | `ranking.combat` | 金丹精英胜利 +20 | 云纹剑 1 / 云铁 10 / 云铁 5 |
 | `ranking.production` | 已结算成品质量分总和 | 高级配方 1 / 精力药剂 3 / 精力药剂 1 |
 

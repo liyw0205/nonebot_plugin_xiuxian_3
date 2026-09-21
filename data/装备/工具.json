@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "items-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "item",
+  "records": [
+    {
+      "name": "基础丹炉",
+      "item_type": "tool",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "durability_bp": 2000,
+      "effects": [
+        {
+          "type": "production_tool",
+          "profession": "alchemy",
+          "durability_cost_bp": 100
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.tool.basic_furnace"
+    },
+    {
+      "name": "基础炼器锤",
+      "item_type": "tool",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "durability_bp": 2000,
+      "effects": [
+        {
+          "type": "production_tool",
+          "profession": "artifice",
+          "durability_cost_bp": 100
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.tool.basic_hammer"
+    }
+  ],
+  "category": "工具",
+  "schema": "xiuxian.content"
+}

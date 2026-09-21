@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "world-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "location",
+  "records": [
+    {
+      "name": "青石镇",
+      "world": "玄天界",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "stage_min",
+          "stage": "new_user"
+        }
+      ],
+      "travel": {
+        "duration_seconds": 0,
+        "stamina": 0,
+        "spirit_stone": 0
+      },
+      "environment": {
+        "training_bp": 10000
+      },
+      "actions": [
+        "player.create",
+        "player.start_seeking",
+        "quest",
+        "market",
+        "visit",
+        "return"
+      ],
+      "key": "xuantian.new_town"
+    },
+    {
+      "name": "玄天近郊",
+      "world": "玄天界",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "stage_min",
+          "stage": "mortal"
+        }
+      ],
+      "travel": {
+        "duration_seconds": 30,
+        "stamina": 2,
+        "spirit_stone": 0
+      },
+      "environment": {
+        "risk": "low"
+      },
+      "actions": [
+        "explore.gather_outskirts",
+        "explore.trial_outskirts",
+        "battle.training_dummy",
+        "battle.wood_rat"
+      ],
+      "key": "xuantian.outskirts"
+    },
+    {
+      "name": "玄天宗山门",
+      "world": "玄天界",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "any_of",
+          "conditions": [
+            {
+              "type": "realm",
+              "realm_key": "qi_gathering",
+              "min_layer": 4
+            },
+            {
+              "type": "mentor_invitation"
+            }
+          ]
+        }
+      ],
+      "travel": {
+        "duration_seconds": 60,
+        "stamina": 3,
+        "spirit_stone": 0
+      },
+      "environment": {
+        "training_bp": 10500
+      },
+      "actions": [
+        "sect.join",
+        "sect.quest",
+        "manual.consultation"
+      ],
+      "key": "xuantian.sect_gate"
+    },
+    {
+      "name": "灵泉谷",
+      "world": "玄天界",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 2
+        },
+        {
+          "type": "quest_completed",
+          "quest_key": "guide.gather_blood_grass"
+        }
+      ],
+      "travel": {
+        "duration_seconds": 90,
+        "stamina": 4,
+        "spirit_stone": 0
+      },
+      "environment": {
+        "training_bp": 11500
+      },
+      "actions": [
+        "explore.spring_gather",
+        "progression.cultivate.spirit_spring",
+        "production.teaching"
+      ],
+      "key": "xuantian.spirit_field"
+    },
+    {
+      "name": "雾隐洞天一层",
+      "world": "洞天",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 4
+        },
+        {
+          "type": "item",
+          "item_key": "item.cave_pass_basic",
+          "quantity": 1
+        }
+      ],
+      "travel": {
+        "duration_seconds": 120,
+        "stamina": 5,
+        "spirit_stone": 10,
+        "item_key": "item.cave_pass_basic",
+        "item_quantity": 1
+      },
+      "environment": {
+        "risk": "medium"
+      },
+      "actions": [
+        "explore.mist_grotto",
+        "livelihood.farming",
+        "production.alchemy"
+      ],
+      "key": "cave.mist_grotto"
+    },
+    {
+      "name": "魔渊入口",
+      "world": "魔界",
+      "status": "locked",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 6
+        },
+        {
+          "type": "quest_completed",
+          "quest_key": "quest.demon_intro"
+        }
+      ],
+      "travel": {
+        "duration_seconds": 120,
+        "stamina": 10
+      },
+      "environment": {
+        "display_only": true
+      },
+      "actions": [
+        "read_entry_requirements"
+      ],
+      "key": "demon.abyss_gate"
+    },
+    {
+      "name": "万兽山入口",
+      "world": "妖界",
+      "status": "locked",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 6
+        },
+        {
+          "type": "quest_completed",
+          "quest_key": "quest.beast_intro"
+        }
+      ],
+      "travel": {
+        "duration_seconds": 120,
+        "stamina": 10
+      },
+      "environment": {
+        "display_only": true
+      },
+      "actions": [
+        "read_entry_requirements"
+      ],
+      "key": "beast.ten_thousand_hills"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

@@ -12,7 +12,7 @@ open_realms_added: [dao_union, tribulation, ascension_ready]
 
 ## 1. v0.6 新增开放内容
 
-| kind | 稳定键 | 权威文件 |
+| kind | 稳定键 | 对应快照（总表裁决） |
 |:--|:--|:--|
 | realm | `dao_union`、`tribulation`、`ascension_ready` | progression v0.6 |
 | location/node | `dao.origin_gate`、`tribulation.sky_terrace`、`ascension.heaven_path`、`ascension.left_world_hall`、`location.final_arena`、终局 `node.*` | world/exploration v0.6 |

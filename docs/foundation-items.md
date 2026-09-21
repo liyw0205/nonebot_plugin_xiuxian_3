@@ -109,7 +109,7 @@
 
 ```json
 {
-  "item_key": "item.basic_robe",
+  "item_key": "item.armor.cotton_robe",
   "item_type": "armor",
   "quality": "common",
   "bind_type": "unbound",

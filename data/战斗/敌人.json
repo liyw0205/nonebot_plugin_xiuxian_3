@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "combat-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "enemy",
+  "records": [
+    {
+      "name": "训练傀儡",
+      "location_key": "xuantian.new_town",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 80,
+        "attack": 8,
+        "initiative": 8
+      },
+      "skills": [
+        "enemy_skill.dummy_tap"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [
+        "reward.battle.training_dummy"
+      ],
+      "key": "enemy.training_dummy",
+      "status": "active"
+    },
+    {
+      "name": "木鼠",
+      "location_key": "xuantian.outskirts",
+      "requirements": [
+        {
+          "type": "stage_min",
+          "stage": "mortal"
+        }
+      ],
+      "stats": {
+        "hp": 45,
+        "attack": 8,
+        "initiative": 10
+      },
+      "skills": [
+        "enemy_skill.scratch"
+      ],
+      "reward_refs": [
+        "reward.battle.wood_rat"
+      ],
+      "key": "enemy.wood_rat",
+      "status": "active"
+    },
+    {
+      "name": "铁鬃野猪",
+      "location_key": "xuantian.outskirts",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 3
+        }
+      ],
+      "stats": {
+        "hp": 100,
+        "attack": 15,
+        "initiative": 7
+      },
+      "skills": [
+        "enemy_skill.charge"
+      ],
+      "reward_refs": [
+        "reward.battle.iron_boar"
+      ],
+      "key": "enemy.iron_boar",
+      "status": "active"
+    },
+    {
+      "name": "劫修学徒",
+      "location_key": "xuantian.outskirts",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 3
+        }
+      ],
+      "stats": {
+        "hp": 180,
+        "attack": 26,
+        "initiative": 12
+      },
+      "skills": [
+        "enemy_skill.blade_wave"
+      ],
+      "reward_refs": [
+        "reward.battle.bandit_apprentice"
+      ],
+      "key": "enemy.bandit_apprentice",
+      "status": "active"
+    },
+    {
+      "name": "雾隐守卫",
+      "location_key": "cave.mist_grotto",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 6
+        }
+      ],
+      "stats": {
+        "hp": 320,
+        "attack": 42,
+        "initiative": 10
+      },
+      "skills": [
+        "enemy_skill.mist_shield"
+      ],
+      "reward_refs": [
+        "reward.battle.mist_guardian"
+      ],
+      "key": "enemy.mist_guardian",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

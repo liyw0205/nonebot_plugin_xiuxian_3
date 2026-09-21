@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "rewards-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "reward",
+  "records": [
+    {
+      "name": "寻仙问道基础奖励",
+      "operation": "player.start_seeking",
+      "entries": [
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 100
+        },
+        {
+          "kind": "resource",
+          "resource_key": "stamina",
+          "quantity": 30,
+          "set_max": 30
+        },
+        {
+          "kind": "resource",
+          "resource_key": "energy",
+          "quantity": 30,
+          "set_max": 30
+        },
+        {
+          "kind": "item",
+          "item_key": "item.food.coarse_spirit_rice",
+          "quantity": 3
+        },
+        {
+          "kind": "item",
+          "item_key": "item.herb.blood_grass",
+          "quantity": 3
+        }
+      ],
+      "once_per_player": true,
+      "key": "reward.onboarding.seeking",
+      "status": "active"
+    },
+    {
+      "name": "寻仙里程碑奖励",
+      "operation": "quest.claim.first_seeking",
+      "entries": [
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 100
+        },
+        {
+          "kind": "item",
+          "item_key": "item.food.coarse_spirit_rice",
+          "quantity": 3
+        }
+      ],
+      "once_per_player": true,
+      "key": "reward.quest.first_seeking",
+      "status": "active"
+    },
+    {
+      "name": "入道里程碑奖励",
+      "operation": "quest.claim.first_cultivation",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.manual.basic_qi",
+          "quantity": 1
+        },
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 200
+        }
+      ],
+      "once_per_player": true,
+      "key": "reward.quest.first_cultivation",
+      "status": "active"
+    },
+    {
+      "name": "采集里程碑奖励",
+      "operation": "quest.claim.first_gather",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.herb.blood_grass",
+          "quantity": 2
+        },
+        {
+          "kind": "resource",
+          "resource_key": "cultivation",
+          "quantity": 30
+        }
+      ],
+      "once_per_player": true,
+      "key": "reward.quest.first_gather",
+      "status": "active"
+    },
+    {
+      "name": "生产里程碑奖励",
+      "operation": "quest.claim.first_craft",
+      "entries": [
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 50
+        },
+        {
+          "kind": "reputation",
+          "reputation_key": "faction_reputation.xuantian",
+          "quantity": 2
+        }
+      ],
+      "once_per_player": true,
+      "key": "reward.quest.first_craft",
+      "status": "active"
+    },
+    {
+      "name": "训练傀儡奖励",
+      "operation": "battle.claim_reward",
+      "entries": [
+        {
+          "kind": "resource",
+          "resource_key": "cultivation",
+          "quantity": 20
+        },
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 5
+        }
+      ],
+      "once_per_battle": true,
+      "key": "reward.battle.training_dummy",
+      "status": "active"
+    },
+    {
+      "name": "木鼠奖励",
+      "operation": "battle.claim_reward",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.herb.blood_grass",
+          "quantity_range": [
+            0,
+            1
+          ]
+        },
+        {
+          "kind": "resource",
+          "resource_key": "cultivation",
+          "quantity": 10
+        }
+      ],
+      "once_per_battle": true,
+      "key": "reward.battle.wood_rat",
+      "status": "active"
+    },
+    {
+      "name": "铁鬃野猪奖励",
+      "operation": "battle.claim_reward",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.ore.ironstone",
+          "quantity": 1
+        },
+        {
+          "kind": "resource",
+          "resource_key": "cultivation",
+          "quantity": 30
+        },
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 8
+        }
+      ],
+      "once_per_battle": true,
+      "key": "reward.battle.iron_boar",
+      "status": "active"
+    },
+    {
+      "name": "劫修学徒奖励",
+      "operation": "battle.claim_reward",
+      "entries": [
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 20
+        },
+        {
+          "kind": "resource",
+          "resource_key": "cultivation",
+          "quantity": 60
+        },
+        {
+          "kind": "item",
+          "item_key": "item.pill.focus_low",
+          "chance_bp": 2000,
+          "quantity": 1
+        }
+      ],
+      "once_per_battle": true,
+      "key": "reward.battle.bandit_apprentice",
+      "status": "active"
+    },
+    {
+      "name": "雾隐守卫奖励",
+      "operation": "battle.claim_reward",
+      "entries": [
+        {
+          "kind": "resource",
+          "resource_key": "cultivation",
+          "quantity": 160
+        }
+      ],
+      "material_pool": {
+        "quantity_range": [
+          1,
+          3
+        ],
+        "selection": "one_weighted",
+        "entries": [
+          {
+            "item_key": "item.herb.spirit_leaf",
+            "weight": 45
+          },
+          {
+            "item_key": "item.mat.array_sand",
+            "weight": 30
+          },
+          {
+            "item_key": "item.ore.ironstone",
+            "weight": 25
+          }
+        ]
+      },
+      "once_per_battle": true,
+      "key": "reward.battle.mist_guardian",
+      "status": "active"
+    },
+    {
+      "name": "灵泉事件基础奖励",
+      "operation": "event.claim_reward",
+      "entries": [
+        {
+          "kind": "resource",
+          "resource_key": "cultivation",
+          "quantity": 150
+        },
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 100
+        }
+      ],
+      "once_per_event_round": true,
+      "key": "reward.event.spirit_spring.base",
+      "status": "active"
+    },
+    {
+      "name": "灵泉事件完成加奖",
+      "operation": "event.claim_reward",
+      "entries": [
+        {
+          "kind": "reputation",
+          "reputation_key": "faction_reputation.xuantian",
+          "quantity": 10
+        }
+      ],
+      "once_per_event_round": true,
+      "key": "reward.event.spirit_spring.completion",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

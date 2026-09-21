@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "items-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "item",
+  "records": [
+    {
+      "name": "棉袍",
+      "item_type": "armor",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "durability_bp": 10000,
+      "equipment_slot": "armor",
+      "effects": [
+        {
+          "type": "flat_stat",
+          "stat": "max_hp",
+          "value": 20
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.armor.cotton_robe"
+    }
+  ],
+  "category": "防具",
+  "schema": "xiuxian.content"
+}

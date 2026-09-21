@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "events-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "quest",
+  "records": [
+    {
+      "name": "第一次寻仙",
+      "status": "open",
+      "trigger": {
+        "operation": "player.start_seeking",
+        "result": "success"
+      },
+      "reward_key": "reward.quest.first_seeking",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.first_seeking"
+    },
+    {
+      "name": "第一次入道",
+      "status": "open",
+      "trigger": {
+        "operation": "player.enter_cultivation",
+        "result": "success"
+      },
+      "reward_key": "reward.quest.first_cultivation",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.first_cultivation"
+    },
+    {
+      "name": "第一次采集",
+      "status": "open",
+      "trigger": {
+        "operation": "explore.gather_outskirts",
+        "result": "success"
+      },
+      "reward_key": "reward.quest.first_gather",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.first_gather"
+    },
+    {
+      "name": "第一次生产",
+      "status": "open",
+      "trigger": {
+        "operation_group": "production.*",
+        "result": "completed"
+      },
+      "reward_key": "reward.quest.first_craft",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.first_craft"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

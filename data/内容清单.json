@@ -1,0 +1,57 @@
+{
+  "schema": "xiuxian.content",
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "rules-0.1",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "status": "active",
+  "files": [
+    "事件/事件.json",
+    "任务/任务.json",
+    "地图/地点.json",
+    "境界/境界.json",
+    "奖励/奖励.json",
+    "引导/引导.json",
+    "战斗/实体.json",
+    "战斗/敌人.json",
+    "技能/技能.json",
+    "灵兽/灵兽.json",
+    "生产/配方.json",
+    "生活/生活.json",
+    "装备/工具.json",
+    "装备/法器.json",
+    "装备/防具.json",
+    "道具/丹药.json",
+    "道具/凭证.json",
+    "道具/功法.json",
+    "道具/材料.json",
+    "道途/道途.json",
+    "阵法/阵法.json"
+  ],
+  "pending_references": [
+    {
+      "source": "beast.gear.sack_small",
+      "label": "生产配方",
+      "reason": "companions v0.1 只声明生产来源，生产配方表尚未给出稳定 recipe_key"
+    },
+    {
+      "source": "demon.abyss_gate / beast.ten_thousand_hills",
+      "label": "未来版本任务",
+      "reason": "quest.demon_intro 与 quest.beast_intro 属于 v0.2，首版入口保持 locked"
+    }
+  ],
+  "open_realms": [
+    "mortal",
+    "qi_sensing",
+    "qi_gathering",
+    "foundation"
+  ],
+  "placeholder_realms": [
+    "golden_core",
+    "nascent_soul"
+  ],
+  "review_notes": [
+    "item.pill.foundation_guard 仅用于 v0.1 筑基失败保护；v0.2 使用 item.pill.golden_core_guard。",
+    "item.token.constitution_reset 仅管理员测试可用，不进入普通掉落。"
+  ]
+}

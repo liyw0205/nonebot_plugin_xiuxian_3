@@ -16,7 +16,9 @@
 
 每个域目录的 README 是入口；model、workflow、use-cases 是实现细节。
 
-全部 `content-v*.md` 同时遵守 [版本内容开发合同](../content-development-contract.md)。会话、成本、随机、结算、取消、过期和奖励的默认行为以该合同为准，内容表可以显式覆盖。
+全部 `content-v*.md` 都是历史发布快照，遵守 [版本内容开发合同](../content-development-contract.md)。
+玩法域的完整路线、首版开关和跨域依赖以[完整内容开发总表](../content-development.md)为准；
+会话、成本、随机、结算、取消、过期和奖励仍必须遵守统一合同。
 
 ## v0.1 内容入口
 
