@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandContext, CommandResult, validate_command_identity
 from ..repository import (
     CurrencyInsufficientError,
     LocationRequirementError,
@@ -34,16 +34,6 @@ class WorldApplication:
         return f"{name}:{context.adapter}:{context.user_id}:{request_key}"
 
     @staticmethod
-    def _invalid_context(context: CommandContext, message: str) -> CommandResult | None:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(False, "INVALID_CONTEXT", "无法识别你的平台身份，请稍后重试。", context.request_id)
-        if not context.can_write_assets:
-            return CommandResult(False, "INVALID_CONTEXT", message, context.request_id)
-        return None
-
-    @staticmethod
     def _display_name(player) -> str:
         value = player.dao_name or "未命名"
         return (
@@ -61,10 +51,9 @@ class WorldApplication:
         return resolve_destination(args[0])
 
     async def preview_travel(self, context: CommandContext) -> CommandResult:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(False, "INVALID_CONTEXT", "无法识别你的平台身份，请稍后重试。", context.request_id)
+        invalid = validate_command_identity(context)
+        if invalid is not None:
+            return invalid
         destination = self._destination(context.command_args)
         if destination is None:
             return CommandResult(False, "INVALID_DESTINATION", "请使用 `移动预览 雾隐洞天`。", context.request_id)
@@ -108,7 +97,11 @@ class WorldApplication:
         })
 
     async def start_travel(self, context: CommandContext, destination: str | None = None) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件不允许开始移动。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许开始移动。",
+        )
         if invalid is not None:
             return invalid
         destination = destination or (self._destination(context.command_args) or "")
@@ -166,7 +159,11 @@ class WorldApplication:
         )
 
     async def settle_travel(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件不允许结算移动。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许结算移动。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:

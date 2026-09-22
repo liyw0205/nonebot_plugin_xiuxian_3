@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandContext, CommandResult, validate_command_identity
 from ..repository import (
     DaoNameTakenError,
     OperationConflictError,
@@ -41,26 +41,6 @@ class PlayerApplication:
             return context.operation_id
         request_key = context.message_id or context.request_id
         return f"{operation_name}:{context.adapter}:{context.user_id}:{request_key}"
-
-    @staticmethod
-    def _invalid_context(context: CommandContext, message: str) -> CommandResult | None:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(
-                ok=False,
-                code="INVALID_CONTEXT",
-                message="无法识别你的平台身份，请稍后重试。",
-                request_id=context.request_id,
-            )
-        if not context.can_write_assets and message:
-            return CommandResult(
-                ok=False,
-                code="INVALID_CONTEXT",
-                message=message,
-                request_id=context.request_id,
-            )
-        return None
 
     @staticmethod
     def _display_name(player) -> str:
@@ -116,7 +96,11 @@ class PlayerApplication:
         )
 
     async def create_player(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件缺少可验证的消息身份，无法创建角色。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件缺少可验证的消息身份，无法创建角色。",
+        )
         if invalid is not None:
             return invalid
         if len(context.command_args) > 1:
@@ -200,7 +184,11 @@ class PlayerApplication:
         )
 
     async def start_seeking(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件缺少可验证的消息身份，无法执行指令。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件缺少可验证的消息身份，无法执行指令。",
+        )
         if invalid is not None:
             return invalid
         operation_id = self._operation_id(context, "player.start_seeking")
@@ -278,10 +266,9 @@ class PlayerApplication:
         )
 
     async def get_profile(self, context: CommandContext) -> CommandResult:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(False, "INVALID_CONTEXT", "无法识别你的平台身份，请稍后重试。", context.request_id)
+        invalid = validate_command_identity(context)
+        if invalid is not None:
+            return invalid
         try:
             player = await self.repository.get_player(
                 platform=context.adapter,
@@ -343,7 +330,11 @@ class PlayerApplication:
         )
 
     async def rename_player(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件缺少可验证的消息身份，无法修改道号。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件缺少可验证的消息身份，无法修改道号。",
+        )
         if invalid is not None:
             return invalid
         if len(context.command_args) != 1:

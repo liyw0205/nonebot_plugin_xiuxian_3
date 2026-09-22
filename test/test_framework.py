@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from tempfile import TemporaryDirectory
 
-from nonebot_plugin_xiuxian_3.contracts import CommandContext
+from nonebot_plugin_xiuxian_3.contracts import CommandContext, validate_command_identity
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
 
@@ -173,6 +173,25 @@ def test_invalid_context_returns_stable_error() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_shared_identity_validation_separates_read_and_write_checks() -> None:
+    invalid = validate_command_identity(CommandContext(adapter="web", user_id=""))
+    assert invalid is not None
+    assert invalid.code == "INVALID_CONTEXT"
+
+    read_only = validate_command_identity(
+        CommandContext(adapter="web", user_id="reader", can_write_assets=False)
+    )
+    assert read_only is None
+
+    write_blocked = validate_command_identity(
+        CommandContext(adapter="web", user_id="writer", can_write_assets=False),
+        require_write=True,
+        write_message="禁止写入。",
+    )
+    assert write_blocked is not None
+    assert write_blocked.message == "禁止写入。"
 
 
 def test_operation_replay_conflict_and_read_only_profile() -> None:

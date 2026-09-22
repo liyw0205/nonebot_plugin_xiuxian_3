@@ -4,6 +4,10 @@
 框架或 CLI。所有适配器把平台事件归一化为 `CommandContext`，再通过同一个
 `XiuxianRuntime` 路由到 application 用例。
 
+身份判断统一由 `contracts.validate_command_identity` 完成：读操作只检查适配器与平台用户
+身份，写操作额外检查 `can_write_assets`。各功能模块不再重复实现 `context.validate()`，只
+负责自己的境界、资源、地点和会话业务规则。
+
 角色功能按职责拆分在 `xiuxian/player/`：`models.py` 保存用例记录，`rules.py`
 保存纯规则，`use_cases.py` 负责命令编排；适配器层只做归一化、路由和消息呈现。
 

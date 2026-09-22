@@ -48,6 +48,33 @@ class CommandResult:
     retryable: bool = False
 
 
+def validate_command_identity(
+    context: CommandContext,
+    *,
+    require_write: bool = False,
+    write_message: str = "当前事件不允许执行此操作。",
+) -> CommandResult | None:
+    """Validate normalized adapter identity at the application boundary.
+
+    Read-only commands only need a stable adapter/user identity. Asset-mutating
+    commands additionally require the adapter to prove that the event can be
+    written safely (for example, it has a message and scene identity).
+    """
+
+    try:
+        context.validate()
+    except ValueError:
+        return CommandResult(
+            False,
+            "INVALID_CONTEXT",
+            "无法识别你的平台身份，请稍后重试。",
+            context.request_id,
+        )
+    if require_write and not context.can_write_assets:
+        return CommandResult(False, "INVALID_CONTEXT", write_message, context.request_id)
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class PlayerView:
     player_id: str

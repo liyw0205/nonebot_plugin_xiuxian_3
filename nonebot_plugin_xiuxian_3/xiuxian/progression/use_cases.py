@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandContext, CommandResult, validate_command_identity
 from ..repository import (
     CultivationAlreadyRecoveredError,
     CultivationAlreadyReadyError,
@@ -71,18 +71,12 @@ class ProgressionApplication:
     def _realm_text(player) -> str:
         return f"感气 L{player.realm_layer}（{segment_for_layer(player.realm_layer)}）"
 
-    @staticmethod
-    def _invalid_context(context: CommandContext) -> CommandResult | None:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(False, "INVALID_CONTEXT", "无法识别你的平台身份，请稍后重试。", context.request_id)
-        if not context.can_write_assets:
-            return CommandResult(False, "INVALID_CONTEXT", "当前事件不允许进行修炼结算。", context.request_id)
-        return None
-
     async def start_cultivation(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行修炼结算。",
+        )
         if invalid is not None:
             return invalid
         mode_key = self._resolve_mode(context.command_args)
@@ -156,7 +150,11 @@ class ProgressionApplication:
         )
 
     async def settle_cultivation(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行修炼结算。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:
@@ -225,7 +223,11 @@ class ProgressionApplication:
         )
 
     async def recover_cultivation(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行修炼结算。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:
@@ -285,7 +287,11 @@ class ProgressionApplication:
         )
 
     async def cancel_cultivation(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行修炼结算。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:
@@ -335,7 +341,11 @@ class ProgressionApplication:
         )
 
     async def advance_layer(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行修炼结算。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:
@@ -406,7 +416,11 @@ class ProgressionApplication:
         )
 
     async def recover_resources(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行修炼结算。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:

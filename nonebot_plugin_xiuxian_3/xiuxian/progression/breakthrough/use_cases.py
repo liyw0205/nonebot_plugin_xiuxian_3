@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ....contracts import CommandContext, CommandResult
+from ....contracts import CommandContext, CommandResult, validate_command_identity
 from ...repository import (
     BreakthroughBusyError,
     BreakthroughNotFoundError,
@@ -72,16 +72,6 @@ class BreakthroughApplication:
         )
 
     @staticmethod
-    def _invalid_context(context: CommandContext) -> CommandResult | None:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(False, "INVALID_CONTEXT", "无法识别你的平台身份，请稍后重试。", context.request_id)
-        if not context.can_write_assets:
-            return CommandResult(False, "INVALID_CONTEXT", "当前事件不允许进行突破结算。", context.request_id)
-        return None
-
-    @staticmethod
     def _parse_start_args(args: tuple[str, ...]) -> tuple[str, bool] | None:
         target = "qi_gathering"
         protection = False
@@ -117,7 +107,11 @@ class BreakthroughApplication:
         return quality + technique + formation
 
     async def preview_breakthrough(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行突破结算。",
+        )
         if invalid is not None:
             return invalid
         parsed = self._parse_start_args(context.command_args)
@@ -164,7 +158,11 @@ class BreakthroughApplication:
         return CommandResult(True, "BREAKTHROUGH_PREVIEW", message, context.request_id, data={"target_realm": target, "ready": ready, "missing": missing, "success_bp": current_success_bp, "preparation_bp": preparation_bp, "pity_bp": player.breakthrough_pity_bp})
 
     async def start_breakthrough(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行突破结算。",
+        )
         if invalid is not None:
             return invalid
         parsed = self._parse_start_args(context.command_args)
@@ -222,7 +220,11 @@ class BreakthroughApplication:
         )
 
     async def settle_breakthrough(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行突破结算。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:
@@ -281,7 +283,11 @@ class BreakthroughApplication:
         return CommandResult(True, "BREAKTHROUGH_SUCCEEDED" if record.success else "BREAKTHROUGH_FAILED", message, context.request_id, operation_id, data={"session_id": record.session_id, "target_realm": record.target_realm, "success": record.success, "roll_bp": record.roll_bp, "success_bp": record.success_bp, "cultivation_before": record.cultivation_before, "cultivation_after": record.cultivation_after, "pity_before_bp": record.pity_before_bp, "pity_after_bp": record.pity_after_bp, "preparation_bp": record.preparation_bp, "reward_currency": record.reward_currency, "reward_stamina": record.reward_stamina, "reward_world_merit": record.reward_world_merit, "reward_items": record.reward_items or {}, "protection_consumed": record.protection_consumed, "weakness_until": record.weakness_until, "idempotent_replay": record.already_completed})
 
     async def recover_weakness(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context)
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行突破结算。",
+        )
         if invalid is not None:
             return invalid
         if len(context.command_args) > 1 or (context.command_args and context.command_args[0] not in {"提前", "立即", "early"}):

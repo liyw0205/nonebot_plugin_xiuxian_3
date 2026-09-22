@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandContext, CommandResult, validate_command_identity
 from ..repository import (
     CultivationBusyError,
     LocationRequiredError,
@@ -45,16 +45,6 @@ class IntroApplication:
         return f"{operation_name}:{context.adapter}:{context.user_id}:{request_key}"
 
     @staticmethod
-    def _invalid_context(context: CommandContext, message: str) -> CommandResult | None:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(False, "INVALID_CONTEXT", "无法识别你的平台身份，请稍后重试。", context.request_id)
-        if not context.can_write_assets:
-            return CommandResult(False, "INVALID_CONTEXT", message, context.request_id)
-        return None
-
-    @staticmethod
     def _display_name(player) -> str:
         value = player.dao_name or "未命名"
         return (
@@ -81,7 +71,11 @@ class IntroApplication:
         return "、".join(f"`完成引导 {GUIDE_COMMANDS[key]}`" for key in pending)
 
     async def complete_intro(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件不允许进行引导结算。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行引导结算。",
+        )
         if invalid is not None:
             return invalid
         guide_key, service_key, error = self._parse_guide(context.command_args)
@@ -175,7 +169,11 @@ class IntroApplication:
         )
 
     async def travel_intro(self, context: CommandContext, destination: str) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件不允许进行移动。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许进行移动。",
+        )
         if invalid is not None:
             return invalid
         destination_key = resolve_destination(destination)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandContext, CommandResult, validate_command_identity
 from ..repository import (
     EnergyInsufficientError,
     MaterialInsufficientError,
@@ -54,21 +54,10 @@ class ProductionApplication:
             return None
         return resolve_recipe(args[0])
 
-    @staticmethod
-    def _invalid_context(context: CommandContext, text: str) -> CommandResult | None:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(False, "INVALID_CONTEXT", "无法识别你的平台身份，请稍后重试。", context.request_id)
-        if not context.can_write_assets:
-            return CommandResult(False, "INVALID_CONTEXT", text, context.request_id)
-        return None
-
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
-        try:
-            context.validate()
-        except ValueError:
-            return CommandResult(False, "INVALID_CONTEXT", "无法识别你的平台身份，请稍后重试。", context.request_id)
+        invalid = validate_command_identity(context)
+        if invalid is not None:
+            return invalid
         recipe_key = self._recipe_args(context.command_args)
         if recipe_key is None:
             return CommandResult(False, "RECIPE_NOT_FOUND", "请指定配方，例如 `生产预览 疗伤丹`。", context.request_id)
@@ -119,7 +108,11 @@ class ProductionApplication:
         )
 
     async def start_production(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件不允许锁定生产资产。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许锁定生产资产。",
+        )
         if invalid is not None:
             return invalid
         recipe_key = self._recipe_args(context.command_args)
@@ -186,7 +179,11 @@ class ProductionApplication:
         )
 
     async def complete_production(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件不允许领取生产结果。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许领取生产结果。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:
@@ -217,7 +214,11 @@ class ProductionApplication:
         return self._settlement_result(context, operation_id, record)
 
     async def recover_production(self, context: CommandContext) -> CommandResult:
-        invalid = self._invalid_context(context, "当前事件不允许恢复生产订单。")
+        invalid = validate_command_identity(
+            context,
+            require_write=True,
+            write_message="当前事件不允许恢复生产订单。",
+        )
         if invalid is not None:
             return invalid
         if context.command_args:
