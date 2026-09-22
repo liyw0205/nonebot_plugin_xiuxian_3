@@ -4,6 +4,9 @@
 > `content-v0.6.md` 的开放边界、稳定键、依赖和验收规则合并为一套可执行规格。
 > `content-v*.md` 现在只保留为历史发布快照和兼容清单，不再单独定义玩法，也不
 > 规定代码必须按版本顺序开发。
+>
+> 本文回答“应该开发什么”；当前分支“已经开发什么”统一查看[当前开发状态](current-status.md)。
+> 规划表中的 `open` 是目标内容状态，只有状态快照也标记为 `open` 时，才允许接入运行时入口。
 
 ## 1. 先读这一节
 
@@ -71,9 +74,9 @@ new_user -> 寻仙问道 -> mortal -> seeker -> cultivator(qi_sensing L1)
 | `realm_key` | 首版状态 | 首版可执行范围 |
 |:--|:--|:--|
 | `mortal` | `open` | 新手城、采集、居所、灵田、城镇委托、基础交易和教学 |
-| `qi_sensing` | `open` | L1-L10、基础修炼、六大道途体验、低风险战斗 |
+| `qi_sensing` | `open` | L1-L10、基础修炼、六大道途体验、低风险战斗规则（运行时后置） |
 | `qi_gathering` | `open` | L1-L10、基础装备、炼丹/炼器/布阵、宗门申请 |
-| `foundation` | `open` | L1-L10、雾隐洞天一层、悬赏、基础 PVE 和贡献 |
+| `foundation` | `open` | L1-L10、雾隐洞天一层、悬赏、基础 PVE 规则和贡献（运行时后置） |
 | `golden_core` | `placeholder` | 注册键和预览条件，不创建突破会话 |
 | `nascent_soul` 及以上 | `placeholder` | 注册键和世界观展示，不产生资产结果 |
 

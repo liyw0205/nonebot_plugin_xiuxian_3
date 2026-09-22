@@ -31,6 +31,7 @@ QQ 官方适配器、消息投递和路由兼容层的复用来源。具体边�
 |:--|:--|
 | [修仙 3 文档索引](docs/index.md) | 全部基础、玩法、扩展和工程文档入口 |
 | [完整内容开发总表](docs/content-development.md) | 首版 MVP、全部境界、功能路线、稳定键依赖和切片验收唯一权威 |
+| [当前开发状态](docs/current-status.md) | 当前已开放、锁定范围和下一步顺序的唯一入口 |
 | [修仙 3 总设计](docs/xiuxian3-design.md) | 世界观、境界、道途、辅修、数值和首版范围 |
 | [目标架构](docs/architecture.md) | 模块边界、依赖方向和启动生命周期 |
 | [适配器与 Web](docs/adapters-and-web.md) | OneBot/QQ 消息归一化、Web API 与权限 |
@@ -67,5 +68,6 @@ git clone --branch main --single-branch \
 ## 当前仓库状态
 
 当前以 `docs/content-development.md` 作为内容、境界和功能范围入口，以
-`docs/xiuxian3-design.md` 作为跨系统设计总纲；后续实现按总表和实施计划拆分
-垂直切片。完整文档按 `docs/index.md` 组织；每个阶段形成独立、可测试、可回滚的提交。
+`docs/current-status.md` 判断当前分支是否已经接入运行时，以 `docs/xiuxian3-design.md`
+作为跨系统设计总纲；后续实现按总表和实施计划拆分垂直切片。完整文档按
+`docs/index.md` 组织；每个阶段形成独立、可测试、可回滚的提交。

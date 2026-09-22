@@ -5,9 +5,10 @@
 `XiuxianRuntime` 路由到 application 用例。
 
 身份判断统一由 `XiuxianApplication._invoke` 调用 `contracts.validate_command_identity` 完成：
-读操作只检查适配器与平台用户身份，写操作额外检查 `can_write_assets`。各功能模块不再
-重复实现身份判断，只负责自己的境界、资源、地点和会话业务规则；所有文本、按钮和 Web
-入口都必须经过 `XiuxianApplication` 的公开方法。
+读操作只检查适配器与平台用户身份，写操作额外检查 `can_write_assets`。各功能模块不应把
+适配器身份当作自己的规则；它们只负责境界、资源、地点和会话业务规则。仓储事务内的
+`_require_player` 是并发写入前的角色存在/暂停状态防线，不替代应用层统一校验。所有文本、
+按钮和 Web 入口都必须经过 `XiuxianApplication` 的公开方法。
 
 数据库角色身份在仓储层由 `SQLitePlayerRepository._require_player` 统一处理。该函数必须
 在当前事务连接上调用，统一处理“角色不存在”和“角色已暂停/删除”，并通过

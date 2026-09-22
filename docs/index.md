@@ -9,6 +9,7 @@
 | [修仙 3 总设计](xiuxian3-design.md) | 项目定位、新手流程、世界观、境界、道途、资源、总体循环和子文档裁决原则 | 主文档 |
 | [实施计划](implementation-plan.md) | P0-P8 依赖、首版垂直切片、风险、验收与回滚 | 执行权威 |
 | [完整内容开发总表](content-development.md) | 全部境界、功能域、发布边界、首版范围、稳定键依赖和完整切片验收 | 内容开发唯一权威 |
+| [当前开发状态](current-status.md) | 当前分支已开放、合同/锁定和下一步开发顺序 | 状态唯一入口 |
 | [版本内容开发合同](content-development-contract.md) | 全部 `content-v*.md` 的字段、版本、事务、幂等、随机、失败、发布和回滚约束 | 内容工程权威 |
 | [上游参考与复用边界](reference-sources.md) | 上游文档的通用玩法参考、适配器复用范围和禁止事项 | 已整理 |
 | [基础域目录](foundation/) | 角色、境界、道途、属性、资源、物品和构筑养成的分文件规格 | 细节权威 |
@@ -19,6 +20,9 @@
 全部境界和功能的完整开发范围以[完整内容开发总表](content-development.md)为准；
 快照只表示某个 `content_version` 的开放键和值，不能要求实现按版本逐个开发。
 所有版本内容文件同时受 [版本内容开发合同](content-development-contract.md) 约束。
+
+当前代码是否已经接入运行时只看[当前开发状态](current-status.md)。域 README 可以说明
+本域的边界和入口，但不复制一份独立的全局状态表。
 
 发布路线：v0.1 新手和玄天界基础闭环；v0.2 金丹、玄天界扩区、宗门/市场成熟和魔界入口；v0.3 元婴、魔界/妖界正式区域、多人副本、阵营战争和赛季；v0.4 化神、领域和跨界深层；v0.5 炼虚、虚空航道和跨服宗门战；v0.6 合道、渡劫、飞升和终局赛季。该路线描述内容快照，不是代码开发顺序。
 
@@ -65,18 +69,20 @@
 
 1. `xiuxian3-design.md`
 2. `content-development.md`，确定首版范围和完整境界/功能路线
-3. `foundation/README.md`，再进入对应域的模型、流程和用例
-4. `gameplay/README.md`，再进入对应玩法域目录；特色运营先读 `routine/`、`adventures/`、`companions/`
-5. `extensions/README.md`，再进入对应扩展域目录
-6. 只有需要复原历史发布参数时才读取对应的 `content-v*.md`
+3. `current-status.md`，确认哪些内容已经接入运行时
+4. `foundation/README.md`，再进入对应域的模型、流程和用例
+5. `gameplay/README.md`，再进入对应玩法域目录；特色运营先读 `routine/`、`adventures/`、`companions/`
+6. `extensions/README.md`，再进入对应扩展域目录
+7. 只有需要复原历史发布参数时才读取对应的 `content-v*.md`
 
 开始实现一个功能：
 
-1. 先读对应域目录的 `README.md`。
-2. 再读该域的 `model.md`、`workflow.md`、`use-cases.md`。
-3. 跨域资源读取 `foundation/items/`，跨域数值读取 `foundation/stats/`。
-4. 涉及消息时读 `extensions/adapters/`；涉及管理员或数据时读 `extensions/web/` 和 `extensions/content/`。
-5. 最后按 `testing.md` 补齐测试与回滚验证。
+1. 先读 `current-status.md`，确认功能不是 `locked` 或 `contract`。
+2. 再读对应域目录的 `README.md`。
+3. 再读该域的 `model.md`、`workflow.md`、`use-cases.md`。
+4. 跨域资源读取 `foundation/items/`，跨域数值读取 `foundation/stats/`。
+5. 涉及消息时读 `extensions/adapters/`；涉及管理员或数据时读 `extensions/web/` 和 `extensions/content/`。
+6. 最后按 `testing.md` 补齐测试与回滚验证。
 
 开始首版新手闭环时，先读 `content-development.md` 的 MVP-1 范围，再读
 `implementation-plan.md` 的当前切片和角色域模型；它们共同冻结

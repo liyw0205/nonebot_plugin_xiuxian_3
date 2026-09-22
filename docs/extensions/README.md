@@ -11,6 +11,7 @@
 全部 `content-v*.md` 都是历史发布快照，遵守 [版本内容开发合同](../content-development-contract.md)。
 扩展域的完整路线、首版能力和发布边界以[完整内容开发总表](../content-development.md)为准；
 扩展只包含平台适配、Web 运营和数据内容；修仙3不提供媒体、WebDAV、第三方账号、小游戏或独立娱乐积分等娱乐子系统。
+当前适配器、Web 和数据内容是否已接入运行时，以[当前开发状态](../current-status.md)为准。
 
 ## v0.1 内容入口
 
