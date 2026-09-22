@@ -9,6 +9,11 @@
 重复实现身份判断，只负责自己的境界、资源、地点和会话业务规则；所有文本、按钮和 Web
 入口都必须经过 `XiuxianApplication` 的公开方法。
 
+数据库角色身份在仓储层由 `SQLitePlayerRepository._require_player` 统一处理。该函数必须
+在当前事务连接上调用，统一处理“角色不存在”和“角色已暂停/删除”，并通过
+`writable=False` 明确只读查询策略；功能事务不应先调用跨连接的 `get_player` 再写入，
+以免出现身份检查与写入之间的竞态。
+
 角色功能按职责拆分在 `xiuxian/player/`：`models.py` 保存用例记录，`rules.py`
 保存纯规则，`use_cases.py` 负责命令编排；适配器层只做归一化、路由和消息呈现。
 

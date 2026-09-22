@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext, validate_command_identity
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.repository import PlayerNotFoundError, PlayerSuspendedError
 
 
 def test_player_creation_and_seeking_are_idempotent_under_concurrency() -> None:
@@ -196,6 +197,46 @@ def test_shared_identity_validation_separates_read_and_write_checks() -> None:
     malformed = validate_command_identity(CommandContext(adapter=None, user_id=123))
     assert malformed is not None
     assert malformed.code == "INVALID_CONTEXT"
+
+
+def test_repository_identity_lookup_is_shared_and_transaction_local() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            await runtime.initialize()
+            with runtime.repository._connect() as connection:
+                try:
+                    runtime.repository._require_player(connection, "web", "missing")
+                except PlayerNotFoundError:
+                    pass
+                else:
+                    raise AssertionError("missing identity bypassed the shared repository check")
+
+            created = await runtime.dispatch(
+                CommandContext(adapter="web", user_id="suspended-user"),
+                "开始修仙",
+            )
+            assert created.ok
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE players SET status = 'suspended' WHERE platform = ? AND platform_user_id = ?",
+                    ("web", "suspended-user"),
+                )
+                for writable in (True, False):
+                    try:
+                        runtime.repository._require_player(
+                            connection,
+                            "web",
+                            "suspended-user",
+                            writable=writable,
+                        )
+                    except PlayerSuspendedError:
+                        pass
+                    else:
+                        raise AssertionError("suspended identity bypassed the shared repository check")
+            await runtime.close()
+
+    asyncio.run(run())
 
 
 def test_every_registered_command_uses_shared_identity_validation() -> None:

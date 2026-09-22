@@ -1046,6 +1046,32 @@ class SQLitePlayerRepository:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    @staticmethod
+    def _require_player(
+        connection: sqlite3.Connection,
+        platform: str,
+        platform_user_id: str,
+        *,
+        writable: bool = True,
+    ) -> sqlite3.Row:
+        """Load one platform identity inside the caller's transaction.
+
+        Every mutating repository operation must use this helper after it has
+        opened its transaction. Keeping lookup and status validation together
+        prevents feature modules from drifting in their identity semantics.
+        """
+
+        row = connection.execute(
+            "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+            (platform, platform_user_id),
+        ).fetchone()
+        if row is None:
+            raise PlayerNotFoundError("player does not exist")
+        if row["status"] != "active":
+            detail = "player is not writable" if writable else "player is not readable"
+            raise PlayerSuspendedError(detail)
+        return row
+
     def _initialize_sync(self) -> None:
         with self._connect() as connection:
             connection.executescript(SCHEMA)
@@ -1460,14 +1486,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
 
             created = row["stage"] == STAGE_NEW_USER
             if created:
@@ -1605,14 +1624,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] not in {STAGE_MORTAL, "seeker"}:
                 raise PlayerStageConflictError("player is not ready for mortal introduction")
 
@@ -1781,14 +1793,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 raise PlayerStageConflictError("player is not ready for travel")
             if destination not in TRAVEL_COSTS:
@@ -1956,14 +1961,7 @@ class SQLitePlayerRepository:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._travel_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 raise PlayerStageConflictError("player is not ready for travel")
             weakness_until = row["weakness_until"]
@@ -2108,13 +2106,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._travel_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?", (platform, platform_user_id)
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM travel_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1", (row["id"],)
             ).fetchone()
@@ -2210,14 +2202,7 @@ class SQLitePlayerRepository:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._exploration_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 raise PlayerStageConflictError("player is not ready for exploration")
             if str(row["location_key"]) != definition.location_key:
@@ -2388,14 +2373,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -2552,13 +2530,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?", (platform, platform_user_id)
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM exploration_sessions WHERE player_id = ? AND status = 'created' ORDER BY id DESC LIMIT 1", (row["id"],)
             ).fetchone()
@@ -2602,14 +2574,7 @@ class SQLitePlayerRepository:
         now = datetime.now(timezone.utc)
         business_date = now.date().isoformat()
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not readable")
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
             accepted = connection.execute(
                 "SELECT * FROM bounty_offers WHERE player_id = ? AND business_date = ?",
                 (row["id"], business_date),
@@ -2729,14 +2694,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._bounty_accept_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if definition.runtime_status != "open":
                 raise BountyContentClosedError("bounty runtime is closed")
             if not self._bounty_player_eligible(row, definition):
@@ -2854,14 +2812,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._bounty_claim_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             offer = connection.execute(
                 "SELECT * FROM bounty_offers WHERE player_id = ? AND status IN ('accepted', 'completed') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -3089,14 +3040,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "seeker":
                 raise PlayerStageConflictError("player is not ready to enter cultivation")
             if row["path_key"]:
@@ -3228,14 +3172,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "cultivator" or row["realm_key"] != REALM_QI_SENSING:
                 raise PlayerStageConflictError("player is not ready for cultivation")
             try:
@@ -3421,14 +3358,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -3585,14 +3515,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -3714,14 +3637,7 @@ class SQLitePlayerRepository:
                     stamina_refund=int(payload["stamina_refund"]),
                     already_completed=True,
                 )
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -3858,14 +3774,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                     unlocks=unlocks,
                 )
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "cultivator" or row["realm_key"] != REALM_QI_SENSING:
                 raise PlayerStageConflictError("player is not ready to advance")
             running = connection.execute(
@@ -3966,14 +3875,7 @@ class SQLitePlayerRepository:
                     changed=bool(payload["changed"]),
                     already_completed=True,
                 )
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             try:
                 last_update = datetime.fromisoformat(str(row["updated_at"]))
             except ValueError:
@@ -4053,14 +3955,7 @@ class SQLitePlayerRepository:
         recipe = recipe_definition(recipe_key)
         now = self._now()
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             self._check_production_requirements(row, recipe)
             day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             day_end = day_start + timedelta(days=1)
@@ -4163,14 +4058,7 @@ class SQLitePlayerRepository:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._production_order_from_payload(json.loads(existing["result_json"]), replay=True)
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "cultivator":
                 raise PlayerStageConflictError("player is not ready for production")
             self._check_production_requirements(row, recipe)
@@ -4392,14 +4280,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._production_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
                 "SELECT * FROM production_orders WHERE player_id = ? AND status IN ('processing', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -4658,14 +4539,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             if target_realm != definition.target_realm:
                 raise BreakthroughRequirementError("target breakthrough is not open")
             if row["stage"] != "cultivator" or row["realm_key"] != definition.source_realm:
@@ -4882,14 +4756,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._breakthrough_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM breakthrough_sessions WHERE player_id = ? AND status = 'preparing' ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -5052,14 +4919,7 @@ class SQLitePlayerRepository:
                     medicine_consumed=bool(payload["medicine_consumed"]),
                     already_completed=True,
                 )
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             weakness_until = row["weakness_until"]
             if not weakness_until:
                 raise WeaknessNotActiveError("no breakthrough weakness is active")
@@ -5205,14 +5065,7 @@ class SQLitePlayerRepository:
                     already_completed=True,
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
 
             current_name = str(row["dao_name"] or "")
             if current_name:
@@ -5324,14 +5177,7 @@ class SQLitePlayerRepository:
                     json.loads(existing["result_json"]), replay=True
                 )
 
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             duplicate = connection.execute(
                 "SELECT 1 FROM routine_checkins WHERE player_id = ? AND target_date = ? LIMIT 1",
                 (row["id"], target_date),
@@ -5491,14 +5337,7 @@ class SQLitePlayerRepository:
                 raise RoutineMakeupDateError(str(exc)) from exc
             canonical_target = parsed_target.isoformat()
             month_key = now.date().strftime("%Y-%m")
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             duplicate = connection.execute(
                 "SELECT 1 FROM routine_checkins WHERE player_id = ? AND target_date = ? LIMIT 1",
                 (row["id"], canonical_target),
@@ -5648,14 +5487,7 @@ class SQLitePlayerRepository:
                 return self._spirit_tree_from_payload(
                     json.loads(existing["result_json"]), replay=True
                 )
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             tree = connection.execute(
                 "SELECT * FROM spirit_trees WHERE player_id = ?", (row["id"],)
             ).fetchone()
@@ -5792,14 +5624,7 @@ class SQLitePlayerRepository:
                 return self._spirit_tree_from_payload(
                     json.loads(existing["result_json"]), replay=True
                 )
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             tree = connection.execute(
                 "SELECT * FROM spirit_trees WHERE player_id = ?", (row["id"],)
             ).fetchone()
@@ -5918,14 +5743,7 @@ class SQLitePlayerRepository:
     ) -> SevenDayStatusRecord:
         now = self._now()
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             campaign = self._ensure_seven_day_campaign(
                 connection, row, serialize_datetime(now)
             )
@@ -6197,14 +6015,7 @@ class SQLitePlayerRepository:
                 definition = seven_day_goal(day_number)
             except ValueError as exc:
                 raise SevenDayGoalInvalidError(str(exc)) from exc
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             campaign = self._ensure_seven_day_campaign(connection, row, now_text)
             start = date.fromisoformat(str(campaign["start_date"]))
             target_date = (start + timedelta(days=day_number - 1)).isoformat()
@@ -6495,14 +6306,7 @@ class SQLitePlayerRepository:
         self, platform: str, platform_user_id: str
     ) -> HonorStatusRecord:
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             return self._honor_status_from_connection(
                 connection, row, serialize_datetime(self._now())
             )
@@ -6558,14 +6362,7 @@ class SQLitePlayerRepository:
                 definition = achievement(achievement_key)
             except ValueError as exc:
                 raise AchievementInvalidError(str(exc)) from exc
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             claimed = connection.execute(
                 "SELECT 1 FROM achievement_claims WHERE player_id = ? AND achievement_key = ?",
                 (row["id"], definition.key),
@@ -6719,14 +6516,7 @@ class SQLitePlayerRepository:
                 definition = honor_title(title_key)
             except ValueError as exc:
                 raise HonorTitleNotFoundError(str(exc)) from exc
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             self._materialize_honor_titles(connection, int(row["id"]), now_text)
             owned = connection.execute(
                 "SELECT 1 FROM honor_titles WHERE player_id = ? AND title_key = ?",
@@ -6842,14 +6632,7 @@ class SQLitePlayerRepository:
                 ends_on and business_date > date.fromisoformat(str(ends_on))
             ):
                 raise RedemptionCodeExpiredError("redemption code is outside its validity window")
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             claimed = connection.execute(
                 "SELECT 1 FROM redemption_claims WHERE player_id = ? AND code_id = ?",
                 (row["id"], code_row["id"]),
@@ -7010,14 +6793,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._fate_roll_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             pool = connection.execute(
                 "SELECT * FROM fate_pools WHERE player_id = ? AND pool_key = ?",
                 (row["id"], FATE_POOL_KEY),
@@ -7231,14 +7007,7 @@ class SQLitePlayerRepository:
                 return self._wayfaring_status_from_payload(
                     json.loads(existing["result_json"]), replay=True
                 )
-            player = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if player is None:
-                raise PlayerNotFoundError("player does not exist")
-            if player["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            player = self._require_player(connection, platform, platform_user_id)
             current = connection.execute(
                 "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
                 (player["id"], WAYFARING_PASS_KEY),
@@ -7296,14 +7065,7 @@ class SQLitePlayerRepository:
         now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            player = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if player is None:
-                raise PlayerNotFoundError("player does not exist")
-            if player["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            player = self._require_player(connection, platform, platform_user_id)
             pass_row = connection.execute(
                 "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
                 (player["id"], WAYFARING_PASS_KEY),
@@ -7393,14 +7155,7 @@ class SQLitePlayerRepository:
                 return self._wayfaring_claim_from_payload(
                     json.loads(existing["result_json"]), replay=True
                 )
-            player = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if player is None:
-                raise PlayerNotFoundError("player does not exist")
-            if player["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            player = self._require_player(connection, platform, platform_user_id)
             pass_row = connection.execute(
                 "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
                 (player["id"], WAYFARING_PASS_KEY),
@@ -7781,14 +7536,7 @@ class SQLitePlayerRepository:
         platform_user_id: str,
     ) -> DaoContractStatusRecord:
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             return self._dao_status_from_connection(connection, row, self._now().date())
 
     async def activate_dao_contract(
@@ -7853,14 +7601,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != "routine.activate_dao_contract" or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._dao_activation_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             used = connection.execute(
                 "SELECT 1 FROM dao_contracts WHERE receipt_id = ? OR receipt_hash = ?",
                 (receipt.receipt_id, receipt.payload_hash),
@@ -7986,14 +7727,7 @@ class SQLitePlayerRepository:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._dao_claim_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
-            if row is None:
-                raise PlayerNotFoundError("player does not exist")
-            if row["status"] != "active":
-                raise PlayerSuspendedError("player is not writable")
+            row = self._require_player(connection, platform, platform_user_id)
             contract_row = connection.execute(
                 """
                 SELECT * FROM dao_contracts
