@@ -20,6 +20,7 @@
       },
       "capacity": {
         "rest_slots": 1,
+        "plots": 1,
         "storage_slots": 10
       },
       "key": "residence.town_room",

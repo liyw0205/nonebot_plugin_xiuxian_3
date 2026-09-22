@@ -153,6 +153,29 @@ CREATE TABLE IF NOT EXISTS residences (
 CREATE INDEX IF NOT EXISTS idx_residences_player ON residences(player_id, ends_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_residences_active ON residences(player_id) WHERE status = 'active';
 
+CREATE TABLE IF NOT EXISTS field_plots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plot_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    residence_id TEXT NOT NULL REFERENCES residences(residence_id),
+    operation_id TEXT NOT NULL UNIQUE,
+    crop_key TEXT,
+    status TEXT NOT NULL CHECK (status IN ('growing', 'harvestable', 'harvested', 'withered')),
+    planted_at TEXT NOT NULL,
+    harvest_at TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    maintenance_count INTEGER NOT NULL DEFAULT 0 CHECK (maintenance_count >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_field_plots_player ON field_plots(player_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_field_plots_residence ON field_plots(residence_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_field_plots_active
+    ON field_plots(residence_id) WHERE status IN ('growing', 'harvestable');
+
 CREATE TABLE IF NOT EXISTS constitution_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL UNIQUE,

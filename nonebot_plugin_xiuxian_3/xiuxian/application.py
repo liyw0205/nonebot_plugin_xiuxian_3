@@ -410,6 +410,30 @@ class XiuxianApplication:
     async def get_residence(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.livelihood.get_profile(context), require_write=False)
 
+    async def plant_field(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.plant(context),
+            write_message="当前事件不允许播种灵田。",
+        )
+
+    async def maintain_field(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.maintain(context),
+            write_message="当前事件不允许维护灵田。",
+        )
+
+    async def harvest_field(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.harvest(context),
+            write_message="当前事件不允许收获灵田。",
+        )
+
+    async def get_field_profile(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.livelihood.get_plot_profile(context), require_write=False)
+
     async def preview_constitution(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.constitution.preview(context), require_write=False)
 

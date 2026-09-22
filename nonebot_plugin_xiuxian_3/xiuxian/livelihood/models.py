@@ -1,8 +1,8 @@
-"""Application records for residence services."""
+"""Application records for residence and field services."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ...contracts import PlayerView
 
@@ -19,4 +19,20 @@ class ResidenceRecord:
     already_completed: bool = False
 
 
-__all__ = ["ResidenceRecord"]
+@dataclass(frozen=True, slots=True)
+class FieldPlotRecord:
+    player: PlayerView
+    plot_id: str
+    residence_id: str
+    crop_key: str | None
+    status: str
+    planted_at: str | None
+    harvest_at: str | None
+    maintenance_count: int = 0
+    required_maintenance: int = 0
+    harvest: dict[str, int] = field(default_factory=dict)
+    local_reputation_delta: int = 0
+    already_completed: bool = False
+
+
+__all__ = ["FieldPlotRecord", "ResidenceRecord"]

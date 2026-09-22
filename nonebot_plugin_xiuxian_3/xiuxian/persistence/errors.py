@@ -204,6 +204,42 @@ class ResidenceRequiredError(RuntimeError):
     """The requested action requires an active residence."""
 
 
+class ResidencePlotRequiredError(RuntimeError):
+    """The active residence does not provide a usable field plot."""
+
+
+class LocalReputationInsufficientError(RuntimeError):
+    """The player has not reached a residence's local reputation gate."""
+
+
+class CropContentClosedError(RuntimeError):
+    """The requested crop is registered but not open."""
+
+
+class FieldPlotBusyError(RuntimeError):
+    """The residence plot already contains a growing crop."""
+
+
+class FieldPlotNotFoundError(RuntimeError):
+    """The player has no current field plot to operate on."""
+
+
+class FieldPlotNotReadyError(RuntimeError):
+    """The crop has not reached its harvest time."""
+
+
+class FieldPlotWitheredError(RuntimeError):
+    """The crop was not harvested within its settlement window."""
+
+
+class FieldPlotAlreadyHarvestedError(RuntimeError):
+    """The current field plot has already been harvested."""
+
+
+class CropDailyLimitError(RuntimeError):
+    """The crop reached its business-day planting quota."""
+
+
 class ConstitutionAlreadySelectedError(RuntimeError):
     """The player already has a main constitution."""
 

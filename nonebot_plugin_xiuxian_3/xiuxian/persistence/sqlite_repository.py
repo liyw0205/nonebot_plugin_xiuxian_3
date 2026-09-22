@@ -22,6 +22,7 @@ from ..exploration.repository import ExplorationRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
+from ..livelihood.repository import LivelihoodRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
 from .errors import *  # noqa: F401,F403
 from .schema import SCHEMA
@@ -37,6 +38,7 @@ class SQLitePlayerRepository(
     ExplorationRepositoryMixin,
     AdventuresRepositoryMixin,
     ProductionRepositoryMixin,
+    LivelihoodRepositoryMixin,
     AdvancementRepositoryMixin,
     CultivationRepositoryMixin,
     BreakthroughRepositoryMixin,
