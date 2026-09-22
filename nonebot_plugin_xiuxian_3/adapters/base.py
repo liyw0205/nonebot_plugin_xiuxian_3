@@ -152,3 +152,4 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("功业录", application.get_honor_status, aliases=("我的功业", "我的称号"))
     router.register("领取功业", application.claim_achievement, aliases=("领取成就",))
     router.register("佩戴称号", application.equip_title, aliases=("装备称号",))
+    router.register("兑换密令", application.redeem_code, aliases=("领取密令", "使用密令"))

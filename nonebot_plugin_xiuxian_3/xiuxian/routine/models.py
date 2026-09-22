@@ -107,6 +107,14 @@ class HonorTitleEquipRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class RedemptionCodeRecord:
+    player: PlayerView
+    code_key: str
+    reward: dict[str, int] = field(default_factory=dict)
+    already_completed: bool = False
+
+
 __all__ = [
     "RoutineClaimRecord",
     "SpiritTreeRecord",
@@ -118,4 +126,5 @@ __all__ = [
     "HonorStatusRecord",
     "AchievementClaimRecord",
     "HonorTitleEquipRecord",
+    "RedemptionCodeRecord",
 ]

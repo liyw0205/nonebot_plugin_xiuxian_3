@@ -43,6 +43,9 @@ code: available -> claimed | expired | revoked
 5. 称号由已落库来源 operation 投影到 `honor_titles`，装备状态单独保存在 `honor_states`；
    功业领取在同一事务内检查来源、写入 `achievement_claims`，并更新名望/信誉流水。
    关闭功业只展示“内容未开放”，不生成来源记录或奖励。
+6. 机缘密令启动时从外部配置物化密令哈希和版本快照；兑换事务锁定库存，检查有效期、撤销、
+   角色唯一领取和总库存，再原子更新资产、`redemption_claims`、库存计数与 operation。
+   明文密令不进入数据库、日志或响应，重复 operation 只回放历史奖励。
 
 ## 七日入道事务流程
 

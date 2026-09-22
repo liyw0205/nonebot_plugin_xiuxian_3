@@ -307,3 +307,10 @@ class XiuxianApplication:
             lambda: self.routine.equip_title(context),
             write_message="当前事件不允许更换称号。",
         )
+
+    async def redeem_code(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.redeem_code(context),
+            write_message="当前事件不允许兑换密令。",
+        )

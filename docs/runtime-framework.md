@@ -26,6 +26,11 @@ await runtime.initialize()
 使用 WAL 和短事务；`data/` 下的领域 JSON 是只读代码配置，数据库、日志和备份
 仍不进入 Git。
 
+机缘密令通过环境变量 `XIUXIAN3_REDEMPTION_CODES` 注入 JSON 数组，例如
+`[{"code_key":"code.onboarding.v0.1","code":"外部密文","reward":{"item.herb.blood_grass":1}}]`。
+进程配置解析后只保留密令哈希；不要把真实密令写入仓库、日志或消息。奖励键只能是普通
+灵石、精力、声望或 `item.*` 物品，不能发放修为、境界、突破准备度或道契权益。
+
 配置从 `data/内容清单.json` 开始加载。领域文件统一使用 `kind`、`records` 和
 记录 `key`；代码通过 `runtime.content.get("item", "item.weapon.wood_sword")`
 读取，不依赖中文文件名。临时测试数据目录没有清单时，内容加载器返回空配置，

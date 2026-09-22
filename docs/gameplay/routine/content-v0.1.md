@@ -70,6 +70,10 @@
 更换展示称号。称号是展示记录，不提供永久战斗属性；来源 operation、奖励版本和领取
 operation 均持久化，重复请求只回放原结果。
 
-`redemption.code` 支持 `code.onboarding.v0.1`、`code.repair.v0.1` 两个示例族；代码本身由配置注入、不写文档明文密钥。每个 code 设置总库存 1000、每角色一次、业务有效期；领取 operation 为 `code_key:player_id`。密令不得发修为、突破物或道契权益。
+`redemption.code` 支持 `code.onboarding.v0.1`、`code.repair.v0.1` 两个示例族；密令由
+`XIUXIAN3_REDEMPTION_CODES` 配置注入，不写入文档明文密钥，数据库只保存密令哈希。每个
+code 默认总库存 1000、每角色一次、可配置业务有效期和撤销状态；领取 operation 使用
+密令哈希与角色身份派生的稳定键，数据库约束仍以 `code_key + player_id` 保证唯一。密令不得
+发修为、突破物或道契权益。支持命令为 `兑换密令 <密令内容>`，成功后只展示奖励，不回显密令。
 
 关闭：窗口结束后 pending 奖励保留 7 日；已激活道契按结束时间执行；灵木 running 周期按原池结算；密令关闭后拒绝新领。

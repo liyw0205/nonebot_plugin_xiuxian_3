@@ -4,10 +4,15 @@ import asyncio
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
+
+import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.config import XiuxianSettings
+from nonebot_plugin_xiuxian_3.xiuxian.routine.rules import redemption_code_definition
 
 
 class MutableClock:
@@ -241,8 +246,12 @@ def test_routine_schema_is_safe_to_initialize_twice() -> None:
                 migration = connection.execute(
                     "SELECT migration_key FROM schema_migrations WHERE migration_key = 'routine.v0.1'"
                 ).fetchone()
+                redemption_migration = connection.execute(
+                    "SELECT migration_key FROM schema_migrations WHERE migration_key = 'routine.redemption.v0.1'"
+                ).fetchone()
             assert {"routine_checkins", "spirit_trees", "spirit_tree_waterings", "spirit_tree_harvests"} <= tables
             assert migration == ("routine.v0.1",)
+            assert redemption_migration == ("routine.redemption.v0.1",)
             await first.close()
             await second.close()
 
@@ -428,5 +437,117 @@ def test_first_craft_achievement_uses_production_operation_source() -> None:
             assert claim.code == "ACHIEVEMENT_CLAIMED"
             assert claim.data["reward"] == {"service_reputation": 2}
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_redemption_code_is_hashed_idempotent_and_player_unique() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            code = redemption_code_definition(
+                "code.onboarding.v0.1",
+                "WELCOME-01",
+                {"item.herb.blood_grass": 2},
+            )
+            settings = XiuxianSettings(data_dir=Path(data_dir), redemption_codes=(code,))
+            runtime = create_runtime(settings=settings)
+            user = "routine-code"
+            await _enter_mortal(runtime, user)
+
+            claimed = await runtime.dispatch(
+                _context(user, "code-first", operation_id="code-op"),
+                "兑换密令 welcome-01",
+            )
+            assert claimed.code == "REDEMPTION_CODE_CLAIMED"
+            assert claimed.data["reward"] == {"item.herb.blood_grass": 2}
+            replay = await runtime.dispatch(
+                _context(user, "code-replay", operation_id="code-op"),
+                "兑换密令 WELCOME-01",
+            )
+            assert replay.ok and replay.data["idempotent_replay"] is True
+            duplicate = await runtime.dispatch(
+                _context(user, "code-duplicate", operation_id="code-op-2"),
+                "兑换密令 WELCOME-01",
+            )
+            assert duplicate.code == "REDEMPTION_CODE_ALREADY_CLAIMED"
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                stored = connection.execute(
+                    "SELECT code_hash, claimed_count FROM redemption_codes WHERE code_key = ?",
+                    (code.code_key,),
+                ).fetchone()
+                claim = connection.execute(
+                    "SELECT code_key, operation_id FROM redemption_claims WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
+                    (user,),
+                ).fetchone()
+                dump = " ".join(str(row) for row in connection.iterdump())
+            assert stored == (code.code_hash, 1)
+            assert claim == (code.code_key, "code-op")
+            assert "WELCOME-01" not in dump
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_redemption_code_window_revoke_capacity_and_reward_validation() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            limited = redemption_code_definition(
+                "code.repair.v0.1",
+                "LIMIT-01",
+                {"item.mat.array_sand": 1},
+                max_claims=1,
+            )
+            expired = redemption_code_definition(
+                "code.expired.v0.1",
+                "EXPIRED-01",
+                {"item.herb.blood_grass": 1},
+                ends_on="2026-09-21",
+            )
+            revoked = redemption_code_definition(
+                "code.revoked.v0.1",
+                "REVOKED-01",
+                {"item.herb.blood_grass": 1},
+                revoked=True,
+            )
+            settings = XiuxianSettings(
+                data_dir=Path(data_dir),
+                redemption_codes=(limited, expired, revoked),
+            )
+            runtime = create_runtime(settings=settings, clock=clock)
+            users = ("routine-code-a", "routine-code-b")
+            await asyncio.gather(*(_enter_mortal(runtime, user) for user in users))
+            results = await asyncio.gather(
+                *(
+                    runtime.dispatch(
+                        _context(user, f"limited-{index}", operation_id=f"limited-{index}"),
+                        "兑换密令 LIMIT-01",
+                    )
+                    for index, user in enumerate(users)
+                )
+            )
+            assert {result.code for result in results} == {
+                "REDEMPTION_CODE_CLAIMED",
+                "REDEMPTION_CODE_EXHAUSTED",
+            }
+            expired_result = await runtime.dispatch(
+                _context(users[0], "expired", operation_id="expired-op"),
+                "兑换密令 EXPIRED-01",
+            )
+            revoked_result = await runtime.dispatch(
+                _context(users[0], "revoked", operation_id="revoked-op"),
+                "兑换密令 REVOKED-01",
+            )
+            assert expired_result.code == "REDEMPTION_CODE_EXPIRED"
+            assert revoked_result.code == "REDEMPTION_CODE_REVOKED"
+            await runtime.close()
+
+        with pytest.raises(ValueError):
+            redemption_code_definition(
+                "code.invalid.v0.1",
+                "INVALID-01",
+                {"cultivation": 1},
+            )
 
     asyncio.run(run())

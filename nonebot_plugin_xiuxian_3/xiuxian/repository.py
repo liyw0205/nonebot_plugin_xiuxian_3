@@ -58,6 +58,7 @@ from .routine.models import (
     HonorStatusRecord,
     HonorTitleEquipRecord,
     HonorTitleView,
+    RedemptionCodeRecord,
     RoutineClaimRecord,
     SevenDayGoalRecord,
     SevenDayGoalView,
@@ -82,6 +83,7 @@ from .routine.rules import (
     achievement,
     achievement_reward,
     honor_title,
+    redemption_code_hash,
     seven_day_goal,
     seven_day_reward,
     tree_harvest_reward,
@@ -424,6 +426,38 @@ CREATE TABLE IF NOT EXISTS achievement_claims (
 CREATE INDEX IF NOT EXISTS idx_achievement_claims_player
     ON achievement_claims(player_id, created_at);
 
+CREATE TABLE IF NOT EXISTS redemption_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code_key TEXT NOT NULL UNIQUE,
+    code_hash TEXT NOT NULL UNIQUE,
+    max_claims INTEGER NOT NULL CHECK (max_claims > 0),
+    claimed_count INTEGER NOT NULL DEFAULT 0 CHECK (claimed_count >= 0),
+    starts_on TEXT,
+    ends_on TEXT,
+    status TEXT NOT NULL CHECK (status IN ('active', 'revoked')),
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS redemption_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    code_id INTEGER NOT NULL REFERENCES redemption_codes(id),
+    code_key TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (player_id, code_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_redemption_claims_player
+    ON redemption_claims(player_id, created_at);
+
 """
 
 
@@ -723,6 +757,26 @@ class HonorTitleClosedError(RuntimeError):
     """The requested title or achievement is not open in the current content."""
 
 
+class RedemptionCodeInvalidError(RuntimeError):
+    """The submitted code is not configured."""
+
+
+class RedemptionCodeExpiredError(RuntimeError):
+    """The configured code is outside its validity window."""
+
+
+class RedemptionCodeRevokedError(RuntimeError):
+    """The configured code was revoked before redemption."""
+
+
+class RedemptionCodeExhaustedError(RuntimeError):
+    """The configured code has no remaining claims."""
+
+
+class RedemptionCodeAlreadyClaimedError(RuntimeError):
+    """The player already redeemed this code."""
+
+
 class SQLitePlayerRepository:
     """Short-transaction repository safe for concurrent asyncio requests.
 
@@ -785,10 +839,49 @@ class SQLitePlayerRepository:
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("routine.v0.1", serialize_datetime(self._now())),
             )
+            self._materialize_redemption_codes(connection, serialize_datetime(self._now()))
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("routine.redemption.v0.1", serialize_datetime(self._now())),
+            )
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
                 "ON players(dao_name) WHERE dao_name <> ''"
             )
+
+    def _materialize_redemption_codes(
+        self,
+        connection: sqlite3.Connection,
+        now_text: str,
+    ) -> None:
+        for definition in self.settings.redemption_codes:
+            status = "revoked" if definition.revoked else "active"
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO redemption_codes(
+                    code_key, code_hash, max_claims, starts_on, ends_on, status,
+                    reward_json, content_version, rule_version, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    definition.code_key,
+                    definition.code_hash,
+                    definition.max_claims,
+                    definition.starts_on,
+                    definition.ends_on,
+                    status,
+                    json.dumps(definition.reward_map(), ensure_ascii=False, sort_keys=True),
+                    definition.content_version,
+                    definition.rule_version,
+                    now_text,
+                    now_text,
+                ),
+            )
+            if definition.revoked:
+                connection.execute(
+                    "UPDATE redemption_codes SET status = 'revoked', updated_at = ? WHERE code_key = ?",
+                    (now_text, definition.code_key),
+                )
 
     @staticmethod
     def _migrate_legacy_schema(connection: sqlite3.Connection) -> None:
@@ -6457,6 +6550,191 @@ class SQLitePlayerRepository:
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             title_key=str(payload["title_key"]),
             label=str(payload["label"]),
+            already_completed=replay,
+        )
+
+    async def redeem_code(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        code: str,
+        operation_id: str,
+    ) -> RedemptionCodeRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._redeem_code_sync,
+                platform,
+                platform_user_id,
+                code,
+                operation_id,
+            )
+
+    def _redeem_code_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        code: str,
+        operation_id: str,
+    ) -> RedemptionCodeRecord:
+        operation_name = "routine.redeem_code"
+        try:
+            code_hash = redemption_code_hash(code)
+        except ValueError as exc:
+            raise RedemptionCodeInvalidError(str(exc)) from exc
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "code_hash": code_hash,
+            },
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._redemption_from_payload(json.loads(existing["result_json"]), replay=True)
+            code_row = connection.execute(
+                "SELECT * FROM redemption_codes WHERE code_hash = ?",
+                (code_hash,),
+            ).fetchone()
+            if code_row is None:
+                raise RedemptionCodeInvalidError("redemption code is not configured")
+            if code_row["status"] == "revoked":
+                raise RedemptionCodeRevokedError("redemption code was revoked")
+            business_date = now.date()
+            starts_on = code_row["starts_on"]
+            ends_on = code_row["ends_on"]
+            if (starts_on and business_date < date.fromisoformat(str(starts_on))) or (
+                ends_on and business_date > date.fromisoformat(str(ends_on))
+            ):
+                raise RedemptionCodeExpiredError("redemption code is outside its validity window")
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            claimed = connection.execute(
+                "SELECT 1 FROM redemption_claims WHERE player_id = ? AND code_id = ?",
+                (row["id"], code_row["id"]),
+            ).fetchone()
+            if claimed is not None:
+                raise RedemptionCodeAlreadyClaimedError("redemption code was already claimed")
+            if int(code_row["claimed_count"]) >= int(code_row["max_claims"]):
+                raise RedemptionCodeExhaustedError("redemption code has no remaining claims")
+
+            reward = self._json_object(code_row["reward_json"], {})
+            inventory = self._json_object(row["inventory_json"], {})
+            stones = int(row["spirit_stones"])
+            energy = int(row["energy"])
+            actual_reward: dict[str, int] = {}
+            local_reputation = 0
+            service_reputation = 0
+            for key, raw_quantity in reward.items():
+                quantity = int(raw_quantity)
+                if key == "spirit_stones":
+                    stones += quantity
+                    actual_reward[key] = quantity
+                elif key == "energy":
+                    gained = min(quantity, max(0, int(row["energy_max"]) - energy))
+                    energy += gained
+                    actual_reward[key] = gained
+                elif key == "local_reputation":
+                    local_reputation += quantity
+                    actual_reward[key] = quantity
+                elif key == "service_reputation":
+                    service_reputation += quantity
+                    actual_reward[key] = quantity
+                else:
+                    inventory[key] = int(inventory.get(key, 0)) + quantity
+                    actual_reward[key] = quantity
+
+            if local_reputation or service_reputation:
+                reputation = connection.execute(
+                    "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                    (row["id"],),
+                ).fetchone()
+                local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
+                local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
+                current_service = int(reputation["service_reputation"]) if reputation is not None else 0
+                current_service = min(100, current_service + service_reputation)
+                connection.execute(
+                    """
+                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
+                        service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
+                    """,
+                    (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
+                )
+            connection.execute(
+                """
+                UPDATE players
+                SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (stones, energy, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO redemption_claims(
+                    player_id, code_id, code_key, operation_id, reward_json,
+                    content_version, rule_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"], code_row["id"], code_row["code_key"], operation_id,
+                    json.dumps(actual_reward, ensure_ascii=False, sort_keys=True),
+                    code_row["content_version"], code_row["rule_version"], now_text,
+                ),
+            )
+            connection.execute(
+                "UPDATE redemption_codes SET claimed_count = claimed_count + 1, updated_at = ? WHERE id = ?",
+                (now_text, code_row["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("redemption returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "code_key": str(code_row["code_key"]),
+                "reward": actual_reward,
+                "content_version": str(code_row["content_version"]),
+                "rule_version": str(code_row["rule_version"]),
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._redemption_from_payload(payload)
+
+    @staticmethod
+    def _redemption_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> RedemptionCodeRecord:
+        return RedemptionCodeRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            code_key=str(payload["code_key"]),
+            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             already_completed=replay,
         )
 

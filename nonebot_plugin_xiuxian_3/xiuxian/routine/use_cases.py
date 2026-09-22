@@ -24,6 +24,11 @@ from ..repository import (
     SevenDayNotStartedError,
     HonorTitleClosedError,
     HonorTitleNotFoundError,
+    RedemptionCodeAlreadyClaimedError,
+    RedemptionCodeExhaustedError,
+    RedemptionCodeExpiredError,
+    RedemptionCodeInvalidError,
+    RedemptionCodeRevokedError,
     SpiritTreeCooldownError,
     SpiritTreeNotReadyError,
     SpiritTreeWateredError,
@@ -38,6 +43,8 @@ from .rules import (
     TREE_SEED,
     TREE_WATER_ACTIVITY,
     honor_title,
+    redemption_code_hash,
+    normalize_redemption_code,
     parse_iso_date,
 )
 
@@ -597,6 +604,61 @@ class RoutineApplication:
             data={
                 "title_key": record.title_key,
                 "label": record.label,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def redeem_code(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_REDEMPTION_COMMAND", "请使用 `兑换密令 密令内容`。", context.request_id)
+        code = context.command_args[0]
+        try:
+            normalized = normalize_redemption_code(code)
+            code_hash = redemption_code_hash(normalized)
+        except ValueError:
+            return CommandResult(False, "INVALID_REDEMPTION_COMMAND", "密令格式无效，请检查后重试。", context.request_id)
+        operation_id = context.operation_id or f"redemption.code:{code_hash}:{context.adapter}:{context.user_id}"
+        try:
+            record = await self.repository.redeem_code(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                code=normalized,
+                operation_id=operation_id,
+            )
+        except RedemptionCodeInvalidError:
+            return CommandResult(False, "REDEMPTION_CODE_INVALID", "密令无效，请检查输入或活动状态。", context.request_id, operation_id)
+        except RedemptionCodeRevokedError:
+            return CommandResult(False, "REDEMPTION_CODE_REVOKED", "这条密令已被撤销。", context.request_id, operation_id)
+        except RedemptionCodeExpiredError:
+            return CommandResult(False, "REDEMPTION_CODE_EXPIRED", "这条密令已不在有效期内。", context.request_id, operation_id)
+        except RedemptionCodeExhaustedError:
+            return CommandResult(False, "REDEMPTION_CODE_EXHAUSTED", "这条密令的领取名额已用完。", context.request_id, operation_id)
+        except RedemptionCodeAlreadyClaimedError:
+            return CommandResult(False, "REDEMPTION_CODE_ALREADY_CLAIMED", "你已经领取过这条密令。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能领取密令。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他密令，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "REDEMPTION_CODE_CLAIMED",
+            (
+                "## 密令兑换成功\n\n"
+                f"**{self._display_name(record.player)}**已领取一份机缘补给。\n\n"
+                f"- **获得**：{self._reward_text(record.reward)}\n\n"
+                "> 同一密令每个角色只能领取一次；重复请求不会重复发放。"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "code_key": record.code_key,
+                "reward": record.reward,
                 "idempotent_replay": record.already_completed,
             },
         )

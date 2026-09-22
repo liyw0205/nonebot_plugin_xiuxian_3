@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 import hashlib
+import json
 from dataclasses import dataclass
+from typing import Any
 
 
 RULE_VERSION = "routine-0.1.0"
@@ -18,6 +20,7 @@ TREE_SEED = "item.seed.spirit_tree"
 SEVEN_DAY_CONTENT_VERSION = CONTENT_VERSION
 SEVEN_DAY_RULE_VERSION = "seven-day-0.1.0"
 HONOR_RULE_VERSION = "honor-0.1.0"
+REDEMPTION_RULE_VERSION = "redemption-0.1.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +105,33 @@ class AchievementDefinition:
     closed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class RedemptionCodeDefinition:
+    """A validated externally configured code; plaintext is never retained."""
+
+    code_key: str
+    code_hash: str
+    reward: tuple[tuple[str, int], ...]
+    max_claims: int = 1000
+    starts_on: str | None = None
+    ends_on: str | None = None
+    revoked: bool = False
+    content_version: str = CONTENT_VERSION
+    rule_version: str = REDEMPTION_RULE_VERSION
+
+    def reward_map(self) -> dict[str, int]:
+        return {key: int(value) for key, value in self.reward}
+
+    def available_on(self, business_date: date) -> bool:
+        if self.revoked:
+            return False
+        if self.starts_on and business_date < date.fromisoformat(self.starts_on):
+            return False
+        if self.ends_on and business_date > date.fromisoformat(self.ends_on):
+            return False
+        return True
+
+
 HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
     HonorTitleDefinition("title.first_seeking", "初入道途", "player.start_seeking"),
     HonorTitleDefinition("title.town_helper", "城镇助行者", "routine.checkin.daily:3"),
@@ -145,6 +175,124 @@ ACHIEVEMENTS: tuple[AchievementDefinition, ...] = (
         closed=True,
     ),
 )
+
+
+_REDEMPTION_FORBIDDEN_KEYS = frozenset(
+    {
+        "cultivation",
+        "total_cultivation",
+        "realm_layer",
+        "foundation_quality",
+        "world_merit",
+        "breakthrough_pity_bp",
+        "dao_contract",
+        "fate_pool",
+    }
+)
+
+
+def normalize_redemption_code(value: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError("redemption code must be a string")
+    normalized = value.strip().casefold()
+    if not normalized or len(normalized) > 256:
+        raise ValueError("redemption code must be 1-256 characters")
+    return normalized
+
+
+def redemption_code_hash(value: str) -> str:
+    normalized = normalize_redemption_code(value)
+    return hashlib.sha256(
+        f"redemption.code.v0.1:{normalized}".encode("utf-8")
+    ).hexdigest()
+
+
+def redemption_code_definition(
+    code_key: str,
+    plaintext: str,
+    reward: dict[str, int] | tuple[tuple[str, int], ...],
+    *,
+    max_claims: int = 1000,
+    starts_on: str | None = None,
+    ends_on: str | None = None,
+    revoked: bool = False,
+    content_version: str = CONTENT_VERSION,
+    rule_version: str = REDEMPTION_RULE_VERSION,
+) -> RedemptionCodeDefinition:
+    if not isinstance(code_key, str) or not code_key.startswith("code."):
+        raise ValueError("redemption code key must start with code.")
+    if not isinstance(max_claims, int) or max_claims < 1:
+        raise ValueError("redemption code max_claims must be positive")
+    for boundary in (starts_on, ends_on):
+        if boundary is not None:
+            try:
+                date.fromisoformat(boundary)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("redemption code dates must be ISO dates") from exc
+    if starts_on and ends_on and starts_on > ends_on:
+        raise ValueError("redemption code starts_on must not exceed ends_on")
+    items = reward.items() if isinstance(reward, dict) else reward
+    normalized_reward: list[tuple[str, int]] = []
+    for key, quantity in items:
+        if not isinstance(key, str) or not key:
+            raise ValueError("redemption reward key is required")
+        if key in _REDEMPTION_FORBIDDEN_KEYS or key.startswith("realm."):
+            raise ValueError(f"redemption reward is forbidden: {key}")
+        if key not in {"spirit_stones", "energy", "local_reputation", "service_reputation"} and not key.startswith("item."):
+            raise ValueError(f"unsupported redemption reward: {key}")
+        if not isinstance(quantity, int) or quantity < 1:
+            raise ValueError("redemption reward quantities must be positive integers")
+        normalized_reward.append((key, quantity))
+    if not normalized_reward:
+        raise ValueError("redemption reward cannot be empty")
+    return RedemptionCodeDefinition(
+        code_key=code_key,
+        code_hash=redemption_code_hash(plaintext),
+        reward=tuple(normalized_reward),
+        max_claims=max_claims,
+        starts_on=starts_on,
+        ends_on=ends_on,
+        revoked=bool(revoked),
+        content_version=content_version,
+        rule_version=rule_version,
+    )
+
+
+def redemption_codes_from_config(value: Any) -> tuple[RedemptionCodeDefinition, ...]:
+    if value in (None, "", []):
+        return ()
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError("XIUXIAN3_REDEMPTION_CODES must be valid JSON") from exc
+    if not isinstance(value, list):
+        raise ValueError("redemption code configuration must be a JSON list")
+    definitions: list[RedemptionCodeDefinition] = []
+    keys: set[str] = set()
+    hashes: set[str] = set()
+    for item in value:
+        if not isinstance(item, dict):
+            raise ValueError("each redemption code must be an object")
+        if "code_key" not in item or "code" not in item or "reward" not in item:
+            raise ValueError("redemption code requires code_key, code and reward")
+        definition = redemption_code_definition(
+            str(item["code_key"]),
+            str(item["code"]),
+            item["reward"],
+            max_claims=item.get("max_claims", 1000),
+            starts_on=item.get("starts_on"),
+            ends_on=item.get("ends_on"),
+            revoked=item.get("revoked", False),
+            content_version=str(item.get("content_version", CONTENT_VERSION)),
+            rule_version=str(item.get("rule_version", REDEMPTION_RULE_VERSION)),
+        )
+        if definition.code_key in keys or definition.code_hash in hashes:
+            raise ValueError("redemption code keys and values must be unique")
+        keys.add(definition.code_key)
+        hashes.add(definition.code_hash)
+        definitions.append(definition)
+    return tuple(definitions)
 
 
 def seven_day_goal(day_number: int) -> SevenDayGoalDefinition:
@@ -252,10 +400,12 @@ __all__ = [
     "SEVEN_DAY_GOALS",
     "SEVEN_DAY_RULE_VERSION",
     "HONOR_RULE_VERSION",
+    "REDEMPTION_RULE_VERSION",
     "HONOR_TITLES",
     "ACHIEVEMENTS",
     "HonorTitleDefinition",
     "AchievementDefinition",
+    "RedemptionCodeDefinition",
     "SevenDayGoalDefinition",
     "checkin_reward",
     "makeup_reward",
@@ -269,4 +419,8 @@ __all__ = [
     "honor_title",
     "achievement",
     "achievement_reward",
+    "normalize_redemption_code",
+    "redemption_code_hash",
+    "redemption_code_definition",
+    "redemption_codes_from_config",
 ]

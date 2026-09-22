@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .routine.rules import RedemptionCodeDefinition, redemption_codes_from_config
+
 
 def _positive_int(name: str, default: int, minimum: int = 1) -> int:
     raw = os.getenv(name)
@@ -26,6 +28,7 @@ class XiuxianSettings:
     database_name: str = "xiuxian3.sqlite3"
     busy_timeout_ms: int = 5_000
     max_inflight: int = 256
+    redemption_codes: tuple[RedemptionCodeDefinition, ...] = ()
 
     @property
     def database_path(self) -> Path:
@@ -39,4 +42,7 @@ class XiuxianSettings:
             database_name=os.getenv("XIUXIAN3_DATABASE_NAME", "xiuxian3.sqlite3"),
             busy_timeout_ms=_positive_int("XIUXIAN3_DB_BUSY_TIMEOUT_MS", 5_000),
             max_inflight=_positive_int("XIUXIAN3_MAX_INFLIGHT", 256),
+            redemption_codes=redemption_codes_from_config(
+                os.getenv("XIUXIAN3_REDEMPTION_CODES", "")
+            ),
         )
