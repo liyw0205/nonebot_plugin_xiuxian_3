@@ -143,3 +143,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("悬赏榜", application.list_bounties)
     router.register("接取悬赏", application.accept_bounty)
     router.register("领取悬赏", application.claim_bounty)
+    router.register("道历问安", application.claim_daily, aliases=("每日问安", "签到"))
+    router.register("补录道历", application.makeup_daily, aliases=("补签到",))
+    router.register("浇灌灵木", application.water_spirit_tree, aliases=("灵木浇灌", "浇水"))
+    router.register("收获灵木", application.harvest_spirit_tree, aliases=("灵木收获",))

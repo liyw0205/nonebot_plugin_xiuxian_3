@@ -7,8 +7,8 @@ import hashlib
 import json
 import sqlite3
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, Callable
 from uuid import uuid4
 
 from ..contracts import PlayerView, serialize_datetime
@@ -52,6 +52,19 @@ from .exploration.rules import (
 )
 from .adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from .adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
+from .routine.models import RoutineClaimRecord, SpiritTreeRecord
+from .routine.rules import (
+    CHECKIN_ACTIVITY,
+    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
+    FATE_TICKET,
+    MAKEUP_ACTIVITY,
+    RULE_VERSION as ROUTINE_RULE_VERSION,
+    checkin_reward,
+    makeup_reward,
+    parse_past_date,
+    tree_harvest_reward,
+    tree_status,
+)
 
 
 SCHEMA = """
@@ -243,6 +256,71 @@ CREATE TABLE IF NOT EXISTS bounty_offers (
 
 CREATE INDEX IF NOT EXISTS idx_bounty_offers_player ON bounty_offers(player_id, business_date);
 CREATE INDEX IF NOT EXISTS idx_bounty_offers_status ON bounty_offers(player_id, status);
+
+CREATE TABLE IF NOT EXISTS routine_checkins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    activity_key TEXT NOT NULL,
+    target_date TEXT NOT NULL,
+    claim_kind TEXT NOT NULL CHECK (claim_kind IN ('daily', 'makeup')),
+    month_key TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL CHECK (status IN ('claimed', 'expired')),
+    cost_json TEXT NOT NULL DEFAULT '{}',
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    streak_before INTEGER NOT NULL DEFAULT 0 CHECK (streak_before >= 0),
+    streak_after INTEGER NOT NULL DEFAULT 0 CHECK (streak_after >= 0),
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    settled_at TEXT NOT NULL,
+    UNIQUE (player_id, target_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_routine_checkins_player_date
+    ON routine_checkins(player_id, target_date);
+CREATE INDEX IF NOT EXISTS idx_routine_checkins_makeup_month
+    ON routine_checkins(player_id, claim_kind, month_key);
+
+CREATE TABLE IF NOT EXISTS spirit_trees (
+    player_id INTEGER PRIMARY KEY REFERENCES players(id),
+    cycle_no INTEGER NOT NULL DEFAULT 1 CHECK (cycle_no >= 1),
+    water_count INTEGER NOT NULL DEFAULT 0 CHECK (water_count >= 0 AND water_count <= 7),
+    last_water_date TEXT,
+    cycle_started_at TEXT,
+    cooldown_until TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS spirit_tree_waterings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    cycle_no INTEGER NOT NULL CHECK (cycle_no >= 1),
+    business_date TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (player_id, cycle_no, business_date)
+);
+
+CREATE TABLE IF NOT EXISTS spirit_tree_harvests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    cycle_no INTEGER NOT NULL CHECK (cycle_no >= 1),
+    operation_id TEXT NOT NULL UNIQUE,
+    pool_key TEXT NOT NULL,
+    seed TEXT NOT NULL,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (player_id, cycle_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spirit_tree_waterings_player
+    ON spirit_tree_waterings(player_id, cycle_no, business_date);
 
 """
 
@@ -475,6 +553,34 @@ class BountyAlreadyClaimedError(RuntimeError):
     """The current bounty reward has already been claimed."""
 
 
+class CheckinAlreadyClaimedError(RuntimeError):
+    """The player already completed today's daily check-in."""
+
+
+class RoutineMakeupDateError(RuntimeError):
+    """The requested makeup date is outside the allowed window."""
+
+
+class RoutineMakeupNotEligibleError(RuntimeError):
+    """The requested date was already claimed or is otherwise ineligible."""
+
+
+class RoutineMakeupLimitError(RuntimeError):
+    """The player reached the monthly makeup limit."""
+
+
+class SpiritTreeWateredError(RuntimeError):
+    """The spirit tree was already watered for this business day."""
+
+
+class SpiritTreeCooldownError(RuntimeError):
+    """The spirit tree is in its post-harvest cooldown."""
+
+
+class SpiritTreeNotReadyError(RuntimeError):
+    """The spirit tree has not reached seven waterings."""
+
+
 class SQLitePlayerRepository:
     """Short-transaction repository safe for concurrent asyncio requests.
 
@@ -483,11 +589,23 @@ class SQLitePlayerRepository:
     prevents an unbounded burst from creating more connections than useful.
     """
 
-    def __init__(self, settings: XiuxianSettings):
+    def __init__(self, settings: XiuxianSettings, *, clock: Callable[[], datetime] | None = None):
         self.settings = settings
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._initialized = False
         self._initialize_lock = asyncio.Lock()
         self._inflight = asyncio.Semaphore(settings.max_inflight)
+
+    def _now(self) -> datetime:
+        value = self._clock()
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def business_today(self) -> date:
+        """Return the injected UTC business date used by routine commands."""
+
+        return self._now().date()
 
     async def initialize(self) -> None:
         if self._initialized:
@@ -517,6 +635,14 @@ class SQLitePlayerRepository:
             connection.executescript(SCHEMA)
             self._migrate_legacy_schema(connection)
             self._migrate_cultivation_session_status(connection)
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS schema_migrations ("
+                "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("routine.v0.1", serialize_datetime(self._now())),
+            )
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
                 "ON players(dao_name) WHERE dao_name <> ''"
@@ -4656,6 +4782,650 @@ class SQLitePlayerRepository:
                 ),
             )
             return RenameRecord(player=player, changed=changed, already_completed=False)
+
+    async def claim_daily(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> RoutineClaimRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_daily_sync, platform, platform_user_id, operation_id
+            )
+
+    def _claim_daily_sync(
+        self, platform: str, platform_user_id: str, operation_id: str
+    ) -> RoutineClaimRecord:
+        operation_name = "routine.checkin.daily"
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "content_version": ROUTINE_CONTENT_VERSION,
+            "rule_version": ROUTINE_RULE_VERSION,
+        }
+        request_hash = self._request_hash(operation_name, request_payload)
+        for attempt in range(5):
+            try:
+                return self._claim_daily_once(
+                    platform,
+                    platform_user_id,
+                    operation_id,
+                    operation_name,
+                    request_hash,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked")
+
+    def _claim_daily_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        operation_name: str,
+        request_hash: str,
+    ) -> RoutineClaimRecord:
+        now = self._now()
+        today = now.date()
+        target_date = today.isoformat()
+        month_key = today.strftime("%Y-%m")
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._routine_claim_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            duplicate = connection.execute(
+                "SELECT 1 FROM routine_checkins WHERE player_id = ? AND target_date = ? LIMIT 1",
+                (row["id"], target_date),
+            ).fetchone()
+            if duplicate is not None:
+                raise CheckinAlreadyClaimedError("daily check-in already claimed")
+
+            previous = connection.execute(
+                "SELECT target_date FROM routine_checkins "
+                "WHERE player_id = ? AND claim_kind = 'daily' AND target_date < ? "
+                "ORDER BY target_date DESC",
+                (row["id"], target_date),
+            ).fetchall()
+            previous_dates = {str(item["target_date"]) for item in previous}
+            streak_before = 0
+            cursor = today - timedelta(days=1)
+            while cursor.isoformat() in previous_dates:
+                streak_before += 1
+                cursor -= timedelta(days=1)
+            streak_after = streak_before + 1
+            requested_reward = checkin_reward(streak_after)
+            inventory = self._json_object(row["inventory_json"], {})
+            stones = int(row["spirit_stones"]) + int(requested_reward.get("spirit_stones", 0))
+            current_energy = int(row["energy"])
+            energy_gain = min(
+                int(requested_reward.get("energy", 0)),
+                max(0, int(row["energy_max"]) - current_energy),
+            )
+            energy = current_energy + energy_gain
+            applied_reward: dict[str, int] = {"spirit_stones": int(requested_reward.get("spirit_stones", 0))}
+            applied_reward["energy"] = energy_gain
+            for key, quantity in requested_reward.items():
+                if key in {"spirit_stones", "energy"}:
+                    continue
+                inventory[key] = int(inventory.get(key, 0)) + int(quantity)
+                applied_reward[key] = int(quantity)
+
+            connection.execute(
+                "UPDATE players SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (stones, energy, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO routine_checkins(
+                    player_id, activity_key, target_date, claim_kind, month_key, operation_id,
+                    status, cost_json, reward_json, streak_before, streak_after,
+                    content_version, rule_version, created_at, settled_at
+                ) VALUES (?, ?, ?, 'daily', ?, ?, 'claimed', '{}', ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"], CHECKIN_ACTIVITY, target_date, month_key, operation_id,
+                    json.dumps(applied_reward, ensure_ascii=False, sort_keys=True),
+                    streak_before, streak_after, ROUTINE_CONTENT_VERSION, ROUTINE_RULE_VERSION,
+                    now_text, now_text,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("daily check-in returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "activity_key": CHECKIN_ACTIVITY,
+                "target_date": target_date,
+                "reward": applied_reward,
+                "requested_reward": requested_reward,
+                "energy_spent": 0,
+                "consecutive_days": streak_after,
+                "streak_before": streak_before,
+                "makeup": False,
+                "content_version": ROUTINE_CONTENT_VERSION,
+                "rule_version": ROUTINE_RULE_VERSION,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._routine_claim_from_payload(payload)
+
+    async def makeup_daily(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        target_date: str,
+        operation_id: str,
+    ) -> RoutineClaimRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._makeup_daily_sync,
+                platform,
+                platform_user_id,
+                target_date,
+                operation_id,
+            )
+
+    def _makeup_daily_sync(
+        self, platform: str, platform_user_id: str, target_date: str, operation_id: str
+    ) -> RoutineClaimRecord:
+        operation_name = "routine.makeup.daily"
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "target_date": target_date,
+            "content_version": ROUTINE_CONTENT_VERSION,
+            "rule_version": ROUTINE_RULE_VERSION,
+        }
+        request_hash = self._request_hash(operation_name, request_payload)
+        for attempt in range(5):
+            try:
+                return self._makeup_daily_once(
+                    platform,
+                    platform_user_id,
+                    target_date,
+                    operation_id,
+                    operation_name,
+                    request_hash,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked")
+
+    def _makeup_daily_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        target_date: str,
+        operation_id: str,
+        operation_name: str,
+        request_hash: str,
+    ) -> RoutineClaimRecord:
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._routine_claim_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+
+            try:
+                parsed_target = parse_past_date(target_date, now.date())
+            except ValueError as exc:
+                raise RoutineMakeupDateError(str(exc)) from exc
+            canonical_target = parsed_target.isoformat()
+            month_key = now.date().strftime("%Y-%m")
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            duplicate = connection.execute(
+                "SELECT 1 FROM routine_checkins WHERE player_id = ? AND target_date = ? LIMIT 1",
+                (row["id"], canonical_target),
+            ).fetchone()
+            if duplicate is not None:
+                raise RoutineMakeupNotEligibleError("date was already claimed")
+            used = connection.execute(
+                "SELECT COUNT(*) AS count FROM routine_checkins WHERE player_id = ? AND claim_kind = 'makeup' AND month_key = ?",
+                (row["id"], month_key),
+            ).fetchone()
+            if int(used["count"]) >= 2:
+                raise RoutineMakeupLimitError("monthly makeup limit reached")
+            if int(row["spirit_stones"]) < 30:
+                raise CurrencyInsufficientError("makeup requires 30 spirit stones")
+
+            requested_reward = makeup_reward()
+            current_energy = int(row["energy"])
+            energy_gain = min(
+                int(requested_reward.get("energy", 0)),
+                max(0, int(row["energy_max"]) - current_energy),
+            )
+            applied_reward = {
+                "spirit_stones": int(requested_reward.get("spirit_stones", 0)),
+                "energy": energy_gain,
+            }
+            stones = int(row["spirit_stones"]) - 30 + applied_reward["spirit_stones"]
+            connection.execute(
+                "UPDATE players SET spirit_stones = ?, energy = ?, updated_at = ? WHERE id = ?",
+                (stones, current_energy + energy_gain, now_text, row["id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO routine_checkins(
+                    player_id, activity_key, target_date, claim_kind, month_key, operation_id,
+                    status, cost_json, reward_json, streak_before, streak_after,
+                    content_version, rule_version, created_at, settled_at
+                ) VALUES (?, ?, ?, 'makeup', ?, ?, 'claimed', ?, ?, 0, 0, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"], MAKEUP_ACTIVITY, canonical_target, month_key, operation_id,
+                    json.dumps({"spirit_stones": 30}, ensure_ascii=False, sort_keys=True),
+                    json.dumps(applied_reward, ensure_ascii=False, sort_keys=True),
+                    ROUTINE_CONTENT_VERSION, ROUTINE_RULE_VERSION, now_text, now_text,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("makeup check-in returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "activity_key": MAKEUP_ACTIVITY,
+                "target_date": canonical_target,
+                "reward": applied_reward,
+                "requested_reward": requested_reward,
+                "energy_spent": 0,
+                "spirit_stones_spent": 30,
+                "consecutive_days": 0,
+                "streak_before": 0,
+                "makeup": True,
+                "content_version": ROUTINE_CONTENT_VERSION,
+                "rule_version": ROUTINE_RULE_VERSION,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._routine_claim_from_payload(payload)
+
+    @staticmethod
+    def _routine_claim_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> RoutineClaimRecord:
+        return RoutineClaimRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            activity_key=str(payload.get("activity_key", CHECKIN_ACTIVITY)),
+            target_date=str(payload["target_date"]),
+            reward={str(k): int(v) for k, v in dict(payload.get("reward", {})).items()},
+            energy_spent=int(payload.get("energy_spent", 0)),
+            spirit_stones_spent=int(payload.get("spirit_stones_spent", 0)),
+            consecutive_days=int(payload.get("consecutive_days", 0)),
+            makeup=bool(payload.get("makeup", False)),
+            already_completed=replay,
+        )
+
+    async def water_spirit_tree(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> SpiritTreeRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._water_spirit_tree_sync, platform, platform_user_id, operation_id
+            )
+
+    def _water_spirit_tree_sync(
+        self, platform: str, platform_user_id: str, operation_id: str
+    ) -> SpiritTreeRecord:
+        operation_name = "routine.spirit_tree.water"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "content_version": ROUTINE_CONTENT_VERSION,
+                "rule_version": ROUTINE_RULE_VERSION,
+            },
+        )
+        for attempt in range(5):
+            try:
+                return self._water_spirit_tree_once(
+                    platform, platform_user_id, operation_id, operation_name, request_hash
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked")
+
+    def _water_spirit_tree_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        operation_name: str,
+        request_hash: str,
+    ) -> SpiritTreeRecord:
+        now = self._now()
+        today = now.date().isoformat()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._spirit_tree_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            tree = connection.execute(
+                "SELECT * FROM spirit_trees WHERE player_id = ?", (row["id"],)
+            ).fetchone()
+            if tree is None:
+                connection.execute(
+                    "INSERT INTO spirit_trees(player_id, cycle_no, water_count, content_version, rule_version, updated_at) VALUES (?, 1, 0, ?, ?, ?)",
+                    (row["id"], ROUTINE_CONTENT_VERSION, ROUTINE_RULE_VERSION, now_text),
+                )
+                tree = connection.execute(
+                    "SELECT * FROM spirit_trees WHERE player_id = ?", (row["id"],)
+                ).fetchone()
+            if tree is None:
+                raise RuntimeError("spirit tree initialization failed")
+            cooldown_until = tree["cooldown_until"]
+            if cooldown_until and now_text < str(cooldown_until):
+                raise SpiritTreeCooldownError("spirit tree is cooling down")
+            cycle_no = int(tree["cycle_no"])
+            if int(tree["water_count"]) >= 7:
+                raise SpiritTreeWateredError("spirit tree is ready for harvest")
+            duplicate = connection.execute(
+                "SELECT 1 FROM spirit_tree_waterings WHERE player_id = ? AND cycle_no = ? AND business_date = ? LIMIT 1",
+                (row["id"], cycle_no, today),
+            ).fetchone()
+            if duplicate is not None:
+                raise SpiritTreeWateredError("spirit tree already watered today")
+            if int(row["energy"]) < 2:
+                raise ResourceInsufficientError("watering requires two energy")
+            water_count = int(tree["water_count"]) + 1
+            cycle_started_at = tree["cycle_started_at"] or now_text
+            connection.execute(
+                "UPDATE players SET energy = energy - 2, updated_at = ? WHERE id = ?",
+                (now_text, row["id"]),
+            )
+            connection.execute(
+                "INSERT INTO spirit_tree_waterings(player_id, cycle_no, business_date, operation_id, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    row["id"], cycle_no, today, operation_id,
+                    json.dumps({"water_count": water_count, "energy_spent": 2, "content_version": ROUTINE_CONTENT_VERSION, "rule_version": ROUTINE_RULE_VERSION}, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            connection.execute(
+                "UPDATE spirit_trees SET water_count = ?, last_water_date = ?, cycle_started_at = ?, snapshot_json = ?, result_json = ?, updated_at = ? WHERE player_id = ?",
+                (
+                    water_count, today, cycle_started_at,
+                    json.dumps({"cycle_no": cycle_no}, ensure_ascii=False, sort_keys=True),
+                    json.dumps({"water_count": water_count}, ensure_ascii=False, sort_keys=True),
+                    now_text, row["id"],
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            player = self._row_to_player(updated) if updated is not None else None
+            if player is None:
+                raise RuntimeError("watering returned no player")
+            status = tree_status(water_count, None, now_text)
+            payload = {
+                "player": self._player_payload(player),
+                "status": status,
+                "water_count": water_count,
+                "energy_spent": 2,
+                "reward": {},
+                "cooldown_until": None,
+                "cycle_no": cycle_no,
+                "content_version": ROUTINE_CONTENT_VERSION,
+                "rule_version": ROUTINE_RULE_VERSION,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._spirit_tree_from_payload(payload)
+
+    async def harvest_spirit_tree(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> SpiritTreeRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._harvest_spirit_tree_sync, platform, platform_user_id, operation_id
+            )
+
+    def _harvest_spirit_tree_sync(
+        self, platform: str, platform_user_id: str, operation_id: str
+    ) -> SpiritTreeRecord:
+        operation_name = "routine.spirit_tree.harvest"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "content_version": ROUTINE_CONTENT_VERSION,
+                "rule_version": ROUTINE_RULE_VERSION,
+            },
+        )
+        for attempt in range(5):
+            try:
+                return self._harvest_spirit_tree_once(
+                    platform, platform_user_id, operation_id, operation_name, request_hash
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked")
+
+    def _harvest_spirit_tree_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        operation_name: str,
+        request_hash: str,
+    ) -> SpiritTreeRecord:
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._spirit_tree_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            tree = connection.execute(
+                "SELECT * FROM spirit_trees WHERE player_id = ?", (row["id"],)
+            ).fetchone()
+            if tree is None:
+                raise SpiritTreeNotReadyError("spirit tree is not ready")
+            cooldown_until = tree["cooldown_until"]
+            if cooldown_until and now_text < str(cooldown_until):
+                raise SpiritTreeCooldownError("spirit tree is cooling down")
+            if int(tree["water_count"]) < 7:
+                raise SpiritTreeNotReadyError("spirit tree is not ready")
+            cycle_no = int(tree["cycle_no"])
+            reward = tree_harvest_reward(operation_id)
+            digest = hashlib.blake2b(
+                f"tree.harvest.v0.1:{operation_id}".encode("utf-8"), digest_size=16
+            ).hexdigest()
+            inventory = self._json_object(row["inventory_json"], {})
+            stones = int(row["spirit_stones"]) + int(reward.get("spirit_stones", 0))
+            actual_reward: dict[str, int] = {}
+            for key, quantity in reward.items():
+                quantity = int(quantity)
+                if key == "spirit_stones":
+                    actual_reward[key] = quantity
+                elif key == "local_reputation":
+                    actual_reward[key] = quantity
+                else:
+                    inventory[key] = int(inventory.get(key, 0)) + quantity
+                    actual_reward[key] = quantity
+            reputation = connection.execute(
+                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                (row["id"],),
+            ).fetchone()
+            local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
+            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + int(reward.get("local_reputation", 0))
+            service_reputation = int(reputation["service_reputation"]) if reputation is not None else 0
+            connection.execute(
+                """
+                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
+                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
+                """,
+                (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
+            )
+            cooldown = now + timedelta(hours=24)
+            cooldown_text = serialize_datetime(cooldown)
+            connection.execute(
+                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+            )
+            result = {
+                "pool_key": "tree.harvest.v0.1",
+                "seed": digest,
+                "reward": actual_reward,
+                "content_version": ROUTINE_CONTENT_VERSION,
+                "rule_version": ROUTINE_RULE_VERSION,
+            }
+            connection.execute(
+                "INSERT INTO spirit_tree_harvests(player_id, cycle_no, operation_id, pool_key, seed, reward_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (row["id"], cycle_no, operation_id, result["pool_key"], digest, json.dumps(actual_reward, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            connection.execute(
+                "UPDATE spirit_trees SET cycle_no = ?, water_count = 0, last_water_date = NULL, cycle_started_at = NULL, cooldown_until = ?, result_json = ?, updated_at = ? WHERE player_id = ?",
+                (cycle_no + 1, cooldown_text, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            player = self._row_to_player(updated) if updated is not None else None
+            if player is None:
+                raise RuntimeError("harvest returned no player")
+            payload = {
+                "player": self._player_payload(player),
+                "status": "cooldown",
+                "water_count": 0,
+                "energy_spent": 0,
+                "reward": actual_reward,
+                "cooldown_until": cooldown_text,
+                "cycle_no": cycle_no,
+                **result,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._spirit_tree_from_payload(payload)
+
+    @staticmethod
+    def _spirit_tree_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> SpiritTreeRecord:
+        return SpiritTreeRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            status=str(payload.get("status", "dormant")),
+            water_count=int(payload.get("water_count", 0)),
+            energy_spent=int(payload.get("energy_spent", 0)),
+            reward={str(k): int(v) for k, v in dict(payload.get("reward", {})).items()},
+            cooldown_until=payload.get("cooldown_until"),
+            already_completed=replay,
+        )
 
     async def get_player(self, *, platform: str, platform_user_id: str) -> PlayerView | None:
         await self.initialize()

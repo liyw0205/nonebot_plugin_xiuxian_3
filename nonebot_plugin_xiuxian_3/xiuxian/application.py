@@ -12,6 +12,7 @@ from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
 from .adventures.use_cases import AdventuresApplication
+from .routine.use_cases import RoutineApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -26,6 +27,7 @@ class XiuxianApplication:
         self.world = WorldApplication(repository)
         self.exploration = ExplorationApplication(repository)
         self.adventures = AdventuresApplication(repository)
+        self.routine = RoutineApplication(repository)
 
     async def _invoke(
         self,
@@ -241,4 +243,32 @@ class XiuxianApplication:
             context,
             lambda: self.adventures.claim_bounty(context),
             write_message="当前事件不允许领取悬赏。",
+        )
+
+    async def claim_daily(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.claim_daily(context),
+            write_message="当前事件不允许进行道历问安。",
+        )
+
+    async def makeup_daily(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.makeup_daily(context),
+            write_message="当前事件不允许补录道历。",
+        )
+
+    async def water_spirit_tree(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.water_spirit_tree(context),
+            write_message="当前事件不允许培育灵木。",
+        )
+
+    async def harvest_spirit_tree(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.harvest_spirit_tree(context),
+            write_message="当前事件不允许收获灵木。",
         )

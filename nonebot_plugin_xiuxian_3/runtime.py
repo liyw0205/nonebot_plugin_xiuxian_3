@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
 from .adapters.base import AdapterRegistry, CommandRouter, register_core_commands
 from .contracts import CommandContext, CommandResult
@@ -42,10 +44,11 @@ def create_runtime(
     settings: XiuxianSettings | None = None,
     data_dir: str | Path | None = None,
     adapters: tuple[str, ...] = ("onebot.v11", "qq.official", "nonebot", "web", "cli"),
+    clock: Callable[[], datetime] | None = None,
 ) -> XiuxianRuntime:
     resolved_settings = settings or XiuxianSettings.from_env(data_dir)
     content = ContentBundle.load_optional(resolved_settings.data_dir)
-    repository = SQLitePlayerRepository(resolved_settings)
+    repository = SQLitePlayerRepository(resolved_settings, clock=clock)
     application = XiuxianApplication(repository)
     router = CommandRouter()
     register_core_commands(router, application)
