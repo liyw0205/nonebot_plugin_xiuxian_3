@@ -20,7 +20,6 @@ from ..repository import (
 from .rules import (
     BREATHING_DURATION_SECONDS,
     MODE_BREATHING,
-    REALM_QI_SENSING,
     can_advance_layer,
     next_layer_threshold,
 )
