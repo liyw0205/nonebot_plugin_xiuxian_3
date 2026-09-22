@@ -63,6 +63,8 @@ from .routine.models import (
     DaoContractClaimRecord,
     DaoContractStatusRecord,
     DaoContractView,
+    FateDrawView,
+    FateRollRecord,
     RoutineClaimRecord,
     SevenDayGoalRecord,
     SevenDayGoalView,
@@ -70,6 +72,17 @@ from .routine.models import (
     SpiritTreeRecord,
 )
 from .routine.billing import BillingReceiptError, verify_receipt
+from .routine.gacha import (
+    FATE_CONTENT_VERSION,
+    FATE_PITY_LIMIT,
+    FATE_POOL_KEY,
+    FATE_RULE_VERSION,
+    FATE_SINGLE_COST,
+    FATE_TEN_COST,
+    FATE_TICKET,
+    reward_totals,
+    roll_fate_pool,
+)
 from .routine.rules import (
     CHECKIN_ACTIVITY,
     CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
@@ -464,6 +477,38 @@ CREATE TABLE IF NOT EXISTS redemption_claims (
 CREATE INDEX IF NOT EXISTS idx_redemption_claims_player
     ON redemption_claims(player_id, created_at);
 
+CREATE TABLE IF NOT EXISTS fate_pools (
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    pool_key TEXT NOT NULL,
+    pity_count INTEGER NOT NULL DEFAULT 0 CHECK (pity_count >= 0 AND pity_count < 10),
+    total_draws INTEGER NOT NULL DEFAULT 0 CHECK (total_draws >= 0),
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (player_id, pool_key)
+);
+
+CREATE TABLE IF NOT EXISTS fate_rolls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    pool_key TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    draw_count INTEGER NOT NULL CHECK (draw_count IN (1, 10)),
+    cost_kind TEXT NOT NULL CHECK (cost_kind IN ('spirit_stones', 'ticket')),
+    cost_quantity INTEGER NOT NULL CHECK (cost_quantity > 0),
+    pity_before INTEGER NOT NULL CHECK (pity_before >= 0 AND pity_before < 10),
+    pity_after INTEGER NOT NULL CHECK (pity_after >= 0 AND pity_after < 10),
+    seed_hash TEXT NOT NULL,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    draws_json TEXT NOT NULL DEFAULT '[]',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fate_rolls_player
+    ON fate_rolls(player_id, pool_key, created_at);
+
 CREATE TABLE IF NOT EXISTS dao_contracts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_id INTEGER NOT NULL REFERENCES players(id),
@@ -819,6 +864,18 @@ class RedemptionCodeExhaustedError(RuntimeError):
 
 class RedemptionCodeAlreadyClaimedError(RuntimeError):
     """The player already redeemed this code."""
+
+
+class FatePoolInvalidError(RuntimeError):
+    """The requested fate pool or draw count is not registered."""
+
+
+class FatePoolNotOpenError(RuntimeError):
+    """The requested fate pool is not available in the current content."""
+
+
+class FateDrawInsufficientError(RuntimeError):
+    """The player lacks the ticket or spirit stones required for a draw."""
 
 
 class BillingReceiptInvalidError(RuntimeError):
@@ -6802,6 +6859,233 @@ class SQLitePlayerRepository:
         return RedemptionCodeRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             code_key=str(payload["code_key"]),
+            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            already_completed=replay,
+        )
+
+    async def roll_fate_pool(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        draw_count: int,
+        operation_id: str,
+    ) -> FateRollRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._roll_fate_pool_sync,
+                platform,
+                platform_user_id,
+                draw_count,
+                operation_id,
+            )
+
+    def _roll_fate_pool_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        draw_count: int,
+        operation_id: str,
+    ) -> FateRollRecord:
+        operation_name = "routine.roll_fate_pool"
+        if draw_count not in {1, 10}:
+            raise FatePoolInvalidError("unsupported fate draw count")
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "pool_key": FATE_POOL_KEY,
+                "draw_count": draw_count,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._fate_roll_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            pool = connection.execute(
+                "SELECT * FROM fate_pools WHERE player_id = ? AND pool_key = ?",
+                (row["id"], FATE_POOL_KEY),
+            ).fetchone()
+            pity_before = int(pool["pity_count"]) if pool is not None else 0
+            if pity_before < 0 or pity_before >= FATE_PITY_LIMIT:
+                raise FatePoolNotOpenError("fate pity state is invalid")
+
+            inventory = self._json_object(row["inventory_json"], {})
+            stones = int(row["spirit_stones"])
+            if draw_count == 1 and int(inventory.get(FATE_TICKET, 0)) > 0:
+                cost_kind = "ticket"
+                cost_quantity = 1
+                remaining_ticket = int(inventory[FATE_TICKET]) - 1
+                if remaining_ticket:
+                    inventory[FATE_TICKET] = remaining_ticket
+                else:
+                    inventory.pop(FATE_TICKET, None)
+            else:
+                cost_kind = "spirit_stones"
+                cost_quantity = FATE_SINGLE_COST if draw_count == 1 else FATE_TEN_COST
+                if stones < cost_quantity:
+                    raise FateDrawInsufficientError("fate draw cost is insufficient")
+                stones -= cost_quantity
+
+            draws, pity_after, seed_hash = roll_fate_pool(
+                operation_id,
+                draw_count=draw_count,
+                pity_before=pity_before,
+            )
+            reward = reward_totals(draws)
+            for key, quantity in reward.items():
+                if key == "spirit_stones":
+                    stones += quantity
+                else:
+                    inventory[key] = int(inventory.get(key, 0)) + quantity
+            connection.execute(
+                """
+                UPDATE players
+                SET spirit_stones = ?, inventory_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    stones,
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    row["id"],
+                ),
+            )
+            total_draws = (int(pool["total_draws"]) if pool is not None else 0) + draw_count
+            connection.execute(
+                """
+                INSERT INTO fate_pools(
+                    player_id, pool_key, pity_count, total_draws,
+                    content_version, rule_version, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(player_id, pool_key) DO UPDATE SET
+                    pity_count = excluded.pity_count,
+                    total_draws = excluded.total_draws,
+                    content_version = excluded.content_version,
+                    rule_version = excluded.rule_version,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    row["id"],
+                    FATE_POOL_KEY,
+                    pity_after,
+                    total_draws,
+                    FATE_CONTENT_VERSION,
+                    FATE_RULE_VERSION,
+                    now_text,
+                ),
+            )
+            draws_payload = [
+                {
+                    "key": draw.key,
+                    "label": draw.label,
+                    "rarity": draw.rarity,
+                    "quantity": draw.quantity,
+                    "guaranteed": draw.guaranteed,
+                }
+                for draw in draws
+            ]
+            connection.execute(
+                """
+                INSERT INTO fate_rolls(
+                    player_id, pool_key, operation_id, draw_count, cost_kind,
+                    cost_quantity, pity_before, pity_after, seed_hash, reward_json,
+                    draws_json, content_version, rule_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"],
+                    FATE_POOL_KEY,
+                    operation_id,
+                    draw_count,
+                    cost_kind,
+                    cost_quantity,
+                    pity_before,
+                    pity_after,
+                    seed_hash,
+                    json.dumps(reward, ensure_ascii=False, sort_keys=True),
+                    json.dumps(draws_payload, ensure_ascii=False, sort_keys=True),
+                    FATE_CONTENT_VERSION,
+                    FATE_RULE_VERSION,
+                    now_text,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("fate roll returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "pool_key": FATE_POOL_KEY,
+                "draw_count": draw_count,
+                "cost_kind": cost_kind,
+                "cost_quantity": cost_quantity,
+                "pity_before": pity_before,
+                "pity_after": pity_after,
+                "seed_hash": seed_hash,
+                "draws": draws_payload,
+                "reward": reward,
+                "content_version": FATE_CONTENT_VERSION,
+                "rule_version": FATE_RULE_VERSION,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash,
+                    result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._fate_roll_from_payload(payload)
+
+    @staticmethod
+    def _fate_roll_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> FateRollRecord:
+        draws = tuple(
+            FateDrawView(
+                key=str(item["key"]),
+                label=str(item["label"]),
+                rarity=str(item["rarity"]),
+                quantity=int(item["quantity"]),
+                guaranteed=bool(item.get("guaranteed", False)),
+            )
+            for item in payload.get("draws", [])
+        )
+        return FateRollRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            pool_key=str(payload["pool_key"]),
+            draw_count=int(payload["draw_count"]),
+            cost_kind=str(payload["cost_kind"]),
+            cost_quantity=int(payload["cost_quantity"]),
+            pity_before=int(payload["pity_before"]),
+            pity_after=int(payload["pity_after"]),
+            seed_hash=str(payload["seed_hash"]),
+            draws=draws,
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             already_completed=replay,
         )

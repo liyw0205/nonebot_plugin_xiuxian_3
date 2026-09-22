@@ -154,6 +154,60 @@
       "requirements": [],
       "status": "active",
       "key": "item.food.spirit_rice"
+    },
+    {
+      "name": "道号碎片",
+      "item_type": "fragment",
+      "quality": "uncommon",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "display_unlock_progress",
+          "target": "dao_name"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.fragment.dao_name"
+    },
+    {
+      "name": "基础配方线索",
+      "item_type": "clue",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "recipe_clue",
+          "scope": "basic"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.clue.recipe_basic"
+    },
+    {
+      "name": "基础功法线索",
+      "item_type": "clue",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "manual_clue",
+          "scope": "basic"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.clue.manual_basic"
     }
   ],
   "category": "材料",

@@ -13,6 +13,7 @@ from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
 from .adventures.use_cases import AdventuresApplication
 from .routine.use_cases import RoutineApplication
+from .routine.gacha_use_cases import GachaApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -28,6 +29,7 @@ class XiuxianApplication:
         self.exploration = ExplorationApplication(repository)
         self.adventures = AdventuresApplication(repository)
         self.routine = RoutineApplication(repository)
+        self.gacha = GachaApplication(repository)
 
     async def _invoke(
         self,
@@ -334,4 +336,11 @@ class XiuxianApplication:
             context,
             lambda: self.routine.claim_dao_contract(context),
             write_message="当前事件不允许领取道契权益。",
+        )
+
+    async def roll_fate_pool(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.gacha.roll_fate_pool(context),
+            write_message="当前事件不允许进行机缘寻宝。",
         )

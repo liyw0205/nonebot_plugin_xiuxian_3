@@ -153,6 +153,30 @@ class DaoContractClaimRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class FateDrawView:
+    key: str
+    label: str
+    rarity: str
+    quantity: int
+    guaranteed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class FateRollRecord:
+    player: PlayerView
+    pool_key: str
+    draw_count: int
+    cost_kind: str
+    cost_quantity: int
+    pity_before: int
+    pity_after: int
+    seed_hash: str
+    draws: tuple[FateDrawView, ...]
+    reward: dict[str, int] = field(default_factory=dict)
+    already_completed: bool = False
+
+
 __all__ = [
     "RoutineClaimRecord",
     "SpiritTreeRecord",
@@ -169,4 +193,6 @@ __all__ = [
     "DaoContractStatusRecord",
     "DaoContractActivationRecord",
     "DaoContractClaimRecord",
+    "FateDrawView",
+    "FateRollRecord",
 ]

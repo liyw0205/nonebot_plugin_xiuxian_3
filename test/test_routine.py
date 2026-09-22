@@ -705,3 +705,107 @@ def test_dao_contract_rejects_invalid_receipts_without_asset_changes() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_fate_pool_prefers_ticket_is_idempotent_and_guarantees_ten_pull_clue() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "routine-fate"
+            await _enter_mortal(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET spirit_stones = ?, inventory_json = ? WHERE platform_user_id = ?",
+                    (1000, json.dumps({"item.ticket.fate_basic": 1}, ensure_ascii=False), user),
+                )
+
+            single = await runtime.dispatch(
+                _context(user, "fate-single", operation_id="fate-single"),
+                "机缘寻宝 单抽",
+            )
+            assert single.code == "FATE_POOL_ROLLED"
+            assert single.data["cost_kind"] == "ticket"
+            assert single.data["draw_count"] == 1
+            replay = await runtime.dispatch(
+                _context(user, "fate-single-replay", operation_id="fate-single"),
+                "机缘寻宝 单抽",
+            )
+            assert replay.ok and replay.data["idempotent_replay"] is True
+            assert replay.data["reward"] == single.data["reward"]
+
+            ten = await runtime.dispatch(
+                _context(user, "fate-ten", operation_id="fate-ten"),
+                "机缘寻宝 十连",
+            )
+            assert ten.code == "FATE_POOL_ROLLED"
+            assert len(ten.data["draws"]) == 10
+            assert any(draw["rarity"] == "rare" for draw in ten.data["draws"])
+            assert ten.data["cost_kind"] == "spirit_stones"
+            assert ten.data["cost_quantity"] == 450
+            assert 0 <= ten.data["pity_after"] < 10
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                fate_rolls = connection.execute(
+                    "SELECT COUNT(*), COUNT(DISTINCT operation_id) FROM fate_rolls"
+                ).fetchone()
+                stones, inventory_json = connection.execute(
+                    "SELECT spirit_stones, inventory_json FROM players WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+            assert fate_rolls == (2, 2)
+            assert json.loads(inventory_json).get("item.ticket.fate_basic", 0) == 0
+            expected_stones = (
+                1000
+                - ten.data["cost_quantity"]
+                + single.data["reward"].get("spirit_stones", 0)
+                + ten.data["reward"].get("spirit_stones", 0)
+            )
+            assert stones == expected_stones
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_fate_pool_same_operation_replays_without_double_spend_and_rejects_empty_wallet() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "routine-fate-concurrent"
+            await _enter_mortal(runtime, user)
+            _set_resources(runtime, user, stones=50, energy=0)
+            results = await asyncio.gather(
+                *(
+                    runtime.dispatch(
+                        _context(user, f"fate-{index}", operation_id="fate-concurrent"),
+                        "机缘寻宝",
+                    )
+                    for index in range(8)
+                )
+            )
+            assert all(result.ok for result in results)
+            assert sum(result.data["idempotent_replay"] is False for result in results) == 1
+            success = next(result for result in results if not result.data["idempotent_replay"])
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                stored = connection.execute(
+                    "SELECT spirit_stones, COUNT(*) FROM players JOIN fate_rolls ON fate_rolls.player_id = players.id WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+            assert stored == (50 - 50 + success.data["reward"].get("spirit_stones", 0), 1)
+
+            poor = "routine-fate-poor"
+            await _enter_mortal(runtime, poor)
+            _set_resources(runtime, poor, stones=0, energy=0)
+            refused = await runtime.dispatch(
+                _context(poor, "fate-poor", operation_id="fate-poor"),
+                "机缘寻宝 单抽",
+            )
+            assert refused.code == "FATE_DRAW_INSUFFICIENT"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                row = connection.execute(
+                    "SELECT spirit_stones, COUNT(fate_rolls.id) FROM players LEFT JOIN fate_rolls ON fate_rolls.player_id = players.id WHERE platform_user_id = ?",
+                    (poor,),
+                ).fetchone()
+            assert row == (0, 0)
+            await runtime.close()
+
+    asyncio.run(run())

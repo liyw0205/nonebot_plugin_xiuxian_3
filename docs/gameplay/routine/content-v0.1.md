@@ -35,7 +35,8 @@
 
 ## 3. 机缘寻宝、问道行卷与功业录
 
-- `gacha.fate.basic`：单抽 50 灵石或 `item.ticket.fate_basic` 1；十连 450 灵石，必须至少出现 1 个灵品/功法线索。池：灵石返还、药材、生产材料、道号碎片、配方线索；不放突破物/终局资产。保底计数 10 抽，保底状态按玩家/池保存。
+- `gacha.fate.basic`：单抽 50 灵石或 `item.ticket.fate_basic` 1；十连 450 灵石，必须至少出现 1 个灵品/功法线索。池：灵石返还、药材、生产材料、道号碎片、配方线索、功法线索；不放突破物/终局资产。当前已开放 `机缘寻宝`、`机缘寻宝 单抽` 和 `机缘寻宝 十连`，单抽优先消耗机缘签。保底计数 10 抽，保底状态按玩家/池保存。
+- 机缘池使用 `operation_id + rule_version` 派生确定性种子，保存每一项结果、消耗、保底前后计数和种子摘要；重复 operation 只回放，不重复扣费。连续 9 次未获得稀有线索时，下一抽保底；十连至少包含 1 项稀有线索。
 - `pass.wayfaring.v0.1`：30 级，业务周期 28 日；每日任务上限 100 行卷点，周任务上限 500。免费线奖励材料/名望/道号展示；付费线需已验证 `dao_contract.monthly`，只增加展示、配方线索、灵木水分券，不给修为/突破物。
 - `honor.title.*`：`title.first_seeking`、`title.town_helper`、`title.first_tower_clear`；纯展示，装备一个、备选保存不限。
 - `honor.achievement.*`：`achievement.first_checkin`、`achievement.first_dispatch`、`achievement.first_craft`、`achievement.codex_5`、`achievement.tower_10`；完成奖励为道号、名望或图鉴页，领取唯一。

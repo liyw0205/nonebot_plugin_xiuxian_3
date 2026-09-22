@@ -49,6 +49,9 @@ code: available -> claimed | expired | revoked
 7. 道契激活先在 billing 端口验证 Ed25519 凭证和角色主体，再在同一事务检查凭证唯一、商品
    价格和周期；激活奖励、`dao_contracts` 与 operation 一起提交。每日领取以
    `(contract_id, business_date)` 唯一，续期从旧周期结束日之后开始；撤销只改变未来状态，不回收已结算权益。
+8. 机缘寻宝在同一事务锁定角色钱包/背包和 `fate_pools` 保底快照；单抽优先消耗机缘签，
+   十连消耗固定灵石，确定性结果写入 `fate_rolls`、角色资产和 operation。保底、奖励清单、
+   种子摘要和版本必须随结果保存，禁止把抽卡结果重新计算为当前池版本。
 
 ## 七日入道事务流程
 

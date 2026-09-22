@@ -83,6 +83,9 @@ data/
 | `item.cave_pass_basic` | 凭证 | 1 | 绑定 |
 | `item.token.change_path` | 特殊物品 | 1 | 绑定 |
 | `item.token.rename_card` | 改名卡 | 99 | 绑定；再次修改道号时消耗 |
+| `item.fragment.dao_name` | 道号碎片 | 99 | 绑定；仅用于展示进度 |
+| `item.clue.recipe_basic` | 基础配方线索 | 99 | 绑定；仅用于线索展示 |
+| `item.clue.manual_basic` | 基础功法线索 | 99 | 绑定；仅用于线索展示 |
 
 另外，`foundation/advancement/content-v0.1.md` 使用
 `item.token.constitution_reset` 作为管理员测试用物品。它不应进入普通掉落池，
