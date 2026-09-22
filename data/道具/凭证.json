@@ -78,6 +78,24 @@
       "requirements": [],
       "status": "active",
       "key": "item.token.rename_card"
+    },
+    {
+      "name": "灵木水分券",
+      "item_type": "token",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "spirit_tree_water_credit",
+          "consume_on": "routine.spirit_tree.water"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.token.spirit_tree_water"
     }
   ],
   "category": "凭证",

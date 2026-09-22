@@ -14,12 +14,20 @@ from .models import (
     FateRollRecord,
     RedemptionCodeRecord,
     RoutineClaimRecord,
+    WayfaringClaimRecord,
+    WayfaringLevelView,
+    WayfaringStatusRecord,
     SevenDayGoalRecord,
     SevenDayGoalView,
     SevenDayStatusRecord,
     SpiritTreeRecord,
 )
 from .rules import RULE_VERSION
+from .wayfaring import (
+    WAYFARING_CONTENT_VERSION,
+    WAYFARING_RULE_VERSION,
+    WAYFARING_PASS_KEY,
+)
 
 __all__ = [
     "RULE_VERSION",
@@ -34,6 +42,12 @@ __all__ = [
     "DaoContractView",
     "FateDrawView",
     "FateRollRecord",
+    "WAYFARING_CONTENT_VERSION",
+    "WAYFARING_RULE_VERSION",
+    "WAYFARING_PASS_KEY",
+    "WayfaringClaimRecord",
+    "WayfaringLevelView",
+    "WayfaringStatusRecord",
     "RedemptionCodeRecord",
     "RoutineClaimRecord",
     "SpiritTreeRecord",

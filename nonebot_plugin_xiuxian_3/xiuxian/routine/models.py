@@ -177,6 +177,45 @@ class FateRollRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class WayfaringLevelView:
+    level: int
+    required_points: int
+    free_reward: dict[str, int] = field(default_factory=dict)
+    paid_reward: dict[str, int] = field(default_factory=dict)
+    free_claimed: bool = False
+    paid_claimed: bool = False
+    free_claimable: bool = False
+    paid_claimable: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class WayfaringStatusRecord:
+    player: PlayerView
+    pass_key: str
+    status: str
+    cycle_start: str
+    cycle_end: str
+    total_points: int
+    current_level: int
+    daily_points: int
+    weekly_points: int
+    claimed_free: tuple[int, ...] = ()
+    claimed_paid: tuple[int, ...] = ()
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class WayfaringClaimRecord:
+    player: PlayerView
+    pass_key: str
+    level: int
+    track: str
+    reward: dict[str, int] = field(default_factory=dict)
+    total_points: int = 0
+    already_completed: bool = False
+
+
 __all__ = [
     "RoutineClaimRecord",
     "SpiritTreeRecord",
@@ -195,4 +234,7 @@ __all__ = [
     "DaoContractClaimRecord",
     "FateDrawView",
     "FateRollRecord",
+    "WayfaringLevelView",
+    "WayfaringStatusRecord",
+    "WayfaringClaimRecord",
 ]

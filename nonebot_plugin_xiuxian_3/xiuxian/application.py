@@ -14,6 +14,7 @@ from .exploration.use_cases import ExplorationApplication
 from .adventures.use_cases import AdventuresApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
+from .routine.wayfaring_use_cases import WayfaringApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -30,6 +31,7 @@ class XiuxianApplication:
         self.adventures = AdventuresApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
+        self.wayfaring = WayfaringApplication(repository)
 
     async def _invoke(
         self,
@@ -343,4 +345,25 @@ class XiuxianApplication:
             context,
             lambda: self.gacha.roll_fate_pool(context),
             write_message="当前事件不允许进行机缘寻宝。",
+        )
+
+    async def get_wayfaring_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.wayfaring.get_status(context),
+            require_write=False,
+        )
+
+    async def start_wayfaring(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.wayfaring.start(context),
+            write_message="当前事件不允许开启行卷。",
+        )
+
+    async def claim_wayfaring_level(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.wayfaring.claim_level(context),
+            write_message="当前事件不允许领取行卷奖励。",
         )

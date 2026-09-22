@@ -157,3 +157,6 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("激活道契", application.activate_dao_contract)
     router.register("领取道契", application.claim_dao_contract)
     router.register("机缘寻宝", application.roll_fate_pool, aliases=("寻宝", "机缘抽奖"))
+    router.register("问道行卷", application.get_wayfaring_status, aliases=("行卷状态",))
+    router.register("开始行卷", application.start_wayfaring)
+    router.register("领取行卷", application.claim_wayfaring_level)

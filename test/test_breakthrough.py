@@ -30,6 +30,31 @@ async def _cultivator(runtime, user_id: str) -> None:
         assert result.ok
 
 
+def test_breakthrough_preview_accepts_read_only_identity() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "breakthrough-preview-reader"
+            await _cultivator(runtime, user)
+
+            result = await runtime.dispatch(
+                CommandContext(
+                    adapter="web",
+                    user_id=user,
+                    request_id="preview-read-only",
+                    can_write_assets=False,
+                ),
+                "突破预览 聚气",
+            )
+
+            assert result.code == "BREAKTHROUGH_PREVIEW"
+            assert result.data["target_realm"] == "qi_gathering"
+            assert result.data["ready"] is False
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def _prepare_player(runtime, user_id: str, *, inventory: dict[str, int], stones: int = 500, layer: int = 10, cultivation: int = 1360) -> None:
     import json
 

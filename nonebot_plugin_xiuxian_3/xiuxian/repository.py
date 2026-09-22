@@ -66,10 +66,25 @@ from .routine.models import (
     FateDrawView,
     FateRollRecord,
     RoutineClaimRecord,
+    WayfaringClaimRecord,
+    WayfaringStatusRecord,
     SevenDayGoalRecord,
     SevenDayGoalView,
     SevenDayStatusRecord,
     SpiritTreeRecord,
+)
+from .routine.wayfaring import (
+    WAYFARING_CONTENT_VERSION,
+    WAYFARING_DAILY_POINT_CAP,
+    WAYFARING_LEVELS,
+    WAYFARING_PASS_KEY,
+    WAYFARING_POINTS_PER_LEVEL,
+    WAYFARING_RULE_VERSION,
+    WAYFARING_WEEKLY_POINT_CAP,
+    wayfaring_free_reward,
+    wayfaring_paid_reward,
+    wayfaring_source_points,
+    wayfaring_week_start,
 )
 from .routine.billing import BillingReceiptError, verify_receipt
 from .routine.gacha import (
@@ -509,6 +524,62 @@ CREATE TABLE IF NOT EXISTS fate_rolls (
 CREATE INDEX IF NOT EXISTS idx_fate_rolls_player
     ON fate_rolls(player_id, pool_key, created_at);
 
+CREATE TABLE IF NOT EXISTS wayfaring_passes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    pass_key TEXT NOT NULL,
+    cycle_start TEXT NOT NULL,
+    cycle_end TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'closed')),
+    total_points INTEGER NOT NULL DEFAULT 0 CHECK (total_points >= 0),
+    daily_date TEXT NOT NULL,
+    daily_points INTEGER NOT NULL DEFAULT 0 CHECK (daily_points >= 0),
+    week_start TEXT NOT NULL,
+    weekly_points INTEGER NOT NULL DEFAULT 0 CHECK (weekly_points >= 0),
+    claimed_free_json TEXT NOT NULL DEFAULT '[]',
+    claimed_paid_json TEXT NOT NULL DEFAULT '[]',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, pass_key, cycle_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wayfaring_passes_player
+    ON wayfaring_passes(player_id, pass_key, cycle_start);
+
+CREATE TABLE IF NOT EXISTS wayfaring_point_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    pass_id INTEGER NOT NULL REFERENCES wayfaring_passes(id),
+    source_key TEXT NOT NULL,
+    source_operation_id TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    week_start TEXT NOT NULL,
+    points INTEGER NOT NULL CHECK (points >= 0),
+    created_at TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    UNIQUE (player_id, pass_id, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wayfaring_point_events_pass
+    ON wayfaring_point_events(pass_id, business_date, week_start);
+
+CREATE TABLE IF NOT EXISTS wayfaring_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    pass_id INTEGER NOT NULL REFERENCES wayfaring_passes(id),
+    level INTEGER NOT NULL CHECK (level BETWEEN 1 AND 30),
+    track TEXT NOT NULL CHECK (track IN ('free', 'paid')),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (player_id, pass_id, level, track)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wayfaring_claims_player
+    ON wayfaring_claims(player_id, pass_id, level);
+
 CREATE TABLE IF NOT EXISTS dao_contracts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_id INTEGER NOT NULL REFERENCES players(id),
@@ -902,6 +973,30 @@ class DaoContractAlreadyRevokedError(RuntimeError):
     """The contract is already revoked or cannot be revoked."""
 
 
+class WayfaringNotStartedError(RuntimeError):
+    """The player has not started the current wayfaring pass."""
+
+
+class WayfaringAlreadyStartedError(RuntimeError):
+    """The current wayfaring cycle is already active."""
+
+
+class WayfaringLevelInvalidError(RuntimeError):
+    """The requested wayfaring level is outside the configured range."""
+
+
+class WayfaringLevelLockedError(RuntimeError):
+    """The player has not earned enough points for the requested level."""
+
+
+class WayfaringClaimAlreadyExistsError(RuntimeError):
+    """The requested wayfaring track was already claimed."""
+
+
+class WayfaringPaidTrackInactiveError(RuntimeError):
+    """The monthly dao contract is not active for the paid track."""
+
+
 class SQLitePlayerRepository:
     """Short-transaction repository safe for concurrent asyncio requests.
 
@@ -968,6 +1063,10 @@ class SQLitePlayerRepository:
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("routine.redemption.v0.1", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("routine.wayfaring.v0.1", serialize_datetime(self._now())),
             )
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
@@ -7088,6 +7187,480 @@ class SQLitePlayerRepository:
             draws=draws,
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             already_completed=replay,
+        )
+
+    async def start_wayfaring(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> WayfaringStatusRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._start_wayfaring_sync, platform, platform_user_id, operation_id
+            )
+
+    def _start_wayfaring_sync(
+        self, platform: str, platform_user_id: str, operation_id: str
+    ) -> WayfaringStatusRecord:
+        operation_name = "pass.wayfaring.start"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "pass_key": WAYFARING_PASS_KEY,
+                "content_version": WAYFARING_CONTENT_VERSION,
+                "rule_version": WAYFARING_RULE_VERSION,
+            },
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        cycle_start, cycle_end = now.date(), now.date() + timedelta(days=27)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._wayfaring_status_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+            player = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if player is None:
+                raise PlayerNotFoundError("player does not exist")
+            if player["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            current = connection.execute(
+                "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
+                (player["id"], WAYFARING_PASS_KEY),
+            ).fetchone()
+            if current is not None and str(current["status"]) in {"active", "completed"}:
+                if date.fromisoformat(str(current["cycle_end"])) >= now.date():
+                    raise WayfaringAlreadyStartedError("wayfaring pass is already active")
+                connection.execute(
+                    "UPDATE wayfaring_passes SET status = 'closed', updated_at = ? WHERE id = ?",
+                    (now_text, current["id"]),
+                )
+            connection.execute(
+                """
+                INSERT INTO wayfaring_passes(
+                    player_id, pass_key, cycle_start, cycle_end, status,
+                    total_points, daily_date, daily_points, week_start, weekly_points,
+                    claimed_free_json, claimed_paid_json, content_version, rule_version,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'active', 0, ?, 0, ?, 0, '[]', '[]', ?, ?, ?, ?)
+                """,
+                (
+                    player["id"], WAYFARING_PASS_KEY, cycle_start.isoformat(), cycle_end.isoformat(),
+                    cycle_start.isoformat(), wayfaring_week_start(cycle_start).isoformat(),
+                    WAYFARING_CONTENT_VERSION, WAYFARING_RULE_VERSION, now_text, now_text,
+                ),
+            )
+            pass_row = connection.execute(
+                "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? AND cycle_start = ?",
+                (player["id"], WAYFARING_PASS_KEY, cycle_start.isoformat()),
+            ).fetchone()
+            if pass_row is None:
+                raise RuntimeError("wayfaring pass initialization failed")
+            payload = self._wayfaring_status_payload(connection, player, pass_row, now)
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id, operation_name, player["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._wayfaring_status_from_payload(payload)
+
+    async def get_wayfaring_status(
+        self, *, platform: str, platform_user_id: str
+    ) -> WayfaringStatusRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_wayfaring_status_sync, platform, platform_user_id
+            )
+
+    def _get_wayfaring_status_sync(
+        self, platform: str, platform_user_id: str
+    ) -> WayfaringStatusRecord:
+        now = self._now()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            player = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if player is None:
+                raise PlayerNotFoundError("player does not exist")
+            if player["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            pass_row = connection.execute(
+                "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
+                (player["id"], WAYFARING_PASS_KEY),
+            ).fetchone()
+            if pass_row is None:
+                raise WayfaringNotStartedError("wayfaring pass has not started")
+            if str(pass_row["status"]) == "active" and now.date() > date.fromisoformat(str(pass_row["cycle_end"])):
+                connection.execute(
+                    "UPDATE wayfaring_passes SET status = 'closed', updated_at = ? WHERE id = ?",
+                    (serialize_datetime(now), pass_row["id"]),
+                )
+                pass_row = connection.execute(
+                    "SELECT * FROM wayfaring_passes WHERE id = ?", (pass_row["id"],)
+                ).fetchone()
+            if pass_row is None:
+                raise RuntimeError("wayfaring pass disappeared")
+            self._sync_wayfaring_points(connection, player, pass_row, now)
+            pass_row = connection.execute(
+                "SELECT * FROM wayfaring_passes WHERE id = ?", (pass_row["id"],)
+            ).fetchone()
+            if pass_row is None:
+                raise RuntimeError("wayfaring pass disappeared")
+            return self._wayfaring_status_from_payload(
+                self._wayfaring_status_payload(connection, player, pass_row, now)
+            )
+
+    async def claim_wayfaring_level(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        level: int,
+        track: str,
+        operation_id: str,
+    ) -> WayfaringClaimRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_wayfaring_level_sync,
+                platform,
+                platform_user_id,
+                level,
+                track,
+                operation_id,
+            )
+
+    def _claim_wayfaring_level_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        level: int,
+        track: str,
+        operation_id: str,
+    ) -> WayfaringClaimRecord:
+        if isinstance(level, bool):
+            raise WayfaringLevelInvalidError("invalid wayfaring level")
+        try:
+            level = int(level)
+        except (TypeError, ValueError) as exc:
+            raise WayfaringLevelInvalidError("invalid wayfaring level") from exc
+        if level not in WAYFARING_LEVELS or track not in {"free", "paid"}:
+            raise WayfaringLevelInvalidError("invalid wayfaring level or track")
+        operation_name = "pass.wayfaring.claim"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "pass_key": WAYFARING_PASS_KEY,
+                "level": level,
+                "track": track,
+                "content_version": WAYFARING_CONTENT_VERSION,
+                "rule_version": WAYFARING_RULE_VERSION,
+            },
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._wayfaring_claim_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+            player = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if player is None:
+                raise PlayerNotFoundError("player does not exist")
+            if player["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            pass_row = connection.execute(
+                "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
+                (player["id"], WAYFARING_PASS_KEY),
+            ).fetchone()
+            if pass_row is None:
+                raise WayfaringNotStartedError("wayfaring pass has not started")
+            if str(pass_row["status"]) == "active" and now.date() > date.fromisoformat(str(pass_row["cycle_end"])):
+                connection.execute(
+                    "UPDATE wayfaring_passes SET status = 'closed', updated_at = ? WHERE id = ?",
+                    (now_text, pass_row["id"]),
+                )
+                pass_row = connection.execute("SELECT * FROM wayfaring_passes WHERE id = ?", (pass_row["id"],)).fetchone()
+            if pass_row is None:
+                raise WayfaringNotStartedError("wayfaring pass has not started")
+            self._sync_wayfaring_points(connection, player, pass_row, now)
+            pass_row = connection.execute("SELECT * FROM wayfaring_passes WHERE id = ?", (pass_row["id"],)).fetchone()
+            if pass_row is None or str(pass_row["status"]) == "closed":
+                raise WayfaringLevelLockedError("wayfaring cycle is closed")
+            current_level = min(WAYFARING_LEVELS[-1], int(pass_row["total_points"]) // WAYFARING_POINTS_PER_LEVEL)
+            if level > current_level:
+                raise WayfaringLevelLockedError("wayfaring level is not unlocked")
+            claimed_key = "claimed_free_json" if track == "free" else "claimed_paid_json"
+            claimed = {int(item) for item in self._json_array(pass_row[claimed_key])}
+            if level in claimed:
+                raise WayfaringClaimAlreadyExistsError("wayfaring reward already claimed")
+            if track == "paid":
+                active_contract = connection.execute(
+                    """
+                    SELECT id, starts_on, ends_on, content_version, rule_version
+                    FROM dao_contracts
+                    WHERE player_id = ? AND contract_key = 'dao_contract.monthly'
+                      AND status = 'active' AND starts_on <= ? AND ends_on >= ?
+                    LIMIT 1
+                    """,
+                    (player["id"], now.date().isoformat(), now.date().isoformat()),
+                ).fetchone()
+                if active_contract is None:
+                    raise WayfaringPaidTrackInactiveError("monthly dao contract is required")
+                reward = wayfaring_paid_reward(level)
+            else:
+                reward = wayfaring_free_reward(level)
+            entitlement_snapshot = None
+            if track == "paid" and active_contract is not None:
+                entitlement_snapshot = {
+                    "contract_id": int(active_contract["id"]),
+                    "contract_key": "dao_contract.monthly",
+                    "starts_on": str(active_contract["starts_on"]),
+                    "ends_on": str(active_contract["ends_on"]),
+                    "content_version": str(active_contract["content_version"]),
+                    "rule_version": str(active_contract["rule_version"]),
+                }
+            actual_reward = self._apply_dao_reward(connection, player, reward, now_text)
+            claimed.add(level)
+            connection.execute(
+                f"UPDATE wayfaring_passes SET {claimed_key} = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(sorted(claimed), ensure_ascii=False), now_text, pass_row["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("wayfaring claim returned no player")
+            connection.execute(
+                """
+                INSERT INTO wayfaring_claims(
+                    player_id, pass_id, level, track, operation_id, reward_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (player["id"], pass_row["id"], level, track, operation_id,
+                 json.dumps(actual_reward, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "pass_key": WAYFARING_PASS_KEY,
+                "level": level,
+                "track": track,
+                "reward": actual_reward,
+                "total_points": int(pass_row["total_points"]),
+                "entitlement_snapshot": entitlement_snapshot,
+                "content_version": WAYFARING_CONTENT_VERSION,
+                "rule_version": WAYFARING_RULE_VERSION,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, player["id"], request_hash,
+                 json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return self._wayfaring_claim_from_payload(payload)
+
+    @staticmethod
+    def _json_array(value: Any) -> list[Any]:
+        if isinstance(value, list):
+            return value
+        try:
+            parsed = json.loads(value or "[]")
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return parsed if isinstance(parsed, list) else []
+
+    @staticmethod
+    def _wayfaring_status_payload(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        pass_row: sqlite3.Row,
+        now: datetime,
+    ) -> dict[str, Any]:
+        total = min(
+            WAYFARING_LEVELS[-1] * WAYFARING_POINTS_PER_LEVEL,
+            int(pass_row["total_points"]),
+        )
+        return {
+            "player": SQLitePlayerRepository._player_payload(SQLitePlayerRepository._row_to_player(player)),
+            "pass_key": str(pass_row["pass_key"]),
+            "status": str(pass_row["status"]),
+            "cycle_start": str(pass_row["cycle_start"]),
+            "cycle_end": str(pass_row["cycle_end"]),
+            "total_points": total,
+            "current_level": min(WAYFARING_LEVELS[-1], total // WAYFARING_POINTS_PER_LEVEL),
+            "daily_points": int(pass_row["daily_points"]),
+            "weekly_points": int(pass_row["weekly_points"]),
+            "claimed_free": [int(item) for item in SQLitePlayerRepository._json_array(pass_row["claimed_free_json"])],
+            "claimed_paid": [int(item) for item in SQLitePlayerRepository._json_array(pass_row["claimed_paid_json"])],
+            "content_version": WAYFARING_CONTENT_VERSION,
+            "rule_version": WAYFARING_RULE_VERSION,
+        }
+
+    @staticmethod
+    def _wayfaring_status_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> WayfaringStatusRecord:
+        return WayfaringStatusRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            pass_key=str(payload["pass_key"]),
+            status=str(payload["status"]),
+            cycle_start=str(payload["cycle_start"]),
+            cycle_end=str(payload["cycle_end"]),
+            total_points=int(payload.get("total_points", 0)),
+            current_level=int(payload.get("current_level", 0)),
+            daily_points=int(payload.get("daily_points", 0)),
+            weekly_points=int(payload.get("weekly_points", 0)),
+            claimed_free=tuple(int(item) for item in payload.get("claimed_free", [])),
+            claimed_paid=tuple(int(item) for item in payload.get("claimed_paid", [])),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _wayfaring_claim_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> WayfaringClaimRecord:
+        return WayfaringClaimRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            pass_key=str(payload["pass_key"]),
+            level=int(payload["level"]),
+            track=str(payload["track"]),
+            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            total_points=int(payload.get("total_points", 0)),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _sync_wayfaring_points(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        pass_row: sqlite3.Row,
+        now: datetime,
+    ) -> None:
+        if str(pass_row["status"]) != "active":
+            return
+        start = str(pass_row["cycle_start"])
+        end = str(pass_row["cycle_end"])
+        sources = {
+            "player.start_seeking": "player.start_seeking",
+            "routine.checkin.daily": "routine.checkin.daily",
+            "routine.spirit_tree.water": "routine.spirit_tree.water",
+            "routine.spirit_tree.harvest": "routine.spirit_tree.harvest",
+            "production.complete": "production.complete",
+            "bounty.claim": "bounty.claim",
+            "exploration.settle": "exploration.settle",
+            "routine.claim_dao_contract": "dao_contract.daily",
+        }
+        placeholders = ",".join("?" for _ in sources)
+        candidates = connection.execute(
+            f"""
+            SELECT operation_id, operation_name, created_at FROM operations
+            WHERE player_id = ? AND operation_name IN ({placeholders})
+              AND substr(created_at, 1, 10) >= ? AND substr(created_at, 1, 10) <= ?
+            ORDER BY created_at ASC, operation_id ASC
+            """,
+            (player["id"], *sources.keys(), start, end),
+        ).fetchall()
+        existing = {
+            str(item["source_operation_id"])
+            for item in connection.execute(
+                "SELECT source_operation_id FROM wayfaring_point_events WHERE pass_id = ?",
+                (pass_row["id"],),
+            ).fetchall()
+        }
+        day_totals: dict[str, int] = {}
+        week_totals: dict[str, int] = {}
+        for item in connection.execute(
+            "SELECT business_date, week_start, points FROM wayfaring_point_events WHERE pass_id = ?",
+            (pass_row["id"],),
+        ).fetchall():
+            day_totals[str(item["business_date"])] = day_totals.get(str(item["business_date"]), 0) + int(item["points"])
+            week_totals[str(item["week_start"])] = week_totals.get(str(item["week_start"]), 0) + int(item["points"])
+        total = int(pass_row["total_points"])
+        for item in candidates:
+            source_operation_id = str(item["operation_id"])
+            if source_operation_id in existing:
+                continue
+            source_key = sources[str(item["operation_name"])]
+            try:
+                raw_points = wayfaring_source_points(source_key)
+            except ValueError:
+                continue
+            try:
+                business_date = datetime.fromisoformat(str(item["created_at"])).date()
+            except ValueError:
+                business_date = now.date()
+            business_date_text = business_date.isoformat()
+            week_text = wayfaring_week_start(business_date).isoformat()
+            remaining = min(
+                WAYFARING_DAILY_POINT_CAP - day_totals.get(business_date_text, 0),
+                WAYFARING_WEEKLY_POINT_CAP - week_totals.get(week_text, 0),
+            )
+            points = max(0, min(raw_points, remaining))
+            connection.execute(
+                """
+                INSERT INTO wayfaring_point_events(
+                    player_id, pass_id, source_key, source_operation_id,
+                    business_date, week_start, points, created_at, payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    player["id"], pass_row["id"], source_key, source_operation_id,
+                    business_date_text, week_text, points, serialize_datetime(now),
+                    json.dumps({"raw_points": raw_points, "capped": points != raw_points}, ensure_ascii=False, sort_keys=True),
+                ),
+            )
+            existing.add(source_operation_id)
+            day_totals[business_date_text] = day_totals.get(business_date_text, 0) + points
+            week_totals[week_text] = week_totals.get(week_text, 0) + points
+            total = min(
+                WAYFARING_LEVELS[-1] * WAYFARING_POINTS_PER_LEVEL,
+                total + points,
+            )
+        today_text = now.date().isoformat()
+        week_text = wayfaring_week_start(now.date()).isoformat()
+        status = str(pass_row["status"])
+        if total >= WAYFARING_LEVELS[-1] * WAYFARING_POINTS_PER_LEVEL:
+            status = "completed"
+        connection.execute(
+            """
+            UPDATE wayfaring_passes
+            SET total_points = ?, daily_date = ?, daily_points = ?,
+                week_start = ?, weekly_points = ?, status = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                total, today_text, day_totals.get(today_text, 0), week_text,
+                week_totals.get(week_text, 0), status, serialize_datetime(now), pass_row["id"],
+            ),
         )
 
     @staticmethod
