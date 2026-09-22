@@ -258,6 +258,18 @@
         "reputation_key": "local.xuantian.new_town",
         "reputation": 2
       },
+      "cargo": {
+        "max_value": 100,
+        "unit_values": {
+          "item.food.coarse_spirit_rice": 5,
+          "item.food.spirit_rice": 12,
+          "item.herb.blood_grass": 10,
+          "item.herb.spirit_leaf": 18,
+          "item.mat.wood": 8,
+          "item.ore.ironstone": 15,
+          "item.mat.array_sand": 20
+        }
+      },
       "daily_limit": 3,
       "delay_chance_bp": 1000,
       "delay_seconds": 600,

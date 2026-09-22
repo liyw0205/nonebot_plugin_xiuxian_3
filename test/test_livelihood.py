@@ -550,6 +550,99 @@ def test_service_accept_concurrency_allows_only_one_provider() -> None:
     asyncio.run(run())
 
 
+def test_short_route_locks_cargo_settles_once_and_preserves_cultivation() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            user = "route-user"
+            await runtime.dispatch(_context(user), "开始修仙")
+            await runtime.dispatch(_context(user), "寻仙问道")
+            preview = await runtime.dispatch(_context(user, "route-preview"), "运输预览 止血草 1")
+            assert preview.code == "ROUTE_PREVIEW"
+            assert preview.data["ready"] is True
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                before = connection.execute(
+                    "SELECT spirit_stones, stamina, cultivation, total_cultivation, location_key, inventory_json FROM players WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+            assert before[:5] == (100, 30, 0, 0, "xuantian.new_town")
+            assert json.loads(before[5])["item.herb.blood_grass"] == 3
+
+            started = await runtime.dispatch(_context(user, "route-start"), "开始运输 止血草 1")
+            assert started.code == "ROUTE_STARTED"
+            route_id = started.data["route_id"]
+            replay = await runtime.dispatch(_context(user, "route-start"), "开始运输 止血草 1")
+            assert replay.data["idempotent_replay"] is True
+            not_ready = await runtime.dispatch(_context(user, "route-settle-early"), f"结算运输 {route_id}")
+            assert not_ready.code == "ROUTE_NOT_READY"
+            clock.advance(minutes=20)
+            settled = await runtime.dispatch(_context(user, "route-settle"), f"结算运输 {route_id}")
+            assert settled.code == "ROUTE_SETTLED"
+            assert settled.data["reward_stones"] == 12
+            assert settled.data["local_reputation_delta"] == 2
+            settled_replay = await runtime.dispatch(_context(user, "route-settle"), f"结算运输 {route_id}")
+            assert settled_replay.data["idempotent_replay"] is True
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                after = connection.execute(
+                    "SELECT spirit_stones, stamina, cultivation, total_cultivation, location_key, inventory_json FROM players WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+                reputation = connection.execute(
+                    "SELECT local_json FROM player_reputations WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
+                    (user,),
+                ).fetchone()
+                status = connection.execute(
+                    "SELECT status, cargo_json FROM livelihood_trade_routes WHERE route_id = ?", (route_id,)
+                ).fetchone()
+            assert after[:5] == (112, 28, 0, 0, "xuantian.outskirts")
+            assert json.loads(after[5]).get("item.herb.blood_grass", 0) == 2
+            assert json.loads(reputation[0])["local.xuantian.new_town"] == 2
+            assert status[0] == "settled"
+            assert json.loads(status[1]) == {"item.herb.blood_grass": 1}
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_short_route_cargo_limit_and_concurrent_lock_are_atomic() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "route-atomic"
+            await runtime.dispatch(_context(user), "开始修仙")
+            await runtime.dispatch(_context(user), "寻仙问道")
+            too_valuable = await runtime.dispatch(_context(user, "route-too-valuable"), "开始运输 止血草 11")
+            assert too_valuable.code == "ROUTE_CARGO_LOCKED"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                before = connection.execute(
+                    "SELECT spirit_stones, stamina, inventory_json FROM players WHERE platform_user_id = ?", (user,)
+                ).fetchone()
+            assert before[:2] == (100, 30)
+            assert json.loads(before[2])["item.herb.blood_grass"] == 3
+            results = await asyncio.gather(
+                runtime.dispatch(_context(user, "route-race-a"), "开始运输 止血草 1"),
+                runtime.dispatch(_context(user, "route-race-b"), "开始运输 止血草 1"),
+            )
+            assert {result.code for result in results} == {"ROUTE_STARTED", "ROUTE_BUSY"}
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                route_count = connection.execute(
+                    "SELECT COUNT(*) FROM livelihood_trade_routes WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?) AND status = 'in_transit'",
+                    (user,),
+                ).fetchone()[0]
+                after = connection.execute(
+                    "SELECT stamina, inventory_json, cultivation, total_cultivation FROM players WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+            assert route_count == 1
+            assert after[0] == 28
+            assert json.loads(after[1])["item.herb.blood_grass"] == 2
+            assert after[2:4] == (0, 0)
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def _onebot_event(content: str, message_id: int, *, user_id: int = 1001, group_id: int = 2002):
     from nonebot.adapters.onebot.v11 import GroupMessageEvent, Message
     from nonebot.adapters.onebot.v11.event import Sender
@@ -672,6 +765,53 @@ def test_real_adapters_reach_cross_player_service_order(kind: str) -> None:
             settled = await dispatch(f"结算服务 {order_id}", 5006, "provider")
             assert settled.code == "SERVICE_SETTLED"
             assert settled.data["outputs"] == {"item.herb.blood_grass": 1}
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("kind", ["onebot", "qq"])
+def test_real_adapters_reach_short_route(kind: str) -> None:
+    pytest.importorskip("nonebot")
+    from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event
+    from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq_event
+
+    clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+
+    def event(text: str, message_id: int):
+        if kind == "onebot":
+            return _onebot_event(text, message_id, user_id=4001, group_id=4002)
+        return _qq_event(text, f"route-qq-{message_id}", member_openid="qq-route-user", group_openid="qq-route-group")
+
+    def normalize(raw):
+        return normalize_event(raw) if kind == "onebot" else normalize_qq_event(raw)
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+
+            async def dispatch(text: str, message_id: int):
+                normalized = normalize(event(text, message_id))
+                return await runtime.dispatch(normalized.context, normalized.text)
+
+            assert (await dispatch("开始修仙", 7000)).ok
+            assert (await dispatch("寻仙问道", 7001)).ok
+            preview = await dispatch("运输预览 止血草 1", 7002)
+            assert preview.code == "ROUTE_PREVIEW"
+            started = await dispatch("开始运输 止血草 1", 7003)
+            assert started.code == "ROUTE_STARTED"
+            clock.advance(minutes=20)
+            settled = await dispatch(f"结算运输 {started.data['route_id']}", 7004)
+            assert settled.code == "ROUTE_SETTLED"
+            assert settled.data["reward_stones"] == 12
+            platform = "onebot.v11" if kind == "onebot" else "qq.official"
+            user_id = "4001" if kind == "onebot" else "qq-route-user"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                row = connection.execute(
+                    "SELECT platform, platform_user_id, location_key FROM players WHERE platform = ? AND platform_user_id = ?",
+                    (platform, user_id),
+                ).fetchone()
+            assert row == (platform, user_id, "xuantian.outskirts")
             await runtime.close()
 
     asyncio.run(run())

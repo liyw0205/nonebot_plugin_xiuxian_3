@@ -242,6 +242,35 @@ CREATE INDEX IF NOT EXISTS idx_livelihood_service_orders_publisher
 CREATE INDEX IF NOT EXISTS idx_livelihood_service_orders_provider
     ON livelihood_service_orders(provider_id, service_key, accepted_at);
 
+CREATE TABLE IF NOT EXISTS livelihood_trade_routes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    route_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    settle_operation_id TEXT UNIQUE,
+    route_key TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('in_transit', 'settled', 'failed', 'expired')),
+    source_location TEXT NOT NULL,
+    destination_location TEXT NOT NULL,
+    cargo_json TEXT NOT NULL DEFAULT '{}',
+    cargo_value INTEGER NOT NULL CHECK (cargo_value > 0),
+    starts_at TEXT NOT NULL,
+    arrives_at TEXT NOT NULL,
+    settled_at TEXT,
+    stamina_cost INTEGER NOT NULL CHECK (stamina_cost >= 0),
+    reward_stones INTEGER NOT NULL CHECK (reward_stones >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_livelihood_trade_routes_player
+    ON livelihood_trade_routes(player_id, business_date, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_livelihood_trade_routes_active
+    ON livelihood_trade_routes(player_id) WHERE status = 'in_transit';
+
 CREATE TABLE IF NOT EXISTS constitution_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL UNIQUE,

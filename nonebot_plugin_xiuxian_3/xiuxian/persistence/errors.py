@@ -308,6 +308,38 @@ class ServiceAlreadySettledError(RuntimeError):
     """The service order already has a terminal settlement."""
 
 
+class RouteContentClosedError(RuntimeError):
+    """The requested livelihood route or cargo is not open."""
+
+
+class RouteCargoRequirementError(RuntimeError):
+    """The route cargo is invalid, unavailable or over the route value limit."""
+
+
+class RouteLocationRequirementError(RuntimeError):
+    """The player is not at the route's source location."""
+
+
+class RouteQuotaError(RuntimeError):
+    """The player reached the route's business-day limit."""
+
+
+class RouteBusyError(RuntimeError):
+    """Another movement or player session prevents starting a route."""
+
+
+class RouteNotFoundError(RuntimeError):
+    """The player has no route waiting for settlement."""
+
+
+class RouteNotReadyError(RuntimeError):
+    """The route has not reached its arrival time."""
+
+
+class RouteAlreadySettledError(RuntimeError):
+    """The route already has a terminal settlement."""
+
+
 class ConstitutionAlreadySelectedError(RuntimeError):
     """The player already has a main constitution."""
 

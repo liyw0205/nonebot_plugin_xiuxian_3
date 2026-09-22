@@ -20,6 +20,7 @@ from .advancement.talent_use_cases import TalentApplication
 from .advancement.skill_use_cases import SkillApplication
 from .advancement.equipment_use_cases import EquipmentApplication
 from .livelihood.use_cases import LivelihoodApplication
+from .livelihood.route_use_cases import RouteApplication
 from .livelihood.service_use_cases import ServiceApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
@@ -46,6 +47,7 @@ class XiuxianApplication:
         self.skill = SkillApplication(repository)
         self.equipment = EquipmentApplication(repository)
         self.livelihood = LivelihoodApplication(repository)
+        self.route = RouteApplication(repository)
         self.service = ServiceApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
@@ -458,6 +460,23 @@ class XiuxianApplication:
             context,
             lambda: self.service.publish_service(context),
             write_message="当前事件不允许发布服务订单。",
+        )
+
+    async def preview_route(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.route.preview_route(context), require_write=False)
+
+    async def start_route(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.route.start_route(context),
+            write_message="当前事件不允许锁定运输货物。",
+        )
+
+    async def settle_route(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.route.settle_route(context),
+            write_message="当前事件不允许结算运输路线。",
         )
 
     async def accept_service(self, context: CommandContext) -> CommandResult:
