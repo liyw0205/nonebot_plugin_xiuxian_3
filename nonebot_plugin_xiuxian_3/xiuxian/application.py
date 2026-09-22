@@ -13,6 +13,8 @@ from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
+from .advancement.use_cases import AdvancementApplication
+from .livelihood.use_cases import LivelihoodApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -31,6 +33,8 @@ class XiuxianApplication:
         self.exploration = ExplorationApplication(repository)
         self.adventures = AdventuresApplication(repository)
         self.mainline = AdventuresMainlineApplication(repository)
+        self.advancement = AdvancementApplication(repository)
+        self.livelihood = LivelihoodApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -271,6 +275,40 @@ class XiuxianApplication:
             lambda: self.mainline.claim_reward(context),
             write_message="当前事件不允许领取主线奖励。",
         )
+
+    async def preview_retreat(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.advancement.preview(context), require_write=False)
+
+    async def start_retreat(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.advancement.start(context),
+            write_message="当前事件不允许开始闭关。",
+        )
+
+    async def settle_retreat(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.advancement.settle(context),
+            write_message="当前事件不允许结算闭关。",
+        )
+
+    async def recover_retreat(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.advancement.settle(context, recover=True),
+            write_message="当前事件不允许恢复闭关。",
+        )
+
+    async def lease_residence(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.lease(context),
+            write_message="当前事件不允许租住居所。",
+        )
+
+    async def get_residence(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.livelihood.get_profile(context), require_write=False)
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

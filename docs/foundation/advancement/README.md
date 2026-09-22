@@ -24,3 +24,11 @@
 ## 实体
 
 `RetreatSession`、`TalentNodeState`、`ConstitutionProfile`、`SkillMastery`、`TemperingRecord`、`RefinementRecord` 均保存角色、目标/快照、成本、版本、状态、operation 与结果摘要。
+
+## 当前实现切片
+
+`content-0.1` 已实现闭关修行的基础切片：`闭关预览`、`开始闭关`、`结算闭关`、`恢复闭关`。
+基础闭关使用 `progression.retreat.basic`，静养闭关使用 `progression.retreat.restful`；两者
+均由独立 `retreat_sessions` 表和 operation ledger 持久化。静养所需的最小居所使用
+`residence.town_room`，通过 `租住居所` 和 `我的居所` 管理。体质、天赋、神通、法器和灵兽
+仍按内容开发总表逐个切片，尚未因为闭关入口而提前开放。

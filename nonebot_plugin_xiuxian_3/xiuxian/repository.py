@@ -41,6 +41,17 @@ from .progression.breakthrough.models import (
     BreakthroughSessionRecord,
     WeaknessRecoveryRecord,
 )
+from .advancement.models import RetreatSessionRecord, RetreatSettlementRecord
+from .advancement.rules import (
+    MAX_OFFLINE_SECONDS,
+    MAX_SETTLEMENT_SECONDS,
+    RETREAT_BASIC,
+    RETREAT_RESTFUL,
+    retreat_definition,
+    retreat_reward,
+)
+from .livelihood.models import ResidenceRecord
+from .livelihood.rules import residence_definition
 from .world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
 from .world.rules import destination_definition, meets_realm, RULE_VERSION
 from .exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
@@ -219,6 +230,46 @@ CREATE TABLE IF NOT EXISTS cultivation_sessions (
 CREATE INDEX IF NOT EXISTS idx_cultivation_sessions_player ON cultivation_sessions(player_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cultivation_sessions_active
     ON cultivation_sessions(player_id) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS retreat_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    retreat_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running', 'settled', 'expired')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    energy_cost INTEGER NOT NULL DEFAULT 0 CHECK (energy_cost >= 0),
+    item_cost_json TEXT NOT NULL DEFAULT '{}',
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_retreat_sessions_player
+    ON retreat_sessions(player_id, retreat_key, starts_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_retreat_sessions_active
+    ON retreat_sessions(player_id) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS residences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    residence_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    residence_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'expired')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    rent_cost INTEGER NOT NULL CHECK (rent_cost >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_residences_player ON residences(player_id, ends_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_residences_active ON residences(player_id) WHERE status = 'active';
 
 CREATE TABLE IF NOT EXISTS production_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -787,6 +838,50 @@ class CultivationExpiredError(RuntimeError):
 
 class CultivationAlreadyRecoveredError(RuntimeError):
     """An expired session already received its one allowed recovery result."""
+
+
+class RetreatContentClosedError(RuntimeError):
+    """The requested retreat mode is registered but not open."""
+
+
+class RetreatBusyError(RuntimeError):
+    """The player already has a long-running action or retreat."""
+
+
+class RetreatDailyLimitError(RuntimeError):
+    """The player reached the retreat mode's business-day quota."""
+
+
+class RetreatNotFoundError(RuntimeError):
+    """The player has no active retreat to settle."""
+
+
+class RetreatNotReadyError(RuntimeError):
+    """The retreat has not reached its end time."""
+
+
+class RetreatExpiredError(RuntimeError):
+    """The retreat is outside its normal settlement window."""
+
+
+class RetreatAlreadySettledError(RuntimeError):
+    """The active retreat already has a settled result."""
+
+
+class ResidenceContentClosedError(RuntimeError):
+    """The requested residence is registered but not open."""
+
+
+class ResidenceAlreadyActiveError(RuntimeError):
+    """The player already has an active residence."""
+
+
+class ResidenceNotFoundError(RuntimeError):
+    """The player has no active residence."""
+
+
+class ResidenceRequiredError(RuntimeError):
+    """The requested action requires an active residence."""
 
 
 class RealmCultivationInsufficientError(RuntimeError):
@@ -1893,6 +1988,12 @@ class SQLitePlayerRepository:
             ).fetchone()
             if exploration is not None:
                 raise CultivationBusyError("exploration must be settled before moving")
+            retreat = connection.execute(
+                "SELECT 1 FROM retreat_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if retreat is not None:
+                raise CultivationBusyError("retreat must be settled before moving")
             weakness_until = row["weakness_until"]
             if weakness_until and now < datetime.fromisoformat(str(weakness_until)):
                 raise WeaknessActiveError("breakthrough weakness blocks travel")
@@ -2059,6 +2160,12 @@ class SQLitePlayerRepository:
             ).fetchone()
             if exploration is not None:
                 raise TravelBusyError("exploration is already running")
+            retreat = connection.execute(
+                "SELECT 1 FROM retreat_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (player_id,),
+            ).fetchone()
+            if retreat is not None:
+                raise TravelBusyError("retreat is already running")
 
             stamina = int(row["stamina"])
             stones = int(row["spirit_stones"])
@@ -2300,6 +2407,12 @@ class SQLitePlayerRepository:
                 ).fetchone()
                 if busy is not None:
                     raise ExplorationBusyError("another action is already running")
+            retreat = connection.execute(
+                "SELECT 1 FROM retreat_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (player_id,),
+            ).fetchone()
+            if retreat is not None:
+                raise ExplorationBusyError("retreat is already running")
             used = connection.execute(
                 "SELECT COUNT(*) AS count FROM exploration_sessions WHERE player_id = ? AND mode_key = ? AND business_date = ?",
                 (player_id, definition.key, business_date),
@@ -3813,6 +3926,12 @@ class SQLitePlayerRepository:
             ).fetchone()
             if exploration is not None:
                 raise CultivationBusyError("exploration is still running")
+            retreat = connection.execute(
+                "SELECT 1 FROM retreat_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if retreat is not None:
+                raise CultivationBusyError("retreat is still running")
             pending = connection.execute(
                 "SELECT status, result_json FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -4332,6 +4451,532 @@ class SQLitePlayerRepository:
             )
             return CultivationCancelRecord(player=player, session_id=session["session_id"], stamina_refund=refund)
 
+    @staticmethod
+    def _has_active_long_action(connection: sqlite3.Connection, player_id: int) -> bool:
+        """Return whether a player has any session that locks another action."""
+
+        checks = (
+            ("cultivation_sessions", "status = 'running'"),
+            ("retreat_sessions", "status = 'running'"),
+            ("production_orders", "status = 'processing'"),
+            ("breakthrough_sessions", "status = 'preparing'"),
+            ("travel_sessions", "status = 'running'"),
+            ("exploration_sessions", "status IN ('created', 'running', 'combat_pending')"),
+        )
+        return any(
+            connection.execute(
+                f"SELECT 1 FROM {table} WHERE player_id = ? AND {predicate} LIMIT 1",
+                (player_id,),
+            ).fetchone()
+            is not None
+            for table, predicate in checks
+        )
+
+    @staticmethod
+    def _retreat_start_from_payload(payload: dict[str, Any], *, replay: bool = False) -> RetreatSessionRecord:
+        return RetreatSessionRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            session_id=str(payload["session_id"]),
+            retreat_key=str(payload["retreat_key"]),
+            status=str(payload["status"]),
+            starts_at=str(payload["starts_at"]),
+            ends_at=str(payload["ends_at"]),
+            energy_cost=int(payload["energy_cost"]),
+            item_cost={str(key): int(value) for key, value in dict(payload.get("item_cost", {})).items()},
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _retreat_settlement_from_payload(payload: dict[str, Any], *, replay: bool = False) -> RetreatSettlementRecord:
+        return RetreatSettlementRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            session_id=str(payload["session_id"]),
+            retreat_key=str(payload["retreat_key"]),
+            status=str(payload["status"]),
+            result={str(key): int(value) for key, value in dict(payload.get("result", {})).items()},
+            cycles=int(payload.get("cycles", 1)),
+            expired=bool(payload.get("expired", False)),
+            already_completed=replay,
+        )
+
+    async def start_retreat(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        retreat_key: str,
+        operation_id: str,
+    ) -> RetreatSessionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._start_retreat_sync,
+                platform,
+                platform_user_id,
+                retreat_key,
+                operation_id,
+            )
+
+    def _start_retreat_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        retreat_key: str,
+        operation_id: str,
+    ) -> RetreatSessionRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._start_retreat_once(platform, platform_user_id, retreat_key, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _start_retreat_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        retreat_key: str,
+        operation_id: str,
+    ) -> RetreatSessionRecord:
+        try:
+            definition = retreat_definition(retreat_key)
+        except ValueError as exc:
+            raise RetreatContentClosedError("unsupported retreat") from exc
+        operation_name = "progression.start_retreat"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "retreat_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            },
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._retreat_start_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = self._require_player(connection, platform, platform_user_id)
+            if definition.key == RETREAT_BASIC:
+                if str(row["stage"]) != "cultivator":
+                    raise PlayerStageConflictError("basic retreat requires entry into cultivation")
+            elif str(row["stage"]) not in {STAGE_MORTAL, "seeker", "cultivator"}:
+                raise PlayerStageConflictError("restful retreat requires a mortal-stage player")
+
+            if self._has_active_long_action(connection, int(row["id"])):
+                raise RetreatBusyError("another long action is active")
+
+            active_residence = connection.execute(
+                "SELECT * FROM residences WHERE player_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if active_residence is not None and now >= datetime.fromisoformat(str(active_residence["ends_at"])):
+                connection.execute(
+                    "UPDATE residences SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'active'",
+                    (now_text, active_residence["id"]),
+                )
+                active_residence = None
+            if definition.key == RETREAT_RESTFUL and active_residence is None:
+                raise ResidenceRequiredError("restful retreat requires an active residence")
+
+            day_start = serialize_datetime(now.replace(hour=0, minute=0, second=0, microsecond=0))
+            used = connection.execute(
+                "SELECT COUNT(*) AS count FROM retreat_sessions WHERE player_id = ? AND retreat_key = ? AND starts_at >= ?",
+                (row["id"], definition.key, day_start),
+            ).fetchone()
+            if used is not None and int(used["count"]) >= definition.daily_limit:
+                raise RetreatDailyLimitError("retreat daily limit reached")
+
+            inventory = self._json_object(row["inventory_json"], {})
+            item_cost = definition.item_cost_map()
+            if definition.required_item and int(inventory.get(definition.required_item, 0)) < 1:
+                raise ResourceInsufficientError("retreat required manual is missing")
+            for item_key, quantity in item_cost.items():
+                if int(inventory.get(item_key, 0)) < quantity:
+                    raise ResourceInsufficientError("retreat item is insufficient")
+            if int(row["energy"]) < definition.energy_cost:
+                raise ResourceInsufficientError("energy is insufficient")
+            for item_key, quantity in item_cost.items():
+                inventory[item_key] = int(inventory.get(item_key, 0)) - quantity
+            seed = f"{definition.random_pool or definition.key}:{definition.rule_version}:{operation_id}"
+            snapshot = {
+                "retreat_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+                "random_pool": definition.random_pool,
+                "random_seed": seed,
+                "realm_key": str(row["realm_key"]),
+                "realm_layer": int(row["realm_layer"]),
+                "path_key": row["path_key"],
+                "subprofession_key": row["subprofession_key"],
+                "qualification": self._json_object(row["qualification_json"], {}),
+                "residence_key": active_residence["residence_key"] if active_residence is not None else None,
+                "energy_before": int(row["energy"]),
+                "item_cost": item_cost,
+            }
+            session_id = uuid4().hex
+            starts_at = now_text
+            ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
+            connection.execute(
+                "UPDATE players SET energy = energy - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (
+                    definition.energy_cost,
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    row["id"],
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO retreat_sessions(
+                    session_id, player_id, operation_id, retreat_key, status,
+                    starts_at, ends_at, energy_cost, item_cost_json, snapshot_json,
+                    result_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, '{}', ?, ?)
+                """,
+                (
+                    session_id,
+                    row["id"],
+                    operation_id,
+                    definition.key,
+                    starts_at,
+                    ends_at,
+                    definition.energy_cost,
+                    json.dumps(item_cost, ensure_ascii=False, sort_keys=True),
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                    starts_at,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("retreat start returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "session_id": session_id,
+                "retreat_key": definition.key,
+                "status": "running",
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "energy_cost": definition.energy_cost,
+                "item_cost": item_cost,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                ),
+            )
+            return self._retreat_start_from_payload(payload)
+
+    async def settle_retreat(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        recover: bool = False,
+    ) -> RetreatSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._settle_retreat_sync,
+                platform,
+                platform_user_id,
+                operation_id,
+                recover,
+            )
+
+    def _settle_retreat_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        recover: bool,
+    ) -> RetreatSettlementRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._settle_retreat_once(platform, platform_user_id, operation_id, recover)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _settle_retreat_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        recover: bool,
+    ) -> RetreatSettlementRecord:
+        operation_name = "progression.recover_retreat" if recover else "progression.settle_retreat"
+        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._retreat_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            session = connection.execute(
+                "SELECT * FROM retreat_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if session is None:
+                latest = connection.execute(
+                    "SELECT status FROM retreat_sessions WHERE player_id = ? ORDER BY id DESC LIMIT 1",
+                    (row["id"],),
+                ).fetchone()
+                if latest is not None and str(latest["status"]) == "settled":
+                    raise RetreatAlreadySettledError("retreat already settled")
+                raise RetreatNotFoundError("no active retreat")
+            if session["status"] == "expired" and not recover:
+                raise RetreatExpiredError("retreat requires recovery")
+            starts_at = datetime.fromisoformat(str(session["starts_at"]))
+            ends_at = datetime.fromisoformat(str(session["ends_at"]))
+            if session["status"] == "running" and now < ends_at:
+                raise RetreatNotReadyError("retreat is not ready")
+            if session["status"] == "running" and now > ends_at + timedelta(seconds=MAX_OFFLINE_SECONDS):
+                connection.execute(
+                    "UPDATE retreat_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ? AND status = 'running'",
+                    (
+                        json.dumps({"expired_at": now_text, "recovery_pending": True}, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                        session["id"],
+                    ),
+                )
+                connection.commit()
+                raise RetreatExpiredError("retreat settlement window expired")
+            snapshot = self._json_object(session["snapshot_json"], {})
+            definition = retreat_definition(str(snapshot.get("retreat_key", session["retreat_key"])))
+            elapsed = max(definition.duration_seconds, int((now - starts_at).total_seconds()))
+            capped = min(MAX_SETTLEMENT_SECONDS, elapsed)
+            cycles = max(1, min(4, capped // definition.duration_seconds))
+            result = retreat_reward(definition.key, str(snapshot.get("random_seed", operation_id)))
+            result = {key: int(value) * cycles for key, value in result.items()}
+            inventory = self._json_object(row["inventory_json"], {})
+            cultivation = int(row["cultivation"])
+            total_cultivation = int(row["total_cultivation"])
+            energy = int(row["energy"])
+            if "cultivation" in result:
+                cultivation += int(result["cultivation"])
+                total_cultivation += int(result["cultivation"])
+            if "energy" in result:
+                energy = min(int(row["energy_max"]), energy + int(result["energy"]))
+            connection.execute(
+                "UPDATE players SET cultivation = ?, total_cultivation = ?, energy = ?, updated_at = ? WHERE id = ?",
+                (cultivation, total_cultivation, energy, now_text, row["id"]),
+            )
+            result_payload = {"result": result, "cycles": cycles, "expired": bool(recover), "settled_at": now_text}
+            connection.execute(
+                "UPDATE retreat_sessions SET status = 'settled', result_json = ?, updated_at = ? WHERE id = ? AND status IN ('running', 'expired')",
+                (json.dumps(result_payload, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("retreat settlement returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "session_id": session["session_id"],
+                "retreat_key": definition.key,
+                "status": "settled",
+                "result": result,
+                "cycles": cycles,
+                "expired": bool(recover),
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._retreat_settlement_from_payload(payload)
+
+    async def lease_residence(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        residence_key: str,
+        operation_id: str,
+    ) -> ResidenceRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._lease_residence_once,
+                platform,
+                platform_user_id,
+                residence_key,
+                operation_id,
+            )
+
+    def _lease_residence_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        residence_key: str,
+        operation_id: str,
+    ) -> ResidenceRecord:
+        try:
+            definition = residence_definition(residence_key)
+        except ValueError as exc:
+            raise ResidenceContentClosedError("unsupported residence") from exc
+        operation_name = "livelihood.lease_residence"
+        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "residence_key": definition.key})
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return ResidenceRecord(
+                    player=self._row_to_player(payload["player"]),
+                    residence_id=str(payload["residence_id"]),
+                    residence_key=str(payload["residence_key"]),
+                    status=str(payload["status"]),
+                    starts_at=str(payload["starts_at"]),
+                    ends_at=str(payload["ends_at"]),
+                    rent_cost=int(payload["rent_cost"]),
+                    already_completed=True,
+                )
+            row = self._require_player(connection, platform, platform_user_id)
+            if str(row["stage"]) not in {STAGE_MORTAL, "seeker", "cultivator"}:
+                raise PlayerStageConflictError("residence requires a mortal-stage player")
+            active = connection.execute(
+                "SELECT * FROM residences WHERE player_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if active is not None:
+                if now < datetime.fromisoformat(str(active["ends_at"])):
+                    raise ResidenceAlreadyActiveError("residence is already active")
+                connection.execute("UPDATE residences SET status = 'expired', updated_at = ? WHERE id = ?", (now_text, active["id"]))
+            if int(row["spirit_stones"]) < definition.rent_cost:
+                raise CurrencyInsufficientError("rent is insufficient")
+            residence_id = uuid4().hex
+            starts_at = now_text
+            ends_at = serialize_datetime(now + timedelta(days=definition.lease_days))
+            connection.execute(
+                "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
+                (definition.rent_cost, now_text, row["id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO residences(
+                    residence_id, player_id, operation_id, residence_key, status,
+                    starts_at, ends_at, rent_cost, snapshot_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    residence_id,
+                    row["id"],
+                    operation_id,
+                    definition.key,
+                    starts_at,
+                    ends_at,
+                    definition.rent_cost,
+                    json.dumps({"content_version": definition.content_version, "rule_version": definition.rule_version}, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                    starts_at,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("residence lease returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "residence_id": residence_id,
+                "residence_key": definition.key,
+                "status": "active",
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "rent_cost": definition.rent_cost,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return ResidenceRecord(
+                player=self._row_to_player(updated),
+                residence_id=residence_id,
+                residence_key=definition.key,
+                status="active",
+                starts_at=starts_at,
+                ends_at=ends_at,
+                rent_cost=definition.rent_cost,
+            )
+
+    async def get_residence(self, *, platform: str, platform_user_id: str) -> ResidenceRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._get_residence_sync, platform, platform_user_id)
+
+    def _get_residence_sync(self, platform: str, platform_user_id: str) -> ResidenceRecord:
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            residence = connection.execute(
+                "SELECT * FROM residences WHERE player_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if residence is None:
+                raise ResidenceNotFoundError("no residence")
+            if now >= datetime.fromisoformat(str(residence["ends_at"])):
+                connection.execute("UPDATE residences SET status = 'expired', updated_at = ? WHERE id = ?", (now_text, residence["id"]))
+                raise ResidenceNotFoundError("residence expired")
+            return ResidenceRecord(
+                player=self._row_to_player(row),
+                residence_id=str(residence["residence_id"]),
+                residence_key=str(residence["residence_key"]),
+                status="active",
+                starts_at=str(residence["starts_at"]),
+                ends_at=str(residence["ends_at"]),
+                rent_cost=int(residence["rent_cost"]),
+            )
+
     async def advance_layer(
         self,
         *,
@@ -4401,6 +5046,12 @@ class SQLitePlayerRepository:
             ).fetchone()
             if running is not None:
                 raise CultivationBusyError("cultivation is still running")
+            retreat = connection.execute(
+                "SELECT 1 FROM retreat_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if retreat is not None:
+                raise CultivationBusyError("retreat is still running")
             layer = int(row["realm_layer"])
             if layer >= 10 or next_layer_threshold(REALM_QI_SENSING, layer) is None:
                 raise RealmLayerInvalidError("realm is already at its maximum layer")
@@ -4698,6 +5349,12 @@ class SQLitePlayerRepository:
             ).fetchone()
             if exploration is not None:
                 raise ProductionBusyError("exploration is still running")
+            retreat = connection.execute(
+                "SELECT 1 FROM retreat_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if retreat is not None:
+                raise ProductionBusyError("retreat is still running")
             day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             day_end = day_start + timedelta(days=1)
             used = connection.execute(
@@ -5199,6 +5856,12 @@ class SQLitePlayerRepository:
             ).fetchone()
             if exploration is not None:
                 raise BreakthroughBusyError("exploration is active")
+            retreat = connection.execute(
+                "SELECT 1 FROM retreat_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if retreat is not None:
+                raise BreakthroughBusyError("retreat is active")
 
             inventory = self._json_object(row["inventory_json"], {})
             for item_key, quantity in definition.materials.items():
