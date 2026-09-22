@@ -11,6 +11,9 @@
 - `preview_breakthrough` -> 条件、成功率、预计损失，不写资产。
 - `start_breakthrough` -> 突破记录、快照和锁定材料。
 - `settle_breakthrough` -> 新境界或失败状态。
+- `world.preview_travel` -> 查看地点准入、成本、来源和预计耗时，不写资产。
+- `world.start_travel` -> 原子扣除移动成本、锁定凭证并创建移动会话。
+- `world.settle_travel` -> 到达后写入位置；重复结算只回放首次结果。
 
 ## 公式
 
@@ -40,7 +43,15 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 聚气突破命令映射为 `突破预览 聚气`、`开始突破 聚气`、`结算突破` 和 `恢复虚弱`（可追加
 `护脉` 或 `提前`）。开始突破独立使用 `progression.breakthrough_qi_gathering` operation，
 结算独立使用 `progression.settle_breakthrough`；两者均保存规则版本、随机池、地点、道途、
-资质、境界和成本快照。当前实现只开放聚气目标，筑基目标明确返回 `CONTENT_CLOSED`。
+资质、境界和成本快照。当前实现开放聚气与筑基目标；金丹及以上目标明确返回 `CONTENT_CLOSED`。
+筑基突破固定使用 5 分钟会话、7,500 bp 基础成功率、聚气修为 70% 失败保留和 6 小时虚弱；
+道基质量、功法、阵法辅修、筑基护脉丹和 +400 bp 失败保底均写入开始快照。
 
 灵泉相关错误码包括 `LOCATION_REQUIRED`、`LOCATION_REQUIREMENT_MISSING` 和
 `CULTIVATION_DAILY_LIMIT`；准入或次数不足时不扣体力、不创建修炼会话。
+
+雾隐洞天移动命令映射为 `移动预览 雾隐洞天`、`前往 雾隐洞天`（或
+`前往雾隐洞天`）和 `结算移动`。入口要求聚气 L4 以上、来源地点有效且持有
+`item.cave_pass_basic`；开始时消耗 5 点体力、10 灵石和 1 张凭证，创建 2 分钟会话。
+移动与修炼、生产、突破互斥；凭证、成本、来源和内容版本写入快照，重复 operation 不会
+重复扣费或改写位置。

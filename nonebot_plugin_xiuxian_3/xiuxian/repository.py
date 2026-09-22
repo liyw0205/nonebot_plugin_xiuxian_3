@@ -41,6 +41,8 @@ from .progression.breakthrough.models import (
     BreakthroughSessionRecord,
     WeaknessRecoveryRecord,
 )
+from .world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
+from .world.rules import destination_definition, meets_realm, RULE_VERSION
 
 
 SCHEMA = """
@@ -75,6 +77,8 @@ CREATE TABLE IF NOT EXISTS players (
     realm_layer INTEGER NOT NULL DEFAULT 0 CHECK (realm_layer >= 0),
     cultivation INTEGER NOT NULL DEFAULT 0 CHECK (cultivation >= 0),
     total_cultivation INTEGER NOT NULL DEFAULT 0 CHECK (total_cultivation >= 0),
+    foundation_quality INTEGER NOT NULL DEFAULT 0 CHECK (foundation_quality >= 0),
+    world_merit INTEGER NOT NULL DEFAULT 0 CHECK (world_merit >= 0),
     weakness_until TEXT,
     breakthrough_pity_bp INTEGER NOT NULL DEFAULT 0 CHECK (breakthrough_pity_bp >= 0),
     durability_json TEXT NOT NULL DEFAULT '{}',
@@ -154,6 +158,30 @@ CREATE TABLE IF NOT EXISTS breakthrough_sessions (
 CREATE INDEX IF NOT EXISTS idx_breakthrough_sessions_player ON breakthrough_sessions(player_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_breakthrough_sessions_active
     ON breakthrough_sessions(player_id) WHERE status = 'preparing';
+
+CREATE TABLE IF NOT EXISTS travel_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    source_location TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running', 'arrived', 'cancelled', 'expired')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    stamina_cost INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0),
+    currency_cost INTEGER NOT NULL DEFAULT 0 CHECK (currency_cost >= 0),
+    pass_key TEXT,
+    pass_quantity INTEGER NOT NULL DEFAULT 0 CHECK (pass_quantity >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_travel_sessions_player ON travel_sessions(player_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_travel_sessions_active
+    ON travel_sessions(player_id) WHERE status = 'running';
 
 """
 
@@ -322,6 +350,18 @@ class ProtectionItemInsufficientError(RuntimeError):
     """The requested breakthrough protection item is missing."""
 
 
+class TravelBusyError(RuntimeError):
+    """The player has another active movement or long-running action."""
+
+
+class TravelNotFoundError(RuntimeError):
+    """The player has no movement session to settle."""
+
+
+class TravelNotReadyError(RuntimeError):
+    """The movement session has not reached its arrival time."""
+
+
 class SQLitePlayerRepository:
     """Short-transaction repository safe for concurrent asyncio requests.
 
@@ -401,6 +441,8 @@ class SQLitePlayerRepository:
             ("realm_layer", "INTEGER NOT NULL DEFAULT 0"),
             ("cultivation", "INTEGER NOT NULL DEFAULT 0"),
             ("total_cultivation", "INTEGER NOT NULL DEFAULT 0"),
+            ("foundation_quality", "INTEGER NOT NULL DEFAULT 0"),
+            ("world_merit", "INTEGER NOT NULL DEFAULT 0"),
             ("weakness_until", "TEXT"),
             ("breakthrough_pity_bp", "INTEGER NOT NULL DEFAULT 0"),
         ):
@@ -1067,6 +1109,16 @@ class SQLitePlayerRepository:
             ).fetchone()
             if moving_session is not None:
                 raise CultivationBusyError("cultivation must be settled before moving")
+            for table, status in (("production_orders", "processing"), ("breakthrough_sessions", "preparing"), ("travel_sessions", "running")):
+                occupied = connection.execute(
+                    f"SELECT 1 FROM {table} WHERE player_id = ? AND status = ? LIMIT 1",
+                    (row["id"], status),
+                ).fetchone()
+                if occupied is not None:
+                    raise CultivationBusyError("another action must be settled before moving")
+            weakness_until = row["weakness_until"]
+            if weakness_until and now < datetime.fromisoformat(str(weakness_until)):
+                raise WeaknessActiveError("breakthrough weakness blocks travel")
             if destination == SPIRIT_FIELD_LOCATION and current not in {
                 "xuantian.new_town",
                 "xuantian.outskirts",
@@ -1104,6 +1156,287 @@ class SQLitePlayerRepository:
                 ),
             )
             return TravelRecord(player=player, destination=destination, changed=changed, stamina_cost=cost)
+
+    async def preview_travel(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        destination: str,
+    ) -> TravelPreview:
+        await self.initialize()
+        player = await self.get_player(platform=platform, platform_user_id=platform_user_id)
+        if player is None:
+            raise PlayerNotFoundError("player does not exist")
+        definition = destination_definition(destination)
+        missing: list[str] = []
+        if not meets_realm(player.realm_key, player.realm_layer, definition.required_realm, definition.required_layer):
+            required = f"{definition.required_realm} L{definition.required_layer}"
+            missing.append(f"境界要求（{required}）")
+        if definition.source_locations and player.location_key not in definition.source_locations:
+            missing.append("来源地点")
+        if player.stamina < definition.stamina_cost:
+            missing.append("体力")
+        if player.spirit_stones < definition.currency_cost:
+            missing.append("灵石")
+        if definition.pass_key and player.inventory.get(definition.pass_key, 0) < definition.pass_quantity:
+            missing.append("洞天凭证")
+        ready = player.status == "active" and player.stage in {STAGE_MORTAL, "seeker", "cultivator"} and not missing
+        return TravelPreview(
+            player=player,
+            destination=destination,
+            source=player.location_key,
+            duration_seconds=definition.duration_seconds,
+            stamina_cost=definition.stamina_cost,
+            currency_cost=definition.currency_cost,
+            pass_key=definition.pass_key,
+            pass_quantity=definition.pass_quantity,
+            ready=ready,
+            missing=tuple(missing),
+        )
+
+    async def start_travel(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        destination: str,
+        operation_id: str,
+    ) -> TravelStartRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._start_travel_sync,
+                platform,
+                platform_user_id,
+                destination,
+                operation_id,
+            )
+
+    def _start_travel_sync(self, platform: str, platform_user_id: str, destination: str, operation_id: str) -> TravelStartRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._start_travel_once(platform, platform_user_id, destination, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _start_travel_once(self, platform: str, platform_user_id: str, destination: str, operation_id: str) -> TravelStartRecord:
+        definition = destination_definition(destination)
+        operation_name = "world.start_travel"
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "destination": destination,
+        }
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._travel_start_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
+                raise PlayerStageConflictError("player is not ready for travel")
+            weakness_until = row["weakness_until"]
+            if weakness_until and now < datetime.fromisoformat(str(weakness_until)):
+                raise WeaknessActiveError("breakthrough weakness blocks travel")
+            current = str(row["location_key"])
+            if definition.source_locations and current not in definition.source_locations:
+                raise LocationRequirementError("source location is not valid")
+            if not meets_realm(str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer):
+                raise LocationRequirementError("realm requirement is not met")
+
+            player_id = int(row["id"])
+            active = connection.execute(
+                "SELECT 1 FROM travel_sessions WHERE player_id = ? AND status = 'running' LIMIT 1", (player_id,)
+            ).fetchone()
+            if active is not None:
+                raise TravelBusyError("travel is already running")
+            for table, status in (("cultivation_sessions", "running"), ("production_orders", "processing"), ("breakthrough_sessions", "preparing")):
+                busy = connection.execute(
+                    f"SELECT 1 FROM {table} WHERE player_id = ? AND status = ? LIMIT 1", (player_id, status)
+                ).fetchone()
+                if busy is not None:
+                    raise TravelBusyError("another action is already running")
+
+            stamina = int(row["stamina"])
+            stones = int(row["spirit_stones"])
+            inventory = self._json_object(row["inventory_json"], {})
+            if stamina < definition.stamina_cost:
+                raise ResourceInsufficientError("stamina is insufficient")
+            if stones < definition.currency_cost:
+                raise CurrencyInsufficientError("spirit stones are insufficient")
+            if definition.pass_key and inventory.get(definition.pass_key, 0) < definition.pass_quantity:
+                raise LocationRequirementError("travel pass is missing")
+
+            if definition.pass_key:
+                remaining = inventory.get(definition.pass_key, 0) - definition.pass_quantity
+                if remaining:
+                    inventory[definition.pass_key] = remaining
+                else:
+                    inventory.pop(definition.pass_key, None)
+            session_id = uuid4().hex
+            ends_at = now + timedelta(seconds=definition.duration_seconds)
+            snapshot = {
+                "rule_version": RULE_VERSION,
+                "content_version": definition.content_version,
+                "source": current,
+                "destination": destination,
+                "stamina_cost": definition.stamina_cost,
+                "currency_cost": definition.currency_cost,
+                "pass_key": definition.pass_key,
+                "pass_quantity": definition.pass_quantity,
+            }
+            connection.execute(
+                """
+                UPDATE players
+                SET stamina = ?, spirit_stones = ?, inventory_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (stamina - definition.stamina_cost, stones - definition.currency_cost,
+                 json.dumps(inventory, ensure_ascii=False, sort_keys=True), serialize_datetime(now), player_id),
+            )
+            connection.execute(
+                """
+                INSERT INTO travel_sessions(
+                    session_id, player_id, operation_id, source_location, destination, status,
+                    starts_at, ends_at, stamina_cost, currency_cost, pass_key, pass_quantity,
+                    snapshot_json, result_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)
+                """,
+                (session_id, player_id, operation_id, current, destination, serialize_datetime(now),
+                 serialize_datetime(ends_at), definition.stamina_cost, definition.currency_cost,
+                 definition.pass_key, definition.pass_quantity, json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                 serialize_datetime(now), serialize_datetime(now)),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player), "session_id": session_id,
+                "source": current, "destination": destination, "status": "running",
+                "starts_at": serialize_datetime(now), "ends_at": serialize_datetime(ends_at),
+                "stamina_cost": definition.stamina_cost, "currency_cost": definition.currency_cost,
+                "pass_key": definition.pass_key, "pass_quantity": definition.pass_quantity,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), serialize_datetime(now)),
+            )
+            return self._travel_start_from_payload(payload)
+
+    @staticmethod
+    def _travel_start_from_payload(payload: dict[str, Any], replay: bool = False) -> TravelStartRecord:
+        return TravelStartRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            session_id=str(payload["session_id"]), source=str(payload["source"]),
+            destination=str(payload["destination"]), status=str(payload["status"]),
+            starts_at=str(payload["starts_at"]), ends_at=str(payload["ends_at"]),
+            stamina_cost=int(payload["stamina_cost"]), currency_cost=int(payload["currency_cost"]),
+            pass_key=payload.get("pass_key"), pass_quantity=int(payload.get("pass_quantity", 0)),
+            already_completed=replay,
+        )
+
+    async def settle_travel(self, *, platform: str, platform_user_id: str, operation_id: str) -> TravelSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._settle_travel_sync, platform, platform_user_id, operation_id)
+
+    def _settle_travel_sync(self, platform: str, platform_user_id: str, operation_id: str) -> TravelSettlementRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._settle_travel_once(platform, platform_user_id, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _settle_travel_once(self, platform: str, platform_user_id: str, operation_id: str) -> TravelSettlementRecord:
+        operation_name = "world.settle_travel"
+        request_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._travel_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?", (platform, platform_user_id)
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            session = connection.execute(
+                "SELECT * FROM travel_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1", (row["id"],)
+            ).fetchone()
+            if session is None:
+                raise TravelNotFoundError("no running travel")
+            ends_at = datetime.fromisoformat(str(session["ends_at"]))
+            if now < ends_at:
+                raise TravelNotReadyError("travel is not ready")
+            connection.execute(
+                "UPDATE players SET location_key = ?, updated_at = ? WHERE id = ?",
+                (session["destination"], serialize_datetime(now), row["id"]),
+            )
+            connection.execute(
+                "UPDATE travel_sessions SET status = 'arrived', result_json = ?, updated_at = ? WHERE id = ? AND status = 'running'",
+                (json.dumps({"arrived": True, "settled_at": serialize_datetime(now)}, ensure_ascii=False, sort_keys=True), serialize_datetime(now), session["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player), "session_id": session["session_id"],
+                "source": session["source_location"], "destination": session["destination"], "status": "arrived",
+                "arrived": True, "stamina_cost": int(session["stamina_cost"]), "currency_cost": int(session["currency_cost"]),
+                "pass_key": session["pass_key"], "pass_quantity": int(session["pass_quantity"]),
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), serialize_datetime(now)),
+            )
+            return self._travel_settlement_from_payload(payload)
+
+    @staticmethod
+    def _travel_settlement_from_payload(payload: dict[str, Any], replay: bool = False) -> TravelSettlementRecord:
+        return TravelSettlementRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            session_id=str(payload["session_id"]), source=str(payload["source"]),
+            destination=str(payload["destination"]), status=str(payload["status"]),
+            arrived=bool(payload.get("arrived", False)), stamina_cost=int(payload.get("stamina_cost", 0)),
+            currency_cost=int(payload.get("currency_cost", 0)), pass_key=payload.get("pass_key"),
+            pass_quantity=int(payload.get("pass_quantity", 0)), already_completed=replay,
+        )
 
     async def enter_cultivation(
         self,
@@ -2695,9 +3028,12 @@ class SQLitePlayerRepository:
         protection: bool,
         operation_id: str,
     ) -> BreakthroughSessionRecord:
-        from .progression.breakthrough.rules import qi_gathering_breakthrough, success_bp
+        from .progression.breakthrough.rules import breakthrough_definition, success_bp
 
-        definition = qi_gathering_breakthrough()
+        try:
+            definition = breakthrough_definition(target_realm)
+        except ValueError as exc:
+            raise BreakthroughRequirementError("target breakthrough is not open") from exc
         operation_name = definition.key
         operation_payload = {
             "platform": platform,
@@ -2784,7 +3120,25 @@ class SQLitePlayerRepository:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
 
             pity_before = int(row["breakthrough_pity_bp"])
-            final_success_bp = success_bp(definition, pity_before)
+            foundation_quality = int(row["foundation_quality"])
+            quality_bonus_bp = 0
+            if definition.quality_bonus_divisor:
+                quality_bonus_bp = min(
+                    definition.quality_bonus_cap_bp,
+                    foundation_quality // definition.quality_bonus_divisor,
+                )
+            technique_bonus_bp = (
+                definition.technique_bonus_bp
+                if definition.technique_bonus_bp and inventory.get("item.manual.basic_qi", 0) > 0
+                else 0
+            )
+            formation_bonus_bp = (
+                definition.formation_bonus_bp
+                if definition.formation_bonus_bp and row["subprofession_key"] == "formation"
+                else 0
+            )
+            preparation_bp = quality_bonus_bp + technique_bonus_bp + formation_bonus_bp
+            final_success_bp = success_bp(definition, pity_before, preparation_bp)
             for item_key, quantity in definition.materials.items():
                 inventory[item_key] = int(inventory.get(item_key, 0)) - quantity
             session_id = uuid4().hex
@@ -2804,6 +3158,11 @@ class SQLitePlayerRepository:
                 "rule_version": definition.rule_version,
                 "random_pool": definition.random_pool,
                 "base_success_bp": definition.base_success_bp,
+                "foundation_quality": foundation_quality,
+                "quality_bonus_bp": quality_bonus_bp,
+                "technique_bonus_bp": technique_bonus_bp,
+                "formation_bonus_bp": formation_bonus_bp,
+                "preparation_bp": preparation_bp,
                 "success_bp": final_success_bp,
                 "pity_before_bp": pity_before,
                 "protection_requested": protection,
@@ -2943,9 +3302,12 @@ class SQLitePlayerRepository:
             if now < ends_at:
                 raise BreakthroughNotReadyError("breakthrough is not ready")
             snapshot = self._json_object(session["snapshot_json"], {})
-            from .progression.breakthrough.rules import qi_gathering_breakthrough
+            from .progression.breakthrough.rules import breakthrough_definition
 
-            definition = qi_gathering_breakthrough()
+            try:
+                definition = breakthrough_definition(str(snapshot.get("target_realm", session["target_realm"])))
+            except ValueError as exc:
+                raise BreakthroughRequirementError("historical breakthrough rule is unavailable") from exc
             roll_bp = breakthrough_roll_bp(str(snapshot.get("random_seed", session["operation_id"])))
             final_success_bp = int(snapshot.get("success_bp", definition.base_success_bp))
             success = roll_bp < final_success_bp
@@ -2965,12 +3327,20 @@ class SQLitePlayerRepository:
             weakness_until: str | None = None
             if success:
                 cultivation_after = 0
-                stamina_after = min(int(row["stamina_max"]), int(row["stamina"]) + 5)
+                stamina_after = min(
+                    int(row["stamina_max"]),
+                    int(row["stamina"]) + definition.reward_stamina,
+                )
+                reward_items = dict(definition.reward_items or {})
+                for item_key, quantity in reward_items.items():
+                    inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
                 connection.execute(
-                    "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + 80, stamina = ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
+                    "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
                     (
                         definition.target_realm,
+                        definition.reward_currency,
                         stamina_after,
+                        definition.reward_world_merit,
                         json.dumps(inventory, ensure_ascii=False, sort_keys=True),
                         now_text,
                         row["id"],
@@ -2980,7 +3350,11 @@ class SQLitePlayerRepository:
             else:
                 retention_bp = definition.protection_retention_bp if protection_consumed else definition.retention_bp
                 weakness_seconds = definition.protection_weakness_seconds if protection_consumed else definition.weakness_seconds
-                cultivation_after = retained_cultivation(cultivation_before, retention_bp, 1360)
+                cultivation_after = retained_cultivation(
+                    cultivation_before,
+                    retention_bp,
+                    definition.source_cultivation_cap,
+                )
                 weakness_until = serialize_datetime(now + timedelta(seconds=weakness_seconds))
                 connection.execute(
                     "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, weakness_until = ?, updated_at = ? WHERE id = ?",
@@ -3006,6 +3380,12 @@ class SQLitePlayerRepository:
                 "weakness_until": weakness_until,
                 "currency_spent": int(snapshot.get("currency_cost", definition.currency_cost)),
                 "materials": snapshot.get("materials", definition.materials),
+                "foundation_quality": int(snapshot.get("foundation_quality", 0)),
+                "preparation_bp": int(snapshot.get("preparation_bp", 0)),
+                "reward_currency": definition.reward_currency if success else 0,
+                "reward_stamina": definition.reward_stamina if success else 0,
+                "reward_world_merit": definition.reward_world_merit if success else 0,
+                "reward_items": dict(definition.reward_items or {}) if success else {},
                 "status": status,
             }
             connection.execute(
@@ -3143,6 +3523,11 @@ class SQLitePlayerRepository:
             weakness_until=payload.get("weakness_until"),
             currency_spent=int(payload.get("currency_spent", 0)),
             materials={str(key): int(value) for key, value in payload.get("materials", {}).items()},
+            preparation_bp=int(payload.get("preparation_bp", 0)),
+            reward_currency=int(payload.get("reward_currency", 0)),
+            reward_stamina=int(payload.get("reward_stamina", 0)),
+            reward_world_merit=int(payload.get("reward_world_merit", 0)),
+            reward_items={str(key): int(value) for key, value in payload.get("reward_items", {}).items()},
             already_completed=replay,
         )
 
@@ -3348,6 +3733,8 @@ class SQLitePlayerRepository:
             realm_layer=int(value("realm_layer", 0)),
             cultivation=int(value("cultivation", 0)),
             total_cultivation=int(value("total_cultivation", 0)),
+            foundation_quality=int(value("foundation_quality", 0)),
+            world_merit=int(value("world_merit", 0)),
             weakness_until=(
                 datetime.fromisoformat(str(value("weakness_until")))
                 if value("weakness_until")
@@ -3392,6 +3779,8 @@ class SQLitePlayerRepository:
             "realm_layer": player.realm_layer,
             "cultivation": player.cultivation,
             "total_cultivation": player.total_cultivation,
+            "foundation_quality": player.foundation_quality,
+            "world_merit": player.world_merit,
             "weakness_until": serialize_datetime(player.weakness_until) if player.weakness_until else None,
             "breakthrough_pity_bp": player.breakthrough_pity_bp,
         }

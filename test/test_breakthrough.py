@@ -133,3 +133,49 @@ def test_breakthrough_success_changes_realm_and_concurrent_start_is_unique() -> 
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_foundation_breakthrough_uses_quality_snapshot_and_grants_cave_pass() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "foundation-breakthrough"
+            await _cultivator(runtime, user)
+            _prepare_player(
+                runtime,
+                user,
+                inventory={
+                    "item.pill.foundation_draft": 1,
+                    "item.mat.array_sand": 3,
+                    "item.ore.ironstone": 3,
+                    "item.manual.basic_qi": 1,
+                },
+                stones=1_000,
+                layer=10,
+                cultivation=2_900,
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key = 'qi_gathering', total_cultivation = 4260, foundation_quality = 5000, subprofession_key = 'formation' WHERE platform_user_id = ?",
+                    (user,),
+                )
+            started = await runtime.dispatch(_context(user, "start", operation_id="foundation-start-0"), "开始突破 筑基")
+            assert started.code == "BREAKTHROUGH_STARTED"
+            assert started.data["success_bp"] == 8_600
+            _finish_breakthrough(runtime, started.data["session_id"])
+            settled = await runtime.dispatch(_context(user, "settle", operation_id="foundation-settle"), "结算突破")
+            assert settled.code == "BREAKTHROUGH_SUCCEEDED"
+            assert settled.data["target_realm"] == "foundation"
+            assert settled.data["reward_world_merit"] == 50
+            assert settled.data["reward_items"] == {"item.cave_pass_basic": 1}
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                row = connection.execute(
+                    "SELECT realm_key, realm_layer, cultivation, world_merit, inventory_json, spirit_stones FROM players WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+                assert row[0:4] == ("foundation", 1, 0, 50)
+                assert '"item.cave_pass_basic": 1' in row[4]
+                assert row[5] == 500
+            await runtime.close()
+
+    asyncio.run(run())

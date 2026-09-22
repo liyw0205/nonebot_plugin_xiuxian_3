@@ -3,7 +3,7 @@
 本文件遵守 [版本内容开发合同](../../content-development-contract.md) 和[境界十层与段位规范](layers.md)。
 
 - `content_version`：`content-0.1`
-- `rule_version`：`progression-0.1.1`（调息）；`progression-0.1.2`（灵泉）；`progression-0.1.3`（聚气突破）
+- `rule_version`：`progression-0.1.1`（调息）；`progression-0.1.2`（灵泉）；`progression-0.1.3`（聚气突破）；`progression-0.1.4`（筑基突破）
 - 开放写用例：`progression.start_cultivation`、`progression.settle_cultivation`、`progression.advance_layer`、`progression.breakthrough_qi_gathering`、`progression.breakthrough_foundation`、`progression.recover_weakness`。
 - 角色在 `player.enter_cultivation` 成功后进入 `qi_sensing` L1（感气一层/入门）；`mortal` 没有修为资产，不能创建修炼或突破 operation。
 
@@ -63,7 +63,15 @@
 保留感气境内修为 80%，进入虚弱 2 小时。聚气护脉丹不提高成功率，只在失败时消耗，改为
 保留 90% 修为并将虚弱缩短到 30 分钟。发送 `恢复虚弱` 可在到期后恢复，`恢复虚弱 提前`
 消耗低阶疗伤丹 ×1 和 50 灵石；恢复不会清除失败保底。重复 operation 只回放原结果，结算
-期间不会重复扣费、发奖或重抽随机结果。筑基突破仍为 `CONTENT_CLOSED`。
+期间不会重复扣费、发奖或重抽随机结果。
+
+筑基突破已接入同一突破会话框架：聚气 L10 混元、总修为至少 4,260 时，可发送 `突破预览 筑基`
+和 `开始突破 筑基`，会话持续 5 分钟。开始时扣除筑基丹 ×1、阵砂 ×3、铁石 ×3 和 500
+灵石；基础成功率 7,500 bp，道基质量按 `foundation_quality // 10` 加成（最多 1,000 bp），
+匹配功法与阵法辅修各可加 300 bp，最终不超过 9,000 bp。成功进入筑基 L1，奖励世界功勋
+50 与雾隐洞天一层凭证；失败保留聚气修为 70%，虚弱 6 小时。筑基护脉丹只在失败时消耗，
+保留 85% 修为并将虚弱缩短到 2 小时；失败保底每次增加 400 bp，最多 +1,200 bp。历史
+会话按快照结算，金丹突破仍为 `CONTENT_CLOSED`。
 
 ## 3. 同境晋层：`progression.advance_layer`
 

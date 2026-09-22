@@ -307,6 +307,8 @@ class PlayerApplication:
                 f"- **道途**：{self._path_text(player.path_key, player.subprofession_key)}\n"
                 f"- **境内修为**：{player.cultivation}\n"
                 f"- **总修为**：{player.total_cultivation}\n"
+                f"- **道基质量**：{player.foundation_quality}\n"
+                f"- **世界功勋**：{player.world_merit}\n"
                 "\n### 六项资质\n\n"
                 f"{self._qualification_text(player.qualification)}"
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(player.intro_flags))}/3"
@@ -323,6 +325,8 @@ class PlayerApplication:
                 "realm_layer": player.realm_layer,
                 "cultivation": player.cultivation,
                 "total_cultivation": player.total_cultivation,
+                "foundation_quality": player.foundation_quality,
+                "world_merit": player.world_merit,
                 "rule_version": player.rule_version,
                 "spirit_stones": player.spirit_stones,
                 "stamina": player.stamina,

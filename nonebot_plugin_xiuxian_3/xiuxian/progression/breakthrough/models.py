@@ -20,6 +20,11 @@ class BreakthroughDefinition:
     minimum_success_bp: int
     maximum_success_bp: int
     pity_cap_bp: int
+    pity_increment_bp: int
+    quality_bonus_divisor: int
+    quality_bonus_cap_bp: int
+    technique_bonus_bp: int
+    formation_bonus_bp: int
     retention_bp: int
     weakness_seconds: int
     protection_key: str
@@ -27,6 +32,11 @@ class BreakthroughDefinition:
     protection_weakness_seconds: int
     rule_version: str
     random_pool: str
+    reward_currency: int = 0
+    reward_stamina: int = 0
+    reward_world_merit: int = 0
+    reward_items: dict[str, int] | None = None
+    source_cultivation_cap: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +69,11 @@ class BreakthroughSettlementRecord:
     weakness_until: str | None
     currency_spent: int
     materials: dict[str, int]
+    preparation_bp: int = 0
+    reward_currency: int = 0
+    reward_stamina: int = 0
+    reward_world_merit: int = 0
+    reward_items: dict[str, int] | None = None
     already_completed: bool = False
 
 

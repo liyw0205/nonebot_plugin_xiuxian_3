@@ -133,3 +133,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("开始生产", application.start_production)
     router.register("领取生产", application.complete_production)
     router.register("恢复生产", application.recover_production)
+    router.register("移动预览", application.preview_travel)
+    router.register("前往", application.start_travel)
+    router.register("前往雾隐洞天", application.start_cave_travel)
+    router.register("结算移动", application.settle_travel)

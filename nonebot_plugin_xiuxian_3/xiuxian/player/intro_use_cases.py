@@ -14,6 +14,7 @@ from ..repository import (
     RepositoryBusyError,
     ResourceInsufficientError,
     SQLitePlayerRepository,
+    WeaknessActiveError,
 )
 from .intro_rules import (
     GUIDE_COMMANDS,
@@ -196,6 +197,8 @@ class IntroApplication:
             return CommandResult(False, "LOCATION_REQUIREMENT_MISSING", "前往灵泉谷需要满足境界、教学和来源地点条件。", context.request_id, operation_id)
         except CultivationBusyError:
             return CommandResult(False, "TRAVEL_BUSY", "修炼进行中不能移动，请先结算或取消修炼。", context.request_id, operation_id)
+        except WeaknessActiveError:
+            return CommandResult(False, "TRAVEL_BUSY", "突破虚弱期间不能移动，请先恢复状态。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，暂时无法移动。", context.request_id, operation_id)
         except PlayerSuspendedError:
