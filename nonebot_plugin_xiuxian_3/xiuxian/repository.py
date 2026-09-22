@@ -43,6 +43,7 @@ from .progression.breakthrough.models import (
 )
 from .advancement.models import RetreatSessionRecord, RetreatSettlementRecord
 from .advancement.constitution_models import ConstitutionRecord
+from .advancement.talent_models import TalentNodeRecord, TalentProfileRecord
 from .advancement.rules import (
     MAX_OFFLINE_SECONDS,
     MAX_SETTLEMENT_SECONDS,
@@ -55,6 +56,14 @@ from .advancement.constitution_rules import (
     CONSTITUTION_RESET_ITEM,
     RESHAPE_COOLDOWN_SECONDS,
     constitution_definition,
+)
+from .advancement.talent_rules import (
+    CONTENT_VERSION as TALENT_CONTENT_VERSION,
+    RULE_VERSION as TALENT_RULE_VERSION,
+    TALENT_POINT_RESOURCE,
+    talent_node_for_reference,
+    talent_tree_nodes,
+    tree_definition,
 )
 from .livelihood.models import ResidenceRecord
 from .livelihood.rules import residence_definition
@@ -197,6 +206,7 @@ CREATE TABLE IF NOT EXISTS players (
     total_cultivation INTEGER NOT NULL DEFAULT 0 CHECK (total_cultivation >= 0),
     foundation_quality INTEGER NOT NULL DEFAULT 0 CHECK (foundation_quality >= 0),
     world_merit INTEGER NOT NULL DEFAULT 0 CHECK (world_merit >= 0),
+    talent_points INTEGER NOT NULL DEFAULT 0 CHECK (talent_points >= 0),
     weakness_until TEXT,
     breakthrough_pity_bp INTEGER NOT NULL DEFAULT 0 CHECK (breakthrough_pity_bp >= 0),
     durability_json TEXT NOT NULL DEFAULT '{}',
@@ -294,6 +304,45 @@ CREATE TABLE IF NOT EXISTS constitution_profiles (
 
 CREATE INDEX IF NOT EXISTS idx_constitution_profiles_player
     ON constitution_profiles(player_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS talent_node_states (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    node_key TEXT NOT NULL,
+    tree_key TEXT NOT NULL,
+    tier INTEGER NOT NULL CHECK (tier BETWEEN 1 AND 5),
+    status TEXT NOT NULL CHECK (status IN ('learned')),
+    cost_points INTEGER NOT NULL CHECK (cost_points >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    unlocked_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, node_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_talent_node_states_player
+    ON talent_node_states(player_id, tree_key, tier);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_talent_node_states_one_per_tier
+    ON talent_node_states(player_id, tree_key, tier) WHERE status = 'learned';
+
+CREATE TABLE IF NOT EXISTS talent_point_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    delta INTEGER NOT NULL CHECK (delta <> 0),
+    balance_before INTEGER NOT NULL CHECK (balance_before >= 0),
+    balance_after INTEGER NOT NULL CHECK (balance_after >= 0),
+    reason TEXT NOT NULL,
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_talent_point_events_player
+    ON talent_point_events(player_id, created_at);
 
 CREATE TABLE IF NOT EXISTS production_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -928,6 +977,22 @@ class ConstitutionBusyError(RuntimeError):
     """A long-running action prevents constitution mutation."""
 
 
+class TalentNodeAlreadyLearnedError(RuntimeError):
+    """The requested talent node is already learned."""
+
+
+class TalentPathMismatchError(RuntimeError):
+    """The requested tree does not match the player's primary path."""
+
+
+class TalentPrerequisiteError(RuntimeError):
+    """The previous talent tier has not been learned."""
+
+
+class TalentBusyError(RuntimeError):
+    """A long-running action prevents talent mutation."""
+
+
 class RealmCultivationInsufficientError(RuntimeError):
     """The player has not reached the next layer threshold."""
 
@@ -1370,6 +1435,7 @@ class SQLitePlayerRepository:
             ("total_cultivation", "INTEGER NOT NULL DEFAULT 0"),
             ("foundation_quality", "INTEGER NOT NULL DEFAULT 0"),
             ("world_merit", "INTEGER NOT NULL DEFAULT 0"),
+            ("talent_points", "INTEGER NOT NULL DEFAULT 0"),
             ("weakness_until", "TEXT"),
             ("breakthrough_pity_bp", "INTEGER NOT NULL DEFAULT 0"),
         ):
@@ -5385,6 +5451,282 @@ class SQLitePlayerRepository:
                 ),
             )
             return self._constitution_from_payload(payload)
+
+    @staticmethod
+    def _talent_node_from_payload(
+        payload: dict[str, Any], *, replay: bool = False
+    ) -> TalentNodeRecord:
+        return TalentNodeRecord(
+            node_key=str(payload["node_key"]),
+            tree_key=str(payload["tree_key"]),
+            tier=int(payload["tier"]),
+            label=str(payload["label"]),
+            description=str(payload["description"]),
+            effect={str(key): value for key, value in dict(payload.get("effect", {})).items()},
+            cost_points=int(payload.get("cost_points", 0)),
+            status=str(payload.get("status", "learned")),
+            unlocked_at=str(payload.get("unlocked_at", "")),
+            already_completed=replay,
+            player=(SQLitePlayerRepository._row_to_player(payload["player"]) if payload.get("player") else None),
+        )
+
+    @staticmethod
+    def _talent_node_from_row(
+        node_row: sqlite3.Row, *, replay: bool = False
+    ) -> TalentNodeRecord:
+        definition = talent_node_for_reference(str(node_row["node_key"]))
+        return TalentNodeRecord(
+            node_key=definition.key,
+            tree_key=definition.tree_key,
+            tier=definition.tier,
+            label=definition.label,
+            description=definition.description,
+            effect=dict(definition.effect),
+            cost_points=int(node_row["cost_points"]),
+            status=str(node_row["status"]),
+            unlocked_at=str(node_row["unlocked_at"]),
+            already_completed=replay,
+        )
+
+    async def get_talent_profile(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> TalentProfileRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_talent_profile_sync,
+                platform,
+                platform_user_id,
+            )
+
+    def _get_talent_profile_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+    ) -> TalentProfileRecord:
+        with self._connect() as connection:
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            if str(row["stage"]) != "cultivator" or not row["path_key"]:
+                raise PlayerStageConflictError("talent profile requires entry into cultivation")
+            tree_key, tree_label = tree_definition(str(row["path_key"]))
+            node_rows = connection.execute(
+                "SELECT * FROM talent_node_states WHERE player_id = ? AND tree_key = ? ORDER BY tier",
+                (row["id"], tree_key),
+            ).fetchall()
+            nodes = tuple(self._talent_node_from_row(node) for node in node_rows)
+            spent = sum(node.cost_points for node in nodes)
+            return TalentProfileRecord(
+                player=self._row_to_player(row),
+                tree_key=tree_key,
+                tree_label=tree_label,
+                nodes=nodes,
+                points_available=int(row["talent_points"]),
+                points_spent=spent,
+            )
+
+    async def unlock_talent(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        node_reference: str,
+        operation_id: str,
+    ) -> TalentNodeRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._unlock_talent_sync,
+                platform,
+                platform_user_id,
+                node_reference,
+                operation_id,
+            )
+
+    def _unlock_talent_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        node_reference: str,
+        operation_id: str,
+    ) -> TalentNodeRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._unlock_talent_once(
+                    platform,
+                    platform_user_id,
+                    node_reference,
+                    operation_id,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _unlock_talent_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        node_reference: str,
+        operation_id: str,
+    ) -> TalentNodeRecord:
+        normalized_reference = node_reference.strip()
+        operation_name = "talent.unlock_node"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "node_reference": normalized_reference,
+                "content_version": TALENT_CONTENT_VERSION,
+                "rule_version": TALENT_RULE_VERSION,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._talent_node_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = self._require_player(connection, platform, platform_user_id)
+            if str(row["stage"]) != "cultivator" or not row["path_key"]:
+                raise PlayerStageConflictError("talent requires entry into cultivation")
+            tree_key, _ = tree_definition(str(row["path_key"]))
+            if normalized_reference.startswith("talent.tree."):
+                definition = talent_node_for_reference(normalized_reference)
+                if definition.tree_key != tree_key:
+                    raise TalentPathMismatchError("talent tree does not match primary path")
+            else:
+                definition = talent_node_for_reference(normalized_reference, tree_key=tree_key)
+            if self._has_active_long_action(connection, int(row["id"])):
+                raise TalentBusyError("another long action is active")
+            existing_node = connection.execute(
+                "SELECT 1 FROM talent_node_states WHERE player_id = ? AND node_key = ? LIMIT 1",
+                (row["id"], definition.key),
+            ).fetchone()
+            if existing_node is not None:
+                raise TalentNodeAlreadyLearnedError("talent node is already learned")
+            if definition.tier > 1:
+                prerequisite_key = f"talent.tree.{tree_key}.tier{definition.tier - 1}"
+                prerequisite = connection.execute(
+                    "SELECT 1 FROM talent_node_states WHERE player_id = ? AND node_key = ? LIMIT 1",
+                    (row["id"], prerequisite_key),
+                ).fetchone()
+                if prerequisite is None:
+                    raise TalentPrerequisiteError("previous talent tier is not learned")
+
+            points_before = int(row["talent_points"])
+            if points_before < definition.cost_points:
+                raise ResourceInsufficientError("talent points are insufficient")
+            points_after = points_before - definition.cost_points
+            constitution = connection.execute(
+                "SELECT constitution_key, snapshot_json FROM constitution_profiles WHERE player_id = ? LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            snapshot = {
+                "node_key": definition.key,
+                "tree_key": definition.tree_key,
+                "tier": definition.tier,
+                "effect": dict(definition.effect),
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+                "qualification": self._json_object(row["qualification_json"], {}),
+                "path_key": row["path_key"],
+                "subprofession_key": row["subprofession_key"],
+                "realm_key": row["realm_key"],
+                "realm_layer": int(row["realm_layer"]),
+                "location_key": row["location_key"],
+                "constitution_key": str(constitution["constitution_key"]) if constitution else None,
+            }
+            node_id = uuid4().hex
+            connection.execute(
+                """
+                INSERT INTO talent_node_states(
+                    node_id, player_id, operation_id, node_key, tree_key, tier,
+                    status, cost_points, snapshot_json, unlocked_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 'learned', ?, ?, ?, ?, ?)
+                """,
+                (
+                    node_id,
+                    row["id"],
+                    operation_id,
+                    definition.key,
+                    definition.tree_key,
+                    definition.tier,
+                    definition.cost_points,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    now_text,
+                    now_text,
+                ),
+            )
+            if definition.cost_points:
+                connection.execute(
+                    "UPDATE players SET talent_points = ?, updated_at = ? WHERE id = ?",
+                    (points_after, now_text, row["id"]),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO talent_point_events(
+                        event_id, player_id, operation_id, delta, balance_before,
+                        balance_after, reason, content_version, rule_version, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        uuid4().hex,
+                        row["id"],
+                        f"{operation_id}:talent-point",
+                        -definition.cost_points,
+                        points_before,
+                        points_after,
+                        f"unlock:{definition.key}",
+                        definition.content_version,
+                        definition.rule_version,
+                        now_text,
+                    ),
+                )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("talent unlock returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "node_key": definition.key,
+                "tree_key": definition.tree_key,
+                "tier": definition.tier,
+                "label": definition.label,
+                "description": definition.description,
+                "effect": dict(definition.effect),
+                "cost_points": definition.cost_points,
+                "unlocked_at": now_text,
+                "talent_points_before": points_before,
+                "talent_points_after": points_after,
+                "status": "learned",
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._talent_node_from_payload(payload)
 
     async def advance_layer(
         self,
@@ -9633,6 +9975,7 @@ class SQLitePlayerRepository:
             total_cultivation=int(value("total_cultivation", 0)),
             foundation_quality=int(value("foundation_quality", 0)),
             world_merit=int(value("world_merit", 0)),
+            talent_points=int(value("talent_points", 0)),
             weakness_until=(
                 datetime.fromisoformat(str(value("weakness_until")))
                 if value("weakness_until")
@@ -9679,6 +10022,7 @@ class SQLitePlayerRepository:
             "total_cultivation": player.total_cultivation,
             "foundation_quality": player.foundation_quality,
             "world_merit": player.world_merit,
+            "talent_points": player.talent_points,
             "weakness_until": serialize_datetime(player.weakness_until) if player.weakness_until else None,
             "breakthrough_pity_bp": player.breakthrough_pity_bp,
         }

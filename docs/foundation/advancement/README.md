@@ -32,5 +32,6 @@
 基础闭关使用 `progression.retreat.basic`，静养闭关使用 `progression.retreat.restful`；两者
 均由独立 `retreat_sessions` 表和 operation ledger 持久化。静养所需的最小居所使用
 `residence.town_room`，通过 `租住居所` 和 `我的居所` 管理。体质使用独立
-`constitution_profiles` 表保存单一主质、效果、资格/道途快照和重塑冷却；天赋、神通、法器和
-灵兽仍按内容开发总表逐个切片，尚未提前开放。
+`constitution_profiles` 表保存单一主质、效果、资格/道途快照和重塑冷却；道脉天书使用
+`talent_node_states` 与天赋点流水保存当前首要道途的五阶线性节点。神通、法器和灵兽仍按
+内容开发总表逐个切片，尚未提前开放。

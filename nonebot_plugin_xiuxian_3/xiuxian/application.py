@@ -15,6 +15,7 @@ from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .advancement.use_cases import AdvancementApplication
 from .advancement.constitution_use_cases import ConstitutionApplication
+from .advancement.talent_use_cases import TalentApplication
 from .livelihood.use_cases import LivelihoodApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
@@ -36,6 +37,7 @@ class XiuxianApplication:
         self.mainline = AdventuresMainlineApplication(repository)
         self.advancement = AdvancementApplication(repository)
         self.constitution = ConstitutionApplication(repository)
+        self.talent = TalentApplication(repository)
         self.livelihood = LivelihoodApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
@@ -330,6 +332,19 @@ class XiuxianApplication:
             context,
             lambda: self.constitution.reshape(context),
             write_message="当前事件不允许重塑体质。",
+        )
+
+    async def preview_talents(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.talent.preview(context), require_write=False)
+
+    async def get_talent_profile(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.talent.profile(context), require_write=False)
+
+    async def unlock_talent(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.talent.unlock(context),
+            write_message="当前事件不允许解锁道脉。",
         )
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:
