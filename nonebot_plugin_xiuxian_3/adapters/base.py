@@ -118,3 +118,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("前往近郊", lambda context: application.travel_intro(context, "近郊"))
     router.register("返回新手城", lambda context: application.travel_intro(context, "新手城"))
     router.register("选择道途", application.enter_cultivation)
+    router.register("开始修炼", application.start_cultivation)
+    router.register("结算修炼", application.settle_cultivation)
+    router.register("取消修炼", application.cancel_cultivation)
+    router.register("晋升境界", application.advance_layer, aliases=("境界晋升",))
+    router.register("恢复状态", application.recover_resources)

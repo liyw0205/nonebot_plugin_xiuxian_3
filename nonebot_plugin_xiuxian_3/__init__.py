@@ -12,7 +12,7 @@ try:
     __plugin_meta__ = PluginMetadata(
         name="修仙 3",
         description="可扩展的修仙文字游戏基础框架",
-        usage="发送：开始修仙、寻仙问道、完成引导、我的状态、修仙改名",
+        usage="发送：开始修仙、寻仙问道、完成引导、选择道途、开始修炼、我的状态",
         type="application",
         supported_adapters={"~onebot.v11", "~qq"},
     )

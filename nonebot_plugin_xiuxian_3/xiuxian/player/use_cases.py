@@ -14,6 +14,7 @@ from ..repository import (
 )
 from .intro_use_cases import IntroApplication
 from .cultivation_use_cases import CultivationApplication
+from .path_rules import PATH_LABELS, SUBPROFESSION_LABELS
 from .rules import (
     LOCATION_LABELS,
     QUALIFICATION_KEYS,
@@ -88,6 +89,15 @@ class PlayerApplication:
     def _realm_text(realm_key: str, layer: int) -> str:
         name = REALM_LABELS.get(realm_key, "未知境界")
         return f"{name} L{layer}" if layer else name
+
+    @staticmethod
+    def _path_text(path_key: str | None, subprofession_key: str | None) -> str:
+        if not path_key:
+            return "未选择"
+        name = PATH_LABELS.get(path_key, "修行道途")
+        if subprofession_key:
+            name += f"·{SUBPROFESSION_LABELS.get(subprofession_key, '辅修')}"
+        return name
 
     @staticmethod
     def _qualification_text(qualification: dict[str, int]) -> str:
@@ -254,6 +264,7 @@ class PlayerApplication:
                 "inventory": player.inventory,
                 "realm_key": player.realm_key,
                 "realm_layer": player.realm_layer,
+                "total_cultivation": player.total_cultivation,
                 "qualification": player.qualification,
                 "idempotent_replay": record.already_completed,
             },
@@ -286,6 +297,9 @@ class PlayerApplication:
                 f"- **灵石**：{player.spirit_stones}\n"
                 f"- **体力**：{player.stamina}/{player.stamina_max}\n"
                 f"- **精力**：{player.energy}/{player.energy_max}\n"
+                f"- **道途**：{self._path_text(player.path_key, player.subprofession_key)}\n"
+                f"- **境内修为**：{player.cultivation}\n"
+                f"- **总修为**：{player.total_cultivation}\n"
                 "\n### 六项资质\n\n"
                 f"{self._qualification_text(player.qualification)}"
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(player.intro_flags))}/3"
@@ -301,6 +315,7 @@ class PlayerApplication:
                 "realm_key": player.realm_key,
                 "realm_layer": player.realm_layer,
                 "cultivation": player.cultivation,
+                "total_cultivation": player.total_cultivation,
                 "rule_version": player.rule_version,
                 "spirit_stones": player.spirit_stones,
                 "stamina": player.stamina,

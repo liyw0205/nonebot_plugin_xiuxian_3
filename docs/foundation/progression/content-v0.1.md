@@ -42,7 +42,12 @@
 
 结算先增加 `realm_cultivation` 和 `total_cultivation`，再只读计算可晋层的最高下一层；不会自动跳层。`progression.advance_layer` 必须使用独立 operation 逐层结算，确保 L3/L6/L9/L10 的内容解锁可审计。
 
-会话状态：`created -> running -> settled | cancelled | expired`。未到结束时间返回 `CULTIVATION_NOT_READY`；超过结束时间 24 小时可由恢复任务按原快照结算。只允许在 `created` 取消并返还全部体力/精力；`running` 后不可取消。重复 operation/结算返回同一会话与结果。
+会话状态：`created -> running -> settled | cancelled | expired`。未到结束时间返回 `CULTIVATION_NOT_READY`；超过结束时间 24 小时可由恢复任务按原快照结算。当前最小实现允许 `running` 阶段取消并返还已锁定体力；重复 operation/结算返回同一会话与结果。
+
+当前运行时先开放 `cultivate.breathing` 的 `running -> settled/cancelled` 最小实现：命令为
+`开始修炼`、`结算修炼`、`取消修炼`。开始时扣除 2 点体力并冻结悟性、境界、地点和规则版本；
+10 分钟后才能结算。取消会原子返还 2 点体力。修为收益写入境内修为与总修为，随后由
+`晋升境界` 独立 operation 逐层推进。其它两类修炼模式仍保持未开放。
 
 ## 3. 同境晋层：`progression.advance_layer`
 

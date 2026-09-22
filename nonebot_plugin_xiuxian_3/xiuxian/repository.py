@@ -7,14 +7,28 @@ import hashlib
 import json
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
 from ..contracts import PlayerView, serialize_datetime
 from .config import XiuxianSettings
-from .player.models import CultivationRecord, IntroRecord, PlayerCreateRecord, RenameRecord, SeekingRecord, TravelRecord
+from .player.models import (
+    CultivationRecord,
+    IntroRecord,
+    PlayerCreateRecord,
+    RenameRecord,
+    SeekingRecord,
+    TravelRecord,
+)
 from .player.rules import STAGE_MORTAL, STAGE_NEW_USER, qualification_for
+from .progression.models import (
+    CultivationCancelRecord,
+    CultivationSessionRecord,
+    CultivationSettlementRecord,
+    LayerAdvanceRecord,
+    ResourceRecoveryRecord,
+)
 
 
 SCHEMA = """
@@ -48,6 +62,7 @@ CREATE TABLE IF NOT EXISTS players (
     realm_key TEXT NOT NULL DEFAULT 'mortal',
     realm_layer INTEGER NOT NULL DEFAULT 0 CHECK (realm_layer >= 0),
     cultivation INTEGER NOT NULL DEFAULT 0 CHECK (cultivation >= 0),
+    total_cultivation INTEGER NOT NULL DEFAULT 0 CHECK (total_cultivation >= 0),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (platform, platform_user_id)
@@ -64,6 +79,26 @@ CREATE TABLE IF NOT EXISTS operations (
 
 CREATE INDEX IF NOT EXISTS idx_players_scene ON players(scene_id);
 CREATE INDEX IF NOT EXISTS idx_operations_player ON operations(player_id);
+
+CREATE TABLE IF NOT EXISTS cultivation_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    mode_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running', 'settled', 'cancelled')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    stamina_cost INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cultivation_sessions_player ON cultivation_sessions(player_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cultivation_sessions_active
+    ON cultivation_sessions(player_id) WHERE status = 'running';
 
 """
 
@@ -110,6 +145,26 @@ class PathAlreadySelectedError(RuntimeError):
 
 class SubprofessionRequiredError(RuntimeError):
     """The support path requires a sub-profession choice."""
+
+
+class CultivationBusyError(RuntimeError):
+    """The player already has a running cultivation session."""
+
+
+class CultivationNotFoundError(RuntimeError):
+    """The player has no running cultivation session."""
+
+
+class CultivationNotReadyError(RuntimeError):
+    """A cultivation session has not reached its end time."""
+
+
+class RealmCultivationInsufficientError(RuntimeError):
+    """The player has not reached the next layer threshold."""
+
+
+class RealmLayerInvalidError(RuntimeError):
+    """The player cannot advance beyond the current realm."""
 
 
 class SQLitePlayerRepository:
@@ -188,6 +243,7 @@ class SQLitePlayerRepository:
             ("realm_key", "TEXT NOT NULL DEFAULT 'mortal'"),
             ("realm_layer", "INTEGER NOT NULL DEFAULT 0"),
             ("cultivation", "INTEGER NOT NULL DEFAULT 0"),
+            ("total_cultivation", "INTEGER NOT NULL DEFAULT 0"),
         ):
             if column not in player_columns:
                 connection.execute(f"ALTER TABLE players ADD COLUMN {column} {definition}")
@@ -463,7 +519,7 @@ class SQLitePlayerRepository:
                 connection.execute(
                     """
                     UPDATE players
-                    SET stage = ?, realm_key = 'mortal', realm_layer = 0, cultivation = 0,
+                    SET stage = ?, realm_key = 'mortal', realm_layer = 0, cultivation = 0, total_cultivation = 0,
                         qualification_json = ?, spirit_stones = spirit_stones + 100,
                         stamina = 30, stamina_max = 30, energy = 30, energy_max = 30,
                         inventory_json = ?, updated_at = ?
@@ -921,7 +977,7 @@ class SQLitePlayerRepository:
                 """
                 UPDATE players
                 SET stage = 'cultivator', path_key = ?, subprofession_key = ?,
-                    realm_key = 'qi_sensing', realm_layer = 1, cultivation = 0,
+                    realm_key = 'qi_sensing', realm_layer = 1, cultivation = 0, total_cultivation = 0,
                     spirit_stones = spirit_stones + 200, inventory_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
@@ -958,6 +1014,588 @@ class SQLitePlayerRepository:
                 path_key=path_key,
                 subprofession_key=subprofession_key,
                 changed=True,
+            )
+
+    async def start_cultivation(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        mode_key: str,
+        operation_id: str,
+    ) -> CultivationSessionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._start_cultivation_sync,
+                platform,
+                platform_user_id,
+                mode_key,
+                operation_id,
+            )
+
+    def _start_cultivation_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        mode_key: str,
+        operation_id: str,
+    ) -> CultivationSessionRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._start_cultivation_once(platform, platform_user_id, mode_key, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _start_cultivation_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        mode_key: str,
+        operation_id: str,
+    ) -> CultivationSessionRecord:
+        from .progression.rules import (
+            BREATHING_DURATION_SECONDS,
+            BREATHING_STAMINA_COST,
+            MODE_BREATHING,
+            REALM_QI_SENSING,
+            RULE_VERSION,
+        )
+
+        operation_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "mode_key": mode_key,
+        }
+        request_hash = self._request_hash("progression.start_cultivation", operation_payload)
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "progression.start_cultivation"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return CultivationSessionRecord(
+                    player=self._row_to_player(payload["player"]),
+                    session_id=str(payload["session_id"]),
+                    mode_key=str(payload["mode_key"]),
+                    status=str(payload["status"]),
+                    starts_at=str(payload["starts_at"]),
+                    ends_at=str(payload["ends_at"]),
+                    stamina_cost=int(payload["stamina_cost"]),
+                    already_completed=True,
+                )
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if row["stage"] != "cultivator" or row["realm_key"] != REALM_QI_SENSING:
+                raise PlayerStageConflictError("player is not ready for cultivation")
+            if mode_key != MODE_BREATHING:
+                raise ValueError("unsupported cultivation mode")
+            running = connection.execute(
+                "SELECT 1 FROM cultivation_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if running is not None:
+                raise CultivationBusyError("player already has a running cultivation")
+            if int(row["stamina"]) < BREATHING_STAMINA_COST:
+                raise ResourceInsufficientError("stamina is insufficient")
+
+            session_id = uuid4().hex
+            starts_at = serialize_datetime(now)
+            ends_at = serialize_datetime(now + timedelta(seconds=BREATHING_DURATION_SECONDS))
+            snapshot = {
+                "realm_key": row["realm_key"],
+                "realm_layer": int(row["realm_layer"]),
+                "qualification": self._json_object(row["qualification_json"], {}),
+                "location_key": row["location_key"],
+                "rule_version": RULE_VERSION,
+                "mode_key": mode_key,
+                "base_cultivation": 40,
+            }
+            connection.execute(
+                "UPDATE players SET stamina = stamina - ?, updated_at = ? WHERE id = ?",
+                (BREATHING_STAMINA_COST, serialize_datetime(now), row["id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO cultivation_sessions(
+                    session_id, player_id, operation_id, mode_key, status,
+                    starts_at, ends_at, stamina_cost, snapshot_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    row["id"],
+                    operation_id,
+                    mode_key,
+                    starts_at,
+                    ends_at,
+                    BREATHING_STAMINA_COST,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                    starts_at,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("cultivation start returned no player")
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "session_id": session_id,
+                "mode_key": mode_key,
+                "status": "running",
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "stamina_cost": BREATHING_STAMINA_COST,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id,
+                    "progression.start_cultivation",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                ),
+            )
+            return CultivationSessionRecord(
+                player=player,
+                session_id=session_id,
+                mode_key=mode_key,
+                status="running",
+                starts_at=starts_at,
+                ends_at=ends_at,
+                stamina_cost=BREATHING_STAMINA_COST,
+            )
+
+    async def settle_cultivation(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> CultivationSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._settle_cultivation_sync,
+                platform,
+                platform_user_id,
+                operation_id,
+            )
+
+    def _settle_cultivation_sync(self, platform: str, platform_user_id: str, operation_id: str) -> CultivationSettlementRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._settle_cultivation_once(platform, platform_user_id, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _settle_cultivation_once(self, platform: str, platform_user_id: str, operation_id: str) -> CultivationSettlementRecord:
+        from .progression.rules import cultivation_gain
+
+        operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash("progression.settle_cultivation", operation_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "progression.settle_cultivation"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return CultivationSettlementRecord(
+                    player=self._row_to_player(payload["player"]),
+                    session_id=str(payload["session_id"]),
+                    cultivation_gain=int(payload["cultivation_gain"]),
+                    already_completed=True,
+                )
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            session = connection.execute(
+                "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if session is None:
+                raise CultivationNotFoundError("no running cultivation")
+            ends_at = datetime.fromisoformat(str(session["ends_at"]))
+            if now < ends_at:
+                raise CultivationNotReadyError("cultivation is not ready")
+            snapshot = self._json_object(session["snapshot_json"], {})
+            qualification = self._json_object(snapshot.get("qualification", {}), {})
+            gain = cultivation_gain(int(snapshot.get("base_cultivation", 40)), qualification)
+            connection.execute(
+                "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, updated_at = ? WHERE id = ?",
+                (gain, gain, now_text, row["id"]),
+            )
+            connection.execute(
+                "UPDATE cultivation_sessions SET status = 'settled', result_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps({"cultivation_gain": gain}, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("cultivation settlement returned no player")
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "session_id": session["session_id"],
+                "cultivation_gain": gain,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    "progression.settle_cultivation",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return CultivationSettlementRecord(player=player, session_id=session["session_id"], cultivation_gain=gain)
+
+    async def cancel_cultivation(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> CultivationCancelRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._cancel_cultivation_sync,
+                platform,
+                platform_user_id,
+                operation_id,
+            )
+
+    def _cancel_cultivation_sync(self, platform: str, platform_user_id: str, operation_id: str) -> CultivationCancelRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._cancel_cultivation_once(platform, platform_user_id, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _cancel_cultivation_once(self, platform: str, platform_user_id: str, operation_id: str) -> CultivationCancelRecord:
+        operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash("progression.cancel_cultivation", operation_payload)
+        now_text = serialize_datetime(datetime.now(timezone.utc))
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "progression.cancel_cultivation"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return CultivationCancelRecord(
+                    player=self._row_to_player(payload["player"]),
+                    session_id=str(payload["session_id"]),
+                    stamina_refund=int(payload["stamina_refund"]),
+                    already_completed=True,
+                )
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            session = connection.execute(
+                "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if session is None:
+                raise CultivationNotFoundError("no running cultivation")
+            refund = int(session["stamina_cost"])
+            connection.execute(
+                "UPDATE players SET stamina = MIN(stamina_max, stamina + ?), updated_at = ? WHERE id = ?",
+                (refund, now_text, row["id"]),
+            )
+            connection.execute(
+                "UPDATE cultivation_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps({"stamina_refund": refund}, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("cultivation cancellation returned no player")
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "session_id": session["session_id"],
+                "stamina_refund": refund,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    "progression.cancel_cultivation",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return CultivationCancelRecord(player=player, session_id=session["session_id"], stamina_refund=refund)
+
+    async def advance_layer(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> LayerAdvanceRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._advance_layer_sync, platform, platform_user_id, operation_id)
+
+    def _advance_layer_sync(self, platform: str, platform_user_id: str, operation_id: str) -> LayerAdvanceRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._advance_layer_once(platform, platform_user_id, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _advance_layer_once(self, platform: str, platform_user_id: str, operation_id: str) -> LayerAdvanceRecord:
+        from .progression.rules import can_advance_layer, next_layer_threshold, REALM_QI_SENSING
+
+        operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash("progression.advance_layer", operation_payload)
+        now_text = serialize_datetime(datetime.now(timezone.utc))
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "progression.advance_layer"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return LayerAdvanceRecord(player=self._row_to_player(payload["player"]), changed=True, already_completed=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if row["stage"] != "cultivator" or row["realm_key"] != REALM_QI_SENSING:
+                raise PlayerStageConflictError("player is not ready to advance")
+            running = connection.execute(
+                "SELECT 1 FROM cultivation_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if running is not None:
+                raise CultivationBusyError("cultivation is still running")
+            layer = int(row["realm_layer"])
+            if layer >= 10 or next_layer_threshold(REALM_QI_SENSING, layer) is None:
+                raise RealmLayerInvalidError("realm is already at its maximum layer")
+            if not can_advance_layer(REALM_QI_SENSING, layer, int(row["cultivation"])):
+                raise RealmCultivationInsufficientError("realm cultivation is insufficient")
+            connection.execute(
+                "UPDATE players SET realm_layer = realm_layer + 1, updated_at = ? WHERE id = ?",
+                (now_text, row["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("layer advancement returned no player")
+            player = self._row_to_player(updated)
+            payload = {"player": self._player_payload(player)}
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    "progression.advance_layer",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return LayerAdvanceRecord(player=player, changed=True)
+
+    async def recover_resources(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> ResourceRecoveryRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._recover_resources_sync, platform, platform_user_id, operation_id)
+
+    def _recover_resources_sync(self, platform: str, platform_user_id: str, operation_id: str) -> ResourceRecoveryRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._recover_resources_once(platform, platform_user_id, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _recover_resources_once(self, platform: str, platform_user_id: str, operation_id: str) -> ResourceRecoveryRecord:
+        from .progression.rules import RECOVERY_PERIOD_SECONDS
+
+        operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash("player.recover_resources", operation_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "player.recover_resources"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return ResourceRecoveryRecord(
+                    player=self._row_to_player(payload["player"]),
+                    periods=int(payload["periods"]),
+                    recovered_stamina=int(payload["recovered_stamina"]),
+                    recovered_energy=int(payload["recovered_energy"]),
+                    changed=bool(payload["changed"]),
+                    already_completed=True,
+                )
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            try:
+                last_update = datetime.fromisoformat(str(row["updated_at"]))
+            except ValueError:
+                last_update = now
+            elapsed = max(0, int((now - last_update).total_seconds()))
+            periods = elapsed // RECOVERY_PERIOD_SECONDS
+            stamina_before = int(row["stamina"])
+            energy_before = int(row["energy"])
+            stamina_after = min(int(row["stamina_max"]), stamina_before + periods)
+            energy_after = min(int(row["energy_max"]), energy_before + periods)
+            recovered_stamina = stamina_after - stamina_before
+            recovered_energy = energy_after - energy_before
+            changed = recovered_stamina > 0 or recovered_energy > 0
+            if periods > 0:
+                advanced_update = last_update + timedelta(seconds=periods * RECOVERY_PERIOD_SECONDS)
+                connection.execute(
+                    "UPDATE players SET stamina = ?, energy = ?, updated_at = ? WHERE id = ?",
+                    (stamina_after, energy_after, serialize_datetime(advanced_update), row["id"]),
+                )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("resource recovery returned no player")
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "periods": periods,
+                "recovered_stamina": recovered_stamina,
+                "recovered_energy": recovered_energy,
+                "changed": changed,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    "player.recover_resources",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return ResourceRecoveryRecord(
+                player=player,
+                periods=periods,
+                recovered_stamina=recovered_stamina,
+                recovered_energy=recovered_energy,
+                changed=changed,
             )
 
     async def rename_player(
@@ -1157,6 +1795,7 @@ class SQLitePlayerRepository:
             realm_key=str(value("realm_key", "mortal")),
             realm_layer=int(value("realm_layer", 0)),
             cultivation=int(value("cultivation", 0)),
+            total_cultivation=int(value("total_cultivation", 0)),
         )
 
     @staticmethod
@@ -1193,4 +1832,5 @@ class SQLitePlayerRepository:
             "realm_key": player.realm_key,
             "realm_layer": player.realm_layer,
             "cultivation": player.cultivation,
+            "total_cultivation": player.total_cultivation,
         }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..contracts import CommandContext, CommandResult
 from .player.use_cases import PlayerApplication
+from .progression.use_cases import ProgressionApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -12,6 +13,7 @@ class XiuxianApplication:
 
     def __init__(self, repository: SQLitePlayerRepository):
         self.player = PlayerApplication(repository)
+        self.progression = ProgressionApplication(repository)
 
     async def create_player(self, context: CommandContext) -> CommandResult:
         return await self.player.create_player(context)
@@ -33,3 +35,18 @@ class XiuxianApplication:
 
     async def enter_cultivation(self, context: CommandContext) -> CommandResult:
         return await self.player.enter_cultivation(context)
+
+    async def start_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self.progression.start_cultivation(context)
+
+    async def settle_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self.progression.settle_cultivation(context)
+
+    async def cancel_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self.progression.cancel_cultivation(context)
+
+    async def advance_layer(self, context: CommandContext) -> CommandResult:
+        return await self.progression.advance_layer(context)
+
+    async def recover_resources(self, context: CommandContext) -> CommandResult:
+        return await self.progression.recover_resources(context)
