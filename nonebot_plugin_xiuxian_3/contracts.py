@@ -110,6 +110,7 @@ class PlayerView:
     weakness_until: datetime | None = None
     breakthrough_pity_bp: int = 0
     talent_points: int = 0
+    skill_insights: int = 0
 
 
 def serialize_datetime(value: datetime) -> str:

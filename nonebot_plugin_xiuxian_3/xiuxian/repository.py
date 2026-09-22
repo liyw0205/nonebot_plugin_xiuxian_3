@@ -44,6 +44,7 @@ from .progression.breakthrough.models import (
 from .advancement.models import RetreatSessionRecord, RetreatSettlementRecord
 from .advancement.constitution_models import ConstitutionRecord
 from .advancement.talent_models import TalentNodeRecord, TalentProfileRecord
+from .advancement.skill_models import SkillMasteryRecord, SkillProfileRecord
 from .advancement.rules import (
     MAX_OFFLINE_SECONDS,
     MAX_SETTLEMENT_SECONDS,
@@ -64,6 +65,16 @@ from .advancement.talent_rules import (
     talent_node_for_reference,
     talent_tree_nodes,
     tree_definition,
+)
+from .advancement.skill_rules import (
+    CONTENT_VERSION as SKILL_CONTENT_VERSION,
+    MAX_SKILL_LEVEL,
+    RULE_VERSION as SKILL_RULE_VERSION,
+    SKILL_INSIGHT_RESOURCE,
+    available_skill_keys,
+    effective_skill_effect,
+    skill_cost,
+    skill_definition,
 )
 from .livelihood.models import ResidenceRecord
 from .livelihood.rules import residence_definition
@@ -207,6 +218,7 @@ CREATE TABLE IF NOT EXISTS players (
     foundation_quality INTEGER NOT NULL DEFAULT 0 CHECK (foundation_quality >= 0),
     world_merit INTEGER NOT NULL DEFAULT 0 CHECK (world_merit >= 0),
     talent_points INTEGER NOT NULL DEFAULT 0 CHECK (talent_points >= 0),
+    skill_insights INTEGER NOT NULL DEFAULT 0 CHECK (skill_insights >= 0),
     weakness_until TEXT,
     breakthrough_pity_bp INTEGER NOT NULL DEFAULT 0 CHECK (breakthrough_pity_bp >= 0),
     durability_json TEXT NOT NULL DEFAULT '{}',
@@ -343,6 +355,42 @@ CREATE TABLE IF NOT EXISTS talent_point_events (
 
 CREATE INDEX IF NOT EXISTS idx_talent_point_events_player
     ON talent_point_events(player_id, created_at);
+
+CREATE TABLE IF NOT EXISTS skill_masteries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mastery_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    skill_key TEXT NOT NULL,
+    path_key TEXT,
+    level INTEGER NOT NULL CHECK (level BETWEEN 1 AND 3),
+    max_level INTEGER NOT NULL CHECK (max_level = 3),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    trained_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, skill_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_masteries_player
+    ON skill_masteries(player_id, skill_key);
+
+CREATE TABLE IF NOT EXISTS skill_insight_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    delta INTEGER NOT NULL CHECK (delta <> 0),
+    balance_before INTEGER NOT NULL CHECK (balance_before >= 0),
+    balance_after INTEGER NOT NULL CHECK (balance_after >= 0),
+    reason TEXT NOT NULL,
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_insight_events_player
+    ON skill_insight_events(player_id, created_at);
 
 CREATE TABLE IF NOT EXISTS production_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -993,6 +1041,18 @@ class TalentBusyError(RuntimeError):
     """A long-running action prevents talent mutation."""
 
 
+class SkillAlreadyMaxedError(RuntimeError):
+    """The requested skill has reached the current mastery cap."""
+
+
+class SkillNotAvailableError(RuntimeError):
+    """The requested skill is not available to the player's primary path."""
+
+
+class SkillBusyError(RuntimeError):
+    """A long-running action prevents skill mutation."""
+
+
 class RealmCultivationInsufficientError(RuntimeError):
     """The player has not reached the next layer threshold."""
 
@@ -1436,6 +1496,7 @@ class SQLitePlayerRepository:
             ("foundation_quality", "INTEGER NOT NULL DEFAULT 0"),
             ("world_merit", "INTEGER NOT NULL DEFAULT 0"),
             ("talent_points", "INTEGER NOT NULL DEFAULT 0"),
+            ("skill_insights", "INTEGER NOT NULL DEFAULT 0"),
             ("weakness_until", "TEXT"),
             ("breakthrough_pity_bp", "INTEGER NOT NULL DEFAULT 0"),
         ):
@@ -5728,6 +5789,284 @@ class SQLitePlayerRepository:
             )
             return self._talent_node_from_payload(payload)
 
+    @staticmethod
+    def _skill_mastery_from_payload(
+        payload: dict[str, Any], *, replay: bool = False
+    ) -> SkillMasteryRecord:
+        return SkillMasteryRecord(
+            player=(SQLitePlayerRepository._row_to_player(payload["player"]) if payload.get("player") else None),
+            skill_key=str(payload["skill_key"]),
+            label=str(payload["label"]),
+            path_key=payload.get("path_key"),
+            level=int(payload["level"]),
+            max_level=int(payload.get("max_level", MAX_SKILL_LEVEL)),
+            base_effect={str(key): value for key, value in dict(payload.get("base_effect", {})).items()},
+            effective_effect={str(key): value for key, value in dict(payload.get("effective_effect", {})).items()},
+            insight_cost=int(payload.get("insight_cost", 0)),
+            spirit_stone_cost=int(payload.get("spirit_stone_cost", 0)),
+            trained_at=str(payload.get("trained_at", "")),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _skill_mastery_from_row(
+        mastery_row: sqlite3.Row, *, replay: bool = False
+    ) -> SkillMasteryRecord:
+        definition = skill_definition(str(mastery_row["skill_key"]))
+        snapshot = SQLitePlayerRepository._json_object(mastery_row["snapshot_json"], {})
+        return SkillMasteryRecord(
+            player=None,
+            skill_key=str(mastery_row["skill_key"]),
+            label=definition.label,
+            path_key=mastery_row["path_key"],
+            level=int(mastery_row["level"]),
+            max_level=int(mastery_row["max_level"]),
+            base_effect={str(key): value for key, value in dict(snapshot.get("base_effect", definition.effect)).items()},
+            effective_effect={
+                str(key): value
+                for key, value in dict(
+                    snapshot.get(
+                        "effective_effect",
+                        effective_skill_effect(definition, int(mastery_row["level"])),
+                    )
+                ).items()
+            },
+            trained_at=str(mastery_row["trained_at"]),
+            already_completed=replay,
+        )
+
+    async def get_skill_profile(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> SkillProfileRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_skill_profile_sync,
+                platform,
+                platform_user_id,
+            )
+
+    def _get_skill_profile_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+    ) -> SkillProfileRecord:
+        with self._connect() as connection:
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            if str(row["stage"]) != "cultivator" or not row["path_key"]:
+                raise PlayerStageConflictError("skill profile requires entry into cultivation")
+            mastery_rows = connection.execute(
+                "SELECT * FROM skill_masteries WHERE player_id = ? ORDER BY skill_key",
+                (row["id"],),
+            ).fetchall()
+            return SkillProfileRecord(
+                player=self._row_to_player(row),
+                skills=tuple(self._skill_mastery_from_row(item) for item in mastery_rows),
+                skill_insights=int(row["skill_insights"]),
+            )
+
+    async def train_skill(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        skill_reference: str,
+        operation_id: str,
+    ) -> SkillMasteryRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._train_skill_sync,
+                platform,
+                platform_user_id,
+                skill_reference,
+                operation_id,
+            )
+
+    def _train_skill_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        skill_reference: str,
+        operation_id: str,
+    ) -> SkillMasteryRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._train_skill_once(
+                    platform,
+                    platform_user_id,
+                    skill_reference,
+                    operation_id,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _train_skill_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        skill_reference: str,
+        operation_id: str,
+    ) -> SkillMasteryRecord:
+        definition = skill_definition(skill_reference)
+        normalized_reference = skill_reference.strip()
+        operation_name = "skill.train"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "skill_reference": normalized_reference,
+                "skill_key": definition.key,
+                "content_version": SKILL_CONTENT_VERSION,
+                "rule_version": SKILL_RULE_VERSION,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._skill_mastery_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = self._require_player(connection, platform, platform_user_id)
+            if str(row["stage"]) != "cultivator" or not row["path_key"]:
+                raise PlayerStageConflictError("skill training requires entry into cultivation")
+            if definition.key not in available_skill_keys(str(row["path_key"])):
+                raise SkillNotAvailableError("skill does not belong to the primary path")
+            if self._has_active_long_action(connection, int(row["id"])):
+                raise SkillBusyError("another long action is active")
+
+            mastery = connection.execute(
+                "SELECT * FROM skill_masteries WHERE player_id = ? AND skill_key = ? LIMIT 1",
+                (row["id"], definition.key),
+            ).fetchone()
+            current_level = int(mastery["level"]) if mastery is not None else 0
+            if current_level >= MAX_SKILL_LEVEL:
+                raise SkillAlreadyMaxedError("skill is already at maximum level")
+            target_level = current_level + 1
+            insight_cost, stone_cost = skill_cost(target_level)
+            insights_before = int(row["skill_insights"])
+            stones_before = int(row["spirit_stones"])
+            if insights_before < insight_cost or stones_before < stone_cost:
+                raise ResourceInsufficientError("skill resources are insufficient")
+            insights_after = insights_before - insight_cost
+            stones_after = stones_before - stone_cost
+            effective_effect = effective_skill_effect(definition, target_level)
+            snapshot = {
+                "skill_key": definition.key,
+                "path_key": definition.path_key,
+                "level": target_level,
+                "max_level": MAX_SKILL_LEVEL,
+                "base_effect": dict(definition.effect),
+                "effective_effect": dict(effective_effect),
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+                "qualification": self._json_object(row["qualification_json"], {}),
+                "realm_key": row["realm_key"],
+                "realm_layer": int(row["realm_layer"]),
+                "location_key": row["location_key"],
+            }
+            snapshot_json = json.dumps(snapshot, ensure_ascii=False, sort_keys=True)
+            if mastery is None:
+                connection.execute(
+                    """
+                    INSERT INTO skill_masteries(
+                        mastery_id, player_id, operation_id, skill_key, path_key, level,
+                        max_level, snapshot_json, trained_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        uuid4().hex,
+                        row["id"],
+                        operation_id,
+                        definition.key,
+                        definition.path_key,
+                        target_level,
+                        MAX_SKILL_LEVEL,
+                        snapshot_json,
+                        now_text,
+                        now_text,
+                        now_text,
+                    ),
+                )
+            else:
+                connection.execute(
+                    """
+                    UPDATE skill_masteries
+                    SET operation_id = ?, level = ?, snapshot_json = ?, trained_at = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (operation_id, target_level, snapshot_json, now_text, now_text, mastery["id"]),
+                )
+            connection.execute(
+                "UPDATE players SET skill_insights = ?, spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (insights_after, stones_after, now_text, row["id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO skill_insight_events(
+                    event_id, player_id, operation_id, delta, balance_before,
+                    balance_after, reason, content_version, rule_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    uuid4().hex,
+                    row["id"],
+                    f"{operation_id}:skill-insight",
+                    -insight_cost,
+                    insights_before,
+                    insights_after,
+                    f"train:{definition.key}",
+                    SKILL_CONTENT_VERSION,
+                    SKILL_RULE_VERSION,
+                    now_text,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("skill training returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "skill_key": definition.key,
+                "label": definition.label,
+                "path_key": definition.path_key,
+                "level": target_level,
+                "max_level": MAX_SKILL_LEVEL,
+                "base_effect": dict(definition.effect),
+                "effective_effect": dict(effective_effect),
+                "insight_cost": insight_cost,
+                "spirit_stone_cost": stone_cost,
+                "trained_at": now_text,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._skill_mastery_from_payload(payload)
+
     async def advance_layer(
         self,
         *,
@@ -9976,6 +10315,7 @@ class SQLitePlayerRepository:
             foundation_quality=int(value("foundation_quality", 0)),
             world_merit=int(value("world_merit", 0)),
             talent_points=int(value("talent_points", 0)),
+            skill_insights=int(value("skill_insights", 0)),
             weakness_until=(
                 datetime.fromisoformat(str(value("weakness_until")))
                 if value("weakness_until")
@@ -10023,6 +10363,7 @@ class SQLitePlayerRepository:
             "foundation_quality": player.foundation_quality,
             "world_merit": player.world_merit,
             "talent_points": player.talent_points,
+            "skill_insights": player.skill_insights,
             "weakness_until": serialize_datetime(player.weakness_until) if player.weakness_until else None,
             "breakthrough_pity_bp": player.breakthrough_pity_bp,
         }

@@ -16,6 +16,7 @@ from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .advancement.use_cases import AdvancementApplication
 from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
+from .advancement.skill_use_cases import SkillApplication
 from .livelihood.use_cases import LivelihoodApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
@@ -38,6 +39,7 @@ class XiuxianApplication:
         self.advancement = AdvancementApplication(repository)
         self.constitution = ConstitutionApplication(repository)
         self.talent = TalentApplication(repository)
+        self.skill = SkillApplication(repository)
         self.livelihood = LivelihoodApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
@@ -345,6 +347,19 @@ class XiuxianApplication:
             context,
             lambda: self.talent.unlock(context),
             write_message="当前事件不允许解锁道脉。",
+        )
+
+    async def preview_skills(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.skill.preview(context), require_write=False)
+
+    async def get_skill_profile(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.skill.profile(context), require_write=False)
+
+    async def train_skill(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.skill.train(context),
+            write_message="当前事件不允许参悟神通。",
         )
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:

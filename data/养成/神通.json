@@ -1,0 +1,73 @@
+{
+  "schema": "xiuxian.content",
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "advancement-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "skill_growth",
+  "records": [
+    {
+      "key": "skill.basic_attack",
+      "name": "基础攻击",
+      "path_key": null,
+      "max_level": 3,
+      "growth": {"effect_delta_bp_per_level": 300},
+      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
+      "status": "active"
+    },
+    {
+      "key": "skill.body.heavy_strike",
+      "name": "重击",
+      "path_key": "body",
+      "max_level": 3,
+      "growth": {"effect_delta_bp_per_level": 300},
+      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
+      "status": "active"
+    },
+    {
+      "key": "skill.spell.water_bolt",
+      "name": "水箭",
+      "path_key": "spell",
+      "max_level": 3,
+      "growth": {"effect_delta_bp_per_level": 300},
+      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
+      "status": "active"
+    },
+    {
+      "key": "skill.device.scout_doll",
+      "name": "侦查机关",
+      "path_key": "device",
+      "max_level": 3,
+      "growth": {"effect_delta_bp_per_level": 300},
+      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
+      "status": "active"
+    },
+    {
+      "key": "skill.demonic.pain_exchange",
+      "name": "痛苦交换",
+      "path_key": "demonic",
+      "max_level": 3,
+      "growth": {"effect_delta_bp_per_level": 300},
+      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
+      "status": "active"
+    },
+    {
+      "key": "skill.beast.partial_transform",
+      "name": "半化形",
+      "path_key": "beast",
+      "max_level": 3,
+      "growth": {"effect_delta_bp_per_level": 300},
+      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
+      "status": "active"
+    },
+    {
+      "key": "skill.support.quick_assessment",
+      "name": "快速鉴定",
+      "path_key": "support",
+      "max_level": 3,
+      "growth": {"effect_delta_bp_per_level": 300},
+      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
+      "status": "active"
+    }
+  ]
+}
