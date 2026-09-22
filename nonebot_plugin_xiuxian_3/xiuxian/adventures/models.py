@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ...contracts import PlayerView
+from .mainline_models import (
+    MainlineClaimRecord,
+    MainlineStageView,
+    MainlineStartRecord,
+    MainlineStatusRecord,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,4 +62,8 @@ __all__ = [
     "BountyBoardRecord",
     "BountyClaimRecord",
     "BountyOfferView",
+    "MainlineClaimRecord",
+    "MainlineStageView",
+    "MainlineStartRecord",
+    "MainlineStatusRecord",
 ]

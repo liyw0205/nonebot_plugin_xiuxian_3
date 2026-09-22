@@ -51,6 +51,27 @@ from .exploration.rules import (
     settlement_result,
 )
 from .adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
+from .adventures.mainline_models import (
+    MainlineClaimRecord,
+    MainlineStageView,
+    MainlineStartRecord,
+    MainlineStatusRecord,
+)
+from .adventures.mainline import (
+    MAINLINE_CONTENT_VERSION,
+    MAINLINE_DEFINITIONS,
+    MAINLINE_LOCKED,
+    MAINLINE_REWARD_PENDING,
+    MAINLINE_RULE_VERSION,
+    MAINLINE_STAGES,
+    MAINLINE_STORY_KEY,
+    mainline_definition,
+    mainline_first_clear_key,
+    mainline_prerequisites_met,
+    mainline_reward,
+    mainline_stage_status,
+    resolve_mainline,
+)
 from .adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
 from .routine.models import (
     AchievementClaimRecord,
@@ -618,6 +639,33 @@ CREATE TABLE IF NOT EXISTS dao_contract_claims (
 CREATE INDEX IF NOT EXISTS idx_dao_contract_claims_player
     ON dao_contract_claims(player_id, business_date);
 
+CREATE TABLE IF NOT EXISTS mainline_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    story_key TEXT NOT NULL,
+    chapter INTEGER NOT NULL CHECK (chapter >= 1),
+    stage INTEGER NOT NULL CHECK (stage >= 1),
+    stage_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('locked', 'available', 'running', 'cleared', 'reward_pending', 'claimed')),
+    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    first_clear_claimed INTEGER NOT NULL DEFAULT 0 CHECK (first_clear_claimed IN (0, 1)),
+    first_clear_key TEXT NOT NULL UNIQUE,
+    start_operation_id TEXT,
+    claim_operation_id TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, story_key, stage_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mainline_runs_player
+    ON mainline_runs(player_id, story_key, chapter, stage);
+CREATE INDEX IF NOT EXISTS idx_mainline_runs_status
+    ON mainline_runs(player_id, status);
+
 """
 
 
@@ -847,6 +895,22 @@ class BountyExpiredError(RuntimeError):
 
 class BountyAlreadyClaimedError(RuntimeError):
     """The current bounty reward has already been claimed."""
+
+
+class MainlineContentClosedError(RuntimeError):
+    """The requested mainline stage is documented but not open yet."""
+
+
+class MainlineRequirementError(RuntimeError):
+    """The player does not satisfy a mainline stage prerequisite."""
+
+
+class MainlineNotStartedError(RuntimeError):
+    """The requested mainline stage has no running attempt."""
+
+
+class MainlineAlreadyRunningError(RuntimeError):
+    """The requested mainline stage already has a running attempt."""
 
 
 class CheckinAlreadyClaimedError(RuntimeError):
@@ -2951,6 +3015,560 @@ class SQLitePlayerRepository:
             progress=int(payload.get("progress", 0)),
             target=int(payload["target"]),
             rewards={str(key): int(value) for key, value in dict(payload.get("rewards", {})).items()},
+            already_completed=replay,
+        )
+
+    async def get_mainline_status(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> MainlineStatusRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_mainline_status_sync,
+                platform,
+                platform_user_id,
+            )
+
+    def _get_mainline_status_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+    ) -> MainlineStatusRecord:
+        with self._connect() as connection:
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            return self._mainline_status_from_connection(connection, row)
+
+    @staticmethod
+    def _mainline_status_from_connection(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        *,
+        replay: bool = False,
+    ) -> MainlineStatusRecord:
+        runs = {
+            str(item["stage_key"]): item
+            for item in connection.execute(
+                "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ?",
+                (player["id"], MAINLINE_STORY_KEY),
+            ).fetchall()
+        }
+        completed_stages = {
+            str(item["stage_key"])
+            for item in runs.values()
+            if bool(item["first_clear_claimed"])
+        }
+        intro_state = SQLitePlayerRepository._json_object(player["intro_json"], {})
+        flags = {str(item) for item in intro_state.get("flags", [])}
+        completed_events = {"player.start_seeking"} if str(player["stage"]) != STAGE_NEW_USER else set()
+        views: list[MainlineStageView] = []
+        for definition in MAINLINE_STAGES:
+            run = runs.get(definition.key)
+            prerequisites_met = mainline_prerequisites_met(
+                definition,
+                completed_stages=completed_stages,
+                completed_events=completed_events,
+                flags=flags,
+                realm_key=str(player["realm_key"]),
+                realm_layer=int(player["realm_layer"]),
+            )
+            run_status = str(run["status"]) if run is not None else ""
+            status = mainline_stage_status(
+                definition,
+                prerequisites_met=prerequisites_met,
+                running=run_status == "running",
+                cleared=run_status == "cleared",
+                reward_pending=run_status == MAINLINE_REWARD_PENDING,
+                claimed=run_status == "claimed",
+            )
+            views.append(
+                MainlineStageView(
+                    key=definition.key,
+                    story_key=definition.story_key,
+                    chapter=definition.chapter,
+                    stage=definition.stage,
+                    label=definition.label,
+                    description=definition.description,
+                    status=status,
+                    first_clear_reward=definition.first_clear_reward_map(),
+                    repeat_reward=definition.repeat_reward_map(),
+                    completed=bool(run and run["status"] in {"cleared", "reward_pending", "claimed"}),
+                    claimed=bool(run and run["status"] == "claimed"),
+                )
+            )
+        current = next((item for item in views if not item.claimed), views[-1])
+        overall = current.status
+        if any(item.status == "running" for item in views):
+            overall = "running"
+        elif any(item.status == MAINLINE_REWARD_PENDING for item in views):
+            overall = MAINLINE_REWARD_PENDING
+        return MainlineStatusRecord(
+            player=SQLitePlayerRepository._row_to_player(player),
+            story_key=MAINLINE_STORY_KEY,
+            chapter=current.chapter,
+            current_stage=current.stage,
+            status=overall,
+            stages=tuple(views),
+            content_version=MAINLINE_CONTENT_VERSION,
+            rule_version=MAINLINE_RULE_VERSION,
+            already_completed=replay,
+        )
+
+    async def start_mainline(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        stage_key: str,
+        operation_id: str,
+    ) -> MainlineStartRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._start_mainline_sync,
+                platform,
+                platform_user_id,
+                stage_key,
+                operation_id,
+            )
+
+    def _start_mainline_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        stage_key: str,
+        operation_id: str,
+    ) -> MainlineStartRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._start_mainline_once(
+                    platform,
+                    platform_user_id,
+                    stage_key,
+                    operation_id,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _start_mainline_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        stage_key: str,
+        operation_id: str,
+    ) -> MainlineStartRecord:
+        definition = mainline_definition(stage_key)
+        operation_name = "mainline.start_stage"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "stage_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._mainline_start_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+            if definition.runtime_status != "open":
+                raise MainlineContentClosedError("mainline stage is not open")
+            row = self._require_player(connection, platform, platform_user_id)
+            status_record = self._mainline_status_from_connection(connection, row)
+            stage_view = next(item for item in status_record.stages if item.key == definition.key)
+            if not mainline_prerequisites_met(
+                definition,
+                completed_stages={
+                    item.key for item in status_record.stages if item.completed
+                },
+                completed_events=(
+                    {"player.start_seeking"}
+                    if str(row["stage"]) != STAGE_NEW_USER
+                    else set()
+                ),
+                flags=SQLitePlayerRepository._json_object(row["intro_json"], {}).get("flags", []),
+                realm_key=str(row["realm_key"]),
+                realm_layer=int(row["realm_layer"]),
+            ):
+                raise MainlineRequirementError("mainline prerequisites are not met")
+            run = connection.execute(
+                "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ? AND stage_key = ?",
+                (row["id"], MAINLINE_STORY_KEY, definition.key),
+            ).fetchone()
+            if run is not None and str(run["status"]) == "running":
+                raise MainlineAlreadyRunningError("mainline stage is already running")
+            first_key = (
+                str(run["first_clear_key"])
+                if run is not None
+                else mainline_first_clear_key(definition.chapter, definition.stage, str(row["player_id"]))
+            )
+            snapshot = {
+                "stage": str(row["stage"]),
+                "realm_key": str(row["realm_key"]),
+                "realm_layer": int(row["realm_layer"]),
+                "location_key": str(row["location_key"]),
+                "intro_flags": list(SQLitePlayerRepository._json_object(row["intro_json"], {}).get("flags", [])),
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            }
+            if run is None:
+                connection.execute(
+                    """
+                    INSERT INTO mainline_runs(
+                        player_id, story_key, chapter, stage, stage_key, status,
+                        attempt_count, first_clear_claimed, first_clear_key,
+                        start_operation_id, snapshot_json, content_version, rule_version,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, 'running', 1, 0, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        row["id"], MAINLINE_STORY_KEY, definition.chapter, definition.stage,
+                        definition.key, first_key, operation_id,
+                        json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                        definition.content_version, definition.rule_version, now_text, now_text,
+                    ),
+                )
+                first_clear = True
+            else:
+                connection.execute(
+                    """
+                    UPDATE mainline_runs
+                    SET status = 'running', attempt_count = attempt_count + 1,
+                        start_operation_id = ?, claim_operation_id = NULL,
+                        snapshot_json = ?, result_json = '{}', updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        operation_id,
+                        json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                        run["id"],
+                    ),
+                )
+                first_clear = not bool(run["first_clear_claimed"])
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("mainline start returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "story_key": MAINLINE_STORY_KEY,
+                "chapter": definition.chapter,
+                "stage": definition.stage,
+                "stage_key": definition.key,
+                "status": "running",
+                "first_clear": first_clear,
+                "label": definition.label,
+                "description": definition.description,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._mainline_start_from_payload(payload)
+
+    async def claim_mainline(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        stage_key: str,
+        operation_id: str,
+    ) -> MainlineClaimRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_mainline_sync,
+                platform,
+                platform_user_id,
+                stage_key,
+                operation_id,
+            )
+
+    def _claim_mainline_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        stage_key: str,
+        operation_id: str,
+    ) -> MainlineClaimRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._claim_mainline_once(
+                    platform,
+                    platform_user_id,
+                    stage_key,
+                    operation_id,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _claim_mainline_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        stage_key: str,
+        operation_id: str,
+    ) -> MainlineClaimRecord:
+        definition = mainline_definition(stage_key)
+        operation_name = "mainline.claim_first_clear"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "stage_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._mainline_claim_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+            if definition.runtime_status != "open":
+                raise MainlineContentClosedError("mainline stage is not open")
+            row = self._require_player(connection, platform, platform_user_id)
+            run = connection.execute(
+                "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ? AND stage_key = ?",
+                (row["id"], MAINLINE_STORY_KEY, definition.key),
+            ).fetchone()
+            if run is None or str(run["status"]) != "running":
+                raise MainlineNotStartedError("mainline stage has not been started")
+            first_clear = not bool(run["first_clear_claimed"])
+            reward = mainline_reward(definition, first_clear=first_clear)
+            connection.execute(
+                "UPDATE mainline_runs SET status = ?, updated_at = ? WHERE id = ?",
+                (MAINLINE_REWARD_PENDING, now_text, run["id"]),
+            )
+            actual_reward = self._apply_mainline_reward(
+                connection,
+                row,
+                reward,
+                operation_id,
+                now_text,
+                definition,
+            )
+            result = {
+                "status": "claimed",
+                "reward": actual_reward,
+                "first_clear": first_clear,
+                "stage_key": definition.key,
+            }
+            connection.execute(
+                """
+                UPDATE mainline_runs
+                SET status = 'claimed', first_clear_claimed = CASE WHEN ? THEN 1 ELSE first_clear_claimed END,
+                    claim_operation_id = ?, result_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    1 if first_clear else 0,
+                    operation_id,
+                    json.dumps(result, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    run["id"],
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("mainline claim returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "story_key": MAINLINE_STORY_KEY,
+                "chapter": definition.chapter,
+                "stage": definition.stage,
+                "stage_key": definition.key,
+                "status": "claimed",
+                "reward": actual_reward,
+                "first_clear": first_clear,
+                "label": definition.label,
+                "source_operation_id": operation_id,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._mainline_claim_from_payload(payload)
+
+    @staticmethod
+    def _apply_mainline_reward(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        reward: dict[str, int | str],
+        operation_id: str,
+        now_text: str,
+        definition: Any,
+    ) -> dict[str, int | str]:
+        inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
+        stones = int(player["spirit_stones"])
+        local_delta = 0
+        service_delta = 0
+        actual: dict[str, int | str] = {}
+        event_keys: list[str] = [
+            f"{definition.story_key}:chapter.{definition.chapter}.stage.{definition.stage}"
+        ]
+        for key, raw_value in reward.items():
+            key = str(key)
+            if key == "spirit_stones":
+                quantity = int(raw_value)
+                stones += quantity
+                actual[key] = quantity
+            elif key == "local_reputation":
+                local_delta += int(raw_value)
+                actual[key] = int(raw_value)
+            elif key == "service_reputation":
+                service_delta += int(raw_value)
+                actual[key] = int(raw_value)
+            elif key == "title_key":
+                title_key = str(raw_value)
+                title = honor_title(title_key)
+                if title.closed:
+                    raise MainlineContentClosedError("mainline title is not open")
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO honor_titles(
+                        player_id, title_key, source_operation_id, acquired_at,
+                        content_version, rule_version
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        player["id"], title_key, operation_id, now_text,
+                        MAINLINE_CONTENT_VERSION, MAINLINE_RULE_VERSION,
+                    ),
+                )
+                actual[key] = title_key
+            elif key.startswith("item."):
+                quantity = int(raw_value)
+                inventory[key] = int(inventory.get(key, 0)) + quantity
+                actual[key] = quantity
+            elif key.startswith("access.") or key.startswith("codex."):
+                quantity = int(raw_value)
+                actual[key] = quantity
+                event_keys.append(key)
+            else:
+                raise ValueError(f"unsupported mainline reward: {key}")
+        if local_delta or service_delta:
+            reputation = connection.execute(
+                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                (player["id"],),
+            ).fetchone()
+            local = SQLitePlayerRepository._json_object(reputation["local_json"], {}) if reputation else {}
+            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_delta
+            service = int(reputation["service_reputation"]) if reputation else 0
+            service = min(100, service + service_delta)
+            connection.execute(
+                """
+                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
+                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
+                """,
+                (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
+            )
+        connection.execute(
+            "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+            (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+        )
+        for event_key in event_keys:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO activity_events(
+                    player_id, event_key, source_operation_id, occurred_at, payload_json
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    player["id"], event_key, operation_id, now_text,
+                    json.dumps({"stage_key": definition.key}, ensure_ascii=False, sort_keys=True),
+                ),
+            )
+        return actual
+
+    @staticmethod
+    def _mainline_start_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> MainlineStartRecord:
+        return MainlineStartRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            story_key=str(payload["story_key"]),
+            chapter=int(payload["chapter"]),
+            stage=int(payload["stage"]),
+            stage_key=str(payload["stage_key"]),
+            status=str(payload["status"]),
+            first_clear=bool(payload.get("first_clear", True)),
+            label=str(payload.get("label", "")),
+            description=str(payload.get("description", "")),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _mainline_claim_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> MainlineClaimRecord:
+        return MainlineClaimRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            story_key=str(payload["story_key"]),
+            chapter=int(payload["chapter"]),
+            stage=int(payload["stage"]),
+            stage_key=str(payload["stage_key"]),
+            status=str(payload["status"]),
+            reward=dict(payload.get("reward", {})),
+            first_clear=bool(payload.get("first_clear", True)),
+            label=str(payload.get("label", "")),
+            source_operation_id=payload.get("source_operation_id"),
             already_completed=replay,
         )
 

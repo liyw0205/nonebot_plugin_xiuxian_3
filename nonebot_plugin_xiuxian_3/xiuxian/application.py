@@ -12,6 +12,7 @@ from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
 from .adventures.use_cases import AdventuresApplication
+from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -29,6 +30,7 @@ class XiuxianApplication:
         self.world = WorldApplication(repository)
         self.exploration = ExplorationApplication(repository)
         self.adventures = AdventuresApplication(repository)
+        self.mainline = AdventuresMainlineApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -247,6 +249,27 @@ class XiuxianApplication:
             context,
             lambda: self.adventures.claim_bounty(context),
             write_message="当前事件不允许领取悬赏。",
+        )
+
+    async def get_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.mainline.start_stage(context),
+            write_message="当前事件不允许开始主线。",
+        )
+
+    async def claim_mainline_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.mainline.claim_reward(context),
+            write_message="当前事件不允许领取主线奖励。",
         )
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:

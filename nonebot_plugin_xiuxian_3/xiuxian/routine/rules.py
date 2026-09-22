@@ -156,6 +156,11 @@ class DaoContractDefinition:
 HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
     HonorTitleDefinition("title.first_seeking", "初入道途", "player.start_seeking"),
     HonorTitleDefinition("title.town_helper", "城镇助行者", "routine.checkin.daily:3"),
+    HonorTitleDefinition(
+        "title.mist_watcher",
+        "雾中守门人",
+        "story.mainline.xuantian:chapter.1.stage.3",
+    ),
     HonorTitleDefinition("title.dispatch_helper", "派遣行者", "specials.dispatch.settled", closed=True),
     HonorTitleDefinition("title.first_tower_clear", "试炼先行", "specials.tower.floor.10", closed=True),
 )
