@@ -13,7 +13,8 @@
 
 ## 2. 体质根性与道脉天书
 
-- `constitution.profile`：入道时六选一：`constitution.iron_bone`（气血上限 +3%）、`constitution.spirit_root`（灵力上限 +3%）、`constitution.wind_step`（先手 +3%）、`constitution.craft_hand`（生产质量 +3%）、`constitution.beast_affinity`（灵兽亲和 +5）、`constitution.fortune_seed`（非保底掉落权重 +3%）。只选一个，保存快照。
+- `constitution.profile`：入道后六选一：`constitution.iron_bone`（气血上限 +3%）、`constitution.spirit_root`（灵力上限 +3%）、`constitution.wind_step`（先手 +3%）、`constitution.craft_hand`（生产质量 +3%）、`constitution.beast_affinity`（灵兽亲和 +5）、`constitution.fortune_seed`（非保底掉落权重 +3%）。只选一个，保存快照。
+- 运行时命令为 `体质预览`、`选择体质 <体质>`、`我的体质`、`重塑体质 <体质>`。首次选择要求已入道且没有其他长时会话；每名角色只有一个主质。重塑令为 `item.token.constitution_reset`，首版不掉落，仅用于管理员测试，重塑后冷却 30 天并保存新的资格/道途/境界快照。
 - `talent.tree.body`、`spell`、`device`、`demonic`、`beast`、`support`：每树 5 节点，首节点免费，后续消耗 `resource.talent_point` 1/2/3/5；每层最多解锁 1 个，节点效果为 +1%–+3% 对应动作效率或一次性质量上限，不直接加突破率。
 - 首次重塑体质要求 `item.token.constitution_reset`（首版不掉落，仅管理员测试），冷却 30 日，重塑会重新锁定构筑快照，不返还已用天赋点。
 

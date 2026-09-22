@@ -42,6 +42,7 @@ from .progression.breakthrough.models import (
     WeaknessRecoveryRecord,
 )
 from .advancement.models import RetreatSessionRecord, RetreatSettlementRecord
+from .advancement.constitution_models import ConstitutionRecord
 from .advancement.rules import (
     MAX_OFFLINE_SECONDS,
     MAX_SETTLEMENT_SECONDS,
@@ -49,6 +50,11 @@ from .advancement.rules import (
     RETREAT_RESTFUL,
     retreat_definition,
     retreat_reward,
+)
+from .advancement.constitution_rules import (
+    CONSTITUTION_RESET_ITEM,
+    RESHAPE_COOLDOWN_SECONDS,
+    constitution_definition,
 )
 from .livelihood.models import ResidenceRecord
 from .livelihood.rules import residence_definition
@@ -270,6 +276,24 @@ CREATE TABLE IF NOT EXISTS residences (
 
 CREATE INDEX IF NOT EXISTS idx_residences_player ON residences(player_id, ends_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_residences_active ON residences(player_id) WHERE status = 'active';
+
+CREATE TABLE IF NOT EXISTS constitution_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL UNIQUE REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    constitution_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('selected')),
+    selected_at TEXT NOT NULL,
+    last_reshaped_at TEXT,
+    reshape_count INTEGER NOT NULL DEFAULT 0 CHECK (reshape_count >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_constitution_profiles_player
+    ON constitution_profiles(player_id, updated_at);
 
 CREATE TABLE IF NOT EXISTS production_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -882,6 +906,26 @@ class ResidenceNotFoundError(RuntimeError):
 
 class ResidenceRequiredError(RuntimeError):
     """The requested action requires an active residence."""
+
+
+class ConstitutionAlreadySelectedError(RuntimeError):
+    """The player already has a main constitution."""
+
+
+class ConstitutionSameError(RuntimeError):
+    """The requested reshape target is already active."""
+
+
+class ConstitutionNotFoundError(RuntimeError):
+    """The player has not selected a constitution."""
+
+
+class ConstitutionCooldownError(RuntimeError):
+    """The constitution reshape cooldown is still active."""
+
+
+class ConstitutionBusyError(RuntimeError):
+    """A long-running action prevents constitution mutation."""
 
 
 class RealmCultivationInsufficientError(RuntimeError):
@@ -4976,6 +5020,371 @@ class SQLitePlayerRepository:
                 ends_at=str(residence["ends_at"]),
                 rent_cost=int(residence["rent_cost"]),
             )
+
+    @staticmethod
+    def _constitution_from_payload(payload: dict[str, Any], *, replay: bool = False) -> ConstitutionRecord:
+        return ConstitutionRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            constitution_key=str(payload["constitution_key"]),
+            label=str(payload["label"]),
+            description=str(payload["description"]),
+            effect={str(key): value for key, value in dict(payload.get("effect", {})).items()},
+            status=str(payload.get("status", "selected")),
+            selected_at=str(payload.get("selected_at", "")),
+            last_reshaped_at=payload.get("last_reshaped_at"),
+            reshape_count=int(payload.get("reshape_count", 0)),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _constitution_from_row(
+        player_row: sqlite3.Row,
+        profile_row: sqlite3.Row,
+        *,
+        replay: bool = False,
+    ) -> ConstitutionRecord:
+        definition = constitution_definition(str(profile_row["constitution_key"]))
+        return ConstitutionRecord(
+            player=SQLitePlayerRepository._row_to_player(player_row),
+            constitution_key=definition.key,
+            label=definition.label,
+            description=definition.description,
+            effect=dict(definition.effect),
+            status=str(profile_row["status"]),
+            selected_at=str(profile_row["selected_at"]),
+            last_reshaped_at=(
+                str(profile_row["last_reshaped_at"])
+                if profile_row["last_reshaped_at"]
+                else None
+            ),
+            reshape_count=int(profile_row["reshape_count"]),
+            already_completed=replay,
+        )
+
+    async def select_constitution(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        constitution_key: str,
+        operation_id: str,
+    ) -> ConstitutionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._select_constitution_sync,
+                platform,
+                platform_user_id,
+                constitution_key,
+                operation_id,
+            )
+
+    def _select_constitution_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        constitution_key: str,
+        operation_id: str,
+    ) -> ConstitutionRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._select_constitution_once(
+                    platform,
+                    platform_user_id,
+                    constitution_key,
+                    operation_id,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _select_constitution_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        constitution_key: str,
+        operation_id: str,
+    ) -> ConstitutionRecord:
+        try:
+            definition = constitution_definition(constitution_key)
+        except ValueError as exc:
+            raise ValueError("unsupported constitution") from exc
+        operation_name = "constitution.select"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "constitution_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._constitution_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = self._require_player(connection, platform, platform_user_id)
+            if str(row["stage"]) != "cultivator" or not row["path_key"]:
+                raise PlayerStageConflictError("constitution requires entry into cultivation")
+            if self._has_active_long_action(connection, int(row["id"])):
+                raise ConstitutionBusyError("another long action is active")
+            profile = connection.execute(
+                "SELECT 1 FROM constitution_profiles WHERE player_id = ? LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if profile is not None:
+                raise ConstitutionAlreadySelectedError("constitution is already selected")
+
+            snapshot = {
+                "constitution_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+                "effect": dict(definition.effect),
+                "qualification": self._json_object(row["qualification_json"], {}),
+                "path_key": row["path_key"],
+                "subprofession_key": row["subprofession_key"],
+                "realm_key": row["realm_key"],
+                "realm_layer": int(row["realm_layer"]),
+                "location_key": row["location_key"],
+            }
+            profile_id = uuid4().hex
+            connection.execute(
+                """
+                INSERT INTO constitution_profiles(
+                    profile_id, player_id, operation_id, constitution_key, status,
+                    selected_at, last_reshaped_at, reshape_count, snapshot_json,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'selected', ?, NULL, 0, ?, ?, ?)
+                """,
+                (
+                    profile_id,
+                    row["id"],
+                    operation_id,
+                    definition.key,
+                    now_text,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    now_text,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("constitution selection returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "constitution_key": definition.key,
+                "label": definition.label,
+                "description": definition.description,
+                "effect": dict(definition.effect),
+                "status": "selected",
+                "selected_at": now_text,
+                "last_reshaped_at": None,
+                "reshape_count": 0,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._constitution_from_payload(payload)
+
+    async def get_constitution(self, *, platform: str, platform_user_id: str) -> ConstitutionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._get_constitution_sync, platform, platform_user_id)
+
+    def _get_constitution_sync(self, platform: str, platform_user_id: str) -> ConstitutionRecord:
+        with self._connect() as connection:
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            profile = connection.execute(
+                "SELECT * FROM constitution_profiles WHERE player_id = ? LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if profile is None:
+                raise ConstitutionNotFoundError("constitution is not selected")
+            return self._constitution_from_row(row, profile)
+
+    async def reshape_constitution(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        constitution_key: str,
+        operation_id: str,
+    ) -> ConstitutionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._reshape_constitution_sync,
+                platform,
+                platform_user_id,
+                constitution_key,
+                operation_id,
+            )
+
+    def _reshape_constitution_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        constitution_key: str,
+        operation_id: str,
+    ) -> ConstitutionRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._reshape_constitution_once(
+                    platform,
+                    platform_user_id,
+                    constitution_key,
+                    operation_id,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _reshape_constitution_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        constitution_key: str,
+        operation_id: str,
+    ) -> ConstitutionRecord:
+        try:
+            definition = constitution_definition(constitution_key)
+        except ValueError as exc:
+            raise ValueError("unsupported constitution") from exc
+        operation_name = "constitution.reshape"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "constitution_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            },
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._constitution_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = self._require_player(connection, platform, platform_user_id)
+            if str(row["stage"]) != "cultivator" or not row["path_key"]:
+                raise PlayerStageConflictError("constitution requires entry into cultivation")
+            if self._has_active_long_action(connection, int(row["id"])):
+                raise ConstitutionBusyError("another long action is active")
+            profile = connection.execute(
+                "SELECT * FROM constitution_profiles WHERE player_id = ? LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if profile is None:
+                raise ConstitutionNotFoundError("constitution is not selected")
+            if str(profile["constitution_key"]) == definition.key:
+                raise ConstitutionSameError("constitution target is already active")
+            if profile["last_reshaped_at"]:
+                last_reshaped_at = datetime.fromisoformat(str(profile["last_reshaped_at"]))
+                if now < last_reshaped_at + timedelta(seconds=RESHAPE_COOLDOWN_SECONDS):
+                    raise ConstitutionCooldownError("constitution reshape cooldown is active")
+            inventory = self._json_object(row["inventory_json"], {})
+            if int(inventory.get(CONSTITUTION_RESET_ITEM, 0)) < 1:
+                raise ResourceInsufficientError("constitution reset token is missing")
+            inventory[CONSTITUTION_RESET_ITEM] = int(inventory[CONSTITUTION_RESET_ITEM]) - 1
+            if inventory[CONSTITUTION_RESET_ITEM] <= 0:
+                inventory.pop(CONSTITUTION_RESET_ITEM, None)
+            snapshot = {
+                "constitution_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+                "effect": dict(definition.effect),
+                "qualification": self._json_object(row["qualification_json"], {}),
+                "path_key": row["path_key"],
+                "subprofession_key": row["subprofession_key"],
+                "realm_key": row["realm_key"],
+                "realm_layer": int(row["realm_layer"]),
+                "location_key": row["location_key"],
+            }
+            reshape_count = int(profile["reshape_count"]) + 1
+            connection.execute(
+                """
+                UPDATE constitution_profiles
+                SET constitution_key = ?, last_reshaped_at = ?, reshape_count = ?,
+                    snapshot_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    definition.key,
+                    now_text,
+                    reshape_count,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    profile["id"],
+                ),
+            )
+            connection.execute(
+                "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("constitution reshape returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "constitution_key": definition.key,
+                "label": definition.label,
+                "description": definition.description,
+                "effect": dict(definition.effect),
+                "status": "selected",
+                "selected_at": str(profile["selected_at"]),
+                "last_reshaped_at": now_text,
+                "reshape_count": reshape_count,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._constitution_from_payload(payload)
 
     async def advance_layer(
         self,

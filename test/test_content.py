@@ -15,6 +15,9 @@ def test_runtime_content_uses_normalized_records() -> None:
     assert sword["status"] == "active"
     assert bundle.require("realm", "foundation")["name"] == "筑基"
     assert bundle.get("item", "item.pill.foundation_guard", include_locked=False)
+    constitution = bundle.require("constitution", "constitution.iron_bone")
+    assert constitution["effect"] == {"type": "max_hp_bp", "value": 300}
+    assert len(bundle.list("constitution", include_locked=False)) == 6
 
 
 def test_runtime_content_is_optional_for_isolated_data_dirs(tmp_path: Path) -> None:

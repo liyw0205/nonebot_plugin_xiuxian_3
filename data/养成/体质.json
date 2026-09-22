@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "content_version": "content-0.1",
+  "rule_version": "advancement-0.1.0",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "kind": "constitution",
+  "records": [
+    {
+      "name": "铁骨",
+      "status": "active",
+      "description": "淬炼体魄，提升气血上限。",
+      "effect": {"type": "max_hp_bp", "value": 300},
+      "selection": "single_main_constitution",
+      "key": "constitution.iron_bone"
+    },
+    {
+      "name": "灵根",
+      "status": "active",
+      "description": "灵力易感，提升灵力上限。",
+      "effect": {"type": "max_mana_bp", "value": 300},
+      "selection": "single_main_constitution",
+      "key": "constitution.spirit_root"
+    },
+    {
+      "name": "风行",
+      "status": "active",
+      "description": "身法轻灵，提升先手。",
+      "effect": {"type": "initiative_bp", "value": 300},
+      "selection": "single_main_constitution",
+      "key": "constitution.wind_step"
+    },
+    {
+      "name": "巧手",
+      "status": "active",
+      "description": "熟于火候，提升生产质量。",
+      "effect": {"type": "production_quality_bp", "value": 300},
+      "selection": "single_main_constitution",
+      "key": "constitution.craft_hand"
+    },
+    {
+      "name": "御兽",
+      "status": "active",
+      "description": "亲近灵兽，提升灵兽亲和。",
+      "effect": {"type": "beast_affinity", "value": 5},
+      "selection": "single_main_constitution",
+      "key": "constitution.beast_affinity"
+    },
+    {
+      "name": "福缘",
+      "status": "active",
+      "description": "机缘相随，提升非保底掉落权重。",
+      "effect": {"type": "drop_weight_bp", "value": 300},
+      "selection": "single_main_constitution",
+      "key": "constitution.fortune_seed"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

@@ -14,6 +14,7 @@ from .exploration.use_cases import ExplorationApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .advancement.use_cases import AdvancementApplication
+from .advancement.constitution_use_cases import ConstitutionApplication
 from .livelihood.use_cases import LivelihoodApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
@@ -34,6 +35,7 @@ class XiuxianApplication:
         self.adventures = AdventuresApplication(repository)
         self.mainline = AdventuresMainlineApplication(repository)
         self.advancement = AdvancementApplication(repository)
+        self.constitution = ConstitutionApplication(repository)
         self.livelihood = LivelihoodApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
@@ -309,6 +311,26 @@ class XiuxianApplication:
 
     async def get_residence(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.livelihood.get_profile(context), require_write=False)
+
+    async def preview_constitution(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.constitution.preview(context), require_write=False)
+
+    async def select_constitution(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.constitution.select(context),
+            write_message="当前事件不允许选择体质。",
+        )
+
+    async def get_constitution(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.constitution.profile(context), require_write=False)
+
+    async def reshape_constitution(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.constitution.reshape(context),
+            write_message="当前事件不允许重塑体质。",
+        )
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
