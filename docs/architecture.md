@@ -42,12 +42,13 @@ nonebot_plugin_xiuxian_3/
 目录名不是强制 API；依赖检查和 import 边界才是强制约束。功能包不能通过
 模块 import 副作用注册命令或任务，必须把声明返回给组合根统一激活。
 
-当前 SQLite 实现采用渐进式拆分：`xiuxian/repository.py` 是稳定兼容门面，
-`xiuxian/persistence/sqlite_repository.py` 负责连接、迁移、通用玩家映射和
-尚未迁移的历史事务；领域事务通过 mixin 放在各域目录，例如
-`progression/repository.py` 的资源恢复、`progression/endgame_repository.py` 的合道/渡劫试炼，
-以及 `world/repository.py` 的虚空航道。
-新领域写入口应优先落在对应域的 repository 模块，不再直接扩大兼容门面。
+当前 SQLite 实现采用组合式拆分：`xiuxian/repository.py` 是稳定兼容门面，
+`xiuxian/persistence/sqlite_repository.py` 只负责连接、迁移、身份查找和组合
+仓储 mixin。玩家引导、普通移动、虚空航道、修炼/突破、闭关/构筑、生产、探索、
+悬赏/主线、日常和终局事务分别位于各域的 `repository.py`（或对应的细分
+`*_repository.py`），并由 `SQLitePlayerRepository` 组合提供原有 API。
+公共异常集中在 `persistence/errors.py`，DDL 集中在 `persistence/schema.py`。
+新领域写入口必须落在对应域的 repository 模块，不再扩大 SQLite 组合根或兼容门面。
 
 ## 3. Feature manifest
 

@@ -2,7 +2,7 @@
 
 Application services keep importing this stable path. The implementation is
 under :mod:`xiuxian.persistence`, while domain-specific transactions are
-provided by the progression and world repository mixins.
+provided by repository mixins in their owning feature packages.
 """
 
 from .persistence.sqlite_repository import *  # noqa: F401,F403

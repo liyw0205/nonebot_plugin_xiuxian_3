@@ -11,10 +11,10 @@ from ..repository import (
     PlayerNotFoundError,
     PlayerSuspendedError,
     RepositoryBusyError,
-    FateRollRecord,
     SQLitePlayerRepository,
 )
 from .gacha import FATE_PITY_LIMIT, FATE_POOL_KEY
+from .models import FateRollRecord
 
 
 class GachaApplication:

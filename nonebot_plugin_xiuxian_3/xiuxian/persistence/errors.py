@@ -1,0 +1,640 @@
+"""Persistence-facing errors grouped in one stable module.
+
+Application layers may translate these errors into adapter responses without
+depending on the SQLite implementation module.
+"""
+
+class RepositoryBusyError(RuntimeError):
+    """The database did not become available before the retry budget ended."""
+
+
+class OperationConflictError(RuntimeError):
+    """An operation ID was reused with a different actor or input."""
+
+
+class PlayerNotFoundError(RuntimeError):
+    """The requested platform identity has no player record."""
+
+
+class PlayerSuspendedError(RuntimeError):
+    """A suspended or deleted player cannot perform a write operation."""
+
+
+class DaoNameTakenError(RuntimeError):
+    """The requested dao name is already used by another player."""
+
+
+class RenameCardRequiredError(RuntimeError):
+    """A named player needs a rename card before changing dao name again."""
+
+
+class PlayerStageConflictError(RuntimeError):
+    """The player is not in the stage required by an onboarding action."""
+
+
+class LocationRequiredError(RuntimeError):
+    """The player must be at a specific location before an action can run."""
+
+
+class LocationRequirementError(RuntimeError):
+    """The player does not satisfy a destination's realm or quest gate."""
+
+
+class VoidQuestMissingError(RuntimeError):
+    """The player has not earned the void refining permit."""
+
+
+class VoidLocationRequiredError(RuntimeError):
+    """Void refining must be prepared at an approved void location."""
+
+
+class VoidResourceInsufficientError(RuntimeError):
+    """The player lacks a void-specific resource for the operation."""
+
+
+class VoidInstabilityActiveError(RuntimeError):
+    """A failed void operation is still imposing instability."""
+
+
+class VoidRouteLockedError(RuntimeError):
+    """The requested route is not available in the current content."""
+
+
+class VoidTravelBusyError(RuntimeError):
+    """Another movement or void session is active."""
+
+
+class VoidAnchorInsufficientError(RuntimeError):
+    """The player lacks enough anchors for a route."""
+
+
+class VoidRouteNotFoundError(RuntimeError):
+    """The player has no route session to settle."""
+
+
+class VoidRouteNotReadyError(RuntimeError):
+    """The route has not reached its arrival time."""
+
+
+class ResourceInsufficientError(RuntimeError):
+    """A player does not have enough of a spendable resource."""
+
+
+class EnergyInsufficientError(RuntimeError):
+    """A player does not have enough energy for production."""
+
+
+class MaterialInsufficientError(RuntimeError):
+    """A player does not have enough recipe inputs."""
+
+
+class ToolMissingError(RuntimeError):
+    """The recipe's required production tool is not owned."""
+
+
+class ToolDurabilityInsufficientError(RuntimeError):
+    """The recipe's required tool cannot pay its durability cost."""
+
+
+class RecipeRequirementError(RuntimeError):
+    """The player does not satisfy a recipe's profession, realm or location gate."""
+
+
+class ProductionBusyError(RuntimeError):
+    """The player already has a processing production order."""
+
+
+class ProductionDailyLimitError(RuntimeError):
+    """The recipe reached its business-day cap."""
+
+
+class ProductionNotFoundError(RuntimeError):
+    """The player has no production order to settle."""
+
+
+class ProductionNotReadyError(RuntimeError):
+    """A production order has not reached its completion time."""
+
+
+class ProductionExpiredError(RuntimeError):
+    """A production order missed its normal completion window."""
+
+
+class PathAlreadySelectedError(RuntimeError):
+    """The player already has a first path and cannot select another one."""
+
+
+class SubprofessionRequiredError(RuntimeError):
+    """The support path requires a sub-profession choice."""
+
+
+class CultivationBusyError(RuntimeError):
+    """The player already has a running cultivation session."""
+
+
+class CultivationRecoveryRequiredError(RuntimeError):
+    """An expired session must be recovered before another one can start."""
+
+
+class CultivationDailyLimitError(RuntimeError):
+    """The selected cultivation mode reached its business-day quota."""
+
+
+class CultivationNotFoundError(RuntimeError):
+    """The player has no running cultivation session."""
+
+
+class CultivationNotReadyError(RuntimeError):
+    """A cultivation session has not reached its end time."""
+
+
+class CultivationAlreadyReadyError(RuntimeError):
+    """A cultivation session reached its end and must be settled, not cancelled."""
+
+
+class CultivationExpiredError(RuntimeError):
+    """A session missed its normal settlement window and needs recovery."""
+
+
+class CultivationAlreadyRecoveredError(RuntimeError):
+    """An expired session already received its one allowed recovery result."""
+
+
+class RetreatContentClosedError(RuntimeError):
+    """The requested retreat mode is registered but not open."""
+
+
+class RetreatBusyError(RuntimeError):
+    """The player already has a long-running action or retreat."""
+
+
+class RetreatDailyLimitError(RuntimeError):
+    """The player reached the retreat mode's business-day quota."""
+
+
+class RetreatNotFoundError(RuntimeError):
+    """The player has no active retreat to settle."""
+
+
+class RetreatNotReadyError(RuntimeError):
+    """The retreat has not reached its end time."""
+
+
+class RetreatExpiredError(RuntimeError):
+    """The retreat is outside its normal settlement window."""
+
+
+class RetreatAlreadySettledError(RuntimeError):
+    """The active retreat already has a settled result."""
+
+
+class ResidenceContentClosedError(RuntimeError):
+    """The requested residence is registered but not open."""
+
+
+class ResidenceAlreadyActiveError(RuntimeError):
+    """The player already has an active residence."""
+
+
+class ResidenceNotFoundError(RuntimeError):
+    """The player has no active residence."""
+
+
+class ResidenceRequiredError(RuntimeError):
+    """The requested action requires an active residence."""
+
+
+class ConstitutionAlreadySelectedError(RuntimeError):
+    """The player already has a main constitution."""
+
+
+class ConstitutionSameError(RuntimeError):
+    """The requested reshape target is already active."""
+
+
+class ConstitutionNotFoundError(RuntimeError):
+    """The player has not selected a constitution."""
+
+
+class ConstitutionCooldownError(RuntimeError):
+    """The constitution reshape cooldown is still active."""
+
+
+class ConstitutionBusyError(RuntimeError):
+    """A long-running action prevents constitution mutation."""
+
+
+class TalentNodeAlreadyLearnedError(RuntimeError):
+    """The requested talent node is already learned."""
+
+
+class TalentPathMismatchError(RuntimeError):
+    """The requested tree does not match the player's primary path."""
+
+
+class TalentPrerequisiteError(RuntimeError):
+    """The previous talent tier has not been learned."""
+
+
+class TalentBusyError(RuntimeError):
+    """A long-running action prevents talent mutation."""
+
+
+class SkillAlreadyMaxedError(RuntimeError):
+    """The requested skill has reached the current mastery cap."""
+
+
+class SkillNotAvailableError(RuntimeError):
+    """The requested skill is not available to the player's primary path."""
+
+
+class SkillBusyError(RuntimeError):
+    """A long-running action prevents skill mutation."""
+
+
+class EquipmentNotOwnedError(RuntimeError):
+    """The player does not own the requested equipment."""
+
+
+class EquipmentAmbiguousError(RuntimeError):
+    """More than one matching equipment instance needs an explicit selector."""
+
+
+class EquipmentTemperingMaxedError(RuntimeError):
+    """The equipment has reached the current tempering cap."""
+
+
+class EquipmentBusyError(RuntimeError):
+    """A long-running action prevents equipment mutation."""
+
+
+class RealmCultivationInsufficientError(RuntimeError):
+    """The player has not reached the next layer threshold."""
+
+
+class RealmLayerInvalidError(RuntimeError):
+    """The player cannot advance beyond the current realm."""
+
+
+class BreakthroughBusyError(RuntimeError):
+    """The player already has a preparing breakthrough."""
+
+
+class BreakthroughNotFoundError(RuntimeError):
+    """The player has no breakthrough session to settle."""
+
+
+class BreakthroughNotReadyError(RuntimeError):
+    """The breakthrough session has not reached its end time."""
+
+
+class BreakthroughExpiredError(RuntimeError):
+    """The breakthrough session is outside its settlement window."""
+
+
+class BreakthroughRequirementError(RuntimeError):
+    """The player is not eligible for the requested breakthrough."""
+
+
+class FoundationQualityInsufficientError(RuntimeError):
+    """The player's foundation quality is below a breakthrough requirement."""
+
+
+class WeaknessActiveError(RuntimeError):
+    """A temporary breakthrough weakness blocks high-risk actions."""
+
+
+class WeaknessNotActiveError(RuntimeError):
+    """There is no breakthrough weakness to recover."""
+
+
+class DomainCrackActiveError(RuntimeError):
+    """The player cannot use domain-bound progression while cracked."""
+
+
+class DomainSelectionBusyError(RuntimeError):
+    """The player already has a pending domain confirmation."""
+
+
+class DomainAlreadySelectedError(RuntimeError):
+    """The player already selected a domain."""
+
+
+class DomainNotEligibleError(RuntimeError):
+    """The player does not meet domain selection prerequisites."""
+
+
+class DomainEnergyInsufficientError(RuntimeError):
+    """The requested domain activation has insufficient charge."""
+
+
+class DomainConflictError(RuntimeError):
+    """The requested domain conflicts with the current party state."""
+
+
+class SoulPowerInsufficientError(RuntimeError):
+    """The player lacks the soul power required for soul transformation."""
+
+
+class FactionReputationInsufficientError(RuntimeError):
+    """No faction reputation reached the soul transformation threshold."""
+
+
+class CultivationInsufficientError(RuntimeError):
+    """The player lacks the total cultivation for soul transformation."""
+
+
+class RealmMismatchError(RuntimeError):
+    """The source realm or layer does not match the requested breakthrough."""
+
+
+class CurrencyInsufficientError(RuntimeError):
+    """The player does not have enough spirit stones."""
+
+
+class ProtectionItemInsufficientError(RuntimeError):
+    """The requested breakthrough protection item is missing."""
+
+
+class QuestRequirementError(RuntimeError):
+    """A progression quest flag is required before an action can start."""
+
+
+class HeartDemonPendingError(RuntimeError):
+    """The player has an unresolved heart-demon session."""
+
+
+class SoulFatigueActiveError(RuntimeError):
+    """The player's soul fatigue window is still active."""
+
+
+class TravelBusyError(RuntimeError):
+    """The player has another active movement or long-running action."""
+
+
+class TravelNotFoundError(RuntimeError):
+    """The player has no movement session to settle."""
+
+
+class TravelNotReadyError(RuntimeError):
+    """The movement session has not reached its arrival time."""
+
+
+class ExplorationBusyError(RuntimeError):
+    """The player already has an active exploration or another locked action."""
+
+
+class ExplorationNotFoundError(RuntimeError):
+    """The player has no exploration session to settle or cancel."""
+
+
+class ExplorationNotReadyError(RuntimeError):
+    """The exploration session has not reached its end time."""
+
+
+class ExplorationExpiredError(RuntimeError):
+    """The exploration session exceeded its normal settlement window."""
+
+
+class ExplorationCombatPendingError(RuntimeError):
+    """The exploration rolled a combat encounter that is still locked."""
+
+
+class ExplorationQuotaExhaustedError(RuntimeError):
+    """The mode reached its business-day quota."""
+
+
+class BountyDailyLimitError(RuntimeError):
+    """The player already accepted a bounty for this business day."""
+
+
+class BountyNotFoundError(RuntimeError):
+    """The player has no current bounty to claim."""
+
+
+class BountyContentClosedError(RuntimeError):
+    """The bounty depends on a runtime that is still closed."""
+
+
+class BountyRequirementError(RuntimeError):
+    """The player does not satisfy a bounty's realm or stage gate."""
+
+
+class BountyIncompleteError(RuntimeError):
+    """The accepted bounty target has not been completed."""
+
+
+class BountyExpiredError(RuntimeError):
+    """The accepted bounty passed its deadline without a claim."""
+
+
+class BountyAlreadyClaimedError(RuntimeError):
+    """The current bounty reward has already been claimed."""
+
+
+class MainlineContentClosedError(RuntimeError):
+    """The requested mainline stage is documented but not open yet."""
+
+
+class MainlineRequirementError(RuntimeError):
+    """The player does not satisfy a mainline stage prerequisite."""
+
+
+class MainlineNotStartedError(RuntimeError):
+    """The requested mainline stage has no running attempt."""
+
+
+class MainlineAlreadyRunningError(RuntimeError):
+    """The requested mainline stage already has a running attempt."""
+
+
+class CheckinAlreadyClaimedError(RuntimeError):
+    """The player already completed today's daily check-in."""
+
+
+class RoutineMakeupDateError(RuntimeError):
+    """The requested makeup date is outside the allowed window."""
+
+
+class RoutineMakeupNotEligibleError(RuntimeError):
+    """The requested date was already claimed or is otherwise ineligible."""
+
+
+class RoutineMakeupLimitError(RuntimeError):
+    """The player reached the monthly makeup limit."""
+
+
+class SpiritTreeWateredError(RuntimeError):
+    """The spirit tree was already watered for this business day."""
+
+
+class SpiritTreeCooldownError(RuntimeError):
+    """The spirit tree is in its post-harvest cooldown."""
+
+
+class SpiritTreeNotReadyError(RuntimeError):
+    """The spirit tree has not reached seven waterings."""
+
+
+class SevenDayNotStartedError(RuntimeError):
+    """The player has not started the seven-day onboarding campaign."""
+
+
+class SevenDayGoalInvalidError(RuntimeError):
+    """The requested seven-day goal number is invalid."""
+
+
+class SevenDayGoalNotOpenError(RuntimeError):
+    """The requested seven-day goal is still in a future business day."""
+
+
+class SevenDayGoalNotCompletedError(RuntimeError):
+    """The requested seven-day goal has no qualifying activity yet."""
+
+
+class SevenDayGoalAlreadyClaimedError(RuntimeError):
+    """The requested seven-day goal reward was already claimed."""
+
+
+class AchievementInvalidError(RuntimeError):
+    """The requested achievement is not registered."""
+
+
+class AchievementNotCompletedError(RuntimeError):
+    """The requested achievement has no qualifying source event yet."""
+
+
+class AchievementAlreadyClaimedError(RuntimeError):
+    """The requested achievement reward was already claimed."""
+
+
+class HonorTitleNotFoundError(RuntimeError):
+    """The requested title is not owned by the player."""
+
+
+class HonorTitleClosedError(RuntimeError):
+    """The requested title or achievement is not open in the current content."""
+
+
+class RedemptionCodeInvalidError(RuntimeError):
+    """The submitted code is not configured."""
+
+
+class RedemptionCodeExpiredError(RuntimeError):
+    """The configured code is outside its validity window."""
+
+
+class RedemptionCodeRevokedError(RuntimeError):
+    """The configured code was revoked before redemption."""
+
+
+class RedemptionCodeExhaustedError(RuntimeError):
+    """The configured code has no remaining claims."""
+
+
+class RedemptionCodeAlreadyClaimedError(RuntimeError):
+    """The player already redeemed this code."""
+
+
+class FatePoolInvalidError(RuntimeError):
+    """The requested fate pool or draw count is not registered."""
+
+
+class FatePoolNotOpenError(RuntimeError):
+    """The requested fate pool is not available in the current content."""
+
+
+class FateDrawInsufficientError(RuntimeError):
+    """The player lacks the ticket or spirit stones required for a draw."""
+
+
+class BillingReceiptInvalidError(RuntimeError):
+    """The external billing receipt failed signature or contract validation."""
+
+
+class BillingReceiptAlreadyUsedError(RuntimeError):
+    """A signed receipt was already consumed by another operation."""
+
+
+class DaoContractInvalidError(RuntimeError):
+    """The requested contract is not registered."""
+
+
+class DaoContractAlreadyClaimedError(RuntimeError):
+    """The daily entitlement was already claimed for the business date."""
+
+
+class DaoContractNotActiveError(RuntimeError):
+    """The contract is not active for the requested business date."""
+
+
+class DaoContractAlreadyRevokedError(RuntimeError):
+    """The contract is already revoked or cannot be revoked."""
+
+
+class WayfaringNotStartedError(RuntimeError):
+    """The player has not started the current wayfaring pass."""
+
+
+class WayfaringAlreadyStartedError(RuntimeError):
+    """The current wayfaring cycle is already active."""
+
+
+class WayfaringLevelInvalidError(RuntimeError):
+    """The requested wayfaring level is outside the configured range."""
+
+
+class WayfaringLevelLockedError(RuntimeError):
+    """The player has not earned enough points for the requested level."""
+
+
+class WayfaringClaimAlreadyExistsError(RuntimeError):
+    """The requested wayfaring track was already claimed."""
+
+
+class WayfaringPaidTrackInactiveError(RuntimeError):
+    """The monthly dao contract is not active for the paid track."""
+
+
+class DaoUnionRequirementError(RuntimeError):
+    """The player does not satisfy the 合道 entry contract."""
+
+
+class TribulationEntryRequirementError(RuntimeError):
+    """The player does not satisfy the 渡劫 entry contract."""
+
+
+class TrialSequenceError(RuntimeError):
+    """The requested tribulation trial is unavailable or out of order."""
+
+
+class TribulationTrialBusyError(RuntimeError):
+    """Another tribulation trial is already preparing."""
+
+
+class TribulationTrialNotFoundError(RuntimeError):
+    """There is no preparing tribulation trial to settle."""
+
+
+class TribulationTrialNotReadyError(RuntimeError):
+    """The preparing tribulation trial has not reached its end time."""
+
+
+class TribulationCooldownError(RuntimeError):
+    """The requested trial is still in its failure cooldown."""
+
+
+class TribulationDebtBlockedError(RuntimeError):
+    """Tribulation debt is too high to start another trial."""
+
+
+class TribulationTokenInsufficientError(RuntimeError):
+    """The player lacks the token required by a tribulation trial."""
+
+
+class ThreeRealmReputationInsufficientError(RuntimeError):
+    """The player lacks the three realm reputation needed by trial two."""
+
+
+class DaoFruitChoiceError(RuntimeError):
+    """The chosen dao fruit is invalid or already locked."""
