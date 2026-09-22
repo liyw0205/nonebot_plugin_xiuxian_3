@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.2",
+  "content_version": "content-0.3",
   "rule_version": "events-0.1.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "quest",
@@ -52,6 +52,15 @@
       "claim_policy": "once_per_player",
       "expires": false,
       "key": "quest.first_craft"
+    },
+    {
+      "name": "元婴准备",
+      "status": "open",
+      "trigger": {"operation": "progression.prepare_nascent_soul", "result": "success"},
+      "reward_key": "reward.quest.prepare_nascent_soul",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.prepare_nascent_soul"
     }
   ],
   "schema": "xiuxian.content"

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.2",
-  "rule_version": "progression-0.2.0",
+  "content_version": "content-0.3",
+  "rule_version": "progression-0.3.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "realm",
   "records": [
@@ -105,7 +105,7 @@
     },
     {
       "name": "元婴",
-      "status": "placeholder",
+      "status": "open",
       "layer_min": 1,
       "layer_max": 10,
       "layer_thresholds": {

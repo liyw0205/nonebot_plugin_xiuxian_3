@@ -1,7 +1,7 @@
 {
   "schema": "xiuxian.content",
   "schema_version": 1,
-  "content_version": "content-0.2",
+  "content_version": "content-0.3",
   "rule_version": "advancement-0.1.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "skill_growth",

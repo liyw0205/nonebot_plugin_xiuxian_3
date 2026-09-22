@@ -10,6 +10,9 @@ from ...repository import (
     BreakthroughNotFoundError,
     BreakthroughNotReadyError,
     BreakthroughRequirementError,
+    HeartDemonPendingError,
+    QuestRequirementError,
+    SoulFatigueActiveError,
     CurrencyInsufficientError,
     MaterialInsufficientError,
     OperationConflictError,
@@ -39,18 +42,25 @@ ITEM_LABELS = {
     "item.pill.golden_core_restore": "金丹恢复丹",
     "item.material.cloud_iron": "云铁",
     "item.pill.healing_low": "低阶疗伤丹",
+    "item.pill.soul_condense": "凝魂丹",
+    "item.pill.soul_restore": "魂元丹",
+    "item.soul_crystal": "神魂晶",
+    "item.demon_core": "魔核",
+    "item.beast_blood": "兽血",
 }
 
 REALM_LABELS = {
     "qi_gathering": "聚气",
     "foundation": "筑基",
     "golden_core": "金丹",
+    "nascent_soul": "元婴",
 }
 
 PROTECTION_LABELS = {
     "item.pill.qi_guard": "聚气护脉丹",
     "item.pill.foundation_guard": "筑基护脉丹",
     "item.pill.golden_core_guard": "金丹护脉丹",
+    "item.pill.soul_restore": "魂元丹",
 }
 
 
@@ -93,6 +103,10 @@ class BreakthroughApplication:
                 target = "golden_core"
             elif arg in {"金丹护脉丹", "金丹保护", "golden_core_guard"}:
                 protection = True
+            elif arg in {"元婴", "nascent_soul", "元婴突破"}:
+                target = "nascent_soul"
+            elif arg in {"魂元丹", "心魔保护", "soul_restore"}:
+                protection = True
             else:
                 return None
         return target, protection
@@ -125,12 +139,41 @@ class BreakthroughApplication:
             if definition.support_bonus_bp and definition.support_key and player.inventory.get(definition.support_key, 0) > 0
             else 0
         )
+        if definition.target_realm == "nascent_soul":
+            flags = set(player.intro_flags)
+            preparation = 0
+            if player.inventory.get("item.manual.basic_qi", 0) > 0 or "preparation.nascent_soul.technique" in flags:
+                preparation += 300
+            world = player.location_key.split(".", 1)[0]
+            if f"alliance.{world}" in flags:
+                preparation += 300
+            if {"sect.nascent_soul_ritual", "quest.nascent_soul_ritual"} & flags:
+                preparation += 300
+            if player.location_key.startswith("xuantian."):
+                preparation += 300
+            return preparation
         return quality + technique + formation + location + support
+
+    async def prepare_nascent_soul(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_PREPARATION_COMMAND", "准备元婴无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "progression.prepare_nascent_soul")
+        try:
+            record = await self.repository.prepare_nascent_soul(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except FoundationQualityInsufficientError:
+            return CommandResult(False, "FOUNDATION_QUALITY_LOW", "道基质量至少需要 5,500，未修改任务状态。", context.request_id, operation_id)
+        except BreakthroughRequirementError:
+            return CommandResult(False, "REALM_MISMATCH", "需要金丹 L10、总修为达到 58,960 才能准备元婴。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他准备操作，请重新发起。", context.request_id, operation_id)
+        return CommandResult(True, "NASCENT_SOUL_PREPARED", "## 元婴准备完成\n\n已记录 `quest.prepare_nascent_soul`，可以查看 `突破预览 元婴`。", context.request_id, operation_id, data={"quest_key": "quest.prepare_nascent_soul", "idempotent_replay": record.already_completed})
 
     async def preview_breakthrough(self, context: CommandContext) -> CommandResult:
         parsed = self._parse_start_args(context.command_args)
         if parsed is None:
-            return CommandResult(False, "INVALID_BREAKTHROUGH_COMMAND", "可用指令：`突破预览 聚气`、`突破预览 筑基` 或 `突破预览 金丹`。", context.request_id)
+            return CommandResult(False, "INVALID_BREAKTHROUGH_COMMAND", "可用指令：`突破预览 聚气`、`突破预览 筑基`、`突破预览 金丹` 或 `突破预览 元婴`。", context.request_id)
         target, _ = parsed
         definition = breakthrough_definition(target)
         try:
@@ -140,8 +183,16 @@ class BreakthroughApplication:
         if player is None:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
         missing = [ITEM_LABELS.get(key, "突破材料") for key, amount in definition.materials.items() if player.inventory.get(key, 0) < amount]
+        if target == "nascent_soul" and max(player.inventory.get("item.demon_core", 0), player.inventory.get("item.beast_blood", 0)) < 2:
+            missing.append("魔核或兽血 ×2")
         preparation_bp = self._preparation_bp(player, definition)
-        current_success_bp = success_bp(definition, player.breakthrough_pity_bp, preparation_bp)
+        if target == "nascent_soul":
+            quality_bp = min(1000, player.foundation_quality // 10)
+            world = player.location_key.split(".", 1)[0]
+            risk_bp = 400 if not player.location_key.startswith("xuantian.") and f"alliance.{world}" not in set(player.intro_flags) else 0
+            current_success_bp = max(5500, min(9000, 5500 + quality_bp + preparation_bp + player.breakthrough_pity_bp + player.heart_demon_bonus_bp - risk_bp))
+        else:
+            current_success_bp = success_bp(definition, player.breakthrough_pity_bp, preparation_bp)
         ready = (
             player.realm_key == definition.source_realm
             and player.realm_layer == 10
@@ -149,10 +200,14 @@ class BreakthroughApplication:
             and player.foundation_quality >= definition.required_foundation_quality
             and not missing
             and player.spirit_stones >= definition.currency_cost
+            and (target != "nascent_soul" or (player.world_merit >= 100 and "quest.prepare_nascent_soul" in player.intro_flags))
+            and (target != "nascent_soul" or player.soul_fatigue_until is None)
         )
         material_lines = "\n".join(
             f"- **{ITEM_LABELS.get(key, '突破材料')}** ×{amount}" for key, amount in definition.materials.items()
         )
+        if target == "nascent_soul":
+            material_lines += "\n- **魔核或兽血** ×2（任选其一）\n- **世界功勋** ×100"
         realm_label = REALM_LABELS[target]
         protection_label = PROTECTION_LABELS[definition.protection_key]
         retention = definition.retention_bp / 100
@@ -168,7 +223,7 @@ class BreakthroughApplication:
             f"- **消耗灵石**：{definition.currency_cost}\n\n"
             "### 必需材料\n\n"
             f"{material_lines}\n\n"
-            f"> 失败会保留当前境内修为的 {retention:.0f}%，并进入 {definition.weakness_seconds // 3600} 小时虚弱。可选 **{protection_label}**，只在失败时消耗。"
+            f"> 失败会保留当前境内修为的 {retention:.0f}%，并进入{'心魔试炼' if target == 'nascent_soul' else f' {definition.weakness_seconds // 3600} 小时虚弱'}。可选 **{protection_label}**，只在失败时消耗。"
         )
         if missing:
             message += f"\n> 当前缺少：{'、'.join(missing)}。"
@@ -197,6 +252,12 @@ class BreakthroughApplication:
             return CommandResult(False, "REALM_MISMATCH", "完成入道后才能进行跨境突破。", context.request_id, operation_id)
         except BreakthroughRequirementError:
             return CommandResult(False, "BREAKTHROUGH_REQUIREMENT_MISSING", f"只有{REALM_LABELS.get(definition.source_realm, definition.source_realm)} L10 混元且总修为达到 {definition.required_total_cultivation:,} 才能开始{REALM_LABELS[target]}突破。", context.request_id, operation_id)
+        except QuestRequirementError:
+            return CommandResult(False, "QUEST_REQUIREMENT_MISSING", "尚未完成元婴准备任务，未扣除任何资源。", context.request_id, operation_id)
+        except HeartDemonPendingError:
+            return CommandResult(False, "HEART_DEMON_PENDING", "心魔尚未化解，请先发送 `化解心魔 面对/净化/交易`。", context.request_id, operation_id)
+        except SoulFatigueActiveError:
+            return CommandResult(False, "SOUL_FATIGUE_ACTIVE", "神魂疲劳尚未恢复，请稍后再试或发送 `恢复神魂疲劳`。", context.request_id, operation_id)
         except FoundationQualityInsufficientError:
             return CommandResult(False, "FOUNDATION_QUALITY_LOW", f"道基质量至少需要 {definition.required_foundation_quality:,}，未扣除任何资源。", context.request_id, operation_id)
         except BreakthroughBusyError:
@@ -243,6 +304,8 @@ class BreakthroughApplication:
             return CommandResult(False, "BREAKTHROUGH_NOT_FOUND", "当前没有等待结算的突破。", context.request_id, operation_id)
         except BreakthroughNotReadyError:
             return CommandResult(False, "BREAKTHROUGH_NOT_READY", "突破准备尚未结束，请稍后再来结算。", context.request_id, operation_id)
+        except HeartDemonPendingError:
+            return CommandResult(False, "HEART_DEMON_PENDING", "心魔尚未化解，请先处理心魔。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能结算突破。", context.request_id, operation_id)
         except OperationConflictError:
@@ -274,20 +337,23 @@ class BreakthroughApplication:
                 f"> {target_label}阶段的新内容将按开发顺序逐步开放。"
             )
         else:
-            weak_text = (
-                f"保护丹生效，虚弱 {30 if record.target_realm == 'qi_gathering' else 120 if record.target_realm == 'foundation' else 240} 分钟"
-                if record.protection_consumed
-                else f"虚弱 {2 if record.target_realm == 'qi_gathering' else 6 if record.target_realm == 'foundation' else 12} 小时"
-            )
-            message = (
-                "## 突破未成\n\n"
-                f"**{self._display_name(player)}**暂未踏入{target_label}，保留境内修为 **{record.cultivation_after}**。\n\n"
-                f"- **结果**：{weak_text}\n"
-                f"- **本次成功率**：{record.success_bp / 100:.0f}%\n"
-                f"- **保底**：下次增加 {record.pity_after_bp - record.pity_before_bp} bp\n\n"
-                "> 虚弱期间不能再次突破；到期后发送 `恢复虚弱`，或使用 `恢复虚弱 提前`。"
-            )
-        return CommandResult(True, "BREAKTHROUGH_SUCCEEDED" if record.success else "BREAKTHROUGH_FAILED", message, context.request_id, operation_id, data={"session_id": record.session_id, "target_realm": record.target_realm, "success": record.success, "roll_bp": record.roll_bp, "success_bp": record.success_bp, "cultivation_before": record.cultivation_before, "cultivation_after": record.cultivation_after, "pity_before_bp": record.pity_before_bp, "pity_after_bp": record.pity_after_bp, "preparation_bp": record.preparation_bp, "reward_currency": record.reward_currency, "reward_stamina": record.reward_stamina, "reward_world_merit": record.reward_world_merit, "reward_local_reputation": record.reward_local_reputation, "reward_items": record.reward_items or {}, "protection_consumed": record.protection_consumed, "weakness_until": record.weakness_until, "idempotent_replay": record.already_completed})
+            if record.heart_demon_pending:
+                message = "## 突破未成\n\n元婴突破失败，心魔已现。请在 24 小时内选择 `化解心魔 面对`、`净化` 或 `交易`。"
+            else:
+                weak_text = (
+                    f"保护丹生效，虚弱 {30 if record.target_realm == 'qi_gathering' else 120 if record.target_realm == 'foundation' else 240} 分钟"
+                    if record.protection_consumed
+                    else f"虚弱 {2 if record.target_realm == 'qi_gathering' else 6 if record.target_realm == 'foundation' else 12} 小时"
+                )
+                message = (
+                    "## 突破未成\n\n"
+                    f"**{self._display_name(player)}**暂未踏入{target_label}，保留境内修为 **{record.cultivation_after}**。\n\n"
+                    f"- **结果**：{weak_text}\n"
+                    f"- **本次成功率**：{record.success_bp / 100:.0f}%\n"
+                    f"- **保底**：下次增加 {record.pity_after_bp - record.pity_before_bp} bp\n\n"
+                    "> 虚弱期间不能再次突破；到期后发送 `恢复虚弱`，或使用 `恢复虚弱 提前`。"
+                )
+        return CommandResult(True, "BREAKTHROUGH_SUCCEEDED" if record.success else "BREAKTHROUGH_FAILED", message, context.request_id, operation_id, data={"session_id": record.session_id, "target_realm": record.target_realm, "success": record.success, "roll_bp": record.roll_bp, "success_bp": record.success_bp, "cultivation_before": record.cultivation_before, "cultivation_after": record.cultivation_after, "pity_before_bp": record.pity_before_bp, "pity_after_bp": record.pity_after_bp, "preparation_bp": record.preparation_bp, "reward_currency": record.reward_currency, "reward_stamina": record.reward_stamina, "reward_world_merit": record.reward_world_merit, "reward_local_reputation": record.reward_local_reputation, "reward_items": record.reward_items or {}, "protection_consumed": record.protection_consumed, "heart_demon_pending": record.heart_demon_pending, "cross_realm_risk_bp": record.cross_realm_risk_bp, "heart_demon_bonus_bp": record.heart_demon_bonus_bp, "weakness_until": record.weakness_until, "idempotent_replay": record.already_completed})
 
     async def recover_weakness(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1 or (context.command_args and context.command_args[0] not in {"提前", "立即", "early"}):
@@ -315,6 +381,47 @@ class BreakthroughApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         return CommandResult(True, "WEAKNESS_RECOVERED", f"## 虚弱已恢复\n\n**{self._display_name(record.player)}**可以继续准备突破。\n\n- **提前恢复**：{'是' if record.early else '否'}\n- **消耗灵石**：{record.spirit_stones_spent}\n- **消耗疗伤丹**：{'是' if record.medicine_consumed else '否'}\n\n> 突破失败保底不会被清除。", context.request_id, operation_id, data={"early": record.early, "spirit_stones_spent": record.spirit_stones_spent, "medicine_consumed": record.medicine_consumed, "idempotent_replay": record.already_completed})
+
+    async def resolve_heart_demon(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_HEART_DEMON_COMMAND", "可用指令：`化解心魔 面对`、`化解心魔 净化` 或 `化解心魔 交易`。", context.request_id)
+        choice = {"面对": "heart_demon.face", "净化": "heart_demon.purify", "交易": "heart_demon.bargain", "face": "heart_demon.face", "purify": "heart_demon.purify", "bargain": "heart_demon.bargain"}.get(context.command_args[0])
+        if choice is None:
+            return CommandResult(False, "INVALID_HEART_DEMON_COMMAND", "可用指令：`化解心魔 面对`、`化解心魔 净化` 或 `化解心魔 交易`。", context.request_id)
+        operation_id = self._operation_id(context, "event.resolve_heart_demon")
+        try:
+            record = await self.repository.resolve_heart_demon(platform=context.adapter, platform_user_id=context.user_id, choice_key=choice, operation_id=operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except HeartDemonPendingError:
+            return CommandResult(False, "HEART_DEMON_NOT_FOUND", "当前没有待处理的心魔。", context.request_id, operation_id)
+        except MaterialInsufficientError:
+            return CommandResult(False, "MATERIAL_INSUFFICIENT", "净化心魔需要魂元丹 ×1，未扣除资源。", context.request_id, operation_id)
+        except BreakthroughRequirementError:
+            return CommandResult(False, "HEART_DEMON_CHOICE_INVALID", "当前状态不能选择该心魔处理方式。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他心魔选择，请重新发起。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能处理心魔。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(True, "HEART_DEMON_RESOLVED", f"## 心魔已化解\n\n处理方式：**{choice.split('.')[-1]}**\n\n- **神魂疲劳**：至 {record.fatigue_until or '无'}\n- **保底**：{record.pity_after_bp} bp\n\n> 疲劳结束后可再次准备元婴突破。", context.request_id, operation_id, data={"session_id": record.session_id, "choice_key": record.choice_key, "status": record.status, "pity_after_bp": record.pity_after_bp, "fatigue_until": record.fatigue_until, "pollution_before": record.pollution_before, "pollution_after": record.pollution_after, "world_merit_gained": record.world_merit_gained, "idempotent_replay": record.already_completed})
+
+    async def recover_soul_fatigue(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_RECOVERY_COMMAND", "恢复神魂疲劳无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "progression.recover_soul_fatigue")
+        try:
+            record = await self.repository.recover_soul_fatigue(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except SoulFatigueActiveError:
+            return CommandResult(False, "SOUL_FATIGUE_ACTIVE", "神魂疲劳尚未到期。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他恢复，请重新发起。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能恢复神魂疲劳。", context.request_id, operation_id)
+        return CommandResult(True, "SOUL_FATIGUE_RECOVERED", "## 神魂疲劳已恢复\n\n现在可以继续准备元婴突破。", context.request_id, operation_id, data={"recovered": record.recovered, "idempotent_replay": record.already_completed})
 
     async def recover_foundation_shock(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1 or (context.command_args and context.command_args[0] not in {"提前", "立即", "early"}):

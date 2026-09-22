@@ -184,6 +184,27 @@ class XiuxianApplication:
             write_message="当前事件不允许进行突破结算。",
         )
 
+    async def prepare_nascent_soul(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.prepare_nascent_soul(context),
+            write_message="当前事件不允许准备元婴。",
+        )
+
+    async def resolve_heart_demon(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.resolve_heart_demon(context),
+            write_message="当前事件不允许处理心魔。",
+        )
+
+    async def recover_soul_fatigue(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.recover_soul_fatigue(context),
+            write_message="当前事件不允许恢复神魂疲劳。",
+        )
+
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.production.preview_recipe(context), require_write=False)
 

@@ -261,6 +261,13 @@ class PlayerApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         if player is None:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送“开始修仙”。", context.request_id)
+        soul_summary = (
+            f"- **神魂**：{player.soul_power}/{player.soul_power_max}\n"
+            f"- **领域能量**：{player.domain_charge}/{player.domain_charge_max}\n"
+            f"- **污染**：{player.pollution}\n"
+            if player.realm_key == "nascent_soul"
+            else ""
+        )
         return CommandResult(
             ok=True,
             code="PROFILE_READ",
@@ -279,6 +286,7 @@ class PlayerApplication:
                 f"- **总修为**：{player.total_cultivation}\n"
                 f"- **道基质量**：{player.foundation_quality}\n"
                 f"- **世界功勋**：{player.world_merit}\n"
+                f"{soul_summary}"
                 "\n### 六项资质\n\n"
                 f"{self._qualification_text(player.qualification)}"
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(player.intro_flags))}/3"
@@ -309,6 +317,14 @@ class PlayerApplication:
                 "qualification": player.qualification,
                 "path_key": player.path_key,
                 "subprofession_key": player.subprofession_key,
+                "soul_power": player.soul_power,
+                "soul_power_max": player.soul_power_max,
+                "domain_charge": player.domain_charge,
+                "domain_charge_max": player.domain_charge_max,
+                "pollution": player.pollution,
+                "bloodline_stability": player.bloodline_stability,
+                "cross_realm_penalty_bp": player.cross_realm_penalty_bp,
+                "soul_fatigue_until": player.soul_fatigue_until.isoformat() if player.soul_fatigue_until else None,
             },
         )
 

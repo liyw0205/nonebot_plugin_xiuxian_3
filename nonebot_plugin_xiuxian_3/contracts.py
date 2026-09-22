@@ -111,6 +111,19 @@ class PlayerView:
     breakthrough_pity_bp: int = 0
     talent_points: int = 0
     skill_insights: int = 0
+    soul_power: int = 0
+    soul_power_max: int = 0
+    domain_charge: int = 0
+    domain_charge_max: int = 0
+    pollution: int = 0
+    bloodline_stability: int = 0
+    cross_realm_penalty_bp: int = 0
+    soul_fatigue_until: datetime | None = None
+    heart_demon_bonus_bp: int = 0
+    max_hp: int = 0
+    max_mp: int = 0
+    carry_capacity: int = 0
+    exploration_efficiency_bp: int = 0
 
 
 def serialize_datetime(value: datetime) -> str:

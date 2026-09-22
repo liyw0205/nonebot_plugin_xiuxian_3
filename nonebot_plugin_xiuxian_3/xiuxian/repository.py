@@ -39,6 +39,9 @@ from .production.models import (
 from .progression.breakthrough.models import (
     BreakthroughSettlementRecord,
     BreakthroughSessionRecord,
+    HeartDemonResolutionRecord,
+    NascentSoulPreparationRecord,
+    SoulFatigueRecoveryRecord,
     WeaknessRecoveryRecord,
 )
 from .advancement.models import RetreatSessionRecord, RetreatSettlementRecord
@@ -239,6 +242,19 @@ CREATE TABLE IF NOT EXISTS players (
     skill_insights INTEGER NOT NULL DEFAULT 0 CHECK (skill_insights >= 0),
     weakness_until TEXT,
     breakthrough_pity_bp INTEGER NOT NULL DEFAULT 0 CHECK (breakthrough_pity_bp >= 0),
+    soul_power INTEGER NOT NULL DEFAULT 0 CHECK (soul_power >= 0),
+    soul_power_max INTEGER NOT NULL DEFAULT 0 CHECK (soul_power_max >= 0),
+    domain_charge INTEGER NOT NULL DEFAULT 0 CHECK (domain_charge >= 0),
+    domain_charge_max INTEGER NOT NULL DEFAULT 0 CHECK (domain_charge_max >= 0),
+    pollution INTEGER NOT NULL DEFAULT 0 CHECK (pollution >= 0),
+    bloodline_stability INTEGER NOT NULL DEFAULT 0 CHECK (bloodline_stability >= 0),
+    cross_realm_penalty_bp INTEGER NOT NULL DEFAULT 0 CHECK (cross_realm_penalty_bp >= 0),
+    soul_fatigue_until TEXT,
+    heart_demon_bonus_bp INTEGER NOT NULL DEFAULT 0 CHECK (heart_demon_bonus_bp >= 0),
+    max_hp INTEGER NOT NULL DEFAULT 0 CHECK (max_hp >= 0),
+    max_mp INTEGER NOT NULL DEFAULT 0 CHECK (max_mp >= 0),
+    carry_capacity INTEGER NOT NULL DEFAULT 0 CHECK (carry_capacity >= 0),
+    exploration_efficiency_bp INTEGER NOT NULL DEFAULT 0 CHECK (exploration_efficiency_bp >= 0),
     durability_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -514,6 +530,24 @@ CREATE TABLE IF NOT EXISTS breakthrough_sessions (
 CREATE INDEX IF NOT EXISTS idx_breakthrough_sessions_player ON breakthrough_sessions(player_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_breakthrough_sessions_active
     ON breakthrough_sessions(player_id) WHERE status = 'preparing';
+
+CREATE TABLE IF NOT EXISTS heart_demon_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    breakthrough_session_id INTEGER NOT NULL REFERENCES breakthrough_sessions(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'resolved')),
+    choice_key TEXT,
+    expires_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_heart_demon_sessions_player
+    ON heart_demon_sessions(player_id, status);
 
 CREATE TABLE IF NOT EXISTS travel_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1200,6 +1234,18 @@ class ProtectionItemInsufficientError(RuntimeError):
     """The requested breakthrough protection item is missing."""
 
 
+class QuestRequirementError(RuntimeError):
+    """A progression quest flag is required before an action can start."""
+
+
+class HeartDemonPendingError(RuntimeError):
+    """The player has an unresolved heart-demon session."""
+
+
+class SoulFatigueActiveError(RuntimeError):
+    """The player's soul fatigue window is still active."""
+
+
 class TravelBusyError(RuntimeError):
     """The player has another active movement or long-running action."""
 
@@ -1602,6 +1648,19 @@ class SQLitePlayerRepository:
             ("skill_insights", "INTEGER NOT NULL DEFAULT 0"),
             ("weakness_until", "TEXT"),
             ("breakthrough_pity_bp", "INTEGER NOT NULL DEFAULT 0"),
+            ("soul_power", "INTEGER NOT NULL DEFAULT 0"),
+            ("soul_power_max", "INTEGER NOT NULL DEFAULT 0"),
+            ("domain_charge", "INTEGER NOT NULL DEFAULT 0"),
+            ("domain_charge_max", "INTEGER NOT NULL DEFAULT 0"),
+            ("pollution", "INTEGER NOT NULL DEFAULT 0"),
+            ("bloodline_stability", "INTEGER NOT NULL DEFAULT 0"),
+            ("cross_realm_penalty_bp", "INTEGER NOT NULL DEFAULT 0"),
+            ("soul_fatigue_until", "TEXT"),
+            ("heart_demon_bonus_bp", "INTEGER NOT NULL DEFAULT 0"),
+            ("max_hp", "INTEGER NOT NULL DEFAULT 0"),
+            ("max_mp", "INTEGER NOT NULL DEFAULT 0"),
+            ("carry_capacity", "INTEGER NOT NULL DEFAULT 0"),
+            ("exploration_efficiency_bp", "INTEGER NOT NULL DEFAULT 0"),
         ):
             if column not in player_columns:
                 connection.execute(f"ALTER TABLE players ADD COLUMN {column} {definition}")
@@ -7444,6 +7503,49 @@ class SQLitePlayerRepository:
             already_completed=replay,
         )
 
+    async def prepare_nascent_soul(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> NascentSoulPreparationRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._prepare_nascent_soul_sync, platform, platform_user_id, operation_id)
+
+    def _prepare_nascent_soul_sync(self, platform: str, platform_user_id: str, operation_id: str) -> NascentSoulPreparationRecord:
+        operation_name = "progression.prepare_nascent_soul"
+        request_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash(operation_name, request_payload)
+        now_text = serialize_datetime(datetime.now(timezone.utc))
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return NascentSoulPreparationRecord(player=self._row_to_player(payload["player"]), already_completed=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            if row["realm_key"] != "golden_core" or int(row["realm_layer"]) != 10 or int(row["total_cultivation"]) < 58960:
+                raise BreakthroughRequirementError("golden core preparation requirement is missing")
+            if int(row["foundation_quality"]) < 5500:
+                raise FoundationQualityInsufficientError("foundation quality is insufficient")
+            intro = self._json_object(row["intro_json"], {})
+            flags = [str(item) for item in intro.get("flags", [])]
+            if "quest.prepare_nascent_soul" not in flags:
+                flags.append("quest.prepare_nascent_soul")
+            intro["flags"] = flags
+            connection.execute("UPDATE players SET intro_json = ?, updated_at = ? WHERE id = ?", (json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, row["id"]))
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("nascent soul preparation returned no player")
+            player = self._row_to_player(updated)
+            payload = {"player": self._player_payload(player)}
+            connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
+            return NascentSoulPreparationRecord(player=player)
+
     async def start_breakthrough(
         self,
         *,
@@ -7544,6 +7646,27 @@ class SQLitePlayerRepository:
                 raise BreakthroughRequirementError("total cultivation is insufficient")
             if int(row["foundation_quality"]) < definition.required_foundation_quality:
                 raise FoundationQualityInsufficientError("foundation quality is insufficient")
+            is_nascent = target_realm == "nascent_soul"
+            if is_nascent:
+                pending = connection.execute(
+                    "SELECT 1 FROM heart_demon_sessions WHERE player_id = ? AND status = 'pending' LIMIT 1",
+                    (row["id"],),
+                ).fetchone()
+                if pending is not None:
+                    raise HeartDemonPendingError("heart demon must be resolved first")
+                fatigue_until = row["soul_fatigue_until"]
+                if fatigue_until:
+                    try:
+                        if datetime.fromisoformat(str(fatigue_until)) > now:
+                            raise SoulFatigueActiveError("soul fatigue is active")
+                    except ValueError:
+                        pass
+                intro_state = self._json_object(row["intro_json"], {})
+                flags = {str(item) for item in intro_state.get("flags", [])}
+                if "quest.prepare_nascent_soul" not in flags:
+                    raise QuestRequirementError("nascent soul preparation quest is missing")
+                if int(row["world_merit"]) < 100:
+                    raise CurrencyInsufficientError("world merit is insufficient")
             weakness_until = row["weakness_until"]
             if weakness_until:
                 try:
@@ -7588,6 +7711,14 @@ class SQLitePlayerRepository:
             for item_key, quantity in definition.materials.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise MaterialInsufficientError("breakthrough material is insufficient")
+            alternative_material: str | None = None
+            if is_nascent:
+                for candidate in ("item.demon_core", "item.beast_blood"):
+                    if int(inventory.get(candidate, 0)) >= 2:
+                        alternative_material = candidate
+                        break
+                if alternative_material is None:
+                    raise MaterialInsufficientError("nascent soul alternative material is insufficient")
             if protection and int(inventory.get(definition.protection_key, 0)) < 1:
                 raise ProtectionItemInsufficientError("breakthrough protection item is missing")
             if int(row["spirit_stones"]) < definition.currency_cost:
@@ -7624,9 +7755,34 @@ class SQLitePlayerRepository:
                 else 0
             )
             preparation_bp = quality_bonus_bp + technique_bonus_bp + formation_bonus_bp + location_bonus_bp + support_bonus_bp
-            final_success_bp = success_bp(definition, pity_before, preparation_bp)
+            heart_demon_bonus_bp = int(row["heart_demon_bonus_bp"]) if is_nascent else 0
+            cross_realm_risk_bp = 0
+            if is_nascent and not str(row["location_key"]).startswith("xuantian."):
+                world = str(row["location_key"]).split(".", 1)[0]
+                flags = {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])}
+                if f"alliance.{world}" not in flags:
+                    cross_realm_risk_bp = 400
+            if is_nascent:
+                flags = {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])}
+                preparation_bp = 0
+                if int(inventory.get("item.manual.basic_qi", 0)) > 0 or "preparation.nascent_soul.technique" in flags:
+                    preparation_bp += 300
+                if f"alliance.{str(row['location_key']).split('.', 1)[0]}" in flags:
+                    preparation_bp += 300
+                if {"sect.nascent_soul_ritual", "quest.nascent_soul_ritual"} & flags:
+                    preparation_bp += 300
+                if str(row["location_key"]).startswith("xuantian."):
+                    preparation_bp += 300
+                final_success_bp = max(5500, min(9000, 5500 + quality_bonus_bp + preparation_bp + pity_before + heart_demon_bonus_bp - cross_realm_risk_bp))
+            else:
+                final_success_bp = success_bp(definition, pity_before, preparation_bp)
             for item_key, quantity in definition.materials.items():
                 inventory[item_key] = int(inventory.get(item_key, 0)) - quantity
+            if alternative_material:
+                inventory[alternative_material] = int(inventory.get(alternative_material, 0)) - 2
+            session_materials = dict(definition.materials)
+            if alternative_material:
+                session_materials[alternative_material] = 2
             session_id = uuid4().hex
             starts_at = now_text
             ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
@@ -7653,20 +7809,27 @@ class SQLitePlayerRepository:
                 "location_bonus_bp": location_bonus_bp,
                 "support_bonus_bp": support_bonus_bp,
                 "support_key": definition.support_key,
+                "alternative_material": alternative_material,
                 "preparation_bp": preparation_bp,
                 "success_bp": final_success_bp,
                 "pity_before_bp": pity_before,
                 "protection_requested": protection,
                 "protection_key": definition.protection_key if protection else None,
-                "materials": definition.materials,
+                "materials": session_materials,
                 "currency_cost": definition.currency_cost,
                 "random_seed": operation_id,
+                "cross_realm_risk_bp": cross_realm_risk_bp,
+                "heart_demon_bonus_bp": heart_demon_bonus_bp,
+                "pollution": int(row["pollution"]),
+                "cross_realm_penalty_bp": int(row["cross_realm_penalty_bp"]),
             }
             connection.execute(
-                "UPDATE players SET inventory_json = ?, spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
+                "UPDATE players SET inventory_json = ?, spirit_stones = spirit_stones - ?, world_merit = world_merit - ?, heart_demon_bonus_bp = CASE WHEN ? = 1 THEN 0 ELSE heart_demon_bonus_bp END, updated_at = ? WHERE id = ?",
                 (
                     json.dumps(inventory, ensure_ascii=False, sort_keys=True),
                     definition.currency_cost,
+                    100 if is_nascent else 0,
+                    1 if is_nascent else 0,
                     now_text,
                     row["id"],
                 ),
@@ -7781,6 +7944,12 @@ class SQLitePlayerRepository:
                 (row["id"],),
             ).fetchone()
             if session is None:
+                pending = connection.execute(
+                    "SELECT 1 FROM heart_demon_sessions WHERE player_id = ? AND status = 'pending' LIMIT 1",
+                    (row["id"],),
+                ).fetchone()
+                if pending is not None:
+                    raise HeartDemonPendingError("heart demon is pending")
                 raise BreakthroughNotFoundError("no preparing breakthrough")
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now < ends_at:
@@ -7798,10 +7967,12 @@ class SQLitePlayerRepository:
             cultivation_before = int(snapshot.get("cultivation", row["cultivation"]))
             pity_before = int(snapshot.get("pity_before_bp", row["breakthrough_pity_bp"]))
             protection_requested = bool(snapshot.get("protection_requested", False))
+            is_nascent = str(snapshot.get("target_realm", session["target_realm"])) == "nascent_soul"
             protection_key = str(snapshot.get("protection_key") or definition.protection_key)
             inventory = self._json_object(row["inventory_json"], {})
             protection_consumed = bool(
                 (not success)
+                and not is_nascent
                 and protection_requested
                 and int(inventory.get(protection_key, 0)) > 0
             )
@@ -7809,6 +7980,7 @@ class SQLitePlayerRepository:
                 inventory[protection_key] = int(inventory.get(protection_key, 0)) - 1
             pity_after = next_pity_bp(definition, pity_before, success)
             weakness_until: str | None = None
+            heart_demon_pending = False
             if success:
                 cultivation_after = 0
                 stamina_after = min(
@@ -7818,18 +7990,33 @@ class SQLitePlayerRepository:
                 reward_items = dict(definition.reward_items or {})
                 for item_key, quantity in reward_items.items():
                     inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
-                connection.execute(
-                    "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
-                    (
-                        definition.target_realm,
-                        definition.reward_currency,
-                        stamina_after,
-                        definition.reward_world_merit,
-                        json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                        now_text,
-                        row["id"],
-                    ),
-                )
+                if is_nascent:
+                    connection.execute(
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, soul_power = 100, soul_power_max = 100, domain_charge = 100, domain_charge_max = 100, cross_realm_penalty_bp = ?, max_hp = max_hp + 600, max_mp = max_mp + 480, carry_capacity = carry_capacity + 50, exploration_efficiency_bp = exploration_efficiency_bp + 1500, heart_demon_bonus_bp = 0, soul_fatigue_until = NULL, updated_at = ? WHERE id = ?",
+                        (
+                            definition.target_realm,
+                            definition.reward_currency,
+                            stamina_after,
+                            definition.reward_world_merit,
+                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            0 if str(row["location_key"]).startswith("xuantian.") else 1000,
+                            now_text,
+                            row["id"],
+                        ),
+                    )
+                else:
+                    connection.execute(
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
+                        (
+                            definition.target_realm,
+                            definition.reward_currency,
+                            stamina_after,
+                            definition.reward_world_merit,
+                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            now_text,
+                            row["id"],
+                        ),
+                    )
                 if definition.reward_local_reputation:
                     reputation = connection.execute(
                         "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
@@ -7856,18 +8043,32 @@ class SQLitePlayerRepository:
                     retention_bp,
                     definition.source_cultivation_cap,
                 )
-                weakness_until = serialize_datetime(now + timedelta(seconds=weakness_seconds))
-                connection.execute(
-                    "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, weakness_until = ?, updated_at = ? WHERE id = ?",
-                    (
-                        cultivation_after,
-                        pity_after,
-                        json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                        weakness_until,
-                        now_text,
-                        row["id"],
-                    ),
-                )
+                if is_nascent:
+                    pity_after = pity_before
+                    heart_demon_pending = True
+                    connection.execute(
+                        "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
+                        (
+                            cultivation_after,
+                            pity_after,
+                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            now_text,
+                            row["id"],
+                        ),
+                    )
+                else:
+                    weakness_until = serialize_datetime(now + timedelta(seconds=weakness_seconds))
+                    connection.execute(
+                        "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, weakness_until = ?, updated_at = ? WHERE id = ?",
+                        (
+                            cultivation_after,
+                            pity_after,
+                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            weakness_until,
+                            now_text,
+                            row["id"],
+                        ),
+                    )
                 status = "failed"
             result = {
                 "success": success,
@@ -7889,17 +8090,44 @@ class SQLitePlayerRepository:
                 "preparation_bp": int(snapshot.get("preparation_bp", 0)),
                 "location_bonus_bp": int(snapshot.get("location_bonus_bp", 0)),
                 "support_bonus_bp": int(snapshot.get("support_bonus_bp", 0)),
+                "cross_realm_risk_bp": int(snapshot.get("cross_realm_risk_bp", 0)),
+                "heart_demon_bonus_bp": int(snapshot.get("heart_demon_bonus_bp", 0)),
                 "reward_currency": definition.reward_currency if success else 0,
                 "reward_stamina": definition.reward_stamina if success else 0,
                 "reward_world_merit": definition.reward_world_merit if success else 0,
                 "reward_local_reputation": definition.reward_local_reputation if success else 0,
                 "reward_items": dict(definition.reward_items or {}) if success else {},
                 "status": status,
+                "heart_demon_pending": heart_demon_pending,
             }
             connection.execute(
                 "UPDATE breakthrough_sessions SET status = ?, result_json = ?, updated_at = ? WHERE id = ?",
                 (status, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
             )
+            if heart_demon_pending:
+                demon_session_id = uuid4().hex
+                demon_snapshot = {
+                    "breakthrough_session_id": session["id"],
+                    "target_realm": "nascent_soul",
+                    "expires_at": serialize_datetime(now + timedelta(hours=24)),
+                    "content_version": result["content_version"],
+                    "rule_version": result["rule_version"],
+                    "pollution_before": int(row["pollution"]),
+                    "pity_before_bp": pity_before,
+                }
+                connection.execute(
+                    "INSERT INTO heart_demon_sessions(session_id, player_id, breakthrough_session_id, operation_id, status, expires_at, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)",
+                    (
+                        demon_session_id,
+                        row["id"],
+                        session["id"],
+                        f"{session['operation_id']}:heart_demon",
+                        demon_snapshot["expires_at"],
+                        json.dumps(demon_snapshot, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                        now_text,
+                    ),
+                )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
                 raise RuntimeError("breakthrough settlement returned no player")
@@ -7910,6 +8138,161 @@ class SQLitePlayerRepository:
                 (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
             )
             return self._breakthrough_settlement_from_payload(payload, replay=False)
+
+    async def resolve_heart_demon(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        choice_key: str,
+        operation_id: str,
+    ) -> HeartDemonResolutionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._resolve_heart_demon_sync,
+                platform,
+                platform_user_id,
+                choice_key,
+                operation_id,
+            )
+
+    def _resolve_heart_demon_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        choice_key: str,
+        operation_id: str,
+    ) -> HeartDemonResolutionRecord:
+        if choice_key not in {"heart_demon.face", "heart_demon.purify", "heart_demon.bargain"}:
+            raise BreakthroughRequirementError("invalid heart demon choice")
+        operation_name = "event.resolve_heart_demon"
+        request_payload = {"platform": platform, "platform_user_id": platform_user_id, "choice_key": choice_key}
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._heart_demon_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            session = connection.execute(
+                "SELECT * FROM heart_demon_sessions WHERE player_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if session is None:
+                raise HeartDemonPendingError("no pending heart demon")
+            try:
+                expired = now >= datetime.fromisoformat(str(session["expires_at"]))
+            except ValueError:
+                expired = False
+            effective_choice = "heart_demon.face" if expired else choice_key
+            if effective_choice == "heart_demon.bargain" and str(row["path_key"] or "") != "demonic" and int(row["pollution"]) < 20:
+                raise BreakthroughRequirementError("bargain requires a demonic path or pollution 20")
+            inventory = self._json_object(row["inventory_json"], {})
+            if effective_choice == "heart_demon.purify":
+                if int(inventory.get("item.pill.soul_restore", 0)) < 1:
+                    raise MaterialInsufficientError("soul restore pill is missing")
+                inventory["item.pill.soul_restore"] = int(inventory.get("item.pill.soul_restore", 0)) - 1
+            pollution_before = int(row["pollution"])
+            pollution_after = pollution_before
+            merit_gain = 0
+            fatigue_hours = 8
+            pity_after = min(1200, int(row["breakthrough_pity_bp"]) + 400)
+            bonus_after = int(row["heart_demon_bonus_bp"])
+            if effective_choice == "heart_demon.face":
+                merit_gain = 50
+            elif effective_choice == "heart_demon.purify":
+                pollution_after = max(0, pollution_before - 10)
+                fatigue_hours = 3
+            else:
+                pollution_after = min(100, pollution_before + 20)
+                fatigue_hours = 12
+                bonus_after = 600
+            fatigue_until = serialize_datetime(now + timedelta(hours=fatigue_hours))
+            connection.execute(
+                "UPDATE players SET inventory_json = ?, pollution = ?, world_merit = world_merit + ?, breakthrough_pity_bp = ?, heart_demon_bonus_bp = ?, soul_fatigue_until = ?, updated_at = ? WHERE id = ?",
+                (
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    pollution_after,
+                    merit_gain,
+                    pity_after,
+                    bonus_after,
+                    fatigue_until,
+                    now_text,
+                    row["id"],
+                ),
+            )
+            result = {
+                "session_id": str(session["session_id"]),
+                "choice_key": effective_choice,
+                "status": "resolved",
+                "pity_after_bp": pity_after,
+                "fatigue_until": fatigue_until,
+                "pollution_before": pollution_before,
+                "pollution_after": pollution_after,
+                "world_merit_gained": merit_gain,
+            }
+            connection.execute(
+                "UPDATE heart_demon_sessions SET status = 'resolved', choice_key = ?, result_json = ?, updated_at = ? WHERE id = ?",
+                (effective_choice, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("heart demon resolution returned no player")
+            payload = {"player": self._player_payload(self._row_to_player(updated)), **result}
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return self._heart_demon_from_payload(payload, replay=False)
+
+    async def recover_soul_fatigue(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> SoulFatigueRecoveryRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._recover_soul_fatigue_sync, platform, platform_user_id, operation_id)
+
+    def _recover_soul_fatigue_sync(self, platform: str, platform_user_id: str, operation_id: str) -> SoulFatigueRecoveryRecord:
+        operation_name = "progression.recover_soul_fatigue"
+        request_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return SoulFatigueRecoveryRecord(player=self._row_to_player(payload["player"]), recovered=bool(payload["recovered"]), already_completed=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            fatigue = row["soul_fatigue_until"]
+            if fatigue:
+                try:
+                    if datetime.fromisoformat(str(fatigue)) > now:
+                        raise SoulFatigueActiveError("soul fatigue is active")
+                except ValueError:
+                    pass
+            connection.execute("UPDATE players SET soul_fatigue_until = NULL, updated_at = ? WHERE id = ?", (now_text, row["id"]))
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("soul fatigue recovery returned no player")
+            payload = {"player": self._player_payload(self._row_to_player(updated)), "recovered": True}
+            connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
+            return SoulFatigueRecoveryRecord(player=self._row_to_player(updated), recovered=True)
 
     async def recover_weakness(
         self,
@@ -8063,6 +8446,24 @@ class SQLitePlayerRepository:
             reward_world_merit=int(payload.get("reward_world_merit", 0)),
             reward_local_reputation=int(payload.get("reward_local_reputation", 0)),
             reward_items={str(key): int(value) for key, value in payload.get("reward_items", {}).items()},
+            already_completed=replay,
+            heart_demon_pending=bool(payload.get("heart_demon_pending", False)),
+            cross_realm_risk_bp=int(payload.get("cross_realm_risk_bp", 0)),
+            heart_demon_bonus_bp=int(payload.get("heart_demon_bonus_bp", 0)),
+        )
+
+    @staticmethod
+    def _heart_demon_from_payload(payload: dict[str, Any], *, replay: bool) -> HeartDemonResolutionRecord:
+        return HeartDemonResolutionRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            session_id=str(payload["session_id"]),
+            choice_key=str(payload["choice_key"]),
+            status=str(payload["status"]),
+            pity_after_bp=int(payload.get("pity_after_bp", 0)),
+            fatigue_until=payload.get("fatigue_until"),
+            pollution_before=int(payload.get("pollution_before", 0)),
+            pollution_after=int(payload.get("pollution_after", 0)),
+            world_merit_gained=int(payload.get("world_merit_gained", 0)),
             already_completed=replay,
         )
 
@@ -11028,6 +11429,23 @@ class SQLitePlayerRepository:
                 else None
             ),
             breakthrough_pity_bp=int(value("breakthrough_pity_bp", 0)),
+            soul_power=int(value("soul_power", 0)),
+            soul_power_max=int(value("soul_power_max", 0)),
+            domain_charge=int(value("domain_charge", 0)),
+            domain_charge_max=int(value("domain_charge_max", 0)),
+            pollution=int(value("pollution", 0)),
+            bloodline_stability=int(value("bloodline_stability", 0)),
+            cross_realm_penalty_bp=int(value("cross_realm_penalty_bp", 0)),
+            soul_fatigue_until=(
+                datetime.fromisoformat(str(value("soul_fatigue_until")))
+                if value("soul_fatigue_until")
+                else None
+            ),
+            heart_demon_bonus_bp=int(value("heart_demon_bonus_bp", 0)),
+            max_hp=int(value("max_hp", 0)),
+            max_mp=int(value("max_mp", 0)),
+            carry_capacity=int(value("carry_capacity", 0)),
+            exploration_efficiency_bp=int(value("exploration_efficiency_bp", 0)),
         )
 
     @staticmethod
@@ -11072,4 +11490,17 @@ class SQLitePlayerRepository:
             "skill_insights": player.skill_insights,
             "weakness_until": serialize_datetime(player.weakness_until) if player.weakness_until else None,
             "breakthrough_pity_bp": player.breakthrough_pity_bp,
+            "soul_power": player.soul_power,
+            "soul_power_max": player.soul_power_max,
+            "domain_charge": player.domain_charge,
+            "domain_charge_max": player.domain_charge_max,
+            "pollution": player.pollution,
+            "bloodline_stability": player.bloodline_stability,
+            "cross_realm_penalty_bp": player.cross_realm_penalty_bp,
+            "soul_fatigue_until": serialize_datetime(player.soul_fatigue_until) if player.soul_fatigue_until else None,
+            "heart_demon_bonus_bp": player.heart_demon_bonus_bp,
+            "max_hp": player.max_hp,
+            "max_mp": player.max_mp,
+            "carry_capacity": player.carry_capacity,
+            "exploration_efficiency_bp": player.exploration_efficiency_bp,
         }

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.2",
-  "rule_version": "items-0.2.0",
+  "content_version": "content-0.3",
+  "rule_version": "items-0.3.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "item",
   "records": [

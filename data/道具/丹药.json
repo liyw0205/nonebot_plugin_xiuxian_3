@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.2",
-  "rule_version": "items-0.2.0",
+  "content_version": "content-0.3",
+  "rule_version": "items-0.3.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "item",
   "records": [
@@ -163,6 +163,32 @@
       "requirements": [],
       "status": "active",
       "key": "item.pill.golden_core_restore"
+    },
+    {
+      "name": "凝魂丹",
+      "item_type": "pill",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "breakthrough_requirement", "target": "nascent_soul"}],
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 10}],
+      "status": "active",
+      "key": "item.pill.soul_condense"
+    },
+    {
+      "name": "魂元丹",
+      "item_type": "pill",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "heart_demon_purify", "pollution_delta": -10, "fatigue_hours": 3}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.soul_restore"
     }
   ],
   "category": "丹药",

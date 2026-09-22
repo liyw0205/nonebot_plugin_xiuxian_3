@@ -82,6 +82,9 @@ class BreakthroughSettlementRecord:
     reward_local_reputation: int = 0
     reward_items: dict[str, int] | None = None
     already_completed: bool = False
+    heart_demon_pending: bool = False
+    cross_realm_risk_bp: int = 0
+    heart_demon_bonus_bp: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,3 +95,30 @@ class WeaknessRecoveryRecord:
     medicine_consumed: bool
     already_completed: bool = False
     medicine_key: str = "item.pill.healing_low"
+
+
+@dataclass(frozen=True, slots=True)
+class HeartDemonResolutionRecord:
+    player: PlayerView
+    session_id: str
+    choice_key: str
+    status: str
+    pity_after_bp: int
+    fatigue_until: str | None
+    pollution_before: int
+    pollution_after: int
+    world_merit_gained: int
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SoulFatigueRecoveryRecord:
+    player: PlayerView
+    recovered: bool
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class NascentSoulPreparationRecord:
+    player: PlayerView
+    already_completed: bool = False

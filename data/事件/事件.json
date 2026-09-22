@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.2",
+  "content_version": "content-0.3",
   "rule_version": "events-0.1.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "event",
@@ -40,6 +40,14 @@
         "completion_bonus_key": "reward.event.spirit_spring.completion"
       },
       "key": "event.spirit_spring"
+    },
+    {
+      "name": "心魔试炼",
+      "status": "open",
+      "trigger": {"operation": "progression.breakthrough_nascent_soul", "result": "failed"},
+      "choices": ["heart_demon.face", "heart_demon.purify", "heart_demon.bargain"],
+      "timeout_seconds": 86400,
+      "key": "event.heart_demon_trial"
     }
   ],
   "schema": "xiuxian.content"

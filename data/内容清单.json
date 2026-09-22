@@ -1,8 +1,8 @@
 {
   "schema": "xiuxian.content",
   "schema_version": 1,
-  "content_version": "content-0.2",
-  "rule_version": "rules-0.2",
+  "content_version": "content-0.3",
+  "rule_version": "rules-0.3",
   "generated_at": "2026-09-22T00:00:00Z",
   "status": "active",
   "files": [
@@ -40,7 +40,7 @@
     {
       "source": "demon.abyss_gate / beast.ten_thousand_hills",
       "label": "未来版本任务",
-      "reason": "quest.demon_intro 与 quest.beast_intro 属于 v0.2，首版入口保持 locked"
+      "reason": "quest.demon_intro 与 quest.beast_intro 属于后续跨界内容，入口保持 locked"
     }
   ],
   "open_realms": [
@@ -48,11 +48,10 @@
     "qi_sensing",
     "qi_gathering",
     "foundation",
-    "golden_core"
-  ],
-  "placeholder_realms": [
+    "golden_core",
     "nascent_soul"
   ],
+  "placeholder_realms": [],
   "review_notes": [
     "item.pill.foundation_guard 仅用于 v0.1 筑基失败保护；v0.2 使用 item.pill.golden_core_guard。",
     "item.token.constitution_reset 仅管理员测试可用，不进入普通掉落。"
