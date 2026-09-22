@@ -35,8 +35,14 @@ class BreakthroughDefinition:
     reward_currency: int = 0
     reward_stamina: int = 0
     reward_world_merit: int = 0
+    reward_local_reputation: int = 0
     reward_items: dict[str, int] | None = None
     source_cultivation_cap: int = 0
+    content_version: str = "content-0.1"
+    required_foundation_quality: int = 0
+    location_bonus_bp: int = 0
+    support_bonus_bp: int = 0
+    support_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +79,7 @@ class BreakthroughSettlementRecord:
     reward_currency: int = 0
     reward_stamina: int = 0
     reward_world_merit: int = 0
+    reward_local_reputation: int = 0
     reward_items: dict[str, int] | None = None
     already_completed: bool = False
 
@@ -84,3 +91,4 @@ class WeaknessRecoveryRecord:
     spirit_stones_spent: int
     medicine_consumed: bool
     already_completed: bool = False
+    medicine_key: str = "item.pill.healing_low"

@@ -129,6 +129,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("开始突破", application.start_breakthrough)
     router.register("结算突破", application.settle_breakthrough)
     router.register("恢复虚弱", application.recover_weakness)
+    router.register("恢复道基震荡", application.recover_foundation_shock)
     router.register("生产预览", application.preview_recipe)
     router.register("开始生产", application.start_production)
     router.register("领取生产", application.complete_production)

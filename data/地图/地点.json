@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.1",
-  "rule_version": "world-0.1.0",
+  "content_version": "content-0.2",
+  "rule_version": "world-0.2.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "location",
   "records": [
@@ -209,6 +209,52 @@
         "read_entry_requirements"
       ],
       "key": "beast.ten_thousand_hills"
+    },
+    {
+      "name": "玄天界·云城",
+      "world": "玄天界",
+      "status": "locked",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "golden_core",
+          "min_layer": 1
+        }
+      ],
+      "travel": {
+        "duration_seconds": 180,
+        "stamina": 8
+      },
+      "environment": {
+        "training_bp": 11000
+      },
+      "actions": [
+        "read_entry_requirements"
+      ],
+      "key": "xuantian.cloud_city"
+    },
+    {
+      "name": "玄天阵堂",
+      "world": "玄天界",
+      "status": "locked",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "golden_core",
+          "min_layer": 1
+        }
+      ],
+      "travel": {
+        "duration_seconds": 0,
+        "stamina": 0
+      },
+      "environment": {
+        "training_bp": 10500
+      },
+      "actions": [
+        "progression.recover_foundation_shock"
+      ],
+      "key": "xuantian.array_hall"
     }
   ],
   "schema": "xiuxian.content"

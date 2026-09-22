@@ -46,6 +46,8 @@ LOCATION_LABELS = {
     "xuantian.wilderness": "玄天界·近郊荒野",
     "xuantian.spirit_field": "玄天界·灵泉谷",
     "cave.mist_grotto": "雾隐洞天·一层",
+    "xuantian.cloud_city": "玄天界·云城",
+    "xuantian.array_hall": "玄天界·阵堂",
 }
 
 REALM_LABELS = {

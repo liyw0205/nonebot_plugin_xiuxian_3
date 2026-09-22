@@ -1,7 +1,7 @@
 """Cross-realm breakthrough domain."""
 
 from .models import BreakthroughDefinition, BreakthroughSessionRecord, BreakthroughSettlementRecord, WeaknessRecoveryRecord
-from .rules import breakthrough_definition, foundation_breakthrough, qi_gathering_breakthrough
+from .rules import breakthrough_definition, foundation_breakthrough, golden_core_breakthrough, qi_gathering_breakthrough
 
 __all__ = [
     "BreakthroughDefinition",
@@ -10,5 +10,6 @@ __all__ = [
     "WeaknessRecoveryRecord",
     "qi_gathering_breakthrough",
     "foundation_breakthrough",
+    "golden_core_breakthrough",
     "breakthrough_definition",
 ]

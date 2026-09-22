@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.1",
-  "rule_version": "items-0.1.0",
+  "content_version": "content-0.2",
+  "rule_version": "items-0.2.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "item",
   "records": [
@@ -96,6 +96,24 @@
       "requirements": [],
       "status": "active",
       "key": "item.token.spirit_tree_water"
+    },
+    {
+      "name": "宗门护法令",
+      "item_type": "token",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "golden_core_support",
+          "target": "progression.breakthrough_golden_core"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.token.faction_seal"
     }
   ],
   "category": "凭证",

@@ -17,6 +17,7 @@ from ...repository import (
     PlayerStageConflictError,
     PlayerSuspendedError,
     ProtectionItemInsufficientError,
+    FoundationQualityInsufficientError,
     RepositoryBusyError,
     WeaknessActiveError,
     WeaknessNotActiveError,
@@ -33,17 +34,23 @@ ITEM_LABELS = {
     "item.mat.array_sand": "阵砂",
     "item.ore.ironstone": "铁石",
     "item.pill.foundation_guard": "筑基护脉丹",
+    "item.pill.core_condense": "凝核丹",
+    "item.pill.golden_core_guard": "金丹护脉丹",
+    "item.pill.golden_core_restore": "金丹恢复丹",
+    "item.material.cloud_iron": "云铁",
     "item.pill.healing_low": "低阶疗伤丹",
 }
 
 REALM_LABELS = {
     "qi_gathering": "聚气",
     "foundation": "筑基",
+    "golden_core": "金丹",
 }
 
 PROTECTION_LABELS = {
     "item.pill.qi_guard": "聚气护脉丹",
     "item.pill.foundation_guard": "筑基护脉丹",
+    "item.pill.golden_core_guard": "金丹护脉丹",
 }
 
 
@@ -82,6 +89,10 @@ class BreakthroughApplication:
                 protection = True
             elif arg in {"筑基", "foundation", "筑基突破"}:
                 target = "foundation"
+            elif arg in {"金丹", "golden_core", "金丹突破"}:
+                target = "golden_core"
+            elif arg in {"金丹护脉丹", "金丹保护", "golden_core_guard"}:
+                protection = True
             else:
                 return None
         return target, protection
@@ -104,12 +115,22 @@ class BreakthroughApplication:
             if definition.formation_bonus_bp and player.subprofession_key == "formation"
             else 0
         )
-        return quality + technique + formation
+        location = (
+            definition.location_bonus_bp
+            if definition.location_bonus_bp and player.location_key == "xuantian.cloud_city"
+            else 0
+        )
+        support = (
+            definition.support_bonus_bp
+            if definition.support_bonus_bp and definition.support_key and player.inventory.get(definition.support_key, 0) > 0
+            else 0
+        )
+        return quality + technique + formation + location + support
 
     async def preview_breakthrough(self, context: CommandContext) -> CommandResult:
         parsed = self._parse_start_args(context.command_args)
         if parsed is None:
-            return CommandResult(False, "INVALID_BREAKTHROUGH_COMMAND", "可用指令：`突破预览 聚气` 或 `突破预览 筑基`。", context.request_id)
+            return CommandResult(False, "INVALID_BREAKTHROUGH_COMMAND", "可用指令：`突破预览 聚气`、`突破预览 筑基` 或 `突破预览 金丹`。", context.request_id)
         target, _ = parsed
         definition = breakthrough_definition(target)
         try:
@@ -125,6 +146,7 @@ class BreakthroughApplication:
             player.realm_key == definition.source_realm
             and player.realm_layer == 10
             and player.total_cultivation >= definition.required_total_cultivation
+            and player.foundation_quality >= definition.required_foundation_quality
             and not missing
             and player.spirit_stones >= definition.currency_cost
         )
@@ -134,11 +156,13 @@ class BreakthroughApplication:
         realm_label = REALM_LABELS[target]
         protection_label = PROTECTION_LABELS[definition.protection_key]
         retention = definition.retention_bp / 100
+        quality_line = f"- **道基质量要求**：{definition.required_foundation_quality}\n" if definition.required_foundation_quality else ""
         message = (
             f"## {realm_label}突破预览\n\n"
             f"**{self._display_name(player)}**当前{('满足' if ready else '尚未满足')}突破条件。\n\n"
             f"- **境界要求**：{REALM_LABELS.get(definition.source_realm, definition.source_realm)} L10（混元）\n"
             f"- **总修为要求**：{definition.required_total_cultivation}\n"
+            f"{quality_line}"
             f"- **当前成功率**：{current_success_bp / 100:.0f}%（基础 {definition.base_success_bp / 100:.0f}%）\n"
             f"- **准备时长**：{definition.duration_seconds // 60} 分钟\n"
             f"- **消耗灵石**：{definition.currency_cost}\n\n"
@@ -153,7 +177,7 @@ class BreakthroughApplication:
     async def start_breakthrough(self, context: CommandContext) -> CommandResult:
         parsed = self._parse_start_args(context.command_args)
         if parsed is None:
-            return CommandResult(False, "INVALID_BREAKTHROUGH_COMMAND", "可用指令：`开始突破 聚气` 或 `开始突破 筑基`，可追加 `护脉`。", context.request_id)
+            return CommandResult(False, "INVALID_BREAKTHROUGH_COMMAND", "可用指令：`开始突破 聚气`、`开始突破 筑基` 或 `开始突破 金丹`，可追加保护丹。", context.request_id)
         target, protection = parsed
         definition = breakthrough_definition(target)
         operation_id = self._operation_id(context, definition.key)
@@ -173,6 +197,8 @@ class BreakthroughApplication:
             return CommandResult(False, "REALM_MISMATCH", "完成入道后才能进行跨境突破。", context.request_id, operation_id)
         except BreakthroughRequirementError:
             return CommandResult(False, "BREAKTHROUGH_REQUIREMENT_MISSING", f"只有{REALM_LABELS.get(definition.source_realm, definition.source_realm)} L10 混元且总修为达到 {definition.required_total_cultivation:,} 才能开始{REALM_LABELS[target]}突破。", context.request_id, operation_id)
+        except FoundationQualityInsufficientError:
+            return CommandResult(False, "FOUNDATION_QUALITY_LOW", f"道基质量至少需要 {definition.required_foundation_quality:,}，未扣除任何资源。", context.request_id, operation_id)
         except BreakthroughBusyError:
             return CommandResult(False, "BREAKTHROUGH_BUSY", "当前已有修炼、生产或突破会话，请先完成后再试。", context.request_id, operation_id)
         except WeaknessActiveError:
@@ -235,6 +261,8 @@ class BreakthroughApplication:
                 reward_lines.append(f"体力 ×{record.reward_stamina}")
             if record.reward_world_merit:
                 reward_lines.append(f"世界功勋 ×{record.reward_world_merit}")
+            if record.reward_local_reputation:
+                reward_lines.append(f"地方名望 ×{record.reward_local_reputation}")
             for item_key, quantity in (record.reward_items or {}).items():
                 reward_lines.append(f"{ITEM_LABELS.get(item_key, '凭证')} ×{quantity}")
             message = (
@@ -247,9 +275,9 @@ class BreakthroughApplication:
             )
         else:
             weak_text = (
-                f"保护丹生效，虚弱 {30 if record.target_realm == 'qi_gathering' else 120} 分钟"
+                f"保护丹生效，虚弱 {30 if record.target_realm == 'qi_gathering' else 120 if record.target_realm == 'foundation' else 240} 分钟"
                 if record.protection_consumed
-                else f"虚弱 {2 if record.target_realm == 'qi_gathering' else 6} 小时"
+                else f"虚弱 {2 if record.target_realm == 'qi_gathering' else 6 if record.target_realm == 'foundation' else 12} 小时"
             )
             message = (
                 "## 突破未成\n\n"
@@ -259,7 +287,7 @@ class BreakthroughApplication:
                 f"- **保底**：下次增加 {record.pity_after_bp - record.pity_before_bp} bp\n\n"
                 "> 虚弱期间不能再次突破；到期后发送 `恢复虚弱`，或使用 `恢复虚弱 提前`。"
             )
-        return CommandResult(True, "BREAKTHROUGH_SUCCEEDED" if record.success else "BREAKTHROUGH_FAILED", message, context.request_id, operation_id, data={"session_id": record.session_id, "target_realm": record.target_realm, "success": record.success, "roll_bp": record.roll_bp, "success_bp": record.success_bp, "cultivation_before": record.cultivation_before, "cultivation_after": record.cultivation_after, "pity_before_bp": record.pity_before_bp, "pity_after_bp": record.pity_after_bp, "preparation_bp": record.preparation_bp, "reward_currency": record.reward_currency, "reward_stamina": record.reward_stamina, "reward_world_merit": record.reward_world_merit, "reward_items": record.reward_items or {}, "protection_consumed": record.protection_consumed, "weakness_until": record.weakness_until, "idempotent_replay": record.already_completed})
+        return CommandResult(True, "BREAKTHROUGH_SUCCEEDED" if record.success else "BREAKTHROUGH_FAILED", message, context.request_id, operation_id, data={"session_id": record.session_id, "target_realm": record.target_realm, "success": record.success, "roll_bp": record.roll_bp, "success_bp": record.success_bp, "cultivation_before": record.cultivation_before, "cultivation_after": record.cultivation_after, "pity_before_bp": record.pity_before_bp, "pity_after_bp": record.pity_after_bp, "preparation_bp": record.preparation_bp, "reward_currency": record.reward_currency, "reward_stamina": record.reward_stamina, "reward_world_merit": record.reward_world_merit, "reward_local_reputation": record.reward_local_reputation, "reward_items": record.reward_items or {}, "protection_consumed": record.protection_consumed, "weakness_until": record.weakness_until, "idempotent_replay": record.already_completed})
 
     async def recover_weakness(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1 or (context.command_args and context.command_args[0] not in {"提前", "立即", "early"}):
@@ -287,6 +315,45 @@ class BreakthroughApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         return CommandResult(True, "WEAKNESS_RECOVERED", f"## 虚弱已恢复\n\n**{self._display_name(record.player)}**可以继续准备突破。\n\n- **提前恢复**：{'是' if record.early else '否'}\n- **消耗灵石**：{record.spirit_stones_spent}\n- **消耗疗伤丹**：{'是' if record.medicine_consumed else '否'}\n\n> 突破失败保底不会被清除。", context.request_id, operation_id, data={"early": record.early, "spirit_stones_spent": record.spirit_stones_spent, "medicine_consumed": record.medicine_consumed, "idempotent_replay": record.already_completed})
+
+    async def recover_foundation_shock(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) > 1 or (context.command_args and context.command_args[0] not in {"提前", "立即", "early"}):
+            return CommandResult(False, "INVALID_RECOVERY_COMMAND", "可用指令：`恢复道基震荡`，或 `恢复道基震荡 提前`。", context.request_id)
+        early = bool(context.command_args)
+        operation_id = self._operation_id(context, "progression.recover_foundation_shock")
+        try:
+            record = await self.repository.recover_foundation_shock(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                early=early,
+                operation_id=operation_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except WeaknessNotActiveError:
+            return CommandResult(False, "WEAKNESS_NOT_ACTIVE", "当前没有需要恢复的道基震荡。", context.request_id, operation_id)
+        except WeaknessActiveError:
+            return CommandResult(False, "WEAKNESS_ACTIVE", "道基震荡尚未到期；提前恢复需要金丹恢复丹 ×1 和 200 灵石。", context.request_id, operation_id)
+        except MaterialInsufficientError:
+            return CommandResult(False, "MATERIAL_INSUFFICIENT", "提前恢复需要金丹恢复丹 ×1，未扣除资源。", context.request_id, operation_id)
+        except CurrencyInsufficientError:
+            return CommandResult(False, "RESOURCE_INSUFFICIENT", "提前恢复需要 200 灵石，未扣除资源。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能恢复道基震荡。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他恢复，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "FOUNDATION_SHOCK_RECOVERED",
+            f"## 道基震荡已恢复\n\n**{self._display_name(record.player)}**可以继续准备金丹突破。\n\n- **提前恢复**：{'是' if record.early else '否'}\n- **消耗灵石**：{record.spirit_stones_spent}\n- **消耗金丹恢复丹**：{'是' if record.medicine_consumed else '否'}\n\n> 突破失败保底不会被清除。",
+            context.request_id,
+            operation_id,
+            data={"early": record.early, "spirit_stones_spent": record.spirit_stones_spent, "medicine_consumed": record.medicine_consumed, "medicine_key": record.medicine_key, "idempotent_replay": record.already_completed},
+        )
 
 
 __all__ = ["BreakthroughApplication"]

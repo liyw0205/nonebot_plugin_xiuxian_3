@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.1",
-  "rule_version": "progression-0.1.1",
+  "content_version": "content-0.2",
+  "rule_version": "progression-0.2.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "realm",
   "records": [
@@ -84,7 +84,7 @@
     },
     {
       "name": "金丹",
-      "status": "placeholder",
+      "status": "open",
       "layer_min": 1,
       "layer_max": 10,
       "layer_thresholds": {

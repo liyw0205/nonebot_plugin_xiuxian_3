@@ -204,3 +204,126 @@ def test_foundation_breakthrough_uses_quality_snapshot_and_grants_cave_pass() ->
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_golden_core_breakthrough_success_grants_merit_and_local_reputation() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "golden-core-success"
+            await _cultivator(runtime, user)
+            _prepare_player(
+                runtime,
+                user,
+                inventory={
+                    "item.pill.core_condense": 1,
+                    "item.material.cloud_iron": 3,
+                    "item.manual.basic_qi": 1,
+                    "item.token.faction_seal": 1,
+                },
+                stones=2_000,
+                layer=10,
+                cultivation=7_700,
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key = 'foundation', total_cultivation = 11960, foundation_quality = 4000, location_key = 'xuantian.cloud_city' WHERE platform_user_id = ?",
+                    (user,),
+                )
+            operation_id = next(
+                f"golden-success-{index}"
+                for index in range(1000)
+                if breakthrough_roll_bp(f"golden-success-{index}") < 5_700
+            )
+            started = await runtime.dispatch(
+                _context(user, "start", operation_id=operation_id),
+                "开始突破 金丹",
+            )
+            assert started.code == "BREAKTHROUGH_STARTED"
+            assert started.data["success_bp"] == 5_700
+            _finish_breakthrough(runtime, started.data["session_id"])
+            settled = await runtime.dispatch(
+                _context(user, "settle", operation_id="golden-settle"),
+                "结算突破",
+            )
+            assert settled.code == "BREAKTHROUGH_SUCCEEDED"
+            assert settled.data["reward_world_merit"] == 100
+            assert settled.data["reward_local_reputation"] == 50
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                row = connection.execute(
+                    "SELECT realm_key, realm_layer, cultivation, total_cultivation, world_merit, spirit_stones FROM players WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+                reputation = connection.execute(
+                    "SELECT local_json FROM player_reputations WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
+                    (user,),
+                ).fetchone()
+            assert row == ("golden_core", 1, 0, 11960, 100, 1_000)
+            assert '"local.xuantian.new_town": 50' in reputation[0]
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_golden_core_failure_protection_and_foundation_shock_recovery() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "golden-core-failure"
+            await _cultivator(runtime, user)
+            _prepare_player(
+                runtime,
+                user,
+                inventory={
+                    "item.pill.core_condense": 1,
+                    "item.material.cloud_iron": 3,
+                    "item.pill.golden_core_guard": 1,
+                    "item.pill.golden_core_restore": 1,
+                },
+                stones=2_000,
+                layer=10,
+                cultivation=7_700,
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key = 'foundation', total_cultivation = 11960, foundation_quality = 4000 WHERE platform_user_id = ?",
+                    (user,),
+                )
+            operation_id = next(
+                f"golden-failure-{index}"
+                for index in range(1000)
+                if breakthrough_roll_bp(f"golden-failure-{index}") >= 4_800
+            )
+            started = await runtime.dispatch(
+                _context(user, "start", operation_id=operation_id),
+                "开始突破 金丹 金丹护脉丹",
+            )
+            assert started.code == "BREAKTHROUGH_STARTED"
+            assert started.data["success_bp"] == 4_800
+            _finish_breakthrough(runtime, started.data["session_id"])
+            settled = await runtime.dispatch(
+                _context(user, "settle", operation_id="golden-failure-settle"),
+                "结算突破",
+            )
+            assert settled.code == "BREAKTHROUGH_FAILED"
+            assert settled.data["cultivation_after"] == 5_390
+            assert settled.data["protection_consumed"] is True
+            early = await runtime.dispatch(
+                _context(user, "recover", operation_id="golden-recover"),
+                "恢复道基震荡 提前",
+            )
+            assert early.code == "FOUNDATION_SHOCK_RECOVERED"
+            assert early.data["spirit_stones_spent"] == 200
+            assert early.data["medicine_key"] == "item.pill.golden_core_restore"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                row = connection.execute(
+                    "SELECT weakness_until, breakthrough_pity_bp, spirit_stones, inventory_json FROM players WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+            assert row[0] is None
+            assert row[1] == 500
+            assert row[2] == 800
+            assert '"item.pill.golden_core_restore": 0' in row[3]
+            await runtime.close()
+
+    asyncio.run(run())

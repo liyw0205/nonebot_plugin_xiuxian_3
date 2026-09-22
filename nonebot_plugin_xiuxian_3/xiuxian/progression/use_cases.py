@@ -33,6 +33,7 @@ from .rules import (
     next_layer_threshold,
     segment_for_layer,
 )
+from ..player.rules import REALM_LABELS
 
 
 class ProgressionApplication:
@@ -69,7 +70,8 @@ class ProgressionApplication:
 
     @staticmethod
     def _realm_text(player) -> str:
-        return f"感气 L{player.realm_layer}（{segment_for_layer(player.realm_layer)}）"
+        label = REALM_LABELS.get(player.realm_key, player.realm_key)
+        return f"{label} L{player.realm_layer}（{segment_for_layer(player.realm_layer)}）"
 
     async def start_cultivation(self, context: CommandContext) -> CommandResult:
         mode_key = self._resolve_mode(context.command_args)
@@ -329,7 +331,7 @@ class ProgressionApplication:
         except CultivationBusyError:
             return CommandResult(False, "CULTIVATION_BUSY", "修炼尚未结算，暂时不能晋升境界。", context.request_id, operation_id)
         except RealmLayerInvalidError:
-            return CommandResult(False, "REALM_LAYER_INVALID", "当前境界已经是感气混元，不能继续晋升。", context.request_id, operation_id)
+            return CommandResult(False, "REALM_LAYER_INVALID", "当前境界已经是混元，不能继续晋升。", context.request_id, operation_id)
         except RealmCultivationInsufficientError:
             return CommandResult(False, "REALM_CULTIVATION_INSUFFICIENT", "境内修为尚未达到下一层门槛，继续修炼后再来。", context.request_id, operation_id)
         except PlayerSuspendedError:

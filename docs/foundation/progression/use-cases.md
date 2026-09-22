@@ -41,9 +41,11 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 的修炼锁或 operation ledger。
 
 聚气突破命令映射为 `突破预览 聚气`、`开始突破 聚气`、`结算突破` 和 `恢复虚弱`（可追加
-`护脉` 或 `提前`）。开始突破独立使用 `progression.breakthrough_qi_gathering` operation，
-结算独立使用 `progression.settle_breakthrough`；两者均保存规则版本、随机池、地点、道途、
-资质、境界和成本快照。当前实现开放聚气与筑基目标；金丹及以上目标明确返回 `CONTENT_CLOSED`。
+`护脉` 或 `提前`）。金丹突破使用 `突破预览 金丹`、`开始突破 金丹`、`结算突破` 和
+`恢复道基震荡`（可追加保护或提前恢复）。开始突破独立使用对应的
+`progression.breakthrough_*` operation，结算独立使用 `progression.settle_breakthrough`；
+两者均保存规则版本、随机池、地点、道途、资质、境界和成本快照。当前实现开放聚气、筑基
+与金丹目标；元婴及以上目标明确保持关闭。
 筑基突破固定使用 5 分钟会话、7,500 bp 基础成功率、聚气修为 70% 失败保留和 6 小时虚弱；
 道基质量、功法、阵法辅修、筑基护脉丹和 +400 bp 失败保底均写入开始快照。
 

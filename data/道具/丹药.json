@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.1",
-  "rule_version": "items-0.1.0",
+  "content_version": "content-0.2",
+  "rule_version": "items-0.2.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "item",
   "records": [
@@ -100,6 +100,69 @@
       "requirements": [],
       "status": "active",
       "key": "item.pill.foundation_guard"
+    },
+    {
+      "name": "凝核丹",
+      "item_type": "pill",
+      "quality": "rare",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_requirement",
+          "target": "golden_core"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 10
+        }
+      ],
+      "status": "active",
+      "key": "item.pill.core_condense"
+    },
+    {
+      "name": "金丹护脉丹",
+      "item_type": "pill",
+      "quality": "rare",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_failure_protection",
+          "target": "golden_core",
+          "cultivation_retention_bp": 7000,
+          "weakness_seconds": 14400
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.golden_core_guard"
+    },
+    {
+      "name": "金丹恢复丹",
+      "item_type": "pill",
+      "quality": "rare",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "recover_breakthrough_shock",
+          "target": "foundation_shock",
+          "currency_cost": 200
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.golden_core_restore"
     }
   ],
   "category": "丹药",

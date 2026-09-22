@@ -177,6 +177,13 @@ class XiuxianApplication:
             write_message="当前事件不允许进行突破结算。",
         )
 
+    async def recover_foundation_shock(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.recover_foundation_shock(context),
+            write_message="当前事件不允许进行突破结算。",
+        )
+
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.production.preview_recipe(context), require_write=False)
 

@@ -14,7 +14,15 @@ ADAPTER_NAME = "qq.official"
 def is_qq_event(event: Any) -> bool:
     module = type(event).__module__.lower()
     if "nonebot.adapters.qq" in module:
-        return True
+        # QQ exposes many non-message events in the same module namespace.
+        # MessageCreate events carry content and an author; reject lifecycle
+        # events before they can reach command matching or persistence.
+        event_name = type(event).__name__.lower()
+        if "message" in event_name:
+            return value(event, "content", default=None) is not None or value(
+                event, "author", default=None
+            ) is not None
+        return False
     return any(
         value(event, name, default=None) is not None
         for name in ("group_openid", "user_openid", "channel_id", "guild_id")

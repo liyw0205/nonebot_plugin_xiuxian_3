@@ -8,6 +8,9 @@ from .models import CultivationMode, LayerUnlock
 
 
 REALM_QI_SENSING = "qi_sensing"
+REALM_QI_GATHERING = "qi_gathering"
+REALM_FOUNDATION = "foundation"
+REALM_GOLDEN_CORE = "golden_core"
 MODE_BREATHING = "cultivate.breathing"
 MODE_SPIRIT_SPRING = "cultivate.spirit_spring"
 RULE_VERSION = "progression-0.1.1"
@@ -16,6 +19,16 @@ SPIRIT_SPRING_RULE_VERSION = "progression-0.1.2"
 # Index zero represents the L1 entry point. Values are the minimum realm
 # cultivation required for each layer in the content-0.1 snapshot.
 QI_SENSING_THRESHOLDS = (0, 80, 170, 280, 410, 560, 730, 920, 1130, 1360)
+QI_GATHERING_THRESHOLDS = (0, 180, 380, 620, 900, 1220, 1580, 1980, 2420, 2900)
+FOUNDATION_THRESHOLDS = (0, 420, 900, 1480, 2180, 3000, 3950, 5050, 6300, 7700)
+GOLDEN_CORE_THRESHOLDS = (0, 2300, 5000, 8200, 12000, 17000, 23000, 30000, 38000, 47000)
+REALM_THRESHOLDS = {
+    REALM_QI_SENSING: QI_SENSING_THRESHOLDS,
+    REALM_QI_GATHERING: QI_GATHERING_THRESHOLDS,
+    REALM_FOUNDATION: FOUNDATION_THRESHOLDS,
+    REALM_GOLDEN_CORE: GOLDEN_CORE_THRESHOLDS,
+}
+FORMAL_REALMS = frozenset(REALM_THRESHOLDS)
 BREATHING_STAMINA_COST = 2
 BREATHING_DURATION_SECONDS = 10 * 60
 BREATHING_BASE_CULTIVATION = 40
@@ -86,12 +99,13 @@ QI_SENSING_LAYER_UNLOCKS: dict[int, tuple[LayerUnlock, ...]] = {
 
 
 def next_layer_threshold(realm_key: str, layer: int) -> int | None:
-    if realm_key != REALM_QI_SENSING or layer < 1:
+    thresholds = REALM_THRESHOLDS.get(realm_key)
+    if thresholds is None or layer < 1:
         return None
     next_layer = layer + 1
     if next_layer > 10:
         return None
-    return QI_SENSING_THRESHOLDS[next_layer - 1]
+    return thresholds[next_layer - 1]
 
 
 def cultivation_mode(mode_key: str) -> CultivationMode:

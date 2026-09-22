@@ -1180,6 +1180,10 @@ class BreakthroughRequirementError(RuntimeError):
     """The player is not eligible for the requested breakthrough."""
 
 
+class FoundationQualityInsufficientError(RuntimeError):
+    """The player's foundation quality is below a breakthrough requirement."""
+
+
 class WeaknessActiveError(RuntimeError):
     """A temporary breakthrough weakness blocks high-risk actions."""
 
@@ -4140,7 +4144,7 @@ class SQLitePlayerRepository:
         mode_key: str,
         operation_id: str,
     ) -> CultivationSessionRecord:
-        from .progression.rules import REALM_QI_SENSING, cultivation_mode
+        from .progression.rules import FORMAL_REALMS, cultivation_mode
 
         operation_payload = {
             "platform": platform,
@@ -4174,7 +4178,7 @@ class SQLitePlayerRepository:
                 )
 
             row = self._require_player(connection, platform, platform_user_id)
-            if row["stage"] != "cultivator" or row["realm_key"] != REALM_QI_SENSING:
+            if row["stage"] != "cultivator" or row["realm_key"] not in FORMAL_REALMS:
                 raise PlayerStageConflictError("player is not ready for cultivation")
             try:
                 mode = cultivation_mode(mode_key)
@@ -6717,7 +6721,7 @@ class SQLitePlayerRepository:
         raise RepositoryBusyError("database remained locked") from last_error
 
     def _advance_layer_once(self, platform: str, platform_user_id: str, operation_id: str) -> LayerAdvanceRecord:
-        from .progression.rules import can_advance_layer, layer_unlocks, next_layer_threshold, REALM_QI_SENSING
+        from .progression.rules import can_advance_layer, layer_unlocks, next_layer_threshold
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.advance_layer", operation_payload)
@@ -6752,7 +6756,7 @@ class SQLitePlayerRepository:
                     unlocks=unlocks,
                 )
             row = self._require_player(connection, platform, platform_user_id)
-            if row["stage"] != "cultivator" or row["realm_key"] != REALM_QI_SENSING:
+            if row["stage"] != "cultivator":
                 raise PlayerStageConflictError("player is not ready to advance")
             running = connection.execute(
                 "SELECT 1 FROM cultivation_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
@@ -6767,11 +6771,12 @@ class SQLitePlayerRepository:
             if retreat is not None:
                 raise CultivationBusyError("retreat is still running")
             layer = int(row["realm_layer"])
-            if layer >= 10 or next_layer_threshold(REALM_QI_SENSING, layer) is None:
+            realm_key = str(row["realm_key"])
+            if layer >= 10 or next_layer_threshold(realm_key, layer) is None:
                 raise RealmLayerInvalidError("realm is already at its maximum layer")
-            if not can_advance_layer(REALM_QI_SENSING, layer, int(row["cultivation"])):
+            if not can_advance_layer(realm_key, layer, int(row["cultivation"])):
                 raise RealmCultivationInsufficientError("realm cultivation is insufficient")
-            unlocks = layer_unlocks(REALM_QI_SENSING, layer + 1)
+            unlocks = layer_unlocks(realm_key, layer + 1)
             connection.execute(
                 "UPDATE players SET realm_layer = realm_layer + 1, updated_at = ? WHERE id = ?",
                 (now_text, row["id"]),
@@ -7537,6 +7542,8 @@ class SQLitePlayerRepository:
                 raise BreakthroughRequirementError("only the current realm's L10 can break through")
             if int(row["total_cultivation"]) < definition.required_total_cultivation:
                 raise BreakthroughRequirementError("total cultivation is insufficient")
+            if int(row["foundation_quality"]) < definition.required_foundation_quality:
+                raise FoundationQualityInsufficientError("foundation quality is insufficient")
             weakness_until = row["weakness_until"]
             if weakness_until:
                 try:
@@ -7604,7 +7611,19 @@ class SQLitePlayerRepository:
                 if definition.formation_bonus_bp and row["subprofession_key"] == "formation"
                 else 0
             )
-            preparation_bp = quality_bonus_bp + technique_bonus_bp + formation_bonus_bp
+            location_bonus_bp = (
+                definition.location_bonus_bp
+                if definition.location_bonus_bp and row["location_key"] == "xuantian.cloud_city"
+                else 0
+            )
+            support_bonus_bp = (
+                definition.support_bonus_bp
+                if definition.support_bonus_bp
+                and definition.support_key
+                and int(inventory.get(definition.support_key, 0)) > 0
+                else 0
+            )
+            preparation_bp = quality_bonus_bp + technique_bonus_bp + formation_bonus_bp + location_bonus_bp + support_bonus_bp
             final_success_bp = success_bp(definition, pity_before, preparation_bp)
             for item_key, quantity in definition.materials.items():
                 inventory[item_key] = int(inventory.get(item_key, 0)) - quantity
@@ -7623,12 +7642,17 @@ class SQLitePlayerRepository:
                 "subprofession_key": row["subprofession_key"],
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "rule_version": definition.rule_version,
+                "content_version": definition.content_version,
                 "random_pool": definition.random_pool,
                 "base_success_bp": definition.base_success_bp,
+                "required_foundation_quality": definition.required_foundation_quality,
                 "foundation_quality": foundation_quality,
                 "quality_bonus_bp": quality_bonus_bp,
                 "technique_bonus_bp": technique_bonus_bp,
                 "formation_bonus_bp": formation_bonus_bp,
+                "location_bonus_bp": location_bonus_bp,
+                "support_bonus_bp": support_bonus_bp,
+                "support_key": definition.support_key,
                 "preparation_bp": preparation_bp,
                 "success_bp": final_success_bp,
                 "pity_before_bp": pity_before,
@@ -7806,6 +7830,23 @@ class SQLitePlayerRepository:
                         row["id"],
                     ),
                 )
+                if definition.reward_local_reputation:
+                    reputation = connection.execute(
+                        "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                        (row["id"],),
+                    ).fetchone()
+                    local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
+                    local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + definition.reward_local_reputation
+                    service_reputation = int(reputation["service_reputation"]) if reputation is not None else 0
+                    connection.execute(
+                        """
+                        INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
+                            service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
+                        """,
+                        (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
+                    )
                 status = "succeeded"
             else:
                 retention_bp = definition.protection_retention_bp if protection_consumed else definition.retention_bp
@@ -7840,11 +7881,18 @@ class SQLitePlayerRepository:
                 "weakness_until": weakness_until,
                 "currency_spent": int(snapshot.get("currency_cost", definition.currency_cost)),
                 "materials": snapshot.get("materials", definition.materials),
+                "content_version": str(snapshot.get("content_version", definition.content_version)),
+                "rule_version": str(snapshot.get("rule_version", definition.rule_version)),
+                "random_pool": str(snapshot.get("random_pool", definition.random_pool)),
                 "foundation_quality": int(snapshot.get("foundation_quality", 0)),
+                "required_foundation_quality": int(snapshot.get("required_foundation_quality", definition.required_foundation_quality)),
                 "preparation_bp": int(snapshot.get("preparation_bp", 0)),
+                "location_bonus_bp": int(snapshot.get("location_bonus_bp", 0)),
+                "support_bonus_bp": int(snapshot.get("support_bonus_bp", 0)),
                 "reward_currency": definition.reward_currency if success else 0,
                 "reward_stamina": definition.reward_stamina if success else 0,
                 "reward_world_merit": definition.reward_world_merit if success else 0,
+                "reward_local_reputation": definition.reward_local_reputation if success else 0,
                 "reward_items": dict(definition.reward_items or {}) if success else {},
                 "status": status,
             }
@@ -7874,14 +7922,35 @@ class SQLitePlayerRepository:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._recover_weakness_sync, platform, platform_user_id, early, operation_id
+                self._recover_weakness_sync, platform, platform_user_id, early, operation_id, None
             )
 
-    def _recover_weakness_sync(self, platform: str, platform_user_id: str, early: bool, operation_id: str) -> WeaknessRecoveryRecord:
+    async def recover_foundation_shock(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        early: bool,
+        operation_id: str,
+    ) -> WeaknessRecoveryRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._recover_weakness_sync, platform, platform_user_id, early, operation_id, "foundation_shock"
+            )
+
+    def _recover_weakness_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        early: bool,
+        operation_id: str,
+        recovery_kind: str | None = None,
+    ) -> WeaknessRecoveryRecord:
         last_error: Exception | None = None
         for attempt in range(5):
             try:
-                return self._recover_weakness_once(platform, platform_user_id, early, operation_id)
+                return self._recover_weakness_once(platform, platform_user_id, early, operation_id, recovery_kind)
             except sqlite3.OperationalError as exc:
                 if "locked" not in str(exc).lower():
                     raise
@@ -7891,8 +7960,15 @@ class SQLitePlayerRepository:
                 time.sleep(0.01 * (2**attempt))
         raise RepositoryBusyError("database remained locked") from last_error
 
-    def _recover_weakness_once(self, platform: str, platform_user_id: str, early: bool, operation_id: str) -> WeaknessRecoveryRecord:
-        operation_name = "progression.recover_weakness"
+    def _recover_weakness_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        early: bool,
+        operation_id: str,
+        recovery_kind: str | None = None,
+    ) -> WeaknessRecoveryRecord:
+        operation_name = "progression.recover_foundation_shock" if recovery_kind == "foundation_shock" else "progression.recover_weakness"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id, "early": early}
         request_hash = self._request_hash(operation_name, request_payload)
         now = datetime.now(timezone.utc)
@@ -7912,6 +7988,7 @@ class SQLitePlayerRepository:
                     early=bool(payload["early"]),
                     spirit_stones_spent=int(payload["spirit_stones_spent"]),
                     medicine_consumed=bool(payload["medicine_consumed"]),
+                    medicine_key=str(payload.get("medicine_key", "item.pill.healing_low")),
                     already_completed=True,
                 )
             row = self._require_player(connection, platform, platform_user_id)
@@ -7921,18 +7998,20 @@ class SQLitePlayerRepository:
             until = datetime.fromisoformat(str(weakness_until))
             expired = now >= until
             inventory = self._json_object(row["inventory_json"], {})
+            medicine_key = "item.pill.golden_core_restore" if recovery_kind == "foundation_shock" else "item.pill.healing_low"
+            stones_cost = 200 if recovery_kind == "foundation_shock" else 50
             medicine_consumed = False
             stones_spent = 0
             if not expired and not early:
                 raise WeaknessActiveError("weakness has not expired")
             if not expired and early:
-                if int(inventory.get("item.pill.healing_low", 0)) < 1:
-                    raise MaterialInsufficientError("early recovery requires a low healing pill")
-                if int(row["spirit_stones"]) < 50:
-                    raise CurrencyInsufficientError("early recovery requires 50 spirit stones")
-                inventory["item.pill.healing_low"] = int(inventory.get("item.pill.healing_low", 0)) - 1
+                if int(inventory.get(medicine_key, 0)) < 1:
+                    raise MaterialInsufficientError("early recovery requires a recovery pill")
+                if int(row["spirit_stones"]) < stones_cost:
+                    raise CurrencyInsufficientError("early recovery requires spirit stones")
+                inventory[medicine_key] = int(inventory.get(medicine_key, 0)) - 1
                 medicine_consumed = True
-                stones_spent = 50
+                stones_spent = stones_cost
             connection.execute(
                 "UPDATE players SET weakness_until = NULL, inventory_json = ?, spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
                 (json.dumps(inventory, ensure_ascii=False, sort_keys=True), stones_spent, now_text, row["id"]),
@@ -7946,6 +8025,7 @@ class SQLitePlayerRepository:
                 "early": early,
                 "spirit_stones_spent": stones_spent,
                 "medicine_consumed": medicine_consumed,
+                "medicine_key": medicine_key,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -7956,6 +8036,7 @@ class SQLitePlayerRepository:
                 early=early,
                 spirit_stones_spent=stones_spent,
                 medicine_consumed=medicine_consumed,
+                medicine_key=medicine_key,
             )
 
     @staticmethod
@@ -7980,6 +8061,7 @@ class SQLitePlayerRepository:
             reward_currency=int(payload.get("reward_currency", 0)),
             reward_stamina=int(payload.get("reward_stamina", 0)),
             reward_world_merit=int(payload.get("reward_world_merit", 0)),
+            reward_local_reputation=int(payload.get("reward_local_reputation", 0)),
             reward_items={str(key): int(value) for key, value in payload.get("reward_items", {}).items()},
             already_completed=replay,
         )

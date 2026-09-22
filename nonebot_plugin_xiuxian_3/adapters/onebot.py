@@ -14,7 +14,14 @@ ADAPTER_NAME = "onebot.v11"
 def is_onebot_v11_event(event: Any) -> bool:
     module = type(event).__module__.lower()
     if "nonebot.adapters.onebot.v11" in module:
-        return True
+        # The adapter module also contains notice/request/meta events.  Only
+        # message events have the identity and message fields needed by the
+        # application boundary.
+        return (
+            value(event, "post_type", default=None) == "message"
+            and value(event, "user_id", default=None) is not None
+            and value(event, "message_type", default=None) in {"group", "private"}
+        )
     return (
         value(event, "post_type", default=None) == "message"
         and value(event, "user_id", default=None) is not None

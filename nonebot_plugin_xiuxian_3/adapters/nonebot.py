@@ -83,6 +83,7 @@ _COMMANDS = (
     "开始突破",
     "结算突破",
     "恢复虚弱",
+    "恢复道基震荡",
     "生产预览",
     "开始生产",
     "领取生产",
@@ -190,7 +191,15 @@ def _canonical_command(text: str) -> str | None:
         configured = get_driver().config.command_start
     except (ImportError, AttributeError, ValueError):
         configured = ("/",)
-    prefixes = (configured,) if isinstance(configured, str) else (configured or ())
+    if isinstance(configured, str):
+        prefixes = (configured,)
+    else:
+        # NoneBot exposes ``command_start`` as a tuple in configured drivers.
+        # Keep the normalizer tolerant of list-like settings and ignore invalid
+        # entries instead of passing a nested tuple to ``str.startswith``.
+        prefixes = tuple(
+            prefix for prefix in (configured or ()) if isinstance(prefix, str)
+        )
     candidates += tuple(
         normalized[len(prefix) :].lstrip()
         for prefix in prefixes
