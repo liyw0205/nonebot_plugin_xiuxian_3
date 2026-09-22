@@ -24,6 +24,7 @@ from .rules import (
     STATUS_LABELS,
     validate_dao_name,
 )
+from ..progression.rules import segment_for_layer
 
 
 class PlayerApplication:
@@ -88,7 +89,13 @@ class PlayerApplication:
     @staticmethod
     def _realm_text(realm_key: str, layer: int) -> str:
         name = REALM_LABELS.get(realm_key, "未知境界")
-        return f"{name} L{layer}" if layer else name
+        if not layer:
+            return name
+        try:
+            segment = segment_for_layer(layer)
+        except ValueError:
+            return f"{name} L{layer}"
+        return f"{name} L{layer}（{segment}）"
 
     @staticmethod
     def _path_text(path_key: str | None, subprofession_key: str | None) -> str:

@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
+    CultivationAlreadyRecoveredError,
+    CultivationAlreadyReadyError,
     CultivationBusyError,
+    CultivationExpiredError,
     CultivationNotFoundError,
     CultivationNotReadyError,
+    CultivationRecoveryRequiredError,
     OperationConflictError,
     PlayerNotFoundError,
     PlayerStageConflictError,
@@ -22,6 +26,7 @@ from .rules import (
     MODE_BREATHING,
     can_advance_layer,
     next_layer_threshold,
+    segment_for_layer,
 )
 
 
@@ -48,6 +53,10 @@ class ProgressionApplication:
             .replace("_", "\\_")
             .replace("~", "\\~")
         )
+
+    @staticmethod
+    def _realm_text(player) -> str:
+        return f"感气 L{player.realm_layer}（{segment_for_layer(player.realm_layer)}）"
 
     @staticmethod
     def _invalid_context(context: CommandContext) -> CommandResult | None:
@@ -81,6 +90,8 @@ class ProgressionApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能修炼。", context.request_id, operation_id)
         except CultivationBusyError:
             return CommandResult(False, "CULTIVATION_BUSY", "你已经有一场修炼正在进行，请先结算或取消。", context.request_id, operation_id)
+        except CultivationRecoveryRequiredError:
+            return CommandResult(False, "CULTIVATION_RECOVERY_REQUIRED", "上一场修炼已过期，请先发送 `恢复修炼` 完成结算。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，暂时无法开始修炼。", context.request_id, operation_id)
         except OperationConflictError:
@@ -136,6 +147,14 @@ class ProgressionApplication:
             return CommandResult(False, "CULTIVATION_NOT_FOUND", "当前没有可结算的修炼。", context.request_id, operation_id)
         except CultivationNotReadyError:
             return CommandResult(False, "CULTIVATION_NOT_READY", "修炼尚未结束，请稍后再来结算。", context.request_id, operation_id)
+        except CultivationExpiredError:
+            return CommandResult(
+                False,
+                "CULTIVATION_EXPIRED",
+                "这场修炼已超过普通结算时限，请发送 `恢复修炼`，按原始修炼快照完成一次恢复结算。",
+                context.request_id,
+                operation_id,
+            )
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能结算修炼。", context.request_id, operation_id)
         except OperationConflictError:
@@ -151,7 +170,7 @@ class ProgressionApplication:
         message = (
             "## 修炼结算完成\n\n"
             f"**{self._display_name(player)}**获得 **修为 ×{record.cultivation_gain}**。\n\n"
-            f"- **境界**：感气 L{player.realm_layer}\n"
+            f"- **境界**：{self._realm_text(player)}\n"
             f"- **境内修为**：{player.cultivation}/{threshold or '混元'}\n"
             f"- **总修为**：{player.total_cultivation}\n"
             f"- **体力**：{player.stamina}/{player.stamina_max}\n\n"
@@ -176,6 +195,64 @@ class ProgressionApplication:
             },
         )
 
+    async def recover_cultivation(self, context: CommandContext) -> CommandResult:
+        invalid = self._invalid_context(context)
+        if invalid is not None:
+            return invalid
+        if context.command_args:
+            return CommandResult(False, "INVALID_CULTIVATION_COMMAND", "恢复修炼无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "progression.recover_cultivation")
+        try:
+            record = await self.repository.recover_cultivation(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except CultivationNotFoundError:
+            return CommandResult(False, "CULTIVATION_NOT_FOUND", "当前没有需要恢复的过期修炼。", context.request_id, operation_id)
+        except CultivationNotReadyError:
+            return CommandResult(False, "CULTIVATION_NOT_READY", "修炼尚未达到可恢复时间，请在普通结算时限后再试。", context.request_id, operation_id)
+        except CultivationAlreadyRecoveredError:
+            return CommandResult(False, "CULTIVATION_ALREADY_RECOVERED", "这场过期修炼已经恢复结算过，不能重复获得修为。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能恢复修炼。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求的操作编号已用于其他恢复，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+
+        player = record.player
+        threshold = next_layer_threshold(player.realm_key, player.realm_layer)
+        return CommandResult(
+            True,
+            "CULTIVATION_RECOVERED",
+            (
+                "## 过期修炼已恢复\n\n"
+                f"**{self._display_name(player)}**按原始修炼快照完成了迟到结算。\n\n"
+                f"- **恢复修为**：{record.cultivation_gain}\n"
+                f"- **境界**：{self._realm_text(player)}\n"
+                f"- **境内修为**：{player.cultivation}/{threshold or '混元'}\n"
+                f"- **总修为**：{player.total_cultivation}\n\n"
+                "> 这场修炼只会恢复结算一次；达到门槛后可发送 `晋升境界`。"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "dao_name": player.dao_name,
+                "session_id": record.session_id,
+                "cultivation_gain": record.cultivation_gain,
+                "cultivation": player.cultivation,
+                "total_cultivation": player.total_cultivation,
+                "realm_key": player.realm_key,
+                "realm_layer": player.realm_layer,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
     async def cancel_cultivation(self, context: CommandContext) -> CommandResult:
         invalid = self._invalid_context(context)
         if invalid is not None:
@@ -193,6 +270,10 @@ class ProgressionApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except CultivationNotFoundError:
             return CommandResult(False, "CULTIVATION_NOT_FOUND", "当前没有可取消的修炼。", context.request_id, operation_id)
+        except CultivationAlreadyReadyError:
+            return CommandResult(False, "CULTIVATION_READY", "修炼已经结束，不能取消，请发送 `结算修炼`。", context.request_id, operation_id)
+        except CultivationExpiredError:
+            return CommandResult(False, "CULTIVATION_EXPIRED", "这场修炼已过期，不能取消，请发送 `恢复修炼` 完成结算。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能取消修炼。", context.request_id, operation_id)
         except OperationConflictError:
@@ -255,12 +336,18 @@ class ProgressionApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         player = record.player
         threshold = next_layer_threshold(player.realm_key, player.realm_layer)
+        unlock_lines = ""
+        if record.unlocks:
+            unlock_lines = "\n\n### 本层解锁\n\n" + "\n".join(
+                f"- **{item.title}**：{item.description}" for item in record.unlocks
+            )
         message = (
             "## 境界晋升\n\n"
-            f"**{self._display_name(player)}**已进入 **感气 L{player.realm_layer}**。\n\n"
+            f"**{self._display_name(player)}**已进入 **{self._realm_text(player)}**。\n\n"
             f"- **境内修为**：{player.cultivation}/{threshold or '混元'}\n"
             f"- **总修为**：{player.total_cultivation}\n\n"
             "> 下一步：继续 `开始修炼`，逐层稳固修为。"
+            f"{unlock_lines}"
         )
         return CommandResult(
             True,
@@ -274,6 +361,15 @@ class ProgressionApplication:
                 "realm_layer": player.realm_layer,
                 "cultivation": player.cultivation,
                 "total_cultivation": player.total_cultivation,
+                "unlocks": [
+                    {
+                        "key": item.key,
+                        "title": item.title,
+                        "description": item.description,
+                        "status": item.status,
+                    }
+                    for item in record.unlocks
+                ],
                 "idempotent_replay": record.already_completed,
             },
         )

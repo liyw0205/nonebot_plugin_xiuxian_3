@@ -42,6 +42,9 @@ class XiuxianApplication:
     async def settle_cultivation(self, context: CommandContext) -> CommandResult:
         return await self.progression.settle_cultivation(context)
 
+    async def recover_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self.progression.recover_cultivation(context)
+
     async def cancel_cultivation(self, context: CommandContext) -> CommandResult:
         return await self.progression.cancel_cultivation(context)
 

@@ -24,9 +24,11 @@ from .player.models import (
 from .player.rules import STAGE_MORTAL, STAGE_NEW_USER, qualification_for
 from .progression.models import (
     CultivationCancelRecord,
+    CultivationRecoveryRecord,
     CultivationSessionRecord,
     CultivationSettlementRecord,
     LayerAdvanceRecord,
+    LayerUnlock,
     ResourceRecoveryRecord,
 )
 
@@ -86,7 +88,7 @@ CREATE TABLE IF NOT EXISTS cultivation_sessions (
     player_id INTEGER NOT NULL REFERENCES players(id),
     operation_id TEXT NOT NULL UNIQUE,
     mode_key TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('running', 'settled', 'cancelled')),
+    status TEXT NOT NULL CHECK (status IN ('running', 'settled', 'cancelled', 'expired')),
     starts_at TEXT NOT NULL,
     ends_at TEXT NOT NULL,
     stamina_cost INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0),
@@ -151,12 +153,28 @@ class CultivationBusyError(RuntimeError):
     """The player already has a running cultivation session."""
 
 
+class CultivationRecoveryRequiredError(RuntimeError):
+    """An expired session must be recovered before another one can start."""
+
+
 class CultivationNotFoundError(RuntimeError):
     """The player has no running cultivation session."""
 
 
 class CultivationNotReadyError(RuntimeError):
     """A cultivation session has not reached its end time."""
+
+
+class CultivationAlreadyReadyError(RuntimeError):
+    """A cultivation session reached its end and must be settled, not cancelled."""
+
+
+class CultivationExpiredError(RuntimeError):
+    """A session missed its normal settlement window and needs recovery."""
+
+
+class CultivationAlreadyRecoveredError(RuntimeError):
+    """An expired session already received its one allowed recovery result."""
 
 
 class RealmCultivationInsufficientError(RuntimeError):
@@ -208,6 +226,7 @@ class SQLitePlayerRepository:
         with self._connect() as connection:
             connection.executescript(SCHEMA)
             self._migrate_legacy_schema(connection)
+            self._migrate_cultivation_session_status(connection)
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
                 "ON players(dao_name) WHERE dao_name <> ''"
@@ -252,6 +271,63 @@ class SQLitePlayerRepository:
         }
         if "request_hash" not in operation_columns:
             connection.execute("ALTER TABLE operations ADD COLUMN request_hash TEXT NOT NULL DEFAULT ''")
+
+    @staticmethod
+    def _migrate_cultivation_session_status(connection: sqlite3.Connection) -> None:
+        """Rebuild the early session table so old databases accept ``expired``.
+
+        SQLite cannot alter a CHECK constraint in place.  The migration keeps
+        every existing session and operation reference while replacing only
+        the table definition and its indexes.
+        """
+
+        table = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'cultivation_sessions'"
+        ).fetchone()
+        schema_sql = str(table[0]) if table and table[0] else ""
+        if "'expired'" in schema_sql:
+            return
+        connection.execute("DROP INDEX IF EXISTS idx_cultivation_sessions_active")
+        connection.execute("DROP INDEX IF EXISTS idx_cultivation_sessions_player")
+        connection.execute("ALTER TABLE cultivation_sessions RENAME TO cultivation_sessions_legacy")
+        connection.execute(
+            """
+            CREATE TABLE cultivation_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL UNIQUE,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                operation_id TEXT NOT NULL UNIQUE,
+                mode_key TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('running', 'settled', 'cancelled', 'expired')),
+                starts_at TEXT NOT NULL,
+                ends_at TEXT NOT NULL,
+                stamina_cost INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0),
+                snapshot_json TEXT NOT NULL DEFAULT '{}',
+                result_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO cultivation_sessions(
+                id, session_id, player_id, operation_id, mode_key, status,
+                starts_at, ends_at, stamina_cost, snapshot_json, result_json,
+                created_at, updated_at
+            )
+            SELECT id, session_id, player_id, operation_id, mode_key, status,
+                   starts_at, ends_at, stamina_cost, snapshot_json, result_json,
+                   created_at, updated_at
+            FROM cultivation_sessions_legacy
+            """
+        )
+        connection.execute("DROP TABLE cultivation_sessions_legacy")
+        connection.execute("CREATE INDEX idx_cultivation_sessions_player ON cultivation_sessions(player_id)")
+        connection.execute(
+            "CREATE UNIQUE INDEX idx_cultivation_sessions_active "
+            "ON cultivation_sessions(player_id) WHERE status = 'running'"
+        )
 
     @staticmethod
     def _request_hash(operation_name: str, payload: dict[str, Any]) -> str:
@@ -1112,12 +1188,16 @@ class SQLitePlayerRepository:
                 raise PlayerStageConflictError("player is not ready for cultivation")
             if mode_key != MODE_BREATHING:
                 raise ValueError("unsupported cultivation mode")
-            running = connection.execute(
-                "SELECT 1 FROM cultivation_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+            pending = connection.execute(
+                "SELECT status, result_json FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
             ).fetchone()
-            if running is not None:
+            if pending is not None and pending["status"] == "running":
                 raise CultivationBusyError("player already has a running cultivation")
+            if pending is not None:
+                pending_result = self._json_object(pending["result_json"], {})
+                if "cultivation_gain" not in pending_result:
+                    raise CultivationRecoveryRequiredError("expired cultivation requires recovery")
             if int(row["stamina"]) < BREATHING_STAMINA_COST:
                 raise ResourceInsufficientError("stamina is insufficient")
 
@@ -1226,7 +1306,7 @@ class SQLitePlayerRepository:
         raise RepositoryBusyError("database remained locked") from last_error
 
     def _settle_cultivation_once(self, platform: str, platform_user_id: str, operation_id: str) -> CultivationSettlementRecord:
-        from .progression.rules import cultivation_gain
+        from .progression.rules import CULTIVATION_SETTLEMENT_GRACE_SECONDS, cultivation_gain
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.settle_cultivation", operation_payload)
@@ -1261,14 +1341,47 @@ class SQLitePlayerRepository:
             if row["status"] != "active":
                 raise PlayerSuspendedError("player is not writable")
             session = connection.execute(
-                "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
+                "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
             ).fetchone()
             if session is None:
                 raise CultivationNotFoundError("no running cultivation")
+            if session["status"] == "expired":
+                raise CultivationExpiredError("cultivation requires recovery")
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now < ends_at:
                 raise CultivationNotReadyError("cultivation is not ready")
+            if now > ends_at + timedelta(seconds=CULTIVATION_SETTLEMENT_GRACE_SECONDS):
+                expiry_payload = {
+                    "platform": platform,
+                    "platform_user_id": platform_user_id,
+                    "session_id": str(session["session_id"]),
+                }
+                connection.execute(
+                    "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
+                    (
+                        json.dumps({"expired_at": now_text, "recovery_pending": True}, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                        session["id"],
+                    ),
+                )
+                connection.execute(
+                    "INSERT OR IGNORE INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        f"progression.expire_cultivation:{session['session_id']}",
+                        "progression.expire_cultivation",
+                        row["id"],
+                        self._request_hash("progression.expire_cultivation", expiry_payload),
+                        json.dumps(
+                            {"session_id": session["session_id"], "status": "expired"},
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
+                        now_text,
+                    ),
+                )
+                connection.commit()
+                raise CultivationExpiredError("cultivation settlement window expired")
             snapshot = self._json_object(session["snapshot_json"], {})
             qualification = self._json_object(snapshot.get("qualification", {}), {})
             gain = cultivation_gain(int(snapshot.get("base_cultivation", 40)), qualification)
@@ -1302,6 +1415,142 @@ class SQLitePlayerRepository:
             )
             return CultivationSettlementRecord(player=player, session_id=session["session_id"], cultivation_gain=gain)
 
+    async def recover_cultivation(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> CultivationRecoveryRecord:
+        """Recover one expired cultivation session using its original snapshot."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._recover_cultivation_sync,
+                platform,
+                platform_user_id,
+                operation_id,
+            )
+
+    def _recover_cultivation_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> CultivationRecoveryRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._recover_cultivation_once(platform, platform_user_id, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _recover_cultivation_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> CultivationRecoveryRecord:
+        from .progression.rules import CULTIVATION_SETTLEMENT_GRACE_SECONDS, cultivation_gain
+
+        operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash("progression.recover_cultivation", operation_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "progression.recover_cultivation"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return CultivationRecoveryRecord(
+                    player=self._row_to_player(payload["player"]),
+                    session_id=str(payload["session_id"]),
+                    cultivation_gain=int(payload["cultivation_gain"]),
+                    already_completed=True,
+                )
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            session = connection.execute(
+                "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if session is None:
+                raise CultivationNotFoundError("no expired cultivation")
+            session_result = self._json_object(session["result_json"], {})
+            if "cultivation_gain" in session_result:
+                raise CultivationAlreadyRecoveredError("cultivation was already recovered")
+            ends_at = datetime.fromisoformat(str(session["ends_at"]))
+            if now < ends_at:
+                raise CultivationNotReadyError("cultivation is not ready")
+            if now <= ends_at + timedelta(seconds=CULTIVATION_SETTLEMENT_GRACE_SECONDS):
+                raise CultivationNotReadyError("cultivation is still within the normal settlement window")
+            snapshot = self._json_object(session["snapshot_json"], {})
+            qualification = self._json_object(snapshot.get("qualification", {}), {})
+            gain = cultivation_gain(int(snapshot.get("base_cultivation", 40)), qualification)
+            connection.execute(
+                "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, updated_at = ? WHERE id = ?",
+                (gain, gain, now_text, row["id"]),
+            )
+            connection.execute(
+                "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
+                (
+                    json.dumps(
+                        {"cultivation_gain": gain, "recovered_after_expiry": True},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    now_text,
+                    session["id"],
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("cultivation recovery returned no player")
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "session_id": session["session_id"],
+                "cultivation_gain": gain,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    "progression.recover_cultivation",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return CultivationRecoveryRecord(
+                player=player,
+                session_id=session["session_id"],
+                cultivation_gain=gain,
+            )
+
     async def cancel_cultivation(
         self,
         *,
@@ -1333,6 +1582,8 @@ class SQLitePlayerRepository:
         raise RepositoryBusyError("database remained locked") from last_error
 
     def _cancel_cultivation_once(self, platform: str, platform_user_id: str, operation_id: str) -> CultivationCancelRecord:
+        from .progression.rules import CULTIVATION_SETTLEMENT_GRACE_SECONDS
+
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.cancel_cultivation", operation_payload)
         now_text = serialize_datetime(datetime.now(timezone.utc))
@@ -1369,6 +1620,45 @@ class SQLitePlayerRepository:
             ).fetchone()
             if session is None:
                 raise CultivationNotFoundError("no running cultivation")
+            ends_at = datetime.fromisoformat(str(session["ends_at"]))
+            now = datetime.now(timezone.utc)
+            if now >= ends_at:
+                if now > ends_at + timedelta(seconds=CULTIVATION_SETTLEMENT_GRACE_SECONDS):
+                    expiry_payload = {
+                        "platform": platform,
+                        "platform_user_id": platform_user_id,
+                        "session_id": str(session["session_id"]),
+                    }
+                    connection.execute(
+                        "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
+                        (
+                            json.dumps(
+                                {"expired_at": serialize_datetime(now), "recovery_pending": True},
+                                ensure_ascii=False,
+                                sort_keys=True,
+                            ),
+                            serialize_datetime(now),
+                            session["id"],
+                        ),
+                    )
+                    connection.execute(
+                        "INSERT OR IGNORE INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (
+                            f"progression.expire_cultivation:{session['session_id']}",
+                            "progression.expire_cultivation",
+                            row["id"],
+                            self._request_hash("progression.expire_cultivation", expiry_payload),
+                            json.dumps(
+                                {"session_id": session["session_id"], "status": "expired"},
+                                ensure_ascii=False,
+                                sort_keys=True,
+                            ),
+                            serialize_datetime(now),
+                        ),
+                    )
+                    connection.commit()
+                    raise CultivationExpiredError("cultivation cancellation window expired")
+                raise CultivationAlreadyReadyError("cultivation must be settled")
             refund = int(session["stamina_cost"])
             connection.execute(
                 "UPDATE players SET stamina = MIN(stamina_max, stamina + ?), updated_at = ? WHERE id = ?",
@@ -1426,7 +1716,7 @@ class SQLitePlayerRepository:
         raise RepositoryBusyError("database remained locked") from last_error
 
     def _advance_layer_once(self, platform: str, platform_user_id: str, operation_id: str) -> LayerAdvanceRecord:
-        from .progression.rules import can_advance_layer, next_layer_threshold, REALM_QI_SENSING
+        from .progression.rules import can_advance_layer, layer_unlocks, next_layer_threshold, REALM_QI_SENSING
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.advance_layer", operation_payload)
@@ -1444,7 +1734,22 @@ class SQLitePlayerRepository:
                 ):
                     raise OperationConflictError("operation input differs from its original request")
                 payload = json.loads(existing_operation["result_json"])
-                return LayerAdvanceRecord(player=self._row_to_player(payload["player"]), changed=True, already_completed=True)
+                unlocks = tuple(
+                    LayerUnlock(
+                        key=str(item.get("key", "")),
+                        title=str(item.get("title", "")),
+                        description=str(item.get("description", "")),
+                        status=str(item.get("status", "preview")),
+                    )
+                    for item in payload.get("unlocks", [])
+                    if isinstance(item, dict)
+                )
+                return LayerAdvanceRecord(
+                    player=self._row_to_player(payload["player"]),
+                    changed=True,
+                    already_completed=True,
+                    unlocks=unlocks,
+                )
             row = connection.execute(
                 "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
                 (platform, platform_user_id),
@@ -1466,6 +1771,7 @@ class SQLitePlayerRepository:
                 raise RealmLayerInvalidError("realm is already at its maximum layer")
             if not can_advance_layer(REALM_QI_SENSING, layer, int(row["cultivation"])):
                 raise RealmCultivationInsufficientError("realm cultivation is insufficient")
+            unlocks = layer_unlocks(REALM_QI_SENSING, layer + 1)
             connection.execute(
                 "UPDATE players SET realm_layer = realm_layer + 1, updated_at = ? WHERE id = ?",
                 (now_text, row["id"]),
@@ -1474,7 +1780,18 @@ class SQLitePlayerRepository:
             if updated is None:
                 raise RuntimeError("layer advancement returned no player")
             player = self._row_to_player(updated)
-            payload = {"player": self._player_payload(player)}
+            payload = {
+                "player": self._player_payload(player),
+                "unlocks": [
+                    {
+                        "key": item.key,
+                        "title": item.title,
+                        "description": item.description,
+                        "status": item.status,
+                    }
+                    for item in unlocks
+                ],
+            }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (
@@ -1486,7 +1803,7 @@ class SQLitePlayerRepository:
                     now_text,
                 ),
             )
-            return LayerAdvanceRecord(player=player, changed=True)
+            return LayerAdvanceRecord(player=player, changed=True, unlocks=unlocks)
 
     async def recover_resources(
         self,

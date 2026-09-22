@@ -28,6 +28,16 @@ class CultivationSettlementRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class CultivationRecoveryRecord:
+    """A late settlement recovered from a session outside its normal window."""
+
+    player: PlayerView
+    session_id: str
+    cultivation_gain: int
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class CultivationCancelRecord:
     player: PlayerView
     session_id: str
@@ -40,6 +50,17 @@ class LayerAdvanceRecord:
     player: PlayerView
     changed: bool
     already_completed: bool = False
+    unlocks: tuple["LayerUnlock", ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class LayerUnlock:
+    """A content capability or preview unlocked at a progression milestone."""
+
+    key: str
+    title: str
+    description: str
+    status: str = "preview"
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,8 +75,10 @@ class ResourceRecoveryRecord:
 
 __all__ = [
     "CultivationCancelRecord",
+    "CultivationRecoveryRecord",
     "CultivationSessionRecord",
     "CultivationSettlementRecord",
+    "LayerUnlock",
     "LayerAdvanceRecord",
     "ResourceRecoveryRecord",
 ]

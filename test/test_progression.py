@@ -80,6 +80,7 @@ def test_cultivation_session_settlement_and_layer_advance() -> None:
             profile = await runtime.dispatch(_context(user, "profile"), "我的状态")
             assert "境内修为" in profile.message
             assert "总修为" in profile.message
+            assert "入门" in profile.message
             assert "体修" in profile.message
             await runtime.close()
 
@@ -118,6 +119,94 @@ def test_cultivation_cancel_and_resource_recovery_are_idempotent() -> None:
             assert recovered.data["periods"] == 2
             assert recovered.data["stamina"] == 12
             assert recovered.data["energy"] == 10
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_expired_cultivation_requires_recovery_and_replays_once() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "expired-user"
+            await _enter_cultivator(runtime, user)
+            started = await runtime.dispatch(_context(user, "start"), "开始修炼")
+            assert started.code == "CULTIVATION_STARTED"
+            old = datetime.now(timezone.utc) - timedelta(hours=25)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE cultivation_sessions SET ends_at = ? WHERE session_id = ?",
+                    ((old - timedelta(minutes=1)).isoformat(), started.data["session_id"]),
+                )
+
+            expired = await runtime.dispatch(_context(user, "settle"), "结算修炼")
+            assert expired.code == "CULTIVATION_EXPIRED"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                status = connection.execute(
+                    "SELECT status FROM cultivation_sessions WHERE session_id = ?",
+                    (started.data["session_id"],),
+                ).fetchone()[0]
+            assert status == "expired"
+            blocked = await runtime.dispatch(_context(user, "start-again"), "开始修炼")
+            assert blocked.code == "CULTIVATION_RECOVERY_REQUIRED"
+
+            recovered = await runtime.dispatch(
+                _context(user, "recover", operation_id="recover-1"),
+                "恢复修炼",
+            )
+            assert recovered.code == "CULTIVATION_RECOVERED"
+            assert recovered.data["cultivation_gain"] >= 41
+            replay = await runtime.dispatch(
+                _context(user, "recover-replay", operation_id="recover-1"),
+                "恢复修炼",
+            )
+            assert replay.code == "CULTIVATION_RECOVERED"
+            assert replay.data["idempotent_replay"] is True
+            assert replay.data["cultivation"] == recovered.data["cultivation"]
+            duplicate = await runtime.dispatch(_context(user, "recover-2"), "恢复修炼")
+            assert duplicate.code == "CULTIVATION_ALREADY_RECOVERED"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_qi_sensing_milestone_unlocks_are_boundary_stable() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "milestone-user"
+            await _enter_cultivator(runtime, user)
+            thresholds = (170, 560, 1130, 1360)
+            expected = (
+                {"guidance.path", "livelihood.service.second.preview"},
+                {"cultivate.seclusion.preview", "sect.regular_task"},
+                {"progression.breakthrough.preview", "exploration.elite.preview"},
+                {"progression.cross_realm.preview"},
+            )
+            for index, (target_layer, cultivation) in enumerate(zip((3, 6, 9, 10), thresholds, strict=True)):
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET realm_layer = ?, cultivation = ? WHERE platform_user_id = ?",
+                        (target_layer - 1, cultivation, user),
+                    )
+                result = await runtime.dispatch(
+                    _context(user, f"advance-{index}", operation_id=f"advance-{index}"),
+                    "晋升境界",
+                )
+                assert result.code == "REALM_LAYER_ADVANCED"
+                assert {item["key"] for item in result.data["unlocks"]} == expected[index]
+                assert all(item["status"] in {"open", "preview"} for item in result.data["unlocks"])
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET realm_layer = 9, cultivation = 1360 WHERE platform_user_id = ?",
+                    (user,),
+                )
+            replay = await runtime.dispatch(
+                _context(user, "advance-replay", operation_id="advance-3"),
+                "晋升境界",
+            )
+            assert replay.data["idempotent_replay"] is True
+            assert {item["key"] for item in replay.data["unlocks"]} == {"progression.cross_realm.preview"}
             await runtime.close()
 
     asyncio.run(run())
