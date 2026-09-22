@@ -131,6 +131,12 @@ class PlayerView:
     initiative: int = 0
     faction_reputation: dict[str, int] = field(default_factory=dict)
     domain_level: int = 0
+    void_power: int = 0
+    void_power_max: int = 0
+    space_resistance_bp: int = 0
+    void_instability_until: datetime | None = None
+    void_route_count: int = 0
+    void_anchor_capacity: int = 0
 
 
 def serialize_datetime(value: datetime) -> str:

@@ -265,7 +265,7 @@ class PlayerApplication:
             f"- **神魂**：{player.soul_power}/{player.soul_power_max}\n"
             f"- **领域能量**：{player.domain_charge}/{player.domain_charge_max}\n"
             f"- **污染**：{player.pollution}\n"
-            if player.realm_key in {"nascent_soul", "soul_transformation"}
+            if player.realm_key in {"nascent_soul", "soul_transformation", "void_refining"}
             else ""
         )
         domain_summary = (
@@ -273,8 +273,15 @@ class PlayerApplication:
             f"- **领域力量**：{player.domain_power}\n"
             f"- **领域抵抗**：{player.realm_resistance_bp} bp\n"
             f"- **领域裂痕**：{player.domain_crack_until.isoformat() if player.domain_crack_until else '无'}\n"
-            if player.realm_key == "soul_transformation"
+            if player.realm_key in {"soul_transformation", "void_refining"}
             else ""
+        )
+        void_summary = (
+            f"- **虚力**：{player.void_power}/{player.void_power_max}\n"
+            f"- **空间抗性**：{player.space_resistance_bp} bp\n"
+            f"- **虚空航道发现**：{player.void_route_count}\n"
+            f"- **虚空不稳定**：{player.void_instability_until.isoformat() if player.void_instability_until else '无'}\n"
+            if player.realm_key == "void_refining" else ""
         )
         return CommandResult(
             ok=True,
@@ -296,6 +303,7 @@ class PlayerApplication:
                 f"- **世界功勋**：{player.world_merit}\n"
                 f"{soul_summary}"
                 f"{domain_summary}"
+                f"{void_summary}"
                 "\n### 六项资质\n\n"
                 f"{self._qualification_text(player.qualification)}"
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(player.intro_flags))}/3"
@@ -341,6 +349,12 @@ class PlayerApplication:
                 "initiative": player.initiative,
                 "domain_level": player.domain_level,
                 "faction_reputation": player.faction_reputation,
+                "void_power": player.void_power,
+                "void_power_max": player.void_power_max,
+                "space_resistance_bp": player.space_resistance_bp,
+                "void_instability_until": player.void_instability_until.isoformat() if player.void_instability_until else None,
+                "void_route_count": player.void_route_count,
+                "void_anchor_capacity": player.void_anchor_capacity,
             },
         )
 

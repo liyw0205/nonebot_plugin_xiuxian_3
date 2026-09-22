@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.4",
-  "rule_version": "items-0.4.0",
+  "content_version": "content-0.5",
+  "rule_version": "items-0.5.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "item",
   "records": [
@@ -320,6 +320,45 @@
       "requirements": [],
       "status": "active",
       "key": "item.ancient_fruit"
+    },
+    {
+      "name": "虚空晶体",
+      "item_type": "breakthrough_material",
+      "quality": "heaven",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound_24h",
+      "tradeable": true,
+      "effects": [{"type": "breakthrough_material", "target": "void_refining"}],
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "status": "active",
+      "key": "item.void_crystal"
+    },
+    {
+      "name": "虚空锚",
+      "item_type": "void_navigation_material",
+      "quality": "rare",
+      "stack_limit": 20,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [{"type": "void_route_anchor"}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.void_anchor"
+    },
+    {
+      "name": "虚空档案",
+      "item_type": "quest_item",
+      "quality": "rare",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "quest_delivery", "target": "quest.break_void"}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.void_archive"
     }
   ],
   "category": "材料",

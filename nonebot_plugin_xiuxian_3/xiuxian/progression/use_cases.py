@@ -405,9 +405,10 @@ class ProgressionApplication:
         player = record.player
         message = (
             "## 状态恢复完成\n\n"
-            f"**{self._display_name(player)}**的体力与精力已按时间恢复。\n\n"
+            f"**{self._display_name(player)}**的体力、精力与虚力已按恢复规则处理。\n\n"
             f"- **体力**：{player.stamina}/{player.stamina_max}\n"
             f"- **精力**：{player.energy}/{player.energy_max}\n"
+            f"- **虚力**：{player.void_power}/{player.void_power_max}\n"
             f"- **恢复周期**：{record.periods} 个\n"
         )
         if not record.changed:
@@ -424,8 +425,11 @@ class ProgressionApplication:
                 "stamina_max": player.stamina_max,
                 "energy": player.energy,
                 "energy_max": player.energy_max,
+                "void_power": player.void_power,
+                "void_power_max": player.void_power_max,
                 "recovered_stamina": record.recovered_stamina,
                 "recovered_energy": record.recovered_energy,
+                "recovered_void_power": record.recovered_void_power,
                 "periods": record.periods,
                 "idempotent_replay": record.already_completed,
             },

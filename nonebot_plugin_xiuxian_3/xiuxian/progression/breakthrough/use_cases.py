@@ -32,6 +32,9 @@ from ...repository import (
     FactionReputationInsufficientError,
     CultivationInsufficientError,
     RealmMismatchError,
+    VoidQuestMissingError,
+    VoidLocationRequiredError,
+    VoidResourceInsufficientError,
     SQLitePlayerRepository,
 )
 from .rules import breakthrough_definition, success_bp
@@ -60,6 +63,8 @@ ITEM_LABELS = {
     "item.domain_core": "领域核心",
     "item.ancient_fruit": "远古古果",
     "item.pill.domain_restore": "领域复原丹",
+    "item.void_crystal": "虚空晶体",
+    "item.void_anchor": "虚空锚",
 }
 
 REALM_LABELS = {
@@ -68,6 +73,7 @@ REALM_LABELS = {
     "golden_core": "金丹",
     "nascent_soul": "元婴",
     "soul_transformation": "化神",
+    "void_refining": "炼虚",
 }
 
 PROTECTION_LABELS = {
@@ -126,6 +132,8 @@ class BreakthroughApplication:
                 target = "soul_transformation"
             elif arg in {"领域复原丹", "领域保护", "domain_restore"}:
                 protection = True
+            elif arg in {"炼虚", "炼虚突破", "void_refining", "void_refinement"}:
+                target = "void_refining"
             else:
                 return None
         return target, protection
@@ -219,6 +227,10 @@ class BreakthroughApplication:
             quest_prepare_bp = 600 if "quest.soul_transformation" in set(player.intro_flags) else 0
             preparation_bp = soul_prepare_bp + reputation_prepare_bp + quest_prepare_bp
             current_success_bp = max(6500, min(9000, 6500 + preparation_bp + player.breakthrough_pity_bp))
+        elif target == "void_refining":
+            route_bonus = min(600, max(0, int(getattr(player, "void_route_count", 0))) * 200)
+            domain_bonus = min(500, max(0, int(player.domain_power)) // 10)
+            current_success_bp = max(7500, min(9200, 7500 + route_bonus + domain_bonus + min(750, player.breakthrough_pity_bp)))
         else:
             current_success_bp = success_bp(definition, player.breakthrough_pity_bp, preparation_bp)
         ready = (
@@ -233,14 +245,22 @@ class BreakthroughApplication:
             and (target != "soul_transformation" or max((int(value) for value in player.faction_reputation.values()), default=0) >= 2000)
             and (target != "nascent_soul" or player.soul_fatigue_until is None)
             and (target != "soul_transformation" or player.domain_crack_until is None)
+            and (target != "void_refining" or (
+                player.location_key in {"void.first_route", "cave.time_garden"}
+                and player.world_merit >= 500
+                and player.domain_charge >= 100
+                and "quest.break_void" in player.intro_flags
+            ))
         )
         material_lines = "\n".join(
             f"- **{ITEM_LABELS.get(key, '突破材料')}** ×{amount}" for key, amount in definition.materials.items()
         )
         if target == "nascent_soul":
             material_lines += "\n- **魔核或兽血** ×2（任选其一）\n- **世界功勋** ×100"
+        elif target == "void_refining":
+            material_lines += "\n- **世界功勋** ×500\n- **领域能量** ×100\n- **位置**：虚空第一航道或时序福地"
         realm_label = REALM_LABELS[target]
-        protection_label = PROTECTION_LABELS[definition.protection_key]
+        protection_label = PROTECTION_LABELS.get(definition.protection_key, "无保护丹")
         retention = definition.retention_bp / 100
         quality_line = f"- **道基质量要求**：{definition.required_foundation_quality}\n" if definition.required_foundation_quality else ""
         message = (
@@ -254,7 +274,7 @@ class BreakthroughApplication:
             f"- **消耗灵石**：{definition.currency_cost}\n\n"
             "### 必需材料\n\n"
             f"{material_lines}\n\n"
-            f"> 失败会保留当前境内修为的 {retention:.0f}%，并进入{'心魔试炼' if target == 'nascent_soul' else '24 小时领域裂痕' if target == 'soul_transformation' else f' {definition.weakness_seconds // 3600} 小时虚弱'}。可选 **{protection_label}**，只在失败时消耗。"
+            f"> 失败会保留当前境内修为的 {retention:.0f}%，并进入{'心魔试炼' if target == 'nascent_soul' else '24 小时领域裂痕' if target == 'soul_transformation' else '48 小时虚空不稳定' if target == 'void_refining' else f' {definition.weakness_seconds // 3600} 小时虚弱'}。{'炼虚没有保护丹。' if target == 'void_refining' else f'可选 **{protection_label}**，只在失败时消耗。'}"
         )
         if missing:
             message += f"\n> 当前缺少：{'、'.join(missing)}。"
@@ -291,6 +311,12 @@ class BreakthroughApplication:
             return CommandResult(False, "SOUL_POWER_INSUFFICIENT", "化神需要神魂至少 200，未扣除任何资源。", context.request_id, operation_id)
         except FactionReputationInsufficientError:
             return CommandResult(False, "FACTION_REPUTATION_INSUFFICIENT", "任一三界声望达到 2,000 后才能化神，未扣除任何资源。", context.request_id, operation_id)
+        except VoidQuestMissingError:
+            return CommandResult(False, "VOID_QUEST_MISSING", "尚未完成界壁试炼并取得炼虚许可，未扣除任何资源。", context.request_id, operation_id)
+        except VoidLocationRequiredError:
+            return CommandResult(False, "VOID_LOCATION_REQUIRED", "炼虚突破必须在虚空第一航道或时序福地进行，未扣除任何资源。", context.request_id, operation_id)
+        except VoidResourceInsufficientError:
+            return CommandResult(False, "VOID_RESOURCE_INSUFFICIENT", "炼虚需要世界功勋 500 和领域能量 100，未扣除任何资源。", context.request_id, operation_id)
         except QuestRequirementError:
             return CommandResult(False, "QUEST_REQUIREMENT_MISSING", "尚未完成对应突破任务，未扣除任何资源。", context.request_id, operation_id)
         except DomainCrackActiveError:
@@ -308,7 +334,7 @@ class BreakthroughApplication:
         except MaterialInsufficientError:
             return CommandResult(False, "MATERIAL_INSUFFICIENT", "突破材料不足，未扣除任何资源。", context.request_id, operation_id)
         except ProtectionItemInsufficientError:
-            return CommandResult(False, "MATERIAL_INSUFFICIENT", f"缺少{PROTECTION_LABELS[definition.protection_key]}，未扣除任何资源。", context.request_id, operation_id)
+            return CommandResult(False, "MATERIAL_INSUFFICIENT", f"缺少{PROTECTION_LABELS.get(definition.protection_key, '保护材料')}，未扣除任何资源。", context.request_id, operation_id)
         except CurrencyInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "灵石不足，未扣除任何资源。", context.request_id, operation_id)
         except OperationConflictError:

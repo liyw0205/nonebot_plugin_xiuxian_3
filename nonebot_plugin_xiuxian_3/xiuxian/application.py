@@ -281,6 +281,12 @@ class XiuxianApplication:
             write_message="当前事件不允许结算移动。",
         )
 
+    async def enter_void_route(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.world.enter_void_route(context), write_message="当前事件不允许进入虚空航道。")
+
+    async def settle_void_route(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.world.settle_void_route(context), write_message="当前事件不允许结算虚空航道。")
+
     async def start_exploration(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.4",
-  "rule_version": "world-0.4.0",
+  "content_version": "content-0.5",
+  "rule_version": "world-0.5.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "location",
   "records": [
@@ -295,6 +295,33 @@
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, "quest.break_void_intro"],
       "actions": ["explore.boundary_trial"],
       "key": "void.portal"
+    },
+    {
+      "name": "虚空第一航道",
+      "world": "虚空",
+      "status": "open",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "travel": {"duration_seconds": 1800, "stamina": 35, "anchor_min": 1, "anchor_max": 3},
+      "actions": ["world.enter_void_route", "explore.void_route", "event.void_storm"],
+      "key": "void.first_route"
+    },
+    {
+      "name": "虚空档案遗迹",
+      "world": "虚空",
+      "status": "open",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "travel": {"duration_seconds": 2700, "stamina": 40, "anchor_min": 2, "anchor_max": 4},
+      "actions": ["world.enter_void_route", "explore.archive_ruins"],
+      "key": "void.archive_ruins"
+    },
+    {
+      "name": "时序福地",
+      "world": "虚空",
+      "status": "open",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "travel": {"duration_seconds": 1800, "stamina": 30, "item_key": "item.void_crystal", "item_quantity": 1},
+      "actions": ["world.enter_void_route", "explore.time_garden"],
+      "key": "cave.time_garden"
     }
   ],
   "schema": "xiuxian.content"

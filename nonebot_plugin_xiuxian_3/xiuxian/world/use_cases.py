@@ -17,8 +17,15 @@ from ..repository import (
     TravelNotReadyError,
     WeaknessActiveError,
     SQLitePlayerRepository,
+    VoidAnchorInsufficientError,
+    VoidInstabilityActiveError,
+    VoidRouteLockedError,
+    VoidTravelBusyError,
+    VoidRouteNotFoundError,
+    VoidRouteNotReadyError,
 )
 from .rules import CAVE_LOCATION, destination_definition, resolve_destination
+from .void_rules import resolve_void_route, void_route_definition
 
 class WorldApplication:
     """Coordinates movement commands while keeping adapter text out of storage."""
@@ -189,6 +196,56 @@ class WorldApplication:
             data={"session_id": record.session_id, "destination": record.destination, "status": record.status,
                   "arrived": record.arrived, "idempotent_replay": record.already_completed},
         )
+
+    async def enter_void_route(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_VOID_ROUTE", "请使用 `进入虚空航道 第一航道`。", context.request_id)
+        route_key = resolve_void_route(context.command_args[0])
+        if route_key is None:
+            return CommandResult(False, "VOID_ROUTE_LOCKED", "暂时没有这条虚空航道。", context.request_id)
+        operation_id = self._operation_id(context, "world.enter_void_route")
+        try:
+            record = await self.repository.start_void_route(
+                platform=context.adapter, platform_user_id=context.user_id, route_key=route_key, operation_id=operation_id
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except VoidRouteLockedError:
+            return CommandResult(False, "VOID_ROUTE_LOCKED", "需要炼虚 L1 才能进入虚空航道，未扣除资源。", context.request_id, operation_id)
+        except VoidInstabilityActiveError:
+            return CommandResult(False, "VOID_INSTABILITY_ACTIVE", "虚空不稳定期间不能进入这条高风险航道，未扣除资源。", context.request_id, operation_id)
+        except VoidAnchorInsufficientError:
+            return CommandResult(False, "VOID_ANCHOR_INSUFFICIENT", "虚空锚不足，未扣除任何资源。", context.request_id, operation_id)
+        except ResourceInsufficientError:
+            return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，未扣除虚空锚。", context.request_id, operation_id)
+        except VoidTravelBusyError:
+            return CommandResult(False, "VOID_TRAVEL_BUSY", "已有行动或虚空航道会话，请先完成后再试。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他航道操作，请重新发起。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        definition = void_route_definition(record.route_key)
+        return CommandResult(True, "VOID_ROUTE_STARTED", f"## 已进入{definition.label}\n\n- **虚空锚**：-{record.anchor_cost}\n- **体力**：{record.player.stamina}/{record.player.stamina_max}\n- **预计抵达**：{record.ends_at}\n\n> 抵达后发送 `结算虚空航道`。", context.request_id, operation_id, data={"session_id": record.session_id, "route_key": record.route_key, "anchor_cost": record.anchor_cost, "stamina_cost": record.stamina_cost, "space_resistance_bp": record.space_resistance_bp, "storm_roll_bp": record.storm_roll_bp, "ends_at": record.ends_at, "idempotent_replay": record.already_completed})
+
+    async def settle_void_route(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_VOID_ROUTE", "结算虚空航道无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "world.settle_void_route")
+        try:
+            record = await self.repository.settle_void_route(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except VoidRouteNotFoundError:
+            return CommandResult(False, "VOID_ROUTE_NOT_FOUND", "当前没有等待结算的虚空航道。", context.request_id, operation_id)
+        except VoidRouteNotReadyError:
+            return CommandResult(False, "VOID_ROUTE_NOT_READY", "航道尚未抵达，请稍后再来结算。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他航道结算，请重新发起。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        reward = "、".join(f"{key} ×{value}" for key, value in record.reward.items()) or "无"
+        storm = "遭遇虚空风暴，额外损失锚 %d" % record.extra_anchor_lost if record.storm else "航行平稳"
+        return CommandResult(True, "VOID_ROUTE_SETTLED", f"## 虚空航道已结算\n\n- **收获**：{reward}\n- **航况**：{storm}\n- **虚空锚**：{record.player.inventory.get('item.void_anchor', 0)}\n\n> 航道快照和随机结果已固定，重复结算不会重复发放。", context.request_id, operation_id, data={"session_id": record.session_id, "route_key": record.route_key, "reward": record.reward, "storm": record.storm, "extra_anchor_lost": record.extra_anchor_lost, "idempotent_replay": record.already_completed})
 
 
 __all__ = ["WorldApplication"]

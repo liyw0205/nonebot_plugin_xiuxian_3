@@ -178,6 +178,36 @@ SOUL_TRANSFORMATION_BREAKTHROUGH = BreakthroughDefinition(
     content_version="content-0.4",
 )
 
+VOID_REFINING_BREAKTHROUGH = BreakthroughDefinition(
+    key="progression.breakthrough_void_refining",
+    target_realm="void_refining",
+    source_realm="soul_transformation",
+    required_total_cultivation=848_960,
+    duration_seconds=15 * 60,
+    materials={"item.void_crystal": 5, "item.void_anchor": 2},
+    currency_cost=80_000,
+    base_success_bp=7_500,
+    minimum_success_bp=7_500,
+    maximum_success_bp=9_200,
+    pity_cap_bp=750,
+    pity_increment_bp=250,
+    quality_bonus_divisor=0,
+    quality_bonus_cap_bp=0,
+    technique_bonus_bp=0,
+    formation_bonus_bp=0,
+    retention_bp=7_500,
+    weakness_seconds=48 * 60 * 60,
+    protection_key="",
+    protection_retention_bp=7_500,
+    protection_weakness_seconds=48 * 60 * 60,
+    rule_version="progression-0.5.0",
+    random_pool="breakthrough.void_refining.v0.5",
+    reward_world_merit=500,
+    reward_items={"item.void_anchor": 3},
+    source_cultivation_cap=600_000,
+    content_version="content-0.5",
+)
+
 
 def qi_gathering_breakthrough() -> BreakthroughDefinition:
     return QI_GATHERING_BREAKTHROUGH
@@ -199,7 +229,13 @@ def soul_transformation_breakthrough() -> BreakthroughDefinition:
     return SOUL_TRANSFORMATION_BREAKTHROUGH
 
 
+def void_refining_breakthrough() -> BreakthroughDefinition:
+    return VOID_REFINING_BREAKTHROUGH
+
+
 def breakthrough_definition(target_realm: str) -> BreakthroughDefinition:
+    if target_realm == "void_refinement":
+        target_realm = "void_refining"
     if target_realm == QI_GATHERING_BREAKTHROUGH.target_realm:
         return QI_GATHERING_BREAKTHROUGH
     if target_realm == FOUNDATION_BREAKTHROUGH.target_realm:
@@ -210,6 +246,8 @@ def breakthrough_definition(target_realm: str) -> BreakthroughDefinition:
         return NASCENT_SOUL_BREAKTHROUGH
     if target_realm == SOUL_TRANSFORMATION_BREAKTHROUGH.target_realm:
         return SOUL_TRANSFORMATION_BREAKTHROUGH
+    if target_realm == VOID_REFINING_BREAKTHROUGH.target_realm:
+        return VOID_REFINING_BREAKTHROUGH
     raise ValueError(f"unsupported breakthrough target: {target_realm}")
 
 
@@ -246,12 +284,14 @@ __all__ = [
     "GOLDEN_CORE_BREAKTHROUGH",
     "NASCENT_SOUL_BREAKTHROUGH",
     "SOUL_TRANSFORMATION_BREAKTHROUGH",
+    "VOID_REFINING_BREAKTHROUGH",
     "breakthrough_definition",
     "breakthrough_roll_bp",
     "foundation_breakthrough",
     "golden_core_breakthrough",
     "nascent_soul_breakthrough",
     "soul_transformation_breakthrough",
+    "void_refining_breakthrough",
     "next_pity_bp",
     "qi_gathering_breakthrough",
     "retained_cultivation",

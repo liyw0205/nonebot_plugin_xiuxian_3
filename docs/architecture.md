@@ -42,6 +42,12 @@ nonebot_plugin_xiuxian_3/
 目录名不是强制 API；依赖检查和 import 边界才是强制约束。功能包不能通过
 模块 import 副作用注册命令或任务，必须把声明返回给组合根统一激活。
 
+当前 SQLite 实现采用渐进式拆分：`xiuxian/repository.py` 是稳定兼容门面，
+`xiuxian/persistence/sqlite_repository.py` 负责连接、迁移、通用玩家映射和
+尚未迁移的历史事务；领域事务通过 mixin 放在各域目录，例如
+`progression/repository.py` 的资源恢复和 `world/repository.py` 的虚空航道。
+新领域写入口应优先落在对应域的 repository 模块，不再直接扩大兼容门面。
+
 ## 3. Feature manifest
 
 每个功能 manifest 至少声明：稳定 feature id、显示名、命令/别名、权限、

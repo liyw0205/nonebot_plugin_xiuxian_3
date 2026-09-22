@@ -53,6 +53,11 @@ LOCATION_LABELS = {
     "demon.abyss_depths": "魔渊深层",
     "beast.ancestral_lake": "祖灵湖",
     "void.portal": "虚空门户",
+    "void.first_route": "虚空第一航道",
+    "void.archive_ruins": "虚空档案遗迹",
+    "void.sect_fortress": "虚空堡垒",
+    "cave.time_garden": "时序福地",
+    "void.void_market": "虚空集市",
 }
 
 REALM_LABELS = {
@@ -63,6 +68,7 @@ REALM_LABELS = {
     "golden_core": "金丹",
     "nascent_soul": "元婴",
     "soul_transformation": "化神",
+    "void_refining": "炼虚",
 }
 
 DAO_NAME_MAX_LENGTH = 7

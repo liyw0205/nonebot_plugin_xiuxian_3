@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.4",
+  "content_version": "content-0.5",
   "rule_version": "combat-0.1.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "entity",

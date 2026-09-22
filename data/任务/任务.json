@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.4",
-  "rule_version": "events-0.4.0",
+  "content_version": "content-0.5",
+  "rule_version": "events-0.5.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "quest",
   "records": [
@@ -71,6 +71,16 @@
       "claim_policy": "once_per_player",
       "expires": false,
       "key": "quest.soul_transformation"
+    },
+    {
+      "name": "炼虚许可",
+      "status": "open",
+      "trigger": {"operation": "quest.break_void", "result": "success"},
+      "requirements": ["void_wall_trial_count>=3", "item.void_archive>=1"],
+      "reward": {"breakthrough_permission": "void_refining"},
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.break_void"
     }
   ],
   "schema": "xiuxian.content"

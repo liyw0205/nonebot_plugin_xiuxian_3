@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.4",
-  "rule_version": "progression-0.4.0",
+  "content_version": "content-0.5",
+  "rule_version": "progression-0.5.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "realm",
   "records": [
@@ -141,8 +141,8 @@
         "9": 480000,
         "10": 600000
       },
-      "next_realm": "void_refinement",
-      "cross_realm_total_cultivation": null,
+      "next_realm": "void_refining",
+      "cross_realm_total_cultivation": 848960,
       "entry_requirements": [
         "realm.nascent_soul.layer10",
         "total_cultivation>=248960",
@@ -151,6 +151,17 @@
         "quest.soul_transformation"
       ],
       "key": "soul_transformation"
+    },
+    {
+      "name": "炼虚",
+      "status": "open",
+      "layer_min": 1,
+      "layer_max": 10,
+      "layer_thresholds": {"1": 0, "2": 90000, "3": 200000, "4": 340000, "5": 520000, "6": 740000, "7": 1000000, "8": 1320000, "9": 1700000, "10": 2150000},
+      "next_realm": "dao_union",
+      "cross_realm_total_cultivation": 2998960,
+      "entry_requirements": ["realm.soul_transformation.layer10", "total_cultivation>=848960", "quest.break_void"],
+      "key": "void_refining"
     }
   ],
   "schema": "xiuxian.content"
