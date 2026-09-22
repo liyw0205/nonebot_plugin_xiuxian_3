@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from .models import LayerUnlock
+from .models import CultivationMode, LayerUnlock
 
 
 REALM_QI_SENSING = "qi_sensing"
 MODE_BREATHING = "cultivate.breathing"
+MODE_SPIRIT_SPRING = "cultivate.spirit_spring"
 RULE_VERSION = "progression-0.1.1"
+SPIRIT_SPRING_RULE_VERSION = "progression-0.1.2"
 
 # Index zero represents the L1 entry point. Values are the minimum realm
 # cultivation required for each layer in the content-0.1 snapshot.
@@ -17,8 +19,19 @@ QI_SENSING_THRESHOLDS = (0, 80, 170, 280, 410, 560, 730, 920, 1130, 1360)
 BREATHING_STAMINA_COST = 2
 BREATHING_DURATION_SECONDS = 10 * 60
 BREATHING_BASE_CULTIVATION = 40
+SPIRIT_SPRING_STAMINA_COST = 3
+SPIRIT_SPRING_DURATION_SECONDS = 15 * 60
+SPIRIT_SPRING_BASE_CULTIVATION = 70
+SPIRIT_SPRING_ENVIRONMENT_BP = 11500
+SPIRIT_SPRING_DAILY_LIMIT = 4
 RECOVERY_PERIOD_SECONDS = 30 * 60
 CULTIVATION_SETTLEMENT_GRACE_SECONDS = 24 * 60 * 60
+
+SPIRIT_FIELD_LOCATION = "xuantian.spirit_field"
+CULTIVATION_MODE_LABELS = {
+    MODE_BREATHING: "调息修炼",
+    MODE_SPIRIT_SPRING: "灵泉修炼",
+}
 
 # These are deliberately previews/qualifications, not direct access to future
 # systems.  The application can expose them before the corresponding domain is
@@ -81,11 +94,50 @@ def next_layer_threshold(realm_key: str, layer: int) -> int | None:
     return QI_SENSING_THRESHOLDS[next_layer - 1]
 
 
-def cultivation_gain(base: int, qualification: Mapping[str, int]) -> int:
-    """Apply the integer version of ``base * (1 + insight / 200)``."""
+def cultivation_mode(mode_key: str) -> CultivationMode:
+    if mode_key == MODE_BREATHING:
+        return CultivationMode(
+            key=MODE_BREATHING,
+            label=CULTIVATION_MODE_LABELS[MODE_BREATHING],
+            stamina_cost=BREATHING_STAMINA_COST,
+            duration_seconds=BREATHING_DURATION_SECONDS,
+            base_cultivation=BREATHING_BASE_CULTIVATION,
+            environment_bp=10000,
+            daily_limit=None,
+            rule_version=RULE_VERSION,
+        )
+    if mode_key == MODE_SPIRIT_SPRING:
+        return CultivationMode(
+            key=MODE_SPIRIT_SPRING,
+            label=CULTIVATION_MODE_LABELS[MODE_SPIRIT_SPRING],
+            stamina_cost=SPIRIT_SPRING_STAMINA_COST,
+            duration_seconds=SPIRIT_SPRING_DURATION_SECONDS,
+            base_cultivation=SPIRIT_SPRING_BASE_CULTIVATION,
+            environment_bp=SPIRIT_SPRING_ENVIRONMENT_BP,
+            daily_limit=SPIRIT_SPRING_DAILY_LIMIT,
+            rule_version=SPIRIT_SPRING_RULE_VERSION,
+            required_location=SPIRIT_FIELD_LOCATION,
+        )
+    raise ValueError(f"unsupported cultivation mode: {mode_key}")
+
+
+def cultivation_mode_label(mode_key: str) -> str:
+    return cultivation_mode(mode_key).label
+
+
+def cultivation_gain(
+    base: int,
+    qualification: Mapping[str, int],
+    *,
+    environment_bp: int = 10000,
+    state_bp: int = 10000,
+) -> int:
+    """Apply insight, environment and state multipliers using integer bp."""
 
     insight = max(0, int(qualification.get("insight", 0)))
-    return (base * (200 + insight)) // 200
+    environment = max(0, int(environment_bp))
+    state = max(0, int(state_bp))
+    return (base * (200 + insight) * environment * state) // (200 * 10000 * 10000)
 
 
 def can_advance_layer(realm_key: str, layer: int, cultivation: int) -> bool:

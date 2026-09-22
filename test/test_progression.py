@@ -210,3 +210,50 @@ def test_qi_sensing_milestone_unlocks_are_boundary_stable() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_spirit_spring_requires_access_and_enforces_daily_quota() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "spirit-spring-user"
+            await _enter_cultivator(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET realm_layer = 2, cultivation = 80 WHERE platform_user_id = ?",
+                    (user,),
+                )
+
+            not_at_spring = await runtime.dispatch(_context(user, "spring-before"), "开始修炼 灵泉")
+            assert not_at_spring.code == "LOCATION_REQUIRED"
+            travel = await runtime.dispatch(_context(user, "spring-travel"), "前往灵泉谷")
+            assert travel.code == "TRAVEL_COMPLETED"
+            assert travel.data["stamina"] == 22
+
+            gains: list[int] = []
+            for index in range(4):
+                started = await runtime.dispatch(
+                    _context(user, f"spring-start-{index}"),
+                    "开始修炼 灵泉",
+                )
+                assert started.code == "CULTIVATION_STARTED"
+                assert started.data["mode_key"] == "cultivate.spirit_spring"
+                assert started.data["stamina_cost"] == 3
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE cultivation_sessions SET ends_at = ? WHERE session_id = ?",
+                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    )
+                settled = await runtime.dispatch(_context(user, f"spring-settle-{index}"), "结算修炼")
+                assert settled.code == "CULTIVATION_SETTLED"
+                assert settled.data["mode_key"] == "cultivate.spirit_spring"
+                assert settled.data["cultivation_gain"] >= 80
+                gains.append(settled.data["cultivation_gain"])
+            limited = await runtime.dispatch(_context(user, "spring-limit"), "开始修炼 灵泉")
+            assert limited.code == "CULTIVATION_DAILY_LIMIT"
+            assert len(set(gains)) == 1
+            profile = await runtime.dispatch(_context(user, "spring-profile"), "我的状态")
+            assert "灵泉谷" in profile.message
+            await runtime.close()
+
+    asyncio.run(run())

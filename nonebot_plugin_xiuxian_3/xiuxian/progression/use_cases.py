@@ -7,10 +7,13 @@ from ..repository import (
     CultivationAlreadyRecoveredError,
     CultivationAlreadyReadyError,
     CultivationBusyError,
+    CultivationDailyLimitError,
     CultivationExpiredError,
     CultivationNotFoundError,
     CultivationNotReadyError,
     CultivationRecoveryRequiredError,
+    LocationRequiredError,
+    LocationRequirementError,
     OperationConflictError,
     PlayerNotFoundError,
     PlayerStageConflictError,
@@ -22,9 +25,11 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .rules import (
-    BREATHING_DURATION_SECONDS,
     MODE_BREATHING,
+    MODE_SPIRIT_SPRING,
     can_advance_layer,
+    cultivation_mode,
+    cultivation_mode_label,
     next_layer_threshold,
     segment_for_layer,
 )
@@ -35,6 +40,14 @@ class ProgressionApplication:
 
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
+
+    @staticmethod
+    def _resolve_mode(args: tuple[str, ...]) -> str | None:
+        if not args or args == ("调息",):
+            return MODE_BREATHING
+        if len(args) == 1 and args[0] in {"灵泉", "灵泉修炼", "灵泉谷"}:
+            return MODE_SPIRIT_SPRING
+        return None
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -72,14 +85,20 @@ class ProgressionApplication:
         invalid = self._invalid_context(context)
         if invalid is not None:
             return invalid
-        if context.command_args and context.command_args != ("调息",):
-            return CommandResult(False, "INVALID_CULTIVATION_MODE", "目前只支持 `开始修炼` 或 `开始修炼 调息`。", context.request_id)
+        mode_key = self._resolve_mode(context.command_args)
+        if mode_key is None:
+            return CommandResult(
+                False,
+                "INVALID_CULTIVATION_MODE",
+                "目前支持 `开始修炼`（调息）或 `开始修炼 灵泉`。",
+                context.request_id,
+            )
         operation_id = self._operation_id(context, "progression.start_cultivation")
         try:
             record = await self.repository.start_cultivation(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                mode_key=MODE_BREATHING,
+                mode_key=mode_key,
                 operation_id=operation_id,
             )
         except PlayerNotFoundError:
@@ -90,6 +109,12 @@ class ProgressionApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能修炼。", context.request_id, operation_id)
         except CultivationBusyError:
             return CommandResult(False, "CULTIVATION_BUSY", "你已经有一场修炼正在进行，请先结算或取消。", context.request_id, operation_id)
+        except CultivationDailyLimitError:
+            return CommandResult(False, "CULTIVATION_DAILY_LIMIT", "灵泉修炼今日次数已用尽，明日再来。", context.request_id, operation_id)
+        except LocationRequiredError:
+            return CommandResult(False, "LOCATION_REQUIRED", "灵泉修炼需要先抵达灵泉谷。", context.request_id, operation_id)
+        except LocationRequirementError:
+            return CommandResult(False, "LOCATION_REQUIREMENT_MISSING", "灵泉修炼需要感气二层，并完成教学采集。", context.request_id, operation_id)
         except CultivationRecoveryRequiredError:
             return CommandResult(False, "CULTIVATION_RECOVERY_REQUIRED", "上一场修炼已过期，请先发送 `恢复修炼` 完成结算。", context.request_id, operation_id)
         except ResourceInsufficientError:
@@ -102,12 +127,13 @@ class ProgressionApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
         player = record.player
+        mode = cultivation_mode(record.mode_key)
         message = (
             "## 修炼已开始\n\n"
-            f"**{self._display_name(player)}**已开始调息修炼。\n\n"
+            f"**{self._display_name(player)}**已开始{mode.label}。\n\n"
             f"- **消耗体力**：{record.stamina_cost}\n"
             f"- **剩余体力**：{player.stamina}/{player.stamina_max}\n"
-            f"- **预计时长**：{BREATHING_DURATION_SECONDS // 60} 分钟\n\n"
+            f"- **预计时长**：{mode.duration_seconds // 60} 分钟\n\n"
             "> 下一步：修炼结束后发送 `结算修炼`；也可以发送 `取消修炼` 返还体力。"
         )
         return CommandResult(
@@ -120,6 +146,7 @@ class ProgressionApplication:
                 "dao_name": player.dao_name,
                 "session_id": record.session_id,
                 "mode_key": record.mode_key,
+                "mode_label": mode.label,
                 "status": record.status,
                 "stamina": player.stamina,
                 "stamina_cost": record.stamina_cost,
@@ -167,9 +194,10 @@ class ProgressionApplication:
         player = record.player
         threshold = next_layer_threshold(player.realm_key, player.realm_layer)
         next_step = "发送 `晋升境界`，尝试进入下一层。" if threshold is not None and player.cultivation >= threshold else "继续发送 `开始修炼`，积累境内修为。"
+        mode_label = cultivation_mode_label(record.mode_key)
         message = (
             "## 修炼结算完成\n\n"
-            f"**{self._display_name(player)}**获得 **修为 ×{record.cultivation_gain}**。\n\n"
+            f"**{self._display_name(player)}**完成{mode_label}，获得 **修为 ×{record.cultivation_gain}**。\n\n"
             f"- **境界**：{self._realm_text(player)}\n"
             f"- **境内修为**：{player.cultivation}/{threshold or '混元'}\n"
             f"- **总修为**：{player.total_cultivation}\n"
@@ -186,6 +214,7 @@ class ProgressionApplication:
                 "dao_name": player.dao_name,
                 "session_id": record.session_id,
                 "cultivation_gain": record.cultivation_gain,
+                "mode_key": record.mode_key,
                 "cultivation": player.cultivation,
                 "total_cultivation": player.total_cultivation,
                 "realm_key": player.realm_key,
@@ -227,12 +256,13 @@ class ProgressionApplication:
 
         player = record.player
         threshold = next_layer_threshold(player.realm_key, player.realm_layer)
+        mode_label = cultivation_mode_label(record.mode_key)
         return CommandResult(
             True,
             "CULTIVATION_RECOVERED",
             (
                 "## 过期修炼已恢复\n\n"
-                f"**{self._display_name(player)}**按原始修炼快照完成了迟到结算。\n\n"
+                f"**{self._display_name(player)}**按原始{mode_label}快照完成了迟到结算。\n\n"
                 f"- **恢复修为**：{record.cultivation_gain}\n"
                 f"- **境界**：{self._realm_text(player)}\n"
                 f"- **境内修为**：{player.cultivation}/{threshold or '混元'}\n"
@@ -245,6 +275,7 @@ class ProgressionApplication:
                 "dao_name": player.dao_name,
                 "session_id": record.session_id,
                 "cultivation_gain": record.cultivation_gain,
+                "mode_key": record.mode_key,
                 "cultivation": player.cultivation,
                 "total_cultivation": player.total_cultivation,
                 "realm_key": player.realm_key,

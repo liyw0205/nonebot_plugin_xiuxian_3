@@ -116,6 +116,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("修仙改名", application.rename_player, aliases=("改名",))
     router.register("完成引导", application.complete_intro)
     router.register("前往近郊", lambda context: application.travel_intro(context, "近郊"))
+    router.register("前往灵泉谷", lambda context: application.travel_intro(context, "灵泉谷"))
     router.register("返回新手城", lambda context: application.travel_intro(context, "新手城"))
     router.register("选择道途", application.enter_cultivation)
     router.register("开始修炼", application.start_cultivation)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
     LocationRequiredError,
+    LocationRequirementError,
     OperationConflictError,
     PlayerNotFoundError,
     PlayerStageConflictError,
@@ -177,7 +178,7 @@ class IntroApplication:
             return invalid
         destination_key = resolve_destination(destination)
         if destination_key is None:
-            return CommandResult(False, "INVALID_DESTINATION", "目前只支持 `前往近郊` 和 `返回新手城`。", context.request_id)
+            return CommandResult(False, "INVALID_DESTINATION", "目前支持 `前往近郊`、`前往灵泉谷` 和 `返回新手城`。", context.request_id)
         operation_id = self._operation_id(context, "world.travel_intro")
         try:
             record = await self.repository.travel_player(
@@ -190,6 +191,8 @@ class IntroApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerStageConflictError:
             return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成 `寻仙问道` 后才能前往近郊。", context.request_id, operation_id)
+        except LocationRequirementError:
+            return CommandResult(False, "LOCATION_REQUIREMENT_MISSING", "前往灵泉谷需要感气二层，并完成教学采集。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，暂时无法移动。", context.request_id, operation_id)
         except PlayerSuspendedError:
@@ -204,11 +207,16 @@ class IntroApplication:
         player = record.player
         destination_name = TRAVEL_LABELS[destination_key]
         if record.changed:
+            next_step = (
+                "发送 `开始修炼 灵泉`，在灵泉谷吸纳灵气。"
+                if destination_key == "xuantian.spirit_field"
+                else "发送 `完成引导 采集`，完成教学采集。"
+            )
             message = (
                 "## 已抵达\n\n"
                 f"**{self._display_name(player)}**已抵达 **{destination_name}**。\n\n"
                 f"- **体力**：{player.stamina}/{player.stamina_max}\n\n"
-                f"> 下一步：发送 `完成引导 采集`，完成教学采集。"
+                f"> 下一步：{next_step}"
             )
         else:
             message = f"## 已在此处\n\n你当前就在 **{destination_name}**，无需重复移动。"

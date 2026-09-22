@@ -20,10 +20,26 @@ class CultivationSessionRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class CultivationMode:
+    """Frozen parameters used when a cultivation session is created."""
+
+    key: str
+    label: str
+    stamina_cost: int
+    duration_seconds: int
+    base_cultivation: int
+    environment_bp: int
+    daily_limit: int | None
+    rule_version: str
+    required_location: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class CultivationSettlementRecord:
     player: PlayerView
     session_id: str
     cultivation_gain: int
+    mode_key: str = ""
     already_completed: bool = False
 
 
@@ -34,6 +50,7 @@ class CultivationRecoveryRecord:
     player: PlayerView
     session_id: str
     cultivation_gain: int
+    mode_key: str = ""
     already_completed: bool = False
 
 
@@ -76,6 +93,7 @@ class ResourceRecoveryRecord:
 __all__ = [
     "CultivationCancelRecord",
     "CultivationRecoveryRecord",
+    "CultivationMode",
     "CultivationSessionRecord",
     "CultivationSettlementRecord",
     "LayerUnlock",

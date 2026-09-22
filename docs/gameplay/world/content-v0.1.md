@@ -33,6 +33,12 @@ preview -> created -> running -> arrived
 
 `world.return_to_town` 从玄天界地点返回青石镇：耗时 30 秒、体力 1；洞天返回耗时 1 分钟、体力 2；不能绕过战斗/生产/突破锁。已关闭地点中的角色仍可执行该返回动作。
 
+当前运行时的灵泉谷最小入口由 `前往灵泉谷` 提供：角色需处于感气二层或以上并完成
+`guide.gather_blood_grass`，移动消耗 4 点体力，抵达后位置写入 `xuantian.spirit_field`。
+该入口与正式 `world.start_travel` 会话共用准入和 operation 事务边界；当前只实现从新手城
+或近郊教学位置进入灵泉谷的切片，完整世界移动会话仍按本合同逐步接入。准入失败不扣体力、
+不改变位置。
+
 ## 3. 失败、关闭与验收
 
 错误：`LOCATION_NOT_FOUND`、`LOCATION_LOCKED`、`LOCATION_REQUIREMENT_MISSING`、`TRAVEL_BUSY`、`TRAVEL_RESOURCE_INSUFFICIENT`、`PLAYER_OCCUPIED`、`TRAVEL_NOT_READY`。观测写起终点、成本、准入快照、会话状态、内容版本和耗时。

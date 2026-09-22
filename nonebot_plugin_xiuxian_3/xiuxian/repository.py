@@ -137,6 +137,10 @@ class LocationRequiredError(RuntimeError):
     """The player must be at a specific location before an action can run."""
 
 
+class LocationRequirementError(RuntimeError):
+    """The player does not satisfy a destination's realm or quest gate."""
+
+
 class ResourceInsufficientError(RuntimeError):
     """A player does not have enough of a spendable resource."""
 
@@ -155,6 +159,10 @@ class CultivationBusyError(RuntimeError):
 
 class CultivationRecoveryRequiredError(RuntimeError):
     """An expired session must be recovered before another one can start."""
+
+
+class CultivationDailyLimitError(RuntimeError):
+    """The selected cultivation mode reached its business-day quota."""
 
 
 class CultivationNotFoundError(RuntimeError):
@@ -870,7 +878,8 @@ class SQLitePlayerRepository:
         destination: str,
         operation_id: str,
     ) -> TravelRecord:
-        from .player.intro_rules import TRAVEL_COSTS
+        from .player.intro_rules import GUIDE_GATHER_BLOOD_GRASS, TRAVEL_COSTS
+        from .progression.rules import REALM_QI_SENSING, SPIRIT_FIELD_LOCATION
 
         operation_payload = {
             "platform": platform,
@@ -910,6 +919,14 @@ class SQLitePlayerRepository:
                 raise PlayerSuspendedError("player is not writable")
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 raise PlayerStageConflictError("player is not ready for travel")
+            if destination not in TRAVEL_COSTS:
+                raise LocationRequirementError("destination is not available")
+            if destination == SPIRIT_FIELD_LOCATION:
+                if row["realm_key"] != REALM_QI_SENSING or int(row["realm_layer"]) < 2:
+                    raise LocationRequirementError("spirit field requires qi sensing layer 2")
+                intro_state = self._json_object(row["intro_json"], {})
+                if GUIDE_GATHER_BLOOD_GRASS not in set(intro_state.get("flags", [])):
+                    raise LocationRequirementError("spirit field requires the gathering lesson")
 
             current = str(row["location_key"])
             changed = current != destination
@@ -1137,13 +1154,7 @@ class SQLitePlayerRepository:
         mode_key: str,
         operation_id: str,
     ) -> CultivationSessionRecord:
-        from .progression.rules import (
-            BREATHING_DURATION_SECONDS,
-            BREATHING_STAMINA_COST,
-            MODE_BREATHING,
-            REALM_QI_SENSING,
-            RULE_VERSION,
-        )
+        from .progression.rules import REALM_QI_SENSING, cultivation_mode
 
         operation_payload = {
             "platform": platform,
@@ -1186,8 +1197,20 @@ class SQLitePlayerRepository:
                 raise PlayerSuspendedError("player is not writable")
             if row["stage"] != "cultivator" or row["realm_key"] != REALM_QI_SENSING:
                 raise PlayerStageConflictError("player is not ready for cultivation")
-            if mode_key != MODE_BREATHING:
-                raise ValueError("unsupported cultivation mode")
+            try:
+                mode = cultivation_mode(mode_key)
+            except ValueError as exc:
+                raise ValueError("unsupported cultivation mode") from exc
+            if mode.required_location and row["location_key"] != mode.required_location:
+                raise LocationRequiredError("selected cultivation mode requires a specific location")
+            if mode.required_location:
+                if int(row["realm_layer"]) < 2:
+                    raise LocationRequirementError("spirit cultivation requires qi sensing layer 2")
+                intro_state = self._json_object(row["intro_json"], {})
+                from .player.intro_rules import GUIDE_GATHER_BLOOD_GRASS
+
+                if GUIDE_GATHER_BLOOD_GRASS not in set(intro_state.get("flags", [])):
+                    raise LocationRequirementError("spirit cultivation requires the gathering lesson")
             pending = connection.execute(
                 "SELECT status, result_json FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -1198,24 +1221,34 @@ class SQLitePlayerRepository:
                 pending_result = self._json_object(pending["result_json"], {})
                 if "cultivation_gain" not in pending_result:
                     raise CultivationRecoveryRequiredError("expired cultivation requires recovery")
-            if int(row["stamina"]) < BREATHING_STAMINA_COST:
+            if mode.daily_limit is not None:
+                day_start = serialize_datetime(now.replace(hour=0, minute=0, second=0, microsecond=0))
+                used = connection.execute(
+                    "SELECT COUNT(*) AS count FROM cultivation_sessions WHERE player_id = ? AND mode_key = ? AND starts_at >= ?",
+                    (row["id"], mode.key, day_start),
+                ).fetchone()
+                if used is not None and int(used["count"]) >= mode.daily_limit:
+                    raise CultivationDailyLimitError("cultivation mode reached its daily limit")
+            if int(row["stamina"]) < mode.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
 
             session_id = uuid4().hex
             starts_at = serialize_datetime(now)
-            ends_at = serialize_datetime(now + timedelta(seconds=BREATHING_DURATION_SECONDS))
+            ends_at = serialize_datetime(now + timedelta(seconds=mode.duration_seconds))
             snapshot = {
                 "realm_key": row["realm_key"],
                 "realm_layer": int(row["realm_layer"]),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "location_key": row["location_key"],
-                "rule_version": RULE_VERSION,
-                "mode_key": mode_key,
-                "base_cultivation": 40,
+                "rule_version": mode.rule_version,
+                "mode_key": mode.key,
+                "base_cultivation": mode.base_cultivation,
+                "environment_bp": mode.environment_bp,
+                "state_bp": 10000,
             }
             connection.execute(
                 "UPDATE players SET stamina = stamina - ?, updated_at = ? WHERE id = ?",
-                (BREATHING_STAMINA_COST, serialize_datetime(now), row["id"]),
+                (mode.stamina_cost, serialize_datetime(now), row["id"]),
             )
             connection.execute(
                 """
@@ -1231,7 +1264,7 @@ class SQLitePlayerRepository:
                     mode_key,
                     starts_at,
                     ends_at,
-                    BREATHING_STAMINA_COST,
+                    mode.stamina_cost,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     starts_at,
                     starts_at,
@@ -1244,11 +1277,11 @@ class SQLitePlayerRepository:
             payload = {
                 "player": self._player_payload(player),
                 "session_id": session_id,
-                "mode_key": mode_key,
+                "mode_key": mode.key,
                 "status": "running",
                 "starts_at": starts_at,
                 "ends_at": ends_at,
-                "stamina_cost": BREATHING_STAMINA_COST,
+                "stamina_cost": mode.stamina_cost,
             }
             connection.execute(
                 """
@@ -1268,11 +1301,11 @@ class SQLitePlayerRepository:
             return CultivationSessionRecord(
                 player=player,
                 session_id=session_id,
-                mode_key=mode_key,
+                mode_key=mode.key,
                 status="running",
                 starts_at=starts_at,
                 ends_at=ends_at,
-                stamina_cost=BREATHING_STAMINA_COST,
+                stamina_cost=mode.stamina_cost,
             )
 
     async def settle_cultivation(
@@ -1329,6 +1362,7 @@ class SQLitePlayerRepository:
                     player=self._row_to_player(payload["player"]),
                     session_id=str(payload["session_id"]),
                     cultivation_gain=int(payload["cultivation_gain"]),
+                    mode_key=str(payload.get("mode_key", "cultivate.breathing")),
                     already_completed=True,
                 )
 
@@ -1384,7 +1418,12 @@ class SQLitePlayerRepository:
                 raise CultivationExpiredError("cultivation settlement window expired")
             snapshot = self._json_object(session["snapshot_json"], {})
             qualification = self._json_object(snapshot.get("qualification", {}), {})
-            gain = cultivation_gain(int(snapshot.get("base_cultivation", 40)), qualification)
+            gain = cultivation_gain(
+                int(snapshot.get("base_cultivation", 40)),
+                qualification,
+                environment_bp=int(snapshot.get("environment_bp", 10000)),
+                state_bp=int(snapshot.get("state_bp", 10000)),
+            )
             connection.execute(
                 "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, updated_at = ? WHERE id = ?",
                 (gain, gain, now_text, row["id"]),
@@ -1401,6 +1440,7 @@ class SQLitePlayerRepository:
                 "player": self._player_payload(player),
                 "session_id": session["session_id"],
                 "cultivation_gain": gain,
+                "mode_key": str(snapshot.get("mode_key", session["mode_key"])),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1413,7 +1453,12 @@ class SQLitePlayerRepository:
                     now_text,
                 ),
             )
-            return CultivationSettlementRecord(player=player, session_id=session["session_id"], cultivation_gain=gain)
+            return CultivationSettlementRecord(
+                player=player,
+                session_id=session["session_id"],
+                cultivation_gain=gain,
+                mode_key=str(snapshot.get("mode_key", session["mode_key"])),
+            )
 
     async def recover_cultivation(
         self,
@@ -1481,6 +1526,7 @@ class SQLitePlayerRepository:
                     player=self._row_to_player(payload["player"]),
                     session_id=str(payload["session_id"]),
                     cultivation_gain=int(payload["cultivation_gain"]),
+                    mode_key=str(payload.get("mode_key", "cultivate.breathing")),
                     already_completed=True,
                 )
 
@@ -1508,7 +1554,12 @@ class SQLitePlayerRepository:
                 raise CultivationNotReadyError("cultivation is still within the normal settlement window")
             snapshot = self._json_object(session["snapshot_json"], {})
             qualification = self._json_object(snapshot.get("qualification", {}), {})
-            gain = cultivation_gain(int(snapshot.get("base_cultivation", 40)), qualification)
+            gain = cultivation_gain(
+                int(snapshot.get("base_cultivation", 40)),
+                qualification,
+                environment_bp=int(snapshot.get("environment_bp", 10000)),
+                state_bp=int(snapshot.get("state_bp", 10000)),
+            )
             connection.execute(
                 "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, updated_at = ? WHERE id = ?",
                 (gain, gain, now_text, row["id"]),
@@ -1533,6 +1584,7 @@ class SQLitePlayerRepository:
                 "player": self._player_payload(player),
                 "session_id": session["session_id"],
                 "cultivation_gain": gain,
+                "mode_key": str(snapshot.get("mode_key", session["mode_key"])),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1549,6 +1601,7 @@ class SQLitePlayerRepository:
                 player=player,
                 session_id=session["session_id"],
                 cultivation_gain=gain,
+                mode_key=str(snapshot.get("mode_key", session["mode_key"])),
             )
 
     async def cancel_cultivation(

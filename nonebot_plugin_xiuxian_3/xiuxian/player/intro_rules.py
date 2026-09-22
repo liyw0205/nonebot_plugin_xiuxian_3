@@ -62,16 +62,21 @@ TRAVEL_DESTINATIONS = {
     "新手城": "xuantian.new_town",
     "青石镇": "xuantian.new_town",
     "xuantian.new_town": "xuantian.new_town",
+    "灵泉谷": "xuantian.spirit_field",
+    "玄天灵泉谷": "xuantian.spirit_field",
+    "xuantian.spirit_field": "xuantian.spirit_field",
 }
 
 TRAVEL_LABELS = {
     "xuantian.outskirts": "玄天近郊",
     "xuantian.new_town": "青石镇",
+    "xuantian.spirit_field": "灵泉谷",
 }
 
 TRAVEL_COSTS = {
     "xuantian.outskirts": 2,
     "xuantian.new_town": 1,
+    "xuantian.spirit_field": 4,
 }
 
 

@@ -3,7 +3,7 @@
 本文件遵守 [版本内容开发合同](../../content-development-contract.md) 和[境界十层与段位规范](layers.md)。
 
 - `content_version`：`content-0.1`
-- `rule_version`：`progression-0.1.1`
+- `rule_version`：`progression-0.1.1`（调息）；`progression-0.1.2`（灵泉）
 - 开放写用例：`progression.start_cultivation`、`progression.settle_cultivation`、`progression.advance_layer`、`progression.breakthrough_qi_gathering`、`progression.breakthrough_foundation`、`progression.recover_weakness`。
 - 角色在 `player.enter_cultivation` 成功后进入 `qi_sensing` L1（感气一层/入门）；`mortal` 没有修为资产，不能创建修炼或突破 operation。
 
@@ -35,7 +35,7 @@
 | `mode_key` | 前置 | 费用 | 持续时间 | 基础修为 | 冷却/次数 |
 |:--|:--|:--|:--|--:|:--|
 | `cultivate.breathing` | 感气 L1 以上、地点允许 | 2 体力 | 10 分钟 | 40 | 每角色同时 1 个 |
-| `cultivate.spirit_spring` | 感气 L1、位于 `xuantian.spirit_field` | 3 体力 | 15 分钟 | 70 | 每日 4 次 |
+| `cultivate.spirit_spring` | 感气 L2、完成教学采集、位于 `xuantian.spirit_field` | 3 体力 | 15 分钟 | 70 | 每日 4 次 |
 | `cultivate.seclusion` | 聚气 L1、无队伍/战斗/生产锁 | 6 体力、2 精力 | 30 分钟 | 170 | 每日 2 次 |
 
 开始时冻结角色、`realm_key`、`realm_layer`、悟性、地点环境、道途、功法、状态、体力/精力、`rule_version`。结算公式：`floor(base_exp * training_rate_bp * environment_bp * state_bp / 1000000000000)`；倍率均为 bp，默认环境/状态为 10000。修炼没有随机池；结果只由已保存快照决定。
@@ -44,12 +44,16 @@
 
 会话状态：`created -> running -> settled | cancelled | expired`。未到结束时间返回 `CULTIVATION_NOT_READY`；超过结束时间 24 小时可由恢复任务按原快照结算。当前最小实现允许 `running` 阶段取消并返还已锁定体力；重复 operation/结算返回同一会话与结果。
 
-当前运行时先开放 `cultivate.breathing` 的 `running -> settled/cancelled/expired` 最小实现：
-命令为 `开始修炼`、`结算修炼`、`恢复修炼`、`取消修炼`。开始时扣除 2 点体力并冻结悟性、
-境界、地点和规则版本；10 分钟后才能结算。结束后 24 小时内允许普通结算，超过窗口标记
-为 `expired`，只能由 `恢复修炼` 按原快照完成一次迟到结算；相同 operation 回放原结果，
-不同 operation 也不能重复增加修为。取消会原子返还 2 点体力。修为收益写入境内修为与总修为，
-随后由 `晋升境界` 独立 operation 逐层推进。其它两类修炼模式仍保持未开放。
+当前运行时开放 `cultivate.breathing` 和 `cultivate.spirit_spring` 的
+`running -> settled/cancelled/expired` 最小实现。调息使用 `开始修炼`，灵泉使用
+`开始修炼 灵泉`；两者都支持 `结算修炼`、`恢复修炼` 和 `取消修炼`。调息开始时扣除
+2 点体力并冻结悟性、境界、地点和规则版本，10 分钟后才能结算；灵泉要求感气二层、
+完成 `guide.gather_blood_grass` 且位于 `xuantian.spirit_field`，开始时扣除 3 点体力，
+持续 15 分钟，基础修为 70，使用 11500 bp 环境倍率，每日最多 4 次。结束后 24 小时内
+允许普通结算，超过窗口标记为 `expired`，只能由 `恢复修炼` 按原快照完成一次迟到结算；
+相同 operation 回放原结果，不同 operation 也不能重复增加修为。取消会原子返还对应模式
+的体力。修为收益写入境内修为与总修为，随后由 `晋升境界` 独立 operation 逐层推进。
+`cultivate.seclusion` 仍保持未开放。
 
 ## 3. 同境晋层：`progression.advance_layer`
 
