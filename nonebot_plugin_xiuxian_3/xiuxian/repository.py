@@ -7,6 +7,7 @@ import hashlib
 import json
 import sqlite3
 import time
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 from uuid import uuid4
@@ -43,6 +44,7 @@ from .progression.breakthrough.models import (
     NascentSoulPreparationRecord,
     SoulFatigueRecoveryRecord,
     WeaknessRecoveryRecord,
+    DomainSelectionRecord,
 )
 from .advancement.models import RetreatSessionRecord, RetreatSettlementRecord
 from .advancement.constitution_models import ConstitutionRecord
@@ -255,6 +257,13 @@ CREATE TABLE IF NOT EXISTS players (
     max_mp INTEGER NOT NULL DEFAULT 0 CHECK (max_mp >= 0),
     carry_capacity INTEGER NOT NULL DEFAULT 0 CHECK (carry_capacity >= 0),
     exploration_efficiency_bp INTEGER NOT NULL DEFAULT 0 CHECK (exploration_efficiency_bp >= 0),
+    domain_key TEXT,
+    domain_power INTEGER NOT NULL DEFAULT 0 CHECK (domain_power >= 0),
+    realm_resistance_bp INTEGER NOT NULL DEFAULT 0 CHECK (realm_resistance_bp >= 0),
+    domain_crack_until TEXT,
+    initiative INTEGER NOT NULL DEFAULT 0 CHECK (initiative >= 0),
+    faction_reputation_json TEXT NOT NULL DEFAULT '{}',
+    domain_charge_reset_date TEXT,
     durability_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -548,6 +557,26 @@ CREATE TABLE IF NOT EXISTS heart_demon_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_heart_demon_sessions_player
     ON heart_demon_sessions(player_id, status);
+
+CREATE TABLE IF NOT EXISTS domain_selection_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    domain_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'cancelled', 'expired')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_domain_selection_sessions_player
+    ON domain_selection_sessions(player_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_selection_sessions_active
+    ON domain_selection_sessions(player_id) WHERE status = 'pending';
 
 CREATE TABLE IF NOT EXISTS travel_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1226,6 +1255,46 @@ class WeaknessNotActiveError(RuntimeError):
     """There is no breakthrough weakness to recover."""
 
 
+class DomainCrackActiveError(RuntimeError):
+    """The player cannot use domain-bound progression while cracked."""
+
+
+class DomainSelectionBusyError(RuntimeError):
+    """The player already has a pending domain confirmation."""
+
+
+class DomainAlreadySelectedError(RuntimeError):
+    """The player already selected a domain."""
+
+
+class DomainNotEligibleError(RuntimeError):
+    """The player does not meet domain selection prerequisites."""
+
+
+class DomainEnergyInsufficientError(RuntimeError):
+    """The requested domain activation has insufficient charge."""
+
+
+class DomainConflictError(RuntimeError):
+    """The requested domain conflicts with the current party state."""
+
+
+class SoulPowerInsufficientError(RuntimeError):
+    """The player lacks the soul power required for soul transformation."""
+
+
+class FactionReputationInsufficientError(RuntimeError):
+    """No faction reputation reached the soul transformation threshold."""
+
+
+class CultivationInsufficientError(RuntimeError):
+    """The player lacks the total cultivation for soul transformation."""
+
+
+class RealmMismatchError(RuntimeError):
+    """The source realm or layer does not match the requested breakthrough."""
+
+
 class CurrencyInsufficientError(RuntimeError):
     """The player does not have enough spirit stones."""
 
@@ -1661,6 +1730,14 @@ class SQLitePlayerRepository:
             ("max_mp", "INTEGER NOT NULL DEFAULT 0"),
             ("carry_capacity", "INTEGER NOT NULL DEFAULT 0"),
             ("exploration_efficiency_bp", "INTEGER NOT NULL DEFAULT 0"),
+            ("domain_key", "TEXT"),
+            ("domain_power", "INTEGER NOT NULL DEFAULT 0"),
+            ("realm_resistance_bp", "INTEGER NOT NULL DEFAULT 0"),
+            ("domain_crack_until", "TEXT"),
+            ("initiative", "INTEGER NOT NULL DEFAULT 0"),
+            ("faction_reputation_json", "TEXT NOT NULL DEFAULT '{}'"),
+            ("domain_level", "INTEGER NOT NULL DEFAULT 0"),
+            ("domain_charge_reset_date", "TEXT"),
         ):
             if column not in player_columns:
                 connection.execute(f"ALTER TABLE players ADD COLUMN {column} {definition}")
@@ -4297,6 +4374,13 @@ class SQLitePlayerRepository:
                     weakness_until = now
                 if weakness_until > now:
                     state_bp = 8000
+            if row["domain_crack_until"]:
+                try:
+                    domain_crack_until = datetime.fromisoformat(str(row["domain_crack_until"]))
+                except ValueError:
+                    domain_crack_until = now
+                if domain_crack_until > now:
+                    state_bp = min(state_bp, 8500)
             snapshot = {
                 "realm_key": row["realm_key"],
                 "realm_layer": int(row["realm_layer"]),
@@ -7639,14 +7723,30 @@ class SQLitePlayerRepository:
             if target_realm != definition.target_realm:
                 raise BreakthroughRequirementError("target breakthrough is not open")
             if row["stage"] != "cultivator" or row["realm_key"] != definition.source_realm:
+                if target_realm == "soul_transformation":
+                    raise RealmMismatchError("current realm does not match the breakthrough")
                 raise BreakthroughRequirementError("current realm does not match the breakthrough")
             if int(row["realm_layer"]) != 10:
+                if target_realm == "soul_transformation":
+                    raise RealmMismatchError("only the current realm's L10 can break through")
                 raise BreakthroughRequirementError("only the current realm's L10 can break through")
             if int(row["total_cultivation"]) < definition.required_total_cultivation:
+                if target_realm == "soul_transformation":
+                    raise CultivationInsufficientError("total cultivation is insufficient")
                 raise BreakthroughRequirementError("total cultivation is insufficient")
             if int(row["foundation_quality"]) < definition.required_foundation_quality:
                 raise FoundationQualityInsufficientError("foundation quality is insufficient")
             is_nascent = target_realm == "nascent_soul"
+            is_soul_transformation = target_realm == "soul_transformation"
+            if is_soul_transformation:
+                crack_until = row["domain_crack_until"]
+                if crack_until:
+                    try:
+                        if datetime.fromisoformat(str(crack_until)) > now:
+                            raise DomainCrackActiveError("domain crack is active")
+                    except ValueError:
+                        pass
+                    connection.execute("UPDATE players SET domain_crack_until = NULL WHERE id = ?", (row["id"],))
             if is_nascent:
                 pending = connection.execute(
                     "SELECT 1 FROM heart_demon_sessions WHERE player_id = ? AND status = 'pending' LIMIT 1",
@@ -7667,6 +7767,25 @@ class SQLitePlayerRepository:
                     raise QuestRequirementError("nascent soul preparation quest is missing")
                 if int(row["world_merit"]) < 100:
                     raise CurrencyInsufficientError("world merit is insufficient")
+            if is_soul_transformation:
+                if int(row["soul_power"]) < 200:
+                    raise SoulPowerInsufficientError("soul power is insufficient")
+                if int(row["world_merit"]) < 500:
+                    raise CurrencyInsufficientError("world merit is insufficient")
+                intro_state = self._json_object(row["intro_json"], {})
+                if "quest.soul_transformation" not in {str(item) for item in intro_state.get("flags", [])}:
+                    raise QuestRequirementError("soul transformation quest is missing")
+                reputation_row = connection.execute(
+                    "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
+                ).fetchone()
+                faction = self._json_object(row["faction_reputation_json"], {})
+                if reputation_row is not None:
+                    local = self._json_object(reputation_row["local_json"], {})
+                    for key, value in local.items():
+                        if str(key).startswith("faction."):
+                            faction[str(key).split(".", 1)[1]] = int(value)
+                if max((int(value) for value in faction.values()), default=0) < 2000:
+                    raise FactionReputationInsufficientError("faction reputation is insufficient")
             weakness_until = row["weakness_until"]
             if weakness_until:
                 try:
@@ -7755,6 +7874,7 @@ class SQLitePlayerRepository:
                 else 0
             )
             preparation_bp = quality_bonus_bp + technique_bonus_bp + formation_bonus_bp + location_bonus_bp + support_bonus_bp
+            soul_prepare_bp = reputation_prepare_bp = quest_prepare_bp = 0
             heart_demon_bonus_bp = int(row["heart_demon_bonus_bp"]) if is_nascent else 0
             cross_realm_risk_bp = 0
             if is_nascent and not str(row["location_key"]).startswith("xuantian."):
@@ -7774,6 +7894,20 @@ class SQLitePlayerRepository:
                 if str(row["location_key"]).startswith("xuantian."):
                     preparation_bp += 300
                 final_success_bp = max(5500, min(9000, 5500 + quality_bonus_bp + preparation_bp + pity_before + heart_demon_bonus_bp - cross_realm_risk_bp))
+            elif is_soul_transformation:
+                reputation_row = connection.execute(
+                    "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
+                ).fetchone()
+                faction = self._json_object(row["faction_reputation_json"], {})
+                if reputation_row is not None:
+                    for key, value in self._json_object(reputation_row["local_json"], {}).items():
+                        if str(key).startswith("faction."):
+                            faction[str(key).split(".", 1)[1]] = int(value)
+                soul_prepare_bp = min(1000, max(0, int(row["soul_power"]) - 200) * 4)
+                reputation_prepare_bp = min(1000, max(0, max((int(value) for value in faction.values()), default=0) - 2000) // 2)
+                quest_prepare_bp = 600 if "quest.soul_transformation" in {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])} else 0
+                preparation_bp = soul_prepare_bp + reputation_prepare_bp + quest_prepare_bp
+                final_success_bp = max(6500, min(9000, 6500 + preparation_bp + pity_before))
             else:
                 final_success_bp = success_bp(definition, pity_before, preparation_bp)
             for item_key, quantity in definition.materials.items():
@@ -7822,18 +7956,27 @@ class SQLitePlayerRepository:
                 "heart_demon_bonus_bp": heart_demon_bonus_bp,
                 "pollution": int(row["pollution"]),
                 "cross_realm_penalty_bp": int(row["cross_realm_penalty_bp"]),
+                "soul_power_before": int(row["soul_power"]),
+                "world_merit_before": int(row["world_merit"]),
+                "soul_prepare_bp": soul_prepare_bp,
+                "reputation_prepare_bp": reputation_prepare_bp,
+                "quest_prepare_bp": quest_prepare_bp,
             }
             connection.execute(
                 "UPDATE players SET inventory_json = ?, spirit_stones = spirit_stones - ?, world_merit = world_merit - ?, heart_demon_bonus_bp = CASE WHEN ? = 1 THEN 0 ELSE heart_demon_bonus_bp END, updated_at = ? WHERE id = ?",
                 (
                     json.dumps(inventory, ensure_ascii=False, sort_keys=True),
                     definition.currency_cost,
-                    100 if is_nascent else 0,
+                    100 if is_nascent else (500 if is_soul_transformation else 0),
                     1 if is_nascent else 0,
                     now_text,
                     row["id"],
                 ),
             )
+            if is_soul_transformation:
+                connection.execute(
+                    "UPDATE players SET soul_power = soul_power - 200 WHERE id = ?", (row["id"],)
+                )
             connection.execute(
                 """
                 INSERT INTO breakthrough_sessions(
@@ -7888,6 +8031,193 @@ class SQLitePlayerRepository:
                 success_bp=final_success_bp,
                 protection_key=snapshot["protection_key"],
             )
+
+    async def choose_domain(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        path_key: str,
+        operation_id: str,
+    ) -> DomainSelectionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._choose_domain_once, platform, platform_user_id, path_key, operation_id)
+
+    def _choose_domain_once(self, platform: str, platform_user_id: str, path_key: str, operation_id: str) -> DomainSelectionRecord:
+        from .paths.rules import domain_definition
+
+        definition = domain_definition(path_key)
+        operation_name = "paths.choose_domain"
+        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "path_key": path_key})
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return DomainSelectionRecord(player=self._row_to_player(payload["player"]), session_id=str(payload["session_id"]), domain_key=str(payload["domain_key"]), status=str(payload["status"]), ends_at=payload.get("ends_at"), energy_cost=int(payload.get("energy_cost", 0)), already_completed=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            crack_until = row["domain_crack_until"]
+            if crack_until:
+                try:
+                    if datetime.fromisoformat(str(crack_until)) > now:
+                        raise DomainCrackActiveError("domain crack is active")
+                except ValueError:
+                    pass
+                connection.execute("UPDATE players SET domain_crack_until = NULL WHERE id = ?", (row["id"],))
+            if str(row["realm_key"]) != "soul_transformation" or int(row["realm_layer"]) < 3:
+                raise DomainNotEligibleError("domain requires soul transformation L3")
+            if row["domain_key"]:
+                raise DomainAlreadySelectedError("domain already selected")
+            if str(row["path_key"] or "") != path_key:
+                raise DomainNotEligibleError("domain does not match primary path")
+            talent_level = connection.execute("SELECT COALESCE(MAX(tier), 0) AS level FROM talent_node_states WHERE player_id = ? AND tree_key = ? AND status = 'learned'", (row["id"], path_key)).fetchone()
+            if max(int(row["domain_level"]), int(talent_level["level"] if talent_level else 0)) < 5:
+                raise DomainNotEligibleError("primary path level is insufficient")
+            pending = connection.execute("SELECT id, ends_at FROM domain_selection_sessions WHERE player_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
+            if pending is not None:
+                if now < datetime.fromisoformat(str(pending["ends_at"])):
+                    raise DomainSelectionBusyError("domain selection is already pending")
+                connection.execute("UPDATE domain_selection_sessions SET status = 'expired', updated_at = ? WHERE id = ?", (now_text, pending["id"]))
+            inventory = self._json_object(row["inventory_json"], {})
+            if int(inventory.get("item.domain_core", 0)) < 1:
+                raise MaterialInsufficientError("domain core is missing")
+            if int(row["spirit_stones"]) < 10_000:
+                raise CurrencyInsufficientError("domain selection requires spirit stones")
+            session_id = uuid4().hex
+            ends_at = serialize_datetime(now + timedelta(minutes=5))
+            snapshot = {"domain_key": definition.domain_key, "path_key": path_key, "energy_cost": definition.energy_cost, "content_version": "content-0.4", "rule_version": "paths-0.4.0"}
+            connection.execute("INSERT INTO domain_selection_sessions(session_id, player_id, operation_id, domain_key, status, starts_at, ends_at, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)", (session_id, row["id"], operation_id, definition.domain_key, now_text, ends_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), now_text, now_text))
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            payload = {"player": self._player_payload(self._row_to_player(updated)), "session_id": session_id, "domain_key": definition.domain_key, "status": "pending", "ends_at": ends_at, "energy_cost": definition.energy_cost}
+            connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
+            return DomainSelectionRecord(player=self._row_to_player(updated), session_id=session_id, domain_key=definition.domain_key, status="pending", ends_at=ends_at, energy_cost=definition.energy_cost)
+
+    async def cancel_domain(self, *, platform: str, platform_user_id: str, operation_id: str) -> DomainSelectionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._cancel_domain_once, platform, platform_user_id, operation_id)
+
+    def _cancel_domain_once(self, platform: str, platform_user_id: str, operation_id: str) -> DomainSelectionRecord:
+        operation_name = "paths.cancel_domain"
+        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
+        now_text = serialize_datetime(datetime.now(timezone.utc))
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return DomainSelectionRecord(player=self._row_to_player(payload["player"]), session_id=str(payload["session_id"]), domain_key=str(payload["domain_key"]), status="cancelled", already_completed=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            session = connection.execute("SELECT * FROM domain_selection_sessions WHERE player_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
+            if session is None:
+                raise DomainNotEligibleError("no pending domain selection")
+            connection.execute("UPDATE domain_selection_sessions SET status = 'cancelled', updated_at = ? WHERE id = ?", (now_text, session["id"]))
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            payload = {"player": self._player_payload(self._row_to_player(updated)), "session_id": session["session_id"], "domain_key": session["domain_key"], "status": "cancelled"}
+            connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
+            return DomainSelectionRecord(player=self._row_to_player(updated), session_id=str(session["session_id"]), domain_key=str(session["domain_key"]), status="cancelled")
+
+    async def confirm_domain(self, *, platform: str, platform_user_id: str, operation_id: str) -> DomainSelectionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._confirm_domain_once, platform, platform_user_id, operation_id)
+
+    def _confirm_domain_once(self, platform: str, platform_user_id: str, operation_id: str) -> DomainSelectionRecord:
+        operation_name = "paths.confirm_domain"
+        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return DomainSelectionRecord(player=self._row_to_player(payload["player"]), session_id=str(payload["session_id"]), domain_key=str(payload["domain_key"]), status="confirmed", confirmed=True, already_completed=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            session = connection.execute("SELECT * FROM domain_selection_sessions WHERE player_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
+            if session is None:
+                raise DomainNotEligibleError("no pending domain selection")
+            if now >= datetime.fromisoformat(str(session["ends_at"])):
+                connection.execute("UPDATE domain_selection_sessions SET status = 'expired', updated_at = ? WHERE id = ?", (now_text, session["id"]))
+                raise DomainNotEligibleError("domain selection confirmation expired")
+            crack_until = row["domain_crack_until"]
+            if crack_until:
+                try:
+                    if datetime.fromisoformat(str(crack_until)) > now:
+                        raise DomainCrackActiveError("domain crack is active")
+                except ValueError:
+                    pass
+            if row["domain_key"]:
+                raise DomainAlreadySelectedError("domain already selected")
+            inventory = self._json_object(row["inventory_json"], {})
+            if int(inventory.get("item.domain_core", 0)) < 1:
+                raise MaterialInsufficientError("domain core is missing")
+            if int(row["spirit_stones"]) < 10_000:
+                raise CurrencyInsufficientError("domain selection requires spirit stones")
+            inventory["item.domain_core"] = int(inventory.get("item.domain_core", 0)) - 1
+            snapshot = self._json_object(session["snapshot_json"], {})
+            domain_key = str(session["domain_key"])
+            pollution_delta = 15 if domain_key == "domain.abyss_shadow" else 0
+            bloodline_delta = -10 if domain_key == "domain.ancestral_wild" else 0
+            connection.execute("UPDATE players SET domain_key = ?, inventory_json = ?, spirit_stones = spirit_stones - 10000, pollution = pollution + ?, bloodline_stability = MAX(0, bloodline_stability + ?), updated_at = ? WHERE id = ?", (domain_key, json.dumps(inventory, ensure_ascii=False, sort_keys=True), pollution_delta, bloodline_delta, now_text, row["id"]))
+            connection.execute("UPDATE domain_selection_sessions SET status = 'confirmed', result_json = ?, updated_at = ? WHERE id = ?", (json.dumps({"domain_key": domain_key, "pollution_delta": pollution_delta, "bloodline_delta": bloodline_delta}, ensure_ascii=False, sort_keys=True), now_text, session["id"]))
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            payload = {"player": self._player_payload(self._row_to_player(updated)), "session_id": session["session_id"], "domain_key": domain_key, "status": "confirmed"}
+            connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
+            return DomainSelectionRecord(player=self._row_to_player(updated), session_id=str(session["session_id"]), domain_key=domain_key, status="confirmed", confirmed=True)
+
+    async def recover_domain_crack(self, *, platform: str, platform_user_id: str, early: bool, operation_id: str) -> WeaknessRecoveryRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._recover_domain_crack_once, platform, platform_user_id, early, operation_id)
+
+    def _recover_domain_crack_once(self, platform: str, platform_user_id: str, early: bool, operation_id: str) -> WeaknessRecoveryRecord:
+        operation_name = "progression.recover_domain_crack"
+        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "early": early})
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return WeaknessRecoveryRecord(player=self._row_to_player(payload["player"]), early=bool(payload["early"]), spirit_stones_spent=int(payload["spirit_stones_spent"]), medicine_consumed=bool(payload["medicine_consumed"]), medicine_key="item.pill.domain_restore", already_completed=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            crack_until = row["domain_crack_until"]
+            if not crack_until:
+                raise WeaknessNotActiveError("no domain crack is active")
+            expired = now >= datetime.fromisoformat(str(crack_until))
+            inventory = self._json_object(row["inventory_json"], {})
+            stones_spent = 0
+            medicine_consumed = False
+            if not expired and not early:
+                raise WeaknessActiveError("domain crack has not expired")
+            if not expired and early:
+                if str(row["location_key"]) != "xuantian.domain_front":
+                    raise BreakthroughRequirementError("early domain recovery requires domain front")
+                if int(inventory.get("item.pill.domain_restore", 0)) < 1:
+                    raise MaterialInsufficientError("domain restore pill is missing")
+                if int(row["spirit_stones"]) < 2000:
+                    raise CurrencyInsufficientError("early domain recovery requires spirit stones")
+                inventory["item.pill.domain_restore"] = int(inventory.get("item.pill.domain_restore", 0)) - 1
+                stones_spent = 2000
+                medicine_consumed = True
+            connection.execute("UPDATE players SET domain_crack_until = NULL, inventory_json = ?, spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?", (json.dumps(inventory, ensure_ascii=False, sort_keys=True), stones_spent, now_text, row["id"]))
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            payload = {"player": self._player_payload(self._row_to_player(updated)), "early": early, "spirit_stones_spent": stones_spent, "medicine_consumed": medicine_consumed}
+            connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
+            return WeaknessRecoveryRecord(player=self._row_to_player(updated), early=early, spirit_stones_spent=stones_spent, medicine_consumed=medicine_consumed, medicine_key="item.pill.domain_restore")
 
     async def settle_breakthrough(
         self,
@@ -7968,6 +8298,7 @@ class SQLitePlayerRepository:
             pity_before = int(snapshot.get("pity_before_bp", row["breakthrough_pity_bp"]))
             protection_requested = bool(snapshot.get("protection_requested", False))
             is_nascent = str(snapshot.get("target_realm", session["target_realm"])) == "nascent_soul"
+            is_soul_transformation = str(snapshot.get("target_realm", session["target_realm"])) == "soul_transformation"
             protection_key = str(snapshot.get("protection_key") or definition.protection_key)
             inventory = self._json_object(row["inventory_json"], {})
             protection_consumed = bool(
@@ -8000,6 +8331,20 @@ class SQLitePlayerRepository:
                             definition.reward_world_merit,
                             json.dumps(inventory, ensure_ascii=False, sort_keys=True),
                             0 if str(row["location_key"]).startswith("xuantian.") else 1000,
+                            now_text,
+                            row["id"],
+                        ),
+                    )
+                elif is_soul_transformation:
+                    connection.execute(
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_key = NULL, domain_power = 100, domain_charge = 150, domain_charge_max = 150, domain_charge_reset_date = ?, realm_resistance_bp = 1000, domain_crack_until = NULL, max_hp = max_hp + 1000, max_mp = max_mp + 800, initiative = initiative + 20, updated_at = ? WHERE id = ?",
+                        (
+                            definition.target_realm,
+                            definition.reward_currency,
+                            stamina_after,
+                            definition.reward_world_merit,
+                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            now.date().isoformat(),
                             now_text,
                             row["id"],
                         ),
@@ -8056,6 +8401,20 @@ class SQLitePlayerRepository:
                             row["id"],
                         ),
                     )
+                elif is_soul_transformation:
+                    domain_crack_until = serialize_datetime(now + timedelta(seconds=weakness_seconds or 24 * 60 * 60))
+                    connection.execute(
+                        "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, domain_crack_until = ?, updated_at = ? WHERE id = ?",
+                        (
+                            cultivation_after,
+                            pity_after,
+                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            domain_crack_until,
+                            now_text,
+                            row["id"],
+                        ),
+                    )
+                    weakness_until = domain_crack_until
                 else:
                     weakness_until = serialize_datetime(now + timedelta(seconds=weakness_seconds))
                     connection.execute(
@@ -8088,6 +8447,9 @@ class SQLitePlayerRepository:
                 "foundation_quality": int(snapshot.get("foundation_quality", 0)),
                 "required_foundation_quality": int(snapshot.get("required_foundation_quality", definition.required_foundation_quality)),
                 "preparation_bp": int(snapshot.get("preparation_bp", 0)),
+                "soul_prepare_bp": int(snapshot.get("soul_prepare_bp", 0)),
+                "reputation_prepare_bp": int(snapshot.get("reputation_prepare_bp", 0)),
+                "quest_prepare_bp": int(snapshot.get("quest_prepare_bp", 0)),
                 "location_bonus_bp": int(snapshot.get("location_bonus_bp", 0)),
                 "support_bonus_bp": int(snapshot.get("support_bonus_bp", 0)),
                 "cross_realm_risk_bp": int(snapshot.get("cross_realm_risk_bp", 0)),
@@ -8450,6 +8812,9 @@ class SQLitePlayerRepository:
             heart_demon_pending=bool(payload.get("heart_demon_pending", False)),
             cross_realm_risk_bp=int(payload.get("cross_realm_risk_bp", 0)),
             heart_demon_bonus_bp=int(payload.get("heart_demon_bonus_bp", 0)),
+            soul_prepare_bp=int(payload.get("soul_prepare_bp", 0)),
+            reputation_prepare_bp=int(payload.get("reputation_prepare_bp", 0)),
+            quest_prepare_bp=int(payload.get("quest_prepare_bp", 0)),
         )
 
     @staticmethod
@@ -11356,7 +11721,34 @@ class SQLitePlayerRepository:
                 "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
                 (platform, platform_user_id),
             ).fetchone()
-        return self._row_to_player(row) if row is not None else None
+            if row is None:
+                return None
+            if str(row["realm_key"]) == "soul_transformation" and int(row["domain_charge_max"]) > 0:
+                business_date = self._now().date().isoformat()
+                if str(row["domain_charge_reset_date"] or "") != business_date:
+                    connection.execute(
+                        "UPDATE players SET domain_charge = domain_charge_max, domain_charge_reset_date = ?, updated_at = ? WHERE id = ?",
+                        (business_date, serialize_datetime(self._now()), row["id"]),
+                    )
+                    row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if row["domain_crack_until"]:
+                try:
+                    if self._now() >= datetime.fromisoformat(str(row["domain_crack_until"])):
+                        connection.execute("UPDATE players SET domain_crack_until = NULL, updated_at = ? WHERE id = ?", (serialize_datetime(self._now()), row["id"]))
+                        row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+                except ValueError:
+                    pass
+            reputation = connection.execute(
+                "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
+            ).fetchone()
+        player = self._row_to_player(row)
+        if reputation is not None:
+            faction = dict(player.faction_reputation)
+            for key, value in self._json_object(reputation["local_json"], {}).items():
+                if str(key).startswith("faction."):
+                    faction[str(key).split(".", 1)[1]] = int(value)
+            player = replace(player, faction_reputation=faction)
+        return player
 
     @staticmethod
     def _json_object(raw: Any, default: dict[str, Any]) -> dict[str, Any]:
@@ -11446,6 +11838,19 @@ class SQLitePlayerRepository:
             max_mp=int(value("max_mp", 0)),
             carry_capacity=int(value("carry_capacity", 0)),
             exploration_efficiency_bp=int(value("exploration_efficiency_bp", 0)),
+            domain_key=value("domain_key"),
+            domain_power=int(value("domain_power", 0)),
+            realm_resistance_bp=int(value("realm_resistance_bp", 0)),
+            domain_crack_until=(
+                datetime.fromisoformat(str(value("domain_crack_until")))
+                if value("domain_crack_until") else None
+            ),
+            initiative=int(value("initiative", 0)),
+            faction_reputation={
+                str(key): int(item)
+                for key, item in SQLitePlayerRepository._json_object(value("faction_reputation_json", "{}"), {}).items()
+            },
+            domain_level=int(value("domain_level", 0)),
         )
 
     @staticmethod
@@ -11503,4 +11908,11 @@ class SQLitePlayerRepository:
             "max_mp": player.max_mp,
             "carry_capacity": player.carry_capacity,
             "exploration_efficiency_bp": player.exploration_efficiency_bp,
+            "domain_key": player.domain_key,
+            "domain_power": player.domain_power,
+            "realm_resistance_bp": player.realm_resistance_bp,
+            "domain_crack_until": serialize_datetime(player.domain_crack_until) if player.domain_crack_until else None,
+            "initiative": player.initiative,
+            "faction_reputation_json": json.dumps(player.faction_reputation, ensure_ascii=False, sort_keys=True),
+            "domain_level": player.domain_level,
         }

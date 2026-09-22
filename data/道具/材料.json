@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.3",
-  "rule_version": "items-0.3.0",
+  "content_version": "content-0.4",
+  "rule_version": "items-0.4.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "item",
   "records": [
@@ -268,6 +268,58 @@
       "requirements": [],
       "status": "active",
       "key": "item.beast_blood"
+    },
+    {
+      "name": "化神魂种",
+      "item_type": "breakthrough_material",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "breakthrough_material", "target": "soul_transformation"}],
+      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 10}],
+      "status": "active",
+      "key": "item.soul_seed"
+    },
+    {
+      "name": "领域核心",
+      "item_type": "domain_material",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "domain_core"}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.domain_core"
+    },
+    {
+      "name": "领域核心碎片",
+      "item_type": "domain_fragment",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "domain_core_exchange", "quantity": 20}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.domain_core_fragment"
+    },
+    {
+      "name": "远古古果",
+      "item_type": "material",
+      "quality": "heaven",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [{"type": "breakthrough_material", "target": "soul_transformation"}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.ancient_fruit"
     }
   ],
   "category": "材料",

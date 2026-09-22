@@ -1,8 +1,8 @@
 {
   "schema": "xiuxian.content",
   "schema_version": 1,
-  "content_version": "content-0.3",
-  "rule_version": "rules-0.3",
+  "content_version": "content-0.4",
+  "rule_version": "rules-0.4",
   "generated_at": "2026-09-22T00:00:00Z",
   "status": "active",
   "files": [
@@ -49,11 +49,13 @@
     "qi_gathering",
     "foundation",
     "golden_core",
-    "nascent_soul"
+    "nascent_soul",
+    "soul_transformation"
   ],
   "placeholder_realms": [],
   "review_notes": [
     "item.pill.foundation_guard 仅用于 v0.1 筑基失败保护；v0.2 使用 item.pill.golden_core_guard。",
-    "item.token.constitution_reset 仅管理员测试可用，不进入普通掉落。"
+    "item.token.constitution_reset 仅管理员测试可用，不进入普通掉落。",
+    "content-0.4 开放化神突破与领域选择；领域深层地点仍按对应玩法状态锁定。"
   ]
 }

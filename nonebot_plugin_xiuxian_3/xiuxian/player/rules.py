@@ -48,6 +48,11 @@ LOCATION_LABELS = {
     "cave.mist_grotto": "雾隐洞天·一层",
     "xuantian.cloud_city": "玄天界·云城",
     "xuantian.array_hall": "玄天界·阵堂",
+    "xuantian.domain_front": "玄天界·领域前线",
+    "cave.ancient_domain": "远古洞天",
+    "demon.abyss_depths": "魔渊深层",
+    "beast.ancestral_lake": "祖灵湖",
+    "void.portal": "虚空门户",
 }
 
 REALM_LABELS = {
@@ -57,6 +62,7 @@ REALM_LABELS = {
     "foundation": "筑基",
     "golden_core": "金丹",
     "nascent_soul": "元婴",
+    "soul_transformation": "化神",
 }
 
 DAO_NAME_MAX_LENGTH = 7

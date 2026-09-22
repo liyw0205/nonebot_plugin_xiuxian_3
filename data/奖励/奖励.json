@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.3",
+  "content_version": "content-0.4",
   "rule_version": "rewards-0.1.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "reward",

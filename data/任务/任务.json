@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.3",
-  "rule_version": "events-0.1.0",
+  "content_version": "content-0.4",
+  "rule_version": "events-0.4.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "quest",
   "records": [
@@ -61,6 +61,16 @@
       "claim_policy": "once_per_player",
       "expires": false,
       "key": "quest.prepare_nascent_soul"
+    },
+    {
+      "name": "化神许可",
+      "status": "open",
+      "trigger": {"operation": "quest.domain_material_commission", "result": "success"},
+      "requirements": ["quest.domain_material_commission", "quest.ancient_domain_line", "event.cross_realm_victory"],
+      "reward": {"preparation_bp": 600},
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.soul_transformation"
     }
   ],
   "schema": "xiuxian.content"

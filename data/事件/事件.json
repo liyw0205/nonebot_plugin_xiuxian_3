@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.3",
-  "rule_version": "events-0.1.0",
+  "content_version": "content-0.4",
+  "rule_version": "events-0.4.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "event",
   "records": [
@@ -48,6 +48,14 @@
       "choices": ["heart_demon.face", "heart_demon.purify", "heart_demon.bargain"],
       "timeout_seconds": 86400,
       "key": "event.heart_demon_trial"
+    },
+    {
+      "name": "领域前线",
+      "status": "locked",
+      "location_key": "xuantian.domain_front",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "reward_key": "reward.event.domain_front",
+      "key": "event.domain_front"
     }
   ],
   "schema": "xiuxian.content"

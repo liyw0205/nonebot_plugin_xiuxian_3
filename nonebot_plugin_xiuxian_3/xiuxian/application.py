@@ -205,6 +205,34 @@ class XiuxianApplication:
             write_message="当前事件不允许恢复神魂疲劳。",
         )
 
+    async def choose_domain(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.choose_domain(context),
+            write_message="当前事件不允许选择领域。",
+        )
+
+    async def confirm_domain(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.confirm_domain(context),
+            write_message="当前事件不允许确认领域。",
+        )
+
+    async def cancel_domain(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.cancel_domain(context),
+            write_message="当前事件不允许取消领域选择。",
+        )
+
+    async def recover_domain_crack(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.recover_domain_crack(context),
+            write_message="当前事件不允许恢复领域裂痕。",
+        )
+
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.production.preview_recipe(context), require_write=False)
 

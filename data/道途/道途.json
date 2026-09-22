@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.3",
-  "rule_version": "paths-0.1.0",
+  "content_version": "content-0.4",
+  "rule_version": "paths-0.4.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "path",
   "records": [
@@ -22,6 +22,7 @@
         "survival_threshold": 100
       },
       "key": "body",
+      "domain_key": "domain.mountain_body",
       "status": "active"
     },
     {
@@ -40,6 +41,7 @@
         "default_rounds": 1
       },
       "key": "spell",
+      "domain_key": "domain.elemental_sea",
       "status": "active"
     },
     {
@@ -58,6 +60,7 @@
         "max": 1
       },
       "key": "device",
+      "domain_key": "domain.machine_city",
       "status": "active"
     },
     {
@@ -76,6 +79,7 @@
         "per_use": 12
       },
       "key": "demonic",
+      "domain_key": "domain.abyss_shadow",
       "status": "active"
     },
     {
@@ -94,6 +98,7 @@
         "per_use": -5
       },
       "key": "beast",
+      "domain_key": "domain.ancestral_wild",
       "status": "active"
     },
     {
@@ -112,6 +117,7 @@
         "per_use": 2
       },
       "key": "support",
+      "domain_key": "domain.artisan_realm",
       "status": "active"
     }
   ],

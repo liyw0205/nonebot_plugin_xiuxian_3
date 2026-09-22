@@ -140,6 +140,27 @@ def test_qq_and_onebot_normalization_reaches_nascent_soul_preview() -> None:
     asyncio.run(run())
 
 
+def test_qq_and_onebot_normalization_reaches_soul_transformation_preview() -> None:
+    qq = normalize_qq_event(_qq_group_event("突破预览 化神", message_id="qq-soul-preview"))
+    onebot = normalize_event(_onebot_group_event("突破预览 化神", message_id=3006))
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            qq_context = replace(qq.context, operation_id="qq-soul-create")
+            onebot_context = replace(onebot.context, operation_id="onebot-soul-create")
+            assert (await runtime.dispatch(qq_context, "开始修仙")).code == "PLAYER_CREATED"
+            assert (await runtime.dispatch(onebot_context, "开始修仙")).code == "PLAYER_CREATED"
+            qq_preview = await runtime.dispatch(replace(qq.context, operation_id="qq-soul-preview"), qq.text)
+            onebot_preview = await runtime.dispatch(replace(onebot.context, operation_id="onebot-soul-preview"), onebot.text)
+            assert qq_preview.code == "BREAKTHROUGH_PREVIEW"
+            assert onebot_preview.code == "BREAKTHROUGH_PREVIEW"
+            assert qq_preview.data["target_realm"] == onebot_preview.data["target_realm"] == "soul_transformation"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_adapter_message_guards_reject_non_message_events() -> None:
     class OneBotNotice:
         __module__ = "nonebot.adapters.onebot.v11.event"

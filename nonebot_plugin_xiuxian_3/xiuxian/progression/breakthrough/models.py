@@ -85,6 +85,9 @@ class BreakthroughSettlementRecord:
     heart_demon_pending: bool = False
     cross_realm_risk_bp: int = 0
     heart_demon_bonus_bp: int = 0
+    soul_prepare_bp: int = 0
+    reputation_prepare_bp: int = 0
+    quest_prepare_bp: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,4 +124,16 @@ class SoulFatigueRecoveryRecord:
 @dataclass(frozen=True, slots=True)
 class NascentSoulPreparationRecord:
     player: PlayerView
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class DomainSelectionRecord:
+    player: PlayerView
+    session_id: str
+    domain_key: str
+    status: str
+    ends_at: str | None = None
+    energy_cost: int = 0
+    confirmed: bool = False
     already_completed: bool = False

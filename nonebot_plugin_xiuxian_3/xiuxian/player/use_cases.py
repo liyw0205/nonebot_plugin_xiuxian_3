@@ -265,7 +265,15 @@ class PlayerApplication:
             f"- **神魂**：{player.soul_power}/{player.soul_power_max}\n"
             f"- **领域能量**：{player.domain_charge}/{player.domain_charge_max}\n"
             f"- **污染**：{player.pollution}\n"
-            if player.realm_key == "nascent_soul"
+            if player.realm_key in {"nascent_soul", "soul_transformation"}
+            else ""
+        )
+        domain_summary = (
+            f"- **领域**：{player.domain_key or '未选择'}\n"
+            f"- **领域力量**：{player.domain_power}\n"
+            f"- **领域抵抗**：{player.realm_resistance_bp} bp\n"
+            f"- **领域裂痕**：{player.domain_crack_until.isoformat() if player.domain_crack_until else '无'}\n"
+            if player.realm_key == "soul_transformation"
             else ""
         )
         return CommandResult(
@@ -287,6 +295,7 @@ class PlayerApplication:
                 f"- **道基质量**：{player.foundation_quality}\n"
                 f"- **世界功勋**：{player.world_merit}\n"
                 f"{soul_summary}"
+                f"{domain_summary}"
                 "\n### 六项资质\n\n"
                 f"{self._qualification_text(player.qualification)}"
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(player.intro_flags))}/3"
@@ -325,6 +334,13 @@ class PlayerApplication:
                 "bloodline_stability": player.bloodline_stability,
                 "cross_realm_penalty_bp": player.cross_realm_penalty_bp,
                 "soul_fatigue_until": player.soul_fatigue_until.isoformat() if player.soul_fatigue_until else None,
+                "domain_key": player.domain_key,
+                "domain_power": player.domain_power,
+                "realm_resistance_bp": player.realm_resistance_bp,
+                "domain_crack_until": player.domain_crack_until.isoformat() if player.domain_crack_until else None,
+                "initiative": player.initiative,
+                "domain_level": player.domain_level,
+                "faction_reputation": player.faction_reputation,
             },
         )
 

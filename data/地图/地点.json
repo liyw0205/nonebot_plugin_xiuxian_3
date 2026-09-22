@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.3",
-  "rule_version": "world-0.3.0",
+  "content_version": "content-0.4",
+  "rule_version": "world-0.4.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "location",
   "records": [
@@ -255,6 +255,46 @@
         "progression.recover_foundation_shock"
       ],
       "key": "xuantian.array_hall"
+    },
+    {
+      "name": "远古洞天",
+      "world": "洞天",
+      "status": "locked",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "item", "item_key": "item.domain_core", "quantity": 1}],
+      "actions": ["explore.ancient_domain"],
+      "key": "cave.ancient_domain"
+    },
+    {
+      "name": "魔渊深层",
+      "world": "魔界",
+      "status": "locked",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "faction_reputation", "faction": "demon", "min": 3000}],
+      "actions": ["explore.abyss_depths"],
+      "key": "demon.abyss_depths"
+    },
+    {
+      "name": "祖灵湖",
+      "world": "妖界",
+      "status": "locked",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "faction_reputation", "faction": "beast", "min": 3000}],
+      "actions": ["explore.ancestral_lake"],
+      "key": "beast.ancestral_lake"
+    },
+    {
+      "name": "领域前线",
+      "world": "玄天界",
+      "status": "locked",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, "domain_selected"],
+      "actions": ["event.domain_front", "progression.recover_domain_crack"],
+      "key": "xuantian.domain_front"
+    },
+    {
+      "name": "虚空门户",
+      "world": "虚空",
+      "status": "locked",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, "quest.break_void_intro"],
+      "actions": ["explore.boundary_trial"],
+      "key": "void.portal"
     }
   ],
   "schema": "xiuxian.content"

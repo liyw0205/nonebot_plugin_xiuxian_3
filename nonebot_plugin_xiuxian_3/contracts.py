@@ -124,6 +124,13 @@ class PlayerView:
     max_mp: int = 0
     carry_capacity: int = 0
     exploration_efficiency_bp: int = 0
+    domain_key: str | None = None
+    domain_power: int = 0
+    realm_resistance_bp: int = 0
+    domain_crack_until: datetime | None = None
+    initiative: int = 0
+    faction_reputation: dict[str, int] = field(default_factory=dict)
+    domain_level: int = 0
 
 
 def serialize_datetime(value: datetime) -> str:

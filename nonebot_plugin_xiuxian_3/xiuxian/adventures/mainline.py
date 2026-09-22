@@ -150,6 +150,7 @@ _REALM_RANK = {
     "foundation": 3,
     "golden_core": 4,
     "nascent_soul": 5,
+    "soul_transformation": 6,
 }
 
 # Mainline v0.1 is intentionally limited to ordinary progression/display

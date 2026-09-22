@@ -144,6 +144,40 @@ NASCENT_SOUL_BREAKTHROUGH = BreakthroughDefinition(
     required_foundation_quality=5_500,
 )
 
+SOUL_TRANSFORMATION_BREAKTHROUGH = BreakthroughDefinition(
+    key="progression.breakthrough_soul_transformation",
+    target_realm="soul_transformation",
+    source_realm="nascent_soul",
+    required_total_cultivation=248_960,
+    duration_seconds=10 * 60,
+    materials={
+        "item.soul_seed": 1,
+        "item.domain_core": 1,
+        "item.ancient_fruit": 3,
+    },
+    currency_cost=20_000,
+    base_success_bp=6_500,
+    minimum_success_bp=6_500,
+    maximum_success_bp=9_000,
+    pity_cap_bp=900,
+    pity_increment_bp=300,
+    quality_bonus_divisor=0,
+    quality_bonus_cap_bp=0,
+    technique_bonus_bp=0,
+    formation_bonus_bp=0,
+    retention_bp=7_000,
+    weakness_seconds=0,
+    protection_key="item.pill.domain_restore",
+    protection_retention_bp=8_500,
+    protection_weakness_seconds=8 * 60 * 60,
+    rule_version="progression-0.4.0",
+    random_pool="breakthrough.soul_transformation.v0.4",
+    reward_world_merit=300,
+    reward_items={"item.domain_core": 1},
+    source_cultivation_cap=190_000,
+    content_version="content-0.4",
+)
+
 
 def qi_gathering_breakthrough() -> BreakthroughDefinition:
     return QI_GATHERING_BREAKTHROUGH
@@ -161,6 +195,10 @@ def nascent_soul_breakthrough() -> BreakthroughDefinition:
     return NASCENT_SOUL_BREAKTHROUGH
 
 
+def soul_transformation_breakthrough() -> BreakthroughDefinition:
+    return SOUL_TRANSFORMATION_BREAKTHROUGH
+
+
 def breakthrough_definition(target_realm: str) -> BreakthroughDefinition:
     if target_realm == QI_GATHERING_BREAKTHROUGH.target_realm:
         return QI_GATHERING_BREAKTHROUGH
@@ -170,6 +208,8 @@ def breakthrough_definition(target_realm: str) -> BreakthroughDefinition:
         return GOLDEN_CORE_BREAKTHROUGH
     if target_realm == NASCENT_SOUL_BREAKTHROUGH.target_realm:
         return NASCENT_SOUL_BREAKTHROUGH
+    if target_realm == SOUL_TRANSFORMATION_BREAKTHROUGH.target_realm:
+        return SOUL_TRANSFORMATION_BREAKTHROUGH
     raise ValueError(f"unsupported breakthrough target: {target_realm}")
 
 
@@ -205,11 +245,13 @@ __all__ = [
     "FOUNDATION_BREAKTHROUGH",
     "GOLDEN_CORE_BREAKTHROUGH",
     "NASCENT_SOUL_BREAKTHROUGH",
+    "SOUL_TRANSFORMATION_BREAKTHROUGH",
     "breakthrough_definition",
     "breakthrough_roll_bp",
     "foundation_breakthrough",
     "golden_core_breakthrough",
     "nascent_soul_breakthrough",
+    "soul_transformation_breakthrough",
     "next_pity_bp",
     "qi_gathering_breakthrough",
     "retained_cultivation",

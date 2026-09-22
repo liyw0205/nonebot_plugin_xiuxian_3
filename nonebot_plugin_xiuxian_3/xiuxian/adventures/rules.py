@@ -100,6 +100,7 @@ def realm_rank(realm_key: str) -> int:
         "foundation": 3,
         "golden_core": 4,
         "nascent_soul": 5,
+        "soul_transformation": 6,
     }.get(realm_key, -1)
 
 

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.3",
-  "rule_version": "items-0.3.0",
+  "content_version": "content-0.4",
+  "rule_version": "items-0.4.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "item",
   "records": [
@@ -189,6 +189,19 @@
       "requirements": [],
       "status": "active",
       "key": "item.pill.soul_restore"
+    },
+    {
+      "name": "领域复原丹",
+      "item_type": "pill",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "domain_crack_recovery", "weakness_seconds": 28800, "currency_cost": 2000}],
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "status": "active",
+      "key": "item.pill.domain_restore"
     }
   ],
   "category": "丹药",

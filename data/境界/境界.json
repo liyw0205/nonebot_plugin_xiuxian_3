@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.3",
-  "rule_version": "progression-0.3.0",
+  "content_version": "content-0.4",
+  "rule_version": "progression-0.4.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "realm",
   "records": [
@@ -123,6 +123,34 @@
       "next_realm": "soul_transformation",
       "cross_realm_total_cultivation": 248960,
       "key": "nascent_soul"
+    },
+    {
+      "name": "化神",
+      "status": "open",
+      "layer_min": 1,
+      "layer_max": 10,
+      "layer_thresholds": {
+        "1": 0,
+        "2": 28000,
+        "3": 60000,
+        "4": 100000,
+        "5": 150000,
+        "6": 210000,
+        "7": 285000,
+        "8": 375000,
+        "9": 480000,
+        "10": 600000
+      },
+      "next_realm": "void_refinement",
+      "cross_realm_total_cultivation": null,
+      "entry_requirements": [
+        "realm.nascent_soul.layer10",
+        "total_cultivation>=248960",
+        "soul_power>=200",
+        "faction_reputation>=2000",
+        "quest.soul_transformation"
+      ],
+      "key": "soul_transformation"
     }
   ],
   "schema": "xiuxian.content"
