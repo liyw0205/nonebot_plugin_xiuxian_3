@@ -216,6 +216,32 @@ CREATE TABLE IF NOT EXISTS town_commission_claims (
 CREATE INDEX IF NOT EXISTS idx_town_commission_claims_player
     ON town_commission_claims(player_id, business_date, status);
 
+CREATE TABLE IF NOT EXISTS livelihood_service_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT NOT NULL UNIQUE,
+    publish_operation_id TEXT NOT NULL UNIQUE,
+    accept_operation_id TEXT UNIQUE,
+    settle_operation_id TEXT UNIQUE,
+    publisher_id INTEGER NOT NULL REFERENCES players(id),
+    provider_id INTEGER REFERENCES players(id),
+    service_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('published', 'accepted', 'delivered', 'failed', 'expired', 'cancelled')),
+    reward_stones INTEGER NOT NULL CHECK (reward_stones > 0),
+    starts_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    accepted_at TEXT,
+    settled_at TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_livelihood_service_orders_publisher
+    ON livelihood_service_orders(publisher_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_livelihood_service_orders_provider
+    ON livelihood_service_orders(provider_id, service_key, accepted_at);
+
 CREATE TABLE IF NOT EXISTS constitution_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL UNIQUE,

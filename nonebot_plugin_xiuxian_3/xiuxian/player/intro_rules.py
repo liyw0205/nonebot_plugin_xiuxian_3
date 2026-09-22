@@ -30,6 +30,7 @@ SERVICE_LABELS = {
     "alchemy": "炼丹",
     "artifice": "炼器",
     "formation": "布阵",
+    "cooking": "烹饪",
 }
 
 GUIDE_ALIASES = {
@@ -44,6 +45,7 @@ GUIDE_ALIASES = {
     "炼丹": GUIDE_CHOOSE_SERVICE,
     "炼器": GUIDE_CHOOSE_SERVICE,
     "布阵": GUIDE_CHOOSE_SERVICE,
+    "烹饪": GUIDE_CHOOSE_SERVICE,
 }
 
 SERVICE_ALIASES = {
@@ -53,6 +55,8 @@ SERVICE_ALIASES = {
     "alchemy": "alchemy",
     "artifice": "artifice",
     "formation": "formation",
+    "烹饪": "cooking",
+    "cooking": "cooking",
 }
 
 TRAVEL_DESTINATIONS = {

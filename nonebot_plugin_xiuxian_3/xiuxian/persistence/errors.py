@@ -272,6 +272,42 @@ class CommissionAlreadyDeliveredError(RuntimeError):
     """The town commission was already delivered."""
 
 
+class ServiceRequirementError(RuntimeError):
+    """The requested service or provider teaching requirement is unavailable."""
+
+
+class ServiceReputationInsufficientError(RuntimeError):
+    """The provider has not reached the service reputation gate."""
+
+
+class ServiceLocationConflictError(RuntimeError):
+    """The provider and publisher are not at the required location."""
+
+
+class ServiceSelfAcceptError(RuntimeError):
+    """A publisher cannot accept their own service order."""
+
+
+class ServiceOrderConflictError(RuntimeError):
+    """The service order is not in the state required by the operation."""
+
+
+class ServiceNotFoundError(RuntimeError):
+    """The requested service order does not exist for the actor."""
+
+
+class ServiceDailyLimitError(RuntimeError):
+    """The provider reached the service's business-day acceptance cap."""
+
+
+class ServiceExpiredError(RuntimeError):
+    """The service order expired before it could be accepted."""
+
+
+class ServiceAlreadySettledError(RuntimeError):
+    """The service order already has a terminal settlement."""
+
+
 class ConstitutionAlreadySelectedError(RuntimeError):
     """The player already has a main constitution."""
 

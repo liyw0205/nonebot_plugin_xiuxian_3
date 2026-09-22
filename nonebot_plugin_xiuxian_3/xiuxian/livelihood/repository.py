@@ -30,11 +30,12 @@ from ..persistence.errors import (
 )
 from ..player.rules import STAGE_MORTAL
 from .commission_repository import CommissionRepositoryMixin
+from .service_repository import ServiceRepositoryMixin
 from .models import FieldPlotRecord, ResidenceRecord
 from .rules import crop_definition, residence_definition
 
 
-class LivelihoodRepositoryMixin(CommissionRepositoryMixin):
+class LivelihoodRepositoryMixin(ServiceRepositoryMixin, CommissionRepositoryMixin):
     """Own every persistence transaction that belongs to ``livelihood``."""
 
     async def lease_residence(

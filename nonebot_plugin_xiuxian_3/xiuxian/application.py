@@ -20,6 +20,7 @@ from .advancement.talent_use_cases import TalentApplication
 from .advancement.skill_use_cases import SkillApplication
 from .advancement.equipment_use_cases import EquipmentApplication
 from .livelihood.use_cases import LivelihoodApplication
+from .livelihood.service_use_cases import ServiceApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -45,6 +46,7 @@ class XiuxianApplication:
         self.skill = SkillApplication(repository)
         self.equipment = EquipmentApplication(repository)
         self.livelihood = LivelihoodApplication(repository)
+        self.service = ServiceApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -449,6 +451,34 @@ class XiuxianApplication:
             context,
             lambda: self.livelihood.deliver_commission(context),
             write_message="当前事件不允许交付城镇委托。",
+        )
+
+    async def publish_service(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.service.publish_service(context),
+            write_message="当前事件不允许发布服务订单。",
+        )
+
+    async def accept_service(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.service.accept_service(context),
+            write_message="当前事件不允许承接服务订单。",
+        )
+
+    async def cancel_service(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.service.cancel_service(context),
+            write_message="当前事件不允许取消服务订单。",
+        )
+
+    async def settle_service(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.service.settle_service(context),
+            write_message="当前事件不允许结算服务订单。",
         )
 
     async def preview_constitution(self, context: CommandContext) -> CommandResult:

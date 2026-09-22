@@ -224,10 +224,16 @@
         "energy": 2,
         "inputs": [
           {
-            "item_key": "item.food.spirit_rice",
+            "item_key": "item.food.coarse_spirit_rice",
             "quantity": 2
           }
         ]
+      },
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "default_amount": 20,
+        "min_amount": 1,
+        "max_amount": 100
       },
       "daily_limit": 5,
       "key": "service.cook_meal",
