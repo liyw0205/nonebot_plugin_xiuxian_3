@@ -6,6 +6,7 @@ from ..contracts import CommandContext, CommandResult
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
 from .progression.use_cases import ProgressionApplication
+from .progression.breakthrough.use_cases import BreakthroughApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -15,6 +16,7 @@ class XiuxianApplication:
     def __init__(self, repository: SQLitePlayerRepository):
         self.player = PlayerApplication(repository)
         self.progression = ProgressionApplication(repository)
+        self.breakthrough = BreakthroughApplication(repository)
         self.production = ProductionApplication(repository)
 
     async def create_player(self, context: CommandContext) -> CommandResult:
@@ -55,6 +57,18 @@ class XiuxianApplication:
 
     async def recover_resources(self, context: CommandContext) -> CommandResult:
         return await self.progression.recover_resources(context)
+
+    async def preview_breakthrough(self, context: CommandContext) -> CommandResult:
+        return await self.breakthrough.preview_breakthrough(context)
+
+    async def start_breakthrough(self, context: CommandContext) -> CommandResult:
+        return await self.breakthrough.start_breakthrough(context)
+
+    async def settle_breakthrough(self, context: CommandContext) -> CommandResult:
+        return await self.breakthrough.settle_breakthrough(context)
+
+    async def recover_weakness(self, context: CommandContext) -> CommandResult:
+        return await self.breakthrough.recover_weakness(context)
 
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
         return await self.production.preview_recipe(context)

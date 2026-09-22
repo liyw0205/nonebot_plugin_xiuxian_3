@@ -34,9 +34,13 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 基础修为 40；灵泉会话要求感气二层、完成教学采集并位于灵泉谷，固定消耗 3 点体力、
 持续 15 分钟、基础修为 70，使用 11500 bp 环境倍率且每日最多 4 次。灵泉会话使用
 `progression-0.1.2` 规则版本，调息继续使用 `progression-0.1.1`。悟性、环境和状态倍率
-均按整数公式计算，结算读取开始时的资质快照，重复 operation 只回放原结果。聚气、筑基
-突破尚未接入本运行时；正式生产使用独立的 `production` application，不会绕过境界域
+均按整数公式计算，结算读取开始时的资质快照，重复 operation 只回放原结果。正式生产使用独立的 `production` application，不会绕过境界域
 的修炼锁或 operation ledger。
+
+聚气突破命令映射为 `突破预览 聚气`、`开始突破 聚气`、`结算突破` 和 `恢复虚弱`（可追加
+`护脉` 或 `提前`）。开始突破独立使用 `progression.breakthrough_qi_gathering` operation，
+结算独立使用 `progression.settle_breakthrough`；两者均保存规则版本、随机池、地点、道途、
+资质、境界和成本快照。当前实现只开放聚气目标，筑基目标明确返回 `CONTENT_CLOSED`。
 
 灵泉相关错误码包括 `LOCATION_REQUIRED`、`LOCATION_REQUIREMENT_MISSING` 和
 `CULTIVATION_DAILY_LIMIT`；准入或次数不足时不扣体力、不创建修炼会话。

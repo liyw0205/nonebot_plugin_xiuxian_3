@@ -78,6 +78,8 @@ class PlayerView:
     realm_layer: int = 0
     cultivation: int = 0
     total_cultivation: int = 0
+    weakness_until: datetime | None = None
+    breakthrough_pity_bp: int = 0
 
 
 def serialize_datetime(value: datetime) -> str:
