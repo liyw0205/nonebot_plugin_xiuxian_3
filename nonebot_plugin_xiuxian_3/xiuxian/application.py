@@ -8,6 +8,7 @@ from .production.use_cases import ProductionApplication
 from .progression.use_cases import ProgressionApplication
 from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
+from .exploration.use_cases import ExplorationApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -20,6 +21,7 @@ class XiuxianApplication:
         self.breakthrough = BreakthroughApplication(repository)
         self.production = ProductionApplication(repository)
         self.world = WorldApplication(repository)
+        self.exploration = ExplorationApplication(repository)
 
     async def create_player(self, context: CommandContext) -> CommandResult:
         return await self.player.create_player(context)
@@ -95,3 +97,12 @@ class XiuxianApplication:
 
     async def settle_travel(self, context: CommandContext) -> CommandResult:
         return await self.world.settle_travel(context)
+
+    async def start_exploration(self, context: CommandContext) -> CommandResult:
+        return await self.exploration.start_exploration(context)
+
+    async def settle_exploration(self, context: CommandContext) -> CommandResult:
+        return await self.exploration.settle_exploration(context)
+
+    async def cancel_exploration(self, context: CommandContext) -> CommandResult:
+        return await self.exploration.cancel_exploration(context)

@@ -137,3 +137,6 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("前往", application.start_travel)
     router.register("前往雾隐洞天", application.start_cave_travel)
     router.register("结算移动", application.settle_travel)
+    router.register("开始探索", application.start_exploration)
+    router.register("结算探索", application.settle_exploration)
+    router.register("取消探索", application.cancel_exploration)

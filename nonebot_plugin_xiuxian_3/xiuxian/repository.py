@@ -43,6 +43,13 @@ from .progression.breakthrough.models import (
 )
 from .world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
 from .world.rules import destination_definition, meets_realm, RULE_VERSION
+from .exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
+from .exploration.rules import (
+    battle_roll_bp,
+    exploration_definition,
+    meets_realm as exploration_meets_realm,
+    settlement_result,
+)
 
 
 SCHEMA = """
@@ -182,6 +189,31 @@ CREATE TABLE IF NOT EXISTS travel_sessions (
 CREATE INDEX IF NOT EXISTS idx_travel_sessions_player ON travel_sessions(player_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_travel_sessions_active
     ON travel_sessions(player_id) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS exploration_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exploration_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    mode_key TEXT NOT NULL,
+    location_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('created', 'running', 'settled', 'cancelled', 'expired', 'combat_pending')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    stamina_cost INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0),
+    daily_limit INTEGER NOT NULL DEFAULT 0 CHECK (daily_limit >= 0),
+    business_date TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_exploration_sessions_player ON exploration_sessions(player_id);
+CREATE INDEX IF NOT EXISTS idx_exploration_sessions_quota
+    ON exploration_sessions(player_id, mode_key, business_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_exploration_sessions_active
+    ON exploration_sessions(player_id) WHERE status IN ('created', 'running', 'combat_pending');
 
 """
 
@@ -360,6 +392,30 @@ class TravelNotFoundError(RuntimeError):
 
 class TravelNotReadyError(RuntimeError):
     """The movement session has not reached its arrival time."""
+
+
+class ExplorationBusyError(RuntimeError):
+    """The player already has an active exploration or another locked action."""
+
+
+class ExplorationNotFoundError(RuntimeError):
+    """The player has no exploration session to settle or cancel."""
+
+
+class ExplorationNotReadyError(RuntimeError):
+    """The exploration session has not reached its end time."""
+
+
+class ExplorationExpiredError(RuntimeError):
+    """The exploration session exceeded its normal settlement window."""
+
+
+class ExplorationCombatPendingError(RuntimeError):
+    """The exploration rolled a combat encounter that is still locked."""
+
+
+class ExplorationQuotaExhaustedError(RuntimeError):
+    """The mode reached its business-day quota."""
 
 
 class SQLitePlayerRepository:
@@ -1109,13 +1165,23 @@ class SQLitePlayerRepository:
             ).fetchone()
             if moving_session is not None:
                 raise CultivationBusyError("cultivation must be settled before moving")
-            for table, status in (("production_orders", "processing"), ("breakthrough_sessions", "preparing"), ("travel_sessions", "running")):
+            for table, status in (
+                ("production_orders", "processing"),
+                ("breakthrough_sessions", "preparing"),
+                ("travel_sessions", "running"),
+            ):
                 occupied = connection.execute(
                     f"SELECT 1 FROM {table} WHERE player_id = ? AND status = ? LIMIT 1",
                     (row["id"], status),
                 ).fetchone()
                 if occupied is not None:
                     raise CultivationBusyError("another action must be settled before moving")
+            exploration = connection.execute(
+                "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if exploration is not None:
+                raise CultivationBusyError("exploration must be settled before moving")
             weakness_until = row["weakness_until"]
             if weakness_until and now < datetime.fromisoformat(str(weakness_until)):
                 raise WeaknessActiveError("breakthrough weakness blocks travel")
@@ -1273,12 +1339,22 @@ class SQLitePlayerRepository:
             ).fetchone()
             if active is not None:
                 raise TravelBusyError("travel is already running")
-            for table, status in (("cultivation_sessions", "running"), ("production_orders", "processing"), ("breakthrough_sessions", "preparing")):
+            for table, status in (
+                ("cultivation_sessions", "running"),
+                ("production_orders", "processing"),
+                ("breakthrough_sessions", "preparing"),
+            ):
                 busy = connection.execute(
                     f"SELECT 1 FROM {table} WHERE player_id = ? AND status = ? LIMIT 1", (player_id, status)
                 ).fetchone()
                 if busy is not None:
                     raise TravelBusyError("another action is already running")
+            exploration = connection.execute(
+                "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') LIMIT 1",
+                (player_id,),
+            ).fetchone()
+            if exploration is not None:
+                raise TravelBusyError("exploration is already running")
 
             stamina = int(row["stamina"])
             stones = int(row["spirit_stones"])
@@ -1437,6 +1513,439 @@ class SQLitePlayerRepository:
             currency_cost=int(payload.get("currency_cost", 0)), pass_key=payload.get("pass_key"),
             pass_quantity=int(payload.get("pass_quantity", 0)), already_completed=replay,
         )
+
+    async def start_exploration(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        mode_key: str,
+        operation_id: str,
+    ) -> ExplorationStartRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._start_exploration_sync,
+                platform,
+                platform_user_id,
+                mode_key,
+                operation_id,
+            )
+
+    def _start_exploration_sync(self, platform: str, platform_user_id: str, mode_key: str, operation_id: str) -> ExplorationStartRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._start_exploration_once(platform, platform_user_id, mode_key, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _start_exploration_once(self, platform: str, platform_user_id: str, mode_key: str, operation_id: str) -> ExplorationStartRecord:
+        definition = exploration_definition(mode_key)
+        operation_name = "exploration.start"
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "mode_key": definition.key,
+        }
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = datetime.now(timezone.utc)
+        business_date = now.date().isoformat()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._exploration_start_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
+                raise PlayerStageConflictError("player is not ready for exploration")
+            if str(row["location_key"]) != definition.location_key:
+                raise LocationRequirementError("exploration requires a specific location")
+            if not exploration_meets_realm(
+                str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer
+            ):
+                raise LocationRequirementError("realm requirement is not met")
+            if definition.key == "explore.spring_gather":
+                intro_state = self._json_object(row["intro_json"], {})
+                if "guide.gather_blood_grass" not in set(intro_state.get("flags", [])):
+                    raise LocationRequirementError("spring gathering requires the gathering lesson")
+
+            player_id = int(row["id"])
+            active = connection.execute(
+                "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') LIMIT 1",
+                (player_id,),
+            ).fetchone()
+            if active is not None:
+                raise ExplorationBusyError("exploration is already active")
+            for table, statuses in (
+                ("travel_sessions", ("running",)),
+                ("cultivation_sessions", ("running",)),
+                ("production_orders", ("processing",)),
+                ("breakthrough_sessions", ("preparing",)),
+            ):
+                placeholders = ", ".join("?" for _ in statuses)
+                busy = connection.execute(
+                    f"SELECT 1 FROM {table} WHERE player_id = ? AND status IN ({placeholders}) LIMIT 1",
+                    (player_id, *statuses),
+                ).fetchone()
+                if busy is not None:
+                    raise ExplorationBusyError("another action is already running")
+            used = connection.execute(
+                "SELECT COUNT(*) AS count FROM exploration_sessions WHERE player_id = ? AND mode_key = ? AND business_date = ?",
+                (player_id, definition.key, business_date),
+            ).fetchone()
+            if used is not None and int(used["count"]) >= definition.daily_limit:
+                raise ExplorationQuotaExhaustedError("exploration mode reached its daily limit")
+            stamina = int(row["stamina"])
+            if stamina < definition.stamina_cost:
+                raise ResourceInsufficientError("stamina is insufficient")
+
+            exploration_id = uuid4().hex
+            starts_at = serialize_datetime(now)
+            ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
+            snapshot = {
+                "mode_key": definition.key,
+                "location_key": definition.location_key,
+                "realm_key": row["realm_key"],
+                "realm_layer": int(row["realm_layer"]),
+                "qualification": self._json_object(row["qualification_json"], {}),
+                "path_key": row["path_key"],
+                "rule_version": definition.rule_version,
+                "random_pool": definition.random_pool,
+                "random_seed": operation_id,
+                "battle_chance_bp": definition.battle_chance_bp,
+                "business_date": business_date,
+                "stamina_cost": definition.stamina_cost,
+            }
+            connection.execute(
+                "UPDATE players SET stamina = ?, updated_at = ? WHERE id = ?",
+                (stamina - definition.stamina_cost, starts_at, player_id),
+            )
+            connection.execute(
+                """
+                INSERT INTO exploration_sessions(
+                    exploration_id, player_id, operation_id, mode_key, location_key, status,
+                    starts_at, ends_at, stamina_cost, daily_limit, business_date,
+                    snapshot_json, result_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'created', ?, ?, ?, ?, ?, ?, '{}', ?, ?)
+                """,
+                (
+                    exploration_id,
+                    player_id,
+                    operation_id,
+                    definition.key,
+                    definition.location_key,
+                    starts_at,
+                    ends_at,
+                    definition.stamina_cost,
+                    definition.daily_limit,
+                    business_date,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                    starts_at,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "exploration_id": exploration_id,
+                "mode_key": definition.key,
+                "location_key": definition.location_key,
+                "status": "created",
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "stamina_cost": definition.stamina_cost,
+                "daily_limit": definition.daily_limit,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    player_id,
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                ),
+            )
+            return self._exploration_start_from_payload(payload)
+
+    @staticmethod
+    def _exploration_start_from_payload(payload: dict[str, Any], replay: bool = False) -> ExplorationStartRecord:
+        return ExplorationStartRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            exploration_id=str(payload["exploration_id"]),
+            mode_key=str(payload["mode_key"]),
+            location_key=str(payload["location_key"]),
+            status=str(payload["status"]),
+            starts_at=str(payload["starts_at"]),
+            ends_at=str(payload["ends_at"]),
+            stamina_cost=int(payload["stamina_cost"]),
+            daily_limit=int(payload["daily_limit"]),
+            already_completed=replay,
+        )
+
+    async def settle_exploration(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> ExplorationSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._settle_exploration_sync, platform, platform_user_id, operation_id)
+
+    def _settle_exploration_sync(self, platform: str, platform_user_id: str, operation_id: str) -> ExplorationSettlementRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._settle_exploration_once(platform, platform_user_id, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _settle_exploration_once(self, platform: str, platform_user_id: str, operation_id: str) -> ExplorationSettlementRecord:
+        operation_name = "exploration.settle"
+        request_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            session = connection.execute(
+                "SELECT * FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if session is None:
+                raise ExplorationNotFoundError("no active exploration")
+            if session["status"] == "combat_pending":
+                stored_result = self._json_object(session["result_json"], {})
+                result = {
+                    str(key): int(value)
+                    for key, value in dict(stored_result.get("result", {})).items()
+                }
+                payload = {
+                    "player": self._player_payload(self._row_to_player(row)),
+                    "exploration_id": session["exploration_id"],
+                    "mode_key": session["mode_key"],
+                    "location_key": session["location_key"],
+                    "status": "combat_pending",
+                    "result": result,
+                    "battle_pending": True,
+                    "expired": False,
+                    "stamina_cost": int(session["stamina_cost"]),
+                }
+                connection.execute(
+                    "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        operation_id,
+                        operation_name,
+                        row["id"],
+                        request_hash,
+                        json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                    ),
+                )
+                return self._exploration_settlement_from_payload(payload)
+            ends_at = datetime.fromisoformat(str(session["ends_at"]))
+            if now < ends_at:
+                raise ExplorationNotReadyError("exploration is not ready")
+            snapshot = self._json_object(session["snapshot_json"], {})
+            expired = now > ends_at + timedelta(hours=24)
+            result: dict[str, int] = {}
+            battle_pending = False
+            status = "expired" if expired else "settled"
+            if not expired:
+                seed = str(snapshot.get("random_seed", session["operation_id"]))
+                battle_pending = battle_roll_bp(seed + ":battle") < int(snapshot.get("battle_chance_bp", 0))
+                if battle_pending:
+                    status = "combat_pending"
+                else:
+                    result = settlement_result(str(session["mode_key"]), seed)
+
+            inventory = self._json_object(row["inventory_json"], {})
+            stones = int(row["spirit_stones"])
+            cultivation = int(row["cultivation"])
+            total_cultivation = int(row["total_cultivation"])
+            if status == "settled":
+                for key, quantity in result.items():
+                    if key == "spirit_stones":
+                        stones += int(quantity)
+                    elif key == "cultivation":
+                        cultivation += int(quantity)
+                        total_cultivation += int(quantity)
+                    else:
+                        inventory[key] = int(inventory.get(key, 0)) + int(quantity)
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, inventory_json = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        stones,
+                        cultivation,
+                        total_cultivation,
+                        json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                        row["id"],
+                    ),
+                )
+            result_json = {
+                "status": status,
+                "result": result,
+                "battle_pending": battle_pending,
+                "expired": expired,
+                "settled_at": now_text,
+            }
+            connection.execute(
+                "UPDATE exploration_sessions SET status = ?, result_json = ?, updated_at = ? WHERE id = ? AND status IN ('created', 'running')",
+                (status, json.dumps(result_json, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "exploration_id": session["exploration_id"],
+                "mode_key": session["mode_key"],
+                "location_key": session["location_key"],
+                "status": status,
+                "result": result,
+                "battle_pending": battle_pending,
+                "expired": expired,
+                "stamina_cost": int(session["stamina_cost"]),
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._exploration_settlement_from_payload(payload)
+
+    @staticmethod
+    def _exploration_settlement_from_payload(payload: dict[str, Any], replay: bool = False) -> ExplorationSettlementRecord:
+        return ExplorationSettlementRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            exploration_id=str(payload["exploration_id"]),
+            mode_key=str(payload["mode_key"]),
+            location_key=str(payload["location_key"]),
+            status=str(payload["status"]),
+            result={str(key): int(value) for key, value in dict(payload.get("result", {})).items()},
+            battle_pending=bool(payload.get("battle_pending", False)),
+            expired=bool(payload.get("expired", False)),
+            stamina_cost=int(payload.get("stamina_cost", 0)),
+            already_completed=replay,
+        )
+
+    async def cancel_exploration(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> ExplorationSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._cancel_exploration_sync, platform, platform_user_id, operation_id)
+
+    def _cancel_exploration_sync(self, platform: str, platform_user_id: str, operation_id: str) -> ExplorationSettlementRecord:
+        operation_name = "exploration.cancel"
+        request_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash(operation_name, request_payload)
+        now_text = serialize_datetime(datetime.now(timezone.utc))
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?", (platform, platform_user_id)
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            session = connection.execute(
+                "SELECT * FROM exploration_sessions WHERE player_id = ? AND status = 'created' ORDER BY id DESC LIMIT 1", (row["id"],)
+            ).fetchone()
+            if session is None:
+                raise ExplorationNotFoundError("exploration cannot be cancelled")
+            stamina = int(row["stamina"]) + int(session["stamina_cost"])
+            connection.execute("UPDATE players SET stamina = ?, updated_at = ? WHERE id = ?", (stamina, now_text, row["id"]))
+            connection.execute(
+                "UPDATE exploration_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ? AND status = 'created'",
+                (json.dumps({"status": "cancelled", "stamina_refund": int(session["stamina_cost"])}, ensure_ascii=False), now_text, session["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "exploration_id": session["exploration_id"],
+                "mode_key": session["mode_key"],
+                "location_key": session["location_key"],
+                "status": "cancelled",
+                "result": {"stamina_refund": int(session["stamina_cost"])},
+                "battle_pending": False,
+                "expired": False,
+                "stamina_cost": int(session["stamina_cost"]),
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return self._exploration_settlement_from_payload(payload)
 
     async def enter_cultivation(
         self,
@@ -1687,6 +2196,12 @@ class SQLitePlayerRepository:
 
                 if GUIDE_GATHER_BLOOD_GRASS not in set(intro_state.get("flags", [])):
                     raise LocationRequirementError("spirit cultivation requires the gathering lesson")
+            exploration = connection.execute(
+                "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if exploration is not None:
+                raise CultivationBusyError("exploration is still running")
             pending = connection.execute(
                 "SELECT status, result_json FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -2600,6 +3115,12 @@ class SQLitePlayerRepository:
             ).fetchone()
             if cultivation is not None:
                 raise ProductionBusyError("cultivation is still running")
+            exploration = connection.execute(
+                "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if exploration is not None:
+                raise ProductionBusyError("exploration is still running")
             day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             day_end = day_start + timedelta(days=1)
             used = connection.execute(
@@ -3109,6 +3630,12 @@ class SQLitePlayerRepository:
             ).fetchone()
             if production is not None:
                 raise BreakthroughBusyError("production order is active")
+            exploration = connection.execute(
+                "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if exploration is not None:
+                raise BreakthroughBusyError("exploration is active")
 
             inventory = self._json_object(row["inventory_json"], {})
             for item_key, quantity in definition.materials.items():
