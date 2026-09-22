@@ -35,7 +35,8 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 持续 15 分钟、基础修为 70，使用 11500 bp 环境倍率且每日最多 4 次。灵泉会话使用
 `progression-0.1.2` 规则版本，调息继续使用 `progression-0.1.1`。悟性、环境和状态倍率
 均按整数公式计算，结算读取开始时的资质快照，重复 operation 只回放原结果。聚气、筑基
-突破和正式生产尚未接入本运行时。
+突破尚未接入本运行时；正式生产使用独立的 `production` application，不会绕过境界域
+的修炼锁或 operation ledger。
 
 灵泉相关错误码包括 `LOCATION_REQUIRED`、`LOCATION_REQUIREMENT_MISSING` 和
 `CULTIVATION_DAILY_LIMIT`；准入或次数不足时不扣体力、不创建修炼会话。

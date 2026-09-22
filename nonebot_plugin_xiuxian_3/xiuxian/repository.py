@@ -31,6 +31,11 @@ from .progression.models import (
     LayerUnlock,
     ResourceRecoveryRecord,
 )
+from .production.models import (
+    ProductionOrderRecord,
+    ProductionPreviewRecord,
+    ProductionSettlementRecord,
+)
 
 
 SCHEMA = """
@@ -65,6 +70,7 @@ CREATE TABLE IF NOT EXISTS players (
     realm_layer INTEGER NOT NULL DEFAULT 0 CHECK (realm_layer >= 0),
     cultivation INTEGER NOT NULL DEFAULT 0 CHECK (cultivation >= 0),
     total_cultivation INTEGER NOT NULL DEFAULT 0 CHECK (total_cultivation >= 0),
+    durability_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (platform, platform_user_id)
@@ -101,6 +107,27 @@ CREATE TABLE IF NOT EXISTS cultivation_sessions (
 CREATE INDEX IF NOT EXISTS idx_cultivation_sessions_player ON cultivation_sessions(player_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cultivation_sessions_active
     ON cultivation_sessions(player_id) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS production_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    recipe_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('processing', 'completed', 'failed', 'cancelled', 'expired')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    energy_cost INTEGER NOT NULL DEFAULT 0 CHECK (energy_cost >= 0),
+    currency_cost INTEGER NOT NULL DEFAULT 0 CHECK (currency_cost >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_production_orders_player ON production_orders(player_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_production_orders_active
+    ON production_orders(player_id) WHERE status = 'processing';
 
 """
 
@@ -143,6 +170,46 @@ class LocationRequirementError(RuntimeError):
 
 class ResourceInsufficientError(RuntimeError):
     """A player does not have enough of a spendable resource."""
+
+
+class EnergyInsufficientError(RuntimeError):
+    """A player does not have enough energy for production."""
+
+
+class MaterialInsufficientError(RuntimeError):
+    """A player does not have enough recipe inputs."""
+
+
+class ToolMissingError(RuntimeError):
+    """The recipe's required production tool is not owned."""
+
+
+class ToolDurabilityInsufficientError(RuntimeError):
+    """The recipe's required tool cannot pay its durability cost."""
+
+
+class RecipeRequirementError(RuntimeError):
+    """The player does not satisfy a recipe's profession, realm or location gate."""
+
+
+class ProductionBusyError(RuntimeError):
+    """The player already has a processing production order."""
+
+
+class ProductionDailyLimitError(RuntimeError):
+    """The recipe reached its business-day cap."""
+
+
+class ProductionNotFoundError(RuntimeError):
+    """The player has no production order to settle."""
+
+
+class ProductionNotReadyError(RuntimeError):
+    """A production order has not reached its completion time."""
+
+
+class ProductionExpiredError(RuntimeError):
+    """A production order missed its normal completion window."""
 
 
 class PathAlreadySelectedError(RuntimeError):
@@ -265,6 +332,7 @@ class SQLitePlayerRepository:
             ("energy", "INTEGER NOT NULL DEFAULT 0"),
             ("energy_max", "INTEGER NOT NULL DEFAULT 0"),
             ("inventory_json", "TEXT NOT NULL DEFAULT '{}'"),
+            ("durability_json", "TEXT NOT NULL DEFAULT '{}'"),
             ("intro_json", "TEXT NOT NULL DEFAULT '{}'"),
             ("selected_service", "TEXT"),
             ("realm_key", "TEXT NOT NULL DEFAULT 'mortal'"),
@@ -929,6 +997,17 @@ class SQLitePlayerRepository:
                     raise LocationRequirementError("spirit field requires the gathering lesson")
 
             current = str(row["location_key"])
+            moving_session = connection.execute(
+                "SELECT 1 FROM cultivation_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if moving_session is not None:
+                raise CultivationBusyError("cultivation must be settled before moving")
+            if destination == SPIRIT_FIELD_LOCATION and current not in {
+                "xuantian.new_town",
+                "xuantian.outskirts",
+            }:
+                raise LocationRequirementError("spirit field can only be entered from the starting area")
             changed = current != destination
             cost = TRAVEL_COSTS[destination] if changed else 0
             stamina = int(row["stamina"])
@@ -1968,6 +2047,531 @@ class SQLitePlayerRepository:
                 changed=changed,
             )
 
+    async def preview_production(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        recipe_key: str,
+    ) -> ProductionPreviewRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._preview_production_sync,
+                platform,
+                platform_user_id,
+                recipe_key,
+            )
+
+    def _preview_production_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        recipe_key: str,
+    ) -> ProductionPreviewRecord:
+        from .production.rules import recipe_definition
+
+        recipe = recipe_definition(recipe_key)
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            self._check_production_requirements(row, recipe)
+            day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            used = connection.execute(
+                """
+                SELECT COUNT(*) AS count FROM production_orders
+                WHERE player_id = ? AND recipe_key = ? AND starts_at >= ? AND starts_at < ?
+                """,
+                (row["id"], recipe.key, serialize_datetime(day_start), serialize_datetime(day_end)),
+            ).fetchone()
+            return ProductionPreviewRecord(
+                player=self._row_to_player(row),
+                recipe_key=recipe.key,
+                recipe_name=recipe.name,
+                energy_cost=recipe.energy_cost,
+                duration_seconds=recipe.duration_seconds,
+                daily_limit=recipe.daily_limit,
+                daily_used=int(used["count"] if used is not None else 0),
+                inputs=dict(recipe.inputs),
+                tool_key=recipe.tool_key,
+                currency_cost=recipe.currency_cost,
+            )
+
+    async def start_production(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        recipe_key: str,
+        operation_id: str,
+    ) -> ProductionOrderRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._start_production_with_retry,
+                platform,
+                platform_user_id,
+                recipe_key,
+                operation_id,
+            )
+
+    def _start_production_with_retry(
+        self,
+        platform: str,
+        platform_user_id: str,
+        recipe_key: str,
+        operation_id: str,
+    ) -> ProductionOrderRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._start_production_once(platform, platform_user_id, recipe_key, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _start_production_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        recipe_key: str,
+        operation_id: str,
+    ) -> ProductionOrderRecord:
+        from .production.rules import RECIPE_RULE_VERSION, TOOL_MAX_DURABILITY_BP, random_quality_bp, recipe_definition
+
+        recipe = recipe_definition(recipe_key)
+        operation_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "recipe_key": recipe.key,
+        }
+        request_hash = self._request_hash("production.start", operation_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != "production.start" or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._production_order_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if row["stage"] != "cultivator":
+                raise PlayerStageConflictError("player is not ready for production")
+            self._check_production_requirements(row, recipe)
+            active = connection.execute(
+                "SELECT 1 FROM production_orders WHERE player_id = ? AND status = 'processing' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if active is not None:
+                raise ProductionBusyError("production order is already processing")
+            cultivation = connection.execute(
+                "SELECT 1 FROM cultivation_sessions WHERE player_id = ? AND status = 'running' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if cultivation is not None:
+                raise ProductionBusyError("cultivation is still running")
+            day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            used = connection.execute(
+                """
+                SELECT COUNT(*) AS count FROM production_orders
+                WHERE player_id = ? AND recipe_key = ? AND starts_at >= ? AND starts_at < ?
+                """,
+                (row["id"], recipe.key, serialize_datetime(day_start), serialize_datetime(day_end)),
+            ).fetchone()
+            if used is not None and int(used["count"]) >= recipe.daily_limit:
+                raise ProductionDailyLimitError("recipe daily cap reached")
+
+            inventory = self._json_object(row["inventory_json"], {})
+            for item_key, quantity in recipe.inputs.items():
+                if int(inventory.get(item_key, 0)) < quantity:
+                    raise MaterialInsufficientError("recipe inputs are insufficient")
+            if int(row["energy"]) < recipe.energy_cost:
+                raise EnergyInsufficientError("energy is insufficient")
+            if int(row["spirit_stones"]) < recipe.currency_cost:
+                raise MaterialInsufficientError("spirit stones are insufficient")
+
+            durability = self._json_object(row["durability_json"], {})
+            tool_durability_before: int | None = None
+            if recipe.tool_key:
+                if int(inventory.get(recipe.tool_key, 0)) < 1:
+                    raise ToolMissingError("production tool is missing")
+                tool_durability_before = int(durability.get(recipe.tool_key, TOOL_MAX_DURABILITY_BP))
+                if tool_durability_before < recipe.tool_cost_bp:
+                    raise ToolDurabilityInsufficientError("production tool durability is insufficient")
+                durability[recipe.tool_key] = tool_durability_before - recipe.tool_cost_bp
+            for item_key, quantity in recipe.inputs.items():
+                inventory[item_key] = int(inventory[item_key]) - quantity
+            order_id = uuid4().hex
+            starts_at = now_text
+            ends_at = serialize_datetime(now + timedelta(seconds=recipe.duration_seconds))
+            snapshot = {
+                "recipe_key": recipe.key,
+                "recipe_name": recipe.name,
+                "rule_version": RECIPE_RULE_VERSION,
+                "realm_key": row["realm_key"],
+                "realm_layer": int(row["realm_layer"]),
+                "location_key": row["location_key"],
+                "inputs": dict(recipe.inputs),
+                "tool_key": recipe.tool_key,
+                "tool_durability_before": tool_durability_before,
+                "tool_durability_after": durability.get(recipe.tool_key) if recipe.tool_key else None,
+                "material_quality_bp": 10000,
+                "proficiency_bp": 0,
+                "random_quality_bp": random_quality_bp(operation_id),
+                "currency_cost": recipe.currency_cost,
+            }
+            connection.execute(
+                """
+                UPDATE players
+                SET energy = energy - ?, spirit_stones = spirit_stones - ?,
+                    inventory_json = ?, durability_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    recipe.energy_cost,
+                    recipe.currency_cost,
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    json.dumps(durability, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    row["id"],
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO production_orders(
+                    order_id, player_id, operation_id, recipe_key, status, starts_at, ends_at,
+                    energy_cost, currency_cost, snapshot_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    order_id,
+                    row["id"],
+                    operation_id,
+                    recipe.key,
+                    starts_at,
+                    ends_at,
+                    recipe.energy_cost,
+                    recipe.currency_cost,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    now_text,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("production start returned no player")
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "order_id": order_id,
+                "recipe_key": recipe.key,
+                "recipe_name": recipe.name,
+                "status": "processing",
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "energy_cost": recipe.energy_cost,
+                "currency_cost": recipe.currency_cost,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at)
+                VALUES (?, 'production.start', ?, ?, ?, ?)
+                """,
+                (operation_id, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return ProductionOrderRecord(
+                player=player,
+                order_id=order_id,
+                recipe_key=recipe.key,
+                recipe_name=recipe.name,
+                status="processing",
+                starts_at=starts_at,
+                ends_at=ends_at,
+                energy_cost=recipe.energy_cost,
+                currency_cost=recipe.currency_cost,
+            )
+
+    async def complete_production(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> ProductionSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._settle_production_with_retry,
+                platform,
+                platform_user_id,
+                operation_id,
+                False,
+            )
+
+    async def recover_production(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> ProductionSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._settle_production_with_retry,
+                platform,
+                platform_user_id,
+                operation_id,
+                True,
+            )
+
+    def _settle_production_with_retry(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        recovery: bool,
+    ) -> ProductionSettlementRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._settle_production_once(platform, platform_user_id, operation_id, recovery)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _settle_production_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        recovery: bool,
+    ) -> ProductionSettlementRecord:
+        from .production.rules import HIGH_QUALITY_THRESHOLD_BP, QUALITY_SUCCESS_THRESHOLD_BP, recipe_definition
+
+        operation_name = "production.recover" if recovery else "production.complete"
+        operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash(operation_name, operation_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._production_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            order = connection.execute(
+                "SELECT * FROM production_orders WHERE player_id = ? AND status IN ('processing', 'expired') ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if order is None:
+                raise ProductionNotFoundError("no processing production order")
+            ends_at = datetime.fromisoformat(str(order["ends_at"]))
+            if not recovery and order["status"] == "expired":
+                raise ProductionExpiredError("production order expired")
+            if not recovery and now < ends_at:
+                raise ProductionNotReadyError("production is not ready")
+            if not recovery and now > ends_at + timedelta(hours=24):
+                connection.execute(
+                    "UPDATE production_orders SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'processing'",
+                    (now_text, order["id"]),
+                )
+                connection.commit()
+                raise ProductionExpiredError("production order expired")
+            if recovery and now <= ends_at + timedelta(hours=24):
+                raise ProductionNotReadyError("production is not ready for recovery")
+            recipe = recipe_definition(str(order["recipe_key"]))
+            snapshot = self._json_object(order["snapshot_json"], {})
+            quality = self._production_quality_from_snapshot(snapshot)
+            success = quality >= QUALITY_SUCCESS_THRESHOLD_BP
+            inventory = self._json_object(row["inventory_json"], {})
+            durability = self._json_object(row["durability_json"], {})
+            outputs: dict[str, int] = {}
+            refunds: dict[str, int] = {}
+            if success:
+                outputs.update(recipe.outputs)
+                if quality >= HIGH_QUALITY_THRESHOLD_BP:
+                    for item_key, quantity in recipe.high_quality_bonus.items():
+                        outputs[item_key] = outputs.get(item_key, 0) + quantity
+                for item_key, quantity in outputs.items():
+                    inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
+                if recipe.key == "recipe.weapon.wood_sword":
+                    durability["item.weapon.wood_sword"] = max(8000, min(10000, 8000 + quality // 5))
+            else:
+                for item_key, quantity in recipe.failure_refunds.items():
+                    if quantity > 0:
+                        refunds[item_key] = quantity
+                        inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
+            tool_durability = snapshot.get("tool_durability_after")
+            status = "completed" if success else "failed"
+            connection.execute(
+                """
+                UPDATE players SET inventory_json = ?, durability_json = ?, updated_at = ? WHERE id = ?
+                """,
+                (
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    json.dumps(durability, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    row["id"],
+                ),
+            )
+            result = {
+                "recipe_key": recipe.key,
+                "recipe_name": recipe.name,
+                "status": status,
+                "quality_bp": quality,
+                "random_quality_bp": int(snapshot.get("random_quality_bp", 0)),
+                "success": success,
+                "outputs": outputs,
+                "refunds": refunds,
+                "currency_spent": recipe.currency_cost,
+                "tool_durability_bp": tool_durability,
+                "recovered": recovery,
+            }
+            connection.execute(
+                "UPDATE production_orders SET status = ?, result_json = ?, updated_at = ? WHERE id = ? AND status IN ('processing', 'expired')",
+                (status, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, order["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("production settlement returned no player")
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "order_id": order["order_id"],
+                **result,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return ProductionSettlementRecord(
+                player=player,
+                order_id=str(order["order_id"]),
+                recipe_key=recipe.key,
+                recipe_name=recipe.name,
+                status=status,
+                quality_bp=quality,
+                random_quality_bp=int(snapshot.get("random_quality_bp", 0)),
+                success=success,
+                outputs=outputs,
+                refunds=refunds,
+                currency_spent=recipe.currency_cost,
+                tool_durability_bp=int(tool_durability) if tool_durability is not None else None,
+            )
+
+    @staticmethod
+    def _check_production_requirements(row: sqlite3.Row, recipe) -> None:
+        teaching = recipe.teaching_allowed and str(row["selected_service"] or "") == recipe.profession
+        profession_ok = str(row["subprofession_key"] or "") == recipe.profession or teaching
+        if not profession_ok:
+            raise RecipeRequirementError("当前道途或生产教学不满足这条配方")
+        if teaching and recipe.required_realm == "qi_sensing":
+            realm_ok = (
+                (str(row["realm_key"]) == "qi_sensing" and int(row["realm_layer"]) >= recipe.min_realm_layer)
+                or str(row["realm_key"]) == "qi_gathering"
+            )
+        else:
+            realm_ok = str(row["realm_key"]) == recipe.required_realm and int(row["realm_layer"]) >= recipe.min_realm_layer
+        if not realm_ok:
+            raise RecipeRequirementError("当前境界不满足这条配方")
+        if recipe.required_location and str(row["location_key"]) not in recipe.required_location:
+            raise RecipeRequirementError("当前地点不满足这条配方")
+
+    @staticmethod
+    def _production_quality_from_snapshot(snapshot: dict[str, Any]) -> int:
+        from .production.rules import production_quality
+
+        return production_quality(
+            material_quality_bp=int(snapshot.get("material_quality_bp", 10000)),
+            proficiency_bp=int(snapshot.get("proficiency_bp", 0)),
+            tool_durability_bp=int(snapshot.get("tool_durability_before", 0) or 0),
+            random_quality_bp_value=int(snapshot.get("random_quality_bp", 0)),
+        )
+
+    @staticmethod
+    def _production_order_from_payload(payload: dict[str, Any], *, replay: bool) -> ProductionOrderRecord:
+        return ProductionOrderRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            order_id=str(payload["order_id"]),
+            recipe_key=str(payload["recipe_key"]),
+            recipe_name=str(payload["recipe_name"]),
+            status=str(payload["status"]),
+            starts_at=str(payload["starts_at"]),
+            ends_at=str(payload["ends_at"]),
+            energy_cost=int(payload["energy_cost"]),
+            currency_cost=int(payload["currency_cost"]),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _production_settlement_from_payload(payload: dict[str, Any], *, replay: bool) -> ProductionSettlementRecord:
+        return ProductionSettlementRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            order_id=str(payload["order_id"]),
+            recipe_key=str(payload["recipe_key"]),
+            recipe_name=str(payload["recipe_name"]),
+            status=str(payload["status"]),
+            quality_bp=int(payload["quality_bp"]),
+            random_quality_bp=int(payload.get("random_quality_bp", 0)),
+            success=bool(payload["success"]),
+            outputs={str(key): int(value) for key, value in payload.get("outputs", {}).items()},
+            refunds={str(key): int(value) for key, value in payload.get("refunds", {}).items()},
+            currency_spent=int(payload.get("currency_spent", 0)),
+            tool_durability_bp=(
+                int(payload["tool_durability_bp"])
+                if payload.get("tool_durability_bp") is not None
+                else None
+            ),
+            already_completed=replay,
+        )
+
     async def rename_player(
         self,
         *,
@@ -2156,6 +2760,10 @@ class SQLitePlayerRepository:
             energy=int(value("energy", 0)),
             energy_max=int(value("energy_max", 0)),
             inventory={str(key): int(item) for key, item in inventory.items()},
+            durability={
+                str(key): int(item)
+                for key, item in SQLitePlayerRepository._json_object(value("durability_json", "{}"), {}).items()
+            },
             intro_flags=tuple(str(item) for item in intro_state.get("flags", [])),
             selected_service=(
                 str(intro_state.get("selected_service"))
@@ -2193,6 +2801,7 @@ class SQLitePlayerRepository:
             "energy": player.energy,
             "energy_max": player.energy_max,
             "inventory_json": json.dumps(player.inventory, ensure_ascii=False, sort_keys=True),
+            "durability_json": json.dumps(player.durability, ensure_ascii=False, sort_keys=True),
             "intro_json": json.dumps(
                 {"flags": list(player.intro_flags), "selected_service": player.selected_service},
                 ensure_ascii=False,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..contracts import CommandContext, CommandResult
 from .player.use_cases import PlayerApplication
+from .production.use_cases import ProductionApplication
 from .progression.use_cases import ProgressionApplication
 from .repository import SQLitePlayerRepository
 
@@ -14,6 +15,7 @@ class XiuxianApplication:
     def __init__(self, repository: SQLitePlayerRepository):
         self.player = PlayerApplication(repository)
         self.progression = ProgressionApplication(repository)
+        self.production = ProductionApplication(repository)
 
     async def create_player(self, context: CommandContext) -> CommandResult:
         return await self.player.create_player(context)
@@ -53,3 +55,15 @@ class XiuxianApplication:
 
     async def recover_resources(self, context: CommandContext) -> CommandResult:
         return await self.progression.recover_resources(context)
+
+    async def preview_recipe(self, context: CommandContext) -> CommandResult:
+        return await self.production.preview_recipe(context)
+
+    async def start_production(self, context: CommandContext) -> CommandResult:
+        return await self.production.start_production(context)
+
+    async def complete_production(self, context: CommandContext) -> CommandResult:
+        return await self.production.complete_production(context)
+
+    async def recover_production(self, context: CommandContext) -> CommandResult:
+        return await self.production.recover_production(context)

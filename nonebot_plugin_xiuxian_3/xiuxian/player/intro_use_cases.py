@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
+    CultivationBusyError,
     LocationRequiredError,
     LocationRequirementError,
     OperationConflictError,
@@ -192,7 +193,9 @@ class IntroApplication:
         except PlayerStageConflictError:
             return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成 `寻仙问道` 后才能前往近郊。", context.request_id, operation_id)
         except LocationRequirementError:
-            return CommandResult(False, "LOCATION_REQUIREMENT_MISSING", "前往灵泉谷需要感气二层，并完成教学采集。", context.request_id, operation_id)
+            return CommandResult(False, "LOCATION_REQUIREMENT_MISSING", "前往灵泉谷需要满足境界、教学和来源地点条件。", context.request_id, operation_id)
+        except CultivationBusyError:
+            return CommandResult(False, "TRAVEL_BUSY", "修炼进行中不能移动，请先结算或取消修炼。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，暂时无法移动。", context.request_id, operation_id)
         except PlayerSuspendedError:

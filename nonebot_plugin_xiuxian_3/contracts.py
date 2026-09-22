@@ -71,6 +71,7 @@ class PlayerView:
     energy: int = 0
     energy_max: int = 0
     inventory: dict[str, int] = field(default_factory=dict)
+    durability: dict[str, int] = field(default_factory=dict)
     intro_flags: tuple[str, ...] = ()
     selected_service: str | None = None
     realm_key: str = "mortal"

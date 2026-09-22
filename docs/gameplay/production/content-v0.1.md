@@ -22,10 +22,16 @@ quality = floor(material_quality*4000/10000)
 | `recipe.pill.healing_low` | `alchemy` 1、聚气或炼丹教学 | `item.herb.blood_grass` 2、`item.food.coarse_spirit_rice` 1 | `item.tool.basic_furnace`，4 精力，30 秒，耐久 -100 bp | `item.pill.healing_low` 1；质量 >=8000 再 +1 | 每日 8；失败返 50% 输入 |
 | `recipe.pill.focus_low` | `alchemy` 1、感气 | `item.herb.spirit_leaf` 2、血草 1 | 炉，5 精力，45 秒，耐久 -100 bp | `item.pill.focus_low` 1 | 每日 6 |
 | `recipe.weapon.wood_sword` | `artifice` 1、聚气 | `item.ore.ironstone` 2、`item.mat.wood` 2 | `item.tool.basic_hammer`，5 精力，60 秒，耐久 -100 bp | `item.weapon.wood_sword` 1，耐久 `8000+quality/5` bp | 每日 4；产出不可低于 8000 耐久 |
-| `recipe.array.gathering_basic` | `formation` 1、聚气 | `item.mat.array_sand` 2、灵石 20 | 阵堂或灵泉谷，6 精力，90 秒 | `item.array.gathering_basic` 1，灵气 +500 bp，24 小时 | 每日 3；失败返阵砂 1、不返灵石 |
+| `recipe.array.gathering_basic` | `formation` 1、聚气 | `item.mat.array_sand` 2、灵石 20 | 灵泉谷，6 精力，90 秒 | `item.array.gathering_basic` 1，灵气 +500 bp，24 小时 | 每日 3；失败返阵砂 1、不返灵石 |
 | `recipe.food.spirit_rice` | 烹饪教学 | `item.food.coarse_spirit_rice` 2 | 2 精力，15 秒 | `item.food.spirit_rice` 2，恢复体力/精力 5 | 每日 10；失败返灵米 1 |
 
 `item.mat.wood`、`item.array.gathering_basic`、`item.food.spirit_rice` 是本文件首次注册的 v0.1 稳定键：木材来自近郊采集；聚灵阵为绑定 24 小时阵法实例；灵米饭可交易、10 分钟使用冷却。
+
+当前运行时切片开放 `recipe.pill.healing_low`、`recipe.weapon.wood_sword` 和
+`recipe.array.gathering_basic` 的个人订单；命令为 `生产预览 <配方>`、`开始生产 <配方>`、
+`领取生产` 和 `恢复生产`。炼丹教学完成且选择炼丹辅修的感气角色可以制作低阶疗伤丹；
+炼器、布阵仍按表中聚气和地点条件校验。五条配方的其余内容键保留在静态配置中，但未
+接入命令入口时不能被当作已开放玩法。
 
 ## 3. 订单、委托与取消
 

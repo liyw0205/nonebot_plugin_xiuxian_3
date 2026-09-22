@@ -125,3 +125,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("取消修炼", application.cancel_cultivation)
     router.register("晋升境界", application.advance_layer, aliases=("境界晋升",))
     router.register("恢复状态", application.recover_resources)
+    router.register("生产预览", application.preview_recipe)
+    router.register("开始生产", application.start_production)
+    router.register("领取生产", application.complete_production)
+    router.register("恢复生产", application.recover_production)
