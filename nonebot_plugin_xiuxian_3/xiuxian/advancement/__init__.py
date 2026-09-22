@@ -4,6 +4,7 @@ from .models import RetreatSessionRecord, RetreatSettlementRecord
 from .constitution_models import ConstitutionRecord
 from .talent_models import TalentNodeRecord, TalentProfileRecord
 from .skill_models import SkillMasteryRecord, SkillProfileRecord
+from .equipment_models import EquipmentRecord, RefinementRecord, TemperingRecord
 from .constitution_rules import (
     CONSTITUTION_DEFINITIONS,
     CONSTITUTION_RESET_ITEM,
@@ -22,6 +23,13 @@ from .skill_rules import (
     SKILL_INSIGHT_RESOURCE,
     skill_cost,
     skill_definition,
+)
+from .equipment_rules import (
+    EQUIPMENT_DEFINITIONS,
+    MAX_TEMPER_LEVEL,
+    equipment_definition,
+    refinement_affix,
+    temper_cost,
 )
 from .rules import (
     RETREAT_BASIC,
@@ -53,6 +61,14 @@ __all__ = [
     "SKILL_INSIGHT_RESOURCE",
     "skill_cost",
     "skill_definition",
+    "EquipmentRecord",
+    "RefinementRecord",
+    "TemperingRecord",
+    "EQUIPMENT_DEFINITIONS",
+    "MAX_TEMPER_LEVEL",
+    "equipment_definition",
+    "refinement_affix",
+    "temper_cost",
     "retreat_definition",
     "retreat_reward",
 ]

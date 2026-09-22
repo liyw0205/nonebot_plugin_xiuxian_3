@@ -17,6 +17,7 @@ from .advancement.use_cases import AdvancementApplication
 from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
 from .advancement.skill_use_cases import SkillApplication
+from .advancement.equipment_use_cases import EquipmentApplication
 from .livelihood.use_cases import LivelihoodApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
@@ -40,6 +41,7 @@ class XiuxianApplication:
         self.constitution = ConstitutionApplication(repository)
         self.talent = TalentApplication(repository)
         self.skill = SkillApplication(repository)
+        self.equipment = EquipmentApplication(repository)
         self.livelihood = LivelihoodApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
@@ -360,6 +362,26 @@ class XiuxianApplication:
             context,
             lambda: self.skill.train(context),
             write_message="当前事件不允许参悟神通。",
+        )
+
+    async def preview_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.equipment.preview_tempering(context), require_write=False)
+
+    async def preview_refinement(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.equipment.preview_refinement(context), require_write=False)
+
+    async def temper_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.temper(context),
+            write_message="当前事件不允许祭炼法器。",
+        )
+
+    async def refine_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.refine(context),
+            write_message="当前事件不允许重铸法器。",
         )
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:

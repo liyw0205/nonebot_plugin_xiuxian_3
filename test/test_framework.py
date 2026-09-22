@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from tempfile import TemporaryDirectory
 
-from nonebot_plugin_xiuxian_3.contracts import CommandContext, validate_command_identity
+from nonebot_plugin_xiuxian_3.contracts import CommandContext, CommandResult, validate_command_identity
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.repository import PlayerNotFoundError, PlayerSuspendedError
 
@@ -254,6 +254,44 @@ def test_every_registered_command_uses_shared_identity_validation() -> None:
                     f"{result.code}"
                 )
 
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_every_registered_command_calls_application_invoke(monkeypatch) -> None:
+    """Command registration must not bypass the application identity boundary.
+
+    This test stubs the shared guard itself.  A real invalid context is not
+    enough here because legacy feature-level guards could make a bypass look
+    correct.
+    """
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            calls: list[tuple[str, bool]] = []
+
+            async def fake_invoke(context, handler, *, require_write=True, write_message=""):
+                calls.append((context.command_args[0] if context.command_args else "", require_write))
+                return CommandResult(
+                    ok=True,
+                    code="SHARED_INVOKE_CALLED",
+                    message="",
+                    request_id=context.request_id,
+                )
+
+            monkeypatch.setattr(runtime.application, "_invoke", fake_invoke)
+            context = CommandContext(adapter="web", user_id="guard-probe")
+
+            results = [
+                await runtime.dispatch(context, command)
+                for command in runtime.router.commands
+            ]
+
+            assert len(results) == len(runtime.router.commands)
+            assert all(result.code == "SHARED_INVOKE_CALLED" for result in results)
+            assert len(calls) == len(runtime.router.commands)
             await runtime.close()
 
     asyncio.run(run())

@@ -22,6 +22,28 @@
           "value": 5
         }
       ],
+      "growth": {
+        "temper": {
+          "max_level": 3,
+          "costs": {
+            "1": {"item.ore.ironstone": 1, "currency.spirit_stone": 20},
+            "2": {"item.ore.ironstone": 2, "currency.spirit_stone": 40},
+            "3": {"item.ore.ironstone": 3, "currency.spirit_stone": 80}
+          },
+          "success_bp": {"1": 10000, "2": 9000, "3": 7500},
+          "failure": "keep_level"
+        },
+        "refinement": {
+          "cost": {"item.ore.ironstone": 2, "currency.spirit_stone": 30},
+          "affix_pool": [
+            {"key": "damage", "value": 1},
+            {"key": "hp", "value": 5},
+            {"key": "initiative", "value": 1}
+          ],
+          "failure": "keep_affixes",
+          "pity_failures": 3
+        }
+      },
       "requirements": [],
       "status": "active",
       "key": "item.weapon.wood_sword"

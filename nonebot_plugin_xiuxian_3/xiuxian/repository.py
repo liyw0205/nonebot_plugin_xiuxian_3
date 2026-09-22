@@ -45,6 +45,7 @@ from .advancement.models import RetreatSessionRecord, RetreatSettlementRecord
 from .advancement.constitution_models import ConstitutionRecord
 from .advancement.talent_models import TalentNodeRecord, TalentProfileRecord
 from .advancement.skill_models import SkillMasteryRecord, SkillProfileRecord
+from .advancement.equipment_models import EquipmentRecord, RefinementRecord, TemperingRecord
 from .advancement.rules import (
     MAX_OFFLINE_SECONDS,
     MAX_SETTLEMENT_SECONDS,
@@ -75,6 +76,23 @@ from .advancement.skill_rules import (
     effective_skill_effect,
     skill_cost,
     skill_definition,
+)
+from .advancement.equipment_rules import (
+    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
+    EQUIPMENT_DEFINITIONS,
+    EQUIPMENT_ALIASES,
+    MAX_TEMPER_LEVEL,
+    REFINEMENT_MATERIAL,
+    REFINEMENT_PITY_FAILURES,
+    REFINEMENT_SUCCESS_BP,
+    RULE_VERSION as EQUIPMENT_RULE_VERSION,
+    TEMPER_MATERIAL,
+    equipment_definition,
+    refinement_affix,
+    refinement_roll_bp,
+    temper_cost,
+    temper_roll_bp,
+    temper_success_bp,
 )
 from .livelihood.models import ResidenceRecord
 from .livelihood.rules import residence_definition
@@ -391,6 +409,71 @@ CREATE TABLE IF NOT EXISTS skill_insight_events (
 
 CREATE INDEX IF NOT EXISTS idx_skill_insight_events_player
     ON skill_insight_events(player_id, created_at);
+
+CREATE TABLE IF NOT EXISTS equipment_instances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instance_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    slot TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'broken', 'archived')),
+    durability_bp INTEGER NOT NULL CHECK (durability_bp >= 0),
+    temper_level INTEGER NOT NULL CHECK (temper_level BETWEEN 0 AND 3),
+    max_temper_level INTEGER NOT NULL CHECK (max_temper_level = 3),
+    affixes_json TEXT NOT NULL DEFAULT '{}',
+    refinement_failure_streak INTEGER NOT NULL DEFAULT 0 CHECK (refinement_failure_streak >= 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, instance_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_instances_player
+    ON equipment_instances(player_id, item_key, status);
+
+CREATE TABLE IF NOT EXISTS equipment_tempering_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    equipment_id INTEGER NOT NULL REFERENCES equipment_instances(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    from_level INTEGER NOT NULL CHECK (from_level >= 0),
+    to_level INTEGER NOT NULL CHECK (to_level >= 1),
+    success INTEGER NOT NULL CHECK (success IN (0, 1)),
+    roll_bp INTEGER NOT NULL CHECK (roll_bp BETWEEN 0 AND 9999),
+    success_bp INTEGER NOT NULL CHECK (success_bp BETWEEN 0 AND 10000),
+    material_key TEXT NOT NULL,
+    material_spent INTEGER NOT NULL CHECK (material_spent >= 0),
+    spirit_stones_spent INTEGER NOT NULL CHECK (spirit_stones_spent >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_tempering_events_player
+    ON equipment_tempering_events(player_id, created_at);
+
+CREATE TABLE IF NOT EXISTS equipment_refinement_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    equipment_id INTEGER NOT NULL REFERENCES equipment_instances(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    success INTEGER NOT NULL CHECK (success IN (0, 1)),
+    roll_bp INTEGER NOT NULL CHECK (roll_bp BETWEEN 0 AND 9999),
+    success_bp INTEGER NOT NULL CHECK (success_bp BETWEEN 0 AND 10000),
+    material_key TEXT NOT NULL,
+    material_spent INTEGER NOT NULL CHECK (material_spent >= 0),
+    spirit_stones_spent INTEGER NOT NULL CHECK (spirit_stones_spent >= 0),
+    old_affixes_json TEXT NOT NULL DEFAULT '{}',
+    new_affixes_json TEXT NOT NULL DEFAULT '{}',
+    failure_streak_before INTEGER NOT NULL CHECK (failure_streak_before >= 0),
+    failure_streak_after INTEGER NOT NULL CHECK (failure_streak_after >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_refinement_events_player
+    ON equipment_refinement_events(player_id, created_at);
 
 CREATE TABLE IF NOT EXISTS production_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1051,6 +1134,22 @@ class SkillNotAvailableError(RuntimeError):
 
 class SkillBusyError(RuntimeError):
     """A long-running action prevents skill mutation."""
+
+
+class EquipmentNotOwnedError(RuntimeError):
+    """The player does not own the requested equipment."""
+
+
+class EquipmentAmbiguousError(RuntimeError):
+    """More than one matching equipment instance needs an explicit selector."""
+
+
+class EquipmentTemperingMaxedError(RuntimeError):
+    """The equipment has reached the current tempering cap."""
+
+
+class EquipmentBusyError(RuntimeError):
+    """A long-running action prevents equipment mutation."""
 
 
 class RealmCultivationInsufficientError(RuntimeError):
@@ -5834,6 +5933,531 @@ class SQLitePlayerRepository:
             trained_at=str(mastery_row["trained_at"]),
             already_completed=replay,
         )
+
+    @staticmethod
+    def _equipment_from_payload(
+        payload: dict[str, Any], *, replay: bool = False
+    ) -> EquipmentRecord:
+        return EquipmentRecord(
+            instance_id=str(payload["instance_id"]),
+            item_key=str(payload["item_key"]),
+            label=str(payload["label"]),
+            slot=str(payload["slot"]),
+            status=str(payload.get("status", "active")),
+            durability_bp=int(payload.get("durability_bp", 10000)),
+            temper_level=int(payload.get("temper_level", 0)),
+            max_temper_level=int(payload.get("max_temper_level", MAX_TEMPER_LEVEL)),
+            affixes={str(key): int(value) for key, value in dict(payload.get("affixes", {})).items()},
+            refinement_failure_streak=int(payload.get("refinement_failure_streak", 0)),
+        )
+
+    @staticmethod
+    def _equipment_from_row(row: sqlite3.Row, *, replay: bool = False) -> EquipmentRecord:
+        definition = EQUIPMENT_DEFINITIONS.get(str(row["item_key"]))
+        return EquipmentRecord(
+            instance_id=str(row["instance_id"]),
+            item_key=str(row["item_key"]),
+            label=str(row["label"] or (definition.label if definition else row["item_key"])),
+            slot=str(row["slot"] or (definition.slot if definition else "unknown")),
+            status=str(row["status"]),
+            durability_bp=int(row["durability_bp"]),
+            temper_level=int(row["temper_level"]),
+            max_temper_level=int(row["max_temper_level"]),
+            affixes={
+                str(key): int(value)
+                for key, value in SQLitePlayerRepository._json_object(row["affixes_json"], {}).items()
+            },
+            refinement_failure_streak=int(row["refinement_failure_streak"]),
+        )
+
+    @staticmethod
+    def _tempering_from_payload(
+        payload: dict[str, Any], *, replay: bool = False
+    ) -> TemperingRecord:
+        return TemperingRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            equipment=SQLitePlayerRepository._equipment_from_payload(payload["equipment"]),
+            from_level=int(payload["from_level"]),
+            to_level=int(payload["to_level"]),
+            success=bool(payload["success"]),
+            roll_bp=int(payload["roll_bp"]),
+            success_bp=int(payload["success_bp"]),
+            material_key=str(payload["material_key"]),
+            material_spent=int(payload["material_spent"]),
+            spirit_stones_spent=int(payload["spirit_stones_spent"]),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _refinement_from_payload(
+        payload: dict[str, Any], *, replay: bool = False
+    ) -> RefinementRecord:
+        return RefinementRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            equipment=SQLitePlayerRepository._equipment_from_payload(payload["equipment"]),
+            old_affixes={str(key): int(value) for key, value in dict(payload.get("old_affixes", {})).items()},
+            new_affixes={str(key): int(value) for key, value in dict(payload.get("new_affixes", {})).items()},
+            success=bool(payload["success"]),
+            roll_bp=int(payload["roll_bp"]),
+            success_bp=int(payload["success_bp"]),
+            material_key=str(payload["material_key"]),
+            material_spent=int(payload["material_spent"]),
+            spirit_stones_spent=int(payload["spirit_stones_spent"]),
+            failure_streak_before=int(payload["failure_streak_before"]),
+            failure_streak_after=int(payload["failure_streak_after"]),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _materialize_equipment(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        definition: Any,
+        now_text: str,
+    ) -> sqlite3.Row:
+        """Convert legacy unique-item inventory entries into stable instances."""
+
+        rows = connection.execute(
+            "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id",
+            (player["id"], definition.key),
+        ).fetchall()
+        if rows:
+            return rows[0] if len(rows) == 1 else player
+        inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
+        quantity = int(inventory.get(definition.key, 0))
+        if quantity <= 0:
+            return player
+        durability = SQLitePlayerRepository._json_object(player["durability_json"], {})
+        durability_bp = int(durability.get(definition.key, 10000))
+        for _ in range(quantity):
+            connection.execute(
+                """
+                INSERT INTO equipment_instances(
+                    instance_id, player_id, item_key, label, slot, status,
+                    durability_bp, temper_level, max_temper_level, affixes_json,
+                    refinement_failure_streak, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'active', ?, 0, ?, '{}', 0, ?, ?)
+                """,
+                (
+                    uuid4().hex,
+                    player["id"],
+                    definition.key,
+                    definition.label,
+                    definition.slot,
+                    max(0, durability_bp),
+                    definition.max_temper_level,
+                    now_text,
+                    now_text,
+                ),
+            )
+        inventory.pop(definition.key, None)
+        connection.execute(
+            "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+        )
+        return connection.execute(
+            "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id LIMIT 1",
+            (player["id"], definition.key),
+        ).fetchone()
+
+    def _resolve_equipment(
+        self,
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        equipment_reference: str,
+        now_text: str,
+    ) -> sqlite3.Row:
+        definition = equipment_definition(equipment_reference)
+        self._materialize_equipment(connection, player, definition, now_text)
+        rows = connection.execute(
+            "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id",
+            (player["id"], definition.key),
+        ).fetchall()
+        if not rows:
+            raise EquipmentNotOwnedError("equipment is not owned")
+        if len(rows) > 1:
+            raise EquipmentAmbiguousError("multiple equipment instances match")
+        return rows[0]
+
+    @staticmethod
+    def _equipment_source_exists(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        definition: Any,
+    ) -> bool:
+        instance = connection.execute(
+            "SELECT 1 FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' LIMIT 1",
+            (player["id"], definition.key),
+        ).fetchone()
+        if instance is not None:
+            return True
+        inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
+        return int(inventory.get(definition.key, 0)) > 0
+
+    async def temper_equipment(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+    ) -> TemperingRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._temper_equipment_sync,
+                platform,
+                platform_user_id,
+                equipment_reference,
+                operation_id,
+            )
+
+    def _temper_equipment_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+    ) -> TemperingRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._temper_equipment_once(platform, platform_user_id, equipment_reference, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _temper_equipment_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+    ) -> TemperingRecord:
+        definition = equipment_definition(equipment_reference)
+        operation_name = "item.tempering"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "equipment_reference": equipment_reference.strip(),
+                "item_key": definition.key,
+                "content_version": EQUIPMENT_CONTENT_VERSION,
+                "rule_version": EQUIPMENT_RULE_VERSION,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._tempering_from_payload(json.loads(existing["result_json"]), replay=True)
+            player = self._require_player(connection, platform, platform_user_id)
+            if str(player["stage"]) != "cultivator":
+                raise PlayerStageConflictError("equipment tempering requires entry into cultivation")
+            if self._has_active_long_action(connection, int(player["id"])):
+                raise EquipmentBusyError("another long action is active")
+            if not self._equipment_source_exists(connection, player, definition):
+                raise EquipmentNotOwnedError("equipment is not owned")
+            candidates = connection.execute(
+                "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id",
+                (player["id"], definition.key),
+            ).fetchall()
+            if len(candidates) > 1:
+                raise EquipmentAmbiguousError("multiple equipment instances match")
+            candidate = candidates[0] if candidates else None
+            from_level = int(candidate["temper_level"]) if candidate is not None else 0
+            max_level = int(candidate["max_temper_level"]) if candidate is not None else definition.max_temper_level
+            if from_level >= max_level:
+                raise EquipmentTemperingMaxedError("equipment has reached maximum temper level")
+            target_level = from_level + 1
+            material_spent, stones_spent = temper_cost(target_level)
+            inventory = self._json_object(player["inventory_json"], {})
+            if int(inventory.get(TEMPER_MATERIAL, 0)) < material_spent or int(player["spirit_stones"]) < stones_spent:
+                raise ResourceInsufficientError("tempering resources are insufficient")
+            equipment = self._resolve_equipment(connection, player, equipment_reference, now_text)
+            player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+            if player is None:
+                raise PlayerNotFoundError("player disappeared during equipment resolution")
+            inventory = self._json_object(player["inventory_json"], {})
+            inventory[TEMPER_MATERIAL] = int(inventory.get(TEMPER_MATERIAL, 0)) - material_spent
+            roll_bp = temper_roll_bp(f"{operation_id}:{equipment['instance_id']}:{target_level}")
+            success_bp = temper_success_bp(target_level)
+            success = roll_bp < success_bp
+            level_after = target_level if success else from_level
+            connection.execute(
+                "UPDATE players SET spirit_stones = spirit_stones - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (stones_spent, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            )
+            connection.execute(
+                "UPDATE equipment_instances SET temper_level = ?, updated_at = ? WHERE id = ?",
+                (level_after, now_text, equipment["id"]),
+            )
+            snapshot = {
+                "item_key": definition.key,
+                "from_level": from_level,
+                "to_level": target_level,
+                "level_after": level_after,
+                "success": success,
+                "roll_bp": roll_bp,
+                "success_bp": success_bp,
+                "material_key": TEMPER_MATERIAL,
+                "material_spent": material_spent,
+                "spirit_stones_spent": stones_spent,
+                "content_version": EQUIPMENT_CONTENT_VERSION,
+                "rule_version": EQUIPMENT_RULE_VERSION,
+            }
+            connection.execute(
+                """
+                INSERT INTO equipment_tempering_events(
+                    event_id, player_id, equipment_id, operation_id, from_level,
+                    to_level, success, roll_bp, success_bp, material_key,
+                    material_spent, spirit_stones_spent, snapshot_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    uuid4().hex,
+                    player["id"],
+                    equipment["id"],
+                    operation_id,
+                    from_level,
+                    target_level,
+                    int(success),
+                    roll_bp,
+                    success_bp,
+                    TEMPER_MATERIAL,
+                    material_spent,
+                    stones_spent,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            updated_equipment = connection.execute("SELECT * FROM equipment_instances WHERE id = ?", (equipment["id"],)).fetchone()
+            updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+            if updated_equipment is None or updated_player is None:
+                raise RuntimeError("equipment tempering returned no state")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated_player)),
+                "equipment": {
+                    "instance_id": updated_equipment["instance_id"],
+                    "item_key": updated_equipment["item_key"],
+                    "label": updated_equipment["label"],
+                    "slot": updated_equipment["slot"],
+                    "status": updated_equipment["status"],
+                    "durability_bp": updated_equipment["durability_bp"],
+                    "temper_level": updated_equipment["temper_level"],
+                    "max_temper_level": updated_equipment["max_temper_level"],
+                    "affixes": self._json_object(updated_equipment["affixes_json"], {}),
+                    "refinement_failure_streak": updated_equipment["refinement_failure_streak"],
+                },
+                "from_level": from_level,
+                "to_level": target_level,
+                "success": success,
+                "roll_bp": roll_bp,
+                "success_bp": success_bp,
+                "material_key": TEMPER_MATERIAL,
+                "material_spent": material_spent,
+                "spirit_stones_spent": stones_spent,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, player["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return self._tempering_from_payload(payload)
+
+    async def refine_equipment(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+    ) -> RefinementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._refine_equipment_sync,
+                platform,
+                platform_user_id,
+                equipment_reference,
+                operation_id,
+            )
+
+    def _refine_equipment_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+    ) -> RefinementRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._refine_equipment_once(platform, platform_user_id, equipment_reference, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _refine_equipment_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+    ) -> RefinementRecord:
+        definition = equipment_definition(equipment_reference)
+        operation_name = "item.refinement"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "equipment_reference": equipment_reference.strip(),
+                "item_key": definition.key,
+                "content_version": EQUIPMENT_CONTENT_VERSION,
+                "rule_version": EQUIPMENT_RULE_VERSION,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._refinement_from_payload(json.loads(existing["result_json"]), replay=True)
+            player = self._require_player(connection, platform, platform_user_id)
+            if str(player["stage"]) != "cultivator":
+                raise PlayerStageConflictError("equipment refinement requires entry into cultivation")
+            if self._has_active_long_action(connection, int(player["id"])):
+                raise EquipmentBusyError("another long action is active")
+            if not self._equipment_source_exists(connection, player, definition):
+                raise EquipmentNotOwnedError("equipment is not owned")
+            material_spent, stones_spent = 2, 30
+            inventory = self._json_object(player["inventory_json"], {})
+            if int(inventory.get(REFINEMENT_MATERIAL, 0)) < material_spent or int(player["spirit_stones"]) < stones_spent:
+                raise ResourceInsufficientError("refinement resources are insufficient")
+            equipment = self._resolve_equipment(connection, player, equipment_reference, now_text)
+            player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+            if player is None:
+                raise PlayerNotFoundError("player disappeared during equipment resolution")
+            inventory = self._json_object(player["inventory_json"], {})
+            inventory[REFINEMENT_MATERIAL] = int(inventory.get(REFINEMENT_MATERIAL, 0)) - material_spent
+            old_affixes = {
+                str(key): int(value)
+                for key, value in self._json_object(equipment["affixes_json"], {}).items()
+            }
+            streak_before = int(equipment["refinement_failure_streak"])
+            roll_bp = refinement_roll_bp(f"{operation_id}:{equipment['instance_id']}:{streak_before}")
+            success_bp = REFINEMENT_SUCCESS_BP
+            success = streak_before >= REFINEMENT_PITY_FAILURES or roll_bp < success_bp
+            new_affixes = dict(old_affixes)
+            if success:
+                affix_key, affix_value = refinement_affix(f"{operation_id}:{equipment['instance_id']}:{streak_before}")
+                new_affixes = {affix_key: affix_value}
+            streak_after = 0 if success else streak_before + 1
+            connection.execute(
+                "UPDATE players SET spirit_stones = spirit_stones - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (stones_spent, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            )
+            connection.execute(
+                "UPDATE equipment_instances SET affixes_json = ?, refinement_failure_streak = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(new_affixes, ensure_ascii=False, sort_keys=True), streak_after, now_text, equipment["id"]),
+            )
+            snapshot = {
+                "item_key": definition.key,
+                "old_affixes": old_affixes,
+                "new_affixes": new_affixes,
+                "success": success,
+                "roll_bp": roll_bp,
+                "success_bp": success_bp,
+                "failure_streak_before": streak_before,
+                "failure_streak_after": streak_after,
+                "content_version": EQUIPMENT_CONTENT_VERSION,
+                "rule_version": EQUIPMENT_RULE_VERSION,
+            }
+            connection.execute(
+                """
+                INSERT INTO equipment_refinement_events(
+                    event_id, player_id, equipment_id, operation_id, success,
+                    roll_bp, success_bp, material_key, material_spent,
+                    spirit_stones_spent, old_affixes_json, new_affixes_json,
+                    failure_streak_before, failure_streak_after, snapshot_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    uuid4().hex,
+                    player["id"],
+                    equipment["id"],
+                    operation_id,
+                    int(success),
+                    roll_bp,
+                    10000 if streak_before >= REFINEMENT_PITY_FAILURES else success_bp,
+                    REFINEMENT_MATERIAL,
+                    material_spent,
+                    stones_spent,
+                    json.dumps(old_affixes, ensure_ascii=False, sort_keys=True),
+                    json.dumps(new_affixes, ensure_ascii=False, sort_keys=True),
+                    streak_before,
+                    streak_after,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            updated_equipment = connection.execute("SELECT * FROM equipment_instances WHERE id = ?", (equipment["id"],)).fetchone()
+            updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+            if updated_equipment is None or updated_player is None:
+                raise RuntimeError("equipment refinement returned no state")
+            actual_success_bp = 10000 if streak_before >= REFINEMENT_PITY_FAILURES else success_bp
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated_player)),
+                "equipment": {
+                    "instance_id": updated_equipment["instance_id"],
+                    "item_key": updated_equipment["item_key"],
+                    "label": updated_equipment["label"],
+                    "slot": updated_equipment["slot"],
+                    "status": updated_equipment["status"],
+                    "durability_bp": updated_equipment["durability_bp"],
+                    "temper_level": updated_equipment["temper_level"],
+                    "max_temper_level": updated_equipment["max_temper_level"],
+                    "affixes": self._json_object(updated_equipment["affixes_json"], {}),
+                    "refinement_failure_streak": updated_equipment["refinement_failure_streak"],
+                },
+                "old_affixes": old_affixes,
+                "new_affixes": new_affixes,
+                "success": success,
+                "roll_bp": roll_bp,
+                "success_bp": actual_success_bp,
+                "material_key": REFINEMENT_MATERIAL,
+                "material_spent": material_spent,
+                "spirit_stones_spent": stones_spent,
+                "failure_streak_before": streak_before,
+                "failure_streak_after": streak_after,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, player["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return self._refinement_from_payload(payload)
 
     async def get_skill_profile(
         self,
