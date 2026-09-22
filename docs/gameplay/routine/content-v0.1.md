@@ -38,6 +38,23 @@
 
 `quest.seven_day.v0.1` 按首次 `start_seeking` 起算 7 个业务日：D1 道历问安，D2 采集，D3 生产预览，D4 悬赏，D5 塔层 1，D6 派遣，D7 选择道途。每日目标可补做但不可跨日重置；完成奖励分别为材料/灵石/名望，D7 额外 `item.ticket.fate_basic` 2。
 
+当前实现的目标键、基础奖励和状态如下：
+
+| 日数 | 目标键 | 基础奖励 | 当前状态 |
+|:--|:--|:--|:--|
+| D1 | `quest.seven_day.day1_checkin` | 粗糙灵米 ×1 | 已开放 |
+| D2 | `quest.seven_day.day2_gather` | 止血草 ×2 | 已开放 |
+| D3 | `quest.seven_day.day3_production_preview` | 灵石 ×30 | 已开放；以生产预览或已开始订单作为可审计来源 |
+| D4 | `quest.seven_day.day4_bounty` | 地方名望 +2 | 已开放；以接取悬赏作为可审计来源 |
+| D5 | `quest.seven_day.day5_tower` | 阵砂 ×2 | 未开放；等待试炼塔/战斗运行时 |
+| D6 | `quest.seven_day.day6_dispatch` | 灵石 ×50 | 未开放；等待派遣系统 |
+| D7 | `quest.seven_day.day7_path` | 地方名望 +5、机缘签 ×2 | 已开放；以选择道途作为可审计来源 |
+
+用户发送 `七日入道` 查看状态，发送 `领取七日目标 <1-7>` 领取已完成目标。目标起点、
+目标日期、来源 operation、奖励和版本均持久化；同一日数或同一 operation 重试只回放原结果，
+不同 operation 不能重复占用同一来源事件。D5/D6 在依赖关闭期间返回未完成，不创建战斗或派遣
+会话。
+
 `redemption.code` 支持 `code.onboarding.v0.1`、`code.repair.v0.1` 两个示例族；代码本身由配置注入、不写文档明文密钥。每个 code 设置总库存 1000、每角色一次、业务有效期；领取 operation 为 `code_key:player_id`。密令不得发修为、突破物或道契权益。
 
 关闭：窗口结束后 pending 奖励保留 7 日；已激活道契按结束时间执行；灵木 running 周期按原池结算；密令关闭后拒绝新领。

@@ -30,6 +30,21 @@ async def _enter_mortal(runtime, user_id: str) -> None:
     assert (await runtime.dispatch(_context(user_id, "seek"), "寻仙问道")).ok
 
 
+async def _enter_alchemy(runtime, user_id: str) -> None:
+    commands = (
+        "开始修仙",
+        "寻仙问道",
+        "完成引导 阅读",
+        "前往近郊",
+        "完成引导 采集",
+        "完成引导 炼丹",
+        "选择道途 辅修 炼丹",
+    )
+    for index, command in enumerate(commands):
+        result = await runtime.dispatch(_context(user_id, f"alchemy-{index}"), command)
+        assert result.ok, (command, result.code, result.message)
+
+
 def _set_resources(runtime, user_id: str, *, stones: int = 100, energy: int = 10) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
@@ -230,5 +245,93 @@ def test_routine_schema_is_safe_to_initialize_twice() -> None:
             assert migration == ("routine.v0.1",)
             await first.close()
             await second.close()
+
+    asyncio.run(run())
+
+
+def test_seven_day_campaign_uses_first_seeking_clock_and_claims_one_goal_once() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 1, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            user = "routine-seven-day"
+            await _enter_mortal(runtime, user)
+
+            status = await runtime.dispatch(_context(user, "status"), "七日入道")
+            assert status.code == "SEVEN_DAY_STATUS"
+            assert status.data["start_date"] == "2026-09-01"
+            assert status.data["current_day"] == 1
+            assert status.data["goals"][1]["state"] == "locked"
+
+            not_done = await runtime.dispatch(
+                _context(user, "claim-before", operation_id="seven-before"), "领取七日目标 1"
+            )
+            assert not_done.code == "SEVEN_DAY_GOAL_NOT_COMPLETED"
+
+            checked = await runtime.dispatch(
+                _context(user, "checkin", operation_id="seven-checkin"), "道历问安"
+            )
+            assert checked.ok
+            claimed = await runtime.dispatch(
+                _context(user, "claim", operation_id="seven-claim-1"), "领取七日目标 1"
+            )
+            assert claimed.code == "SEVEN_DAY_GOAL_CLAIMED"
+            replay = await runtime.dispatch(
+                _context(user, "claim-replay", operation_id="seven-claim-1"), "领取七日目标 1"
+            )
+            assert replay.ok and replay.data["idempotent_replay"] is True
+            conflict = await runtime.dispatch(
+                _context(user, "claim-conflict", operation_id="seven-claim-1"), "领取七日目标 2"
+            )
+            assert conflict.code == "OPERATION_CONFLICT"
+            duplicate = await runtime.dispatch(
+                _context(user, "claim-duplicate", operation_id="seven-claim-1b"), "领取七日目标 1"
+            )
+            assert duplicate.code == "SEVEN_DAY_ALREADY_CLAIMED"
+
+            clock.advance(days=1)
+            future = await runtime.dispatch(
+                _context(user, "future", operation_id="seven-future"), "领取七日目标 3"
+            )
+            assert future.code == "SEVEN_DAY_GOAL_NOT_OPEN"
+
+            clock.advance(days=4)
+            closed = await runtime.dispatch(_context(user, "closed"), "七日入道")
+            assert closed.data["current_day"] == 6
+            assert closed.data["goals"][4]["state"] == "content_closed"
+            assert closed.data["goals"][5]["state"] == "content_closed"
+            blocked = await runtime.dispatch(
+                _context(user, "tower", operation_id="seven-tower"), "领取七日目标 5"
+            )
+            assert blocked.code == "SEVEN_DAY_GOAL_NOT_COMPLETED"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_seven_day_production_preview_is_audited_as_day_three_activity() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 1, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            user = "routine-seven-production"
+            await _enter_alchemy(runtime, user)
+            clock.advance(days=2)
+            preview = await runtime.dispatch(
+                _context(user, "preview", operation_id="preview-seven-day"), "生产预览 疗伤丹"
+            )
+            assert preview.code == "RECIPE_PREVIEW"
+            claimed = await runtime.dispatch(
+                _context(user, "claim", operation_id="claim-seven-day-3"), "领取七日目标 3"
+            )
+            assert claimed.code == "SEVEN_DAY_GOAL_CLAIMED"
+            assert claimed.data["reward"] == {"spirit_stones": 30}
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                event = connection.execute(
+                    "SELECT event_key, source_operation_id FROM activity_events WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
+                    (user,),
+                ).fetchone()
+            assert event == ("production.preview", "preview-seven-day")
+            await runtime.close()
 
     asyncio.run(run())

@@ -52,7 +52,13 @@ from .exploration.rules import (
 )
 from .adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from .adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
-from .routine.models import RoutineClaimRecord, SpiritTreeRecord
+from .routine.models import (
+    RoutineClaimRecord,
+    SevenDayGoalRecord,
+    SevenDayGoalView,
+    SevenDayStatusRecord,
+    SpiritTreeRecord,
+)
 from .routine.rules import (
     CHECKIN_ACTIVITY,
     CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
@@ -62,6 +68,11 @@ from .routine.rules import (
     checkin_reward,
     makeup_reward,
     parse_past_date,
+    SEVEN_DAY_CONTENT_VERSION,
+    SEVEN_DAY_GOALS,
+    SEVEN_DAY_RULE_VERSION,
+    seven_day_goal,
+    seven_day_reward,
     tree_harvest_reward,
     tree_status,
 )
@@ -322,6 +333,48 @@ CREATE TABLE IF NOT EXISTS spirit_tree_harvests (
 CREATE INDEX IF NOT EXISTS idx_spirit_tree_waterings_player
     ON spirit_tree_waterings(player_id, cycle_no, business_date);
 
+CREATE TABLE IF NOT EXISTS activity_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    event_key TEXT NOT NULL,
+    source_operation_id TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    UNIQUE (player_id, event_key, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_events_player_key
+    ON activity_events(player_id, event_key, occurred_at);
+
+CREATE TABLE IF NOT EXISTS seven_day_campaigns (
+    player_id INTEGER PRIMARY KEY REFERENCES players(id),
+    start_date TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'closed')),
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS seven_day_goal_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    day_number INTEGER NOT NULL CHECK (day_number BETWEEN 1 AND 7),
+    goal_key TEXT NOT NULL,
+    target_date TEXT NOT NULL,
+    source_operation_id TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (player_id, day_number),
+    UNIQUE (player_id, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_seven_day_claims_player
+    ON seven_day_goal_claims(player_id, day_number);
+
 """
 
 
@@ -579,6 +632,26 @@ class SpiritTreeCooldownError(RuntimeError):
 
 class SpiritTreeNotReadyError(RuntimeError):
     """The spirit tree has not reached seven waterings."""
+
+
+class SevenDayNotStartedError(RuntimeError):
+    """The player has not started the seven-day onboarding campaign."""
+
+
+class SevenDayGoalInvalidError(RuntimeError):
+    """The requested seven-day goal number is invalid."""
+
+
+class SevenDayGoalNotOpenError(RuntimeError):
+    """The requested seven-day goal is still in a future business day."""
+
+
+class SevenDayGoalNotCompletedError(RuntimeError):
+    """The requested seven-day goal has no qualifying activity yet."""
+
+
+class SevenDayGoalAlreadyClaimedError(RuntimeError):
+    """The requested seven-day goal reward was already claimed."""
 
 
 class SQLitePlayerRepository:
@@ -980,7 +1053,7 @@ class SQLitePlayerRepository:
             "root_affinity": root_affinity,
         }
         request_hash = self._request_hash("player.start_seeking", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
@@ -3570,6 +3643,7 @@ class SQLitePlayerRepository:
         platform: str,
         platform_user_id: str,
         recipe_key: str,
+        operation_id: str = "",
     ) -> ProductionPreviewRecord:
         await self.initialize()
         async with self._inflight:
@@ -3578,6 +3652,7 @@ class SQLitePlayerRepository:
                 platform,
                 platform_user_id,
                 recipe_key,
+                operation_id,
             )
 
     def _preview_production_sync(
@@ -3585,11 +3660,12 @@ class SQLitePlayerRepository:
         platform: str,
         platform_user_id: str,
         recipe_key: str,
+        operation_id: str,
     ) -> ProductionPreviewRecord:
         from .production.rules import recipe_definition
 
         recipe = recipe_definition(recipe_key)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
@@ -3609,6 +3685,18 @@ class SQLitePlayerRepository:
                 """,
                 (row["id"], recipe.key, serialize_datetime(day_start), serialize_datetime(day_end)),
             ).fetchone()
+            if operation_id:
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO activity_events(
+                        player_id, event_key, source_operation_id, occurred_at, payload_json
+                    ) VALUES (?, 'production.preview', ?, ?, ?)
+                    """,
+                    (
+                        row["id"], operation_id, serialize_datetime(now),
+                        json.dumps({"recipe_key": recipe.key}, ensure_ascii=False, sort_keys=True),
+                    ),
+                )
             return ProductionPreviewRecord(
                 player=self._row_to_player(row),
                 recipe_key=recipe.key,
@@ -5424,6 +5512,421 @@ class SQLitePlayerRepository:
             energy_spent=int(payload.get("energy_spent", 0)),
             reward={str(k): int(v) for k, v in dict(payload.get("reward", {})).items()},
             cooldown_until=payload.get("cooldown_until"),
+            already_completed=replay,
+        )
+
+    async def get_seven_day_status(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> SevenDayStatusRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_seven_day_status_sync, platform, platform_user_id
+            )
+
+    def _get_seven_day_status_sync(
+        self, platform: str, platform_user_id: str
+    ) -> SevenDayStatusRecord:
+        now = self._now()
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            campaign = self._ensure_seven_day_campaign(
+                connection, row, serialize_datetime(now)
+            )
+            return self._seven_day_status_from_connection(connection, row, campaign, now)
+
+    @staticmethod
+    def _ensure_seven_day_campaign(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        now_text: str,
+    ) -> sqlite3.Row:
+        campaign = connection.execute(
+            "SELECT * FROM seven_day_campaigns WHERE player_id = ?",
+            (player["id"],),
+        ).fetchone()
+        if campaign is not None:
+            return campaign
+        seeking = connection.execute(
+            """
+            SELECT created_at FROM operations
+            WHERE player_id = ? AND operation_name = 'player.start_seeking'
+            ORDER BY created_at ASC LIMIT 1
+            """,
+            (player["id"],),
+        ).fetchone()
+        if seeking is None:
+            raise SevenDayNotStartedError("seven-day campaign has not started")
+        try:
+            start_date = datetime.fromisoformat(str(seeking["created_at"])).date().isoformat()
+        except ValueError as exc:
+            raise SevenDayNotStartedError("invalid seeking timestamp") from exc
+        connection.execute(
+            """
+            INSERT INTO seven_day_campaigns(
+                player_id, start_date, status, content_version, rule_version,
+                created_at, updated_at
+            ) VALUES (?, ?, 'active', ?, ?, ?, ?)
+            """,
+            (
+                player["id"], start_date, SEVEN_DAY_CONTENT_VERSION,
+                SEVEN_DAY_RULE_VERSION, now_text, now_text,
+            ),
+        )
+        created = connection.execute(
+            "SELECT * FROM seven_day_campaigns WHERE player_id = ?",
+            (player["id"],),
+        ).fetchone()
+        if created is None:
+            raise RuntimeError("seven-day campaign initialization failed")
+        return created
+
+    @staticmethod
+    def _seven_day_source_operation(
+        connection: sqlite3.Connection,
+        player_id: int,
+        goal,
+        target_date: str,
+    ) -> str | None:
+        used = {
+            str(item["source_operation_id"])
+            for item in connection.execute(
+                "SELECT source_operation_id FROM seven_day_goal_claims WHERE player_id = ?",
+                (player_id,),
+            ).fetchall()
+        }
+        if goal.event_key == "routine.checkin.daily":
+            candidates = connection.execute(
+                """
+                SELECT operation_id FROM routine_checkins
+                WHERE player_id = ? AND claim_kind = 'daily' AND target_date >= ?
+                ORDER BY target_date ASC, id ASC
+                """,
+                (player_id, target_date),
+            ).fetchall()
+        elif goal.event_key == "explore.gather_outskirts":
+            candidates = connection.execute(
+                """
+                SELECT operation_id FROM exploration_sessions
+                WHERE player_id = ? AND mode_key = ? AND status = 'settled'
+                ORDER BY id ASC
+                """,
+                (player_id, goal.event_key),
+            ).fetchall()
+        elif goal.event_key == "production.preview":
+            candidates = connection.execute(
+                """
+                SELECT source_operation_id FROM activity_events
+                WHERE player_id = ? AND event_key = 'production.preview'
+                ORDER BY occurred_at ASC, id ASC
+                """,
+                (player_id,),
+            ).fetchall()
+            if not candidates:
+                # Older rows may predate preview activity auditing; a started
+                # order remains a compatible durable fallback.
+                candidates = connection.execute(
+                    """
+                    SELECT operation_id FROM production_orders
+                    WHERE player_id = ? AND status IN ('processing', 'completed', 'failed')
+                    ORDER BY starts_at ASC, id ASC
+                    """,
+                    (player_id,),
+                ).fetchall()
+        elif goal.event_key == "bounty.accept":
+            candidates = connection.execute(
+                """
+                SELECT operation_id FROM bounty_offers
+                WHERE player_id = ?
+                ORDER BY accepted_at ASC, id ASC
+                """,
+                (player_id,),
+            ).fetchall()
+        elif goal.event_key == "player.enter_cultivation":
+            candidates = connection.execute(
+                """
+                SELECT operation_id FROM operations
+                WHERE player_id = ? AND operation_name = ?
+                ORDER BY created_at ASC
+                """,
+                (player_id, goal.event_key),
+            ).fetchall()
+        else:
+            candidates = connection.execute(
+                """
+                SELECT source_operation_id FROM activity_events
+                WHERE player_id = ? AND event_key = ? AND occurred_at >= ?
+                ORDER BY occurred_at ASC, id ASC
+                """,
+                (player_id, goal.event_key, f"{target_date}T00:00:00+00:00"),
+            ).fetchall()
+        for candidate in candidates:
+            value = str(candidate["operation_id"] if "operation_id" in candidate.keys() else candidate["source_operation_id"])
+            if value not in used:
+                return value
+        return None
+
+    def _seven_day_status_from_connection(
+        self,
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        campaign: sqlite3.Row,
+        now: datetime,
+    ) -> SevenDayStatusRecord:
+        start = date.fromisoformat(str(campaign["start_date"]))
+        current_day = (now.date() - start).days + 1
+        current_day = max(0, min(len(SEVEN_DAY_GOALS), current_day))
+        claims = {
+            int(item["day_number"]): item
+            for item in connection.execute(
+                "SELECT * FROM seven_day_goal_claims WHERE player_id = ?",
+                (player["id"],),
+            ).fetchall()
+        }
+        goals: list[SevenDayGoalView] = []
+        for definition in SEVEN_DAY_GOALS:
+            target_date = (start + timedelta(days=definition.day_number - 1)).isoformat()
+            claim = claims.get(definition.day_number)
+            if claim is not None:
+                state = "claimed"
+                source = str(claim["source_operation_id"])
+            elif current_day < definition.day_number:
+                state = "locked"
+                source = None
+            elif definition.closed:
+                state = "content_closed"
+                source = None
+            else:
+                source = self._seven_day_source_operation(
+                    connection, int(player["id"]), definition, target_date
+                )
+                state = "claimable" if source else "pending"
+            goals.append(
+                SevenDayGoalView(
+                    day_number=definition.day_number,
+                    goal_key=definition.key,
+                    label=definition.label,
+                    target_date=target_date,
+                    state=state,
+                    reward=seven_day_reward(definition),
+                    source_operation_id=source,
+                )
+            )
+        status = "completed" if all(goal.state == "claimed" for goal in goals) else str(campaign["status"])
+        if status != campaign["status"]:
+            connection.execute(
+                "UPDATE seven_day_campaigns SET status = ?, updated_at = ? WHERE player_id = ?",
+                (status, serialize_datetime(now), player["id"]),
+            )
+        return SevenDayStatusRecord(
+            player=self._row_to_player(player),
+            start_date=str(campaign["start_date"]),
+            current_day=current_day,
+            status=status,
+            goals=tuple(goals),
+        )
+
+    async def claim_seven_day_goal(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        day_number: int,
+        operation_id: str,
+    ) -> SevenDayGoalRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_seven_day_goal_sync,
+                platform,
+                platform_user_id,
+                day_number,
+                operation_id,
+            )
+
+    def _claim_seven_day_goal_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        day_number: int,
+        operation_id: str,
+    ) -> SevenDayGoalRecord:
+        operation_name = "routine.claim_seven_day_goal"
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "day_number": day_number,
+            "content_version": SEVEN_DAY_CONTENT_VERSION,
+            "rule_version": SEVEN_DAY_RULE_VERSION,
+        }
+        request_hash = self._request_hash(operation_name, request_payload)
+        for attempt in range(5):
+            try:
+                return self._claim_seven_day_goal_once(
+                    platform, platform_user_id, day_number, operation_id,
+                    operation_name, request_hash,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked")
+
+    def _claim_seven_day_goal_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        day_number: int,
+        operation_id: str,
+        operation_name: str,
+        request_hash: str,
+    ) -> SevenDayGoalRecord:
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._seven_day_goal_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+            try:
+                definition = seven_day_goal(day_number)
+            except ValueError as exc:
+                raise SevenDayGoalInvalidError(str(exc)) from exc
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            campaign = self._ensure_seven_day_campaign(connection, row, now_text)
+            start = date.fromisoformat(str(campaign["start_date"]))
+            target_date = (start + timedelta(days=day_number - 1)).isoformat()
+            if now.date() < start + timedelta(days=day_number - 1):
+                raise SevenDayGoalNotOpenError("seven-day goal is not open")
+            claimed = connection.execute(
+                "SELECT 1 FROM seven_day_goal_claims WHERE player_id = ? AND day_number = ?",
+                (row["id"], day_number),
+            ).fetchone()
+            if claimed is not None:
+                raise SevenDayGoalAlreadyClaimedError("seven-day goal was already claimed")
+            if definition.closed:
+                raise SevenDayGoalNotCompletedError("seven-day goal depends on closed content")
+            source_operation_id = self._seven_day_source_operation(
+                connection, int(row["id"]), definition, target_date
+            )
+            if source_operation_id is None:
+                raise SevenDayGoalNotCompletedError("seven-day goal is not completed")
+            reward = seven_day_reward(definition)
+            inventory = self._json_object(row["inventory_json"], {})
+            stones = int(row["spirit_stones"])
+            local_reputation = 0
+            for key, quantity in reward.items():
+                if key == "spirit_stones":
+                    stones += int(quantity)
+                elif key == "local_reputation":
+                    local_reputation += int(quantity)
+                else:
+                    inventory[key] = int(inventory.get(key, 0)) + int(quantity)
+            reputation = connection.execute(
+                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                (row["id"],),
+            ).fetchone()
+            local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
+            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
+            service_reputation = int(reputation["service_reputation"]) if reputation is not None else 0
+            if local_reputation:
+                connection.execute(
+                    """
+                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
+                        service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
+                    """,
+                    (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
+                )
+            connection.execute(
+                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO seven_day_goal_claims(
+                    player_id, day_number, goal_key, target_date, source_operation_id,
+                    operation_id, reward_json, content_version, rule_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"], day_number, definition.key, target_date, source_operation_id,
+                    operation_id, json.dumps(reward, ensure_ascii=False, sort_keys=True),
+                    SEVEN_DAY_CONTENT_VERSION, SEVEN_DAY_RULE_VERSION, now_text,
+                ),
+            )
+            total_claimed = connection.execute(
+                "SELECT COUNT(*) AS count FROM seven_day_goal_claims WHERE player_id = ?",
+                (row["id"],),
+            ).fetchone()
+            campaign_complete = int(total_claimed["count"]) == len(SEVEN_DAY_GOALS)
+            if campaign_complete:
+                connection.execute(
+                    "UPDATE seven_day_campaigns SET status = 'completed', updated_at = ? WHERE player_id = ?",
+                    (now_text, row["id"]),
+                )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("seven-day goal returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "day_number": day_number,
+                "goal_key": definition.key,
+                "target_date": target_date,
+                "reward": reward,
+                "source_operation_id": source_operation_id,
+                "campaign_complete": campaign_complete,
+                "content_version": SEVEN_DAY_CONTENT_VERSION,
+                "rule_version": SEVEN_DAY_RULE_VERSION,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._seven_day_goal_from_payload(payload)
+
+    @staticmethod
+    def _seven_day_goal_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> SevenDayGoalRecord:
+        return SevenDayGoalRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            day_number=int(payload["day_number"]),
+            goal_key=str(payload["goal_key"]),
+            target_date=str(payload["target_date"]),
+            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            source_operation_id=str(payload["source_operation_id"]),
+            campaign_complete=bool(payload.get("campaign_complete", False)),
             already_completed=replay,
         )
 

@@ -272,3 +272,17 @@ class XiuxianApplication:
             lambda: self.routine.harvest_spirit_tree(context),
             write_message="当前事件不允许收获灵木。",
         )
+
+    async def get_seven_day_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.get_seven_day_status(context),
+            require_write=False,
+        )
+
+    async def claim_seven_day_goal(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.claim_seven_day_goal(context),
+            write_message="当前事件不允许领取七日目标奖励。",
+        )

@@ -14,6 +14,11 @@ from ..repository import (
     RoutineMakeupDateError,
     RoutineMakeupLimitError,
     RoutineMakeupNotEligibleError,
+    SevenDayGoalAlreadyClaimedError,
+    SevenDayGoalInvalidError,
+    SevenDayGoalNotCompletedError,
+    SevenDayGoalNotOpenError,
+    SevenDayNotStartedError,
     SpiritTreeCooldownError,
     SpiritTreeNotReadyError,
     SpiritTreeWateredError,
@@ -61,6 +66,9 @@ class RoutineApplication:
             "local_reputation": "地方名望",
             FATE_TICKET: "机缘签",
             TREE_SEED: "灵木种子",
+            "item.food.coarse_spirit_rice": "粗糙灵米",
+            "item.herb.blood_grass": "止血草",
+            "item.mat.array_sand": "阵砂",
         }
         return "、".join(
             f"{labels.get(key, '奖励')} ×{value}"
@@ -241,6 +249,125 @@ class RoutineApplication:
             context.request_id,
             operation_id,
             data={"reward": record.reward, "cooldown_until": record.cooldown_until, "idempotent_replay": record.already_completed},
+        )
+
+    @staticmethod
+    def _seven_day_state_text(state: str) -> str:
+        return {
+            "claimed": "已领取",
+            "claimable": "可领取",
+            "pending": "待完成",
+            "locked": "尚未开启",
+            "content_closed": "内容未开放",
+        }.get(state, "待完成")
+
+    async def get_seven_day_status(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_ROUTINE_COMMAND", "查看七日入道无需附加参数。", context.request_id)
+        try:
+            record = await self.repository.get_seven_day_status(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except SevenDayNotStartedError:
+            return CommandResult(False, "SEVEN_DAY_NOT_STARTED", "请先发送 `寻仙问道`，再开启七日入道。", context.request_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看七日入道。", context.request_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        lines = [
+            "## 七日入道",
+            "",
+            f"**{self._display_name(record.player)}** · 第 {record.current_day}/7 业务日",
+            f"- **开始日期**：{record.start_date}",
+            "",
+        ]
+        goals = []
+        for goal in record.goals:
+            state_text = self._seven_day_state_text(goal.state)
+            lines.append(f"- **D{goal.day_number} {goal.label}**：{state_text}（{goal.target_date}）")
+            goals.append(
+                {
+                    "day": goal.day_number,
+                    "label": goal.label,
+                    "target_date": goal.target_date,
+                    "state": goal.state,
+                    "reward": goal.reward,
+                }
+            )
+        lines.append("")
+        lines.append("> 已完成的目标可发送 `领取七日目标 日数` 领取奖励；目标可以补做，但不会重置七日进度。")
+        return CommandResult(
+            True,
+            "SEVEN_DAY_STATUS",
+            "\n".join(lines),
+            context.request_id,
+            data={
+                "start_date": record.start_date,
+                "current_day": record.current_day,
+                "status": record.status,
+                "goals": goals,
+            },
+        )
+
+    async def claim_seven_day_goal(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_ROUTINE_COMMAND", "请使用 `领取七日目标 日数`，日数为 1 到 7。", context.request_id)
+        try:
+            day_number = int(context.command_args[0])
+        except ValueError:
+            day_number = 0
+        operation_id = self._operation_id(context, "routine.claim_seven_day_goal")
+        try:
+            record = await self.repository.claim_seven_day_goal(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                day_number=day_number,
+                operation_id=operation_id,
+            )
+        except SevenDayGoalInvalidError:
+            return CommandResult(False, "INVALID_ROUTINE_COMMAND", "七日目标日数只能是 1 到 7。", context.request_id, operation_id)
+        except SevenDayNotStartedError:
+            return CommandResult(False, "SEVEN_DAY_NOT_STARTED", "请先发送 `寻仙问道`，再开启七日入道。", context.request_id, operation_id)
+        except SevenDayGoalNotOpenError:
+            return CommandResult(False, "SEVEN_DAY_GOAL_NOT_OPEN", "这一天的目标尚未开启，请按业务日顺序完成。", context.request_id, operation_id)
+        except SevenDayGoalAlreadyClaimedError:
+            return CommandResult(False, "SEVEN_DAY_ALREADY_CLAIMED", "这一天的七日目标奖励已经领取过了。", context.request_id, operation_id)
+        except SevenDayGoalNotCompletedError:
+            return CommandResult(False, "SEVEN_DAY_GOAL_NOT_COMPLETED", "目标尚未完成，或它依赖的内容暂未开放。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能领取七日目标奖励。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他七日目标，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "SEVEN_DAY_GOAL_CLAIMED",
+            (
+                f"## 七日目标已领取\n\n"
+                f"**{self._display_name(record.player)}**完成了第 **D{record.day_number}** 天目标。\n\n"
+                f"- **获得**：{self._reward_text(record.reward)}\n"
+                f"- **目标日期**：{record.target_date}\n\n"
+                "> 七日进度按首次寻仙问道日期计算，补做不会重置进度。"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "day": record.day_number,
+                "target_date": record.target_date,
+                "reward": record.reward,
+                "campaign_complete": record.campaign_complete,
+                "idempotent_replay": record.already_completed,
+            },
         )
 
 

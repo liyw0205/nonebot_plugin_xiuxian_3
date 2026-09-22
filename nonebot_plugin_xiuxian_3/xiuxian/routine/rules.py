@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 import hashlib
+from dataclasses import dataclass
 
 
 RULE_VERSION = "routine-0.1.0"
@@ -14,6 +15,83 @@ TREE_WATER_ACTIVITY = "ritual.spirit_tree.water"
 TREE_HARVEST_ACTIVITY = "ritual.spirit_tree.harvest"
 FATE_TICKET = "item.ticket.fate_basic"
 TREE_SEED = "item.seed.spirit_tree"
+SEVEN_DAY_CONTENT_VERSION = CONTENT_VERSION
+SEVEN_DAY_RULE_VERSION = "seven-day-0.1.0"
+
+
+@dataclass(frozen=True, slots=True)
+class SevenDayGoalDefinition:
+    day_number: int
+    key: str
+    label: str
+    reward: tuple[tuple[str, int], ...]
+    event_key: str
+    closed: bool = False
+
+
+SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
+    SevenDayGoalDefinition(
+        1,
+        "quest.seven_day.day1_checkin",
+        "道历问安",
+        (("item.food.coarse_spirit_rice", 1),),
+        "routine.checkin.daily",
+    ),
+    SevenDayGoalDefinition(
+        2,
+        "quest.seven_day.day2_gather",
+        "完成一次近郊采集",
+        (("item.herb.blood_grass", 2),),
+        "explore.gather_outskirts",
+    ),
+    SevenDayGoalDefinition(
+        3,
+        "quest.seven_day.day3_production_preview",
+        "查看一次生产预览或开始生产",
+        (("spirit_stones", 30),),
+        "production.preview",
+    ),
+    SevenDayGoalDefinition(
+        4,
+        "quest.seven_day.day4_bounty",
+        "接取一次悬赏",
+        (("local_reputation", 2),),
+        "bounty.accept",
+    ),
+    SevenDayGoalDefinition(
+        5,
+        "quest.seven_day.day5_tower",
+        "完成试炼塔一层",
+        (("item.mat.array_sand", 2),),
+        "specials.tower.floor.1",
+        closed=True,
+    ),
+    SevenDayGoalDefinition(
+        6,
+        "quest.seven_day.day6_dispatch",
+        "完成一次派遣",
+        (("spirit_stones", 50),),
+        "specials.dispatch.settled",
+        closed=True,
+    ),
+    SevenDayGoalDefinition(
+        7,
+        "quest.seven_day.day7_path",
+        "选择道途",
+        (("local_reputation", 5), (FATE_TICKET, 2)),
+        "player.enter_cultivation",
+    ),
+)
+
+
+def seven_day_goal(day_number: int) -> SevenDayGoalDefinition:
+    if day_number < 1 or day_number > len(SEVEN_DAY_GOALS):
+        raise ValueError("invalid seven-day goal")
+    return SEVEN_DAY_GOALS[day_number - 1]
+
+
+def seven_day_reward(goal: SevenDayGoalDefinition) -> dict[str, int]:
+    return {key: int(value) for key, value in goal.reward}
 
 
 def parse_past_date(value: str, today: date) -> date:
@@ -86,6 +164,10 @@ __all__ = [
     "TREE_HARVEST_ACTIVITY",
     "TREE_SEED",
     "TREE_WATER_ACTIVITY",
+    "SEVEN_DAY_CONTENT_VERSION",
+    "SEVEN_DAY_GOALS",
+    "SEVEN_DAY_RULE_VERSION",
+    "SevenDayGoalDefinition",
     "checkin_reward",
     "makeup_reward",
     "next_date",
@@ -93,4 +175,6 @@ __all__ = [
     "parse_past_date",
     "tree_harvest_reward",
     "tree_status",
+    "seven_day_goal",
+    "seven_day_reward",
 ]

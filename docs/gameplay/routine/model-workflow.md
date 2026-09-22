@@ -41,6 +41,16 @@ code: available -> claimed | expired | revoked
 4. 收获随机结果由 operation ID 派生确定性种子，持久化池键、种子摘要、奖励和版本；重放
    直接反序列化历史 payload，不重新调用随机池。
 
+## 七日入道事务流程
+
+1. 首次 `player.start_seeking` operation 的服务端时间生成 `seven_day_campaigns.start_date`；
+   状态查询和领奖都使用该快照，不读取客户端传入日期。
+2. 目标来源必须是已落库的业务记录：问安、采集、生产订单、悬赏接取和入道 operation；同一
+   来源 operation 只能绑定一个目标，补做只能补领未领取的历史日数。
+3. 领奖在同一事务内检查目标日期、来源、`seven_day_goal_claims(player_id, day_number)` 唯一
+   键，更新背包/灵石/地方名望并写 operation。D5/D6 内容关闭时只返回未开放，不写入任何
+   战斗或派遣状态。
+
 ## 观测
 
 记录窗口键、参与人数、领取/补领率、补签消耗、灵木产出、道契激活/撤销、机缘池消耗/保底、行卷等级、密令错误率、重复 operation 与管理员撤销。

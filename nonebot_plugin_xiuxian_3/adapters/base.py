@@ -147,3 +147,5 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("补录道历", application.makeup_daily, aliases=("补签到",))
     router.register("浇灌灵木", application.water_spirit_tree, aliases=("灵木浇灌", "浇水"))
     router.register("收获灵木", application.harvest_spirit_tree, aliases=("灵木收获",))
+    router.register("七日入道", application.get_seven_day_status, aliases=("七日目标", "入道七日"))
+    router.register("领取七日目标", application.claim_seven_day_goal, aliases=("领取七日任务", "领取七日入道"))

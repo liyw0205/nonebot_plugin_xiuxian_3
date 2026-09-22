@@ -5,6 +5,7 @@ from dataclasses import replace
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.adapters.base import EventDeduplicator
+from nonebot_plugin_xiuxian_3.adapters.nonebot import _canonical_command
 from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event
 from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq_event
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -66,6 +67,12 @@ def test_event_deduplication_is_bounded_and_exact() -> None:
     assert dedup.accept("onebot.v11:bot:event-2") is True
     assert dedup.accept("onebot.v11:bot:event-3") is True
     assert dedup.accept("") is True
+
+
+def test_nonebot_command_gate_includes_shared_routine_commands() -> None:
+    assert _canonical_command("七日入道") == "七日入道"
+    assert _canonical_command("领取七日目标 1") == "领取七日目标 1"
+    assert _canonical_command("/七日目标") == "七日目标"
 
 
 def test_normalized_qq_event_reaches_shared_application() -> None:

@@ -58,11 +58,13 @@ class ProductionApplication:
         recipe_key = self._recipe_args(context.command_args)
         if recipe_key is None:
             return CommandResult(False, "RECIPE_NOT_FOUND", "请指定配方，例如 `生产预览 疗伤丹`。", context.request_id)
+        operation_id = self._operation_id(context, "production.preview")
         try:
             record = await self.repository.preview_production(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 recipe_key=recipe_key,
+                operation_id=operation_id,
             )
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
@@ -92,6 +94,7 @@ class ProductionApplication:
                 + f"\n\n> 下一步：发送 `开始生产 {record.recipe_name}`，锁定材料并开始。"
             ),
             context.request_id,
+            operation_id,
             data={
                 "recipe_key": record.recipe_key,
                 "recipe_name": record.recipe_name,
@@ -101,6 +104,7 @@ class ProductionApplication:
                 "daily_limit": record.daily_limit,
                 "inputs": record.inputs,
                 "currency_cost": record.currency_cost,
+                "idempotent_replay": False,
             },
         )
 

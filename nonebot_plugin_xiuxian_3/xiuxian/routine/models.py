@@ -31,4 +31,42 @@ class SpiritTreeRecord:
     already_completed: bool = False
 
 
-__all__ = ["RoutineClaimRecord", "SpiritTreeRecord"]
+@dataclass(frozen=True, slots=True)
+class SevenDayGoalView:
+    day_number: int
+    goal_key: str
+    label: str
+    target_date: str
+    state: str
+    reward: dict[str, int] = field(default_factory=dict)
+    source_operation_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SevenDayStatusRecord:
+    player: PlayerView
+    start_date: str
+    current_day: int
+    status: str
+    goals: tuple[SevenDayGoalView, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SevenDayGoalRecord:
+    player: PlayerView
+    day_number: int
+    goal_key: str
+    target_date: str
+    reward: dict[str, int]
+    source_operation_id: str
+    campaign_complete: bool
+    already_completed: bool = False
+
+
+__all__ = [
+    "RoutineClaimRecord",
+    "SpiritTreeRecord",
+    "SevenDayGoalView",
+    "SevenDayStatusRecord",
+    "SevenDayGoalRecord",
+]
