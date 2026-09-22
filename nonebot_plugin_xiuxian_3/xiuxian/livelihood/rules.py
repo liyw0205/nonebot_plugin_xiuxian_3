@@ -79,6 +79,20 @@ class CropDefinition:
     rule_version: str = RULE_VERSION
 
 
+@dataclass(frozen=True, slots=True)
+class TownCommissionDefinition:
+    key: str
+    label: str
+    inputs: dict[str, int]
+    reward_stones: int
+    local_reputation: int
+    service_reputation: int
+    stock: int
+    duration_seconds: int = 12 * 60 * 60
+    content_version: str = CONTENT_VERSION
+    rule_version: str = RULE_VERSION
+
+
 CROP_DEFINITIONS = {
     BLOOD_GRASS: CropDefinition(
         key=BLOOD_GRASS,
@@ -104,16 +118,74 @@ def crop_definition(value: str | None = None) -> CropDefinition:
         raise ValueError(f"unsupported crop key: {value}") from exc
 
 
+COMMISSION_HERB_SUPPLY = "town_commission.herb_supply"
+COMMISSION_REPAIR_TOOLS = "town_commission.repair_tools"
+COMMISSION_MEAL_SERVICE = "town_commission.meal_service"
+
+TOWN_COMMISSION_DEFINITIONS = {
+    COMMISSION_HERB_SUPPLY: TownCommissionDefinition(
+        key=COMMISSION_HERB_SUPPLY,
+        label="止血草供应",
+        inputs={"item.herb.blood_grass": 3},
+        reward_stones=18,
+        local_reputation=3,
+        service_reputation=1,
+        stock=200,
+    ),
+    COMMISSION_REPAIR_TOOLS: TownCommissionDefinition(
+        key=COMMISSION_REPAIR_TOOLS,
+        label="工具修缮",
+        inputs={"item.mat.wood": 2, "item.ore.ironstone": 1},
+        reward_stones=25,
+        local_reputation=4,
+        service_reputation=1,
+        stock=120,
+    ),
+    COMMISSION_MEAL_SERVICE: TownCommissionDefinition(
+        key=COMMISSION_MEAL_SERVICE,
+        label="灵米饭供应",
+        inputs={"item.food.spirit_rice": 2},
+        reward_stones=20,
+        local_reputation=3,
+        service_reputation=1,
+        stock=150,
+    ),
+}
+
+COMMISSION_ALIASES = {
+    "止血草供应": COMMISSION_HERB_SUPPLY,
+    "草药供应": COMMISSION_HERB_SUPPLY,
+    "工具修缮": COMMISSION_REPAIR_TOOLS,
+    "灵米饭供应": COMMISSION_MEAL_SERVICE,
+    "灵米饭": COMMISSION_MEAL_SERVICE,
+}
+
+
+def commission_definition(value: str | None = None) -> TownCommissionDefinition:
+    key = COMMISSION_ALIASES.get((value or "").strip(), (value or "").strip())
+    try:
+        return TOWN_COMMISSION_DEFINITIONS[key]
+    except KeyError as exc:
+        raise ValueError(f"unsupported commission key: {value}") from exc
+
+
 __all__ = [
     "BLOOD_GRASS",
     "CONTENT_VERSION",
     "COURTYARD",
     "CROP_DEFINITIONS",
     "CROP_ALIASES",
+    "COMMISSION_ALIASES",
+    "COMMISSION_HERB_SUPPLY",
+    "COMMISSION_MEAL_SERVICE",
+    "COMMISSION_REPAIR_TOOLS",
     "RULE_VERSION",
+    "TOWN_COMMISSION_DEFINITIONS",
+    "TownCommissionDefinition",
     "TOWN_ROOM",
     "CropDefinition",
     "ResidenceDefinition",
     "crop_definition",
+    "commission_definition",
     "residence_definition",
 ]

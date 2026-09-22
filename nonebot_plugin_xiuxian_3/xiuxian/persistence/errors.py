@@ -240,6 +240,38 @@ class CropDailyLimitError(RuntimeError):
     """The crop reached its business-day planting quota."""
 
 
+class CommissionNotFoundError(RuntimeError):
+    """The requested town commission is not published for this business day."""
+
+
+class CommissionStockExhaustedError(RuntimeError):
+    """The global stock for a town commission has been claimed."""
+
+
+class CommissionAlreadyAcceptedError(RuntimeError):
+    """The player already accepted this town commission."""
+
+
+class CommissionQuotaError(RuntimeError):
+    """The player has reached the daily town commission acceptance limit."""
+
+
+class CommissionExpiredError(RuntimeError):
+    """The town commission can no longer be delivered."""
+
+
+class CommissionNotAcceptedError(RuntimeError):
+    """The player has no accepted commission to deliver."""
+
+
+class CommissionMaterialInsufficientError(RuntimeError):
+    """The player lacks materials required by a town commission."""
+
+
+class CommissionAlreadyDeliveredError(RuntimeError):
+    """The town commission was already delivered."""
+
+
 class ConstitutionAlreadySelectedError(RuntimeError):
     """The player already has a main constitution."""
 

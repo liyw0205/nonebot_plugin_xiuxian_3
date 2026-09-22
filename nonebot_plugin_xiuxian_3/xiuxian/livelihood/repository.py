@@ -29,11 +29,12 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..player.rules import STAGE_MORTAL
+from .commission_repository import CommissionRepositoryMixin
 from .models import FieldPlotRecord, ResidenceRecord
 from .rules import crop_definition, residence_definition
 
 
-class LivelihoodRepositoryMixin:
+class LivelihoodRepositoryMixin(CommissionRepositoryMixin):
     """Own every persistence transaction that belongs to ``livelihood``."""
 
     async def lease_residence(

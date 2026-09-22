@@ -176,6 +176,46 @@ CREATE INDEX IF NOT EXISTS idx_field_plots_residence ON field_plots(residence_id
 CREATE UNIQUE INDEX IF NOT EXISTS idx_field_plots_active
     ON field_plots(residence_id) WHERE status IN ('growing', 'harvestable');
 
+CREATE TABLE IF NOT EXISTS town_commissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    commission_id TEXT NOT NULL UNIQUE,
+    commission_key TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('published', 'paused', 'expired')),
+    stock_total INTEGER NOT NULL CHECK (stock_total >= 0),
+    stock_remaining INTEGER NOT NULL CHECK (stock_remaining >= 0),
+    starts_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (commission_key, business_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_town_commissions_date
+    ON town_commissions(business_date, status);
+
+CREATE TABLE IF NOT EXISTS town_commission_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    claim_id TEXT NOT NULL UNIQUE,
+    commission_id TEXT NOT NULL REFERENCES town_commissions(commission_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    business_date TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('accepted', 'delivered', 'expired')),
+    accept_operation_id TEXT NOT NULL UNIQUE,
+    deliver_operation_id TEXT UNIQUE,
+    accepted_at TEXT NOT NULL,
+    delivered_at TEXT,
+    result_json TEXT NOT NULL DEFAULT '{}',
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, commission_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_town_commission_claims_player
+    ON town_commission_claims(player_id, business_date, status);
+
 CREATE TABLE IF NOT EXISTS constitution_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL UNIQUE,

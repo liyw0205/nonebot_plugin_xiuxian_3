@@ -434,6 +434,23 @@ class XiuxianApplication:
     async def get_field_profile(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.livelihood.get_plot_profile(context), require_write=False)
 
+    async def list_commissions(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.livelihood.list_commissions(context), require_write=False)
+
+    async def accept_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.accept_commission(context),
+            write_message="当前事件不允许接取城镇委托。",
+        )
+
+    async def deliver_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.deliver_commission(context),
+            write_message="当前事件不允许交付城镇委托。",
+        )
+
     async def preview_constitution(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.constitution.preview(context), require_write=False)
 
