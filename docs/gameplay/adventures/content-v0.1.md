@@ -12,6 +12,11 @@
 
 每日 00:00 创建 `bounty.daily.<date>`；角色最多接 1 条。接取时冻结目标/奖励/截止时间；同一已结算事件只推进一次；领取键为 `bounty_key:date:player`。
 
+运行时状态：`bounty.herb_supply` 与 `bounty.craft_order` 已开放；`bounty.training_dummy`
+依赖自动回合训练战，当前保持 `locked`，接取返回 `CONTENT_CLOSED`，不会写入悬赏或扣除
+资源。草药进度以接取时背包数量为基线，生产进度以接取时已完成订单数为基线；领取成功
+同时更新灵石/精力/物品与地方名望或服务信誉，重复领取只回放原 operation。
+
 ## 2. 秘境试炼
 
 | `instance_key` | 前置 | 路线/成本 | 首通奖励 | 重复挑战 |

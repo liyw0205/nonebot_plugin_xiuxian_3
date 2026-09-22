@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult, validate_command_identity
+from ...contracts import CommandContext, CommandResult
 from ..repository import (
     DaoNameTakenError,
     OperationConflictError,
@@ -96,13 +96,6 @@ class PlayerApplication:
         )
 
     async def create_player(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件缺少可验证的消息身份，无法创建角色。",
-        )
-        if invalid is not None:
-            return invalid
         if len(context.command_args) > 1:
             return CommandResult(
                 False,
@@ -184,13 +177,6 @@ class PlayerApplication:
         )
 
     async def start_seeking(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件缺少可验证的消息身份，无法执行指令。",
-        )
-        if invalid is not None:
-            return invalid
         operation_id = self._operation_id(context, "player.start_seeking")
         try:
             record = await self.repository.start_seeking(
@@ -266,9 +252,6 @@ class PlayerApplication:
         )
 
     async def get_profile(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(context)
-        if invalid is not None:
-            return invalid
         try:
             player = await self.repository.get_player(
                 platform=context.adapter,
@@ -330,13 +313,6 @@ class PlayerApplication:
         )
 
     async def rename_player(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件缺少可验证的消息身份，无法修改道号。",
-        )
-        if invalid is not None:
-            return invalid
         if len(context.command_args) != 1:
             return CommandResult(
                 False,

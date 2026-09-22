@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult, validate_command_identity
+from ...contracts import CommandContext, CommandResult
 from ..repository import (
     ExplorationBusyError,
     ExplorationNotFoundError,
@@ -64,13 +64,6 @@ class ExplorationApplication:
         return LOCATION_LABELS.get(location_key, "未知地点")
 
     async def start_exploration(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件不允许开始探索。",
-        )
-        if invalid is not None:
-            return invalid
         mode_key = self._mode(context.command_args)
         if mode_key is None:
             return CommandResult(
@@ -133,13 +126,6 @@ class ExplorationApplication:
         )
 
     async def settle_exploration(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件不允许结算探索。",
-        )
-        if invalid is not None:
-            return invalid
         if context.command_args:
             return CommandResult(False, "INVALID_EXPLORATION_COMMAND", "结算探索无需附加参数。", context.request_id)
         operation_id = self._operation_id(context, "exploration.settle")
@@ -217,13 +203,6 @@ class ExplorationApplication:
         )
 
     async def cancel_exploration(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件不允许取消探索。",
-        )
-        if invalid is not None:
-            return invalid
         if context.command_args:
             return CommandResult(False, "INVALID_EXPLORATION_COMMAND", "取消探索无需附加参数。", context.request_id)
         operation_id = self._operation_id(context, "exploration.cancel")

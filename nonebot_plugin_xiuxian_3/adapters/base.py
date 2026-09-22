@@ -140,3 +140,6 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("开始探索", application.start_exploration)
     router.register("结算探索", application.settle_exploration)
     router.register("取消探索", application.cancel_exploration)
+    router.register("悬赏榜", application.list_bounties)
+    router.register("接取悬赏", application.accept_bounty)
+    router.register("领取悬赏", application.claim_bounty)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult, validate_command_identity
+from ...contracts import CommandContext, CommandResult
 from ..repository import (
     CurrencyInsufficientError,
     LocationRequirementError,
@@ -51,9 +51,6 @@ class WorldApplication:
         return resolve_destination(args[0])
 
     async def preview_travel(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(context)
-        if invalid is not None:
-            return invalid
         destination = self._destination(context.command_args)
         if destination is None:
             return CommandResult(False, "INVALID_DESTINATION", "请使用 `移动预览 雾隐洞天`。", context.request_id)
@@ -97,13 +94,6 @@ class WorldApplication:
         })
 
     async def start_travel(self, context: CommandContext, destination: str | None = None) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件不允许开始移动。",
-        )
-        if invalid is not None:
-            return invalid
         destination = destination or (self._destination(context.command_args) or "")
         if not destination:
             return CommandResult(False, "INVALID_DESTINATION", "请使用 `前往 雾隐洞天`。", context.request_id)
@@ -159,13 +149,6 @@ class WorldApplication:
         )
 
     async def settle_travel(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件不允许结算移动。",
-        )
-        if invalid is not None:
-            return invalid
         if context.command_args:
             return CommandResult(False, "INVALID_TRAVEL_COMMAND", "结算移动无需附加参数。", context.request_id)
         operation_id = self._operation_id(context, "world.settle_travel")

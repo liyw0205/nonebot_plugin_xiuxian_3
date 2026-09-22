@@ -31,9 +31,9 @@ class CommandContext:
     operation_id: str = ""
 
     def validate(self) -> None:
-        if not self.adapter.strip():
+        if not isinstance(self.adapter, str) or not self.adapter.strip():
             raise ValueError("adapter is required")
-        if not self.user_id.strip():
+        if not isinstance(self.user_id, str) or not self.user_id.strip():
             raise ValueError("user_id is required")
 
 

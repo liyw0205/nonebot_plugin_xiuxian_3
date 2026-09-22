@@ -193,6 +193,59 @@ def test_shared_identity_validation_separates_read_and_write_checks() -> None:
     assert write_blocked is not None
     assert write_blocked.message == "禁止写入。"
 
+    malformed = validate_command_identity(CommandContext(adapter=None, user_id=123))
+    assert malformed is not None
+    assert malformed.code == "INVALID_CONTEXT"
+
+
+def test_every_registered_command_uses_shared_identity_validation() -> None:
+    """All feature modules must reject an unidentified event at the boundary."""
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            context = CommandContext(adapter="web", user_id="")
+
+            for command in runtime.router.commands:
+                result = await runtime.dispatch(context, command)
+                assert result.code == "INVALID_CONTEXT", (
+                    f"{command!r} bypassed shared identity validation: "
+                    f"{result.code}"
+                )
+
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_read_only_commands_accept_read_only_identity() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            context = CommandContext(
+                adapter="web",
+                user_id="read-only-user",
+                can_write_assets=False,
+            )
+            read_only_commands = (
+                "我的状态",
+                "我的修仙信息",
+                "悬赏榜",
+                "生产预览",
+                "移动预览",
+                "突破预览",
+            )
+
+            for command in read_only_commands:
+                result = await runtime.dispatch(context, command)
+                assert result.code != "INVALID_CONTEXT", (
+                    f"read-only command {command!r} unexpectedly requires write access"
+                )
+
+            await runtime.close()
+
+    asyncio.run(run())
+
 
 def test_operation_replay_conflict_and_read_only_profile() -> None:
     async def run() -> None:

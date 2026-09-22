@@ -4,9 +4,10 @@
 框架或 CLI。所有适配器把平台事件归一化为 `CommandContext`，再通过同一个
 `XiuxianRuntime` 路由到 application 用例。
 
-身份判断统一由 `contracts.validate_command_identity` 完成：读操作只检查适配器与平台用户
-身份，写操作额外检查 `can_write_assets`。各功能模块不再重复实现 `context.validate()`，只
-负责自己的境界、资源、地点和会话业务规则。
+身份判断统一由 `XiuxianApplication._invoke` 调用 `contracts.validate_command_identity` 完成：
+读操作只检查适配器与平台用户身份，写操作额外检查 `can_write_assets`。各功能模块不再
+重复实现身份判断，只负责自己的境界、资源、地点和会话业务规则；所有文本、按钮和 Web
+入口都必须经过 `XiuxianApplication` 的公开方法。
 
 角色功能按职责拆分在 `xiuxian/player/`：`models.py` 保存用例记录，`rules.py`
 保存纯规则，`use_cases.py` 负责命令编排；适配器层只做归一化、路由和消息呈现。
@@ -125,6 +126,12 @@ result = await runtime.dispatch(
 会话状态为 `created -> settled | cancelled | expired`；固定遭遇战会进入 `combat_pending`，
 此状态只能稳定返回“战斗待处理”，不会抽取探索奖励，也不会启动战斗运行时。自动回合
 PVE/PvP 仍等待后置战斗门槛。
+
+探索完成后可使用悬赏域的只读/写入命令：`悬赏榜` 查看当日三条固定悬赏，
+`接取悬赏 草药补给` 或 `接取悬赏 生产订单` 冻结服务端目标和进度基线，完成后发送
+`领取悬赏`。每业务日每角色最多接取一条；领取在同一 SQLite 事务中发放灵石、精力、
+物品并更新地方名望/服务信誉，失败、过期、重复 operation 和不同输入冲突均不会重复发奖。
+训练傀儡悬赏只展示为锁定，战斗运行时开放前不会创建悬赏会话。
 
 普通结算窗口为修炼结束后的 24 小时。超过窗口的会话标记为 `expired`，`结算修炼`
 返回 `CULTIVATION_EXPIRED`；发送 `恢复修炼` 会使用开始时快照完成唯一一次迟到结算，

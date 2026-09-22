@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult, validate_command_identity
+from ...contracts import CommandContext, CommandResult
 from ..repository import (
     CultivationBusyError,
     LocationRequiredError,
@@ -71,13 +71,6 @@ class IntroApplication:
         return "、".join(f"`完成引导 {GUIDE_COMMANDS[key]}`" for key in pending)
 
     async def complete_intro(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件不允许进行引导结算。",
-        )
-        if invalid is not None:
-            return invalid
         guide_key, service_key, error = self._parse_guide(context.command_args)
         if error:
             return CommandResult(False, "INVALID_GUIDE", error, context.request_id)
@@ -169,13 +162,6 @@ class IntroApplication:
         )
 
     async def travel_intro(self, context: CommandContext, destination: str) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件不允许进行移动。",
-        )
-        if invalid is not None:
-            return invalid
         destination_key = resolve_destination(destination)
         if destination_key is None:
             return CommandResult(False, "INVALID_DESTINATION", "目前支持 `前往近郊`、`前往灵泉谷` 和 `返回新手城`。", context.request_id)

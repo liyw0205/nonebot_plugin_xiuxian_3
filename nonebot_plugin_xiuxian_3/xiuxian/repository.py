@@ -50,6 +50,8 @@ from .exploration.rules import (
     meets_realm as exploration_meets_realm,
     settlement_result,
 )
+from .adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
+from .adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
 
 
 SCHEMA = """
@@ -214,6 +216,33 @@ CREATE INDEX IF NOT EXISTS idx_exploration_sessions_quota
     ON exploration_sessions(player_id, mode_key, business_date);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_exploration_sessions_active
     ON exploration_sessions(player_id) WHERE status IN ('created', 'running', 'combat_pending');
+
+CREATE TABLE IF NOT EXISTS player_reputations (
+    player_id INTEGER PRIMARY KEY REFERENCES players(id),
+    local_json TEXT NOT NULL DEFAULT '{}',
+    service_reputation INTEGER NOT NULL DEFAULT 0 CHECK (service_reputation >= 0 AND service_reputation <= 100),
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bounty_offers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    offer_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    bounty_key TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('accepted', 'completed', 'claimed', 'expired')),
+    accepted_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, business_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bounty_offers_player ON bounty_offers(player_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_bounty_offers_status ON bounty_offers(player_id, status);
 
 """
 
@@ -416,6 +445,34 @@ class ExplorationCombatPendingError(RuntimeError):
 
 class ExplorationQuotaExhaustedError(RuntimeError):
     """The mode reached its business-day quota."""
+
+
+class BountyDailyLimitError(RuntimeError):
+    """The player already accepted a bounty for this business day."""
+
+
+class BountyNotFoundError(RuntimeError):
+    """The player has no current bounty to claim."""
+
+
+class BountyContentClosedError(RuntimeError):
+    """The bounty depends on a runtime that is still closed."""
+
+
+class BountyRequirementError(RuntimeError):
+    """The player does not satisfy a bounty's realm or stage gate."""
+
+
+class BountyIncompleteError(RuntimeError):
+    """The accepted bounty target has not been completed."""
+
+
+class BountyExpiredError(RuntimeError):
+    """The accepted bounty passed its deadline without a claim."""
+
+
+class BountyAlreadyClaimedError(RuntimeError):
+    """The current bounty reward has already been claimed."""
 
 
 class SQLitePlayerRepository:
@@ -1946,6 +2003,420 @@ class SQLitePlayerRepository:
                 (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
             )
             return self._exploration_settlement_from_payload(payload)
+
+    async def get_bounty_board(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> BountyBoardRecord:
+        await self.initialize()
+        return await asyncio.to_thread(self._get_bounty_board_sync, platform, platform_user_id)
+
+    def _get_bounty_board_sync(self, platform: str, platform_user_id: str) -> BountyBoardRecord:
+        now = datetime.now(timezone.utc)
+        business_date = now.date().isoformat()
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not readable")
+            accepted = connection.execute(
+                "SELECT * FROM bounty_offers WHERE player_id = ? AND business_date = ?",
+                (row["id"], business_date),
+            ).fetchone()
+            offers: list[BountyOfferView] = []
+            for definition in BOUNTY_DEFINITIONS.values():
+                progress = 0
+                expires_at: str | None = None
+                if accepted is not None and accepted["bounty_key"] == definition.key:
+                    progress = self._bounty_progress(connection, row, accepted, definition)
+                    expires_at = str(accepted["expires_at"])
+                    if accepted["status"] == "claimed":
+                        status = "claimed"
+                    elif now > datetime.fromisoformat(str(accepted["expires_at"])):
+                        status = "expired"
+                    elif progress >= definition.target_amount:
+                        status = "completed"
+                    else:
+                        status = "accepted"
+                elif accepted is not None:
+                    status = "daily_limit"
+                elif definition.runtime_status != "open":
+                    status = "locked"
+                elif not self._bounty_player_eligible(row, definition):
+                    status = "requirement"
+                else:
+                    status = "available"
+                offers.append(
+                    BountyOfferView(
+                        key=definition.key,
+                        label=definition.label,
+                        description=definition.description,
+                        status=status,
+                        progress=progress,
+                        target=definition.target_amount,
+                        reward=reward_map(definition),
+                        expires_at=expires_at,
+                    )
+                )
+            return BountyBoardRecord(
+                player=self._row_to_player(row),
+                business_date=business_date,
+                offers=tuple(offers),
+            )
+
+    @staticmethod
+    def _bounty_player_eligible(row: sqlite3.Row | dict[str, Any], definition) -> bool:
+        stage = str(row["stage"] if isinstance(row, sqlite3.Row) else row.get("stage", ""))
+        if stage not in {STAGE_MORTAL, "seeker", "cultivator"}:
+            return False
+        realm_key = str(row["realm_key"] if isinstance(row, sqlite3.Row) else row.get("realm_key", "mortal"))
+        layer = int(row["realm_layer"] if isinstance(row, sqlite3.Row) else row.get("realm_layer", 0))
+        return bounty_meets_realm(realm_key, layer, definition.required_realm, definition.required_layer)
+
+    @staticmethod
+    def _bounty_progress(connection: sqlite3.Connection, row: sqlite3.Row, offer: sqlite3.Row, definition) -> int:
+        snapshot = SQLitePlayerRepository._json_object(offer["snapshot_json"], {})
+        if definition.target_kind == "inventory_gain":
+            inventory = SQLitePlayerRepository._json_object(row["inventory_json"], {})
+            current = int(inventory.get(str(definition.target_key), 0))
+            baseline = int(snapshot.get("baseline_quantity", 0))
+            return max(0, min(definition.target_amount, current - baseline))
+        if definition.target_kind == "production_completed":
+            current = connection.execute(
+                "SELECT COUNT(*) AS count FROM production_orders WHERE player_id = ? AND status = 'completed'",
+                (row["id"],),
+            ).fetchone()
+            baseline = int(snapshot.get("baseline_completed_orders", 0))
+            return max(0, min(definition.target_amount, int(current["count"]) - baseline))
+        result = SQLitePlayerRepository._json_object(offer["result_json"], {})
+        return max(0, min(definition.target_amount, int(result.get("progress", 0))))
+
+    async def accept_bounty(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        bounty_key: str,
+        operation_id: str,
+    ) -> BountyAcceptRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._accept_bounty_sync,
+                platform,
+                platform_user_id,
+                bounty_key,
+                operation_id,
+            )
+
+    def _accept_bounty_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        bounty_key: str,
+        operation_id: str,
+    ) -> BountyAcceptRecord:
+        definition = bounty_definition(bounty_key)
+        operation_name = "bounty.accept"
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "bounty_key": definition.key,
+        }
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = datetime.now(timezone.utc)
+        business_date = now.date().isoformat()
+        starts_at = serialize_datetime(now)
+        expires_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._bounty_accept_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if definition.runtime_status != "open":
+                raise BountyContentClosedError("bounty runtime is closed")
+            if not self._bounty_player_eligible(row, definition):
+                raise BountyRequirementError("bounty requirements are not met")
+            accepted = connection.execute(
+                "SELECT 1 FROM bounty_offers WHERE player_id = ? AND business_date = ? LIMIT 1",
+                (row["id"], business_date),
+            ).fetchone()
+            if accepted is not None:
+                raise BountyDailyLimitError("player already accepted a bounty today")
+            inventory = self._json_object(row["inventory_json"], {})
+            completed_orders = connection.execute(
+                "SELECT COUNT(*) AS count FROM production_orders WHERE player_id = ? AND status = 'completed'",
+                (row["id"],),
+            ).fetchone()
+            snapshot = {
+                "bounty_key": definition.key,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+                "target_kind": definition.target_kind,
+                "target_key": definition.target_key,
+                "target_amount": definition.target_amount,
+                "baseline_quantity": int(inventory.get(str(definition.target_key), 0)) if definition.target_key else 0,
+                "baseline_completed_orders": int(completed_orders["count"]),
+            }
+            offer_id = uuid4().hex
+            connection.execute(
+                """
+                INSERT INTO bounty_offers(
+                    offer_id, player_id, operation_id, bounty_key, business_date, status,
+                    accepted_at, expires_at, snapshot_json, result_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'accepted', ?, ?, ?, '{}', ?, ?)
+                """,
+                (
+                    offer_id,
+                    row["id"],
+                    operation_id,
+                    definition.key,
+                    business_date,
+                    starts_at,
+                    expires_at,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                    starts_at,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "bounty_key": definition.key,
+                "label": definition.label,
+                "status": "accepted",
+                "progress": 0,
+                "target": definition.target_amount,
+                "starts_at": starts_at,
+                "expires_at": expires_at,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    starts_at,
+                ),
+            )
+            return self._bounty_accept_from_payload(payload)
+
+    @staticmethod
+    def _bounty_accept_from_payload(payload: dict[str, Any], replay: bool = False) -> BountyAcceptRecord:
+        return BountyAcceptRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            bounty_key=str(payload["bounty_key"]),
+            label=str(payload["label"]),
+            status=str(payload["status"]),
+            progress=int(payload.get("progress", 0)),
+            target=int(payload["target"]),
+            starts_at=str(payload["starts_at"]),
+            expires_at=str(payload["expires_at"]),
+            already_completed=replay,
+        )
+
+    async def claim_bounty(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> BountyClaimRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_bounty_sync,
+                platform,
+                platform_user_id,
+                operation_id,
+            )
+
+    def _claim_bounty_sync(self, platform: str, platform_user_id: str, operation_id: str) -> BountyClaimRecord:
+        operation_name = "bounty.claim"
+        request_payload = {"platform": platform, "platform_user_id": platform_user_id}
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = datetime.now(timezone.utc)
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._bounty_claim_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            offer = connection.execute(
+                "SELECT * FROM bounty_offers WHERE player_id = ? AND status IN ('accepted', 'completed') ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if offer is None:
+                claimed = connection.execute(
+                    "SELECT 1 FROM bounty_offers WHERE player_id = ? AND status = 'claimed' ORDER BY id DESC LIMIT 1",
+                    (row["id"],),
+                ).fetchone()
+                if claimed is not None:
+                    raise BountyAlreadyClaimedError("bounty reward was already claimed")
+                raise BountyNotFoundError("no bounty is waiting for a claim")
+            definition = bounty_definition(str(offer["bounty_key"]))
+            progress = self._bounty_progress(connection, row, offer, definition)
+            if now > datetime.fromisoformat(str(offer["expires_at"])):
+                connection.execute(
+                    "UPDATE bounty_offers SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ? AND status IN ('accepted', 'completed')",
+                    (
+                        json.dumps({"status": "expired", "progress": progress}, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                        offer["id"],
+                    ),
+                )
+                connection.commit()
+                raise BountyExpiredError("bounty has expired")
+            if progress < definition.target_amount:
+                raise BountyIncompleteError("bounty target is incomplete")
+
+            inventory = self._json_object(row["inventory_json"], {})
+            stones = int(row["spirit_stones"])
+            cultivation = int(row["cultivation"])
+            total_cultivation = int(row["total_cultivation"])
+            energy = int(row["energy"])
+            rewards = reward_map(definition)
+            actual_rewards: dict[str, int] = {}
+            local_reputation = 0
+            service_reputation = 0
+            for key, quantity in rewards.items():
+                quantity = int(quantity)
+                if key == "spirit_stones":
+                    stones += quantity
+                    actual_rewards[key] = quantity
+                elif key == "cultivation":
+                    cultivation += quantity
+                    total_cultivation += quantity
+                    actual_rewards[key] = quantity
+                elif key == "energy":
+                    gained = min(quantity, max(0, int(row["energy_max"]) - energy))
+                    energy += gained
+                    actual_rewards[key] = gained
+                elif key == "local_reputation":
+                    local_reputation += quantity
+                    actual_rewards[key] = quantity
+                elif key == "service_reputation":
+                    service_reputation += quantity
+                    actual_rewards[key] = quantity
+                else:
+                    inventory[key] = int(inventory.get(key, 0)) + quantity
+                    actual_rewards[key] = quantity
+
+            reputation = connection.execute(
+                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                (row["id"],),
+            ).fetchone()
+            local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
+            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
+            current_service = int(reputation["service_reputation"]) if reputation is not None else 0
+            current_service = min(100, current_service + service_reputation)
+            connection.execute(
+                """
+                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
+                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
+                """,
+                (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
+            )
+            connection.execute(
+                """
+                UPDATE players
+                SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, energy = ?,
+                    inventory_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    stones,
+                    cultivation,
+                    total_cultivation,
+                    energy,
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    row["id"],
+                ),
+            )
+            result_json = {
+                "status": "claimed",
+                "progress": progress,
+                "target": definition.target_amount,
+                "rewards": actual_rewards,
+            }
+            connection.execute(
+                "UPDATE bounty_offers SET status = 'claimed', result_json = ?, updated_at = ? WHERE id = ? AND status IN ('accepted', 'completed')",
+                (json.dumps(result_json, ensure_ascii=False, sort_keys=True), now_text, offer["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "bounty_key": definition.key,
+                "label": definition.label,
+                "status": "claimed",
+                "progress": progress,
+                "target": definition.target_amount,
+                "rewards": actual_rewards,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._bounty_claim_from_payload(payload)
+
+    @staticmethod
+    def _bounty_claim_from_payload(payload: dict[str, Any], replay: bool = False) -> BountyClaimRecord:
+        return BountyClaimRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            bounty_key=str(payload["bounty_key"]),
+            label=str(payload["label"]),
+            status=str(payload["status"]),
+            progress=int(payload.get("progress", 0)),
+            target=int(payload["target"]),
+            rewards={str(key): int(value) for key, value in dict(payload.get("rewards", {})).items()},
+            already_completed=replay,
+        )
 
     async def enter_cultivation(
         self,

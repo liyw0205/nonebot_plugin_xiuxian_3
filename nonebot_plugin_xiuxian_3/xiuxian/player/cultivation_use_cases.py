@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult, validate_command_identity
+from ...contracts import CommandContext, CommandResult
 from ..repository import (
     OperationConflictError,
     PathAlreadySelectedError,
@@ -47,13 +47,6 @@ class CultivationApplication:
         )
 
     async def enter_cultivation(self, context: CommandContext) -> CommandResult:
-        invalid = validate_command_identity(
-            context,
-            require_write=True,
-            write_message="当前事件不允许进行入道结算。",
-        )
-        if invalid is not None:
-            return invalid
         path_key, subprofession_key, error = self._parse_args(context.command_args)
         if error:
             return CommandResult(False, "INVALID_PATH", error, context.request_id)

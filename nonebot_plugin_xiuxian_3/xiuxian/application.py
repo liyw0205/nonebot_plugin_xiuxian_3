@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from ..contracts import CommandContext, CommandResult
+from collections.abc import Awaitable, Callable
+
+from ..contracts import CommandContext, CommandResult, validate_command_identity
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
 from .progression.use_cases import ProgressionApplication
 from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
+from .adventures.use_cases import AdventuresApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -22,87 +25,220 @@ class XiuxianApplication:
         self.production = ProductionApplication(repository)
         self.world = WorldApplication(repository)
         self.exploration = ExplorationApplication(repository)
+        self.adventures = AdventuresApplication(repository)
+
+    async def _invoke(
+        self,
+        context: CommandContext,
+        handler: Callable[[], Awaitable[CommandResult]],
+        *,
+        require_write: bool = True,
+        write_message: str = "当前事件不允许执行此操作。",
+    ) -> CommandResult:
+        """Run an application use case after one shared identity check."""
+
+        invalid = validate_command_identity(
+            context,
+            require_write=require_write,
+            write_message=write_message,
+        )
+        if invalid is not None:
+            return invalid
+        return await handler()
 
     async def create_player(self, context: CommandContext) -> CommandResult:
-        return await self.player.create_player(context)
+        return await self._invoke(
+            context,
+            lambda: self.player.create_player(context),
+            write_message="当前事件缺少可验证的消息身份，无法创建角色。",
+        )
 
     async def start_seeking(self, context: CommandContext) -> CommandResult:
-        return await self.player.start_seeking(context)
+        return await self._invoke(
+            context,
+            lambda: self.player.start_seeking(context),
+            write_message="当前事件缺少可验证的消息身份，无法执行指令。",
+        )
 
     async def get_profile(self, context: CommandContext) -> CommandResult:
-        return await self.player.get_profile(context)
+        return await self._invoke(context, lambda: self.player.get_profile(context), require_write=False)
 
     async def rename_player(self, context: CommandContext) -> CommandResult:
-        return await self.player.rename_player(context)
+        return await self._invoke(
+            context,
+            lambda: self.player.rename_player(context),
+            write_message="当前事件缺少可验证的消息身份，无法修改道号。",
+        )
 
     async def complete_intro(self, context: CommandContext) -> CommandResult:
-        return await self.player.complete_intro(context)
+        return await self._invoke(
+            context,
+            lambda: self.player.complete_intro(context),
+            write_message="当前事件不允许进行引导结算。",
+        )
 
     async def travel_intro(self, context: CommandContext, destination: str) -> CommandResult:
-        return await self.player.travel_intro(context, destination)
+        return await self._invoke(
+            context,
+            lambda: self.player.travel_intro(context, destination),
+            write_message="当前事件不允许进行移动。",
+        )
 
     async def enter_cultivation(self, context: CommandContext) -> CommandResult:
-        return await self.player.enter_cultivation(context)
+        return await self._invoke(
+            context,
+            lambda: self.player.enter_cultivation(context),
+            write_message="当前事件不允许进行入道结算。",
+        )
 
     async def start_cultivation(self, context: CommandContext) -> CommandResult:
-        return await self.progression.start_cultivation(context)
+        return await self._invoke(
+            context,
+            lambda: self.progression.start_cultivation(context),
+            write_message="当前事件不允许进行修炼结算。",
+        )
 
     async def settle_cultivation(self, context: CommandContext) -> CommandResult:
-        return await self.progression.settle_cultivation(context)
+        return await self._invoke(
+            context,
+            lambda: self.progression.settle_cultivation(context),
+            write_message="当前事件不允许进行修炼结算。",
+        )
 
     async def recover_cultivation(self, context: CommandContext) -> CommandResult:
-        return await self.progression.recover_cultivation(context)
+        return await self._invoke(
+            context,
+            lambda: self.progression.recover_cultivation(context),
+            write_message="当前事件不允许进行修炼结算。",
+        )
 
     async def cancel_cultivation(self, context: CommandContext) -> CommandResult:
-        return await self.progression.cancel_cultivation(context)
+        return await self._invoke(
+            context,
+            lambda: self.progression.cancel_cultivation(context),
+            write_message="当前事件不允许进行修炼结算。",
+        )
 
     async def advance_layer(self, context: CommandContext) -> CommandResult:
-        return await self.progression.advance_layer(context)
+        return await self._invoke(
+            context,
+            lambda: self.progression.advance_layer(context),
+            write_message="当前事件不允许进行修炼结算。",
+        )
 
     async def recover_resources(self, context: CommandContext) -> CommandResult:
-        return await self.progression.recover_resources(context)
+        return await self._invoke(
+            context,
+            lambda: self.progression.recover_resources(context),
+            write_message="当前事件不允许进行修炼结算。",
+        )
 
     async def preview_breakthrough(self, context: CommandContext) -> CommandResult:
-        return await self.breakthrough.preview_breakthrough(context)
+        return await self._invoke(context, lambda: self.breakthrough.preview_breakthrough(context), require_write=False)
 
     async def start_breakthrough(self, context: CommandContext) -> CommandResult:
-        return await self.breakthrough.start_breakthrough(context)
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.start_breakthrough(context),
+            write_message="当前事件不允许进行突破结算。",
+        )
 
     async def settle_breakthrough(self, context: CommandContext) -> CommandResult:
-        return await self.breakthrough.settle_breakthrough(context)
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.settle_breakthrough(context),
+            write_message="当前事件不允许进行突破结算。",
+        )
 
     async def recover_weakness(self, context: CommandContext) -> CommandResult:
-        return await self.breakthrough.recover_weakness(context)
+        return await self._invoke(
+            context,
+            lambda: self.breakthrough.recover_weakness(context),
+            write_message="当前事件不允许进行突破结算。",
+        )
 
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
-        return await self.production.preview_recipe(context)
+        return await self._invoke(context, lambda: self.production.preview_recipe(context), require_write=False)
 
     async def start_production(self, context: CommandContext) -> CommandResult:
-        return await self.production.start_production(context)
+        return await self._invoke(
+            context,
+            lambda: self.production.start_production(context),
+            write_message="当前事件不允许锁定生产资产。",
+        )
 
     async def complete_production(self, context: CommandContext) -> CommandResult:
-        return await self.production.complete_production(context)
+        return await self._invoke(
+            context,
+            lambda: self.production.complete_production(context),
+            write_message="当前事件不允许领取生产结果。",
+        )
 
     async def recover_production(self, context: CommandContext) -> CommandResult:
-        return await self.production.recover_production(context)
+        return await self._invoke(
+            context,
+            lambda: self.production.recover_production(context),
+            write_message="当前事件不允许恢复生产订单。",
+        )
 
     async def preview_travel(self, context: CommandContext) -> CommandResult:
-        return await self.world.preview_travel(context)
+        return await self._invoke(context, lambda: self.world.preview_travel(context), require_write=False)
 
     async def start_travel(self, context: CommandContext) -> CommandResult:
-        return await self.world.start_travel(context)
+        return await self._invoke(
+            context,
+            lambda: self.world.start_travel(context),
+            write_message="当前事件不允许开始移动。",
+        )
 
     async def start_cave_travel(self, context: CommandContext) -> CommandResult:
-        return await self.world.start_travel(context, "cave.mist_grotto")
+        return await self._invoke(
+            context,
+            lambda: self.world.start_travel(context, "cave.mist_grotto"),
+            write_message="当前事件不允许开始移动。",
+        )
 
     async def settle_travel(self, context: CommandContext) -> CommandResult:
-        return await self.world.settle_travel(context)
+        return await self._invoke(
+            context,
+            lambda: self.world.settle_travel(context),
+            write_message="当前事件不允许结算移动。",
+        )
 
     async def start_exploration(self, context: CommandContext) -> CommandResult:
-        return await self.exploration.start_exploration(context)
+        return await self._invoke(
+            context,
+            lambda: self.exploration.start_exploration(context),
+            write_message="当前事件不允许开始探索。",
+        )
 
     async def settle_exploration(self, context: CommandContext) -> CommandResult:
-        return await self.exploration.settle_exploration(context)
+        return await self._invoke(
+            context,
+            lambda: self.exploration.settle_exploration(context),
+            write_message="当前事件不允许结算探索。",
+        )
 
     async def cancel_exploration(self, context: CommandContext) -> CommandResult:
-        return await self.exploration.cancel_exploration(context)
+        return await self._invoke(
+            context,
+            lambda: self.exploration.cancel_exploration(context),
+            write_message="当前事件不允许取消探索。",
+        )
+
+    async def list_bounties(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.adventures.list_bounties(context), require_write=False)
+
+    async def accept_bounty(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.adventures.accept_bounty(context),
+            write_message="当前事件不允许接取悬赏。",
+        )
+
+    async def claim_bounty(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.adventures.claim_bounty(context),
+            write_message="当前事件不允许领取悬赏。",
+        )
