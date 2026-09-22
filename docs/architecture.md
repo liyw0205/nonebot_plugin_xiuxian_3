@@ -45,7 +45,8 @@ nonebot_plugin_xiuxian_3/
 当前 SQLite 实现采用渐进式拆分：`xiuxian/repository.py` 是稳定兼容门面，
 `xiuxian/persistence/sqlite_repository.py` 负责连接、迁移、通用玩家映射和
 尚未迁移的历史事务；领域事务通过 mixin 放在各域目录，例如
-`progression/repository.py` 的资源恢复和 `world/repository.py` 的虚空航道。
+`progression/repository.py` 的资源恢复、`progression/endgame_repository.py` 的合道/渡劫试炼，
+以及 `world/repository.py` 的虚空航道。
 新领域写入口应优先落在对应域的 repository 模块，不再直接扩大兼容门面。
 
 ## 3. Feature manifest

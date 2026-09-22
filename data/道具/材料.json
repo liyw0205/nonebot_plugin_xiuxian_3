@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.5",
-  "rule_version": "items-0.5.0",
+  "content_version": "content-0.6",
+  "rule_version": "items-0.6.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "item",
   "records": [
@@ -359,6 +359,58 @@
       "requirements": [],
       "status": "active",
       "key": "item.void_archive"
+    },
+    {
+      "name": "道果碎片",
+      "item_type": "endgame_material",
+      "quality": "heaven",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "dao_fruit_progress", "amount": 100}],
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 10}],
+      "status": "active",
+      "key": "item.dao_fruit_fragment"
+    },
+    {
+      "name": "天劫凭证",
+      "item_type": "tribulation_token",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "tribulation_trial_token"}],
+      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}],
+      "status": "active",
+      "key": "item.tribulation_token"
+    },
+    {
+      "name": "飞升凭证",
+      "item_type": "ascension_certificate",
+      "quality": "mythic",
+      "stack_limit": 1,
+      "instance_mode": "instance",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "final_battle_entry"}],
+      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 10}],
+      "status": "active",
+      "key": "item.ascension_certificate"
+    },
+    {
+      "name": "天劫护符",
+      "item_type": "tribulation_guard",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "tribulation_debt_reduction", "amount": 5}],
+      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 1}],
+      "status": "active",
+      "key": "item.tribulation_guard"
     }
   ],
   "category": "材料",

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.5",
+  "content_version": "content-0.6",
   "rule_version": "world-0.5.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "location",

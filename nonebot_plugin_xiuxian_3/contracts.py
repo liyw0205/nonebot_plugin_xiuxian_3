@@ -137,6 +137,12 @@ class PlayerView:
     void_instability_until: datetime | None = None
     void_route_count: int = 0
     void_anchor_capacity: int = 0
+    dao_fruit_progress: int = 0
+    ascension_merit: int = 0
+    tribulation_debt: int = 0
+    dao_fruit_key: str | None = None
+    endgame_status: str = "none"
+    ending_key: str | None = None
 
 
 def serialize_datetime(value: datetime) -> str:

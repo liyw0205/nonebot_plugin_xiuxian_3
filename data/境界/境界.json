@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.5",
-  "rule_version": "progression-0.5.0",
+  "content_version": "content-0.6",
+  "rule_version": "progression-0.6.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "realm",
   "records": [
@@ -162,6 +162,29 @@
       "cross_realm_total_cultivation": 2998960,
       "entry_requirements": ["realm.soul_transformation.layer10", "total_cultivation>=848960", "quest.break_void"],
       "key": "void_refining"
+    },
+    {
+      "name": "合道",
+      "status": "open",
+      "layer_min": 1,
+      "layer_max": 10,
+      "layer_thresholds": {"1": 0, "2": 280000, "3": 600000, "4": 1000000, "5": 1500000, "6": 2100000, "7": 2850000, "8": 3750000, "9": 4800000, "10": 6000000},
+      "next_realm": "tribulation",
+      "cross_realm_total_cultivation": 8998960,
+      "entry_requirements": ["realm.void_refining.layer10", "total_cultivation>=2998960", "quest.dao_union", "item.dao_fruit_fragment>=10", "world_merit>=2000"],
+      "key": "dao_union"
+    },
+    {
+      "name": "渡劫",
+      "status": "open",
+      "layer_min": 1,
+      "layer_max": 10,
+      "layer_thresholds": {"1": 0, "2": 100000, "3": 220000, "4": 380000, "5": 600000, "6": 850000, "7": 1150000, "8": 1500000, "9": 1900000, "10": 2400000},
+      "next_realm": "ascension_ready",
+      "cross_realm_total_cultivation": 0,
+      "entry_requirements": ["realm.dao_union.layer10", "total_cultivation>=8998960"],
+      "trial_order": ["trial.body_and_mind", "trial.three_realms", "trial.dao_choice"],
+      "key": "tribulation"
     }
   ],
   "schema": "xiuxian.content"

@@ -8,6 +8,7 @@ from ..contracts import CommandContext, CommandResult, validate_command_identity
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
 from .progression.use_cases import ProgressionApplication
+from .progression.endgame_use_cases import EndgameApplication
 from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
@@ -31,6 +32,7 @@ class XiuxianApplication:
     def __init__(self, repository: SQLitePlayerRepository):
         self.player = PlayerApplication(repository)
         self.progression = ProgressionApplication(repository)
+        self.endgame = EndgameApplication(repository)
         self.breakthrough = BreakthroughApplication(repository)
         self.production = ProductionApplication(repository)
         self.world = WorldApplication(repository)
@@ -144,6 +146,34 @@ class XiuxianApplication:
             context,
             lambda: self.progression.advance_layer(context),
             write_message="当前事件不允许进行修炼结算。",
+        )
+
+    async def begin_dao_union(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.endgame.begin_dao_union(context),
+            write_message="当前事件不允许执行合道。",
+        )
+
+    async def begin_tribulation(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.endgame.begin_tribulation(context),
+            write_message="当前事件不允许进入渡劫。",
+        )
+
+    async def start_tribulation_trial(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.endgame.start_trial(context),
+            write_message="当前事件不允许开始天劫试炼。",
+        )
+
+    async def settle_tribulation_trial(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.endgame.settle_trial(context),
+            write_message="当前事件不允许结算天劫试炼。",
         )
 
     async def recover_resources(self, context: CommandContext) -> CommandResult:

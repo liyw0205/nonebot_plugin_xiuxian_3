@@ -22,6 +22,7 @@ from ..repository import (
     RealmLayerInvalidError,
     RepositoryBusyError,
     ResourceInsufficientError,
+    TrialSequenceError,
     SQLitePlayerRepository,
 )
 from .rules import (
@@ -334,6 +335,8 @@ class ProgressionApplication:
             return CommandResult(False, "REALM_LAYER_INVALID", "当前境界已经是混元，不能继续晋升。", context.request_id, operation_id)
         except RealmCultivationInsufficientError:
             return CommandResult(False, "REALM_CULTIVATION_INSUFFICIENT", "境内修为尚未达到下一层门槛，继续修炼后再来。", context.request_id, operation_id)
+        except TrialSequenceError:
+            return CommandResult(False, "TRIAL_SEQUENCE_INVALID", "渡劫层级需要先按顺序完成对应天劫试炼和道源任务。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能晋升。", context.request_id, operation_id)
         except OperationConflictError:

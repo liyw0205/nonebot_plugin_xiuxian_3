@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.5",
-  "rule_version": "events-0.5.0",
+  "content_version": "content-0.6",
+  "rule_version": "events-0.6.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "event",
   "records": [
@@ -64,6 +64,22 @@
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
       "random_pool": "void.route.storm.v0.5",
       "key": "event.void_storm"
+    },
+    {
+      "name": "道源任务",
+      "status": "open",
+      "requirements": [{"type": "realm", "realm_key": "dao_union", "min_layer": 1}],
+      "task_keys": ["task.dao_origin.guard", "task.dao_origin.build", "task.dao_origin.teach"],
+      "random_pool": "dao.origin.v0.6",
+      "key": "event.dao_origin"
+    },
+    {
+      "name": "天劫试炼台",
+      "status": "open",
+      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}],
+      "trial_order": ["trial.body_and_mind", "trial.three_realms", "trial.dao_choice"],
+      "duration_seconds": 1800,
+      "key": "event.heaven_tribulation"
     }
   ],
   "schema": "xiuxian.content"

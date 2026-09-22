@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.5",
-  "rule_version": "paths-0.4.0",
+  "content_version": "content-0.6",
+  "rule_version": "paths-0.6.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "path",
   "records": [
@@ -22,6 +22,7 @@
         "survival_threshold": 100
       },
       "key": "body",
+      "fruit_key": "fruit.immortal_body",
       "domain_key": "domain.mountain_body",
       "status": "active"
     },
@@ -41,6 +42,7 @@
         "default_rounds": 1
       },
       "key": "spell",
+      "fruit_key": "fruit.origin_spell",
       "domain_key": "domain.elemental_sea",
       "status": "active"
     },
@@ -60,6 +62,7 @@
         "max": 1
       },
       "key": "device",
+      "fruit_key": "fruit.machine_heaven",
       "domain_key": "domain.machine_city",
       "status": "active"
     },
@@ -79,6 +82,7 @@
         "per_use": 12
       },
       "key": "demonic",
+      "fruit_key": "fruit.free_demon",
       "domain_key": "domain.abyss_shadow",
       "status": "active"
     },
@@ -98,6 +102,7 @@
         "per_use": -5
       },
       "key": "beast",
+      "fruit_key": "fruit.ancestral_king",
       "domain_key": "domain.ancestral_wild",
       "status": "active"
     },
@@ -117,6 +122,7 @@
         "per_use": 2
       },
       "key": "support",
+      "fruit_key": "fruit.allcraft",
       "domain_key": "domain.artisan_realm",
       "status": "active"
     }

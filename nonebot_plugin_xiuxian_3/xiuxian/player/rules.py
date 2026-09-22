@@ -58,6 +58,11 @@ LOCATION_LABELS = {
     "void.sect_fortress": "虚空堡垒",
     "cave.time_garden": "时序福地",
     "void.void_market": "虚空集市",
+    "dao.origin_gate": "道源门",
+    "tribulation.sky_terrace": "天劫台",
+    "ascension.heaven_path": "飞升路",
+    "ascension.left_world_hall": "留界殿",
+    "location.final_arena": "终局天榜",
 }
 
 REALM_LABELS = {
@@ -69,6 +74,8 @@ REALM_LABELS = {
     "nascent_soul": "元婴",
     "soul_transformation": "化神",
     "void_refining": "炼虚",
+    "dao_union": "合道",
+    "tribulation": "渡劫",
 }
 
 DAO_NAME_MAX_LENGTH = 7

@@ -111,6 +111,7 @@ from ..world.void_rules import (
     void_route_roll_bp,
 )
 from ..progression.repository import ProgressionRepositoryMixin
+from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
 from ..world.rules import destination_definition, meets_realm, RULE_VERSION
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
@@ -281,6 +282,12 @@ CREATE TABLE IF NOT EXISTS players (
     void_route_count INTEGER NOT NULL DEFAULT 0 CHECK (void_route_count >= 0),
     void_anchor_capacity INTEGER NOT NULL DEFAULT 0 CHECK (void_anchor_capacity >= 0),
     void_power_reset_date TEXT,
+    dao_fruit_progress INTEGER NOT NULL DEFAULT 0 CHECK (dao_fruit_progress >= 0),
+    ascension_merit INTEGER NOT NULL DEFAULT 0 CHECK (ascension_merit >= 0),
+    tribulation_debt INTEGER NOT NULL DEFAULT 0 CHECK (tribulation_debt >= 0),
+    dao_fruit_key TEXT,
+    endgame_status TEXT NOT NULL DEFAULT 'none',
+    ending_key TEXT,
     durability_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -1022,6 +1029,47 @@ CREATE INDEX IF NOT EXISTS idx_void_route_sessions_player ON void_route_sessions
 CREATE UNIQUE INDEX IF NOT EXISTS idx_void_route_sessions_active
     ON void_route_sessions(player_id) WHERE status = 'running';
 
+CREATE TABLE IF NOT EXISTS tribulation_trial_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    trial_key TEXT NOT NULL,
+    choice_key TEXT,
+    status TEXT NOT NULL CHECK (status IN ('preparing', 'succeeded', 'failed', 'expired')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tribulation_trial_sessions_player
+    ON tribulation_trial_sessions(player_id, trial_key, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tribulation_trial_sessions_active
+    ON tribulation_trial_sessions(player_id) WHERE status = 'preparing';
+
+CREATE TABLE IF NOT EXISTS endgame_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    session_type TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('preparing', 'succeeded', 'failed')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_endgame_sessions_player
+    ON endgame_sessions(player_id, session_type, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_endgame_sessions_active
+    ON endgame_sessions(player_id) WHERE status = 'preparing';
+
 """
 
 
@@ -1617,7 +1665,51 @@ class WayfaringPaidTrackInactiveError(RuntimeError):
     """The monthly dao contract is not active for the paid track."""
 
 
-class SQLitePlayerRepository(WorldRepositoryMixin, ProgressionRepositoryMixin):
+class DaoUnionRequirementError(RuntimeError):
+    """The player does not satisfy the 合道 entry contract."""
+
+
+class TribulationEntryRequirementError(RuntimeError):
+    """The player does not satisfy the 渡劫 entry contract."""
+
+
+class TrialSequenceError(RuntimeError):
+    """The requested tribulation trial is unavailable or out of order."""
+
+
+class TribulationTrialBusyError(RuntimeError):
+    """Another tribulation trial is already preparing."""
+
+
+class TribulationTrialNotFoundError(RuntimeError):
+    """There is no preparing tribulation trial to settle."""
+
+
+class TribulationTrialNotReadyError(RuntimeError):
+    """The preparing tribulation trial has not reached its end time."""
+
+
+class TribulationCooldownError(RuntimeError):
+    """The requested trial is still in its failure cooldown."""
+
+
+class TribulationDebtBlockedError(RuntimeError):
+    """Tribulation debt is too high to start another trial."""
+
+
+class TribulationTokenInsufficientError(RuntimeError):
+    """The player lacks the token required by a tribulation trial."""
+
+
+class ThreeRealmReputationInsufficientError(RuntimeError):
+    """The player lacks the three realm reputation needed by trial two."""
+
+
+class DaoFruitChoiceError(RuntimeError):
+    """The chosen dao fruit is invalid or already locked."""
+
+
+class SQLitePlayerRepository(EndgameRepositoryMixin, WorldRepositoryMixin, ProgressionRepositoryMixin):
     """Short-transaction repository safe for concurrent asyncio requests.
 
     Each operation uses a thread-local SQLite connection through ``to_thread``.
@@ -1819,6 +1911,12 @@ class SQLitePlayerRepository(WorldRepositoryMixin, ProgressionRepositoryMixin):
             ("void_route_count", "INTEGER NOT NULL DEFAULT 0"),
             ("void_anchor_capacity", "INTEGER NOT NULL DEFAULT 0"),
             ("void_power_reset_date", "TEXT"),
+            ("dao_fruit_progress", "INTEGER NOT NULL DEFAULT 0"),
+            ("ascension_merit", "INTEGER NOT NULL DEFAULT 0"),
+            ("tribulation_debt", "INTEGER NOT NULL DEFAULT 0"),
+            ("dao_fruit_key", "TEXT"),
+            ("endgame_status", "TEXT NOT NULL DEFAULT 'none'"),
+            ("ending_key", "TEXT"),
         ):
             if column not in player_columns:
                 connection.execute(f"ALTER TABLE players ADD COLUMN {column} {definition}")
@@ -6947,6 +7045,7 @@ class SQLitePlayerRepository(WorldRepositoryMixin, ProgressionRepositoryMixin):
 
     def _advance_layer_once(self, platform: str, platform_user_id: str, operation_id: str) -> LayerAdvanceRecord:
         from ..progression.rules import can_advance_layer, layer_unlocks, next_layer_threshold
+        from ..progression.endgame_rules import TRIAL_ORDER
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.advance_layer", operation_payload)
@@ -7001,6 +7100,21 @@ class SQLitePlayerRepository(WorldRepositoryMixin, ProgressionRepositoryMixin):
                 raise RealmLayerInvalidError("realm is already at its maximum layer")
             if not can_advance_layer(realm_key, layer, int(row["cultivation"])):
                 raise RealmCultivationInsufficientError("realm cultivation is insufficient")
+            if realm_key == "tribulation" and layer in {3, 6, 9}:
+                completed = {
+                    str(item["trial_key"])
+                    for item in connection.execute(
+                        "SELECT trial_key FROM tribulation_trial_sessions WHERE player_id = ? AND status = 'succeeded'",
+                        (row["id"],),
+                    ).fetchall()
+                }
+                required = {3: TRIAL_ORDER[:1], 6: TRIAL_ORDER[:2], 9: TRIAL_ORDER}[layer]
+                if any(item not in completed for item in required):
+                    raise TrialSequenceError("the required tribulation trial has not succeeded")
+                if layer == 9:
+                    flags = set(str(item) for item in self._json_object(row["intro_json"], {}).get("flags", []))
+                    if not {"task.dao_origin.guard", "task.dao_origin.build", "task.dao_origin.teach"}.issubset(flags):
+                        raise TrialSequenceError("dao origin tasks are incomplete")
             unlocks = layer_unlocks(realm_key, layer + 1)
             connection.execute(
                 "UPDATE players SET realm_layer = realm_layer + 1, updated_at = ? WHERE id = ?",
@@ -11893,6 +12007,12 @@ class SQLitePlayerRepository(WorldRepositoryMixin, ProgressionRepositoryMixin):
             ),
             void_route_count=int(value("void_route_count", 0)),
             void_anchor_capacity=int(value("void_anchor_capacity", 0)),
+            dao_fruit_progress=int(value("dao_fruit_progress", 0)),
+            ascension_merit=int(value("ascension_merit", 0)),
+            tribulation_debt=int(value("tribulation_debt", 0)),
+            dao_fruit_key=value("dao_fruit_key"),
+            endgame_status=str(value("endgame_status", "none")),
+            ending_key=value("ending_key"),
         )
 
     @staticmethod
@@ -11963,4 +12083,10 @@ class SQLitePlayerRepository(WorldRepositoryMixin, ProgressionRepositoryMixin):
             "void_instability_until": serialize_datetime(player.void_instability_until) if player.void_instability_until else None,
             "void_route_count": player.void_route_count,
             "void_anchor_capacity": player.void_anchor_capacity,
+            "dao_fruit_progress": player.dao_fruit_progress,
+            "ascension_merit": player.ascension_merit,
+            "tribulation_debt": player.tribulation_debt,
+            "dao_fruit_key": player.dao_fruit_key,
+            "endgame_status": player.endgame_status,
+            "ending_key": player.ending_key,
         }

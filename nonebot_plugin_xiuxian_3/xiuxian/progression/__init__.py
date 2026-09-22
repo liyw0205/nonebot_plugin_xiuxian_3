@@ -9,6 +9,8 @@ from .rules import (
     REALM_NASCENT_SOUL,
     REALM_SOUL_TRANSFORMATION,
     REALM_VOID_REFINING,
+    REALM_DAO_UNION,
+    REALM_TRIBULATION,
     QI_SENSING_THRESHOLDS,
     REALM_THRESHOLDS,
     cultivation_gain,
@@ -17,6 +19,13 @@ from .rules import (
     layer_unlocks,
     segment_for_layer,
     unlocks_for_layer,
+)
+from .endgame_rules import (
+    DAO_UNION_TOTAL_CULTIVATION,
+    TRIBULATION_TOTAL_CULTIVATION,
+    TRIAL_ORDER,
+    TRIAL_LABELS,
+    THREE_REALM_KEYS,
 )
 
 __all__ = [
@@ -28,6 +37,8 @@ __all__ = [
     "REALM_NASCENT_SOUL",
     "REALM_SOUL_TRANSFORMATION",
     "REALM_VOID_REFINING",
+    "REALM_DAO_UNION",
+    "REALM_TRIBULATION",
     "QI_SENSING_THRESHOLDS",
     "REALM_THRESHOLDS",
     "cultivation_gain",
@@ -36,4 +47,9 @@ __all__ = [
     "layer_unlocks",
     "segment_for_layer",
     "unlocks_for_layer",
+    "DAO_UNION_TOTAL_CULTIVATION",
+    "TRIBULATION_TOTAL_CULTIVATION",
+    "TRIAL_ORDER",
+    "TRIAL_LABELS",
+    "THREE_REALM_KEYS",
 ]

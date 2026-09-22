@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "content_version": "content-0.5",
-  "rule_version": "events-0.5.0",
+  "content_version": "content-0.6",
+  "rule_version": "events-0.6.0",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "quest",
   "records": [
@@ -81,6 +81,43 @@
       "claim_policy": "once_per_player",
       "expires": false,
       "key": "quest.break_void"
+    },
+    {
+      "name": "合道许可",
+      "status": "open",
+      "trigger": {"operation": "quest.dao_union", "result": "success"},
+      "requirements": ["three_realms.mainline", "dao_union.challenge", "dao_union.masterwork"],
+      "reward": {"permission": "dao_union"},
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.dao_union"
+    },
+    {
+      "name": "守界防御",
+      "status": "open",
+      "requirements": ["realm.dao_union.layer1", "defense_count>=3"],
+      "reward": {"dao_fruit_progress": 150, "ascension_merit": 150},
+      "claim_policy": "once_per_season",
+      "expires": false,
+      "key": "task.dao_origin.guard"
+    },
+    {
+      "name": "留界建设",
+      "status": "open",
+      "requirements": ["realm.dao_union.layer1", "building_count>=3"],
+      "reward": {"dao_fruit_progress": 160, "ascension_merit": 150},
+      "claim_policy": "once_per_season",
+      "expires": false,
+      "key": "task.dao_origin.build"
+    },
+    {
+      "name": "道统传承",
+      "status": "open",
+      "requirements": ["realm.dao_union.layer1", "teaching_count>=3"],
+      "reward": {"dao_fruit_progress": 160, "ascension_merit": 150},
+      "claim_policy": "once_per_season",
+      "expires": false,
+      "key": "task.dao_origin.teach"
     }
   ],
   "schema": "xiuxian.content"

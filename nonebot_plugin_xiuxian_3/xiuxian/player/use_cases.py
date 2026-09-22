@@ -283,6 +283,14 @@ class PlayerApplication:
             f"- **虚空不稳定**：{player.void_instability_until.isoformat() if player.void_instability_until else '无'}\n"
             if player.realm_key == "void_refining" else ""
         )
+        endgame_summary = (
+            f"- **道果进度**：{player.dao_fruit_progress}\n"
+            f"- **道源功勋**：{player.ascension_merit}\n"
+            f"- **天劫债**：{player.tribulation_debt}\n"
+            f"- **道果**：{player.dao_fruit_key or '未锁定'}\n"
+            if player.realm_key in {"dao_union", "tribulation"} or player.endgame_status != "none"
+            else ""
+        )
         return CommandResult(
             ok=True,
             code="PROFILE_READ",
@@ -304,6 +312,7 @@ class PlayerApplication:
                 f"{soul_summary}"
                 f"{domain_summary}"
                 f"{void_summary}"
+                f"{endgame_summary}"
                 "\n### 六项资质\n\n"
                 f"{self._qualification_text(player.qualification)}"
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(player.intro_flags))}/3"
@@ -355,6 +364,12 @@ class PlayerApplication:
                 "void_instability_until": player.void_instability_until.isoformat() if player.void_instability_until else None,
                 "void_route_count": player.void_route_count,
                 "void_anchor_capacity": player.void_anchor_capacity,
+                "dao_fruit_progress": player.dao_fruit_progress,
+                "ascension_merit": player.ascension_merit,
+                "tribulation_debt": player.tribulation_debt,
+                "dao_fruit_key": player.dao_fruit_key,
+                "endgame_status": player.endgame_status,
+                "ending_key": player.ending_key,
             },
         )
 
