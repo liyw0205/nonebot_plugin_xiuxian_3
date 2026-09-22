@@ -40,6 +40,9 @@ code: available -> claimed | expired | revoked
    次只进入 `ready`，收获才会写入 `spirit_tree_harvests`、发放地方名望并开启 24 小时冷却。
 4. 收获随机结果由 operation ID 派生确定性种子，持久化池键、种子摘要、奖励和版本；重放
    直接反序列化历史 payload，不重新调用随机池。
+5. 称号由已落库来源 operation 投影到 `honor_titles`，装备状态单独保存在 `honor_states`；
+   功业领取在同一事务内检查来源、写入 `achievement_claims`，并更新名望/信誉流水。
+   关闭功业只展示“内容未开放”，不生成来源记录或奖励。
 
 ## 七日入道事务流程
 

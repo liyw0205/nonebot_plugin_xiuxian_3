@@ -335,3 +335,98 @@ def test_seven_day_production_preview_is_audited_as_day_three_activity() -> None
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_honor_titles_and_achievements_are_audited_and_idempotent() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            user = "routine-honor"
+            await _enter_mortal(runtime, user)
+
+            initial = await runtime.dispatch(_context(user, "honor-status"), "功业录")
+            assert initial.code == "HONOR_STATUS"
+            assert initial.data["titles"][0]["acquired"] is True
+            assert initial.data["achievements"][0]["state"] == "pending"
+
+            equipped = await runtime.dispatch(
+                _context(user, "equip-first", operation_id="equip-first"), "佩戴称号 1"
+            )
+            assert equipped.code == "TITLE_EQUIPPED"
+            blocked_read_only = await runtime.dispatch(
+                CommandContext(
+                    adapter="web",
+                    user_id=user,
+                    can_write_assets=False,
+                ),
+                "佩戴称号 1",
+            )
+            assert blocked_read_only.code == "INVALID_CONTEXT"
+
+            checkin = await runtime.dispatch(
+                _context(user, "honor-checkin", operation_id="honor-checkin"), "道历问安"
+            )
+            assert checkin.ok
+            claim = await runtime.dispatch(
+                _context(user, "honor-claim", operation_id="honor-claim"), "领取功业 1"
+            )
+            assert claim.code == "ACHIEVEMENT_CLAIMED"
+            assert claim.data["reward"] == {"local_reputation": 3}
+            replay = await runtime.dispatch(
+                _context(user, "honor-replay", operation_id="honor-claim"), "领取功业 1"
+            )
+            assert replay.data["idempotent_replay"] is True
+            duplicate = await runtime.dispatch(
+                _context(user, "honor-duplicate", operation_id="honor-claim-2"), "领取功业 1"
+            )
+            assert duplicate.code == "ACHIEVEMENT_ALREADY_CLAIMED"
+
+            clock.advance(days=1)
+            assert (await runtime.dispatch(_context(user, "daily-2"), "道历问安")).ok
+            clock.advance(days=1)
+            assert (await runtime.dispatch(_context(user, "daily-3"), "道历问安")).ok
+            status = await runtime.dispatch(_context(user, "honor-status-2"), "功业录")
+            assert status.data["titles"][1]["acquired"] is True
+
+            closed = await runtime.dispatch(
+                _context(user, "closed-achievement", operation_id="closed-achievement"),
+                "领取功业 3",
+            )
+            assert closed.code == "CONTENT_CLOSED"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_first_craft_achievement_uses_production_operation_source() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "routine-craft-honor"
+            await _enter_alchemy(runtime, user)
+            started = await runtime.dispatch(
+                _context(user, "craft-start", operation_id="craft-start"),
+                "开始生产 疗伤丹",
+            )
+            assert started.code == "PRODUCTION_STARTED"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                old = (datetime.now(timezone.utc) - timedelta(seconds=2)).isoformat()
+                connection.execute(
+                    "UPDATE production_orders SET starts_at = ?, ends_at = ? WHERE order_id = ?",
+                    (old, old, started.data["order_id"]),
+                )
+            completed = await runtime.dispatch(
+                _context(user, "craft-complete", operation_id="craft-complete"),
+                "领取生产",
+            )
+            assert completed.code == "PRODUCTION_COMPLETED"
+            claim = await runtime.dispatch(
+                _context(user, "craft-claim", operation_id="craft-achievement"),
+                "领取功业 2",
+            )
+            assert claim.code == "ACHIEVEMENT_CLAIMED"
+            assert claim.data["reward"] == {"service_reputation": 2}
+            await runtime.close()
+
+    asyncio.run(run())

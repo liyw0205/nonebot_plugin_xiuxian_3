@@ -53,6 +53,11 @@ from .exploration.rules import (
 from .adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from .adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
 from .routine.models import (
+    AchievementClaimRecord,
+    AchievementView,
+    HonorStatusRecord,
+    HonorTitleEquipRecord,
+    HonorTitleView,
     RoutineClaimRecord,
     SevenDayGoalRecord,
     SevenDayGoalView,
@@ -71,6 +76,12 @@ from .routine.rules import (
     SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
     SEVEN_DAY_RULE_VERSION,
+    ACHIEVEMENTS,
+    HONOR_RULE_VERSION,
+    HONOR_TITLES,
+    achievement,
+    achievement_reward,
+    honor_title,
     seven_day_goal,
     seven_day_reward,
     tree_harvest_reward,
@@ -375,6 +386,44 @@ CREATE TABLE IF NOT EXISTS seven_day_goal_claims (
 CREATE INDEX IF NOT EXISTS idx_seven_day_claims_player
     ON seven_day_goal_claims(player_id, day_number);
 
+CREATE TABLE IF NOT EXISTS honor_titles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    title_key TEXT NOT NULL,
+    source_operation_id TEXT NOT NULL,
+    acquired_at TEXT NOT NULL,
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    UNIQUE (player_id, title_key),
+    UNIQUE (player_id, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_honor_titles_player
+    ON honor_titles(player_id, acquired_at);
+
+CREATE TABLE IF NOT EXISTS honor_states (
+    player_id INTEGER PRIMARY KEY REFERENCES players(id),
+    equipped_title_key TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS achievement_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    achievement_key TEXT NOT NULL,
+    source_operation_id TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (player_id, achievement_key),
+    UNIQUE (player_id, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_achievement_claims_player
+    ON achievement_claims(player_id, created_at);
+
 """
 
 
@@ -652,6 +701,26 @@ class SevenDayGoalNotCompletedError(RuntimeError):
 
 class SevenDayGoalAlreadyClaimedError(RuntimeError):
     """The requested seven-day goal reward was already claimed."""
+
+
+class AchievementInvalidError(RuntimeError):
+    """The requested achievement is not registered."""
+
+
+class AchievementNotCompletedError(RuntimeError):
+    """The requested achievement has no qualifying source event yet."""
+
+
+class AchievementAlreadyClaimedError(RuntimeError):
+    """The requested achievement reward was already claimed."""
+
+
+class HonorTitleNotFoundError(RuntimeError):
+    """The requested title is not owned by the player."""
+
+
+class HonorTitleClosedError(RuntimeError):
+    """The requested title or achievement is not open in the current content."""
 
 
 class SQLitePlayerRepository:
@@ -5927,6 +5996,467 @@ class SQLitePlayerRepository:
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             source_operation_id=str(payload["source_operation_id"]),
             campaign_complete=bool(payload.get("campaign_complete", False)),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _honor_source_operation(
+        connection: sqlite3.Connection,
+        player_id: int,
+        source_event: str,
+    ) -> str | None:
+        if source_event == "player.start_seeking":
+            row = connection.execute(
+                """
+                SELECT operation_id FROM operations
+                WHERE player_id = ? AND operation_name = ?
+                ORDER BY created_at ASC LIMIT 1
+                """,
+                (player_id, source_event),
+            ).fetchone()
+        elif source_event == "routine.checkin.daily":
+            row = connection.execute(
+                """
+                SELECT operation_id FROM routine_checkins
+                WHERE player_id = ? AND claim_kind = 'daily'
+                ORDER BY target_date ASC, id ASC LIMIT 1
+                """,
+                (player_id,),
+            ).fetchone()
+        elif source_event == "routine.checkin.daily:3":
+            row = connection.execute(
+                """
+                SELECT operation_id FROM routine_checkins
+                WHERE player_id = ? AND claim_kind = 'daily'
+                ORDER BY target_date ASC, id ASC LIMIT 1 OFFSET 2
+                """,
+                (player_id,),
+            ).fetchone()
+        elif source_event == "production.complete":
+            row = connection.execute(
+                """
+                SELECT operation_id FROM production_orders
+                WHERE player_id = ? AND status = 'completed'
+                ORDER BY updated_at ASC, id ASC LIMIT 1
+                """,
+                (player_id,),
+            ).fetchone()
+        else:
+            row = connection.execute(
+                """
+                SELECT source_operation_id FROM activity_events
+                WHERE player_id = ? AND event_key = ?
+                ORDER BY occurred_at ASC, id ASC LIMIT 1
+                """,
+                (player_id, source_event),
+            ).fetchone()
+        if row is None:
+            return None
+        key = "operation_id" if "operation_id" in row.keys() else "source_operation_id"
+        return str(row[key])
+
+    @staticmethod
+    def _materialize_honor_titles(
+        connection: sqlite3.Connection,
+        player_id: int,
+        now_text: str,
+    ) -> None:
+        for definition in HONOR_TITLES:
+            if definition.closed:
+                continue
+            source_operation_id = SQLitePlayerRepository._honor_source_operation(
+                connection, player_id, definition.source_event
+            )
+            if source_operation_id is None:
+                continue
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO honor_titles(
+                    player_id, title_key, source_operation_id, acquired_at,
+                    content_version, rule_version
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    player_id,
+                    definition.key,
+                    source_operation_id,
+                    now_text,
+                    ROUTINE_CONTENT_VERSION,
+                    HONOR_RULE_VERSION,
+                ),
+            )
+
+    @staticmethod
+    def _honor_status_from_connection(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        now_text: str,
+    ) -> HonorStatusRecord:
+        SQLitePlayerRepository._materialize_honor_titles(connection, int(player["id"]), now_text)
+        state = connection.execute(
+            "SELECT equipped_title_key FROM honor_states WHERE player_id = ?",
+            (player["id"],),
+        ).fetchone()
+        equipped = str(state["equipped_title_key"]) if state and state["equipped_title_key"] else None
+        title_rows = {
+            str(item["title_key"]): item
+            for item in connection.execute(
+                "SELECT title_key, source_operation_id FROM honor_titles WHERE player_id = ?",
+                (player["id"],),
+            ).fetchall()
+        }
+        titles = tuple(
+            HonorTitleView(
+                title_key=definition.key,
+                label=definition.label,
+                acquired=definition.key in title_rows,
+                equipped=definition.key == equipped,
+                source_operation_id=(
+                    str(title_rows[definition.key]["source_operation_id"])
+                    if definition.key in title_rows
+                    else None
+                ),
+            )
+            for definition in HONOR_TITLES
+        )
+        claim_rows = {
+            str(item["achievement_key"]): item
+            for item in connection.execute(
+                "SELECT achievement_key, source_operation_id, reward_json FROM achievement_claims WHERE player_id = ?",
+                (player["id"],),
+            ).fetchall()
+        }
+        achievements: list[AchievementView] = []
+        for definition in ACHIEVEMENTS:
+            claim = claim_rows.get(definition.key)
+            source = SQLitePlayerRepository._honor_source_operation(
+                connection, int(player["id"]), definition.source_event
+            )
+            if claim is not None:
+                state_name = "claimed"
+                source = str(claim["source_operation_id"])
+                reward = SQLitePlayerRepository._json_object(claim["reward_json"], {})
+            elif definition.closed:
+                state_name = "content_closed"
+                reward = achievement_reward(definition)
+                source = None
+            elif source is not None:
+                state_name = "claimable"
+                reward = achievement_reward(definition)
+            else:
+                state_name = "pending"
+                reward = achievement_reward(definition)
+            achievements.append(
+                AchievementView(
+                    achievement_key=definition.key,
+                    label=definition.label,
+                    state=state_name,
+                    reward=reward,
+                    source_operation_id=source,
+                )
+            )
+        return HonorStatusRecord(
+            player=SQLitePlayerRepository._row_to_player(player),
+            equipped_title_key=equipped,
+            titles=titles,
+            achievements=tuple(achievements),
+        )
+
+    async def get_honor_status(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> HonorStatusRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_honor_status_sync, platform, platform_user_id
+            )
+
+    def _get_honor_status_sync(
+        self, platform: str, platform_user_id: str
+    ) -> HonorStatusRecord:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            return self._honor_status_from_connection(
+                connection, row, serialize_datetime(self._now())
+            )
+
+    async def claim_achievement(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        achievement_key: str,
+        operation_id: str,
+    ) -> AchievementClaimRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_achievement_sync,
+                platform,
+                platform_user_id,
+                achievement_key,
+                operation_id,
+            )
+
+    def _claim_achievement_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        achievement_key: str,
+        operation_id: str,
+    ) -> AchievementClaimRecord:
+        operation_name = "routine.claim_achievement"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "achievement_key": achievement_key,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._achievement_claim_from_payload(
+                    json.loads(existing["result_json"]), replay=True
+                )
+            try:
+                definition = achievement(achievement_key)
+            except ValueError as exc:
+                raise AchievementInvalidError(str(exc)) from exc
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            claimed = connection.execute(
+                "SELECT 1 FROM achievement_claims WHERE player_id = ? AND achievement_key = ?",
+                (row["id"], definition.key),
+            ).fetchone()
+            if claimed is not None:
+                raise AchievementAlreadyClaimedError("achievement was already claimed")
+            if definition.closed:
+                raise HonorTitleClosedError("achievement content is closed")
+            source_operation_id = self._honor_source_operation(
+                connection, int(row["id"]), definition.source_event
+            )
+            if source_operation_id is None:
+                raise AchievementNotCompletedError("achievement is not completed")
+            reward = achievement_reward(definition)
+            local_reputation = int(reward.get("local_reputation", 0))
+            service_reputation_delta = int(reward.get("service_reputation", 0))
+            reputation = connection.execute(
+                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                (row["id"],),
+            ).fetchone()
+            local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
+            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
+            service_reputation = int(reputation["service_reputation"]) if reputation is not None else 0
+            service_reputation = min(100, service_reputation + service_reputation_delta)
+            if local_reputation or service_reputation_delta:
+                connection.execute(
+                    """
+                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
+                        service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
+                    """,
+                    (
+                        row["id"],
+                        json.dumps(local, ensure_ascii=False, sort_keys=True),
+                        service_reputation,
+                        now_text,
+                    ),
+                )
+            title_key = reward.get("title_key")
+            if title_key:
+                title_definition = honor_title(str(title_key))
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO honor_titles(
+                        player_id, title_key, source_operation_id, acquired_at,
+                        content_version, rule_version
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        row["id"], str(title_key), source_operation_id, now_text,
+                        ROUTINE_CONTENT_VERSION, HONOR_RULE_VERSION,
+                    ),
+                )
+                del title_definition
+            connection.execute(
+                """
+                INSERT INTO achievement_claims(
+                    player_id, achievement_key, source_operation_id, operation_id,
+                    reward_json, content_version, rule_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"], definition.key, source_operation_id, operation_id,
+                    json.dumps(reward, ensure_ascii=False, sort_keys=True),
+                    ROUTINE_CONTENT_VERSION, HONOR_RULE_VERSION, now_text,
+                ),
+            )
+            updated = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (row["id"],)
+            ).fetchone()
+            if updated is None:
+                raise RuntimeError("achievement claim returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "achievement_key": definition.key,
+                "label": definition.label,
+                "reward": reward,
+                "source_operation_id": source_operation_id,
+                "content_version": ROUTINE_CONTENT_VERSION,
+                "rule_version": HONOR_RULE_VERSION,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._achievement_claim_from_payload(payload)
+
+    @staticmethod
+    def _achievement_claim_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> AchievementClaimRecord:
+        return AchievementClaimRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            achievement_key=str(payload["achievement_key"]),
+            label=str(payload["label"]),
+            reward=dict(payload.get("reward", {})),
+            source_operation_id=str(payload["source_operation_id"]),
+            already_completed=replay,
+        )
+
+    async def equip_title(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        title_key: str,
+        operation_id: str,
+    ) -> HonorTitleEquipRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._equip_title_sync,
+                platform,
+                platform_user_id,
+                title_key,
+                operation_id,
+            )
+
+    def _equip_title_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        title_key: str,
+        operation_id: str,
+    ) -> HonorTitleEquipRecord:
+        operation_name = "routine.equip_title"
+        request_hash = self._request_hash(
+            operation_name,
+            {"platform": platform, "platform_user_id": platform_user_id, "title_key": title_key},
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._title_equip_from_payload(json.loads(existing["result_json"]), replay=True)
+            try:
+                definition = honor_title(title_key)
+            except ValueError as exc:
+                raise HonorTitleNotFoundError(str(exc)) from exc
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            self._materialize_honor_titles(connection, int(row["id"]), now_text)
+            owned = connection.execute(
+                "SELECT 1 FROM honor_titles WHERE player_id = ? AND title_key = ?",
+                (row["id"], definition.key),
+            ).fetchone()
+            if owned is None:
+                raise HonorTitleNotFoundError("title is not owned")
+            connection.execute(
+                """
+                INSERT INTO honor_states(player_id, equipped_title_key, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(player_id) DO UPDATE SET equipped_title_key = excluded.equipped_title_key,
+                    updated_at = excluded.updated_at
+                """,
+                (row["id"], definition.key, now_text),
+            )
+            updated = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (row["id"],)
+            ).fetchone()
+            if updated is None:
+                raise RuntimeError("title equip returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "title_key": definition.key,
+                "label": definition.label,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._title_equip_from_payload(payload)
+
+    @staticmethod
+    def _title_equip_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> HonorTitleEquipRecord:
+        return HonorTitleEquipRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            title_key=str(payload["title_key"]),
+            label=str(payload["label"]),
             already_completed=replay,
         )
 

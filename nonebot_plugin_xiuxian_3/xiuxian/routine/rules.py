@@ -17,6 +17,7 @@ FATE_TICKET = "item.ticket.fate_basic"
 TREE_SEED = "item.seed.spirit_tree"
 SEVEN_DAY_CONTENT_VERSION = CONTENT_VERSION
 SEVEN_DAY_RULE_VERSION = "seven-day-0.1.0"
+HONOR_RULE_VERSION = "honor-0.1.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +85,68 @@ SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class HonorTitleDefinition:
+    key: str
+    label: str
+    source_event: str
+    closed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementDefinition:
+    key: str
+    label: str
+    source_event: str
+    reward: tuple[tuple[str, int | str], ...]
+    closed: bool = False
+
+
+HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
+    HonorTitleDefinition("title.first_seeking", "初入道途", "player.start_seeking"),
+    HonorTitleDefinition("title.town_helper", "城镇助行者", "routine.checkin.daily:3"),
+    HonorTitleDefinition("title.dispatch_helper", "派遣行者", "specials.dispatch.settled", closed=True),
+    HonorTitleDefinition("title.first_tower_clear", "试炼先行", "specials.tower.floor.10", closed=True),
+)
+
+
+ACHIEVEMENTS: tuple[AchievementDefinition, ...] = (
+    AchievementDefinition(
+        "achievement.first_checkin",
+        "首次道历问安",
+        "routine.checkin.daily",
+        (("local_reputation", 3),),
+    ),
+    AchievementDefinition(
+        "achievement.first_craft",
+        "首次完成生产",
+        "production.complete",
+        (("service_reputation", 2),),
+    ),
+    AchievementDefinition(
+        "achievement.first_dispatch",
+        "首次完成派遣",
+        "specials.dispatch.settled",
+        (("title_key", "title.dispatch_helper"),),
+        closed=True,
+    ),
+    AchievementDefinition(
+        "achievement.codex_5",
+        "收录五条图鉴",
+        "specials.codex.count.5",
+        (("local_reputation", 5),),
+        closed=True,
+    ),
+    AchievementDefinition(
+        "achievement.tower_10",
+        "试炼塔十层",
+        "specials.tower.floor.10",
+        (("title_key", "title.first_tower_clear"),),
+        closed=True,
+    ),
+)
+
+
 def seven_day_goal(day_number: int) -> SevenDayGoalDefinition:
     if day_number < 1 or day_number > len(SEVEN_DAY_GOALS):
         raise ValueError("invalid seven-day goal")
@@ -92,6 +155,27 @@ def seven_day_goal(day_number: int) -> SevenDayGoalDefinition:
 
 def seven_day_reward(goal: SevenDayGoalDefinition) -> dict[str, int]:
     return {key: int(value) for key, value in goal.reward}
+
+
+def honor_title(key: str) -> HonorTitleDefinition:
+    for definition in HONOR_TITLES:
+        if definition.key == key:
+            return definition
+    raise ValueError(f"unsupported honor title: {key}")
+
+
+def achievement(key: str) -> AchievementDefinition:
+    for definition in ACHIEVEMENTS:
+        if definition.key == key:
+            return definition
+    raise ValueError(f"unsupported achievement: {key}")
+
+
+def achievement_reward(definition: AchievementDefinition) -> dict[str, int | str]:
+    return {
+        key: (int(value) if isinstance(value, int) else str(value))
+        for key, value in definition.reward
+    }
 
 
 def parse_past_date(value: str, today: date) -> date:
@@ -167,6 +251,11 @@ __all__ = [
     "SEVEN_DAY_CONTENT_VERSION",
     "SEVEN_DAY_GOALS",
     "SEVEN_DAY_RULE_VERSION",
+    "HONOR_RULE_VERSION",
+    "HONOR_TITLES",
+    "ACHIEVEMENTS",
+    "HonorTitleDefinition",
+    "AchievementDefinition",
     "SevenDayGoalDefinition",
     "checkin_reward",
     "makeup_reward",
@@ -177,4 +266,7 @@ __all__ = [
     "tree_status",
     "seven_day_goal",
     "seven_day_reward",
+    "honor_title",
+    "achievement",
+    "achievement_reward",
 ]

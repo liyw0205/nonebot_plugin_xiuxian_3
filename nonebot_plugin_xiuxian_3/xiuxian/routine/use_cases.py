@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
+    AchievementAlreadyClaimedError,
+    AchievementInvalidError,
+    AchievementNotCompletedError,
     CheckinAlreadyClaimedError,
     CurrencyInsufficientError,
     OperationConflictError,
@@ -19,17 +22,22 @@ from ..repository import (
     SevenDayGoalNotCompletedError,
     SevenDayGoalNotOpenError,
     SevenDayNotStartedError,
+    HonorTitleClosedError,
+    HonorTitleNotFoundError,
     SpiritTreeCooldownError,
     SpiritTreeNotReadyError,
     SpiritTreeWateredError,
     SQLitePlayerRepository,
 )
 from .rules import (
+    ACHIEVEMENTS,
     CHECKIN_ACTIVITY,
     FATE_TICKET,
+    HONOR_TITLES,
     TREE_HARVEST_ACTIVITY,
     TREE_SEED,
     TREE_WATER_ACTIVITY,
+    honor_title,
     parse_iso_date,
 )
 
@@ -75,6 +83,63 @@ class RoutineApplication:
             for key, value in reward.items()
             if value
         ) or "无"
+
+    @staticmethod
+    def _honor_reward_text(reward: dict[str, int | str]) -> str:
+        labels = {
+            "local_reputation": "地方名望",
+            "service_reputation": "服务信誉",
+            "title_key": "称号",
+        }
+        parts: list[str] = []
+        for key, value in reward.items():
+            if key == "title_key":
+                try:
+                    parts.append(f"称号「{honor_title(str(value)).label}」")
+                except ValueError:
+                    parts.append("称号")
+            else:
+                parts.append(f"{labels.get(key, '奖励')} +{value}")
+        return "、".join(parts) or "无"
+
+    @staticmethod
+    def _resolve_achievement(args: tuple[str, ...]) -> str | None:
+        if len(args) != 1:
+            return None
+        value = args[0].strip()
+        if value.isdigit():
+            index = int(value)
+            if 1 <= index <= len(ACHIEVEMENTS):
+                return ACHIEVEMENTS[index - 1].key
+            return None
+        for definition in ACHIEVEMENTS:
+            if value in {definition.key, definition.label}:
+                return definition.key
+        return None
+
+    @staticmethod
+    def _resolve_title(args: tuple[str, ...]) -> str | None:
+        if len(args) != 1:
+            return None
+        value = args[0].strip()
+        if value.isdigit():
+            index = int(value)
+            if 1 <= index <= len(HONOR_TITLES):
+                return HONOR_TITLES[index - 1].key
+            return None
+        for definition in HONOR_TITLES:
+            if value in {definition.key, definition.label}:
+                return definition.key
+        return None
+
+    @staticmethod
+    def _honor_state_text(state: str) -> str:
+        return {
+            "claimed": "已领取",
+            "claimable": "可领取",
+            "pending": "待完成",
+            "content_closed": "内容未开放",
+        }.get(state, "待完成")
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -366,6 +431,172 @@ class RoutineApplication:
                 "target_date": record.target_date,
                 "reward": record.reward,
                 "campaign_complete": record.campaign_complete,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def get_honor_status(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_HONOR_COMMAND", "查看功业录无需附加参数。", context.request_id)
+        try:
+            record = await self.repository.get_honor_status(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看功业录。", context.request_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        lines = [
+            "## 功业录",
+            "",
+            f"**{self._display_name(record.player)}**的修行记录",
+            "",
+            "### 功业",
+        ]
+        achievements: list[dict[str, object]] = []
+        for index, item in enumerate(record.achievements, start=1):
+            state_text = self._honor_state_text(item.state)
+            lines.append(f"- **{index}. {item.label}**：{state_text}")
+            achievements.append(
+                {
+                    "index": index,
+                    "achievement_key": item.achievement_key,
+                    "label": item.label,
+                    "state": item.state,
+                    "reward": item.reward,
+                }
+            )
+        lines.extend(["", "### 称号", ""])
+        titles: list[dict[str, object]] = []
+        for index, item in enumerate(record.titles, start=1):
+            title_definition = next(
+                definition for definition in HONOR_TITLES if definition.key == item.title_key
+            )
+            if item.acquired:
+                state_text = "已佩戴" if item.equipped else "已获得"
+            elif item.source_operation_id is None:
+                state_text = "内容未开放" if title_definition.closed else "未获得"
+            else:
+                state_text = "已获得"
+            lines.append(f"- **{index}. {item.label}**：{state_text}")
+            titles.append(
+                {
+                    "index": index,
+                    "title_key": item.title_key,
+                    "label": item.label,
+                    "acquired": item.acquired,
+                    "equipped": item.equipped,
+                }
+            )
+        lines.extend(
+            [
+                "",
+                "> 发送 `领取功业 序号` 领取可领取的功业奖励；发送 `佩戴称号 序号` 更换展示称号。",
+            ]
+        )
+        return CommandResult(
+            True,
+            "HONOR_STATUS",
+            "\n".join(lines),
+            context.request_id,
+            data={
+                "equipped_title_key": record.equipped_title_key,
+                "titles": titles,
+                "achievements": achievements,
+            },
+        )
+
+    async def claim_achievement(self, context: CommandContext) -> CommandResult:
+        achievement_key = self._resolve_achievement(context.command_args)
+        if achievement_key is None:
+            return CommandResult(False, "INVALID_HONOR_COMMAND", "请使用 `领取功业 序号`，序号可在 `功业录` 中查看。", context.request_id)
+        operation_id = self._operation_id(context, "routine.claim_achievement")
+        try:
+            record = await self.repository.claim_achievement(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                achievement_key=achievement_key,
+                operation_id=operation_id,
+            )
+        except AchievementInvalidError:
+            return CommandResult(False, "INVALID_HONOR_COMMAND", "未找到这项功业。", context.request_id, operation_id)
+        except AchievementNotCompletedError:
+            return CommandResult(False, "ACHIEVEMENT_NOT_COMPLETED", "这项功业尚未完成。", context.request_id, operation_id)
+        except AchievementAlreadyClaimedError:
+            return CommandResult(False, "ACHIEVEMENT_ALREADY_CLAIMED", "这项功业的奖励已经领取过了。", context.request_id, operation_id)
+        except HonorTitleClosedError:
+            return CommandResult(False, "CONTENT_CLOSED", "这项功业依赖的内容尚未开放。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能领取功业奖励。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他功业，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "ACHIEVEMENT_CLAIMED",
+            (
+                "## 功业奖励已领取\n\n"
+                f"**{self._display_name(record.player)}**完成了 **{record.label}**。\n\n"
+                f"- **获得**：{self._honor_reward_text(record.reward)}\n\n"
+                "> 奖励已写入功业记录，重复领取不会再次发放。"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "achievement_key": record.achievement_key,
+                "label": record.label,
+                "reward": record.reward,
+                "source_operation_id": record.source_operation_id,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def equip_title(self, context: CommandContext) -> CommandResult:
+        title_key = self._resolve_title(context.command_args)
+        if title_key is None:
+            return CommandResult(False, "INVALID_HONOR_COMMAND", "请使用 `佩戴称号 序号`，序号可在 `功业录` 中查看。", context.request_id)
+        operation_id = self._operation_id(context, "routine.equip_title")
+        try:
+            record = await self.repository.equip_title(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                title_key=title_key,
+                operation_id=operation_id,
+            )
+        except HonorTitleNotFoundError:
+            return CommandResult(False, "TITLE_NOT_FOUND", "你还没有获得这个称号。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能更换称号。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他称号操作，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "TITLE_EQUIPPED",
+            (
+                "## 称号已更换\n\n"
+                f"**{self._display_name(record.player)}**当前展示称号为 **{record.label}**。"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "title_key": record.title_key,
+                "label": record.label,
                 "idempotent_replay": record.already_completed,
             },
         )

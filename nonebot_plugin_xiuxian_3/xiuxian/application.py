@@ -286,3 +286,24 @@ class XiuxianApplication:
             lambda: self.routine.claim_seven_day_goal(context),
             write_message="当前事件不允许领取七日目标奖励。",
         )
+
+    async def get_honor_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.get_honor_status(context),
+            require_write=False,
+        )
+
+    async def claim_achievement(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.claim_achievement(context),
+            write_message="当前事件不允许领取功业奖励。",
+        )
+
+    async def equip_title(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.equip_title(context),
+            write_message="当前事件不允许更换称号。",
+        )

@@ -63,10 +63,59 @@ class SevenDayGoalRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class HonorTitleView:
+    title_key: str
+    label: str
+    acquired: bool
+    equipped: bool = False
+    source_operation_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementView:
+    achievement_key: str
+    label: str
+    state: str
+    reward: dict[str, int | str] = field(default_factory=dict)
+    source_operation_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class HonorStatusRecord:
+    player: PlayerView
+    equipped_title_key: str | None
+    titles: tuple[HonorTitleView, ...]
+    achievements: tuple[AchievementView, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementClaimRecord:
+    player: PlayerView
+    achievement_key: str
+    label: str
+    reward: dict[str, int | str]
+    source_operation_id: str
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class HonorTitleEquipRecord:
+    player: PlayerView
+    title_key: str
+    label: str
+    already_completed: bool = False
+
+
 __all__ = [
     "RoutineClaimRecord",
     "SpiritTreeRecord",
     "SevenDayGoalView",
     "SevenDayStatusRecord",
     "SevenDayGoalRecord",
+    "HonorTitleView",
+    "AchievementView",
+    "HonorStatusRecord",
+    "AchievementClaimRecord",
+    "HonorTitleEquipRecord",
 ]
