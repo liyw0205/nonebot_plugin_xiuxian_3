@@ -17,6 +17,7 @@ test = ["pytest>=8"]
 nonebot = ["nonebot2>=2.4"]
 onebot = ["nonebot-adapter-onebot>=2.4.6"]
 qq = ["nonebot-adapter-qq>=1.7.1"]
+billing = ["cryptography>=41"]
 
 [project.scripts]
 xiuxian3 = "nonebot_plugin_xiuxian_3.__main__:main"

@@ -19,6 +19,7 @@
 | `XIUXIAN3_RATE_*` | 用户、群、全局限流边界 |
 | `XIUXIAN3_QQ_CAPABILITIES` | 按 AppID 声明 Markdown、键盘、媒体等能力 |
 | `XIUXIAN3_REDEMPTION_CODES` | 外部注入的机缘密令 JSON；仅进程读取，数据库只存哈希 |
+| `XIUXIAN3_BILLING_PUBLIC_KEY` | 道契 billing 服务的 Ed25519 公钥；不配置则关闭道契激活 |
 
 所有密钥、QQ token、WebDAV 密码、NewAPI token 和用户身份数据只进运行目录，
 不进入 Git、日志、错误响应或截图。

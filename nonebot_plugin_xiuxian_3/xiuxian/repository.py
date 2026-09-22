@@ -59,12 +59,17 @@ from .routine.models import (
     HonorTitleEquipRecord,
     HonorTitleView,
     RedemptionCodeRecord,
+    DaoContractActivationRecord,
+    DaoContractClaimRecord,
+    DaoContractStatusRecord,
+    DaoContractView,
     RoutineClaimRecord,
     SevenDayGoalRecord,
     SevenDayGoalView,
     SevenDayStatusRecord,
     SpiritTreeRecord,
 )
+from .routine.billing import BillingReceiptError, verify_receipt
 from .routine.rules import (
     CHECKIN_ACTIVITY,
     CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
@@ -83,6 +88,7 @@ from .routine.rules import (
     achievement,
     achievement_reward,
     honor_title,
+    dao_contract,
     redemption_code_hash,
     seven_day_goal,
     seven_day_reward,
@@ -458,6 +464,44 @@ CREATE TABLE IF NOT EXISTS redemption_claims (
 CREATE INDEX IF NOT EXISTS idx_redemption_claims_player
     ON redemption_claims(player_id, created_at);
 
+CREATE TABLE IF NOT EXISTS dao_contracts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    contract_key TEXT NOT NULL,
+    receipt_id TEXT NOT NULL UNIQUE,
+    receipt_hash TEXT NOT NULL UNIQUE,
+    subject TEXT NOT NULL,
+    starts_on TEXT NOT NULL,
+    ends_on TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'revoked', 'expired')),
+    revoke_reason TEXT,
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, contract_key, starts_on)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dao_contracts_player
+    ON dao_contracts(player_id, status, ends_on);
+
+CREATE TABLE IF NOT EXISTS dao_contract_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    contract_id INTEGER NOT NULL REFERENCES dao_contracts(id),
+    contract_key TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (contract_id, business_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dao_contract_claims_player
+    ON dao_contract_claims(player_id, business_date);
+
 """
 
 
@@ -775,6 +819,30 @@ class RedemptionCodeExhaustedError(RuntimeError):
 
 class RedemptionCodeAlreadyClaimedError(RuntimeError):
     """The player already redeemed this code."""
+
+
+class BillingReceiptInvalidError(RuntimeError):
+    """The external billing receipt failed signature or contract validation."""
+
+
+class BillingReceiptAlreadyUsedError(RuntimeError):
+    """A signed receipt was already consumed by another operation."""
+
+
+class DaoContractInvalidError(RuntimeError):
+    """The requested contract is not registered."""
+
+
+class DaoContractAlreadyClaimedError(RuntimeError):
+    """The daily entitlement was already claimed for the business date."""
+
+
+class DaoContractNotActiveError(RuntimeError):
+    """The contract is not active for the requested business date."""
+
+
+class DaoContractAlreadyRevokedError(RuntimeError):
+    """The contract is already revoked or cannot be revoked."""
 
 
 class SQLitePlayerRepository:
@@ -6737,6 +6805,476 @@ class SQLitePlayerRepository:
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             already_completed=replay,
         )
+
+    @staticmethod
+    def _apply_dao_reward(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        reward: dict[str, int],
+        now_text: str,
+    ) -> dict[str, int]:
+        inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
+        stones = int(player["spirit_stones"])
+        energy = int(player["energy"])
+        actual: dict[str, int] = {}
+        local_reputation = 0
+        service_reputation = 0
+        for key, raw_quantity in reward.items():
+            quantity = int(raw_quantity)
+            if key == "spirit_stones":
+                stones += quantity
+                actual[key] = quantity
+            elif key == "energy":
+                gained = min(quantity, max(0, int(player["energy_max"]) - energy))
+                energy += gained
+                actual[key] = gained
+            elif key == "local_reputation":
+                local_reputation += quantity
+                actual[key] = quantity
+            elif key == "service_reputation":
+                service_reputation += quantity
+                actual[key] = quantity
+            else:
+                inventory[key] = int(inventory.get(key, 0)) + quantity
+                actual[key] = quantity
+        if local_reputation or service_reputation:
+            reputation = connection.execute(
+                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                (player["id"],),
+            ).fetchone()
+            local = SQLitePlayerRepository._json_object(reputation["local_json"], {}) if reputation is not None else {}
+            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
+            current_service = int(reputation["service_reputation"]) if reputation is not None else 0
+            current_service = min(100, current_service + service_reputation)
+            connection.execute(
+                """
+                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
+                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
+                """,
+                (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
+            )
+        connection.execute(
+            """
+            UPDATE players
+            SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (stones, energy, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+        )
+        return actual
+
+    @staticmethod
+    def _dao_status_from_connection(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        business_date: date,
+    ) -> DaoContractStatusRecord:
+        rows = connection.execute(
+            """
+            SELECT contract_key, starts_on, ends_on, status
+            FROM dao_contracts
+            WHERE player_id = ?
+            ORDER BY starts_on DESC, id DESC
+            """,
+            (player["id"],),
+        ).fetchall()
+        views: list[DaoContractView] = []
+        for row in rows:
+            try:
+                definition = dao_contract(str(row["contract_key"]))
+            except ValueError:
+                continue
+            status = str(row["status"])
+            if status == "active" and business_date > date.fromisoformat(str(row["ends_on"])):
+                status = "expired"
+            views.append(
+                DaoContractView(
+                    contract_key=definition.key,
+                    label=definition.label,
+                    status=status,
+                    starts_on=str(row["starts_on"]),
+                    ends_on=str(row["ends_on"]),
+                    daily_reward=definition.daily_reward_map(),
+                )
+            )
+        return DaoContractStatusRecord(
+            player=SQLitePlayerRepository._row_to_player(player),
+            contracts=tuple(views),
+        )
+
+    async def get_dao_contract_status(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> DaoContractStatusRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_dao_contract_status_sync,
+                platform,
+                platform_user_id,
+            )
+
+    def _get_dao_contract_status_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+    ) -> DaoContractStatusRecord:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            return self._dao_status_from_connection(connection, row, self._now().date())
+
+    async def activate_dao_contract(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        receipt_token: str,
+        operation_id: str,
+    ) -> DaoContractActivationRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._activate_dao_contract_sync,
+                platform,
+                platform_user_id,
+                receipt_token,
+                operation_id,
+            )
+
+    def _activate_dao_contract_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        receipt_token: str,
+        operation_id: str,
+    ) -> DaoContractActivationRecord:
+        try:
+            receipt = verify_receipt(receipt_token, self.settings.billing_public_key)
+        except BillingReceiptError as exc:
+            raise BillingReceiptInvalidError(str(exc)) from exc
+        try:
+            definition = dao_contract(receipt.contract_key)
+        except ValueError as exc:
+            raise BillingReceiptInvalidError("receipt contract is not registered") from exc
+        subject = f"{platform}:{platform_user_id}"
+        now = self._now()
+        if receipt.subject != subject:
+            raise BillingReceiptInvalidError("receipt subject does not match the player")
+        if receipt.currency != "spirit_stones" or receipt.amount != definition.price:
+            raise BillingReceiptInvalidError("receipt price does not match the contract")
+        if receipt.issued_at > now:
+            raise BillingReceiptInvalidError("receipt was issued in the future")
+        if receipt.valid_until is not None and receipt.valid_until < now:
+            raise BillingReceiptInvalidError("receipt is expired")
+        request_hash = self._request_hash(
+            "routine.activate_dao_contract",
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "receipt_hash": receipt.payload_hash,
+            },
+        )
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != "routine.activate_dao_contract" or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._dao_activation_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            used = connection.execute(
+                "SELECT 1 FROM dao_contracts WHERE receipt_id = ? OR receipt_hash = ?",
+                (receipt.receipt_id, receipt.payload_hash),
+            ).fetchone()
+            if used is not None:
+                raise BillingReceiptAlreadyUsedError("receipt was already consumed")
+            today = now.date()
+            active = connection.execute(
+                """
+                SELECT ends_on FROM dao_contracts
+                WHERE player_id = ? AND contract_key = ? AND status = 'active'
+                ORDER BY ends_on DESC LIMIT 1
+                """,
+                (row["id"], definition.key),
+            ).fetchone()
+            if active is not None and date.fromisoformat(str(active["ends_on"])) >= today:
+                starts = date.fromisoformat(str(active["ends_on"])) + timedelta(days=1)
+            else:
+                starts = today
+            ends = starts + timedelta(days=definition.duration_days - 1)
+            activation_reward = self._apply_dao_reward(
+                connection, row, definition.activation_reward_map(), now_text
+            )
+            connection.execute(
+                """
+                INSERT INTO dao_contracts(
+                    player_id, contract_key, receipt_id, receipt_hash, subject,
+                    starts_on, ends_on, status, content_version, rule_version,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+                """,
+                (
+                    row["id"], definition.key, receipt.receipt_id, receipt.payload_hash,
+                    receipt.subject, starts.isoformat(), ends.isoformat(),
+                    definition.content_version, definition.rule_version, now_text, now_text,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("contract activation returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "contract_key": definition.key,
+                "label": definition.label,
+                "receipt_id": receipt.receipt_id,
+                "starts_on": starts.isoformat(),
+                "ends_on": ends.isoformat(),
+                "activation_reward": activation_reward,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id, "routine.activate_dao_contract", row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._dao_activation_from_payload(payload)
+
+    @staticmethod
+    def _dao_activation_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> DaoContractActivationRecord:
+        return DaoContractActivationRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            contract_key=str(payload["contract_key"]),
+            label=str(payload["label"]),
+            receipt_id=str(payload["receipt_id"]),
+            starts_on=str(payload["starts_on"]),
+            ends_on=str(payload["ends_on"]),
+            activation_reward={str(key): int(value) for key, value in dict(payload.get("activation_reward", {})).items()},
+            already_completed=replay,
+        )
+
+    async def claim_dao_contract(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        contract_key: str,
+        operation_id: str,
+    ) -> DaoContractClaimRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_dao_contract_sync,
+                platform,
+                platform_user_id,
+                contract_key,
+                operation_id,
+            )
+
+    def _claim_dao_contract_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        contract_key: str,
+        operation_id: str,
+    ) -> DaoContractClaimRecord:
+        try:
+            definition = dao_contract(contract_key)
+        except ValueError as exc:
+            raise DaoContractInvalidError(str(exc)) from exc
+        today = self._now().date()
+        operation_name = "routine.claim_dao_contract"
+        request_hash = self._request_hash(
+            operation_name,
+            {"platform": platform, "platform_user_id": platform_user_id, "contract_key": contract_key, "business_date": today.isoformat()},
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._dao_claim_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            contract_row = connection.execute(
+                """
+                SELECT * FROM dao_contracts
+                WHERE player_id = ? AND contract_key = ? AND status = 'active'
+                  AND starts_on <= ? AND ends_on >= ?
+                ORDER BY starts_on DESC LIMIT 1
+                """,
+                (row["id"], contract_key, today.isoformat(), today.isoformat()),
+            ).fetchone()
+            if contract_row is None:
+                raise DaoContractNotActiveError("dao contract is not active")
+            claimed = connection.execute(
+                "SELECT 1 FROM dao_contract_claims WHERE contract_id = ? AND business_date = ?",
+                (contract_row["id"], today.isoformat()),
+            ).fetchone()
+            if claimed is not None:
+                raise DaoContractAlreadyClaimedError("dao contract was already claimed today")
+            reward = definition.daily_reward_map()
+            offset = (today - date.fromisoformat(str(contract_row["starts_on"]))).days
+            if definition.reputation_every_days and offset % definition.reputation_every_days == 0:
+                reward["local_reputation"] = reward.get("local_reputation", 0) + definition.reputation_reward
+            actual_reward = self._apply_dao_reward(connection, row, reward, now_text)
+            connection.execute(
+                """
+                INSERT INTO dao_contract_claims(
+                    player_id, contract_id, contract_key, business_date, operation_id,
+                    reward_json, content_version, rule_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"], contract_row["id"], definition.key, today.isoformat(), operation_id,
+                    json.dumps(actual_reward, ensure_ascii=False, sort_keys=True),
+                    definition.content_version, definition.rule_version, now_text,
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("contract claim returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "contract_key": definition.key,
+                "label": definition.label,
+                "business_date": today.isoformat(),
+                "reward": actual_reward,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id, operation_name, row["id"], request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text,
+                ),
+            )
+            return self._dao_claim_from_payload(payload)
+
+    @staticmethod
+    def _dao_claim_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> DaoContractClaimRecord:
+        return DaoContractClaimRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            contract_key=str(payload["contract_key"]),
+            label=str(payload["label"]),
+            business_date=str(payload["business_date"]),
+            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            already_completed=replay,
+        )
+
+    async def revoke_dao_contract(
+        self,
+        *,
+        player_id: str,
+        contract_key: str,
+        reason: str,
+        operation_id: str,
+    ) -> bool:
+        """Admin/billing port: stop future claims without clawing back rewards."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._revoke_dao_contract_sync,
+                player_id,
+                contract_key,
+                reason,
+                operation_id,
+            )
+
+    def _revoke_dao_contract_sync(
+        self,
+        player_id: str,
+        contract_key: str,
+        reason: str,
+        operation_id: str,
+    ) -> bool:
+        if not reason.strip() or len(reason) > 256:
+            raise DaoContractAlreadyRevokedError("revoke reason is required")
+        request_hash = self._request_hash(
+            "routine.revoke_dao_contract",
+            {"player_id": player_id, "contract_key": contract_key, "reason": reason.strip()},
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != "routine.revoke_dao_contract" or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return bool(json.loads(existing["result_json"]).get("revoked", False))
+            row = connection.execute(
+                """
+                SELECT dc.id, p.id AS player_db_id
+                FROM dao_contracts AS dc
+                JOIN players AS p ON p.id = dc.player_id
+                WHERE p.player_id = ? AND dc.contract_key = ? AND dc.status = 'active'
+                ORDER BY dc.ends_on DESC LIMIT 1
+                """,
+                (player_id, contract_key),
+            ).fetchone()
+            if row is None:
+                raise DaoContractAlreadyRevokedError("dao contract is not active")
+            connection.execute(
+                "UPDATE dao_contracts SET status = 'revoked', revoke_reason = ?, updated_at = ? WHERE id = ?",
+                (reason.strip(), now_text, row["id"]),
+            )
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, "routine.revoke_dao_contract", row["player_db_id"], request_hash, json.dumps({"revoked": True}), now_text),
+            )
+            return True
 
     async def get_player(self, *, platform: str, platform_user_id: str) -> PlayerView | None:
         await self.initialize()

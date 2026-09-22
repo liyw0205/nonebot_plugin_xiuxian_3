@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+
+try:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+except ImportError:  # pragma: no cover - optional billing extra
+    Ed25519PrivateKey = None  # type: ignore[assignment,misc]
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -56,6 +62,12 @@ def _set_resources(runtime, user_id: str, *, stones: int = 100, energy: int = 10
             "UPDATE players SET spirit_stones = ?, energy = ?, energy_max = 30 WHERE platform_user_id = ?",
             (stones, energy, user_id),
         )
+
+
+def _signed_receipt(private_key: object, payload: dict[str, object]) -> str:
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    encode = lambda value: base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+    return f"{encode(canonical)}.{encode(private_key.sign(canonical))}"
 
 
 def test_daily_checkin_is_idempotent_and_unique_across_operations() -> None:
@@ -549,5 +561,147 @@ def test_redemption_code_window_revoke_capacity_and_reward_validation() -> None:
                 "INVALID-01",
                 {"cultivation": 1},
             )
+
+    asyncio.run(run())
+
+
+def test_dao_contract_signed_receipt_claim_renewal_and_revoke() -> None:
+    async def run() -> None:
+        if Ed25519PrivateKey is None:
+            pytest.skip("cryptography billing extra is not installed")
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        private_key = Ed25519PrivateKey.generate()
+        public_key = base64.urlsafe_b64encode(
+            private_key.public_key().public_bytes_raw()
+        ).decode("ascii").rstrip("=")
+        with TemporaryDirectory() as data_dir:
+            settings = XiuxianSettings(data_dir=Path(data_dir), billing_public_key=public_key)
+            runtime = create_runtime(settings=settings, clock=clock)
+            user = "routine-contract"
+            await _enter_mortal(runtime, user)
+            subject = f"web:{user}"
+            receipt = _signed_receipt(
+                private_key,
+                {
+                    "receipt_id": "receipt-weekly-1",
+                    "subject": subject,
+                    "contract_key": "dao_contract.weekly",
+                    "amount": 180,
+                    "currency": "spirit_stones",
+                    "issued_at": clock.value.isoformat(),
+                },
+            )
+            activated = await runtime.dispatch(
+                _context(user, "activate", operation_id="contract-activate"),
+                f"激活道契 {receipt}",
+            )
+            assert activated.code == "DAO_CONTRACT_ACTIVATED"
+            assert activated.data["activation_reward"] == {"item.ticket.fate_basic": 2}
+            status = await runtime.dispatch(_context(user, "contract-status"), "我的道契")
+            assert status.code == "DAO_CONTRACT_STATUS"
+            assert status.data["contracts"][0]["starts_on"] == "2026-09-22"
+            assert status.data["contracts"][0]["ends_on"] == "2026-09-28"
+
+            claimed = await runtime.dispatch(
+                _context(user, "contract-claim", operation_id="contract-claim"),
+                "领取道契 周",
+            )
+            assert claimed.code == "DAO_CONTRACT_CLAIMED"
+            assert claimed.data["reward"] == {"spirit_stones": 35, "energy": 0}
+            replay = await runtime.dispatch(
+                _context(user, "contract-replay", operation_id="contract-claim"),
+                "领取道契 周",
+            )
+            assert replay.ok and replay.data["idempotent_replay"] is True
+            duplicate = await runtime.dispatch(
+                _context(user, "contract-duplicate", operation_id="contract-claim-2"),
+                "领取道契 周",
+            )
+            assert duplicate.code == "DAO_CONTRACT_ALREADY_CLAIMED"
+
+            renewal = _signed_receipt(
+                private_key,
+                {
+                    "receipt_id": "receipt-weekly-2",
+                    "subject": subject,
+                    "contract_key": "dao_contract.weekly",
+                    "amount": 180,
+                    "currency": "spirit_stones",
+                    "issued_at": clock.value.isoformat(),
+                },
+            )
+            renewed = await runtime.dispatch(
+                _context(user, "renew", operation_id="contract-renew"),
+                f"激活道契 {renewal}",
+            )
+            assert renewed.data["starts_on"] == "2026-09-29"
+            assert renewed.data["ends_on"] == "2026-10-05"
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_public_id = connection.execute(
+                    "SELECT player_id FROM players WHERE platform_user_id = ?", (user,)
+                ).fetchone()[0]
+            assert await runtime.repository.revoke_dao_contract(
+                player_id=player_public_id,
+                contract_key="dao_contract.weekly",
+                reason="billing reversal",
+                operation_id="contract-revoke",
+            )
+            clock.advance(days=8)
+            blocked = await runtime.dispatch(
+                _context(user, "contract-after-revoke", operation_id="contract-after-revoke"),
+                "领取道契 周",
+            )
+            assert blocked.code == "DAO_CONTRACT_NOT_ACTIVE"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_dao_contract_rejects_invalid_receipts_without_asset_changes() -> None:
+    async def run() -> None:
+        if Ed25519PrivateKey is None:
+            pytest.skip("cryptography billing extra is not installed")
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        private_key = Ed25519PrivateKey.generate()
+        public_key = base64.urlsafe_b64encode(
+            private_key.public_key().public_bytes_raw()
+        ).decode("ascii").rstrip("=")
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(
+                settings=XiuxianSettings(data_dir=Path(data_dir), billing_public_key=public_key),
+                clock=clock,
+            )
+            user = "routine-contract-invalid"
+            await _enter_mortal(runtime, user)
+            malformed = await runtime.dispatch(
+                _context(user, "bad", operation_id="bad-receipt"),
+                "激活道契 not-a-receipt",
+            )
+            assert malformed.code == "BILLING_RECEIPT_INVALID"
+            wrong_subject = _signed_receipt(
+                private_key,
+                {
+                    "receipt_id": "receipt-wrong-subject",
+                    "subject": "web:someone-else",
+                    "contract_key": "dao_contract.daily",
+                    "amount": 30,
+                    "currency": "spirit_stones",
+                    "issued_at": clock.value.isoformat(),
+                },
+            )
+            rejected = await runtime.dispatch(
+                _context(user, "wrong-subject", operation_id="wrong-subject"),
+                f"激活道契 {wrong_subject}",
+            )
+            assert rejected.code == "BILLING_RECEIPT_INVALID"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                contract_count = connection.execute("SELECT COUNT(*) FROM dao_contracts").fetchone()[0]
+                operation_count = connection.execute(
+                    "SELECT COUNT(*) FROM operations WHERE operation_name = 'routine.activate_dao_contract'"
+                ).fetchone()[0]
+            assert contract_count == 0
+            assert operation_count == 0
+            await runtime.close()
 
     asyncio.run(run())

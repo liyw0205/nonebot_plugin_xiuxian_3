@@ -29,6 +29,7 @@ class XiuxianSettings:
     busy_timeout_ms: int = 5_000
     max_inflight: int = 256
     redemption_codes: tuple[RedemptionCodeDefinition, ...] = ()
+    billing_public_key: str = ""
 
     @property
     def database_path(self) -> Path:
@@ -45,4 +46,5 @@ class XiuxianSettings:
             redemption_codes=redemption_codes_from_config(
                 os.getenv("XIUXIAN3_REDEMPTION_CODES", "")
             ),
+            billing_public_key=os.getenv("XIUXIAN3_BILLING_PUBLIC_KEY", ""),
         )

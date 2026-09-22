@@ -21,6 +21,7 @@ SEVEN_DAY_CONTENT_VERSION = CONTENT_VERSION
 SEVEN_DAY_RULE_VERSION = "seven-day-0.1.0"
 HONOR_RULE_VERSION = "honor-0.1.0"
 REDEMPTION_RULE_VERSION = "redemption-0.1.0"
+DAO_CONTRACT_RULE_VERSION = "dao-contract-0.1.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,11 +133,60 @@ class RedemptionCodeDefinition:
         return True
 
 
+@dataclass(frozen=True, slots=True)
+class DaoContractDefinition:
+    key: str
+    label: str
+    duration_days: int
+    price: int
+    daily_reward: tuple[tuple[str, int], ...]
+    activation_reward: tuple[tuple[str, int], ...] = ()
+    reputation_every_days: int | None = None
+    reputation_reward: int = 0
+    content_version: str = CONTENT_VERSION
+    rule_version: str = DAO_CONTRACT_RULE_VERSION
+
+    def daily_reward_map(self) -> dict[str, int]:
+        return {key: int(value) for key, value in self.daily_reward}
+
+    def activation_reward_map(self) -> dict[str, int]:
+        return {key: int(value) for key, value in self.activation_reward}
+
+
 HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
     HonorTitleDefinition("title.first_seeking", "初入道途", "player.start_seeking"),
     HonorTitleDefinition("title.town_helper", "城镇助行者", "routine.checkin.daily:3"),
     HonorTitleDefinition("title.dispatch_helper", "派遣行者", "specials.dispatch.settled", closed=True),
     HonorTitleDefinition("title.first_tower_clear", "试炼先行", "specials.tower.floor.10", closed=True),
+)
+
+
+DAO_CONTRACTS: tuple[DaoContractDefinition, ...] = (
+    DaoContractDefinition(
+        "dao_contract.daily",
+        "日道契",
+        duration_days=1,
+        price=30,
+        daily_reward=(("spirit_stones", 30), ("energy", 2)),
+    ),
+    DaoContractDefinition(
+        "dao_contract.weekly",
+        "周道契",
+        duration_days=7,
+        price=180,
+        daily_reward=(("spirit_stones", 35), ("energy", 3)),
+        activation_reward=((FATE_TICKET, 2),),
+    ),
+    DaoContractDefinition(
+        "dao_contract.monthly",
+        "月道契",
+        duration_days=30,
+        price=600,
+        daily_reward=(("spirit_stones", 40), ("energy", 4)),
+        activation_reward=(("item.cosmetic.dao_name_frame", 1),),
+        reputation_every_days=7,
+        reputation_reward=3,
+    ),
 )
 
 
@@ -312,6 +362,13 @@ def honor_title(key: str) -> HonorTitleDefinition:
     raise ValueError(f"unsupported honor title: {key}")
 
 
+def dao_contract(key: str) -> DaoContractDefinition:
+    for definition in DAO_CONTRACTS:
+        if definition.key == key:
+            return definition
+    raise ValueError(f"unsupported dao contract: {key}")
+
+
 def achievement(key: str) -> AchievementDefinition:
     for definition in ACHIEVEMENTS:
         if definition.key == key:
@@ -401,11 +458,13 @@ __all__ = [
     "SEVEN_DAY_RULE_VERSION",
     "HONOR_RULE_VERSION",
     "REDEMPTION_RULE_VERSION",
+    "DAO_CONTRACT_RULE_VERSION",
     "HONOR_TITLES",
     "ACHIEVEMENTS",
     "HonorTitleDefinition",
     "AchievementDefinition",
     "RedemptionCodeDefinition",
+    "DaoContractDefinition",
     "SevenDayGoalDefinition",
     "checkin_reward",
     "makeup_reward",
@@ -423,4 +482,6 @@ __all__ = [
     "redemption_code_hash",
     "redemption_code_definition",
     "redemption_codes_from_config",
+    "DAO_CONTRACTS",
+    "dao_contract",
 ]

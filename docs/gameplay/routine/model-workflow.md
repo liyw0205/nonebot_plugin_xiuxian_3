@@ -46,6 +46,9 @@ code: available -> claimed | expired | revoked
 6. 机缘密令启动时从外部配置物化密令哈希和版本快照；兑换事务锁定库存，检查有效期、撤销、
    角色唯一领取和总库存，再原子更新资产、`redemption_claims`、库存计数与 operation。
    明文密令不进入数据库、日志或响应，重复 operation 只回放历史奖励。
+7. 道契激活先在 billing 端口验证 Ed25519 凭证和角色主体，再在同一事务检查凭证唯一、商品
+   价格和周期；激活奖励、`dao_contracts` 与 operation 一起提交。每日领取以
+   `(contract_id, business_date)` 唯一，续期从旧周期结束日之后开始；撤销只改变未来状态，不回收已结算权益。
 
 ## 七日入道事务流程
 

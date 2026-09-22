@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
     AchievementAlreadyClaimedError,
     AchievementInvalidError,
     AchievementNotCompletedError,
+    BillingReceiptAlreadyUsedError,
+    BillingReceiptInvalidError,
     CheckinAlreadyClaimedError,
     CurrencyInsufficientError,
     OperationConflictError,
@@ -24,6 +28,9 @@ from ..repository import (
     SevenDayNotStartedError,
     HonorTitleClosedError,
     HonorTitleNotFoundError,
+    DaoContractAlreadyClaimedError,
+    DaoContractInvalidError,
+    DaoContractNotActiveError,
     RedemptionCodeAlreadyClaimedError,
     RedemptionCodeExhaustedError,
     RedemptionCodeExpiredError,
@@ -43,6 +50,7 @@ from .rules import (
     TREE_SEED,
     TREE_WATER_ACTIVITY,
     honor_title,
+    DAO_CONTRACTS,
     redemption_code_hash,
     normalize_redemption_code,
     parse_iso_date,
@@ -147,6 +155,25 @@ class RoutineApplication:
             "pending": "待完成",
             "content_closed": "内容未开放",
         }.get(state, "待完成")
+
+    @staticmethod
+    def _resolve_contract_key(args: tuple[str, ...]) -> str | None:
+        if len(args) != 1:
+            return None
+        value = args[0].strip().casefold()
+        aliases = {
+            "日": "dao_contract.daily",
+            "日道契": "dao_contract.daily",
+            "daily": "dao_contract.daily",
+            "周": "dao_contract.weekly",
+            "周道契": "dao_contract.weekly",
+            "weekly": "dao_contract.weekly",
+            "月": "dao_contract.monthly",
+            "月道契": "dao_contract.monthly",
+            "monthly": "dao_contract.monthly",
+        }
+        value = aliases.get(value, value)
+        return value if any(definition.key == value for definition in DAO_CONTRACTS) else None
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -658,6 +685,149 @@ class RoutineApplication:
             operation_id,
             data={
                 "code_key": record.code_key,
+                "reward": record.reward,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def get_dao_contract_status(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_CONTRACT_COMMAND", "查看道契无需附加参数。", context.request_id)
+        try:
+            record = await self.repository.get_dao_contract_status(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看道契。", context.request_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        status_text = {"active": "生效中", "expired": "已到期", "revoked": "已撤销"}
+        lines = ["## 我的道契", "", f"**{self._display_name(record.player)}**的道契记录", ""]
+        contracts: list[dict[str, object]] = []
+        if not record.contracts:
+            lines.append("> 当前没有道契。发送 `激活道契 凭证` 开通已验证的道契。")
+        else:
+            for item in record.contracts:
+                lines.append(
+                    f"- **{item.label}**：{status_text.get(item.status, item.status)}（{item.starts_on} 至 {item.ends_on}）"
+                )
+                contracts.append(
+                    {
+                        "contract_key": item.contract_key,
+                        "label": item.label,
+                        "status": item.status,
+                        "starts_on": item.starts_on,
+                        "ends_on": item.ends_on,
+                        "daily_reward": item.daily_reward,
+                    }
+                )
+            lines.append("")
+            lines.append("> 发送 `领取道契 日/周/月` 领取当日权益；已领取的业务日不会重复发放。")
+        return CommandResult(
+            True,
+            "DAO_CONTRACT_STATUS",
+            "\n".join(lines),
+            context.request_id,
+            data={"contracts": contracts},
+        )
+
+    async def activate_dao_contract(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_CONTRACT_COMMAND", "请使用 `激活道契 凭证`。", context.request_id)
+        token = context.command_args[0]
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        operation_id = context.operation_id or f"routine.activate_dao_contract:{token_hash}:{context.adapter}:{context.user_id}"
+        try:
+            record = await self.repository.activate_dao_contract(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                receipt_token=token,
+                operation_id=operation_id,
+            )
+        except BillingReceiptInvalidError:
+            return CommandResult(False, "BILLING_RECEIPT_INVALID", "道契凭证无效或未通过验证，未发放任何权益。", context.request_id, operation_id)
+        except BillingReceiptAlreadyUsedError:
+            return CommandResult(False, "BILLING_RECEIPT_USED", "这张道契凭证已经使用过了。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能激活道契。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他道契操作，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "DAO_CONTRACT_ACTIVATED",
+            (
+                "## 道契已激活\n\n"
+                f"**{self._display_name(record.player)}**已激活 **{record.label}**。\n\n"
+                f"- **有效期**：{record.starts_on} 至 {record.ends_on}\n"
+                f"- **激活权益**：{self._reward_text(record.activation_reward)}\n\n"
+                "> 凭证已记账；同一凭证不会重复发放。"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "contract_key": record.contract_key,
+                "receipt_id": record.receipt_id,
+                "starts_on": record.starts_on,
+                "ends_on": record.ends_on,
+                "activation_reward": record.activation_reward,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def claim_dao_contract(self, context: CommandContext) -> CommandResult:
+        contract_key = self._resolve_contract_key(context.command_args)
+        if contract_key is None:
+            return CommandResult(False, "INVALID_CONTRACT_COMMAND", "请使用 `领取道契 日`、`领取道契 周` 或 `领取道契 月`。", context.request_id)
+        operation_id = context.operation_id or f"routine.claim_dao_contract:{contract_key}:{self.repository.business_today().isoformat()}:{context.adapter}:{context.user_id}"
+        try:
+            record = await self.repository.claim_dao_contract(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                contract_key=contract_key,
+                operation_id=operation_id,
+            )
+        except DaoContractInvalidError:
+            return CommandResult(False, "INVALID_CONTRACT_COMMAND", "未找到这类道契。", context.request_id, operation_id)
+        except DaoContractNotActiveError:
+            return CommandResult(False, "DAO_CONTRACT_NOT_ACTIVE", "这类道契今天没有生效中的权益。", context.request_id, operation_id)
+        except DaoContractAlreadyClaimedError:
+            return CommandResult(False, "DAO_CONTRACT_ALREADY_CLAIMED", "这类道契今天的权益已经领取过了。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能领取道契权益。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他道契操作，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "DAO_CONTRACT_CLAIMED",
+            (
+                "## 道契权益已领取\n\n"
+                f"**{self._display_name(record.player)}**领取了 **{record.label}**今日权益。\n\n"
+                f"- **获得**：{self._reward_text(record.reward)}\n"
+                f"- **业务日**：{record.business_date}\n\n"
+                "> 同一道契同一业务日只能领取一次。"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "contract_key": record.contract_key,
+                "business_date": record.business_date,
                 "reward": record.reward,
                 "idempotent_replay": record.already_completed,
             },

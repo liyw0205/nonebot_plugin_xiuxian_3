@@ -314,3 +314,24 @@ class XiuxianApplication:
             lambda: self.routine.redeem_code(context),
             write_message="当前事件不允许兑换密令。",
         )
+
+    async def get_dao_contract_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.get_dao_contract_status(context),
+            require_write=False,
+        )
+
+    async def activate_dao_contract(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.activate_dao_contract(context),
+            write_message="当前事件不允许激活道契。",
+        )
+
+    async def claim_dao_contract(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.routine.claim_dao_contract(context),
+            write_message="当前事件不允许领取道契权益。",
+        )

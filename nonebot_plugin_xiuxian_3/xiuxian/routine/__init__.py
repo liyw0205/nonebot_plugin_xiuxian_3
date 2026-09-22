@@ -1,4 +1,4 @@
-"""道历问安、补录道历与灵木聚财。"""
+"""道历、运营循环与可审计权益。"""
 
 from .models import (
     AchievementClaimRecord,
@@ -6,6 +6,10 @@ from .models import (
     HonorStatusRecord,
     HonorTitleEquipRecord,
     HonorTitleView,
+    DaoContractActivationRecord,
+    DaoContractClaimRecord,
+    DaoContractStatusRecord,
+    DaoContractView,
     RedemptionCodeRecord,
     RoutineClaimRecord,
     SevenDayGoalRecord,
@@ -22,6 +26,10 @@ __all__ = [
     "HonorStatusRecord",
     "HonorTitleEquipRecord",
     "HonorTitleView",
+    "DaoContractActivationRecord",
+    "DaoContractClaimRecord",
+    "DaoContractStatusRecord",
+    "DaoContractView",
     "RedemptionCodeRecord",
     "RoutineClaimRecord",
     "SpiritTreeRecord",

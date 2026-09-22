@@ -234,6 +234,7 @@ def test_read_only_commands_accept_read_only_identity() -> None:
                 "生产预览",
                 "移动预览",
                 "突破预览",
+                "我的道契",
             )
 
             for command in read_only_commands:

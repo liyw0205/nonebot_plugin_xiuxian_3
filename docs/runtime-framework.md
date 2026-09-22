@@ -31,6 +31,10 @@ await runtime.initialize()
 进程配置解析后只保留密令哈希；不要把真实密令写入仓库、日志或消息。奖励键只能是普通
 灵石、精力、声望或 `item.*` 物品，不能发放修为、境界、突破准备度或道契权益。
 
+道契测试凭证需要安装可选依赖 `cryptography`，并通过 `XIUXIAN3_BILLING_PUBLIC_KEY` 配置
+Ed25519 公钥。凭证由外部 billing 服务签发，核心只验签并保存摘要；支付私钥、银行卡信息和
+原始凭证不进入游戏数据库。未配置公钥或验签失败时，激活返回 `BILLING_RECEIPT_INVALID`，不改变角色资产。
+
 配置从 `data/内容清单.json` 开始加载。领域文件统一使用 `kind`、`records` 和
 记录 `key`；代码通过 `runtime.content.get("item", "item.weapon.wood_sword")`
 读取，不依赖中文文件名。临时测试数据目录没有清单时，内容加载器返回空配置，

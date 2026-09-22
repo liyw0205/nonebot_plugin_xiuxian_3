@@ -115,6 +115,44 @@ class RedemptionCodeRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class DaoContractView:
+    contract_key: str
+    label: str
+    status: str
+    starts_on: str
+    ends_on: str
+    daily_reward: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class DaoContractStatusRecord:
+    player: PlayerView
+    contracts: tuple[DaoContractView, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DaoContractActivationRecord:
+    player: PlayerView
+    contract_key: str
+    label: str
+    receipt_id: str
+    starts_on: str
+    ends_on: str
+    activation_reward: dict[str, int] = field(default_factory=dict)
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class DaoContractClaimRecord:
+    player: PlayerView
+    contract_key: str
+    label: str
+    business_date: str
+    reward: dict[str, int] = field(default_factory=dict)
+    already_completed: bool = False
+
+
 __all__ = [
     "RoutineClaimRecord",
     "SpiritTreeRecord",
@@ -127,4 +165,8 @@ __all__ = [
     "AchievementClaimRecord",
     "HonorTitleEquipRecord",
     "RedemptionCodeRecord",
+    "DaoContractView",
+    "DaoContractStatusRecord",
+    "DaoContractActivationRecord",
+    "DaoContractClaimRecord",
 ]
