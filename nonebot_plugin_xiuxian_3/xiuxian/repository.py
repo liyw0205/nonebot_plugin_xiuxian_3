@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from ..contracts import PlayerView, serialize_datetime
 from .config import XiuxianSettings
-from .player.models import PlayerCreateRecord, RenameRecord, SeekingRecord
+from .player.models import CultivationRecord, IntroRecord, PlayerCreateRecord, RenameRecord, SeekingRecord, TravelRecord
 from .player.rules import STAGE_MORTAL, STAGE_NEW_USER, qualification_for
 
 
@@ -38,6 +38,16 @@ CREATE TABLE IF NOT EXISTS players (
     subprofession_key TEXT,
     qualification_json TEXT NOT NULL DEFAULT '{}',
     spirit_stones INTEGER NOT NULL DEFAULT 0 CHECK (spirit_stones >= 0),
+    stamina INTEGER NOT NULL DEFAULT 0 CHECK (stamina >= 0),
+    stamina_max INTEGER NOT NULL DEFAULT 0 CHECK (stamina_max >= 0),
+    energy INTEGER NOT NULL DEFAULT 0 CHECK (energy >= 0),
+    energy_max INTEGER NOT NULL DEFAULT 0 CHECK (energy_max >= 0),
+    inventory_json TEXT NOT NULL DEFAULT '{}',
+    intro_json TEXT NOT NULL DEFAULT '{}',
+    selected_service TEXT,
+    realm_key TEXT NOT NULL DEFAULT 'mortal',
+    realm_layer INTEGER NOT NULL DEFAULT 0 CHECK (realm_layer >= 0),
+    cultivation INTEGER NOT NULL DEFAULT 0 CHECK (cultivation >= 0),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (platform, platform_user_id)
@@ -80,6 +90,26 @@ class DaoNameTakenError(RuntimeError):
 
 class RenameCardRequiredError(RuntimeError):
     """A named player needs a rename card before changing dao name again."""
+
+
+class PlayerStageConflictError(RuntimeError):
+    """The player is not in the stage required by an onboarding action."""
+
+
+class LocationRequiredError(RuntimeError):
+    """The player must be at a specific location before an action can run."""
+
+
+class ResourceInsufficientError(RuntimeError):
+    """A player does not have enough of a spendable resource."""
+
+
+class PathAlreadySelectedError(RuntimeError):
+    """The player already has a first path and cannot select another one."""
+
+
+class SubprofessionRequiredError(RuntimeError):
+    """The support path requires a sub-profession choice."""
 
 
 class SQLitePlayerRepository:
@@ -148,6 +178,16 @@ class SQLitePlayerRepository:
             ("rule_version", "TEXT NOT NULL DEFAULT 'player-onboarding-v0.1.0'"),
             ("path_key", "TEXT"),
             ("subprofession_key", "TEXT"),
+            ("stamina", "INTEGER NOT NULL DEFAULT 0"),
+            ("stamina_max", "INTEGER NOT NULL DEFAULT 0"),
+            ("energy", "INTEGER NOT NULL DEFAULT 0"),
+            ("energy_max", "INTEGER NOT NULL DEFAULT 0"),
+            ("inventory_json", "TEXT NOT NULL DEFAULT '{}'"),
+            ("intro_json", "TEXT NOT NULL DEFAULT '{}'"),
+            ("selected_service", "TEXT"),
+            ("realm_key", "TEXT NOT NULL DEFAULT 'mortal'"),
+            ("realm_layer", "INTEGER NOT NULL DEFAULT 0"),
+            ("cultivation", "INTEGER NOT NULL DEFAULT 0"),
         ):
             if column not in player_columns:
                 connection.execute(f"ALTER TABLE players ADD COLUMN {column} {definition}")
@@ -278,9 +318,10 @@ class SQLitePlayerRepository:
                     INSERT INTO players (
                         player_id, platform, platform_user_id, scene_id, nickname, dao_name, stage,
                         status, location_key, rule_version, qualification_json,
-                        spirit_stones, created_at, updated_at
+                        spirit_stones, stamina, stamina_max, energy, energy_max,
+                        inventory_json, intro_json, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 'xuantian.new_town',
-                              'player-onboarding-v0.1.0', '{}', 0, ?, ?)
+                              'player-onboarding-v0.1.0', '{}', 0, 0, 0, 0, 0, '{}', '{}', ?, ?)
                     """,
                     (
                         public_id,
@@ -422,12 +463,23 @@ class SQLitePlayerRepository:
                 connection.execute(
                     """
                     UPDATE players
-                    SET stage = ?, qualification_json = ?, spirit_stones = spirit_stones + 100, updated_at = ?
+                    SET stage = ?, realm_key = 'mortal', realm_layer = 0, cultivation = 0,
+                        qualification_json = ?, spirit_stones = spirit_stones + 100,
+                        stamina = 30, stamina_max = 30, energy = 30, energy_max = 30,
+                        inventory_json = ?, updated_at = ?
                     WHERE id = ? AND stage = ?
                     """,
                     (
                         STAGE_MORTAL,
                         json.dumps(qualification, ensure_ascii=False, sort_keys=True),
+                        json.dumps(
+                            {
+                                "item.food.coarse_spirit_rice": 3,
+                                "item.herb.blood_grass": 3,
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
                         serialize_datetime(now),
                         row["id"],
                         STAGE_NEW_USER,
@@ -454,6 +506,459 @@ class SQLitePlayerRepository:
                 ),
             )
             return SeekingRecord(player=player, created=created, already_completed=False)
+
+    async def complete_intro(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        guide_key: str,
+        service_key: str | None,
+        operation_id: str,
+    ) -> IntroRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._complete_intro_sync,
+                platform,
+                platform_user_id,
+                guide_key,
+                service_key,
+                operation_id,
+            )
+
+    def _complete_intro_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        guide_key: str,
+        service_key: str | None,
+        operation_id: str,
+    ) -> IntroRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._complete_intro_once(
+                    platform,
+                    platform_user_id,
+                    guide_key,
+                    service_key,
+                    operation_id,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _complete_intro_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        guide_key: str,
+        service_key: str | None,
+        operation_id: str,
+    ) -> IntroRecord:
+        operation_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "guide_key": guide_key,
+            "service_key": service_key,
+        }
+        request_hash = self._request_hash("player.complete_intro", operation_payload)
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "player.complete_intro"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return IntroRecord(
+                    player=self._row_to_player(payload["player"]),
+                    guide_key=guide_key,
+                    changed=bool(payload.get("changed", False)),
+                    stage_advanced=bool(payload.get("stage_advanced", False)),
+                    item_quantity=int(payload.get("item_quantity", 0)),
+                    selected_service=payload.get("selected_service"),
+                    already_completed=True,
+                )
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if row["stage"] not in {STAGE_MORTAL, "seeker"}:
+                raise PlayerStageConflictError("player is not ready for mortal introduction")
+
+            intro_state = self._json_object(row["intro_json"], {})
+            flags = [str(item) for item in intro_state.get("flags", [])]
+            selected = str(intro_state.get("selected_service") or row["selected_service"] or "") or None
+            changed = guide_key not in flags
+            if not changed and guide_key == "guide.choose_service" and selected != service_key:
+                raise OperationConflictError("teaching service differs from the completed choice")
+
+            item_quantity = 0
+            stamina = int(row["stamina"])
+            energy = int(row["energy"])
+            inventory = self._json_object(row["inventory_json"], {})
+            if changed:
+                if guide_key == "guide.gather_blood_grass":
+                    if row["location_key"] != "xuantian.outskirts":
+                        raise LocationRequiredError("gathering lesson requires the outskirts")
+                    if stamina < 2:
+                        raise ResourceInsufficientError("stamina is insufficient")
+                    stamina -= 2
+                    item_quantity = 1 + (hashlib.blake2b(operation_id.encode("utf-8"), digest_size=1).digest()[0] % 2)
+                    inventory["item.herb.blood_grass"] = int(inventory.get("item.herb.blood_grass", 0)) + item_quantity
+                elif guide_key == "guide.choose_service":
+                    if energy < 2:
+                        raise ResourceInsufficientError("energy is insufficient")
+                    energy -= 2
+                    selected = service_key
+                elif guide_key == "guide.read_world":
+                    pass
+                else:
+                    raise ValueError("unsupported introduction guide")
+                flags.append(guide_key)
+
+            from .player.intro_rules import intro_complete
+
+            stage_advanced = row["stage"] == STAGE_MORTAL and intro_complete(flags)
+            stage = "seeker" if stage_advanced else row["stage"]
+            intro_state = {"flags": sorted(set(flags)), "selected_service": selected}
+            connection.execute(
+                """
+                UPDATE players
+                SET stage = ?, stamina = ?, energy = ?, inventory_json = ?, intro_json = ?,
+                    selected_service = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    stage,
+                    stamina,
+                    energy,
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    json.dumps(intro_state, ensure_ascii=False, sort_keys=True),
+                    selected,
+                    serialize_datetime(now),
+                    row["id"],
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("intro completion returned no row")
+            player = self._row_to_player(updated)
+            payload = {
+                "player": self._player_payload(player),
+                "changed": changed,
+                "stage_advanced": stage_advanced,
+                "item_quantity": item_quantity,
+                "selected_service": selected,
+            }
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id,
+                    "player.complete_intro",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    serialize_datetime(now),
+                ),
+            )
+            return IntroRecord(
+                player=player,
+                guide_key=guide_key,
+                changed=changed,
+                stage_advanced=stage_advanced,
+                item_quantity=item_quantity,
+                selected_service=selected,
+            )
+
+    async def travel_player(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        destination: str,
+        operation_id: str,
+    ) -> TravelRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._travel_player_sync,
+                platform,
+                platform_user_id,
+                destination,
+                operation_id,
+            )
+
+    def _travel_player_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        destination: str,
+        operation_id: str,
+    ) -> TravelRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._travel_player_once(platform, platform_user_id, destination, operation_id)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _travel_player_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        destination: str,
+        operation_id: str,
+    ) -> TravelRecord:
+        from .player.intro_rules import TRAVEL_COSTS
+
+        operation_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "destination": destination,
+        }
+        request_hash = self._request_hash("world.travel_intro", operation_payload)
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "world.travel_intro"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return TravelRecord(
+                    player=self._row_to_player(payload["player"]),
+                    destination=destination,
+                    changed=bool(payload.get("changed", False)),
+                    stamina_cost=int(payload.get("stamina_cost", 0)),
+                    already_completed=True,
+                )
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
+                raise PlayerStageConflictError("player is not ready for travel")
+
+            current = str(row["location_key"])
+            changed = current != destination
+            cost = TRAVEL_COSTS[destination] if changed else 0
+            stamina = int(row["stamina"])
+            if changed and stamina < cost:
+                raise ResourceInsufficientError("stamina is insufficient")
+            if changed:
+                stamina -= cost
+                connection.execute(
+                    "UPDATE players SET location_key = ?, stamina = ?, updated_at = ? WHERE id = ?",
+                    (destination, stamina, serialize_datetime(now), row["id"]),
+                )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("travel returned no row")
+            player = self._row_to_player(updated)
+            payload = {"player": self._player_payload(player), "changed": changed, "stamina_cost": cost}
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id,
+                    "world.travel_intro",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    serialize_datetime(now),
+                ),
+            )
+            return TravelRecord(player=player, destination=destination, changed=changed, stamina_cost=cost)
+
+    async def enter_cultivation(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        path_key: str,
+        subprofession_key: str | None,
+        operation_id: str,
+    ) -> CultivationRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._enter_cultivation_sync,
+                platform,
+                platform_user_id,
+                path_key,
+                subprofession_key,
+                operation_id,
+            )
+
+    def _enter_cultivation_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        path_key: str,
+        subprofession_key: str | None,
+        operation_id: str,
+    ) -> CultivationRecord:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._enter_cultivation_once(
+                    platform,
+                    platform_user_id,
+                    path_key,
+                    subprofession_key,
+                    operation_id,
+                )
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _enter_cultivation_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        path_key: str,
+        subprofession_key: str | None,
+        operation_id: str,
+    ) -> CultivationRecord:
+        from .player.path_rules import reward_items
+
+        operation_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "path_key": path_key,
+            "subprofession_key": subprofession_key,
+        }
+        request_hash = self._request_hash("player.enter_cultivation", operation_payload)
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_operation = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing_operation is not None:
+                if (
+                    existing_operation["operation_name"] != "player.enter_cultivation"
+                    or existing_operation["request_hash"] != request_hash
+                ):
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing_operation["result_json"])
+                return CultivationRecord(
+                    player=self._row_to_player(payload["player"]),
+                    path_key=path_key,
+                    subprofession_key=subprofession_key,
+                    changed=bool(payload.get("changed", False)),
+                    already_completed=True,
+                )
+
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not writable")
+            if row["stage"] != "seeker":
+                raise PlayerStageConflictError("player is not ready to enter cultivation")
+            if row["path_key"]:
+                raise PathAlreadySelectedError("path is already selected")
+            if path_key == "support" and not subprofession_key:
+                raise SubprofessionRequiredError("support path needs a sub-profession")
+
+            inventory = self._json_object(row["inventory_json"], {})
+            for item_key, quantity in reward_items(path_key, subprofession_key):
+                inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
+            connection.execute(
+                """
+                UPDATE players
+                SET stage = 'cultivator', path_key = ?, subprofession_key = ?,
+                    realm_key = 'qi_sensing', realm_layer = 1, cultivation = 0,
+                    spirit_stones = spirit_stones + 200, inventory_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    path_key,
+                    subprofession_key,
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    serialize_datetime(now),
+                    row["id"],
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("cultivation entry returned no row")
+            player = self._row_to_player(updated)
+            payload = {"player": self._player_payload(player), "changed": True}
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    operation_id, operation_name, player_id, request_hash, result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    operation_id,
+                    "player.enter_cultivation",
+                    row["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    serialize_datetime(now),
+                ),
+            )
+            return CultivationRecord(
+                player=player,
+                path_key=path_key,
+                subprofession_key=subprofession_key,
+                changed=True,
+            )
 
     async def rename_player(
         self,
@@ -597,6 +1102,11 @@ class SQLitePlayerRepository:
         return self._row_to_player(row) if row is not None else None
 
     @staticmethod
+    def _json_object(raw: Any, default: dict[str, Any]) -> dict[str, Any]:
+        value = json.loads(raw) if isinstance(raw, str) else raw
+        return dict(value) if isinstance(value, dict) else dict(default)
+
+    @staticmethod
     def _row_to_player(row: sqlite3.Row | dict[str, Any]) -> PlayerView:
         def value(name: str, default: Any = None) -> Any:
             if isinstance(row, dict):
@@ -608,6 +1118,14 @@ class SQLitePlayerRepository:
 
         qualification_raw = value("qualification_json", "{}")
         qualification = json.loads(qualification_raw) if isinstance(qualification_raw, str) else qualification_raw
+        inventory_raw = value("inventory_json", "{}")
+        inventory = json.loads(inventory_raw) if isinstance(inventory_raw, str) else inventory_raw
+        intro_raw = value("intro_json", "{}")
+        intro_state = json.loads(intro_raw) if isinstance(intro_raw, str) else intro_raw
+        if not isinstance(inventory, dict):
+            inventory = {}
+        if not isinstance(intro_state, dict):
+            intro_state = {}
         return PlayerView(
             player_id=str(value("player_id", value("id", ""))),
             platform=str(value("platform", "")),
@@ -625,6 +1143,20 @@ class SQLitePlayerRepository:
             rule_version=str(value("rule_version", "player-onboarding-v0.1.0")),
             path_key=value("path_key"),
             subprofession_key=value("subprofession_key"),
+            stamina=int(value("stamina", 0)),
+            stamina_max=int(value("stamina_max", 0)),
+            energy=int(value("energy", 0)),
+            energy_max=int(value("energy_max", 0)),
+            inventory={str(key): int(item) for key, item in inventory.items()},
+            intro_flags=tuple(str(item) for item in intro_state.get("flags", [])),
+            selected_service=(
+                str(intro_state.get("selected_service"))
+                if intro_state.get("selected_service")
+                else value("selected_service")
+            ),
+            realm_key=str(value("realm_key", "mortal")),
+            realm_layer=int(value("realm_layer", 0)),
+            cultivation=int(value("cultivation", 0)),
         )
 
     @staticmethod
@@ -647,4 +1179,18 @@ class SQLitePlayerRepository:
             "rule_version": player.rule_version,
             "path_key": player.path_key,
             "subprofession_key": player.subprofession_key,
+            "stamina": player.stamina,
+            "stamina_max": player.stamina_max,
+            "energy": player.energy,
+            "energy_max": player.energy_max,
+            "inventory_json": json.dumps(player.inventory, ensure_ascii=False, sort_keys=True),
+            "intro_json": json.dumps(
+                {"flags": list(player.intro_flags), "selected_service": player.selected_service},
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+            "selected_service": player.selected_service,
+            "realm_key": player.realm_key,
+            "realm_layer": player.realm_layer,
+            "cultivation": player.cultivation,
         }

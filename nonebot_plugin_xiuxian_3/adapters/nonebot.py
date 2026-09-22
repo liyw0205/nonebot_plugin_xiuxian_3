@@ -60,7 +60,18 @@ def _rule_for(checker: Callable[[Any], bool]):
     return rule
 
 
-_COMMANDS = ("开始修仙", "寻仙问道", "我的状态", "我的修仙信息", "修仙改名", "改名")
+_COMMANDS = (
+    "开始修仙",
+    "寻仙问道",
+    "我的状态",
+    "我的修仙信息",
+    "修仙改名",
+    "改名",
+    "完成引导",
+    "前往近郊",
+    "返回新手城",
+    "选择道途",
+)
 
 
 def _canonical_command(text: str) -> str | None:

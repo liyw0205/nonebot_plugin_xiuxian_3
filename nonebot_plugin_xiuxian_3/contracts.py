@@ -66,6 +66,16 @@ class PlayerView:
     path_key: str | None = None
     subprofession_key: str | None = None
     dao_name: str = ""
+    stamina: int = 0
+    stamina_max: int = 0
+    energy: int = 0
+    energy_max: int = 0
+    inventory: dict[str, int] = field(default_factory=dict)
+    intro_flags: tuple[str, ...] = ()
+    selected_service: str | None = None
+    realm_key: str = "mortal"
+    realm_layer: int = 0
+    cultivation: int = 0
 
 
 def serialize_datetime(value: datetime) -> str:

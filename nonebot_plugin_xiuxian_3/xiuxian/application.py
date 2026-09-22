@@ -24,3 +24,12 @@ class XiuxianApplication:
 
     async def rename_player(self, context: CommandContext) -> CommandResult:
         return await self.player.rename_player(context)
+
+    async def complete_intro(self, context: CommandContext) -> CommandResult:
+        return await self.player.complete_intro(context)
+
+    async def travel_intro(self, context: CommandContext, destination: str) -> CommandResult:
+        return await self.player.travel_intro(context, destination)
+
+    async def enter_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self.player.enter_cultivation(context)

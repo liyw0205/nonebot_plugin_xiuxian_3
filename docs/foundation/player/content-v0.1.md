@@ -93,10 +93,15 @@ new_user
 | 引导键 | 动作 | 资源/失败 | 产出 |
 |:--|:--|:--|:--|
 | `guide.read_world` | 阅读三界与道途说明并确认 | 无消耗；重复返回已完成 | 了解玄天/魔/妖三界与洞天福地 |
-| `guide.gather_blood_grass` | 在 `xuantian.outskirts` 完成一次教学采集 | 2 体力；采集失败返还 1 体力，不返还时间 | `item.herb.blood_grass` 1–2，固定 `gather.v0.1` 池 |
-| `guide.choose_service` | 选择炼丹、炼器或布阵教学服务 | 2 精力；预览不消耗 | 对应教学配方/阵图/维护任务之一 |
+| `guide.gather_blood_grass` | 在 `xuantian.outskirts` 完成一次教学采集 | 2 体力；当前实现采用确定性 operation 结果 | `item.herb.blood_grass` 1–2，固定 `gather.v0.1` 池 |
+| `guide.choose_service` | 选择炼丹、炼器或布阵教学服务 | 2 精力；必须明确服务类型 | 记录对应教学配方/阵图/维护方向 |
 
 引导中所有有资产结果的请求都要有 operation、内容版本、随机结果和流水。三项都完成时 `player.complete_intro` 写入 `stage=seeker`；重复结算不重复发放任何奖励。
+
+适配器命令映射固定为：`完成引导 阅读`、`完成引导 采集`、`完成引导 炼丹`、
+`完成引导 炼器`、`完成引导 布阵`。采集前必须使用 `前往近郊`，教学完成后可用
+`返回新手城`；前往近郊消耗 2 点体力，返回新手城消耗 1 点体力。地点错误、体力/精力
+不足和阶段错误均不改变引导标记或库存。
 
 ## 6. 体系分支与入道：`player.enter_cultivation`
 
@@ -109,11 +114,14 @@ new_user
 | `device` | 器修 | `skill.device.scout_doll` | 机关操控上限 1，法器耐久 |
 | `demonic` | 魔修 | `skill.demonic.pain_exchange` | 每次 +12 侵蚀；首版有净化教学 |
 | `beast` | 妖修 | `skill.beast.partial_transform` | 每次 -5 化形稳定度 |
-| `support` | 辅修 | `skill.support.quick_assessment` | 必须同时选择一项主辅修，额外消耗 2 精力 |
+| `support` | 辅修 | `skill.support.quick_assessment` | 必须同时选择炼丹、炼器或布阵 |
 
 `support` 不是弱化战斗的“副职业占位”。它是首要构筑分支，必须同时选择 `alchemy`（炼丹）、`artifice`（炼器）或 `formation`（布阵）之一，作为 `subprofession_key`；子类生活玩法在后续引导/委托中解锁。体/法/器/魔/妖五条首要道途的主辅修默认未选择，在感气阶段完成一项生产教学后才能选择，避免首版一次性塞入所有界面。
 
 入道奖励由 `player.enter_cultivation` 的单一 operation 发放：灵石 200、`item.manual.basic_qi` 1、对应道途试用技能 1。器修额外获得 `item.tool.basic_hammer`；辅修依主辅修获得 `item.tool.basic_furnace`、`item.tool.basic_hammer` 或 `item.mat.array_sand` 3。奖励定义引用 `foundation/items/content-v0.1.md`，不能由命令层硬编码。
+
+实际命令示例：`选择道途 体修`、`选择道途 法修`、`选择道途 器修`、`选择道途 魔修`、
+`选择道途 妖修`，以及 `选择道途 辅修 炼丹/炼器/布阵`。
 
 失败规则：无效 path/subprofession、非 `seeker`、被暂停、内容未开放或 operation 输入冲突均不改变角色、道途、境界或奖励。道途切换首版只允许筑基后使用 `item.token.change_path` 与灵石 500；该 token 首版不掉落，仅用于测试与管理员受控恢复。
 

@@ -12,10 +12,13 @@ from ..repository import (
     RepositoryBusyError,
     SQLitePlayerRepository,
 )
+from .intro_use_cases import IntroApplication
+from .cultivation_use_cases import CultivationApplication
 from .rules import (
     LOCATION_LABELS,
     QUALIFICATION_KEYS,
     QUALIFICATION_LABELS,
+    REALM_LABELS,
     STAGE_LABELS,
     STATUS_LABELS,
     validate_dao_name,
@@ -27,6 +30,8 @@ class PlayerApplication:
 
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
+        self.intro = IntroApplication(repository)
+        self.cultivation = CultivationApplication(repository)
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -78,6 +83,11 @@ class PlayerApplication:
     @staticmethod
     def _location_text(location_key: str) -> str:
         return LOCATION_LABELS.get(location_key, "未知地点")
+
+    @staticmethod
+    def _realm_text(realm_key: str, layer: int) -> str:
+        name = REALM_LABELS.get(realm_key, "未知境界")
+        return f"{name} L{layer}" if layer else name
 
     @staticmethod
     def _qualification_text(qualification: dict[str, int]) -> str:
@@ -205,9 +215,12 @@ class PlayerApplication:
                 f"- **道号**：{self._display_name(player)}\n"
                 f"- **阶段**：{self._stage_text(player.stage)}\n"
                 f"- **灵石**：{player.spirit_stones}\n\n"
+                f"- **体力**：{player.stamina}/{player.stamina_max}\n"
+                f"- **精力**：{player.energy}/{player.energy_max}\n"
+                "- **初始物资**：粗糙灵米 ×3、止血草 ×3\n\n"
                 "### 六项资质\n\n"
                 + self._qualification_text(player.qualification)
-                + "\n\n> 下一步：查看 `我的状态`，确认当前修仙信息。"
+                + "\n\n> 下一步：发送 `完成引导 阅读`，开始凡人引导。"
             )
             code = "SEEKING_STARTED"
         else:
@@ -234,6 +247,13 @@ class PlayerApplication:
                 "location_key": player.location_key,
                 "rule_version": player.rule_version,
                 "spirit_stones": player.spirit_stones,
+                "stamina": player.stamina,
+                "stamina_max": player.stamina_max,
+                "energy": player.energy,
+                "energy_max": player.energy_max,
+                "inventory": player.inventory,
+                "realm_key": player.realm_key,
+                "realm_layer": player.realm_layer,
                 "qualification": player.qualification,
                 "idempotent_replay": record.already_completed,
             },
@@ -262,9 +282,13 @@ class PlayerApplication:
                 f"- **阶段**：{self._stage_text(player.stage)}\n"
                 f"- **状态**：{self._status_text(player.status)}\n"
                 f"- **位置**：{self._location_text(player.location_key)}\n"
+                f"- **境界**：{self._realm_text(player.realm_key, player.realm_layer)}\n"
                 f"- **灵石**：{player.spirit_stones}\n"
+                f"- **体力**：{player.stamina}/{player.stamina_max}\n"
+                f"- **精力**：{player.energy}/{player.energy_max}\n"
                 "\n### 六项资质\n\n"
                 f"{self._qualification_text(player.qualification)}"
+                f"\n\n### 凡人引导\n\n- **进度**：{len(set(player.intro_flags))}/3"
             ),
             request_id=context.request_id,
             data={
@@ -274,8 +298,18 @@ class PlayerApplication:
                 "stage": player.stage,
                 "status": player.status,
                 "location_key": player.location_key,
+                "realm_key": player.realm_key,
+                "realm_layer": player.realm_layer,
+                "cultivation": player.cultivation,
                 "rule_version": player.rule_version,
                 "spirit_stones": player.spirit_stones,
+                "stamina": player.stamina,
+                "stamina_max": player.stamina_max,
+                "energy": player.energy,
+                "energy_max": player.energy_max,
+                "inventory": player.inventory,
+                "intro_flags": player.intro_flags,
+                "selected_service": player.selected_service,
                 "qualification": player.qualification,
                 "path_key": player.path_key,
                 "subprofession_key": player.subprofession_key,
@@ -347,3 +381,12 @@ class PlayerApplication:
                 "idempotent_replay": record.already_completed,
             },
         )
+
+    async def complete_intro(self, context: CommandContext) -> CommandResult:
+        return await self.intro.complete_intro(context)
+
+    async def travel_intro(self, context: CommandContext, destination: str) -> CommandResult:
+        return await self.intro.travel_intro(context, destination)
+
+    async def enter_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self.cultivation.enter_cultivation(context)

@@ -30,7 +30,7 @@ STAGE_LABELS = {
     STAGE_NEW_USER: "新用户",
     STAGE_MORTAL: "凡人",
     "seeker": "求道者",
-    "cultivator": "修士",
+    "cultivator": "修行者",
     "suspended": "暂停中",
 }
 
@@ -42,9 +42,19 @@ STATUS_LABELS = {
 
 LOCATION_LABELS = {
     "xuantian.new_town": "玄天界·新手城",
+    "xuantian.outskirts": "玄天界·近郊",
     "xuantian.wilderness": "玄天界·近郊荒野",
     "xuantian.spirit_field": "玄天界·灵泉谷",
     "cave.mist_grotto": "雾隐洞天·一层",
+}
+
+REALM_LABELS = {
+    "mortal": "凡人",
+    "qi_sensing": "感气",
+    "qi_gathering": "聚气",
+    "foundation": "筑基",
+    "golden_core": "金丹",
+    "nascent_soul": "元婴",
 }
 
 DAO_NAME_MAX_LENGTH = 7
