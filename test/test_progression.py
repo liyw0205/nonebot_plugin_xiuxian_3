@@ -255,14 +255,69 @@ def test_foundation_late_milestone_is_recorded_with_the_layer_advance() -> None:
                     "foundation-late-advance",
                 )
                 assert json.loads(record[3]) == {
+                    "maximum_faction_reputation": 0,
                     "realm_key": "foundation",
                     "realm_layer": 9,
                     "required_layer": 9,
+                    "required_max_faction_reputation": 0,
                     "required_realm": "foundation",
                     "required_total_cultivation": 10000,
                     "total_cultivation": 10000,
                 }
                 assert record[4:] == ("content-0.2", "progression-0.2.0")
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_nascent_soul_late_milestone_requires_reputation_and_replays() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "nascent-late-user"
+            await _enter_cultivator(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET realm_key = 'nascent_soul', realm_layer = 8, cultivation = 153000,
+                        total_cultivation = 210000, faction_reputation_json = ?
+                    WHERE platform_user_id = ?
+                    """,
+                    (json.dumps({"faction.abyss": 999}), user),
+                )
+            below = await runtime.dispatch(_context(user, "nascent-late-below"), "晋升境界")
+            assert below.code == "REALM_LAYER_ADVANCED"
+            assert below.data["unlocks"] == []
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET cultivation = 190000, total_cultivation = 210000, faction_reputation_json = ?
+                    WHERE platform_user_id = ?
+                    """,
+                    (json.dumps({"faction.abyss": 1000, "faction.xuantian": 300}), user),
+                )
+            fulfilled = await runtime.dispatch(
+                _context(user, "nascent-late-fulfilled", operation_id="nascent-late-advance"),
+                "晋升境界",
+            )
+            assert fulfilled.code == "REALM_LAYER_ADVANCED"
+            assert {item["key"] for item in fulfilled.data["unlocks"]} == {"milestone.nascent_soul_late"}
+            replay = await runtime.dispatch(
+                _context(user, "nascent-late-replay", operation_id="nascent-late-advance"),
+                "晋升境界",
+            )
+            assert replay.data["idempotent_replay"] is True
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                snapshot = json.loads(
+                    connection.execute(
+                        "SELECT snapshot_json FROM progression_milestones WHERE milestone_key = 'milestone.nascent_soul_late'"
+                    ).fetchone()[0]
+                )
+                assert snapshot["maximum_faction_reputation"] == 1000
+                assert snapshot["required_max_faction_reputation"] == 1000
             await runtime.close()
 
     asyncio.run(run())

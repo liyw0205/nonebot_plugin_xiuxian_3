@@ -15,6 +15,11 @@
 | `milestone.nascent_soul_late` | 元婴 L9 圆满、总修为 `>=210,000`、任一三界声望 `>=1,000` | 解锁跨界秘境、赛季首领和道统前置 | 不产生境界变化 |
 | `event.heart_demon_trial` | 元婴突破失败后自动创建 | 三选一心魔处理；决定疲劳/污染/声望结果 | 只允许按原 operation 结算一次 |
 
+当前运行时在 `progression.advance_layer` 成功进入元婴 L9（或之后的层数），总修为达到
+210,000 且任一三界声望达到 1,000 时，原子写入 `milestone.nascent_soul_late` 资格记录。
+快照包含达到条件时的境界、层数、总修为、最高三界声望、内容/规则版本和来源 operation；
+相同角色只会获得一次，并随晋升 operation 回放原结果。
+
 ## 2. 突破会话
 
 材料与成本：`item.pill.soul_condense` 1、`item.soul_crystal` 5、`item.demon_core` 或 `item.beast_blood` 2、灵石 5,000、世界功勋 100。可选 `item.pill.soul_restore` 1 作为心魔保护，只有失败时消耗。

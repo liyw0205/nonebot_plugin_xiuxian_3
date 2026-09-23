@@ -20,11 +20,22 @@ def record_due_milestones(
     """Persist each newly qualified milestone and return its player-facing unlock."""
 
     player_id = int(player["id"])
+    try:
+        faction_reputation = json.loads(str(player["faction_reputation_json"]))
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        faction_reputation = {}
+    if not isinstance(faction_reputation, dict):
+        faction_reputation = {}
+    maximum_faction_reputation = max(
+        (int(value) for value in faction_reputation.values()),
+        default=0,
+    )
     unlocks: list[LayerUnlock] = []
     for definition in due_milestones(
         realm_key=str(player["realm_key"]),
         realm_layer=int(player["realm_layer"]),
         total_cultivation=int(player["total_cultivation"]),
+        maximum_faction_reputation=maximum_faction_reputation,
     ):
         snapshot = {
             "realm_key": str(player["realm_key"]),
@@ -33,6 +44,8 @@ def record_due_milestones(
             "required_realm": definition.required_realm,
             "required_layer": definition.required_layer,
             "required_total_cultivation": definition.required_total_cultivation,
+            "maximum_faction_reputation": maximum_faction_reputation,
+            "required_max_faction_reputation": definition.required_max_faction_reputation,
         }
         cursor = connection.execute(
             """
