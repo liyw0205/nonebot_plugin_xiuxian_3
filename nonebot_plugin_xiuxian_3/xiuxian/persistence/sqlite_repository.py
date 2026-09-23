@@ -136,6 +136,7 @@ class SQLitePlayerRepository(
             connection.executescript(SCHEMA)
             self._migrate_legacy_schema(connection)
             self._migrate_cultivation_session_status(connection)
+            self._migrate_economy_ledger_asset_kind(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
@@ -329,6 +330,54 @@ class SQLitePlayerRepository(
         connection.execute(
             "CREATE UNIQUE INDEX idx_cultivation_sessions_active "
             "ON cultivation_sessions(player_id) WHERE status = 'running'"
+        )
+
+    @staticmethod
+    def _migrate_economy_ledger_asset_kind(connection: sqlite3.Connection) -> None:
+        """Allow resource locks in the economy ledger on pre-market databases."""
+
+        table = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'economy_ledger_entries'"
+        ).fetchone()
+        schema_sql = str(table[0]) if table and table[0] else ""
+        if "'resource'" in schema_sql:
+            return
+        connection.execute("ALTER TABLE economy_ledger_entries RENAME TO economy_ledger_entries_legacy")
+        connection.execute(
+            """
+            CREATE TABLE economy_ledger_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                operation_id TEXT NOT NULL,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                asset_kind TEXT NOT NULL CHECK (asset_kind IN ('currency', 'item', 'resource')),
+                asset_key TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                direction TEXT NOT NULL CHECK (direction IN ('credit', 'debit', 'lock', 'release')),
+                amount INTEGER NOT NULL CHECK (amount >= 0),
+                before_value INTEGER NOT NULL CHECK (before_value >= 0),
+                after_value INTEGER NOT NULL CHECK (after_value >= 0),
+                source_id TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO economy_ledger_entries(
+                id, operation_id, player_id, asset_kind, asset_key, reason, direction,
+                amount, before_value, after_value, source_id, created_at
+            )
+            SELECT id, operation_id, player_id, asset_kind, asset_key, reason, direction,
+                   amount, before_value, after_value, source_id, created_at
+            FROM economy_ledger_entries_legacy
+            """
+        )
+        connection.execute("DROP TABLE economy_ledger_entries_legacy")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_economy_ledger_operation ON economy_ledger_entries(operation_id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_economy_ledger_player ON economy_ledger_entries(player_id, created_at)"
         )
 
     @staticmethod

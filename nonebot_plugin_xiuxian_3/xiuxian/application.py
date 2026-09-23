@@ -788,3 +788,27 @@ class XiuxianApplication:
 
     async def list_market_orders(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.list_market_orders(context), require_write=False)
+
+    async def create_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.create_production_commission(context), write_message="当前事件不允许发布生产委托。")
+
+    async def list_production_commissions(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.list_production_commissions(context), require_write=False)
+
+    async def accept_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.accept_production_commission(context), write_message="当前事件不允许接取生产委托。")
+
+    async def deliver_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.deliver_production_commission(context), write_message="当前事件不允许交付生产委托。")
+
+    async def settle_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.settle_production_commission(context), write_message="当前事件不允许确认生产委托。")
+
+    async def cancel_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.cancel_production_commission(context), write_message="当前事件不允许取消生产委托。")
+
+    async def expire_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.expire_production_commission(context), write_message="当前事件不允许清理生产委托。")
+
+    async def recover_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.recover_production_commission(context), write_message="当前事件不允许恢复生产委托。")

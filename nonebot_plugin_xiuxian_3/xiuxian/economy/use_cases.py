@@ -5,6 +5,14 @@ from __future__ import annotations
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
     BalanceInsufficientError,
+    CommissionDeliveryError,
+    CommissionEscrowConflictError,
+    CommissionExpiredError,
+    CommissionNotFoundError,
+    CommissionRecipeForbiddenError,
+    CommissionRequirementError,
+    CommissionSelfAcceptError,
+    CommissionStateConflictError,
     MarketBuyerCapacityInsufficientError,
     MarketItemForbiddenError,
     MarketItemLockedError,
@@ -22,6 +30,8 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .rules import resolve_market_item
+from ..production.rules import resolve_recipe
+from .rules import COMMISSION_RECIPES
 
 
 class EconomyApplication:
@@ -94,9 +104,202 @@ class EconomyApplication:
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能操作经济功能。"),
             OperationConflictError: ("LEDGER_CONFLICT", "这次请求编号已经用于其他经济操作。"),
+            CommissionRecipeForbiddenError: ("COMMISSION_RECIPE_FORBIDDEN", "当前只开放疗伤丹和木纹剑生产委托。"),
+            CommissionEscrowConflictError: ("COMMISSION_ESCROW_CONFLICT", "灵石不足，无法锁定委托报酬。"),
+            CommissionStateConflictError: ("COMMISSION_STATE_CONFLICT", "委托当前状态不允许此操作。"),
+            CommissionNotFoundError: ("COMMISSION_NOT_FOUND", "生产委托不存在。"),
+            CommissionExpiredError: ("COMMISSION_EXPIRED", "生产委托已经过期。"),
+            CommissionSelfAcceptError: ("COMMISSION_SELF_ACCEPT", "不能接取自己发布的生产委托。"),
+            CommissionRequirementError: ("COMMISSION_REQUIREMENT_MISSING", "当前境界、道途或资源不满足该委托。"),
+            CommissionDeliveryError: ("COMMISSION_DELIVERY_INVALID", "当前委托不在可交付或确认状态。"),
         }
         code, message = messages.get(type(exc), ("PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。"))
         return CommandResult(False, code, message, context.request_id, operation_id, retryable=isinstance(exc, RepositoryBusyError))
+
+    @staticmethod
+    def _commission_data(record) -> dict[str, object]:
+        return {
+            "commission_id": record.commission_id,
+            "status": record.status,
+            "publisher_player_id": record.publisher_player_id,
+            "publisher_platform_user_id": record.publisher_platform_user_id,
+            "publisher_dao_name": record.publisher_dao_name,
+            "producer_player_id": record.producer_player_id,
+            "producer_platform_user_id": record.producer_platform_user_id,
+            "producer_dao_name": record.producer_dao_name,
+            "recipe_key": record.recipe_key,
+            "recipe_name": record.recipe_name,
+            "reward_stones": record.reward_stones,
+            "material_mode": record.material_mode,
+            "starts_at": record.starts_at,
+            "ends_at": record.ends_at,
+            "expires_at": record.expires_at,
+            "outputs": record.outputs,
+            "refunds": record.refunds,
+            "producer_payment": record.producer_payment,
+            "publisher_refund": record.publisher_refund,
+            "platform_fee": record.platform_fee,
+            "quality_bp": record.quality_bp,
+            "idempotent_replay": record.already_completed,
+        }
+
+    @staticmethod
+    def _commission_mode(args: tuple[str, ...]) -> str | None:
+        if len(args) == 2:
+            return "producer_supplies"
+        if len(args) != 3:
+            return None
+        return {
+            "生产者供料": "producer_supplies",
+            "自备材料": "producer_supplies",
+            "producer": "producer_supplies",
+            "委托人供料": "publisher_supplies",
+            "委托方供料": "publisher_supplies",
+            "publisher": "publisher_supplies",
+        }.get(args[2])
+
+    async def create_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) not in {2, 3}:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `发布生产委托 配方 报酬 [委托人供料]`。", context.request_id)
+        recipe_key = resolve_recipe(context.command_args[0])
+        if recipe_key not in COMMISSION_RECIPES:
+            return CommandResult(False, "COMMISSION_RECIPE_FORBIDDEN", "当前只开放疗伤丹和木纹剑生产委托。", context.request_id)
+        try:
+            reward = int(context.command_args[1])
+        except ValueError:
+            return CommandResult(False, "COMMISSION_ESCROW_CONFLICT", "委托报酬必须是 1-500 灵石。", context.request_id)
+        mode = self._commission_mode(context.command_args)
+        if mode is None:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "供料方式只能填写 `委托人供料` 或 `生产者供料`。", context.request_id)
+        operation_id = self._operation_id(context, "economy.create_production_commission")
+        try:
+            record = await self.repository.create_production_commission(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                recipe_key=recipe_key,
+                reward_stones=reward,
+                material_mode=mode,
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(
+            True,
+            "COMMISSION_CREATED",
+            f"## 生产委托已发布\n\n**{record.recipe_name}**，报酬 {record.reward_stones} 灵石。\n\n- **委托号**：`{record.commission_id}`\n- **供料方式**：{record.material_mode}\n- **有效至**：{record.expires_at}\n\n> 报酬已锁定；委托人供料时材料也已锁定。",
+            context.request_id,
+            operation_id,
+            data=self._commission_data(record),
+        )
+
+    async def list_production_commissions(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "生产委托列表无需附加参数。", context.request_id)
+        try:
+            records = await self.repository.list_production_commissions(
+                platform=context.adapter, platform_user_id=context.user_id
+            )
+        except Exception as exc:
+            return self._error(context, "", exc)
+        if not records:
+            return CommandResult(True, "COMMISSION_LIST_EMPTY", "当前没有公开的生产委托。", context.request_id, data={"commissions": []})
+        lines = ["## 生产委托列表", ""]
+        data = []
+        for record in records:
+            lines.append(
+                f"- `{record.commission_id}` {record.recipe_name}，报酬 {record.reward_stones} 灵石，委托人 {record.publisher_dao_name}"
+            )
+            data.append(self._commission_data(record))
+        return CommandResult(True, "COMMISSION_LISTED", "\n".join(lines), context.request_id, data={"commissions": data})
+
+    async def accept_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `接取生产委托 委托号`。", context.request_id)
+        operation_id = self._operation_id(context, "economy.accept_production_commission")
+        try:
+            record = await self.repository.accept_production_commission(
+                platform=context.adapter, platform_user_id=context.user_id,
+                commission_id=context.command_args[0], operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(
+            True,
+            "COMMISSION_ACCEPTED",
+            f"## 生产委托已接取\n\n你已接取 **{record.recipe_name}**。材料、精力和工具已锁定，完成后发送 `交付生产委托 {record.commission_id}`。",
+            context.request_id,
+            operation_id,
+            data=self._commission_data(record),
+        )
+
+    async def deliver_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `交付生产委托 委托号`。", context.request_id)
+        operation_id = self._operation_id(context, "economy.deliver_production_commission")
+        try:
+            record = await self.repository.deliver_production_commission(
+                platform=context.adapter, platform_user_id=context.user_id,
+                commission_id=context.command_args[0], operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        if record.status == "failed":
+            text = f"## 生产委托失败\n\n委托 `{record.commission_id}` 生产失败，已返还报酬 {record.publisher_refund} 灵石及部分材料。"
+        else:
+            text = f"## 成品待确认\n\n**{record.recipe_name}**已完成，产物暂存于委托中。请委托人发送 `确认生产委托 {record.commission_id}`。"
+        return CommandResult(True, "COMMISSION_DELIVERED", text, context.request_id, operation_id, data=self._commission_data(record))
+
+    async def settle_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `确认生产委托 委托号`。", context.request_id)
+        operation_id = self._operation_id(context, "economy.settle_production_commission")
+        try:
+            record = await self.repository.settle_production_commission(
+                platform=context.adapter, platform_user_id=context.user_id,
+                commission_id=context.command_args[0], operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(True, "COMMISSION_SETTLED", f"## 生产委托已结算\n\n{record.recipe_name} 已交付，生产者获得 {record.producer_payment} 灵石，平台手续费 {record.platform_fee} 灵石。", context.request_id, operation_id, data=self._commission_data(record))
+
+    async def cancel_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `取消生产委托 委托号`。", context.request_id)
+        operation_id = self._operation_id(context, "economy.cancel_production_commission")
+        try:
+            record = await self.repository.cancel_production_commission(
+                platform=context.adapter, platform_user_id=context.user_id,
+                commission_id=context.command_args[0], operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(True, "COMMISSION_CANCELLED", f"## 生产委托已取消\n\n委托 `{record.commission_id}` 已取消，报酬和锁定资源已按规则释放。", context.request_id, operation_id, data=self._commission_data(record))
+
+    async def expire_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `清理生产委托 委托号`。", context.request_id)
+        operation_id = self._operation_id(context, "economy.expire_production_commission")
+        try:
+            record = await self.repository.expire_production_commission(
+                platform=context.adapter, platform_user_id=context.user_id,
+                commission_id=context.command_args[0], operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(True, "COMMISSION_EXPIRED", f"## 生产委托已过期\n\n委托 `{record.commission_id}` 已关闭，报酬和材料已释放。", context.request_id, operation_id, data=self._commission_data(record))
+
+    async def recover_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `恢复生产委托 委托号`。", context.request_id)
+        operation_id = self._operation_id(context, "economy.recover_production_commission")
+        try:
+            record = await self.repository.recover_production_commission(
+                platform=context.adapter, platform_user_id=context.user_id,
+                commission_id=context.command_args[0], operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(True, "COMMISSION_RECOVERED", f"## 过期生产委托已恢复\n\n委托 `{record.commission_id}` 已按原生产快照结算，状态为 {record.status}。", context.request_id, operation_id, data=self._commission_data(record))
 
     async def create_market_order(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 3:

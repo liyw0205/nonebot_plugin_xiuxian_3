@@ -1123,7 +1123,7 @@ CREATE TABLE IF NOT EXISTS economy_ledger_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     operation_id TEXT NOT NULL,
     player_id INTEGER NOT NULL REFERENCES players(id),
-    asset_kind TEXT NOT NULL CHECK (asset_kind IN ('currency', 'item')),
+    asset_kind TEXT NOT NULL CHECK (asset_kind IN ('currency', 'item', 'resource')),
     asset_key TEXT NOT NULL,
     reason TEXT NOT NULL,
     direction TEXT NOT NULL CHECK (direction IN ('credit', 'debit', 'lock', 'release')),
@@ -1168,6 +1168,49 @@ CREATE TABLE IF NOT EXISTS market_item_locks (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS production_commission_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    commission_id TEXT NOT NULL UNIQUE,
+    publisher_player_id INTEGER NOT NULL REFERENCES players(id),
+    producer_player_id INTEGER REFERENCES players(id),
+    recipe_key TEXT NOT NULL,
+    reward_stones INTEGER NOT NULL CHECK (reward_stones BETWEEN 1 AND 500),
+    material_mode TEXT NOT NULL CHECK (material_mode IN ('producer_supplies', 'publisher_supplies')),
+    status TEXT NOT NULL CHECK (status IN ('draft', 'published', 'accepted', 'locked', 'processing', 'completed', 'failed', 'delivered', 'settled', 'cancelled', 'expired')),
+    published_at TEXT NOT NULL,
+    accepted_at TEXT,
+    starts_at TEXT,
+    ends_at TEXT,
+    expires_at TEXT NOT NULL,
+    settled_at TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_production_commissions_status
+    ON production_commission_orders(status, expires_at);
+CREATE INDEX IF NOT EXISTS idx_production_commissions_publisher
+    ON production_commission_orders(publisher_player_id, status);
+CREATE INDEX IF NOT EXISTS idx_production_commissions_producer
+    ON production_commission_orders(producer_player_id, status);
+
+CREATE TABLE IF NOT EXISTS production_commission_locks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    commission_id TEXT NOT NULL REFERENCES production_commission_orders(commission_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    asset_kind TEXT NOT NULL CHECK (asset_kind IN ('item', 'energy', 'tool')),
+    asset_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity >= 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (commission_id, player_id, asset_kind, asset_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_production_commission_locks_player
+    ON production_commission_locks(player_id, asset_kind, asset_key);
 
 
 """

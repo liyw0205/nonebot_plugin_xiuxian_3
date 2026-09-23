@@ -954,3 +954,35 @@ class MarketOrderLimitError(RuntimeError):
 
 class MarketItemForbiddenError(RuntimeError):
     """The requested item is bound, a credential, or otherwise non-tradeable."""
+
+
+class CommissionRecipeForbiddenError(RuntimeError):
+    """The recipe is not available for player production commissions."""
+
+
+class CommissionEscrowConflictError(RuntimeError):
+    """The commission cannot reserve or release its reward escrow."""
+
+
+class CommissionStateConflictError(RuntimeError):
+    """The commission is not in a state valid for the requested transition."""
+
+
+class CommissionNotFoundError(RuntimeError):
+    """The requested production commission does not exist."""
+
+
+class CommissionExpiredError(RuntimeError):
+    """The production commission passed its deadline."""
+
+
+class CommissionSelfAcceptError(RuntimeError):
+    """A publisher cannot accept their own production commission."""
+
+
+class CommissionRequirementError(RuntimeError):
+    """The producer does not satisfy recipe or resource requirements."""
+
+
+class CommissionDeliveryError(RuntimeError):
+    """The requested commission delivery transition is invalid."""

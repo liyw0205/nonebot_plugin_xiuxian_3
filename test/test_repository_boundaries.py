@@ -52,6 +52,14 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "begin_dao_union": "nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_repository",
         "preview_final_battle": "nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_repository",
         "choose_ending": "nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_repository",
+        "create_market_order": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
+        "buy_market_order": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
+        "cancel_market_order": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
+        "create_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
+        "accept_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
+        "deliver_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
+        "settle_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
+        "cancel_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
     }
 
     assert {

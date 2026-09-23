@@ -16,6 +16,13 @@ MARKET_MAX_UNIT_PRICE = 100_000
 MARKET_LISTING_FEE_PER_ITEM = 1
 MARKET_TRADE_FEE_BP = 500
 MARKET_BP_DENOMINATOR = 10_000
+COMMISSION_MIN_REWARD = 1
+COMMISSION_MAX_REWARD = 500
+COMMISSION_PLATFORM_FEE_BP = 200
+COMMISSION_FAILURE_REFUND_BP = 8000
+COMMISSION_TTL_SECONDS = 24 * 60 * 60
+COMMISSION_RECOVERY_GRACE_SECONDS = 24 * 60 * 60
+COMMISSION_RECIPES = frozenset({"recipe.pill.healing_low", "recipe.weapon.wood_sword"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +82,14 @@ def trade_fee(total_price: int) -> int:
     return max(1, (total_price * MARKET_TRADE_FEE_BP + MARKET_BP_DENOMINATOR - 1) // MARKET_BP_DENOMINATOR)
 
 
+def commission_platform_fee(reward: int) -> int:
+    return (reward * COMMISSION_PLATFORM_FEE_BP) // MARKET_BP_DENOMINATOR
+
+
+def commission_failure_refund(reward: int) -> int:
+    return (reward * COMMISSION_FAILURE_REFUND_BP) // MARKET_BP_DENOMINATOR
+
+
 __all__ = [
     "ECONOMY_CONTENT_VERSION",
     "ECONOMY_RULE_VERSION",
@@ -86,9 +101,18 @@ __all__ = [
     "MARKET_MIN_QUANTITY",
     "MARKET_MIN_UNIT_PRICE",
     "MARKET_ORDER_TTL_SECONDS",
+    "COMMISSION_FAILURE_REFUND_BP",
+    "COMMISSION_MAX_REWARD",
+    "COMMISSION_MIN_REWARD",
+    "COMMISSION_PLATFORM_FEE_BP",
+    "COMMISSION_RECIPES",
+    "COMMISSION_RECOVERY_GRACE_SECONDS",
+    "COMMISSION_TTL_SECONDS",
     "MarketItem",
     "listing_fee",
     "resolve_market_item",
     "trade_fee",
+    "commission_failure_refund",
+    "commission_platform_fee",
     "validate_market_listing",
 ]
