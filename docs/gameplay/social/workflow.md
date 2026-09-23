@@ -3,6 +3,7 @@
 ```text
 application -> accepted/rejected/expired
 member -> active -> left/kicked
+mentor -> invited -> active -> graduated/rejected/expired
 party -> forming -> ready -> running -> settled/disbanded
 service -> created -> accepted -> locked -> processing -> delivered -> settled
 ```
@@ -15,3 +16,6 @@ service -> created -> accepted -> locked -> processing -> delivered -> settled
 宗门职位首版：成员、执事、长老、副宗主、宗主。公共仓库、成员管理、职位和解散均需要权限与审计。
 
 队伍中任何成员不满足地点、境界或资源条件，行动整体拒绝。队长离开按规则转移或解散，不能留下不可结算队伍。
+
+师徒邀请保存 24 小时截止时间并在接受/拒绝时清理过期状态。毕业由师傅发起，要求徒弟已入道、
+达到聚气 L3 且存在已完成生产或已交付常驻经营服务；毕业关系 ID 作为唯一结算键。

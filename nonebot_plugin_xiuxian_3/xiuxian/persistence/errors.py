@@ -428,6 +428,34 @@ class PartyNotReadyError(RuntimeError):
     """The party does not have two active, confirmed members."""
 
 
+class MentorRequirementError(RuntimeError):
+    """The actor or target does not satisfy the mentor relationship gate."""
+
+
+class MentorRelationConflictError(RuntimeError):
+    """Either player already has an active or pending mentor relationship."""
+
+
+class MentorInvitationNotFoundError(RuntimeError):
+    """The requested mentor invitation does not exist for the actor."""
+
+
+class MentorInvitationExpiredError(RuntimeError):
+    """The requested mentor invitation has expired."""
+
+
+class MentorPermissionDeniedError(RuntimeError):
+    """The actor lacks permission for the mentor transition."""
+
+
+class MentorGraduationNotReadyError(RuntimeError):
+    """The apprentice has not satisfied all graduation conditions."""
+
+
+class MentorStateConflictError(RuntimeError):
+    """The mentor relation is not in a state that accepts this transition."""
+
+
 class EndingInvalidError(RuntimeError):
     """The requested terminal ending key is not supported."""
 

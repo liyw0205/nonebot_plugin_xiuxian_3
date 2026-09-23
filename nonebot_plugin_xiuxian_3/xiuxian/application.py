@@ -24,6 +24,7 @@ from .livelihood.route_use_cases import RouteApplication
 from .livelihood.service_use_cases import ServiceApplication
 from .social.sect_use_cases import SectApplication
 from .social.party_use_cases import PartyApplication
+from .social.mentor_use_cases import MentorApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -53,6 +54,7 @@ class XiuxianApplication:
         self.service = ServiceApplication(repository)
         self.social = SectApplication(repository)
         self.party = PartyApplication(repository)
+        self.mentor = MentorApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -551,6 +553,18 @@ class XiuxianApplication:
 
     async def get_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.get_party(context), require_write=False)
+
+    async def invite_mentor(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.mentor.invite_mentor(context), write_message="当前事件不允许发出拜师邀请。")
+
+    async def accept_mentor(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.mentor.accept_mentor(context), write_message="当前事件不允许接受拜师邀请。")
+
+    async def reject_mentor(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.mentor.reject_mentor(context), write_message="当前事件不允许拒绝拜师邀请。")
+
+    async def graduate_apprentice(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.mentor.graduate_apprentice(context), write_message="当前事件不允许办理师徒毕业。")
 
     async def accept_service(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

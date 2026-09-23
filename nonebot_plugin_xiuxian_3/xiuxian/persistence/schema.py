@@ -386,6 +386,35 @@ CREATE INDEX IF NOT EXISTS idx_party_members_player ON party_members(player_id, 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_party_members_current_player
     ON party_members(player_id) WHERE status IN ('invited', 'active');
 
+CREATE TABLE IF NOT EXISTS mentor_relations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relation_id TEXT NOT NULL UNIQUE,
+    master_id INTEGER NOT NULL REFERENCES players(id),
+    apprentice_id INTEGER NOT NULL REFERENCES players(id),
+    status TEXT NOT NULL CHECK (status IN ('invited', 'active', 'rejected', 'expired', 'graduated')),
+    expires_at TEXT NOT NULL,
+    invited_at TEXT NOT NULL,
+    accepted_at TEXT,
+    rejected_at TEXT,
+    graduated_at TEXT,
+    graduate_operation_id TEXT UNIQUE,
+    master_contribution INTEGER NOT NULL DEFAULT 0 CHECK (master_contribution >= 0),
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK (master_id <> apprentice_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mentor_relations_master
+    ON mentor_relations(master_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_mentor_relations_apprentice
+    ON mentor_relations(apprentice_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mentor_relations_active_master
+    ON mentor_relations(master_id, apprentice_id) WHERE status IN ('invited', 'active');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mentor_relations_active_apprentice
+    ON mentor_relations(apprentice_id) WHERE status = 'active';
+
 CREATE TABLE IF NOT EXISTS constitution_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL UNIQUE,
