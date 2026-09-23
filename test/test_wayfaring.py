@@ -10,6 +10,9 @@ from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
 
+TEST_NOW = datetime(2026, 9, 22, 12, tzinfo=timezone.utc)
+
+
 def _context(user_id: str, request_id: str, *, operation_id: str = "") -> CommandContext:
     return CommandContext(
         adapter="web",
@@ -20,7 +23,7 @@ def _context(user_id: str, request_id: str, *, operation_id: str = "") -> Comman
 
 
 def _insert_source_operations(runtime, user_id: str, names: list[str]) -> None:
-    now = datetime(2026, 9, 22, 12, tzinfo=timezone.utc).isoformat()
+    now = TEST_NOW.isoformat()
     with sqlite3.connect(runtime.settings.database_path) as connection:
         player_id = connection.execute(
             "SELECT id FROM players WHERE platform_user_id = ?", (user_id,)
@@ -40,7 +43,7 @@ def _insert_source_operations(runtime, user_id: str, names: list[str]) -> None:
 def test_wayfaring_start_status_caps_and_free_claim_are_idempotent() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: TEST_NOW)
             user = "wayfaring-user"
             assert (await runtime.dispatch(_context(user, "create"), "开始修仙")).ok
             started = await runtime.dispatch(_context(user, "start"), "开始行卷")
@@ -87,7 +90,7 @@ def test_wayfaring_start_status_caps_and_free_claim_are_idempotent() -> None:
 def test_wayfaring_paid_track_requires_monthly_contract_without_asset_change() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: TEST_NOW)
             user = "wayfaring-paid-user"
             assert (await runtime.dispatch(_context(user, "create"), "开始修仙")).ok
             assert (await runtime.dispatch(_context(user, "start"), "开始行卷")).ok

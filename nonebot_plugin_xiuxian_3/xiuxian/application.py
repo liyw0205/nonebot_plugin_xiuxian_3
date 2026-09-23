@@ -22,6 +22,7 @@ from .advancement.equipment_use_cases import EquipmentApplication
 from .livelihood.use_cases import LivelihoodApplication
 from .livelihood.route_use_cases import RouteApplication
 from .livelihood.service_use_cases import ServiceApplication
+from .social.sect_use_cases import SectApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -49,6 +50,7 @@ class XiuxianApplication:
         self.livelihood = LivelihoodApplication(repository)
         self.route = RouteApplication(repository)
         self.service = ServiceApplication(repository)
+        self.social = SectApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -478,6 +480,40 @@ class XiuxianApplication:
             lambda: self.route.settle_route(context),
             write_message="当前事件不允许结算运输路线。",
         )
+
+    async def create_sect(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.social.create_sect(context),
+            write_message="当前事件不允许创建宗门。",
+        )
+
+    async def apply_sect(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.social.apply_sect(context),
+            write_message="当前事件不允许申请加入宗门。",
+        )
+
+    async def list_sect_applications(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.social.list_applications(context), require_write=False)
+
+    async def review_sect_application(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.social.review_application(context),
+            write_message="当前事件不允许审批宗门申请。",
+        )
+
+    async def leave_sect(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.social.leave_sect(context),
+            write_message="当前事件不允许离开宗门。",
+        )
+
+    async def get_sect_profile(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.social.get_profile(context), require_write=False)
 
     async def accept_service(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

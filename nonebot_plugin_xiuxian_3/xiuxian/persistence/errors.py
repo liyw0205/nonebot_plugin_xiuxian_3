@@ -340,6 +340,58 @@ class RouteAlreadySettledError(RuntimeError):
     """The route already has a terminal settlement."""
 
 
+class SectContentClosedError(RuntimeError):
+    """The requested sect content is not open."""
+
+
+class SectNameInvalidError(RuntimeError):
+    """The sect name or motto does not satisfy content limits."""
+
+
+class SectRequirementError(RuntimeError):
+    """The player does not satisfy the sect creation requirement."""
+
+
+class SectAlreadyJoinedError(RuntimeError):
+    """The player already belongs to a sect."""
+
+
+class SectJoinCooldownError(RuntimeError):
+    """The player is still in the post-leave sect cooldown."""
+
+
+class SectNotFoundError(RuntimeError):
+    """The requested sect does not exist or is not active."""
+
+
+class SectFullError(RuntimeError):
+    """The sect has no available member slot."""
+
+
+class SectApplicationExistsError(RuntimeError):
+    """The player already has a pending application for this sect."""
+
+
+class SectApplicationNotFoundError(RuntimeError):
+    """The requested sect application does not exist."""
+
+
+class SectApplicationExpiredError(RuntimeError):
+    """The requested sect application has expired."""
+
+
+class SectPermissionDeniedError(RuntimeError):
+    """The actor does not have the required sect role."""
+
+
+class SectAssetLockedError(RuntimeError):
+    """The player has an active session or order that blocks leaving."""
+
+
+class SectLeaderCannotLeaveError(RuntimeError):
+    """The sect leader must transfer leadership before leaving."""
+
+
 class ConstitutionAlreadySelectedError(RuntimeError):
     """The player already has a main constitution."""
 

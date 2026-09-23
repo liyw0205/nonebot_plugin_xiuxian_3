@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS players (
     dao_fruit_key TEXT,
     endgame_status TEXT NOT NULL DEFAULT 'none',
     ending_key TEXT,
+    sect_join_cooldown_until TEXT,
     durability_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -270,6 +271,65 @@ CREATE INDEX IF NOT EXISTS idx_livelihood_trade_routes_player
     ON livelihood_trade_routes(player_id, business_date, status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_livelihood_trade_routes_active
     ON livelihood_trade_routes(player_id) WHERE status = 'in_transit';
+
+CREATE TABLE IF NOT EXISTS sects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sect_id TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL UNIQUE,
+    motto TEXT NOT NULL DEFAULT '',
+    leader_id INTEGER NOT NULL REFERENCES players(id),
+    status TEXT NOT NULL CHECK (status IN ('active', 'dissolving', 'dissolved')),
+    max_members INTEGER NOT NULL CHECK (max_members > 0),
+    warehouse_capacity INTEGER NOT NULL CHECK (warehouse_capacity >= 0),
+    construction INTEGER NOT NULL DEFAULT 0 CHECK (construction >= 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sects_status ON sects(status, created_at);
+
+CREATE TABLE IF NOT EXISTS sect_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    role TEXT NOT NULL CHECK (role IN ('member', 'deacon', 'elder', 'vice_leader', 'leader')),
+    status TEXT NOT NULL CHECK (status IN ('active', 'left', 'kicked')),
+    contribution INTEGER NOT NULL DEFAULT 0 CHECK (contribution >= 0),
+    joined_at TEXT NOT NULL,
+    left_at TEXT,
+    last_action_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_members_sect ON sect_members(sect_id, status, role);
+CREATE INDEX IF NOT EXISTS idx_sect_members_player ON sect_members(player_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sect_members_active_player
+    ON sect_members(player_id) WHERE status = 'active';
+
+CREATE TABLE IF NOT EXISTS sect_applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id TEXT NOT NULL UNIQUE,
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    applicant_id INTEGER NOT NULL REFERENCES players(id),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'expired', 'withdrawn')),
+    reason TEXT NOT NULL DEFAULT '',
+    review_reason TEXT NOT NULL DEFAULT '',
+    reviewer_id INTEGER REFERENCES players(id),
+    apply_operation_id TEXT NOT NULL UNIQUE,
+    review_operation_id TEXT UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_applications_sect ON sect_applications(sect_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_sect_applications_applicant ON sect_applications(applicant_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sect_applications_pending
+    ON sect_applications(sect_id, applicant_id) WHERE status = 'pending';
 
 CREATE TABLE IF NOT EXISTS constitution_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

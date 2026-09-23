@@ -23,6 +23,7 @@ from ..adventures.repository import AdventuresRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
 from ..livelihood.repository import LivelihoodRepositoryMixin
+from ..social.sect_repository import SectRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
 from .errors import *  # noqa: F401,F403
 from .schema import SCHEMA
@@ -39,6 +40,7 @@ class SQLitePlayerRepository(
     AdventuresRepositoryMixin,
     ProductionRepositoryMixin,
     LivelihoodRepositoryMixin,
+    SectRepositoryMixin,
     AdvancementRepositoryMixin,
     CultivationRepositoryMixin,
     BreakthroughRepositoryMixin,
@@ -250,6 +252,7 @@ class SQLitePlayerRepository(
             ("dao_fruit_key", "TEXT"),
             ("endgame_status", "TEXT NOT NULL DEFAULT 'none'"),
             ("ending_key", "TEXT"),
+            ("sect_join_cooldown_until", "TEXT"),
         ):
             if column not in player_columns:
                 connection.execute(f"ALTER TABLE players ADD COLUMN {column} {definition}")
