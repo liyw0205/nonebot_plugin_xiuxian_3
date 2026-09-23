@@ -255,16 +255,64 @@ def test_foundation_late_milestone_is_recorded_with_the_layer_advance() -> None:
                     "foundation-late-advance",
                 )
                 assert json.loads(record[3]) == {
+                    "domain_level": 0,
                     "maximum_faction_reputation": 0,
                     "realm_key": "foundation",
                     "realm_layer": 9,
                     "required_layer": 9,
+                    "required_domain_level": 0,
                     "required_max_faction_reputation": 0,
                     "required_realm": "foundation",
                     "required_total_cultivation": 10000,
                     "total_cultivation": 10000,
                 }
                 assert record[4:] == ("content-0.2", "progression-0.2.0")
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_soul_transformation_late_milestone_requires_domain_level() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "soul-late-user"
+            await _enter_cultivator(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET realm_key = 'soul_transformation', realm_layer = 8, cultivation = 480000,
+                        total_cultivation = 720000, domain_level = 2
+                    WHERE platform_user_id = ?
+                    """,
+                    (user,),
+                )
+            below = await runtime.dispatch(_context(user, "soul-late-below"), "晋升境界")
+            assert below.code == "REALM_LAYER_ADVANCED"
+            assert below.data["unlocks"] == []
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET cultivation = 600000, total_cultivation = 720000, domain_level = 3
+                    WHERE platform_user_id = ?
+                    """,
+                    (user,),
+                )
+            fulfilled = await runtime.dispatch(_context(user, "soul-late-fulfilled"), "晋升境界")
+            assert fulfilled.code == "REALM_LAYER_ADVANCED"
+            assert {item["key"] for item in fulfilled.data["unlocks"]} == {
+                "milestone.soul_transformation_late"
+            }
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                snapshot = json.loads(
+                    connection.execute(
+                        "SELECT snapshot_json FROM progression_milestones WHERE milestone_key = 'milestone.soul_transformation_late'"
+                    ).fetchone()[0]
+                )
+                assert snapshot["domain_level"] == snapshot["required_domain_level"] == 3
             await runtime.close()
 
     asyncio.run(run())

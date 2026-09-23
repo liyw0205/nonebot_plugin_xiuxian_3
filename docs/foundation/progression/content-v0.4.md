@@ -17,6 +17,11 @@
 
 v0.3 或更低版本读取这些内容时状态为 `locked`，只能展示前置条件；不得扣材料或创建会话。
 
+当前运行时在 `progression.advance_layer` 成功进入化神 L9（或之后的层数），总修为达到
+720,000 且领域等级达到 3 时，原子写入 `milestone.soul_transformation_late` 资格记录。
+快照冻结境界、层数、总修为、领域等级、内容/规则版本和来源 operation；同一角色只会获得一次，
+并随晋升 operation 回放原结果。
+
 ## 2. 化神突破：`progression.breakthrough_soul_transformation`
 
 输入：`player_id`、可选 `use_domain_stabilizer`、`operation_id`。创建时锁定角色、元婴状态、神魂、三界声望、装备/道途、地点、材料和 `random_pool=breakthrough.soul_transformation.v0.4`。
