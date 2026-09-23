@@ -16,6 +16,7 @@ class CultivationSessionRecord:
     starts_at: str
     ends_at: str
     stamina_cost: int
+    energy_cost: int = 0
     already_completed: bool = False
 
 
@@ -26,12 +27,16 @@ class CultivationMode:
     key: str
     label: str
     stamina_cost: int
+    energy_cost: int
     duration_seconds: int
     base_cultivation: int
     environment_bp: int
     daily_limit: int | None
     rule_version: str
     required_location: str | None = None
+    required_realm: str | None = None
+    required_layer: int = 0
+    requires_solitude: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +64,7 @@ class CultivationCancelRecord:
     player: PlayerView
     session_id: str
     stamina_refund: int
+    energy_refund: int = 0
     already_completed: bool = False
 
 

@@ -3,7 +3,7 @@
 本文件遵守 [版本内容开发合同](../../content-development-contract.md) 和[境界十层与段位规范](layers.md)。
 
 - `content_version`：`content-0.1`
-- `rule_version`：`progression-0.1.1`（调息）；`progression-0.1.2`（灵泉）；`progression-0.1.3`（聚气突破）；`progression-0.1.4`（筑基突破）
+- `rule_version`：`progression-0.1.1`（调息）；`progression-0.1.2`（灵泉）；`progression-0.1.3`（聚气突破）；`progression-0.1.4`（筑基突破）；`progression-0.1.5`（静修）
 - 开放写用例：`progression.start_cultivation`、`progression.settle_cultivation`、`progression.advance_layer`、`progression.breakthrough_qi_gathering`、`progression.breakthrough_foundation`、`progression.recover_weakness`。
 - 角色在 `player.enter_cultivation` 成功后进入 `qi_sensing` L1（感气一层/入门）；`mortal` 没有修为资产，不能创建修炼或突破 operation。
 
@@ -44,7 +44,7 @@
 
 会话状态：`created -> running -> settled | cancelled | expired`。未到结束时间返回 `CULTIVATION_NOT_READY`；超过结束时间 24 小时可由恢复任务按原快照结算。当前最小实现允许 `running` 阶段取消并返还已锁定体力；重复 operation/结算返回同一会话与结果。
 
-当前运行时开放 `cultivate.breathing` 和 `cultivate.spirit_spring` 的
+当前运行时开放 `cultivate.breathing`、`cultivate.spirit_spring` 和 `cultivate.seclusion` 的
 `running -> settled/cancelled/expired` 最小实现。调息使用 `开始修炼`，灵泉使用
 `开始修炼 灵泉`；两者都支持 `结算修炼`、`恢复修炼` 和 `取消修炼`。调息开始时扣除
 2 点体力并冻结悟性、境界、地点和规则版本，10 分钟后才能结算；灵泉要求感气二层、
@@ -53,7 +53,7 @@
 允许普通结算，超过窗口标记为 `expired`，只能由 `恢复修炼` 按原快照完成一次迟到结算；
 相同 operation 回放原结果，不同 operation 也不能重复增加修为。取消会原子返还对应模式
 的体力。修为收益写入境内修为与总修为，随后由 `晋升境界` 独立 operation 逐层推进。
-`cultivate.seclusion` 仍保持未开放。
+静修使用 `开始修炼 静修`，要求聚气一层且没有队伍、战斗或生产锁；开始时原子扣除 6 点体力和 2 点精力，持续 30 分钟，基础修为 170，每日最多 2 次。静修取消时按开始快照返还体力和精力；结算同样只增加修为，不会自动晋层。
 
 聚气突破已接入最小运行时闭环：感气 L10 混元、总修为至少 1,360，且未处于修炼、生产或
 虚弱状态时，可发送 `突破预览 聚气` 查看条件，再发送 `开始突破 聚气`（可追加 `护脉`）创建

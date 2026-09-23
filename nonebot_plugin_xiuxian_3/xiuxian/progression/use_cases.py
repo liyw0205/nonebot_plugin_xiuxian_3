@@ -11,6 +11,7 @@ from ..repository import (
     CultivationExpiredError,
     CultivationNotFoundError,
     CultivationNotReadyError,
+    CultivationRequirementError,
     CultivationRecoveryRequiredError,
     LocationRequiredError,
     LocationRequirementError,
@@ -27,6 +28,7 @@ from ..repository import (
 )
 from .rules import (
     MODE_BREATHING,
+    MODE_SECLUSION,
     MODE_SPIRIT_SPRING,
     can_advance_layer,
     cultivation_mode,
@@ -49,6 +51,8 @@ class ProgressionApplication:
             return MODE_BREATHING
         if len(args) == 1 and args[0] in {"灵泉", "灵泉修炼", "灵泉谷"}:
             return MODE_SPIRIT_SPRING
+        if len(args) == 1 and args[0] in {"静修", "静修修炼"}:
+            return MODE_SECLUSION
         return None
 
     @staticmethod
@@ -80,7 +84,7 @@ class ProgressionApplication:
             return CommandResult(
                 False,
                 "INVALID_CULTIVATION_MODE",
-                "目前支持 `开始修炼`（调息）或 `开始修炼 灵泉`。",
+                "目前支持 `开始修炼`（调息）、`开始修炼 灵泉` 或 `开始修炼 静修`。",
                 context.request_id,
             )
         operation_id = self._operation_id(context, "progression.start_cultivation")
@@ -100,7 +104,26 @@ class ProgressionApplication:
         except CultivationBusyError:
             return CommandResult(False, "CULTIVATION_BUSY", "你已经有一场修炼正在进行，请先结算或取消。", context.request_id, operation_id)
         except CultivationDailyLimitError:
-            return CommandResult(False, "CULTIVATION_DAILY_LIMIT", "灵泉修炼今日次数已用尽，明日再来。", context.request_id, operation_id)
+            return CommandResult(
+                False,
+                "CULTIVATION_DAILY_LIMIT",
+                f"{cultivation_mode_label(mode_key)}今日次数已用尽，明日再来。",
+                context.request_id,
+                operation_id,
+            )
+        except CultivationRequirementError:
+            requirement_message = (
+                "静修需要达到聚气一层。"
+                if mode_key == MODE_SECLUSION
+                else f"{cultivation_mode_label(mode_key)}所需境界尚未达到。"
+            )
+            return CommandResult(
+                False,
+                "CULTIVATION_REQUIREMENT_MISSING",
+                requirement_message,
+                context.request_id,
+                operation_id,
+            )
         except LocationRequiredError:
             return CommandResult(False, "LOCATION_REQUIRED", "灵泉修炼需要先抵达灵泉谷。", context.request_id, operation_id)
         except LocationRequirementError:
@@ -108,7 +131,7 @@ class ProgressionApplication:
         except CultivationRecoveryRequiredError:
             return CommandResult(False, "CULTIVATION_RECOVERY_REQUIRED", "上一场修炼已过期，请先发送 `恢复修炼` 完成结算。", context.request_id, operation_id)
         except ResourceInsufficientError:
-            return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，暂时无法开始修炼。", context.request_id, operation_id)
+            return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力或精力不足，暂时无法开始修炼。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求的操作编号已用于其他修炼，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
@@ -118,13 +141,20 @@ class ProgressionApplication:
 
         player = record.player
         mode = cultivation_mode(record.mode_key)
+        energy_lines = (
+            f"- **消耗精力**：{record.energy_cost}\n"
+            f"- **剩余精力**：{player.energy}/{player.energy_max}\n"
+            if record.energy_cost
+            else ""
+        )
         message = (
             "## 修炼已开始\n\n"
             f"**{self._display_name(player)}**已开始{mode.label}。\n\n"
             f"- **消耗体力**：{record.stamina_cost}\n"
             f"- **剩余体力**：{player.stamina}/{player.stamina_max}\n"
+            f"{energy_lines}"
             f"- **预计时长**：{mode.duration_seconds // 60} 分钟\n\n"
-            "> 下一步：修炼结束后发送 `结算修炼`；也可以发送 `取消修炼` 返还体力。"
+            "> 下一步：修炼结束后发送 `结算修炼`；也可以发送 `取消修炼` 返还已消耗资源。"
         )
         return CommandResult(
             True,
@@ -140,6 +170,9 @@ class ProgressionApplication:
                 "status": record.status,
                 "stamina": player.stamina,
                 "stamina_cost": record.stamina_cost,
+                "energy": player.energy,
+                "energy_cost": record.energy_cost,
+                "starts_at": record.starts_at,
                 "ends_at": record.ends_at,
                 "idempotent_replay": record.already_completed,
             },
@@ -295,13 +328,15 @@ class ProgressionApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         player = record.player
+        energy_refund_line = f"- **返还精力**：{record.energy_refund}\n" if record.energy_refund else ""
         return CommandResult(
             True,
             "CULTIVATION_CANCELLED",
             (
                 "## 修炼已取消\n\n"
-                f"**{self._display_name(player)}**收回了本次修炼消耗的体力。\n\n"
+                f"**{self._display_name(player)}**收回了本次修炼消耗的资源。\n\n"
                 f"- **返还体力**：{record.stamina_refund}\n"
+                f"{energy_refund_line}"
                 f"- **体力**：{player.stamina}/{player.stamina_max}\n\n"
                 "> 下一步：准备好后可再次发送 `开始修炼`。"
             ),
@@ -311,6 +346,8 @@ class ProgressionApplication:
                 "dao_name": player.dao_name,
                 "stamina": player.stamina,
                 "stamina_refund": record.stamina_refund,
+                "energy": player.energy,
+                "energy_refund": record.energy_refund,
                 "idempotent_replay": record.already_completed,
             },
         )

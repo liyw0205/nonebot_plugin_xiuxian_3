@@ -18,8 +18,10 @@ REALM_DAO_UNION = "dao_union"
 REALM_TRIBULATION = "tribulation"
 MODE_BREATHING = "cultivate.breathing"
 MODE_SPIRIT_SPRING = "cultivate.spirit_spring"
+MODE_SECLUSION = "cultivate.seclusion"
 RULE_VERSION = "progression-0.1.1"
 SPIRIT_SPRING_RULE_VERSION = "progression-0.1.2"
+SECLUSION_RULE_VERSION = "progression-0.1.5"
 
 # Index zero represents the L1 entry point. Values are the minimum realm
 # cultivation required for each layer in the content-0.1 snapshot.
@@ -52,6 +54,11 @@ SPIRIT_SPRING_DURATION_SECONDS = 15 * 60
 SPIRIT_SPRING_BASE_CULTIVATION = 70
 SPIRIT_SPRING_ENVIRONMENT_BP = 11500
 SPIRIT_SPRING_DAILY_LIMIT = 4
+SECLUSION_STAMINA_COST = 6
+SECLUSION_ENERGY_COST = 2
+SECLUSION_DURATION_SECONDS = 30 * 60
+SECLUSION_BASE_CULTIVATION = 170
+SECLUSION_DAILY_LIMIT = 2
 RECOVERY_PERIOD_SECONDS = 30 * 60
 CULTIVATION_SETTLEMENT_GRACE_SECONDS = 24 * 60 * 60
 
@@ -59,6 +66,7 @@ SPIRIT_FIELD_LOCATION = "xuantian.spirit_field"
 CULTIVATION_MODE_LABELS = {
     MODE_BREATHING: "调息修炼",
     MODE_SPIRIT_SPRING: "灵泉修炼",
+    MODE_SECLUSION: "静修",
 }
 
 # These are deliberately previews/qualifications, not direct access to future
@@ -129,23 +137,44 @@ def cultivation_mode(mode_key: str) -> CultivationMode:
             key=MODE_BREATHING,
             label=CULTIVATION_MODE_LABELS[MODE_BREATHING],
             stamina_cost=BREATHING_STAMINA_COST,
+            energy_cost=0,
             duration_seconds=BREATHING_DURATION_SECONDS,
             base_cultivation=BREATHING_BASE_CULTIVATION,
             environment_bp=10000,
             daily_limit=None,
             rule_version=RULE_VERSION,
+            required_realm=REALM_QI_SENSING,
+            required_layer=1,
         )
     if mode_key == MODE_SPIRIT_SPRING:
         return CultivationMode(
             key=MODE_SPIRIT_SPRING,
             label=CULTIVATION_MODE_LABELS[MODE_SPIRIT_SPRING],
             stamina_cost=SPIRIT_SPRING_STAMINA_COST,
+            energy_cost=0,
             duration_seconds=SPIRIT_SPRING_DURATION_SECONDS,
             base_cultivation=SPIRIT_SPRING_BASE_CULTIVATION,
             environment_bp=SPIRIT_SPRING_ENVIRONMENT_BP,
             daily_limit=SPIRIT_SPRING_DAILY_LIMIT,
             rule_version=SPIRIT_SPRING_RULE_VERSION,
             required_location=SPIRIT_FIELD_LOCATION,
+            required_realm=REALM_QI_SENSING,
+            required_layer=2,
+        )
+    if mode_key == MODE_SECLUSION:
+        return CultivationMode(
+            key=MODE_SECLUSION,
+            label=CULTIVATION_MODE_LABELS[MODE_SECLUSION],
+            stamina_cost=SECLUSION_STAMINA_COST,
+            energy_cost=SECLUSION_ENERGY_COST,
+            duration_seconds=SECLUSION_DURATION_SECONDS,
+            base_cultivation=SECLUSION_BASE_CULTIVATION,
+            environment_bp=10000,
+            daily_limit=SECLUSION_DAILY_LIMIT,
+            rule_version=SECLUSION_RULE_VERSION,
+            required_realm=REALM_QI_GATHERING,
+            required_layer=1,
+            requires_solitude=True,
         )
     raise ValueError(f"unsupported cultivation mode: {mode_key}")
 

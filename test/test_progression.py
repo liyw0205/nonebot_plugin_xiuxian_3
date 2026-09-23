@@ -257,3 +257,143 @@ def test_spirit_spring_requires_access_and_enforces_daily_quota() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_seclusion_requires_qi_gathering_locks_resources_and_replays_once() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "seclusion-user"
+            await _enter_cultivator(runtime, user)
+
+            before_gate = await runtime.dispatch(_context(user, "seclusion-gate"), "开始修炼 静修")
+            assert before_gate.code == "CULTIVATION_REQUIREMENT_MISSING"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform_user_id = ?", (user,)
+                ).fetchone()[0]
+                connection.execute(
+                    "UPDATE players SET realm_key = 'qi_gathering', realm_layer = 1, stamina = 5, energy = 30 WHERE id = ?",
+                    (player_id,),
+                )
+
+            insufficient = await runtime.dispatch(_context(user, "seclusion-insufficient"), "开始修炼 静修")
+            assert insufficient.code == "RESOURCE_INSUFFICIENT"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT stamina, energy FROM players WHERE id = ?", (player_id,)
+                ).fetchone() == (5, 30)
+                connection.execute("UPDATE players SET stamina = 30, energy = 30 WHERE id = ?", (player_id,))
+
+            operation = _context(user, "seclusion-concurrent", operation_id="seclusion-start")
+            first, replay = await asyncio.gather(
+                runtime.dispatch(operation, "开始修炼 静修"),
+                runtime.dispatch(operation, "开始修炼 静修"),
+            )
+            assert first.code == replay.code == "CULTIVATION_STARTED"
+            assert sum(result.data["idempotent_replay"] is False for result in (first, replay)) == 1
+            started = first if not first.data["idempotent_replay"] else replay
+            assert started.data["mode_key"] == "cultivate.seclusion"
+            assert started.data["stamina_cost"] == 6
+            assert started.data["energy_cost"] == 2
+            assert datetime.fromisoformat(started.data["ends_at"]) - datetime.fromisoformat(
+                started.data["starts_at"]
+            ) == timedelta(minutes=30)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT stamina, energy FROM players WHERE id = ?", (player_id,)
+                ).fetchone() == (24, 28)
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM cultivation_sessions WHERE player_id = ?", (player_id,)
+                ).fetchone()[0] == 1
+
+            _finish_session(runtime, user)
+            settled = await runtime.dispatch(_context(user, "seclusion-settle"), "结算修炼")
+            assert settled.code == "CULTIVATION_SETTLED"
+            assert settled.data["mode_key"] == "cultivate.seclusion"
+            assert settled.data["cultivation_gain"] >= 170
+            assert settled.data["realm_key"] == "qi_gathering"
+            assert settled.data["realm_layer"] == 1
+
+            second = await runtime.dispatch(_context(user, "seclusion-second"), "开始修炼 静修")
+            assert second.code == "CULTIVATION_STARTED"
+            cancelled = await runtime.dispatch(_context(user, "seclusion-cancel"), "取消修炼")
+            assert cancelled.code == "CULTIVATION_CANCELLED"
+            assert cancelled.data["stamina_refund"] == 6
+            assert cancelled.data["energy_refund"] == 2
+            assert cancelled.data["stamina"] == 24
+            assert cancelled.data["energy"] == 28
+            limited = await runtime.dispatch(_context(user, "seclusion-limit"), "开始修炼 静修")
+            assert limited.code == "CULTIVATION_DAILY_LIMIT"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_seclusion_rejects_party_combat_and_production_locks() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "seclusion-lock-user"
+            await _enter_cultivator(runtime, user)
+            now = datetime.now(timezone.utc).isoformat()
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform_user_id = ?", (user,)
+                ).fetchone()[0]
+                connection.execute(
+                    "UPDATE players SET realm_key = 'qi_gathering', realm_layer = 1 WHERE id = ?",
+                    (player_id,),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO party_members(
+                        party_id, player_id, role, status, confirmed_at,
+                        invited_at, joined_at, left_at, created_at, updated_at
+                    ) VALUES ('party-seclusion-lock', ?, 'leader', 'active', ?, ?, ?, NULL, ?, ?)
+                    """,
+                    (player_id, now, now, now, now, now),
+                )
+                resources_before_locks = connection.execute(
+                    "SELECT stamina, energy FROM players WHERE id = ?", (player_id,)
+                ).fetchone()
+            party_locked = await runtime.dispatch(_context(user, "seclusion-party"), "开始修炼 静修")
+            assert party_locked.code == "CULTIVATION_BUSY"
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute("DELETE FROM party_members WHERE player_id = ?", (player_id,))
+                connection.execute(
+                    """
+                    INSERT INTO exploration_sessions(
+                        exploration_id, player_id, operation_id, mode_key, location_key, status,
+                        starts_at, ends_at, stamina_cost, daily_limit, business_date,
+                        snapshot_json, result_json, created_at, updated_at
+                    ) VALUES ('explore-seclusion-lock', ?, 'explore-seclusion-lock', 'explore.outskirts',
+                              'xuantian.outskirts', 'combat_pending', ?, ?, 0, 0, '2026-09-24', '{}', '{}', ?, ?)
+                    """,
+                    (player_id, now, now, now, now),
+                )
+            combat_locked = await runtime.dispatch(_context(user, "seclusion-combat"), "开始修炼 静修")
+            assert combat_locked.code == "CULTIVATION_BUSY"
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute("DELETE FROM exploration_sessions WHERE player_id = ?", (player_id,))
+                connection.execute(
+                    """
+                    INSERT INTO production_orders(
+                        order_id, player_id, operation_id, recipe_key, status, starts_at, ends_at,
+                        energy_cost, currency_cost, snapshot_json, result_json, created_at, updated_at
+                    ) VALUES ('production-seclusion-lock', ?, 'production-seclusion-lock',
+                              'recipe.pill.healing_low', 'processing', ?, ?, 0, 0, '{}', '{}', ?, ?)
+                    """,
+                    (player_id, now, now, now, now),
+                )
+            production_locked = await runtime.dispatch(_context(user, "seclusion-production"), "开始修炼 静修")
+            assert production_locked.code == "CULTIVATION_BUSY"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT stamina, energy FROM players WHERE id = ?", (player_id,)
+                ).fetchone() == resources_before_locks
+            await runtime.close()
+
+    asyncio.run(run())

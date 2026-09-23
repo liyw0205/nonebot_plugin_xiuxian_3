@@ -413,7 +413,7 @@ class CultivationRepositoryMixin:
             "mode_key": mode_key,
         }
         request_hash = self._request_hash("progression.start_cultivation", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
@@ -435,6 +435,7 @@ class CultivationRepositoryMixin:
                     starts_at=str(payload["starts_at"]),
                     ends_at=str(payload["ends_at"]),
                     stamina_cost=int(payload["stamina_cost"]),
+                    energy_cost=int(payload.get("energy_cost", 0)),
                     already_completed=True,
                 )
 
@@ -447,9 +448,14 @@ class CultivationRepositoryMixin:
                 raise ValueError("unsupported cultivation mode") from exc
             if mode.required_location and row["location_key"] != mode.required_location:
                 raise LocationRequiredError("selected cultivation mode requires a specific location")
+            if not meets_realm(
+                str(row["realm_key"]),
+                int(row["realm_layer"]),
+                mode.required_realm,
+                mode.required_layer,
+            ):
+                raise CultivationRequirementError("cultivation realm requirement is not met")
             if mode.required_location:
-                if int(row["realm_layer"]) < 2:
-                    raise LocationRequirementError("spirit cultivation requires qi sensing layer 2")
                 intro_state = self._json_object(row["intro_json"], {})
                 from ..player.intro_rules import GUIDE_GATHER_BLOOD_GRASS
 
@@ -467,6 +473,19 @@ class CultivationRepositoryMixin:
             ).fetchone()
             if retreat is not None:
                 raise CultivationBusyError("retreat is still running")
+            if mode.requires_solitude:
+                party = connection.execute(
+                    "SELECT 1 FROM party_members WHERE player_id = ? AND status IN ('invited', 'active') LIMIT 1",
+                    (row["id"],),
+                ).fetchone()
+                if party is not None:
+                    raise CultivationBusyError("seclusion requires no active party")
+                production = connection.execute(
+                    "SELECT 1 FROM production_orders WHERE player_id = ? AND status = 'processing' LIMIT 1",
+                    (row["id"],),
+                ).fetchone()
+                if production is not None:
+                    raise CultivationBusyError("seclusion requires no active production")
             pending = connection.execute(
                 "SELECT status, result_json FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
@@ -485,8 +504,8 @@ class CultivationRepositoryMixin:
                 ).fetchone()
                 if used is not None and int(used["count"]) >= mode.daily_limit:
                     raise CultivationDailyLimitError("cultivation mode reached its daily limit")
-            if int(row["stamina"]) < mode.stamina_cost:
-                raise ResourceInsufficientError("stamina is insufficient")
+            if int(row["stamina"]) < mode.stamina_cost or int(row["energy"]) < mode.energy_cost:
+                raise ResourceInsufficientError("cultivation resources are insufficient")
 
             session_id = uuid4().hex
             starts_at = serialize_datetime(now)
@@ -513,13 +532,15 @@ class CultivationRepositoryMixin:
                 "location_key": row["location_key"],
                 "rule_version": mode.rule_version,
                 "mode_key": mode.key,
+                "stamina_cost": mode.stamina_cost,
+                "energy_cost": mode.energy_cost,
                 "base_cultivation": mode.base_cultivation,
                 "environment_bp": mode.environment_bp,
                 "state_bp": state_bp,
             }
             connection.execute(
-                "UPDATE players SET stamina = stamina - ?, updated_at = ? WHERE id = ?",
-                (mode.stamina_cost, serialize_datetime(now), row["id"]),
+                "UPDATE players SET stamina = stamina - ?, energy = energy - ?, updated_at = ? WHERE id = ?",
+                (mode.stamina_cost, mode.energy_cost, serialize_datetime(now), row["id"]),
             )
             connection.execute(
                 """
@@ -553,6 +574,7 @@ class CultivationRepositoryMixin:
                 "starts_at": starts_at,
                 "ends_at": ends_at,
                 "stamina_cost": mode.stamina_cost,
+                "energy_cost": mode.energy_cost,
             }
             connection.execute(
                 """
@@ -577,6 +599,7 @@ class CultivationRepositoryMixin:
                 starts_at=starts_at,
                 ends_at=ends_at,
                 stamina_cost=mode.stamina_cost,
+                energy_cost=mode.energy_cost,
             )
 
     async def settle_cultivation(
@@ -614,7 +637,7 @@ class CultivationRepositoryMixin:
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.settle_cultivation", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -771,7 +794,7 @@ class CultivationRepositoryMixin:
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.recover_cultivation", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -896,7 +919,8 @@ class CultivationRepositoryMixin:
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.cancel_cultivation", operation_payload)
-        now_text = serialize_datetime(datetime.now(timezone.utc))
+        now = self._now()
+        now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
@@ -914,6 +938,7 @@ class CultivationRepositoryMixin:
                     player=self._row_to_player(payload["player"]),
                     session_id=str(payload["session_id"]),
                     stamina_refund=int(payload["stamina_refund"]),
+                    energy_refund=int(payload.get("energy_refund", 0)),
                     already_completed=True,
                 )
             row = self._require_player(connection, platform, platform_user_id)
@@ -924,7 +949,6 @@ class CultivationRepositoryMixin:
             if session is None:
                 raise CultivationNotFoundError("no running cultivation")
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
-            now = datetime.now(timezone.utc)
             if now >= ends_at:
                 if now > ends_at + timedelta(seconds=CULTIVATION_SETTLEMENT_GRACE_SECONDS):
                     expiry_payload = {
@@ -962,14 +986,24 @@ class CultivationRepositoryMixin:
                     connection.commit()
                     raise CultivationExpiredError("cultivation cancellation window expired")
                 raise CultivationAlreadyReadyError("cultivation must be settled")
+            snapshot = self._json_object(session["snapshot_json"], {})
             refund = int(session["stamina_cost"])
+            energy_refund = int(snapshot.get("energy_cost", 0))
             connection.execute(
-                "UPDATE players SET stamina = MIN(stamina_max, stamina + ?), updated_at = ? WHERE id = ?",
-                (refund, now_text, row["id"]),
+                "UPDATE players SET stamina = MIN(stamina_max, stamina + ?), energy = MIN(energy_max, energy + ?), updated_at = ? WHERE id = ?",
+                (refund, energy_refund, now_text, row["id"]),
             )
             connection.execute(
                 "UPDATE cultivation_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps({"stamina_refund": refund}, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+                (
+                    json.dumps(
+                        {"stamina_refund": refund, "energy_refund": energy_refund},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    now_text,
+                    session["id"],
+                ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
@@ -979,6 +1013,7 @@ class CultivationRepositoryMixin:
                 "player": self._player_payload(player),
                 "session_id": session["session_id"],
                 "stamina_refund": refund,
+                "energy_refund": energy_refund,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -991,7 +1026,12 @@ class CultivationRepositoryMixin:
                     now_text,
                 ),
             )
-            return CultivationCancelRecord(player=player, session_id=session["session_id"], stamina_refund=refund)
+            return CultivationCancelRecord(
+                player=player,
+                session_id=session["session_id"],
+                stamina_refund=refund,
+                energy_refund=energy_refund,
+            )
 
     @staticmethod
     def _has_active_long_action(connection: sqlite3.Connection, player_id: int) -> bool:

@@ -167,6 +167,50 @@ def test_qq_and_onebot_spirit_leaf_field_flow_reaches_shared_application() -> No
     asyncio.run(run())
 
 
+def test_qq_and_onebot_normalization_reaches_seclusion_cultivation() -> None:
+    qq = normalize_qq_event(_qq_group_event("开始修炼 静修", message_id="qq-seclusion"))
+    onebot = normalize_event(_onebot_group_event("开始修炼 静修", message_id=3012))
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for prefix, normalized in (("qq", qq), ("onebot", onebot)):
+                base = normalized.context
+                dispatch = lambda operation, text: runtime.adapters.dispatch(
+                    base.adapter,
+                    replace(base, operation_id=operation),
+                    text,
+                )
+                assert (await dispatch(f"{prefix}-create", "开始修仙")).ok
+                assert (await dispatch(f"{prefix}-seek", "寻仙问道")).ok
+                assert (await dispatch(f"{prefix}-read", "完成引导 阅读")).ok
+                assert (await dispatch(f"{prefix}-travel", "前往近郊")).ok
+                assert (await dispatch(f"{prefix}-gather", "完成引导 采集")).ok
+                assert (await dispatch(f"{prefix}-service", "完成引导 炼丹")).ok
+                assert (await dispatch(f"{prefix}-path", "选择道途 体修")).code == "CULTIVATION_ENTERED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        """
+                        UPDATE players
+                        SET realm_key = 'qi_gathering', realm_layer = 1, stamina = 30, energy = 30
+                        WHERE platform = ? AND platform_user_id = ?
+                        """,
+                        (base.adapter, base.user_id),
+                    )
+                started = await runtime.adapters.dispatch(
+                    base.adapter,
+                    replace(base, operation_id=f"{prefix}-seclusion"),
+                    normalized.text,
+                )
+                assert started.code == "CULTIVATION_STARTED"
+                assert started.data["mode_key"] == "cultivate.seclusion"
+                assert started.data["stamina_cost"] == 6
+                assert started.data["energy_cost"] == 2
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_qq_and_onebot_public_project_flow_reaches_shared_application() -> None:
     qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-public-project"))
     onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3011))

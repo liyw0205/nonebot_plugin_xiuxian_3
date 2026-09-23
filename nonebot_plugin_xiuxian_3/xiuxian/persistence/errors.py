@@ -140,6 +140,10 @@ class CultivationDailyLimitError(RuntimeError):
     """The selected cultivation mode reached its business-day quota."""
 
 
+class CultivationRequirementError(RuntimeError):
+    """The player does not satisfy the selected cultivation mode's gate."""
+
+
 class CultivationNotFoundError(RuntimeError):
     """The player has no running cultivation session."""
 
