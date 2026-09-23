@@ -196,3 +196,97 @@ def test_tribulation_layer_requires_ordered_trials_and_origin_tasks() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_qq_and_onebot_choose_ascension_endings_and_freeze_writes() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "qq-ending"), ("onebot.v11", "onebot-ending")):
+                await _created(runtime, adapter, user)
+                blocked = await runtime.dispatch(
+                    _ctx(adapter, user, f"ending-blocked-{adapter}"), "选择结局 飞升"
+                )
+                assert blocked.code == "ASCENSION_REQUIREMENT_MISSING"
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="tribulation",
+                    realm_layer=10,
+                    total_cultivation=8_998_960,
+                    endgame_status="ascension_ready",
+                    dao_fruit_key=None,
+                )
+                chosen = await runtime.dispatch(
+                    _ctx(adapter, user, f"ending-{adapter}"), "终局选择 飞升"
+                )
+                assert chosen.code == "ENDING_CHOSEN"
+                assert chosen.data["ending_key"] == "ascend"
+                assert chosen.data["status"] == "ascended"
+                replay = await runtime.dispatch(
+                    _ctx(adapter, user, f"ending-{adapter}"), "选择结局 ascend"
+                )
+                assert replay.code == "ENDING_CHOSEN"
+                assert replay.data["idempotent_replay"] is True
+                conflict = await runtime.dispatch(
+                    _ctx(adapter, user, f"ending-conflict-{adapter}"), "选择结局 留界"
+                )
+                assert conflict.code == "ENDING_ALREADY_CHOSEN"
+                frozen = await runtime.dispatch(
+                    _ctx(adapter, user, f"rename-after-ending-{adapter}"), "修仙改名 终局后"
+                )
+                assert frozen.code == "PLAYER_SUSPENDED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    ending = db.execute(
+                        "SELECT endgame_endings.ending_key, endgame_endings.status, endgame_endings.operation_id FROM endgame_endings "
+                        "JOIN players ON players.id = endgame_endings.player_id "
+                        "WHERE players.platform = ? AND players.platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                assert ending == ("ascend", "ascended", f"ending-{adapter}")
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_remain_in_world_requires_dao_fruit_and_records_one_ending() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            adapter, user = "onebot.v11", "remain-ending"
+            await _created(runtime, adapter, user)
+            _set_player(
+                runtime,
+                adapter,
+                user,
+                realm_key="tribulation",
+                realm_layer=10,
+                total_cultivation=8_998_960,
+                endgame_status="ascension_ready",
+                dao_fruit_key=None,
+            )
+            missing_fruit = await runtime.dispatch(
+                _ctx(adapter, user, "remain-missing-fruit"), "选择结局 留界"
+            )
+            assert missing_fruit.code == "ASCENSION_REQUIREMENT_MISSING"
+            _set_player(runtime, adapter, user, dao_fruit_key="fruit.immortal_body")
+            chosen = await runtime.dispatch(
+                _ctx(adapter, user, "remain-choice"), "选择结局 留界"
+            )
+            assert chosen.code == "ENDING_CHOSEN"
+            assert chosen.data["ending_key"] == "remain_in_world"
+            assert chosen.data["status"] == "remained_in_world"
+            assert chosen.data["realm_key"] == "tribulation"
+            with sqlite3.connect(runtime.settings.database_path) as db:
+                count, fruit = db.execute(
+                    "SELECT COUNT(*), MAX(fruit_key) FROM endgame_endings "
+                    "JOIN players ON players.id = endgame_endings.player_id "
+                    "WHERE players.platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+            assert (count, fruit) == (1, "fruit.immortal_body")
+            await runtime.close()
+
+    asyncio.run(run())

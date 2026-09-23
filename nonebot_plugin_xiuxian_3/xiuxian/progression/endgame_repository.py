@@ -10,18 +10,23 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from .endgame_models import (
     DaoUnionRecord,
+    EndgameEndingRecord,
     TribulationEntryRecord,
     TrialSessionRecord,
     TrialSettlementRecord,
 )
 from .endgame_rules import (
+    ASCENDED_STATUS,
+    ASCENSION_READY_STATUS,
     CONTENT_VERSION,
     DAO_UNION_FRAGMENT_COST,
     DAO_UNION_MERIT_COST,
     DAO_UNION_STONE_COST,
     DAO_UNION_TOTAL_CULTIVATION,
+    ENDING_KEYS,
     FRUIT_KEYS,
     RULE_VERSION,
+    REMAINED_IN_WORLD_STATUS,
     TRIBULATION_TRIAL_DURATION_SECONDS,
     TRIBULATION_TOTAL_CULTIVATION,
     THREE_REALM_KEYS,
@@ -112,6 +117,112 @@ class EndgameRepositoryMixin:
                 (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
             )
             return DaoUnionRecord(player=player, changed=True)
+
+    async def choose_ending(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        ending_key: str,
+        operation_id: str,
+    ) -> EndgameEndingRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._choose_ending_once,
+                platform,
+                platform_user_id,
+                ending_key,
+                operation_id,
+            )
+
+    def _choose_ending_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        ending_key: str,
+        operation_id: str,
+    ) -> EndgameEndingRecord:
+        from ..repository import (
+            AscensionRequirementError,
+            EndingAlreadyChosenError,
+            EndingInvalidError,
+            OperationConflictError,
+            PlayerSuspendedError,
+        )
+
+        ending_key = ending_key.strip().lower()
+        if ending_key not in ENDING_KEYS:
+            raise EndingInvalidError("unsupported ending key")
+        operation_name = "ascension.choose_ending"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "ending_key": ending_key,
+                "content_version": CONTENT_VERSION,
+                "rule_version": RULE_VERSION,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._ending_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            if str(row["status"]) != "active":
+                raise PlayerSuspendedError("player is not active")
+            current_key = str(row["ending_key"] or "")
+            if current_key:
+                if current_key != ending_key:
+                    raise EndingAlreadyChosenError("a different ending has already been chosen")
+                payload = self._ending_payload(row, ending_key=current_key, status=str(row["endgame_status"]))
+                connection.execute(
+                    "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+                )
+                return self._ending_from_payload(payload, replay=True)
+            if str(row["endgame_status"]) != ASCENSION_READY_STATUS:
+                raise AscensionRequirementError("player is not ready for an ending")
+            fruit_key = str(row["dao_fruit_key"] or "") or None
+            if ending_key == "remain_in_world" and not fruit_key:
+                raise AscensionRequirementError("remain in world requires a locked dao fruit")
+            status = ASCENDED_STATUS if ending_key == "ascend" else REMAINED_IN_WORLD_STATUS
+            connection.execute(
+                "UPDATE players SET endgame_status = ?, ending_key = ?, updated_at = ? WHERE id = ?",
+                (status, ending_key, now_text, row["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("ending choice returned no player")
+            payload = self._ending_payload(updated, ending_key=ending_key, status=status)
+            connection.execute(
+                "INSERT INTO endgame_endings(player_id, ending_key, status, fruit_key, snapshot_json, operation_id, content_version, rule_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    updated["id"],
+                    ending_key,
+                    status,
+                    fruit_key,
+                    json.dumps(payload["snapshot"], ensure_ascii=False, sort_keys=True),
+                    operation_id,
+                    CONTENT_VERSION,
+                    RULE_VERSION,
+                    now_text,
+                ),
+            )
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, updated["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return self._ending_from_payload(payload, replay=False)
 
     async def begin_tribulation(self, *, platform: str, platform_user_id: str, operation_id: str) -> TribulationEntryRecord:
         await self.initialize()
@@ -417,6 +528,33 @@ class EndgameRepositoryMixin:
             reward_merit=int(payload.get("reward_merit", 0)),
             reward_items={str(key): int(value) for key, value in dict(payload.get("reward_items", {})).items()},
             dao_fruit_key=payload.get("dao_fruit_key"),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _ending_payload(row, *, ending_key: str, status: str) -> dict:
+        from ..repository import SQLitePlayerRepository
+
+        player = SQLitePlayerRepository._row_to_player(row)
+        player_payload = SQLitePlayerRepository._player_payload(player)
+        return {
+            "player": player_payload,
+            "ending_key": ending_key,
+            "status": status,
+            "fruit_key": player.dao_fruit_key,
+            "snapshot": player_payload,
+            "content_version": CONTENT_VERSION,
+            "rule_version": RULE_VERSION,
+        }
+
+    @staticmethod
+    def _ending_from_payload(payload: dict, *, replay: bool) -> EndgameEndingRecord:
+        from ..repository import SQLitePlayerRepository
+
+        return EndgameEndingRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            ending_key=str(payload["ending_key"]),
+            status=str(payload["status"]),
             already_completed=replay,
         )
 

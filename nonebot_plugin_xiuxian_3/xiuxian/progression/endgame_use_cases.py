@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
+    AscensionRequirementError,
     CurrencyInsufficientError,
     DaoFruitChoiceError,
     DaoUnionRequirementError,
+    EndingAlreadyChosenError,
+    EndingInvalidError,
     MaterialInsufficientError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -54,6 +57,18 @@ class EndgameApplication:
             "trial.dao_choice": "trial.dao_choice",
         }
         return aliases.get(value)
+
+    @staticmethod
+    def _ending_key(value: str) -> str | None:
+        aliases = {
+            "飞升": "ascend",
+            "ascend": "ascend",
+            "飞升路": "ascend",
+            "留界": "remain_in_world",
+            "remain_in_world": "remain_in_world",
+            "留界殿": "remain_in_world",
+        }
+        return aliases.get(value.strip().lower())
 
     @staticmethod
     def _failure(context: CommandContext, operation_id: str, code: str, message: str) -> CommandResult:
@@ -121,6 +136,46 @@ class EndgameApplication:
             context.request_id,
             operation_id,
             data={"realm_key": player.realm_key, "realm_layer": player.realm_layer, "idempotent_replay": record.already_completed},
+        )
+
+    async def choose_ending(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_ENDING_COMMAND", "请使用 `选择结局 飞升` 或 `选择结局 留界`。", context.request_id)
+        ending_key = self._ending_key(context.command_args[0])
+        if ending_key is None:
+            return CommandResult(False, "INVALID_ENDING_COMMAND", "结局只能选择飞升或留界。", context.request_id)
+        operation_id = self._operation_id(context, "ascension.choose_ending")
+        try:
+            record = await self.repository.choose_ending(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                ending_key=ending_key,
+                operation_id=operation_id,
+            )
+        except EndingInvalidError:
+            return self._failure(context, operation_id, "INVALID_ENDING_COMMAND", "结局只能选择飞升或留界。")
+        except AscensionRequirementError:
+            return self._failure(context, operation_id, "ASCENSION_REQUIREMENT_MISSING", "尚未满足终局选择条件，或留界尚未锁定道果。")
+        except EndingAlreadyChosenError:
+            return self._failure(context, operation_id, "ENDING_ALREADY_CHOSEN", "终局已经选择，不能改选另一条结局。")
+        except PlayerNotFoundError:
+            return self._failure(context, operation_id, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。")
+        except PlayerSuspendedError:
+            return self._failure(context, operation_id, "PLAYER_SUSPENDED", "当前角色暂时不能选择终局。")
+        except OperationConflictError:
+            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这次请求编号已经用于其他终局选择。")
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        label = "飞升" if record.ending_key == "ascend" else "留界"
+        return CommandResult(
+            True,
+            "ENDING_CHOSEN",
+            f"## 终局已定\n\n**{self._display_name(record.player)}**选择了 **{label}**。该选择不可更改。",
+            context.request_id,
+            operation_id,
+            data={"ending_key": record.ending_key, "status": record.status, "realm_key": record.player.realm_key, "realm_layer": record.player.realm_layer, "idempotent_replay": record.already_completed},
         )
 
     async def start_trial(self, context: CommandContext) -> CommandResult:

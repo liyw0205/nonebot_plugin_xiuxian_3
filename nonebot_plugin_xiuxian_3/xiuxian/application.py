@@ -168,6 +168,13 @@ class XiuxianApplication:
             write_message="当前事件不允许进入渡劫。",
         )
 
+    async def choose_ending(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.endgame.choose_ending(context),
+            write_message="当前事件不允许选择终局。",
+        )
+
     async def start_tribulation_trial(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

@@ -94,6 +94,22 @@ CREATE TABLE IF NOT EXISTS operations (
 CREATE INDEX IF NOT EXISTS idx_players_scene ON players(scene_id);
 CREATE INDEX IF NOT EXISTS idx_operations_player ON operations(player_id);
 
+CREATE TABLE IF NOT EXISTS endgame_endings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL UNIQUE REFERENCES players(id),
+    ending_key TEXT NOT NULL CHECK (ending_key IN ('ascend', 'remain_in_world')),
+    status TEXT NOT NULL CHECK (status IN ('ascended', 'remained_in_world')),
+    fruit_key TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    operation_id TEXT NOT NULL UNIQUE,
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_endgame_endings_status
+    ON endgame_endings(status, created_at);
+
 CREATE TABLE IF NOT EXISTS cultivation_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL UNIQUE,

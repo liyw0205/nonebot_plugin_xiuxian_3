@@ -392,6 +392,18 @@ class SectLeaderCannotLeaveError(RuntimeError):
     """The sect leader must transfer leadership before leaving."""
 
 
+class EndingInvalidError(RuntimeError):
+    """The requested terminal ending key is not supported."""
+
+
+class AscensionRequirementError(RuntimeError):
+    """The player is not ready to choose a terminal ending."""
+
+
+class EndingAlreadyChosenError(RuntimeError):
+    """A different terminal ending has already been chosen."""
+
+
 class ConstitutionAlreadySelectedError(RuntimeError):
     """The player already has a main constitution."""
 

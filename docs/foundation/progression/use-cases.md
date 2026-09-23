@@ -40,6 +40,15 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 均按整数公式计算，结算读取开始时的资质快照，重复 operation 只回放原结果。正式生产使用独立的 `production` application，不会绕过境界域
 的修炼锁或 operation ledger。
 
+合道、渡劫和终局选择由独立的 `progression.endgame_repository` mixin 持久化，
+不回填主仓储实现。`开始合道`、`开始渡劫`、`开始天劫试炼`、`结算天劫试炼` 和
+`选择结局`（别名 `终局选择`）均通过 `EndgameApplication` 接入统一路由。
+`选择结局 飞升` 或 `选择结局 留界` 只接受 `endgame_status=ascension_ready`；留界
+还必须已有锁定 `dao_fruit_key`。结局写入 `endgame_endings` 历史表和 operation ledger，
+同一 operation 或同一结局重复请求只回放原结果，另一结局返回
+`ENDING_ALREADY_CHOSEN`。终局状态为 `ascended` 或 `remained_in_world` 后，普通写用例
+由仓储边界冻结，资料读取仍可用。
+
 聚气突破命令映射为 `突破预览 聚气`、`开始突破 聚气`、`结算突破` 和 `恢复虚弱`（可追加
 `护脉` 或 `提前`）。金丹突破使用 `突破预览 金丹`、`开始突破 金丹`、`结算突破` 和
 `恢复道基震荡`（可追加保护或提前恢复）。开始突破独立使用对应的
