@@ -1,6 +1,6 @@
 # 修仙 3 文档总索引
 
-本文档用于开发阶段按主题加载上下文。`xiuxian3-design.md` 是总纲；每个域目录的 `README.md` 是域索引，`model.md`、`workflow.md`、`use-cases.md` 等文件是实现细节权威。顶层同名文档保留为概览，不再承担全部细节。
+本文档用于开发阶段按主题加载上下文。`xiuxian3-design.md` 是总纲；每个域目录的 `README.md` 是域索引，`model.md`、`workflow.md`、`use-cases.md` 等文件是实现细节权威。顶层同名文档保留为兼容概览，不再承担规则或运行时状态裁决。
 
 ## 一、设计总纲
 
@@ -13,7 +13,7 @@
 | [版本内容开发合同](content-development-contract.md) | 全部 `content-v*.md` 的字段、版本、事务、幂等、随机、失败、发布和回滚约束 | 内容工程权威 |
 | [上游参考与复用边界](reference-sources.md) | 上游文档的通用玩法参考、适配器复用范围和禁止事项 | 已整理 |
 | [基础域目录](foundation/) | 角色、境界、道途、属性、资源、物品和构筑养成的分文件规格 | 细节权威 |
-| [核心玩法域目录](gameplay/) | 世界、探索、战斗、生产、社交、经济、活动、常驻经营、道历运营、冒险主线和灵兽灵骑的分文件规格 | 细节权威 |
+| [核心玩法域目录](gameplay/) | 世界、探索、战斗、生产、社交、经济、活动、常驻经营、道历运营、冒险主线、灵兽灵骑和特色玩法的分文件规格 | 细节权威 |
 | [扩展域目录](extensions/) | 适配器、Web 运营和数据内容的分文件规格 | 细节权威 |
 
 各域的 `content-v0.1.md` 至 `content-v0.6.md` 是历史发布快照，不是并列的开发规范。
@@ -35,6 +35,7 @@
 | [道途域](foundation/paths/) | 六大道途、辅修、选择、切换和状态 | 分文件 |
 | [属性域](foundation/stats/) | 基础属性、派生属性、定点计算、来源和快照 | 分文件 |
 | [资源与物品域](foundation/items/) | 资源、背包、功法、技能、装备、丹药和奖励 | 分文件 |
+| [养成域](foundation/advancement/) | 闭关、体质、天赋、神通与法器养成 | 分文件 |
 
 ## 三、核心玩法
 
@@ -48,6 +49,10 @@
 | [经济域](gameplay/economy/) | 钱包、市场、订单、锁定和流水 | 分文件 |
 | [活动域](gameplay/events/) | 任务、世界事件、轮次、排行和奖励 | 分文件 |
 | [常驻经营域](gameplay/livelihood/) | 洞府、灵田、城镇委托、商贸运输、地方名望和生活循环 | 分文件 |
+| [道历运营域](gameplay/routine/) | 道历、道契、机缘、功业与行卷 | 分文件 |
+| [冒险域](gameplay/adventures/) | 悬赏、秘境、主线与斗法留影 | 分文件 |
+| [灵兽灵骑域](gameplay/companions/) | 实体成长、灵兽与灵骑 | 分文件 |
+| [特色玩法域](gameplay/specials/) | 挂机、派遣、图鉴、试炼塔、竞技场与多结局剧情 | 分文件，当前多数为锁定合同 |
 
 ## 四、扩展和运行
 
@@ -71,7 +76,7 @@
 2. `content-development.md`，确定首版范围和完整境界/功能路线
 3. `current-status.md`，确认哪些内容已经接入运行时
 4. `foundation/README.md`，再进入对应域的模型、流程和用例
-5. `gameplay/README.md`，再进入对应玩法域目录；特色运营先读 `routine/`、`adventures/`、`companions/`
+5. `gameplay/README.md`，再进入对应玩法域目录；特色运营先读 `routine/`、`adventures/`、`companions/`、`specials/`
 6. `extensions/README.md`，再进入对应扩展域目录
 7. 只有需要复原历史发布参数时才读取对应的 `content-v*.md`
 
@@ -89,7 +94,18 @@
 `new_user -> 寻仙问道 -> mortal -> seeker -> cultivator` 状态机、初始资源、引导与六大道途选择。
 不得以旧项目或历史快照推断本文未声明的规则。
 
-## 六、统一文档约定
+## 六、兼容概览
+
+以下顶层页面保留给旧链接和快速浏览，不定义当前运行时边界，也不能覆盖对应目录下的
+领域文档。实现前仍从本索引中的域 README 进入。
+
+| 范围 | 兼容概览 |
+|:--|:--|
+| 基础 | [角色](foundation-player.md)、[境界](foundation-progression.md)、[道途](foundation-paths.md)、[属性](foundation-stats.md)、[物品](foundation-items.md) |
+| 核心玩法 | [世界](gameplay-world.md)、[探索](gameplay-exploration.md)、[战斗](gameplay-combat.md)、[生产](gameplay-production.md)、[社交](gameplay-social.md)、[经济](gameplay-economy.md)、[活动](gameplay-events.md) |
+| 扩展 | [适配器](extension-adapters.md)、[数据内容](extension-data-content.md)、[Web 运营](extension-web-ops.md) |
+
+## 七、统一文档约定
 
 每个玩法文档都必须说明：目标、玩家流程、实体字段、状态机、前置条件、用例输入输出、消耗、产出、随机性、冷却、失败/取消/过期、幂等、权限、错误码、观测字段、验收样例和首版范围。
 
