@@ -23,6 +23,7 @@ from .livelihood.use_cases import LivelihoodApplication
 from .livelihood.route_use_cases import RouteApplication
 from .livelihood.service_use_cases import ServiceApplication
 from .social.sect_use_cases import SectApplication
+from .social.party_use_cases import PartyApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -51,6 +52,7 @@ class XiuxianApplication:
         self.route = RouteApplication(repository)
         self.service = ServiceApplication(repository)
         self.social = SectApplication(repository)
+        self.party = PartyApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -528,6 +530,27 @@ class XiuxianApplication:
 
     async def get_sect_profile(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.social.get_profile(context), require_write=False)
+
+    async def create_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.create_party(context), write_message="当前事件不允许创建队伍。")
+
+    async def invite_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.invite_party(context), write_message="当前事件不允许邀请队伍成员。")
+
+    async def accept_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.accept_party(context), write_message="当前事件不允许接受队伍邀请。")
+
+    async def reject_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.reject_party(context), write_message="当前事件不允许处理队伍邀请。")
+
+    async def confirm_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.confirm_party(context), write_message="当前事件不允许确认队伍。")
+
+    async def leave_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.leave_party(context), write_message="当前事件不允许退出队伍。")
+
+    async def get_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.get_party(context), require_write=False)
 
     async def accept_service(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

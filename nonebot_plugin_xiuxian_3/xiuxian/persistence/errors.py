@@ -392,6 +392,42 @@ class SectLeaderCannotLeaveError(RuntimeError):
     """The sect leader must transfer leadership before leaving."""
 
 
+class PartyNotFoundError(RuntimeError):
+    """The requested party does not exist or is not visible to the actor."""
+
+
+class PartyAlreadyMemberError(RuntimeError):
+    """The player already belongs to a forming or active party."""
+
+
+class PartyInvitationExistsError(RuntimeError):
+    """The target already has a pending invitation for a party."""
+
+
+class PartyInvitationNotFoundError(RuntimeError):
+    """The player has no pending invitation for the requested party."""
+
+
+class PartyInvitationExpiredError(RuntimeError):
+    """The party confirmation window has expired."""
+
+
+class PartyLocationMismatchError(RuntimeError):
+    """Party members must share the party's frozen location."""
+
+
+class PartyPermissionDeniedError(RuntimeError):
+    """The actor lacks the required party role."""
+
+
+class PartyStateConflictError(RuntimeError):
+    """The requested party transition is invalid for its current state."""
+
+
+class PartyNotReadyError(RuntimeError):
+    """The party does not have two active, confirmed members."""
+
+
 class EndingInvalidError(RuntimeError):
     """The requested terminal ending key is not supported."""
 

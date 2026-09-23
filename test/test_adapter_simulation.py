@@ -161,6 +161,29 @@ def test_qq_and_onebot_normalization_reaches_soul_transformation_preview() -> No
     asyncio.run(run())
 
 
+def test_qq_and_onebot_normalization_reaches_party_state_machine() -> None:
+    qq = normalize_qq_event(_qq_group_event("创建双人队伍", message_id="qq-party-create"))
+    onebot = normalize_event(_onebot_group_event("创建探索队伍", message_id=3007))
+    assert _canonical_command(qq.text) == "创建双人队伍"
+    assert _canonical_command(onebot.text) == "创建探索队伍"
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for normalized, adapter_user, operation in (
+                (qq, qq.context.user_id, "qq-party-adapter"),
+                (onebot, onebot.context.user_id, "onebot-party-adapter"),
+            ):
+                context = replace(normalized.context, operation_id=f"{operation}-create")
+                assert (await runtime.dispatch(context, "开始修仙")).code == "PLAYER_CREATED"
+                assert (await runtime.dispatch(replace(context, operation_id=f"{operation}-seek"), "寻仙问道")).code == "SEEKING_STARTED"
+                result = await runtime.dispatch(replace(context, operation_id=operation), normalized.text)
+                assert result.code == "PARTY_CREATED"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_adapter_message_guards_reject_non_message_events() -> None:
     class OneBotNotice:
         __module__ = "nonebot.adapters.onebot.v11.event"

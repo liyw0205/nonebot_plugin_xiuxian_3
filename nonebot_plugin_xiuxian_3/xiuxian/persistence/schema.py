@@ -347,6 +347,45 @@ CREATE INDEX IF NOT EXISTS idx_sect_applications_applicant ON sect_applications(
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sect_applications_pending
     ON sect_applications(sect_id, applicant_id) WHERE status = 'pending';
 
+CREATE TABLE IF NOT EXISTS parties (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    party_id TEXT NOT NULL UNIQUE,
+    party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair')),
+    status TEXT NOT NULL CHECK (status IN ('forming', 'ready', 'disbanded', 'expired')),
+    leader_id INTEGER NOT NULL REFERENCES players(id),
+    location_key TEXT NOT NULL,
+    confirmation_deadline TEXT NOT NULL,
+    current_session_id TEXT,
+    distribution_key TEXT NOT NULL DEFAULT 'contribution',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_parties_leader ON parties(leader_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_parties_status ON parties(status, confirmation_deadline);
+
+CREATE TABLE IF NOT EXISTS party_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    party_id TEXT NOT NULL REFERENCES parties(party_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    role TEXT NOT NULL CHECK (role IN ('leader', 'member')),
+    status TEXT NOT NULL CHECK (status IN ('invited', 'active', 'rejected', 'left', 'expired')),
+    confirmed_at TEXT,
+    invited_at TEXT NOT NULL,
+    joined_at TEXT,
+    left_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (party_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_party_members_party ON party_members(party_id, status, id);
+CREATE INDEX IF NOT EXISTS idx_party_members_player ON party_members(player_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_party_members_current_player
+    ON party_members(player_id) WHERE status IN ('invited', 'active');
+
 CREATE TABLE IF NOT EXISTS constitution_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL UNIQUE,
