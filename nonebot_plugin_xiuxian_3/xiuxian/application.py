@@ -28,6 +28,7 @@ from .social.mentor_use_cases import MentorApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
+from .economy.use_cases import EconomyApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -58,6 +59,7 @@ class XiuxianApplication:
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
+        self.economy = EconomyApplication(repository)
 
     async def _invoke(
         self,
@@ -771,3 +773,18 @@ class XiuxianApplication:
             lambda: self.wayfaring.claim_level(context),
             write_message="当前事件不允许领取行卷奖励。",
         )
+
+    async def create_market_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.create_market_order(context), write_message="当前事件不允许发布摆摊。")
+
+    async def buy_market_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.buy_market_order(context), write_message="当前事件不允许购买摆摊。")
+
+    async def cancel_market_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.cancel_market_order(context), write_message="当前事件不允许取消摆摊。")
+
+    async def expire_market_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.expire_market_order(context), write_message="当前事件不允许清理摆摊。")
+
+    async def list_market_orders(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.list_market_orders(context), require_write=False)

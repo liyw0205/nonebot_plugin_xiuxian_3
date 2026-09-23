@@ -902,3 +902,55 @@ class ThreeRealmReputationInsufficientError(RuntimeError):
 
 class DaoFruitChoiceError(RuntimeError):
     """The chosen dao fruit is invalid or already locked."""
+
+
+class WalletNotFoundError(RuntimeError):
+    """The requested player wallet does not exist."""
+
+
+class BalanceInsufficientError(RuntimeError):
+    """The wallet cannot pay the requested amount."""
+
+
+class CurrencyInvalidError(RuntimeError):
+    """The operation requested an unsupported currency."""
+
+
+class MarketOrderNotFoundError(RuntimeError):
+    """The requested market order does not exist."""
+
+
+class MarketOrderExpiredError(RuntimeError):
+    """The market order has passed its expiry deadline."""
+
+
+class MarketOrderAlreadySettledError(RuntimeError):
+    """The market order is already in a terminal state."""
+
+
+class MarketPriceInvalidError(RuntimeError):
+    """The market quantity or unit price violates the v0.1 limits."""
+
+
+class MarketItemLockedError(RuntimeError):
+    """The seller lacks enough unlocked inventory for the order."""
+
+
+class MarketOrderNotListedError(RuntimeError):
+    """The order is not available for purchase or cancellation."""
+
+
+class MarketBuyerCapacityInsufficientError(RuntimeError):
+    """The buyer cannot fit the purchased stack in their inventory."""
+
+
+class MarketSelfTradeError(RuntimeError):
+    """A seller cannot purchase their own order."""
+
+
+class MarketOrderLimitError(RuntimeError):
+    """The seller has reached the simultaneous listing limit."""
+
+
+class MarketItemForbiddenError(RuntimeError):
+    """The requested item is bound, a credential, or otherwise non-tradeable."""

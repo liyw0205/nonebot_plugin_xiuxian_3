@@ -230,3 +230,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("问道行卷", application.get_wayfaring_status, aliases=("行卷状态",))
     router.register("开始行卷", application.start_wayfaring)
     router.register("领取行卷", application.claim_wayfaring_level)
+    router.register("发布摆摊", application.create_market_order)
+    router.register("购买摆摊", application.buy_market_order)
+    router.register("取消摆摊", application.cancel_market_order)
+    router.register("清理摆摊", application.expire_market_order)
+    router.register("摆摊列表", application.list_market_orders)

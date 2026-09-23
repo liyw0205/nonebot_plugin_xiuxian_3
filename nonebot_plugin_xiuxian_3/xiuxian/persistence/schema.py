@@ -1119,5 +1119,55 @@ CREATE INDEX IF NOT EXISTS idx_endgame_sessions_player
 CREATE UNIQUE INDEX IF NOT EXISTS idx_endgame_sessions_active
     ON endgame_sessions(player_id) WHERE status = 'preparing';
 
+CREATE TABLE IF NOT EXISTS economy_ledger_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    operation_id TEXT NOT NULL,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    asset_kind TEXT NOT NULL CHECK (asset_kind IN ('currency', 'item')),
+    asset_key TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    direction TEXT NOT NULL CHECK (direction IN ('credit', 'debit', 'lock', 'release')),
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    before_value INTEGER NOT NULL CHECK (before_value >= 0),
+    after_value INTEGER NOT NULL CHECK (after_value >= 0),
+    source_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_economy_ledger_operation
+    ON economy_ledger_entries(operation_id);
+CREATE INDEX IF NOT EXISTS idx_economy_ledger_player
+    ON economy_ledger_entries(player_id, created_at);
+
+CREATE TABLE IF NOT EXISTS market_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT NOT NULL UNIQUE,
+    seller_player_id INTEGER NOT NULL REFERENCES players(id),
+    buyer_player_id INTEGER REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity >= 1),
+    remaining_quantity INTEGER NOT NULL CHECK (remaining_quantity >= 0),
+    unit_price INTEGER NOT NULL CHECK (unit_price >= 1),
+    listing_fee INTEGER NOT NULL CHECK (listing_fee >= 0),
+    status TEXT NOT NULL CHECK (status IN ('draft', 'listed', 'matched', 'settled', 'cancelled', 'expired')),
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_orders_status
+    ON market_orders(status, expires_at);
+CREATE INDEX IF NOT EXISTS idx_market_orders_seller
+    ON market_orders(seller_player_id, status);
+
+CREATE TABLE IF NOT EXISTS market_item_locks (
+    order_id TEXT PRIMARY KEY REFERENCES market_orders(order_id),
+    seller_player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity >= 1),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 
 """
