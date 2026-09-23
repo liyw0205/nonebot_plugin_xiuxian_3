@@ -26,7 +26,7 @@ from ..repository import (
     TrialSequenceError,
     SQLitePlayerRepository,
 )
-from .endgame_rules import TRIAL_LABELS
+from .endgame_rules import ASCENSION_READY_STATUS, TRIAL_LABELS
 
 
 class EndgameApplication:
@@ -73,6 +73,44 @@ class EndgameApplication:
     @staticmethod
     def _failure(context: CommandContext, operation_id: str, code: str, message: str) -> CommandResult:
         return CommandResult(False, code, message, context.request_id, operation_id)
+
+    async def preview_final_battle(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_ENDGAME_COMMAND", "终局战预览无需附加参数。", context.request_id)
+        try:
+            record = await self.repository.preview_final_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except PlayerNotFoundError:
+            return self._failure(context, "", "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。")
+        except PlayerSuspendedError:
+            return self._failure(context, "", "PLAYER_SUSPENDED", "当前角色暂时不能查看终局战资格。")
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        if record.player.endgame_status == ASCENSION_READY_STATUS:
+            message = "## 终局战已完成\n\n已进入飞升候选状态，请直接选择结局；预览不会再次创建战斗。"
+        elif record.ready:
+            message = (
+                "## 终局战前置已满足\n\n"
+                "当前版本的自动回合战斗运行时尚未开放，预览不会锁定飞升凭证或创建战斗会话。"
+            )
+        else:
+            message = "## 终局战前置未满足\n\n" + "、".join(record.missing)
+        return CommandResult(
+            True,
+            "FINAL_BATTLE_PREVIEW",
+            message,
+            context.request_id,
+            data={
+                "ready": record.ready,
+                "missing": record.missing,
+                "trial_keys": record.trial_keys,
+                "certificate_count": record.certificate_count,
+                "runtime_open": record.runtime_open,
+                "endgame_status": record.player.endgame_status,
+            },
+        )
 
     async def begin_dao_union(self, context: CommandContext) -> CommandResult:
         if context.command_args:

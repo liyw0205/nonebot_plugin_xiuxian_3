@@ -11,12 +11,14 @@ from ...contracts import serialize_datetime
 from .endgame_models import (
     DaoUnionRecord,
     EndgameEndingRecord,
+    FinalBattlePreviewRecord,
     TribulationEntryRecord,
     TrialSessionRecord,
     TrialSettlementRecord,
 )
 from .endgame_rules import (
     ASCENDED_STATUS,
+    ASCENSION_CERTIFICATE_KEY,
     ASCENSION_READY_STATUS,
     CONTENT_VERSION,
     DAO_UNION_FRAGMENT_COST,
@@ -24,6 +26,8 @@ from .endgame_rules import (
     DAO_UNION_STONE_COST,
     DAO_UNION_TOTAL_CULTIVATION,
     ENDING_KEYS,
+    FINAL_BATTLE_MIN_MERIT,
+    FINAL_BATTLE_MIN_PROGRESS,
     FRUIT_KEYS,
     RULE_VERSION,
     REMAINED_IN_WORLD_STATUS,
@@ -223,6 +227,66 @@ class EndgameRepositoryMixin:
                 (operation_id, operation_name, updated["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
             )
             return self._ending_from_payload(payload, replay=False)
+
+    async def preview_final_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> FinalBattlePreviewRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._preview_final_battle_once,
+                platform,
+                platform_user_id,
+            )
+
+    def _preview_final_battle_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+    ) -> FinalBattlePreviewRecord:
+        from ..repository import PlayerSuspendedError
+
+        with self._connect() as connection:
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            if str(row["status"]) != "active":
+                raise PlayerSuspendedError("player is not active")
+            completed = tuple(
+                str(item["trial_key"])
+                for item in connection.execute(
+                    "SELECT trial_key FROM tribulation_trial_sessions "
+                    "WHERE player_id = ? AND status = 'succeeded' ORDER BY id",
+                    (row["id"],),
+                ).fetchall()
+            )
+            completed_set = set(completed)
+            inventory = self._json_object(row["inventory_json"], {})
+            missing: list[str] = []
+            if str(row["realm_key"]) != "tribulation" or int(row["realm_layer"]) != 10:
+                missing.append("TRIBULATION_L10_REQUIRED")
+            if not set(TRIAL_ORDER).issubset(completed_set):
+                missing.append("TRIBULATION_TRIALS_INCOMPLETE")
+            if int(row["dao_fruit_progress"]) < FINAL_BATTLE_MIN_PROGRESS:
+                missing.append("DAO_FRUIT_PROGRESS_INSUFFICIENT")
+            if int(row["ascension_merit"]) < FINAL_BATTLE_MIN_MERIT:
+                missing.append("ASCENSION_MERIT_INSUFFICIENT")
+            if int(row["tribulation_debt"]) >= 100:
+                missing.append("TRIBULATION_DEBT_BLOCKED")
+            certificate_count = int(inventory.get(ASCENSION_CERTIFICATE_KEY, 0))
+            if certificate_count < 1:
+                missing.append("ASCENSION_CERTIFICATE_MISSING")
+            if str(row["endgame_status"] or "none") == ASCENSION_READY_STATUS:
+                missing = []
+            return FinalBattlePreviewRecord(
+                player=self._row_to_player(row),
+                ready=not missing,
+                missing=tuple(missing),
+                trial_keys=completed,
+                certificate_count=certificate_count,
+                runtime_open=False,
+            )
 
     async def begin_tribulation(self, *, platform: str, platform_user_id: str, operation_id: str) -> TribulationEntryRecord:
         await self.initialize()

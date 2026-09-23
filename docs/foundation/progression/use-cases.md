@@ -49,6 +49,11 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 `ENDING_ALREADY_CHOSEN`。终局状态为 `ascended` 或 `remained_in_world` 后，普通写用例
 由仓储边界冻结，资料读取仍可用。
 
+`终局战预览`（别名 `预览终局战`）是只读的最终战前置检查：返回渡劫 L10、三次试炼、
+道果进度、道源功勋、天劫债和飞升凭证的缺失项。当前只维护资格接口和测试夹具，
+不会创建 `endgame_sessions`、锁定或消耗凭证，也不会启动 `BattleSession` 或自动回合战斗；
+`ascension_ready` 候选只需继续选择结局。
+
 聚气突破命令映射为 `突破预览 聚气`、`开始突破 聚气`、`结算突破` 和 `恢复虚弱`（可追加
 `护脉` 或 `提前`）。金丹突破使用 `突破预览 金丹`、`开始突破 金丹`、`结算突破` 和
 `恢复道基震荡`（可追加保护或提前恢复）。开始突破独立使用对应的

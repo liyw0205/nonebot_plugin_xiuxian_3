@@ -117,8 +117,12 @@ class SQLitePlayerRepository(
         if row["status"] != "active":
             detail = "player is not writable" if writable else "player is not readable"
             raise PlayerSuspendedError(detail)
-        if writable and str(row["endgame_status"] or "none") in {"ascended", "remained_in_world"}:
-            raise PlayerSuspendedError("terminal ending has frozen ordinary writes")
+        if writable and str(row["endgame_status"] or "none") in {
+            "ascension_ready",
+            "ascended",
+            "remained_in_world",
+        }:
+            raise PlayerSuspendedError("endgame state has frozen ordinary writes")
         return row
 
     def _initialize_sync(self) -> None:

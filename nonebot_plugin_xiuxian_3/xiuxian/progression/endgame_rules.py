@@ -12,6 +12,9 @@ ENDING_KEYS = frozenset({"ascend", "remain_in_world"})
 ASCENSION_READY_STATUS = "ascension_ready"
 ASCENDED_STATUS = "ascended"
 REMAINED_IN_WORLD_STATUS = "remained_in_world"
+ASCENSION_CERTIFICATE_KEY = "item.ascension_certificate"
+FINAL_BATTLE_MIN_PROGRESS = 1_000
+FINAL_BATTLE_MIN_MERIT = 1_000
 DAO_UNION_TOTAL_CULTIVATION = 2_998_960
 TRIBULATION_TOTAL_CULTIVATION = 8_998_960
 DAO_UNION_FRAGMENT_COST = 10
@@ -104,6 +107,7 @@ def fruit_for_path(path_key: str | None) -> str | None:
 __all__ = [
     "ASCENDED_STATUS",
     "ASCENSION_READY_STATUS",
+    "ASCENSION_CERTIFICATE_KEY",
     "CONTENT_VERSION",
     "RULE_VERSION",
     "DAO_UNION_TOTAL_CULTIVATION",
@@ -117,6 +121,8 @@ __all__ = [
     "THREE_REALM_KEYS",
     "FRUIT_KEYS",
     "ENDING_KEYS",
+    "FINAL_BATTLE_MIN_MERIT",
+    "FINAL_BATTLE_MIN_PROGRESS",
     "REMAINED_IN_WORLD_STATUS",
     "TrialDefinition",
     "trial_definition",

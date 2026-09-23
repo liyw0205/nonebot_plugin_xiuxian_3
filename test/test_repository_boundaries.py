@@ -39,6 +39,7 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "accept_bounty": "nonebot_plugin_xiuxian_3.xiuxian.adventures.repository",
         "claim_daily": "nonebot_plugin_xiuxian_3.xiuxian.routine.repository",
         "begin_dao_union": "nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_repository",
+        "preview_final_battle": "nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_repository",
         "choose_ending": "nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_repository",
     }
 

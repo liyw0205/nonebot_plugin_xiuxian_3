@@ -127,6 +127,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("开始合道", application.begin_dao_union)
     router.register("开始渡劫", application.begin_tribulation)
     router.register("选择结局", application.choose_ending, aliases=("终局选择",))
+    router.register("终局战预览", application.preview_final_battle, aliases=("预览终局战",))
     router.register("开始天劫试炼", application.start_tribulation_trial)
     router.register("结算天劫试炼", application.settle_tribulation_trial)
     router.register("恢复状态", application.recover_resources)

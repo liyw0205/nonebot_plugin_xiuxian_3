@@ -219,6 +219,10 @@ def test_qq_and_onebot_choose_ascension_endings_and_freeze_writes() -> None:
                     endgame_status="ascension_ready",
                     dao_fruit_key=None,
                 )
+                frozen_candidate = await runtime.dispatch(
+                    _ctx(adapter, user, f"rename-candidate-{adapter}"), "修仙改名 候选后"
+                )
+                assert frozen_candidate.code == "PLAYER_SUSPENDED"
                 chosen = await runtime.dispatch(
                     _ctx(adapter, user, f"ending-{adapter}"), "终局选择 飞升"
                 )
@@ -246,6 +250,95 @@ def test_qq_and_onebot_choose_ascension_endings_and_freeze_writes() -> None:
                         (adapter, user),
                     ).fetchone()
                 assert ending == ("ascend", "ascended", f"ending-{adapter}")
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_qq_and_onebot_final_battle_preview_is_read_only() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user, command in (
+                ("qq.official", "qq-final-preview", "终局战预览"),
+                ("onebot.v11", "onebot-final-preview", "预览终局战"),
+            ):
+                await _created(runtime, adapter, user)
+                _set_player(runtime, adapter, user, tribulation_debt=100)
+                blocked = await runtime.dispatch(_ctx(adapter, user, f"preview-blocked-{adapter}"), command)
+                assert blocked.code == "FINAL_BATTLE_PREVIEW"
+                assert blocked.data["ready"] is False
+                assert blocked.data["runtime_open"] is False
+                assert blocked.data["missing"] == (
+                    "TRIBULATION_L10_REQUIRED",
+                    "TRIBULATION_TRIALS_INCOMPLETE",
+                    "DAO_FRUIT_PROGRESS_INSUFFICIENT",
+                    "ASCENSION_MERIT_INSUFFICIENT",
+                    "TRIBULATION_DEBT_BLOCKED",
+                    "ASCENSION_CERTIFICATE_MISSING",
+                )
+
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="tribulation",
+                    realm_layer=10,
+                    dao_fruit_progress=1_000,
+                    ascension_merit=1_000,
+                    tribulation_debt=0,
+                    inventory_json=json.dumps({"item.ascension_certificate": 1}),
+                )
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    player_id = db.execute(
+                        "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    for index, trial_key in enumerate(
+                        ("trial.body_and_mind", "trial.three_realms", "trial.dao_choice"),
+                        start=1,
+                    ):
+                        db.execute(
+                            "INSERT INTO tribulation_trial_sessions(session_id, player_id, operation_id, trial_key, status, starts_at, ends_at, result_json, created_at, updated_at) "
+                            "VALUES (?, ?, ?, ?, 'succeeded', 'start', 'end', '{}', 'created', 'updated')",
+                            (f"{user}-trial-{index}", player_id, f"{user}-trial-op-{index}", trial_key),
+                        )
+                    before = db.execute(
+                        "SELECT inventory_json, dao_fruit_progress, ascension_merit, tribulation_debt FROM players WHERE id = ?",
+                        (player_id,),
+                    ).fetchone()
+                    operation_count = db.execute("SELECT COUNT(*) FROM operations WHERE player_id = ?", (player_id,)).fetchone()[0]
+
+                ready = await runtime.dispatch(_ctx(adapter, user, f"preview-ready-{adapter}"), command)
+                assert ready.code == "FINAL_BATTLE_PREVIEW"
+                assert ready.data["ready"] is True
+                assert ready.data["missing"] == ()
+                assert ready.data["trial_keys"] == (
+                    "trial.body_and_mind",
+                    "trial.three_realms",
+                    "trial.dao_choice",
+                )
+                assert ready.data["certificate_count"] == 1
+                assert ready.data["runtime_open"] is False
+                replay = await runtime.dispatch(_ctx(adapter, user, f"preview-ready-{adapter}"), command)
+                assert replay.data == ready.data
+
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    after = db.execute(
+                        "SELECT inventory_json, dao_fruit_progress, ascension_merit, tribulation_debt FROM players WHERE id = ?",
+                        (player_id,),
+                    ).fetchone()
+                    assert after == before
+                    assert db.execute("SELECT COUNT(*) FROM operations WHERE player_id = ?", (player_id,)).fetchone()[0] == operation_count
+                    assert db.execute("SELECT COUNT(*) FROM endgame_sessions WHERE player_id = ?", (player_id,)).fetchone()[0] == 0
+
+                _set_player(runtime, adapter, user, endgame_status="ascension_ready", realm_key="mortal", realm_layer=0)
+                candidate = await runtime.dispatch(_ctx(adapter, user, f"preview-candidate-{adapter}"), command)
+                assert candidate.code == "FINAL_BATTLE_PREVIEW"
+                assert candidate.data["ready"] is True
+                assert candidate.data["missing"] == ()
+                assert candidate.data["endgame_status"] == "ascension_ready"
             await runtime.close()
 
     asyncio.run(run())

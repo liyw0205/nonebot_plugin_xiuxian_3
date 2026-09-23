@@ -58,10 +58,21 @@ class EndgameEndingRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class FinalBattlePreviewRecord:
+    player: PlayerView
+    ready: bool
+    missing: tuple[str, ...]
+    trial_keys: tuple[str, ...]
+    certificate_count: int
+    runtime_open: bool = False
+
+
 __all__ = [
     "DaoUnionRecord",
     "TribulationEntryRecord",
     "TrialSessionRecord",
     "TrialSettlementRecord",
     "EndgameEndingRecord",
+    "FinalBattlePreviewRecord",
 ]

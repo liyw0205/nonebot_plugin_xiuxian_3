@@ -175,6 +175,13 @@ class XiuxianApplication:
             write_message="当前事件不允许选择终局。",
         )
 
+    async def preview_final_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.endgame.preview_final_battle(context),
+            require_write=False,
+        )
+
     async def start_tribulation_trial(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,
