@@ -45,7 +45,41 @@ TRAINING_DUMMY = EnemyDefinition(
     reward={"cultivation": 20, "spirit_stones": 5},
 )
 
-ENEMIES = {TRAINING_DUMMY.key: TRAINING_DUMMY}
+CROSS_REALM_SENTINEL = EnemyDefinition(
+    key="enemy.cross_realm_sentinel",
+    label="跨界守门人",
+    location_key="cave.boundary_realm",
+    required_realm="nascent_soul",
+    required_layer=1,
+    max_hp=180,
+    attack=22,
+    initiative=14,
+    agility=12,
+    skill_key="enemy_skill.boundary_sweep",
+    random_pool="battle.enemy.cross_realm_sentinel.v0.4",
+    reward={},
+)
+
+BOUNDARY_TRIAL_GUARDIAN = EnemyDefinition(
+    key="enemy.boundary_trial_guardian",
+    label="界壁试炼守卫",
+    location_key="void.portal",
+    required_realm="soul_transformation",
+    required_layer=1,
+    max_hp=240,
+    attack=28,
+    initiative=16,
+    agility=14,
+    skill_key="enemy_skill.boundary_wall",
+    random_pool="battle.enemy.boundary_trial_guardian.v0.5",
+    reward={},
+)
+
+ENEMIES = {
+    TRAINING_DUMMY.key: TRAINING_DUMMY,
+    CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
+    BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
+}
 
 
 def enemy_definition(enemy_key: str) -> EnemyDefinition:

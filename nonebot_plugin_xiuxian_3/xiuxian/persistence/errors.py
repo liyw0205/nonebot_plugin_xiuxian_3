@@ -1062,3 +1062,23 @@ class BattleRewardNotAvailableError(RuntimeError):
 
 class BattleRewardAlreadyClaimedError(RuntimeError):
     """The battle reward was already claimed by a different operation."""
+
+
+class QuestRequirementError(RuntimeError):
+    """The player does not satisfy a quest action or completion gate."""
+
+
+class QuestAlreadyCompletedError(RuntimeError):
+    """The requested one-time quest component has already been completed."""
+
+
+class QuestNotCompletedError(RuntimeError):
+    """The player has not completed all required quest components."""
+
+
+class QuestResourceInsufficientError(RuntimeError):
+    """The player lacks a material required by a quest action."""
+
+
+class QuestOperationNotFoundError(RuntimeError):
+    """A quest source operation cannot be found or is not eligible."""

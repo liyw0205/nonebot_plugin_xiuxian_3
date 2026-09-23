@@ -1409,5 +1409,40 @@ CREATE TABLE IF NOT EXISTS battle_reward_claims (
 CREATE INDEX IF NOT EXISTS idx_battle_reward_claims_player
     ON battle_reward_claims(player_id, created_at);
 
+CREATE TABLE IF NOT EXISTS quest_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    quest_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'claimed')),
+    progress_json TEXT NOT NULL DEFAULT '{}',
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    source_operation_id TEXT,
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, quest_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_quest_progress_player
+    ON quest_progress(player_id, quest_key, status);
+
+CREATE TABLE IF NOT EXISTS quest_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    quest_key TEXT NOT NULL,
+    component_key TEXT NOT NULL,
+    source_operation_id TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (player_id, quest_key, component_key, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_quest_events_player
+    ON quest_events(player_id, quest_key, component_key, created_at);
+
 
 """

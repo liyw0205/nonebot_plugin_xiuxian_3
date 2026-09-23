@@ -32,6 +32,7 @@ from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
 from .events.use_cases import EventsApplication
+from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -66,6 +67,7 @@ class XiuxianApplication:
         self.wayfaring = WayfaringApplication(repository)
         self.economy = EconomyApplication(repository)
         self.events = EventsApplication(repository)
+        self.quests = QuestApplication(repository)
 
     async def _invoke(
         self,
@@ -390,6 +392,33 @@ class XiuxianApplication:
             lambda: self.combat.replay_battle(context),
             require_write=False,
         )
+
+    async def get_advanced_quests(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.get_advanced_quests(context), require_write=False)
+
+    async def complete_domain_material_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.complete_domain_material_commission(context), write_message="当前事件不允许完成领域委托。")
+
+    async def complete_ancient_domain_line(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.complete_ancient_domain_line(context), write_message="当前事件不允许推进远古洞天任务。")
+
+    async def start_cross_realm_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.start_cross_realm_battle(context), write_message="当前事件不允许开始跨界战。")
+
+    async def start_void_wall_trial(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.start_void_wall_trial(context), write_message="当前事件不允许开始界壁试炼。")
+
+    async def acquire_void_archive(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.acquire_void_archive(context), write_message="当前事件不允许探索档案遗迹。")
+
+    async def deliver_void_archive(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.deliver_void_archive(context), write_message="当前事件不允许交付虚空档案。")
+
+    async def claim_soul_transformation_quest(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.claim_soul_transformation(context), write_message="当前事件不允许领取化神许可。")
+
+    async def claim_void_refining_quest(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.claim_void_refining(context), write_message="当前事件不允许领取炼虚许可。")
 
     async def list_bounties(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.adventures.list_bounties(context), require_write=False)

@@ -65,6 +65,12 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "cancel_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
         "get_spirit_spring_event": "nonebot_plugin_xiuxian_3.xiuxian.events.repository",
         "claim_spirit_spring_event": "nonebot_plugin_xiuxian_3.xiuxian.events.repository",
+        "get_advanced_quests": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
+        "complete_domain_material_commission": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
+        "complete_ancient_domain_line": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
+        "claim_soul_transformation_quest": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
+        "claim_void_refining_quest": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
+        "start_quest_battle": "nonebot_plugin_xiuxian_3.xiuxian.combat.repository",
     }
 
     assert {

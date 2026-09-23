@@ -57,16 +57,16 @@
 
 | 缺口 | 已有部分 | 尚缺的玩家路径 | 推荐归属 |
 |:--|:--|:--|:--|
-| 自动回合战斗 | 训练傀儡单人 PVE、开始快照、服务端自动回合、回放、奖励唯一性和失败调息 | 近郊/洞天/高阶任务遭遇、完整技能、多人 PVE 与 PvP；先为许可任务增加单人战斗生产者，再扩展队伍战斗 | `gameplay/combat` |
-| 化神许可 | 化神突破会话、领域裂痕与领域选择 | `quest.soul_transformation` 的三次领域材料委托和一次跨界战斗来源 | `gameplay/events`、`gameplay/combat`、`foundation/progression` |
-| 炼虚许可 | 炼虚突破会话、虚空航道和里程碑 | `quest.break_void` 的三次界壁试炼和虚空档案交付来源 | `gameplay/events`、`gameplay/exploration`、`gameplay/combat` |
+| 自动回合战斗 | 训练傀儡单人 PVE、跨界守门人、界壁试炼、开始快照、服务端自动回合、回放、奖励唯一性和失败调息 | 近郊/洞天遭遇、完整技能、多人 PVE 与 PvP | `gameplay/combat` |
+| 化神许可 | 化神突破会话、领域裂痕与领域选择；三次领域材料委托、三次远古洞天任务、跨界战胜利和许可领取均有来源 operation 记录 | 领域前线完整活动、多人跨界副本和赛季奖励 | `gameplay/events`、`gameplay/combat`、`foundation/progression` |
+| 炼虚许可 | 炼虚突破会话、虚空航道和里程碑；三次界壁试炼（失败也计参与）、虚空档案来源/交付和许可领取均有来源 operation 记录 | 虚空档案遗迹的完整航行/守卫副本、档案碎片周任务和赛季奖励 | `gameplay/events`、`gameplay/exploration`、`gameplay/combat` |
 | 合道许可 | 合道入境事务和道果线索 | `quest.dao_union` 的三界主线、跨服宗门战或等价挑战、职业终局作品及资格快照 | `gameplay/adventures`、`gameplay/social`、`gameplay/production`、`gameplay/combat` |
 | 终局资源闭环 | 三次天劫试炼、道果锁定、最终战只读资格预览、结局选择 | `task.dao_origin.guard/build/teach`、终局配方、飞升凭证和 `dao_fruit_progress` / `ascension_merit` 的可审计生产者 | `gameplay/events`、`gameplay/production`、`foundation/progression` |
 | 最终战与赛季 | 终局前置检查、结局历史表和冻结普通写入 | 30 分钟终局战会话、至多 5 人协助、凭证锁定/失败不耗、候选生成、三榜与匿名展示 | `gameplay/combat`、`gameplay/events`、`gameplay/social` |
 
-`quest.prepare_nascent_soul` 是上述任务中唯一已有玩家命令生产者（`准备元婴`）。其余三项
-突破许可目前只由消费端校验；高阶测试会明确用 SQLite 夹具构造资格，以验证状态机而不是
-声称这些任务已可由玩家完成。
+`quest.prepare_nascent_soul`、`quest.soul_transformation` 和 `quest.break_void` 现已有玩家命令生产者。
+高阶许可通过 `quest_progress` / `quest_events` 保存组件、来源 operation、版本和冻结快照，突破消费端
+仍兼容历史测试夹具，但玩家入口不会直接接受或写入资格标记；战斗资格只接受已结算的对应战斗会话。
 
 终局来源数值还有一项待实现前统一的闭合校验：`extensions/content/content-v0.6.md` 规定三次
 试炼与三项道源任务合计应提供 `ascension_merit=1,000`，而现有运行时试炼奖励和未实现任务
@@ -79,7 +79,7 @@
 
 1. 稳定当前已开放切片的迁移、回放、并发、资产锁和 QQ/OneBot 适配器契约。
 2. 自动回合最小闭环已完成：训练傀儡、单人 PVE、可回放会话、超时/失败恢复和奖励唯一性均已接入；后续遭遇战只能复用该会话证据，不能补写资格标记。
-3. 以已完成的战斗会话为唯一证据，实现 `quest.soul_transformation` 与 `quest.break_void` 的任务生产者；随后接入对应突破，不写入测试式资格标记。
+3. 化神/炼虚许可生产者已完成：任务组件、来源 operation、自动战斗证据、材料扣除、重复请求和 QQ/OneBot 测试均已接入。
 4. 实现 `quest.dao_union`、三项道源任务、终局配方和飞升凭证，先通过终局资源可达性公式测试。
 5. 最后开放多人终局战、候选生成、赛季三榜和展示结局；再推进 PvP、跨服与完整三界区域。
 

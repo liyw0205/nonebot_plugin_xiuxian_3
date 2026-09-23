@@ -28,6 +28,7 @@ from ..social.sect_repository import SectRepositoryMixin
 from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
+from ..quests.repository import QuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
 from .errors import *  # noqa: F401,F403
@@ -50,6 +51,7 @@ class SQLitePlayerRepository(
     PartyRepositoryMixin,
     MentorRepositoryMixin,
     EventsRepositoryMixin,
+    QuestRepositoryMixin,
     EconomyRepositoryMixin,
     AdvancementRepositoryMixin,
     CultivationRepositoryMixin,

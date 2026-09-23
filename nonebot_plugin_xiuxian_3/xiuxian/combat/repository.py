@@ -59,6 +59,31 @@ class CombatRepositoryMixin:
                 platform,
                 platform_user_id,
                 operation_id,
+                "enemy.training_dummy",
+                "pve.training",
+            )
+
+    async def start_quest_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        enemy_key: str,
+        battle_type: str,
+        operation_id: str,
+    ) -> BattleStartRecord:
+        """Create a named quest encounter using the same replayable battle core."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync,
+                self._start_training_battle_once,
+                platform,
+                platform_user_id,
+                operation_id,
+                enemy_key,
+                battle_type,
             )
 
     async def run_battle_turn(self, *, battle_id: str, expected_round: int) -> BattleTurnRecord:
@@ -114,16 +139,22 @@ class CombatRepositoryMixin:
         raise RepositoryBusyError("database remained locked") from last_error
 
     def _start_training_battle_once(
-        self, platform: str, platform_user_id: str, operation_id: str
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        enemy_key: str = "enemy.training_dummy",
+        battle_type: str = "pve.training",
     ) -> BattleStartRecord:
-        enemy = enemy_definition("enemy.training_dummy")
-        operation_name = "battle.start"
+        enemy = enemy_definition(enemy_key)
+        operation_name = "battle.start" if battle_type == "pve.training" else f"battle.start.{battle_type}"
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "enemy_key": enemy.key,
+                "battle_type": battle_type,
                 "content_version": CONTENT_VERSION,
                 "rule_version": RULE_VERSION,
             },
@@ -144,10 +175,10 @@ class CombatRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if not self._meets_enemy_requirement(player, enemy.required_realm, enemy.required_layer):
                 raise BattleRequirementError("realm requirement is not met")
-            if str(player["location_key"]) != enemy.location_key:
+            if battle_type == "pve.training" and str(player["location_key"]) != enemy.location_key:
                 raise BattleRequirementError("battle requires a specific location")
             cooldown = player["battle_defeat_until"]
-            if cooldown and now < datetime.fromisoformat(str(cooldown)):
+            if battle_type == "pve.training" and cooldown and now < datetime.fromisoformat(str(cooldown)):
                 raise BattleCooldownError("battle defeat cooldown is active")
             if self._has_active_long_action(connection, int(player["id"])):
                 raise BattleBusyError("another long action is active")
@@ -168,7 +199,7 @@ class CombatRepositoryMixin:
             )
             battle_id = uuid4().hex
             snapshot = {
-                "battle_type": "pve.training",
+                "battle_type": battle_type,
                 "location_key": enemy.location_key,
                 "player": {
                     "player_id": str(player["player_id"]),
@@ -206,12 +237,13 @@ class CombatRepositoryMixin:
                     status, reward_status, round_no, action_sequence, starts_at, turn_deadline,
                     snapshot_json, state_json, result_json, content_version, rule_version,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, 'pve.training', ?, ?, 'created', 'none', 0, 0, ?, ?, ?, ?, '{}', ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, 'created', 'none', 0, 0, ?, ?, ?, ?, '{}', ?, ?, ?, ?)
                 """,
                 (
                     battle_id,
                     player["id"],
                     operation_id,
+                    battle_type,
                     enemy.key,
                     enemy.location_key,
                     now_text,
@@ -468,7 +500,7 @@ class CombatRepositoryMixin:
                 str(key): int(value)
                 for key, value in dict(snapshot.get("reward", {})).items()
             } if outcome == "won" else {}
-            reward_status = "pending" if outcome == "won" else "none"
+            reward_status = "pending" if outcome == "won" and reward else "none"
             durability_loss = 0
             if outcome == "won":
                 durable_ids = [
@@ -489,7 +521,7 @@ class CombatRepositoryMixin:
                         (now_text, player["id"], *durable_ids),
                     )
                     durability_loss = 50
-            elif outcome in {"lost", "expired"}:
+            elif outcome in {"lost", "expired"} and str(session["battle_type"]) == "pve.training":
                 connection.execute(
                     "UPDATE players SET battle_defeat_until = ?, updated_at = ? WHERE id = ?",
                     (
