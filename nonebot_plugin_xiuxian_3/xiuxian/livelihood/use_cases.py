@@ -158,7 +158,7 @@ class LivelihoodApplication:
     async def plant(self, context: CommandContext) -> CommandResult:
         crop_key = self._resolve_crop(context.command_args)
         if crop_key is None:
-            return CommandResult(False, "INVALID_CROP", "可用 `灵田播种` 或 `灵田播种 止血草`。", context.request_id)
+            return CommandResult(False, "INVALID_CROP", "可用 `灵田播种 止血草` 或 `灵田播种 灵叶`。", context.request_id)
         operation_id = self._operation_id(context, "livelihood.plant")
         try:
             record = await self.repository.plant_plot(

@@ -6,6 +6,7 @@ from .route_models import RoutePreviewRecord, RouteSettlementRecord, RouteStartR
 from .rules import (
     BLOOD_GRASS,
     COURTYARD,
+    SPIRIT_LEAF,
     TOWN_ROOM,
     commission_definition,
     crop_definition,
@@ -22,6 +23,7 @@ from .route_rules import ROUTE_NEW_TOWN_OUTSKIRTS, route_definition, resolve_car
 __all__ = [
     "BLOOD_GRASS",
     "COURTYARD",
+    "SPIRIT_LEAF",
     "FieldPlotRecord",
     "ResidenceRecord",
     "TOWN_ROOM",

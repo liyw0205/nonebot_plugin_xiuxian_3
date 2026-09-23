@@ -7,4 +7,8 @@
 - [用例与验收](use-cases.md)
 - [v0.1 城镇与居所内容](content-v0.1.md)
 
+当前已开放：止血草与灵叶灵田、城镇委托、服务订单和短途运输。灵叶需要小院，播种快照固定 `livelihood.harvest.v0.1` 阵砂副产物结果；灵泉事件中的灵叶贡献另见[活动域](../events/README.md)。
+
+仓储按领域拆分：居所事务在 `repository.py`，灵田事务在 `field_repository.py`，委托、服务和运输分别在各自的 repository mixin 中。
+
 所有 `content-v*.md` 遵守 [版本内容开发合同](../../content-development-contract.md)。常驻经营的产出只允许材料、灵石、名望、信誉、建设与服务资格；不得直接发放修为、跨境突破材料或战斗属性。

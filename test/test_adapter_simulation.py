@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import sqlite3
 from dataclasses import replace
+from datetime import datetime, timezone
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
@@ -14,6 +17,19 @@ from nonebot_plugin_xiuxian_3.adapters.nonebot import _canonical_command
 from nonebot_plugin_xiuxian_3.adapters.onebot import is_onebot_v11_event, normalize_event
 from nonebot_plugin_xiuxian_3.adapters.qq import is_qq_event, normalize_event as normalize_qq_event
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+
+
+class MutableClock:
+    def __init__(self, value: datetime):
+        self.value = value
+
+    def __call__(self) -> datetime:
+        return self.value
+
+    def advance(self, **kwargs: int) -> None:
+        from datetime import timedelta
+
+        self.value += timedelta(**kwargs)
 
 
 def _onebot_group_event(content: str, *, message_id: int = 3003):
@@ -93,6 +109,59 @@ def test_real_qq_group_event_reaches_shared_application() -> None:
             assert created.code == "PLAYER_CREATED"
             assert profile.code == "PROFILE_READ"
             assert profile.data["dao_name"] == "青云"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_qq_and_onebot_spirit_leaf_field_flow_reaches_shared_application() -> None:
+    qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-spirit-leaf"))
+    onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3010))
+
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            for prefix, normalized in (("qq", qq), ("onebot", onebot)):
+                context = replace(normalized.context, operation_id=f"{prefix}-create")
+                assert (await runtime.adapters.dispatch(normalized.context.adapter, context, "开始修仙")).ok
+                assert (
+                    await runtime.adapters.dispatch(
+                        normalized.context.adapter,
+                        replace(context, operation_id=f"{prefix}-seek"),
+                        "寻仙问道",
+                    )
+                ).ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (normalized.context.adapter, normalized.context.user_id),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE players SET inventory_json = ?, spirit_stones = 100 WHERE id = ?",
+                        (json.dumps({"item.herb.spirit_leaf": 1}), player_id),
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                        VALUES (?, ?, 0, ?)
+                        ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json
+                        """,
+                        (player_id, json.dumps({"local.xuantian.new_town": 40}), clock.value.isoformat()),
+                    )
+                dispatch = lambda operation, text: runtime.adapters.dispatch(
+                    normalized.context.adapter,
+                    replace(context, operation_id=operation),
+                    text,
+                )
+                assert (await dispatch(f"{prefix}-lease", "租住居所 小院")).code == "RESIDENCE_LEASED"
+                assert (await dispatch(f"{prefix}-plant", "灵田播种 灵叶")).code == "FIELD_PLOT_PLANTED"
+                assert (await dispatch(f"{prefix}-maintain-1", "灵田维护")).ok
+                assert (await dispatch(f"{prefix}-maintain-2", "灵田维护")).ok
+                clock.advance(hours=8)
+                harvested = await dispatch(f"{prefix}-harvest", "灵田收获")
+                assert harvested.code == "FIELD_PLOT_HARVESTED"
+                assert harvested.data["harvest"]["item.herb.spirit_leaf"] == 3
             await runtime.close()
 
     asyncio.run(run())

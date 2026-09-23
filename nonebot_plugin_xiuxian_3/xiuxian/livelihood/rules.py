@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 
@@ -61,6 +62,8 @@ def residence_definition(value: str | None = None) -> ResidenceDefinition:
 
 
 BLOOD_GRASS = "crop.blood_grass"
+SPIRIT_LEAF = "crop.spirit_leaf"
+SPIRIT_LEAF_HARVEST_POOL = "livelihood.harvest.v0.1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +78,7 @@ class CropDefinition:
     unmaintained_harvest: dict[str, int]
     daily_limit: int
     residence_key: str | None = None
+    random_pool: str | None = None
     content_version: str = CONTENT_VERSION
     rule_version: str = RULE_VERSION
 
@@ -105,9 +109,28 @@ CROP_DEFINITIONS = {
         unmaintained_harvest={"item.herb.blood_grass": 1},
         daily_limit=2,
     ),
+    SPIRIT_LEAF: CropDefinition(
+        key=SPIRIT_LEAF,
+        label="灵叶",
+        seed_key="item.herb.spirit_leaf",
+        growth_seconds=8 * 60 * 60,
+        maintenance_energy=2,
+        required_maintenance=2,
+        maintained_harvest={"item.herb.spirit_leaf": 3},
+        unmaintained_harvest={"item.herb.spirit_leaf": 1},
+        daily_limit=1,
+        residence_key=COURTYARD,
+        random_pool=SPIRIT_LEAF_HARVEST_POOL,
+    ),
 }
 
-CROP_ALIASES = {"止血草": BLOOD_GRASS, "血草": BLOOD_GRASS, "blood_grass": BLOOD_GRASS}
+CROP_ALIASES = {
+    "止血草": BLOOD_GRASS,
+    "血草": BLOOD_GRASS,
+    "blood_grass": BLOOD_GRASS,
+    "灵叶": SPIRIT_LEAF,
+    "spirit_leaf": SPIRIT_LEAF,
+}
 
 
 def crop_definition(value: str | None = None) -> CropDefinition:
@@ -116,6 +139,15 @@ def crop_definition(value: str | None = None) -> CropDefinition:
         return CROP_DEFINITIONS[key]
     except KeyError as exc:
         raise ValueError(f"unsupported crop key: {value}") from exc
+
+
+def spirit_leaf_array_sand_roll(operation_id: str) -> int:
+    """Return the frozen 0/1副产物 roll for a spirit-leaf planting."""
+
+    digest = hashlib.blake2b(
+        f"{SPIRIT_LEAF_HARVEST_POOL}:{operation_id}".encode("utf-8"), digest_size=2
+    ).digest()
+    return int.from_bytes(digest, "big") % 2
 
 
 COMMISSION_HERB_SUPPLY = "town_commission.herb_supply"
@@ -171,6 +203,8 @@ def commission_definition(value: str | None = None) -> TownCommissionDefinition:
 
 __all__ = [
     "BLOOD_GRASS",
+    "SPIRIT_LEAF",
+    "SPIRIT_LEAF_HARVEST_POOL",
     "CONTENT_VERSION",
     "COURTYARD",
     "CROP_DEFINITIONS",
@@ -186,6 +220,7 @@ __all__ = [
     "CropDefinition",
     "ResidenceDefinition",
     "crop_definition",
+    "spirit_leaf_array_sand_roll",
     "commission_definition",
     "residence_definition",
 ]

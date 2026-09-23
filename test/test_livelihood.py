@@ -111,6 +111,64 @@ def test_plot_expiry_marks_withered_without_refunding_assets() -> None:
     asyncio.run(run())
 
 
+def test_spirit_leaf_requires_courtyard_and_freezes_array_sand_roll() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            user = "spirit-leaf-user"
+            context = _context(user)
+            await runtime.dispatch(context, "开始修仙")
+            await runtime.dispatch(context, "寻仙问道")
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform_user_id = ?", (user,)
+                ).fetchone()[0]
+                connection.execute(
+                    "UPDATE players SET inventory_json = ?, spirit_stones = 100 WHERE id = ?",
+                    (json.dumps({"item.herb.spirit_leaf": 2}), player_id),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+                    VALUES (?, ?, 0, ?)
+                    ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json
+                    """,
+                    (player_id, json.dumps({"local.xuantian.new_town": 40}), clock.value.isoformat()),
+                )
+
+            leased = await runtime.dispatch(_context(user, "spirit-lease"), "租住居所 小院")
+            assert leased.code == "RESIDENCE_LEASED"
+            planted = await runtime.dispatch(
+                _context(user, "spirit-plant"), "灵田播种 灵叶"
+            )
+            assert planted.code == "FIELD_PLOT_PLANTED"
+            assert planted.data["crop_key"] == "crop.spirit_leaf"
+            assert planted.data["required_maintenance"] == 2
+            assert (await runtime.dispatch(_context(user, "spirit-maintain-1"), "灵田维护")).ok
+            assert (await runtime.dispatch(_context(user, "spirit-maintain-2"), "灵田维护")).ok
+            clock.advance(hours=8)
+            harvested = await runtime.dispatch(_context(user, "spirit-harvest"), "灵田收获")
+            assert harvested.code == "FIELD_PLOT_HARVESTED"
+            assert harvested.data["harvest"]["item.herb.spirit_leaf"] == 3
+            assert harvested.data["harvest"].get("item.mat.array_sand", 0) in {0, 1}
+            replay = await runtime.dispatch(_context(user, "spirit-harvest"), "灵田收获")
+            assert replay.data["harvest"] == harvested.data["harvest"]
+            assert replay.data["idempotent_replay"] is True
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                snapshot = connection.execute(
+                    "SELECT snapshot_json FROM field_plots WHERE plot_id = ?", (planted.data["plot_id"],)
+                ).fetchone()[0]
+                payload = json.loads(snapshot)
+                assert payload["random_pool"] == "livelihood.harvest.v0.1"
+                assert payload["random_seed"] == "spirit-plant"
+                assert payload["array_sand_roll"] in {0, 1}
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_town_commission_defers_materials_until_delivery_and_settles_once() -> None:
     async def run() -> None:
         clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
