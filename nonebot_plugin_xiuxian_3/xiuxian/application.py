@@ -29,6 +29,7 @@ from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
+from .events.use_cases import EventsApplication
 from .repository import SQLitePlayerRepository
 
 
@@ -60,6 +61,7 @@ class XiuxianApplication:
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
         self.economy = EconomyApplication(repository)
+        self.events = EventsApplication(repository)
 
     async def _invoke(
         self,
@@ -788,6 +790,16 @@ class XiuxianApplication:
 
     async def list_market_orders(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.list_market_orders(context), require_write=False)
+
+    async def get_spirit_spring_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.get_spirit_spring_event(context), require_write=False)
+
+    async def claim_spirit_spring_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.events.claim_spirit_spring_event(context),
+            write_message="当前事件不允许领取灵泉事件奖励。",
+        )
 
     async def create_production_commission(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.create_production_commission(context), write_message="当前事件不允许发布生产委托。")

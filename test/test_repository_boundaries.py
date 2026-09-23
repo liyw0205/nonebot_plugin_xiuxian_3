@@ -60,6 +60,8 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "deliver_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
         "settle_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
         "cancel_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
+        "get_spirit_spring_event": "nonebot_plugin_xiuxian_3.xiuxian.events.repository",
+        "claim_spirit_spring_event": "nonebot_plugin_xiuxian_3.xiuxian.events.repository",
     }
 
     assert {

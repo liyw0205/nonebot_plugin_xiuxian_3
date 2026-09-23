@@ -760,6 +760,22 @@ class SevenDayGoalAlreadyClaimedError(RuntimeError):
     """The requested seven-day goal reward was already claimed."""
 
 
+class EventNotActiveError(RuntimeError):
+    """No open or claimable world-event round is available."""
+
+
+class EventContributionInsufficientError(RuntimeError):
+    """The player has not reached the event reward contribution threshold."""
+
+
+class EventRewardAlreadyClaimedError(RuntimeError):
+    """The player already claimed this event round's reward."""
+
+
+class EventRewardExpiredError(RuntimeError):
+    """The event reward window has closed."""
+
+
 class AchievementInvalidError(RuntimeError):
     """The requested achievement is not registered."""
 

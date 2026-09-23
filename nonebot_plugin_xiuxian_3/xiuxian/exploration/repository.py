@@ -265,7 +265,7 @@ class ExplorationRepositoryMixin:
             "mode_key": definition.key,
         }
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         business_date = now.date().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -443,7 +443,7 @@ class ExplorationRepositoryMixin:
         operation_name = "exploration.settle"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -546,6 +546,14 @@ class ExplorationRepositoryMixin:
                 "UPDATE exploration_sessions SET status = ?, result_json = ?, updated_at = ? WHERE id = ? AND status IN ('created', 'running')",
                 (status, json.dumps(result_json, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
             )
+            if status == "settled" and str(session["mode_key"]) == "explore.spring_gather":
+                self._record_spirit_spring_contribution(
+                    connection,
+                    player_id=int(row["id"]),
+                    source_operation_id=str(session["operation_id"]),
+                    quantity=int(result.get("item.herb.spirit_leaf", 0)),
+                    occurred_at=datetime.fromisoformat(str(session["starts_at"])),
+                )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             player = self._row_to_player(updated)
             payload = {
@@ -601,7 +609,7 @@ class ExplorationRepositoryMixin:
         operation_name = "exploration.cancel"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash(operation_name, request_payload)
-        now_text = serialize_datetime(datetime.now(timezone.utc))
+        now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(

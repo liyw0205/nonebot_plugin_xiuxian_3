@@ -805,6 +805,65 @@ CREATE TABLE IF NOT EXISTS activity_events (
 CREATE INDEX IF NOT EXISTS idx_activity_events_player_key
     ON activity_events(player_id, event_key, occurred_at);
 
+CREATE TABLE IF NOT EXISTS world_event_rounds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL UNIQUE,
+    event_key TEXT NOT NULL,
+    location_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('scheduled', 'open', 'running', 'settlement', 'settled', 'failed', 'cancelled')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    claim_expires_at TEXT NOT NULL,
+    target_quantity INTEGER NOT NULL CHECK (target_quantity >= 0),
+    total_contribution INTEGER NOT NULL DEFAULT 0 CHECK (total_contribution >= 0),
+    result_json TEXT NOT NULL DEFAULT '{}',
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_world_event_rounds_lookup
+    ON world_event_rounds(event_key, status, starts_at, claim_expires_at);
+
+CREATE TABLE IF NOT EXISTS world_event_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL REFERENCES world_event_rounds(round_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    contribution INTEGER NOT NULL CHECK (contribution >= 0),
+    updated_at TEXT NOT NULL,
+    UNIQUE (round_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_world_event_contributions_round
+    ON world_event_contributions(round_id, contribution DESC);
+
+CREATE TABLE IF NOT EXISTS world_event_contribution_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL REFERENCES world_event_rounds(round_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    source_operation_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity >= 0),
+    applied_quantity INTEGER NOT NULL CHECK (applied_quantity >= 0),
+    occurred_at TEXT NOT NULL,
+    UNIQUE (round_id, player_id, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_world_event_contribution_events_source
+    ON world_event_contribution_events(source_operation_id);
+
+CREATE TABLE IF NOT EXISTS world_event_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL REFERENCES world_event_rounds(round_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    claimed_at TEXT NOT NULL,
+    UNIQUE (round_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_world_event_claims_round
+    ON world_event_claims(round_id, claimed_at);
+
 CREATE TABLE IF NOT EXISTS seven_day_campaigns (
     player_id INTEGER PRIMARY KEY REFERENCES players(id),
     start_date TEXT NOT NULL,

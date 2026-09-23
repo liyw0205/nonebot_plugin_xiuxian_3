@@ -243,3 +243,5 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("取消生产委托", application.cancel_production_commission)
     router.register("清理生产委托", application.expire_production_commission)
     router.register("恢复生产委托", application.recover_production_commission)
+    router.register("灵泉事件", application.get_spirit_spring_event)
+    router.register("领取灵泉事件奖励", application.claim_spirit_spring_event)
