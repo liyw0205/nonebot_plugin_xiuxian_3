@@ -6,9 +6,10 @@
 - [状态机](workflow.md)
 - [用例与验收](use-cases.md)
 - [v0.1 城镇与居所内容](content-v0.1.md)
+- [v0.2 设施、商会与公共项目内容](content-v0.2.md)
 
-当前已开放：止血草与灵叶灵田、城镇委托、服务订单和短途运输。灵叶需要小院，播种快照固定 `livelihood.harvest.v0.1` 阵砂副产物结果；灵泉事件中的灵叶贡献另见[活动域](../events/README.md)。
+当前已开放：止血草与灵叶灵田、城镇委托、服务订单、短途运输和地方公共项目。公共项目按周轮换，贡献上限为单次 30 点，完成后按快照在 7 天内生效；个人累计贡献达到 10 点后可结算一次奖励。灵叶需要小院，播种快照固定 `livelihood.harvest.v0.1` 阵砂副产物结果；灵泉事件中的灵叶贡献另见[活动域](../events/README.md)。
 
-仓储按领域拆分：居所事务在 `repository.py`，灵田事务在 `field_repository.py`，委托、服务和运输分别在各自的 repository mixin 中。
+仓储按领域拆分：居所事务在 `repository.py`，灵田事务在 `field_repository.py`，委托、服务、运输和公共项目分别在各自的 repository mixin 中。
 
 所有 `content-v*.md` 遵守 [版本内容开发合同](../../content-development-contract.md)。常驻经营的产出只允许材料、灵石、名望、信誉、建设与服务资格；不得直接发放修为、跨境突破材料或战斗属性。

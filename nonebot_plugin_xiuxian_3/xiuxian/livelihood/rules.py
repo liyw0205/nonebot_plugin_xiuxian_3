@@ -201,6 +201,85 @@ def commission_definition(value: str | None = None) -> TownCommissionDefinition:
         raise ValueError(f"unsupported commission key: {value}") from exc
 
 
+PROJECT_TOWN_WELL = "project.town_well"
+PROJECT_MARKET_ROAD = "project.market_road"
+PROJECT_HERB_GARDEN = "project.herb_garden"
+PROJECT_CONTENT_VERSION = "content-0.2"
+PROJECT_RULE_VERSION = "livelihood-0.2.0"
+TRANSPORT_TICKET = "item.token.transport_coupon"
+HERB_SEED_BUNDLE = "item.seed.herb_bundle"
+
+
+@dataclass(frozen=True, slots=True)
+class PublicProjectDefinition:
+    key: str
+    label: str
+    requirements: dict[str, int]
+    contribution_resources: tuple[str, ...]
+    effect_key: str
+    reward: dict[str, int | str]
+    content_version: str = PROJECT_CONTENT_VERSION
+    rule_version: str = PROJECT_RULE_VERSION
+
+
+PUBLIC_PROJECT_DEFINITIONS = {
+    PROJECT_TOWN_WELL: PublicProjectDefinition(
+        key=PROJECT_TOWN_WELL,
+        label="新镇灵井",
+        requirements={"item.mat.wood": 100},
+        contribution_resources=("item.mat.wood",),
+        effect_key="town_commission.stock_bonus",
+        reward={"spirit_stones": 30, "local_reputation": 5},
+    ),
+    PROJECT_MARKET_ROAD: PublicProjectDefinition(
+        key=PROJECT_MARKET_ROAD,
+        label="商路修缮",
+        requirements={"item.material.cloud_iron": 60, "currency.spirit_stone": 3000},
+        contribution_resources=("item.material.cloud_iron", "currency.spirit_stone"),
+        effect_key="route.delay_weight_reduction",
+        reward={"service_reputation": 3, "item": TRANSPORT_TICKET},
+    ),
+    PROJECT_HERB_GARDEN: PublicProjectDefinition(
+        key=PROJECT_HERB_GARDEN,
+        label="百草园",
+        requirements={"item.herb.spirit_leaf": 120},
+        contribution_resources=("item.herb.spirit_leaf",),
+        effect_key="town_commission.herb_reward_bonus",
+        reward={"item": HERB_SEED_BUNDLE},
+    ),
+}
+
+PROJECT_ALIASES = {
+    "灵井": PROJECT_TOWN_WELL,
+    "新镇灵井": PROJECT_TOWN_WELL,
+    "project.town_well": PROJECT_TOWN_WELL,
+    "商路": PROJECT_MARKET_ROAD,
+    "商路修缮": PROJECT_MARKET_ROAD,
+    "project.market_road": PROJECT_MARKET_ROAD,
+    "百草园": PROJECT_HERB_GARDEN,
+    "灵草园": PROJECT_HERB_GARDEN,
+    "project.herb_garden": PROJECT_HERB_GARDEN,
+}
+
+
+def project_definition(value: str | None = None) -> PublicProjectDefinition:
+    key = PROJECT_ALIASES.get((value or "").strip(), (value or "").strip())
+    try:
+        return PUBLIC_PROJECT_DEFINITIONS[key]
+    except KeyError as exc:
+        raise ValueError(f"unsupported project key: {value}") from exc
+
+
+def weekly_project_key(week_key: str) -> str:
+    """Choose one deterministic project for a town's weekly rotation."""
+
+    import hashlib
+
+    digest = hashlib.blake2b(week_key.encode("utf-8"), digest_size=2).digest()
+    keys = tuple(PUBLIC_PROJECT_DEFINITIONS)
+    return keys[int.from_bytes(digest, "big") % len(keys)]
+
+
 __all__ = [
     "BLOOD_GRASS",
     "SPIRIT_LEAF",
@@ -223,4 +302,16 @@ __all__ = [
     "spirit_leaf_array_sand_roll",
     "commission_definition",
     "residence_definition",
+    "HERB_SEED_BUNDLE",
+    "PROJECT_ALIASES",
+    "PROJECT_CONTENT_VERSION",
+    "PROJECT_HERB_GARDEN",
+    "PROJECT_MARKET_ROAD",
+    "PROJECT_RULE_VERSION",
+    "PROJECT_TOWN_WELL",
+    "PUBLIC_PROJECT_DEFINITIONS",
+    "PublicProjectDefinition",
+    "TRANSPORT_TICKET",
+    "project_definition",
+    "weekly_project_key",
 ]

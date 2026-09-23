@@ -340,6 +340,30 @@ class RouteAlreadySettledError(RuntimeError):
     """The route already has a terminal settlement."""
 
 
+class ProjectNotFoundError(RuntimeError):
+    """The requested weekly public project does not exist."""
+
+
+class ProjectContentClosedError(RuntimeError):
+    """The requested public project is not open in the current content."""
+
+
+class ProjectContributionLimitError(RuntimeError):
+    """A single public-project contribution exceeds the point cap."""
+
+
+class ProjectContributionRequirementError(RuntimeError):
+    """The selected resource cannot contribute to this public project."""
+
+
+class ProjectAlreadyCompleteError(RuntimeError):
+    """The public project has already reached its contribution requirements."""
+
+
+class ProjectNotReadyError(RuntimeError):
+    """The public project is not ready for reward settlement."""
+
+
 class SectContentClosedError(RuntimeError):
     """The requested sect content is not open."""
 

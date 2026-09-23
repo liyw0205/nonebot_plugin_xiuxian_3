@@ -321,14 +321,21 @@ class CommissionRepositoryMixin:
     def _ensure_commissions(self, connection: Any, business_date: str, now: datetime) -> None:
         day_start = datetime(now.year, now.month, now.day, tzinfo=now.tzinfo)
         starts_at = serialize_datetime(day_start)
+        effects = self._public_project_effects(connection, now)
+        stock_multiplier = 120 if "town_commission.stock_bonus" in effects else 100
+        herb_reward_multiplier = 110 if "town_commission.herb_reward_bonus" in effects else 100
         for definition in TOWN_COMMISSION_DEFINITIONS.values():
             expires = day_start + timedelta(seconds=definition.duration_seconds)
             status = "published" if now < expires else "expired"
             commission_id = f"town.new_town.{business_date}.{definition.key.rsplit('.', 1)[-1]}"
+            stock = definition.stock * stock_multiplier // 100
+            reward_stones = definition.reward_stones
+            if definition.key == "town_commission.herb_supply":
+                reward_stones = reward_stones * herb_reward_multiplier // 100
             snapshot = {
                 "label": definition.label,
                 "inputs": definition.inputs,
-                "reward_stones": definition.reward_stones,
+                "reward_stones": reward_stones,
                 "local_reputation": definition.local_reputation,
                 "service_reputation": definition.service_reputation,
                 "content_version": definition.content_version,
@@ -346,8 +353,8 @@ class CommissionRepositoryMixin:
                     definition.key,
                     business_date,
                     status,
-                    definition.stock,
-                    definition.stock,
+                    stock,
+                    stock,
                     starts_at,
                     serialize_datetime(expires),
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
@@ -355,6 +362,32 @@ class CommissionRepositoryMixin:
                     starts_at,
                 ),
             )
+            if stock_multiplier > 100 or herb_reward_multiplier > 100:
+                current = connection.execute(
+                    "SELECT id, stock_total, stock_remaining, snapshot_json FROM town_commissions WHERE commission_id = ?",
+                    (commission_id,),
+                ).fetchone()
+                if current is None:
+                    continue
+                additional_stock = max(0, stock - int(current["stock_total"]))
+                current_snapshot = self._json_object(current["snapshot_json"], {})
+                if definition.key == "town_commission.herb_supply":
+                    current_snapshot["reward_stones"] = reward_stones
+                connection.execute(
+                    """
+                    UPDATE town_commissions
+                    SET stock_total = ?, stock_remaining = stock_remaining + ?,
+                        snapshot_json = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        max(int(current["stock_total"]), stock),
+                        additional_stock,
+                        json.dumps(current_snapshot, ensure_ascii=False, sort_keys=True),
+                        serialize_datetime(now),
+                        current["id"],
+                    ),
+                )
 
     @staticmethod
     def _expire_commissions(connection: Any, business_date: str, now: datetime, now_text: str) -> None:

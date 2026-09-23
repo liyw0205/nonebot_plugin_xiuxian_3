@@ -288,6 +288,61 @@ CREATE INDEX IF NOT EXISTS idx_livelihood_trade_routes_player
 CREATE UNIQUE INDEX IF NOT EXISTS idx_livelihood_trade_routes_active
     ON livelihood_trade_routes(player_id) WHERE status = 'in_transit';
 
+CREATE TABLE IF NOT EXISTS livelihood_projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL UNIQUE,
+    project_key TEXT NOT NULL,
+    business_week TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('proposed', 'funded', 'building', 'active', 'maintenance_due', 'inactive')),
+    target_points INTEGER NOT NULL CHECK (target_points >= 0),
+    contribution_points INTEGER NOT NULL DEFAULT 0 CHECK (contribution_points >= 0),
+    requirements_json TEXT NOT NULL DEFAULT '{}',
+    progress_json TEXT NOT NULL DEFAULT '{}',
+    effect_key TEXT NOT NULL,
+    effect_starts_at TEXT,
+    effect_ends_at TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (project_key, business_week)
+);
+
+CREATE INDEX IF NOT EXISTS idx_livelihood_projects_week
+    ON livelihood_projects(business_week, status);
+
+CREATE TABLE IF NOT EXISTS livelihood_project_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contribution_id TEXT NOT NULL UNIQUE,
+    project_id TEXT NOT NULL REFERENCES livelihood_projects(project_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    resource_key TEXT NOT NULL,
+    resource_amount INTEGER NOT NULL CHECK (resource_amount > 0),
+    contribution_points INTEGER NOT NULL CHECK (contribution_points > 0),
+    created_at TEXT NOT NULL,
+    UNIQUE (project_id, player_id, operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_livelihood_project_contributions_player
+    ON livelihood_project_contributions(player_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_livelihood_project_contributions_project
+    ON livelihood_project_contributions(project_id, created_at);
+
+CREATE TABLE IF NOT EXISTS livelihood_project_rewards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL REFERENCES livelihood_projects(project_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    eligible INTEGER NOT NULL CHECK (eligible IN (0, 1)),
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (project_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_livelihood_project_rewards_player
+    ON livelihood_project_rewards(player_id, created_at);
+
 CREATE TABLE IF NOT EXISTS sects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sect_id TEXT NOT NULL UNIQUE,

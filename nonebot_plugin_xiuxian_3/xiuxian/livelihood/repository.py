@@ -23,6 +23,7 @@ from .commission_repository import CommissionRepositoryMixin
 from .field_repository import FieldPlotRepositoryMixin
 from .route_repository import RouteRepositoryMixin
 from .service_repository import ServiceRepositoryMixin
+from .project_repository import ProjectRepositoryMixin
 from .models import ResidenceRecord
 from .rules import residence_definition
 
@@ -32,6 +33,7 @@ class LivelihoodRepositoryMixin(
     ServiceRepositoryMixin,
     CommissionRepositoryMixin,
     FieldPlotRepositoryMixin,
+    ProjectRepositoryMixin,
 ):
     """Own every persistence transaction that belongs to ``livelihood``."""
 

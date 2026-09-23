@@ -22,6 +22,7 @@ from .advancement.equipment_use_cases import EquipmentApplication
 from .livelihood.use_cases import LivelihoodApplication
 from .livelihood.route_use_cases import RouteApplication
 from .livelihood.service_use_cases import ServiceApplication
+from .livelihood.project_use_cases import ProjectApplication
 from .social.sect_use_cases import SectApplication
 from .social.party_use_cases import PartyApplication
 from .social.mentor_use_cases import MentorApplication
@@ -54,6 +55,7 @@ class XiuxianApplication:
         self.livelihood = LivelihoodApplication(repository)
         self.route = RouteApplication(repository)
         self.service = ServiceApplication(repository)
+        self.project = ProjectApplication(repository)
         self.social = SectApplication(repository)
         self.party = PartyApplication(repository)
         self.mentor = MentorApplication(repository)
@@ -477,6 +479,23 @@ class XiuxianApplication:
             context,
             lambda: self.livelihood.deliver_commission(context),
             write_message="当前事件不允许交付城镇委托。",
+        )
+
+    async def list_projects(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.project.list_projects(context), require_write=False)
+
+    async def contribute_project(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.project.contribute(context),
+            write_message="当前事件不允许贡献公共项目。",
+        )
+
+    async def settle_project(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.project.settle(context),
+            write_message="当前事件不允许结算公共项目。",
         )
 
     async def publish_service(self, context: CommandContext) -> CommandResult:

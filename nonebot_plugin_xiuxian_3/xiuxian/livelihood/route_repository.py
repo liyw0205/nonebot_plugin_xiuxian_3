@@ -181,8 +181,14 @@ class RouteRepositoryMixin:
                 inventory[cargo_key] = remaining
             else:
                 inventory.pop(cargo_key, None)
+            effects = self._public_project_effects(connection, now)
+            delay_chance_bp = max(
+                0,
+                definition.delay_chance_bp
+                - (1000 if "route.delay_weight_reduction" in effects else 0),
+            )
             delay_roll = route_delay_roll_bp(operation_id)
-            delay_seconds = definition.delay_seconds if delay_roll < definition.delay_chance_bp else 0
+            delay_seconds = definition.delay_seconds if delay_roll < delay_chance_bp else 0
             starts_at = now
             arrives_at = now + timedelta(seconds=definition.duration_seconds + delay_seconds)
             route_id = uuid4().hex
@@ -199,6 +205,7 @@ class RouteRepositoryMixin:
                 "random_pool": definition.random_pool,
                 "random_seed": operation_id,
                 "delay_roll_bp": delay_roll,
+                "delay_chance_bp": delay_chance_bp,
                 "delay_seconds": delay_seconds,
                 "content_version": definition.content_version,
                 "rule_version": definition.rule_version,

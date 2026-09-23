@@ -167,6 +167,45 @@ def test_qq_and_onebot_spirit_leaf_field_flow_reaches_shared_application() -> No
     asyncio.run(run())
 
 
+def test_qq_and_onebot_public_project_flow_reaches_shared_application() -> None:
+    qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-public-project"))
+    onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3011))
+
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 10, 12, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            for prefix, normalized in (("qq", qq), ("onebot", onebot)):
+                base = normalized.context
+                dispatch = lambda operation, text: runtime.adapters.dispatch(
+                    base.adapter,
+                    replace(base, operation_id=operation),
+                    text,
+                )
+                assert (await dispatch(f"{prefix}-project-create", "开始修仙")).ok
+                assert (await dispatch(f"{prefix}-project-seek", "寻仙问道")).ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (base.adapter, base.user_id),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE players SET inventory_json = ? WHERE id = ?",
+                        (json.dumps({"item.mat.wood": 10}), player_id),
+                    )
+                listing = await dispatch(f"{prefix}-project-list", "公共项目")
+                assert listing.code == "PROJECT_LIST"
+                contributed = await dispatch(
+                    f"{prefix}-project-contribute",
+                    "贡献公共项目 project.town_well 木材 10",
+                )
+                assert contributed.code == "PROJECT_CONTRIBUTED"
+                assert contributed.data["contribution_points"] == 10
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_qq_and_onebot_normalization_reaches_golden_core_preview() -> None:
     qq = normalize_qq_event(_qq_group_event("突破预览 金丹", message_id="qq-golden-preview"))
     onebot = normalize_event(_onebot_group_event("突破预览 金丹", message_id=3004))
