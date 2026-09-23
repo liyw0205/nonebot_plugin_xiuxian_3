@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
@@ -207,6 +208,94 @@ def test_qi_sensing_milestone_unlocks_are_boundary_stable() -> None:
             )
             assert replay.data["idempotent_replay"] is True
             assert {item["key"] for item in replay.data["unlocks"]} == {"progression.cross_realm.preview"}
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_foundation_late_milestone_is_recorded_with_the_layer_advance() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "foundation-late-user"
+            await _enter_cultivator(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET realm_key = 'foundation', realm_layer = 8, cultivation = 6300,
+                        total_cultivation = 10000
+                    WHERE platform_user_id = ?
+                    """,
+                    (user,),
+                )
+
+            first = await runtime.dispatch(
+                _context(user, "foundation-late", operation_id="foundation-late-advance"),
+                "晋升境界",
+            )
+            assert first.code == "REALM_LAYER_ADVANCED"
+            assert {item["key"] for item in first.data["unlocks"]} == {"milestone.foundation_late"}
+            replay = await runtime.dispatch(
+                _context(user, "foundation-late-replay", operation_id="foundation-late-advance"),
+                "晋升境界",
+            )
+            assert replay.data["idempotent_replay"] is True
+            assert replay.data["unlocks"] == first.data["unlocks"]
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                record = connection.execute(
+                    """
+                    SELECT milestone_key, status, source_operation_id, snapshot_json, content_version, rule_version
+                    FROM progression_milestones
+                    """
+                ).fetchone()
+                assert record[0:3] == (
+                    "milestone.foundation_late",
+                    "unlocked",
+                    "foundation-late-advance",
+                )
+                assert json.loads(record[3]) == {
+                    "realm_key": "foundation",
+                    "realm_layer": 9,
+                    "required_layer": 9,
+                    "required_realm": "foundation",
+                    "required_total_cultivation": 10000,
+                    "total_cultivation": 10000,
+                }
+                assert record[4:] == ("content-0.2", "progression-0.2.0")
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_foundation_late_milestone_requires_total_cultivation_threshold() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "foundation-late-threshold"
+            await _enter_cultivator(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET realm_key = 'foundation', realm_layer = 8, cultivation = 6300,
+                        total_cultivation = 9999
+                    WHERE platform_user_id = ?
+                    """,
+                    (user,),
+                )
+            below = await runtime.dispatch(_context(user, "foundation-late-below"), "晋升境界")
+            assert below.code == "REALM_LAYER_ADVANCED"
+            assert below.data["unlocks"] == []
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute("SELECT COUNT(*) FROM progression_milestones").fetchone()[0] == 0
+                connection.execute(
+                    "UPDATE players SET cultivation = 7700, total_cultivation = 10000 WHERE platform_user_id = ?",
+                    (user,),
+                )
+            fulfilled = await runtime.dispatch(_context(user, "foundation-late-fulfilled"), "晋升境界")
+            assert fulfilled.code == "REALM_LAYER_ADVANCED"
+            assert {item["key"] for item in fulfilled.data["unlocks"]} == {"milestone.foundation_late"}
             await runtime.close()
 
     asyncio.run(run())

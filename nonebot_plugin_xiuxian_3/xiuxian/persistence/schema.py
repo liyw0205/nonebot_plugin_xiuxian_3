@@ -130,6 +130,23 @@ CREATE INDEX IF NOT EXISTS idx_cultivation_sessions_player ON cultivation_sessio
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cultivation_sessions_active
     ON cultivation_sessions(player_id) WHERE status = 'running';
 
+CREATE TABLE IF NOT EXISTS progression_milestones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    milestone_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('unlocked')),
+    source_operation_id TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    unlocked_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (player_id, milestone_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_progression_milestones_player
+    ON progression_milestones(player_id, unlocked_at);
+
 CREATE TABLE IF NOT EXISTS retreat_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL UNIQUE,

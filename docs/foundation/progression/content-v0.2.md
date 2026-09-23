@@ -17,6 +17,10 @@
 
 `golden_core` 在 v0.1 仍为 `placeholder`；任何 v0.1 玩家请求必须返回 `CONTENT_CLOSED`，不扣材料或修为。
 
+当前运行时在 `progression.advance_layer` 成功进入筑基 L9（或之后的层数）且总修为达到
+10,000 时，原子写入 `milestone.foundation_late` 资格记录。记录冻结达到资格时的境界、层数、
+总修为、内容/规则版本和来源 operation；同一角色只会获得一次，并随晋升 operation 回放原结果。
+
 ## 2. 金丹突破：`progression.breakthrough_golden_core`
 
 输入：`player_id`、可选保护丹 `use_golden_core_guard`、`operation_id`。开始时冻结角色、`Progression`、属性快照、道途状态、装备、地点、材料、规则和随机池；结算引用 `random_pool=breakthrough.golden_core.v0.2`。

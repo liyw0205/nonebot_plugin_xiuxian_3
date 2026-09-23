@@ -1113,7 +1113,7 @@ class CultivationRepositoryMixin:
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.advance_layer", operation_payload)
-        now_text = serialize_datetime(datetime.now(timezone.utc))
+        now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
@@ -1179,7 +1179,7 @@ class CultivationRepositoryMixin:
                     flags = set(str(item) for item in self._json_object(row["intro_json"], {}).get("flags", []))
                     if not {"task.dao_origin.guard", "task.dao_origin.build", "task.dao_origin.teach"}.issubset(flags):
                         raise TrialSequenceError("dao origin tasks are incomplete")
-            unlocks = layer_unlocks(realm_key, layer + 1)
+            layer_unlocks_reached = layer_unlocks(realm_key, layer + 1)
             connection.execute(
                 "UPDATE players SET realm_layer = realm_layer + 1, updated_at = ? WHERE id = ?",
                 (now_text, row["id"]),
@@ -1187,6 +1187,15 @@ class CultivationRepositoryMixin:
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
                 raise RuntimeError("layer advancement returned no player")
+            from ..progression.milestone_repository import record_due_milestones
+
+            milestone_unlocks = record_due_milestones(
+                connection,
+                player=updated,
+                source_operation_id=operation_id,
+                now_text=now_text,
+            )
+            unlocks = (*layer_unlocks_reached, *milestone_unlocks)
             player = self._row_to_player(updated)
             payload = {
                 "player": self._player_payload(player),

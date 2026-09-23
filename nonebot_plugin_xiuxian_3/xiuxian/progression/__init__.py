@@ -27,6 +27,7 @@ from .endgame_rules import (
     TRIAL_LABELS,
     THREE_REALM_KEYS,
 )
+from .milestone_rules import FOUNDATION_LATE_MILESTONE, MILESTONE_DEFINITIONS, due_milestones
 
 __all__ = [
     "CULTIVATION_SETTLEMENT_GRACE_SECONDS",
@@ -52,4 +53,7 @@ __all__ = [
     "TRIAL_ORDER",
     "TRIAL_LABELS",
     "THREE_REALM_KEYS",
+    "FOUNDATION_LATE_MILESTONE",
+    "MILESTONE_DEFINITIONS",
+    "due_milestones",
 ]
