@@ -19,6 +19,7 @@ from ..progression.breakthrough.repository import BreakthroughRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
 from ..world.travel_repository import TravelRepositoryMixin
 from ..exploration.repository import ExplorationRepositoryMixin
+from ..combat.repository import CombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
@@ -41,6 +42,7 @@ class SQLitePlayerRepository(
     ProgressionRepositoryMixin,
     RoutineRepositoryMixin,
     ExplorationRepositoryMixin,
+    CombatRepositoryMixin,
     AdventuresRepositoryMixin,
     ProductionRepositoryMixin,
     LivelihoodRepositoryMixin,
@@ -232,6 +234,7 @@ class SQLitePlayerRepository(
             ("talent_points", "INTEGER NOT NULL DEFAULT 0"),
             ("skill_insights", "INTEGER NOT NULL DEFAULT 0"),
             ("weakness_until", "TEXT"),
+            ("battle_defeat_until", "TEXT"),
             ("breakthrough_pity_bp", "INTEGER NOT NULL DEFAULT 0"),
             ("soul_power", "INTEGER NOT NULL DEFAULT 0"),
             ("soul_power_max", "INTEGER NOT NULL DEFAULT 0"),

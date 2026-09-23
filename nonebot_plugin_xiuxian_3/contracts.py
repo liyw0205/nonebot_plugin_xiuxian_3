@@ -108,6 +108,7 @@ class PlayerView:
     foundation_quality: int = 0
     world_merit: int = 0
     weakness_until: datetime | None = None
+    battle_defeat_until: datetime | None = None
     breakthrough_pity_bp: int = 0
     talent_points: int = 0
     skill_insights: int = 0

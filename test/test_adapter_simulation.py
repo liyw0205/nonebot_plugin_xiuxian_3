@@ -114,6 +114,44 @@ def test_real_qq_group_event_reaches_shared_application() -> None:
     asyncio.run(run())
 
 
+def test_qq_and_onebot_normalization_reaches_automatic_training_battle() -> None:
+    qq = normalize_qq_event(_qq_group_event("开始训练战", message_id="qq-training-battle"))
+    onebot = normalize_event(_onebot_group_event("开始训练战", message_id=3020))
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for prefix, normalized in (("qq", qq), ("onebot", onebot)):
+                base = normalized.context
+
+                async def dispatch(operation: str, text: str):
+                    return await runtime.adapters.dispatch(
+                        base.adapter,
+                        replace(base, operation_id=operation),
+                        text,
+                    )
+
+                assert (await dispatch(f"{prefix}-create", "开始修仙")).ok
+                assert (await dispatch(f"{prefix}-seek", "寻仙问道")).ok
+                assert (await dispatch(f"{prefix}-read", "完成引导 阅读")).ok
+                assert (await dispatch(f"{prefix}-travel", "前往近郊")).ok
+                assert (await dispatch(f"{prefix}-gather", "完成引导 采集")).ok
+                assert (await dispatch(f"{prefix}-service", "完成引导 炼丹")).ok
+                assert (await dispatch(f"{prefix}-path", "选择道途 体修")).code == "CULTIVATION_ENTERED"
+                assert (await dispatch(f"{prefix}-return", "返回新手城")).ok
+                settled = await dispatch(f"{prefix}-battle", normalized.text)
+                assert settled.code == "BATTLE_SETTLED"
+                assert settled.data["outcome"] == "won"
+                claimed = await dispatch(f"{prefix}-claim", "领取战斗奖励")
+                assert claimed.code == "BATTLE_REWARD_CLAIMED"
+                replay = await dispatch(f"{prefix}-replay", "战斗回放")
+                assert replay.code == "BATTLE_REPLAY"
+                assert replay.data["actions"]
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_qq_and_onebot_spirit_leaf_field_flow_reaches_shared_application() -> None:
     qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-spirit-leaf"))
     onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3010))

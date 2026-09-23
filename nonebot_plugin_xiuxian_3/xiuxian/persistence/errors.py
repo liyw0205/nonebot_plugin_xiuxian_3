@@ -1030,3 +1030,35 @@ class CommissionRequirementError(RuntimeError):
 
 class CommissionDeliveryError(RuntimeError):
     """The requested commission delivery transition is invalid."""
+
+
+class BattleNotFoundError(RuntimeError):
+    """The requested battle session does not exist for this player."""
+
+
+class BattleBusyError(RuntimeError):
+    """A player already has a battle or another locked long action."""
+
+
+class BattleRequirementError(RuntimeError):
+    """The player misses a battle location, realm, or state prerequisite."""
+
+
+class BattleCooldownError(RuntimeError):
+    """A recent battle defeat is still imposing its cooldown."""
+
+
+class BattleNotReadyError(RuntimeError):
+    """The server has not yet reached a terminal battle outcome."""
+
+
+class BattleAlreadySettledError(RuntimeError):
+    """The terminal battle was already converted into a settlement."""
+
+
+class BattleRewardNotAvailableError(RuntimeError):
+    """There is no settled victory reward pending for the player."""
+
+
+class BattleRewardAlreadyClaimedError(RuntimeError):
+    """The battle reward was already claimed by a different operation."""

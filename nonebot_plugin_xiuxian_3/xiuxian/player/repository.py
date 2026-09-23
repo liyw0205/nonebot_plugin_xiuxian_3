@@ -1084,6 +1084,11 @@ class PlayerRepositoryMixin:
                 if value("weakness_until")
                 else None
             ),
+            battle_defeat_until=(
+                datetime.fromisoformat(str(value("battle_defeat_until")))
+                if value("battle_defeat_until")
+                else None
+            ),
             breakthrough_pity_bp=int(value("breakthrough_pity_bp", 0)),
             soul_power=int(value("soul_power", 0)),
             soul_power_max=int(value("soul_power_max", 0)),
@@ -1173,6 +1178,7 @@ class PlayerRepositoryMixin:
             "talent_points": player.talent_points,
             "skill_insights": player.skill_insights,
             "weakness_until": serialize_datetime(player.weakness_until) if player.weakness_until else None,
+            "battle_defeat_until": serialize_datetime(player.battle_defeat_until) if player.battle_defeat_until else None,
             "breakthrough_pity_bp": player.breakthrough_pity_bp,
             "soul_power": player.soul_power,
             "soul_power_max": player.soul_power_max,

@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS players (
     talent_points INTEGER NOT NULL DEFAULT 0 CHECK (talent_points >= 0),
     skill_insights INTEGER NOT NULL DEFAULT 0 CHECK (skill_insights >= 0),
     weakness_until TEXT,
+    battle_defeat_until TEXT,
     breakthrough_pity_bp INTEGER NOT NULL DEFAULT 0 CHECK (breakthrough_pity_bp >= 0),
     soul_power INTEGER NOT NULL DEFAULT 0 CHECK (soul_power >= 0),
     soul_power_max INTEGER NOT NULL DEFAULT 0 CHECK (soul_power_max >= 0),
@@ -1342,6 +1343,71 @@ CREATE TABLE IF NOT EXISTS production_commission_locks (
 
 CREATE INDEX IF NOT EXISTS idx_production_commission_locks_player
     ON production_commission_locks(player_id, asset_kind, asset_key);
+
+CREATE TABLE IF NOT EXISTS battle_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    start_operation_id TEXT NOT NULL UNIQUE,
+    resolved_operation_id TEXT UNIQUE,
+    claim_operation_id TEXT UNIQUE,
+    battle_type TEXT NOT NULL,
+    enemy_key TEXT NOT NULL,
+    location_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('created', 'running', 'won', 'lost', 'escaped', 'expired', 'settled')),
+    reward_status TEXT NOT NULL CHECK (reward_status IN ('none', 'pending', 'claimed')),
+    round_no INTEGER NOT NULL DEFAULT 0 CHECK (round_no BETWEEN 0 AND 20),
+    action_sequence INTEGER NOT NULL DEFAULT 0 CHECK (action_sequence >= 0),
+    starts_at TEXT NOT NULL,
+    turn_deadline TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    state_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_sessions_player
+    ON battle_sessions(player_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_battle_sessions_active
+    ON battle_sessions(player_id) WHERE status IN ('created', 'running');
+
+CREATE TABLE IF NOT EXISTS battle_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL UNIQUE,
+    battle_id TEXT NOT NULL REFERENCES battle_sessions(battle_id),
+    sequence_no INTEGER NOT NULL CHECK (sequence_no >= 1),
+    round_no INTEGER NOT NULL CHECK (round_no BETWEEN 1 AND 20),
+    actor_key TEXT NOT NULL CHECK (actor_key IN ('player', 'enemy')),
+    strategy_key TEXT NOT NULL,
+    skill_key TEXT NOT NULL,
+    target_key TEXT NOT NULL,
+    hit_roll_bp INTEGER NOT NULL CHECK (hit_roll_bp BETWEEN 0 AND 9999),
+    crit_roll_bp INTEGER NOT NULL CHECK (crit_roll_bp BETWEEN 0 AND 9999),
+    hit_bp INTEGER NOT NULL CHECK (hit_bp BETWEEN 0 AND 10000),
+    damage INTEGER NOT NULL CHECK (damage >= 0),
+    state_json TEXT NOT NULL DEFAULT '{}',
+    operation_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (battle_id, sequence_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_actions_replay
+    ON battle_actions(battle_id, sequence_no);
+
+CREATE TABLE IF NOT EXISTS battle_reward_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id TEXT NOT NULL UNIQUE REFERENCES battle_sessions(battle_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_reward_claims_player
+    ON battle_reward_claims(player_id, created_at);
 
 
 """

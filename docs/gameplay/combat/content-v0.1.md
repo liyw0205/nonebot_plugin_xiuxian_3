@@ -12,6 +12,27 @@ PvP 规则预留：双方或多方必须使用战斗开始时的角色、属性�
 断线不暂停战斗，结果可完整回放；匹配按境界/保护规则分组，禁止刷分、协商输赢和永久资产损失。
 在前置基础未完成前，上述规则只作为 `locked` 合同和测试夹具存在。
 
+### 1.1 首个运行时切片：训练傀儡
+
+`enemy.training_dummy` 是自动战斗运行时的首个可用垂直切片。玩家只能发送 `开始训练战`、
+`领取战斗奖励` 和 `战斗回放`；客户端携带的技能、目标、伤害或回合参数一律拒绝。开始命令只创建
+会话，随后由同一 application 调用内部 `run_turn` 直至 `resolve_battle`，因此聊天适配器不能直接推进
+单回合。
+
+训练战开始快照的基础攻击属性使用当前已存在的角色投影，避免在战斗域另建一套角色属性：
+
+```text
+max_hp = max(100 + body*4 + equipment_hp_affix, players.max_hp)
+attack = 10 + floor(body/2) + weapon_temper_level*2 + equipment_damage_affix
+initiative = max(8 + floor(agility/2) + equipment_initiative_affix, players.initiative)
+agility = qualification.agility
+```
+
+仅快照内状态参与计算；战后修改资质、先手或装备不会改写历史回放。训练傀儡当前只使用
+`skill.basic_attack` 与 `enemy_skill.dummy_tap`，每回合保存命中、暴击随机值、策略、目标、伤害和双方
+剩余气血。胜利结算时参与的武器/防具耐久各扣 `50 bp`；三次服务端回合超时会自动防御并判负，失败只写
+15 分钟战败调息，不扣永久物品。完整道途技能、探索遭遇、多人 PVE 与 PvP 仍按后续切片开放。
+
 ## 2. 敌人与技能
 
 | `enemy_key` | 前置地点/境界 | 气血/攻击/先手 | 技能与行为 | 胜利奖励池 |

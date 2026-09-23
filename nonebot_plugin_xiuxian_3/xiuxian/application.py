@@ -12,6 +12,7 @@ from .progression.endgame_use_cases import EndgameApplication
 from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
+from .combat.use_cases import CombatApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .advancement.use_cases import AdvancementApplication
@@ -45,6 +46,7 @@ class XiuxianApplication:
         self.production = ProductionApplication(repository)
         self.world = WorldApplication(repository)
         self.exploration = ExplorationApplication(repository)
+        self.combat = CombatApplication(repository)
         self.adventures = AdventuresApplication(repository)
         self.mainline = AdventuresMainlineApplication(repository)
         self.advancement = AdvancementApplication(repository)
@@ -366,6 +368,27 @@ class XiuxianApplication:
             context,
             lambda: self.exploration.cancel_exploration(context),
             write_message="当前事件不允许取消探索。",
+        )
+
+    async def start_training_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.combat.start_training_battle(context),
+            write_message="当前事件不允许开始训练战。",
+        )
+
+    async def claim_battle_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.combat.claim_battle_reward(context),
+            write_message="当前事件不允许领取战斗奖励。",
+        )
+
+    async def replay_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.combat.replay_battle(context),
+            require_write=False,
         )
 
     async def list_bounties(self, context: CommandContext) -> CommandResult:

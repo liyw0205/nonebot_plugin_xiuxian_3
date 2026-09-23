@@ -1044,6 +1044,7 @@ class CultivationRepositoryMixin:
             ("breakthrough_sessions", "status = 'preparing'"),
             ("travel_sessions", "status = 'running'"),
             ("exploration_sessions", "status IN ('created', 'running', 'combat_pending')"),
+            ("battle_sessions", "status IN ('created', 'running')"),
             ("void_route_sessions", "status = 'running'"),
         )
         return any(
