@@ -86,6 +86,8 @@ class EndgameProductionRepositoryMixin:
             realm_rank = {"mortal": 0, "qi_sensing": 1, "qi_gathering": 2, "foundation": 3, "golden_core": 4, "nascent_soul": 5, "soul_transformation": 6, "void_refining": 7, "dao_union": 8, "tribulation": 9}
             if realm_rank.get(str(player["realm_key"]), -1) < realm_rank[recipe.required_realm]:
                 raise EndgameRecipeRequirementError("endgame recipe realm gate is not met")
+            if recipe.required_location and str(player["location_key"]) != recipe.required_location:
+                raise EndgameRecipeRequirementError("endgame recipe requires its designated location")
             if recipe.key == "recipe.dao.fruit_fragment":
                 if int(player["dao_fruit_progress"]) + recipe.output_progress > DAO_FRUIT_PROGRESS_CAP:
                     raise EndgameRecipeRequirementError("dao fruit progress cap would be exceeded")
@@ -142,6 +144,7 @@ class EndgameProductionRepositoryMixin:
                 "output_item": recipe.output_item,
                 "output_progress": recipe.output_progress,
                 "world_merit_cost": recipe.world_merit_cost,
+                "location_key": str(player["location_key"]),
                 "progress_before": int(player["dao_fruit_progress"]),
                 "roll_bp": roll_bp,
                 "content_version": CONTENT_VERSION,

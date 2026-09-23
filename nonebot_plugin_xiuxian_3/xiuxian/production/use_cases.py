@@ -252,7 +252,7 @@ class ProductionApplication:
         except EndgameRecipeBusyError:
             return CommandResult(False, "ENDGAME_RECIPE_BUSY", "已有终局配方正在制作，请先结算。", context.request_id, operation_id)
         except EndgameRecipeRequirementError:
-            return CommandResult(False, "ENDGAME_RECIPE_CONTEXT_INVALID", "境界、试炼、领域或终局资源前置未满足。", context.request_id, operation_id)
+            return CommandResult(False, "ENDGAME_RECIPE_CONTEXT_INVALID", "需在道源门制作，并满足境界、试炼、领域及资源前置。", context.request_id, operation_id)
         except QuestResourceInsufficientError:
             return CommandResult(False, "QUEST_RESOURCE_INSUFFICIENT", "世界功勋不足，未扣除资源。", context.request_id, operation_id)
         except MaterialInsufficientError:

@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
-from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import recipe_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import ENDGAME_RECIPES, recipe_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_REWARDS, DAO_ORIGIN_TASKS
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import (
     TRIBULATION_MERIT_REWARD,
@@ -307,6 +307,49 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_endgame_recipes_require_dao_origin_gate_on_qq_and_onebot() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "qq-origin-gate"), ("onebot.v11", "ob-origin-gate")):
+                await _create(runtime, adapter, user)
+                _set_player(runtime, adapter, user, stage="cultivator", realm_key="tribulation", realm_layer=10)
+                for recipe_key, recipe in ENDGAME_RECIPES.items():
+                    realm_key = recipe.required_realm
+                    _set_player(runtime, adapter, user, realm_key=realm_key)
+                    blocked = await runtime.dispatch(
+                        _ctx(adapter, user, f"wrong-place-{recipe_key}"),
+                        f"开始终局配方 {recipe_key}",
+                    )
+                    assert blocked.code == "ENDGAME_RECIPE_CONTEXT_INVALID"
+
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    realm_key="dao_union",
+                    realm_layer=1,
+                    location_key="dao.origin_gate",
+                    inventory_json=json.dumps({"item.dao_fruit_fragment": 10, "item.soul_crystal": 5}),
+                )
+                started = await runtime.dispatch(
+                    _ctx(adapter, user, f"at-origin-gate-{adapter}"),
+                    "开始终局配方 recipe.dao.fruit_fragment",
+                )
+                assert started.code == "ENDGAME_RECIPE_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    snapshot_json = connection.execute(
+                        "SELECT snapshot_json FROM endgame_sessions WHERE session_id = ?",
+                        (started.data["session_id"],),
+                    ).fetchone()[0]
+                assert json.loads(snapshot_json)["location_key"] == "dao.origin_gate"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_endgame_recipe_replay_failure_refund_and_final_battle_preview_path() -> None:
     async def run() -> None:
         clock = MutableClock()
@@ -325,6 +368,7 @@ def test_endgame_recipe_replay_failure_refund_and_final_battle_preview_path() ->
                 dao_fruit_progress=1_000,
                 ascension_merit=1_000,
                 world_merit=1_000,
+                location_key="dao.origin_gate",
                 inventory_json=json.dumps({"item.dao_fruit_fragment": 10, "item.soul_crystal": 5}),
             )
             with sqlite3.connect(runtime.settings.database_path) as connection:
@@ -423,7 +467,15 @@ def test_endgame_recipe_frontier_is_atomic_when_requirements_are_missing() -> No
             runtime = create_runtime(data_dir=data_dir)
             adapter, user = "qq.official", "endgame-recipe-blocked"
             await _create(runtime, adapter, user)
-            _set_player(runtime, adapter, user, realm_key="tribulation", realm_layer=10, world_merit=999)
+            _set_player(
+                runtime,
+                adapter,
+                user,
+                realm_key="tribulation",
+                realm_layer=10,
+                location_key="dao.origin_gate",
+                world_merit=999,
+            )
             blocked = await runtime.dispatch(
                 _ctx(adapter, user, "certificate-blocked"),
                 "开始终局配方 recipe.ascension.certificate",

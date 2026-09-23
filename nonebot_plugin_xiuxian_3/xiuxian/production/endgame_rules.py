@@ -24,6 +24,7 @@ class EndgameRecipeDefinition:
     required_progress: int = 0
     required_ascension_merit: int = 0
     required_realm: str = "dao_union"
+    required_location: str = "dao.origin_gate"
 
 
 ENDGAME_RECIPES = {
