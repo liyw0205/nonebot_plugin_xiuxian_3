@@ -46,6 +46,7 @@ class TrialSettlementRecord:
     reward_progress: int
     reward_merit: int
     reward_items: dict[str, int]
+    reward_world_merit: int = 0
     dao_fruit_key: str | None = None
     already_completed: bool = False
 

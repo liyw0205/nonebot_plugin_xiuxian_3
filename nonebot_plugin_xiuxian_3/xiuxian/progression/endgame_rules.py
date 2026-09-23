@@ -37,6 +37,13 @@ TRIBULATION_PROGRESS_REWARD = {
     "trial.dao_choice": 250,
 }
 TRIBULATION_MERIT_REWARD = {
+    # Keep the resource closure explicit: the three trials contribute 550,
+    # while the three dao-origin tasks contribute the remaining 450.
+    "trial.body_and_mind": 100,
+    "trial.three_realms": 200,
+    "trial.dao_choice": 250,
+}
+TRIBULATION_WORLD_MERIT_REWARD = {
     "trial.body_and_mind": 0,
     "trial.three_realms": 500,
     "trial.dao_choice": 0,
@@ -116,6 +123,7 @@ __all__ = [
     "DAO_UNION_MERIT_COST",
     "DAO_UNION_STONE_COST",
     "TRIBULATION_TRIAL_DURATION_SECONDS",
+    "TRIBULATION_WORLD_MERIT_REWARD",
     "TRIAL_ORDER",
     "TRIAL_LABELS",
     "THREE_REALM_KEYS",

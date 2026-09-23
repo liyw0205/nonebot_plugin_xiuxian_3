@@ -8,6 +8,7 @@ from ..persistence.errors import (
     BattleNotReadyError,
     BattleRequirementError,
     OperationConflictError,
+    DaoOriginTaskRequirementError,
     PlayerNotFoundError,
     PlayerSuspendedError,
     QuestAlreadyCompletedError,
@@ -40,6 +41,7 @@ class QuestApplication:
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能推进任务。"),
             QuestRequirementError: ("QUEST_REQUIREMENT_MISSING", "当前境界或任务前置不满足，未修改进度。"),
             QuestResourceInsufficientError: ("QUEST_RESOURCE_INSUFFICIENT", "任务材料不足，未修改进度。"),
+            DaoOriginTaskRequirementError: ("ENDGAME_EVENT_REQUIREMENT_MISSING", "需要先进入合道且满足道源任务前置。"),
             QuestNotCompletedError: ("QUEST_REQUIREMENT_MISSING", "任务前置尚未完成，未发放许可。"),
             QuestAlreadyCompletedError: ("QUEST_ALREADY_COMPLETED", "这个任务环节已经完成。"),
             BattleRequirementError: ("BATTLE_REQUIREMENT_MISSING", "当前境界或位置不满足战斗前置。"),
@@ -134,6 +136,130 @@ class QuestApplication:
             "quest.break_void.claim",
             self.repository.claim_void_refining_quest,
             "炼虚许可",
+        )
+
+    async def record_dao_union_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._simple_action(
+            context,
+            "quest.dao_union.three_realm_mainline",
+            self.repository.record_dao_union_mainline,
+            "三界主线资格",
+        )
+
+    async def deliver_dao_union_work(self, context: CommandContext) -> CommandResult:
+        return await self._simple_action(
+            context,
+            "quest.dao_union.endgame_work",
+            self.repository.deliver_dao_union_work,
+            "道途终局作品交付",
+        )
+
+    async def start_dao_union_challenge(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_QUEST_COMMAND", "合道挑战不接受技能、目标或伤害参数。", context.request_id)
+        operation_id = self._operation_id(context, "quest.dao_union.personal_challenge")
+        try:
+            started = await self.repository.start_quest_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                enemy_key="enemy.cross_realm_sentinel",
+                battle_type="pve.dao_union_challenge",
+                operation_id=operation_id,
+            )
+            resolved = await self._run_battle(started.battle_id, started.round_no)
+            evidence = None
+            if resolved.outcome == "won":
+                try:
+                    evidence = await self.repository.record_dao_union_challenge(
+                        platform=context.adapter,
+                        platform_user_id=context.user_id,
+                        operation_id=f"{operation_id}:evidence",
+                        battle_id=resolved.battle_id,
+                    )
+                except QuestAlreadyCompletedError:
+                    pass
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        challenge_progress = evidence.progress if evidence else (
+            {"cross_server_challenge": 1} if resolved.outcome == "won" else {}
+        )
+        return CommandResult(
+            True,
+            "DAO_UNION_CHALLENGE_SETTLED",
+            f"## 合道个人挑战已结算\n\n- **结果**：{'胜利' if resolved.outcome == 'won' else '失败'}\n- **回合**：{resolved.round_no}/20\n- **资格进度**：{challenge_progress.get('cross_server_challenge', 0)}/1",
+            context.request_id,
+            operation_id,
+            data={"battle_id": resolved.battle_id, "outcome": resolved.outcome, "progress": challenge_progress},
+        )
+
+    async def claim_dao_union_quest(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_QUEST_COMMAND", "领取合道许可无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "quest.dao_union.claim")
+        try:
+            record = await self.repository.claim_dao_union_quest(
+                platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(
+            True,
+            "QUEST_PERMIT_GRANTED",
+            "## 合道许可已获得\n\n资格快照已冻结，可查看合道突破预览。",
+            context.request_id,
+            operation_id,
+            data={
+                "quest_key": record.quest_key,
+                "status": record.status,
+                "progress": record.progress,
+                "snapshot": record.snapshot,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def complete_dao_origin_task(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_QUEST_COMMAND", "请指定道源任务：守界、建设或传承。", context.request_id)
+        task_key = {
+            "守界": "task.dao_origin.guard",
+            "task.dao_origin.guard": "task.dao_origin.guard",
+            "建设": "task.dao_origin.build",
+            "task.dao_origin.build": "task.dao_origin.build",
+            "传承": "task.dao_origin.teach",
+            "task.dao_origin.teach": "task.dao_origin.teach",
+        }.get(context.command_args[0])
+        if task_key is None:
+            return CommandResult(False, "INVALID_QUEST_COMMAND", "道源任务只能选择守界、建设或传承。", context.request_id)
+        operation_id = self._operation_id(context, task_key)
+        try:
+            record = await self.repository.complete_dao_origin_task(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                task_key=task_key,
+                operation_id=operation_id,
+            )
+        except QuestNotCompletedError:
+            requirements = {
+                "task.dao_origin.guard": "守界需要一场本赛季的合道挑战胜利。",
+                "task.dao_origin.build": "建设需要一项本赛季达标并已结算的公共项目。",
+                "task.dao_origin.teach": "传承需要一段本赛季已毕业的师徒关系。",
+            }
+            return CommandResult(
+                False,
+                "ENDGAME_EVENT_REQUIREMENT_MISSING",
+                requirements[task_key],
+                context.request_id,
+                operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(
+            True,
+            "DAO_ORIGIN_TASK_RECORDED",
+            f"## 道源任务已核验\n\n- **任务**：{task_key}\n- **进度**：{record.progress.get('completed', 0)}/3\n- **本次奖励**：{record.reward}",
+            context.request_id,
+            operation_id,
+            data=self._data(record),
         )
 
     async def start_cross_realm_battle(self, context: CommandContext) -> CommandResult:

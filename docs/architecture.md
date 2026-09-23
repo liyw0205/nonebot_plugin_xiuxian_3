@@ -47,6 +47,10 @@ nonebot_plugin_xiuxian_3/
 仓储 mixin。玩家引导、普通移动、虚空航道、修炼/突破、闭关/构筑、生产、探索、
 悬赏/主线、日常和终局事务分别位于各域的 `repository.py`（或对应的细分
 `*_repository.py`），并由 `SQLitePlayerRepository` 组合提供原有 API。
+高阶任务通用许可在 `quests/repository.py`，合道资格与道源赛季事务在
+`quests/endgame_repository.py`；终局配方在 `production/endgame_repository.py`，
+境界状态机在 `progression/endgame_repository.py`。新增事务应按领域职责放置，
+不要继续扩张兼容门面或无边界的通用仓储文件。
 公共异常集中在 `persistence/errors.py`，DDL 集中在 `persistence/schema.py`。
 新领域写入口必须落在对应域的 repository 模块，不再扩大 SQLite 组合根或兼容门面。
 

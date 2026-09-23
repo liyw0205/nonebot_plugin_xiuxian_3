@@ -293,10 +293,10 @@ class EndgameApplication:
         return CommandResult(
             True,
             "TRIAL_SUCCEEDED" if record.success else "TRIAL_FAILED",
-            f"## {label}结算{status}\n\n道果进度 +{record.reward_progress}，道源功勋 +{record.reward_merit}，天劫债 +{record.debt_delta}。",
+            f"## {label}结算{status}\n\n道果进度 +{record.reward_progress}，道源功勋 +{record.reward_merit}，世界功勋 +{record.reward_world_merit}，天劫债 +{record.debt_delta}。",
             context.request_id,
             operation_id,
-            data={"session_id": record.session_id, "trial_key": record.trial_key, "success": record.success, "roll_bp": record.roll_bp, "dao_fruit_progress": record.player.dao_fruit_progress, "ascension_merit": record.player.ascension_merit, "tribulation_debt": record.player.tribulation_debt, "dao_fruit_key": record.dao_fruit_key, "idempotent_replay": record.already_completed},
+            data={"session_id": record.session_id, "trial_key": record.trial_key, "success": record.success, "roll_bp": record.roll_bp, "dao_fruit_progress": record.player.dao_fruit_progress, "ascension_merit": record.player.ascension_merit, "world_merit": record.player.world_merit, "reward_world_merit": record.reward_world_merit, "tribulation_debt": record.player.tribulation_debt, "dao_fruit_key": record.dao_fruit_key, "idempotent_replay": record.already_completed},
         )
 
 

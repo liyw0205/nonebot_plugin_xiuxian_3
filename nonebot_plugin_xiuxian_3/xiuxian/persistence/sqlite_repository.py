@@ -22,6 +22,7 @@ from ..exploration.repository import ExplorationRepositoryMixin
 from ..combat.repository import CombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
+from ..production.endgame_repository import EndgameProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
 from ..livelihood.repository import LivelihoodRepositoryMixin
 from ..social.sect_repository import SectRepositoryMixin
@@ -46,6 +47,7 @@ class SQLitePlayerRepository(
     CombatRepositoryMixin,
     AdventuresRepositoryMixin,
     ProductionRepositoryMixin,
+    EndgameProductionRepositoryMixin,
     LivelihoodRepositoryMixin,
     SectRepositoryMixin,
     PartyRepositoryMixin,

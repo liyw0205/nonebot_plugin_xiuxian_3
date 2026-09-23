@@ -36,11 +36,11 @@ void_refining/L10 混元
 
 | 试炼键 | 开放条件 | 成本 | 固定奖励 | 失败后果 |
 |:--|:--|:--|:--|:--|
-| `trial.body_and_mind` | 渡劫 L3 | `item.tribulation_token` 1 | 开放渡劫 L4–L6；道果进度 100；`item.dao_fruit_fragment` 1 | `resource.tribulation_debt +10`，24 小时不可重试 |
-| `trial.three_realms` | 第一次成功、渡劫 L6 | `item.tribulation_token` 1、三界声望各 2,000 | 开放渡劫 L7–L9；道果进度 180；世界功勋 500 | 债务 +15，48 小时不可重试 |
-| `trial.dao_choice` | 前两次成功、渡劫 L9、道果进度 `>=280` | `item.tribulation_token` 1、选择对应 `fruit_key` | 锁定候选道果；道果进度 250 | 债务 +20，72 小时不可重试 |
+| `trial.body_and_mind` | 渡劫 L3 | `item.tribulation_token` 1 | 开放渡劫 L4–L6；道果进度 100；`resource.ascension_merit` 100；`item.dao_fruit_fragment` 1 | `resource.tribulation_debt +10`，24 小时不可重试 |
+| `trial.three_realms` | 第一次成功、渡劫 L6 | `item.tribulation_token` 1、三界声望各 2,000 | 开放渡劫 L7–L9；道果进度 180；`resource.ascension_merit` 200；世界功勋 500 | 债务 +15，48 小时不可重试 |
+| `trial.dao_choice` | 前两次成功、渡劫 L9、道果进度 `>=280` | `item.tribulation_token` 1、选择对应 `fruit_key` | 锁定候选道果；道果进度 250；`resource.ascension_merit` 250 | 债务 +20，72 小时不可重试 |
 
-试炼为固定战斗/选择内容，使用各自 `random_pool=tribulation.<trial_key>.v0.6`。成功率不使用一键概率：战斗按快照回放；选择题按条件判定；随机仅用于记录的战斗行动。债务达到 100 时，下一次试炼追加 `difficulty_bp=2000`，表现为敌方护盾/环境机制，不能直接扣除角色资产。
+三次试炼和三项道源任务的固定奖励合计为道果进度 1,000、`resource.ascension_merit` 1,000。`trial.three_realms` 另给世界功勋 500；道源任务另给世界功勋共 1,000。债务达到 100 时，下一次试炼追加 `difficulty_bp=2000`，表现为敌方护盾/环境机制，不能直接扣除角色资产。
 
 ## 4. 最终战与飞升候选
 

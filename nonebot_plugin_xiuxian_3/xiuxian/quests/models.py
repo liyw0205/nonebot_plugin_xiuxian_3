@@ -33,4 +33,21 @@ class QuestClaimRecord:
     already_completed: bool = False
 
 
-__all__ = ["QuestActionRecord", "QuestClaimRecord", "QuestStatusRecord"]
+@dataclass(frozen=True, slots=True)
+class DaoUnionQualificationRecord:
+    """The immutable qualification snapshot used by the 合道 permit."""
+
+    player: PlayerView
+    quest_key: str
+    status: str
+    progress: dict[str, int]
+    snapshot: dict[str, object]
+    already_completed: bool = False
+
+
+__all__ = [
+    "DaoUnionQualificationRecord",
+    "QuestActionRecord",
+    "QuestClaimRecord",
+    "QuestStatusRecord",
+]

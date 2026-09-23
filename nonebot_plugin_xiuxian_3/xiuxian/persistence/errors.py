@@ -1082,3 +1082,31 @@ class QuestResourceInsufficientError(RuntimeError):
 
 class QuestOperationNotFoundError(RuntimeError):
     """A quest source operation cannot be found or is not eligible."""
+
+
+class DaoUnionQuestRequirementError(RuntimeError):
+    """The player has not completed the three dao-union qualification components."""
+
+
+class DaoOriginTaskRequirementError(RuntimeError):
+    """The player is not eligible for a dao-origin task."""
+
+
+class EndgameRecipeRequirementError(RuntimeError):
+    """The player is missing the context required by an endgame recipe."""
+
+
+class EndgameRecipeAlreadyCreatedError(RuntimeError):
+    """A one-time endgame recipe has already been created."""
+
+
+class EndgameRecipeBusyError(RuntimeError):
+    """Another endgame recipe order is still processing."""
+
+
+class EndgameRecipeNotFoundError(RuntimeError):
+    """The player has no endgame recipe order to settle."""
+
+
+class EndgameRecipeNotReadyError(RuntimeError):
+    """The endgame recipe order has not reached its settlement time."""

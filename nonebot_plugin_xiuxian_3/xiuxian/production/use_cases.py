@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
+    EndgameRecipeAlreadyCreatedError,
+    EndgameRecipeBusyError,
+    EndgameRecipeNotFoundError,
+    EndgameRecipeNotReadyError,
+    EndgameRecipeRequirementError,
     EnergyInsufficientError,
     MaterialInsufficientError,
     OperationConflictError,
@@ -15,12 +20,14 @@ from ..repository import (
     ProductionExpiredError,
     ProductionNotFoundError,
     ProductionNotReadyError,
+    QuestResourceInsufficientError,
     RecipeRequirementError,
     RepositoryBusyError,
     SQLitePlayerRepository,
     ToolDurabilityInsufficientError,
     ToolMissingError,
 )
+from .endgame_rules import resolve_endgame_recipe
 from .rules import item_label, resolve_recipe
 
 
@@ -225,6 +232,82 @@ class ProductionApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         return self._settlement_result(context, operation_id, record, recovered=True)
+
+    async def start_endgame_recipe(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "ENDGAME_RECIPE_CONTEXT_INVALID", "请指定一个终局配方键。", context.request_id)
+        recipe_key = resolve_endgame_recipe(context.command_args[0])
+        if recipe_key is None:
+            return CommandResult(False, "ENDGAME_RECIPE_CONTEXT_INVALID", "未开放该终局配方。", context.request_id)
+        operation_id = self._operation_id(context, "endgame.production.start")
+        try:
+            record = await self.repository.start_endgame_recipe(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                recipe_key=recipe_key,
+                operation_id=operation_id,
+            )
+        except EndgameRecipeAlreadyCreatedError:
+            return CommandResult(False, "ENDGAME_RECIPE_ALREADY_CREATED", "该终局配方的次数已用尽。", context.request_id, operation_id)
+        except EndgameRecipeBusyError:
+            return CommandResult(False, "ENDGAME_RECIPE_BUSY", "已有终局配方正在制作，请先结算。", context.request_id, operation_id)
+        except EndgameRecipeRequirementError:
+            return CommandResult(False, "ENDGAME_RECIPE_CONTEXT_INVALID", "境界、试炼、领域或终局资源前置未满足。", context.request_id, operation_id)
+        except QuestResourceInsufficientError:
+            return CommandResult(False, "QUEST_RESOURCE_INSUFFICIENT", "世界功勋不足，未扣除资源。", context.request_id, operation_id)
+        except MaterialInsufficientError:
+            return CommandResult(False, "MATERIAL_INSUFFICIENT", "终局配方材料不足，未扣除资源。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能制作终局配方。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次操作编号已用于其他请求。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "ENDGAME_RECIPE_STARTED",
+            f"## 终局配方已开始\n\n**{record.recipe_key}**已建立个人制作会话，预计于 {record.ends_at} 后结算。",
+            context.request_id,
+            operation_id,
+            data={"session_id": record.session_id, "recipe_key": record.recipe_key, "status": record.status, "ends_at": record.ends_at, "idempotent_replay": record.already_completed},
+        )
+
+    async def settle_endgame_recipe(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_ENDGAME_RECIPE_COMMAND", "结算终局配方无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "endgame.production.settle")
+        try:
+            record = await self.repository.settle_endgame_recipe(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+        except EndgameRecipeNotFoundError:
+            return CommandResult(False, "ENDGAME_RECIPE_NOT_FOUND", "当前没有待结算的终局配方。", context.request_id, operation_id)
+        except EndgameRecipeNotReadyError:
+            return CommandResult(False, "ENDGAME_RECIPE_NOT_READY", "终局配方尚未完成，请稍后再结算。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能结算终局配方。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次操作编号已用于其他请求。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "ENDGAME_RECIPE_SETTLED",
+            f"## 终局配方结算{'成功' if record.success else '失败'}\n\n- **配方**：{record.recipe_key}\n- **产出**：{record.rewards or '无'}\n- **返还**：{record.refunds or '无'}",
+            context.request_id,
+            operation_id,
+            data={"session_id": record.session_id, "recipe_key": record.recipe_key, "success": record.success, "roll_bp": record.roll_bp, "rewards": record.rewards, "refunds": record.refunds, "dao_fruit_progress": record.player.dao_fruit_progress, "ascension_merit": record.player.ascension_merit, "world_merit": record.player.world_merit, "idempotent_replay": record.already_completed},
+        )
 
     def _settlement_result(self, context: CommandContext, operation_id: str, record, *, recovered: bool = False) -> CommandResult:
         result_text = "恢复生产完成" if recovered else "生产完成"

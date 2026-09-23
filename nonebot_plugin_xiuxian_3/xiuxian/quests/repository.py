@@ -8,6 +8,7 @@ import sqlite3
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -16,6 +17,7 @@ from ..persistence.errors import (
     QuestRequirementError,
     QuestResourceInsufficientError,
 )
+from .endgame_repository import EndgameQuestRepositoryMixin
 from .models import QuestActionRecord, QuestClaimRecord, QuestStatusRecord
 from .rules import (
     ANCIENT_DOMAIN_LINE,
@@ -30,11 +32,14 @@ from .rules import (
     VOID_QUEST,
     VOID_TRIAL_TARGET,
     VOID_WALL_TRIAL,
+    DAO_ORIGIN_TARGET,
+    DAO_ORIGIN_TASKS,
+    DAO_UNION_QUEST,
     meets_realm,
 )
 
 
-class QuestRepositoryMixin:
+class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
     """Keep quest state separate from the compatibility repository facade."""
 
     async def get_advanced_quests(self, *, platform: str, platform_user_id: str) -> QuestStatusRecord:
@@ -230,7 +235,9 @@ class QuestRepositoryMixin:
     ) -> QuestActionRecord:
         operation_name = "explore.archive_ruins"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
-        now_text = serialize_datetime(self._now())
+        now = self._now()
+        now_text = serialize_datetime(now)
+        season_id, season_start, season_end = final_heaven_season_window(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             replay = self._quest_operation_replay(connection, operation_id, operation_name, request_hash)
@@ -354,6 +361,7 @@ class QuestRepositoryMixin:
             quest_key=VOID_QUEST,
             requirements=((VOID_QUEST, VOID_WALL_TRIAL, VOID_TRIAL_TARGET), (VOID_QUEST, VOID_ARCHIVE_DELIVERY, 1)),
         )
+
 
     def _record_component_sync(
         self,
@@ -550,7 +558,18 @@ class QuestRepositoryMixin:
         for quest_key in (DOMAIN_COMMISSION, ANCIENT_DOMAIN_LINE, SOUL_QUEST, VOID_QUEST):
             result[quest_key] = self._quest_status_for_player(connection, player_id, quest_key)
         result[CROSS_REALM_VICTORY] = self._quest_status_for_player(connection, player_id, CROSS_REALM_VICTORY)
+        for quest_key in (DAO_UNION_QUEST, *DAO_ORIGIN_TASKS):
+            result[quest_key] = self._quest_status_for_player(connection, player_id, quest_key)
+        season_id, _, _ = final_heaven_season_window(self._now())
+        for task_key in DAO_ORIGIN_TASKS:
+            count = self._dao_origin_task_count(connection, player_id, task_key, season_id)
+            result[task_key].update(
+                status="completed" if count >= DAO_ORIGIN_TARGET else "active",
+                progress={"completed": count, "target": DAO_ORIGIN_TARGET},
+                season_id=season_id,
+            )
         return result
+
 
     def _quest_status_for_player(self, connection: sqlite3.Connection, player_id: int, quest_key: str) -> dict[str, object]:
         row = connection.execute(
@@ -598,6 +617,8 @@ class QuestRepositoryMixin:
         outcome: str,
         payload: dict[str, object],
         now_text: str,
+        content_version: str = CONTENT_VERSION,
+        rule_version: str = RULE_VERSION,
     ) -> None:
         connection.execute(
             """
@@ -613,8 +634,8 @@ class QuestRepositoryMixin:
                 source_operation_id,
                 outcome,
                 json.dumps(payload, ensure_ascii=False, sort_keys=True),
-                CONTENT_VERSION,
-                RULE_VERSION,
+                content_version,
+                rule_version,
                 now_text,
             ),
         )
@@ -629,6 +650,9 @@ class QuestRepositoryMixin:
         snapshot: dict[str, object],
         source_operation_id: str,
         now_text: str,
+        *,
+        content_version: str = CONTENT_VERSION,
+        rule_version: str = RULE_VERSION,
     ) -> None:
         connection.execute(
             """
@@ -641,6 +665,8 @@ class QuestRepositoryMixin:
                 progress_json = excluded.progress_json,
                 snapshot_json = excluded.snapshot_json,
                 source_operation_id = excluded.source_operation_id,
+                content_version = excluded.content_version,
+                rule_version = excluded.rule_version,
                 updated_at = excluded.updated_at
             """,
             (
@@ -650,8 +676,8 @@ class QuestRepositoryMixin:
                 json.dumps(progress, ensure_ascii=False, sort_keys=True),
                 json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                 source_operation_id,
-                CONTENT_VERSION,
-                RULE_VERSION,
+                content_version,
+                rule_version,
                 now_text,
                 now_text,
             ),

@@ -307,6 +307,20 @@ class XiuxianApplication:
             write_message="当前事件不允许锁定生产资产。",
         )
 
+    async def start_endgame_recipe(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.production.start_endgame_recipe(context),
+            write_message="当前事件不允许开始终局配方。",
+        )
+
+    async def settle_endgame_recipe(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.production.settle_endgame_recipe(context),
+            write_message="当前事件不允许结算终局配方。",
+        )
+
     async def complete_production(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,
@@ -419,6 +433,21 @@ class XiuxianApplication:
 
     async def claim_void_refining_quest(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.claim_void_refining(context), write_message="当前事件不允许领取炼虚许可。")
+
+    async def record_dao_union_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.record_dao_union_mainline(context), write_message="当前事件不允许记录合道主线资格。")
+
+    async def start_dao_union_challenge(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.start_dao_union_challenge(context), write_message="当前事件不允许开始合道挑战。")
+
+    async def deliver_dao_union_work(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.deliver_dao_union_work(context), write_message="当前事件不允许交付合道作品。")
+
+    async def claim_dao_union_quest(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.claim_dao_union_quest(context), write_message="当前事件不允许领取合道许可。")
+
+    async def complete_dao_origin_task(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.complete_dao_origin_task(context), write_message="当前事件不允许完成道源任务。")
 
     async def list_bounties(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.adventures.list_bounties(context), require_write=False)

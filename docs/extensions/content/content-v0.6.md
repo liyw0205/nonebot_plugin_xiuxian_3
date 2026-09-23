@@ -33,11 +33,11 @@ open_realms_added: [dao_union, tribulation, ascension_ready]
 | 来源键 | 道果进度 | `resource.ascension_merit` | 上限/条件 |
 |:--|--:|--:|:--|
 | `trial.body_and_mind` | 100 | 100 | 一次 |
-| `trial.three_realms` | 180 | 200 | 一次 |
+| `trial.three_realms` | 180 | 200 | 一次；另给世界功勋 500 |
 | `trial.dao_choice` | 250 | 250 | 一次 |
-| `task.dao_origin.guard` | 150 | 150 | 一次，守界任务 |
-| `task.dao_origin.build` | 160 | 150 | 一次，留界建设任务 |
-| `task.dao_origin.teach` | 160 | 150 | 一次，道统传承任务 |
+| `task.dao_origin.guard` | 150 | 150 | 一次，守界任务；另给世界功勋 300 |
+| `task.dao_origin.build` | 160 | 150 | 一次，留界建设任务；另给世界功勋 300 |
+| `task.dao_origin.teach` | 160 | 150 | 一次，道统传承任务；另给世界功勋 400 |
 | `recipe.dao.fruit_fragment` | 100 | 0 | 最多 3 次，需对应碎片来源 |
 
 三试炼 + 三道源任务合计道果 1000、`resource.ascension_merit` 1000；配方是失败保护/额外进度路径，不能突破每赛季进度上限 1300。`resource.ascension_merit` 是唯一资源键，文档不得使用未定义的“飞升功勋”作为独立资源。

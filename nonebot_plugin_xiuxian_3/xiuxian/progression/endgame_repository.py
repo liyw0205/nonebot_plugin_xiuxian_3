@@ -33,6 +33,7 @@ from .endgame_rules import (
     REMAINED_IN_WORLD_STATUS,
     TRIBULATION_TRIAL_DURATION_SECONDS,
     TRIBULATION_TOTAL_CULTIVATION,
+    TRIBULATION_WORLD_MERIT_REWARD,
     THREE_REALM_KEYS,
     TRIAL_ORDER,
     fruit_for_path,
@@ -449,6 +450,11 @@ class EndgameRepositoryMixin:
             inventory["item.tribulation_token"] = int(inventory["item.tribulation_token"]) - definition.token_cost
             if inventory["item.tribulation_token"] == 0:
                 inventory.pop("item.tribulation_token")
+            guard_used = int(inventory.get("item.tribulation_guard", 0)) > 0
+            if guard_used:
+                inventory["item.tribulation_guard"] = int(inventory["item.tribulation_guard"]) - 1
+                if inventory["item.tribulation_guard"] == 0:
+                    inventory.pop("item.tribulation_guard")
             session_id = uuid4().hex
             ends_at = serialize_datetime(now + timedelta(seconds=TRIBULATION_TRIAL_DURATION_SECONDS))
             snapshot = {
@@ -460,6 +466,7 @@ class EndgameRepositoryMixin:
                 "rule_version": RULE_VERSION,
                 "debt_before": int(row["tribulation_debt"]),
                 "progress_before": int(row["dao_fruit_progress"]),
+                "guard_used": guard_used,
             }
             connection.execute(
                 "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
@@ -530,11 +537,14 @@ class EndgameRepositoryMixin:
             definition = trial_definition(trial_key)
             roll_bp = trial_roll_bp(str(snapshot.get("random_seed", session["operation_id"])))
             success = trial_success(trial_key, roll_bp)
-            debt_delta = 0 if success else definition.debt_delta
+            debt_delta = 0 if success else max(0, definition.debt_delta - (5 if snapshot.get("guard_used") else 0))
             progress = definition.progress_reward if success else 0
             merit = definition.merit_reward if success else 0
+            world_merit = TRIBULATION_WORLD_MERIT_REWARD[trial_key] if success else 0
             reward_items = {"item.dao_fruit_fragment": 1} if success and trial_key == "trial.body_and_mind" else {}
             inventory = self._json_object(row["inventory_json"], {})
+            if success and snapshot.get("guard_used"):
+                inventory["item.tribulation_guard"] = int(inventory.get("item.tribulation_guard", 0)) + 1
             for key, value in reward_items.items():
                 inventory[key] = int(inventory.get(key, 0)) + value
             fruit_key = str(snapshot.get("choice_key")) if success and trial_key == "trial.dao_choice" else None
@@ -544,12 +554,12 @@ class EndgameRepositoryMixin:
             if success and fruit_key:
                 connection.execute(
                     "UPDATE players SET dao_fruit_progress=?, ascension_merit=ascension_merit+?, world_merit=world_merit+?, dao_fruit_key=?, inventory_json=?, updated_at=? WHERE id=?",
-                    (new_progress, merit, merit, fruit_key, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                    (new_progress, merit, world_merit, fruit_key, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
                 )
             else:
                 connection.execute(
                     "UPDATE players SET dao_fruit_progress=?, ascension_merit=ascension_merit+?, world_merit=world_merit+?, tribulation_debt=?, inventory_json=?, updated_at=? WHERE id=?",
-                    (new_progress, merit, merit, new_debt, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                    (new_progress, merit, world_merit, new_debt, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
                 )
             result = {
                 "success": success,
@@ -557,6 +567,7 @@ class EndgameRepositoryMixin:
                 "debt_delta": debt_delta,
                 "reward_progress": progress,
                 "reward_merit": merit,
+                "reward_world_merit": world_merit,
                 "reward_items": reward_items,
                 "dao_fruit_key": fruit_key,
                 "cooldown_until": cooldown_until,
@@ -590,6 +601,7 @@ class EndgameRepositoryMixin:
             debt_delta=int(payload.get("debt_delta", 0)),
             reward_progress=int(payload.get("reward_progress", 0)),
             reward_merit=int(payload.get("reward_merit", 0)),
+            reward_world_merit=int(payload.get("reward_world_merit", 0)),
             reward_items={str(key): int(value) for key, value in dict(payload.get("reward_items", {})).items()},
             dao_fruit_key=payload.get("dao_fruit_key"),
             already_completed=replay,

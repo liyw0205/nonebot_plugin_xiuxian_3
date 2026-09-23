@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import trial_roll_bp
 
 
@@ -193,6 +194,81 @@ def test_tribulation_layer_requires_ordered_trials_and_origin_tasks() -> None:
             advanced = await runtime.dispatch(_ctx(adapter, user, "advance"), "晋升境界")
             assert advanced.code == "REALM_LAYER_ADVANCED"
             assert advanced.data["realm_layer"] == 4
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_tribulation_l10_requires_three_current_season_events_per_origin_task() -> None:
+    async def run() -> None:
+        now = datetime(2026, 9, 24, tzinfo=timezone.utc)
+        season_id, _, _ = final_heaven_season_window(now)
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: now)
+            for adapter, user in (("qq.official", "qq-season-gate"), ("onebot.v11", "ob-season-gate")):
+                await _created(runtime, adapter, user)
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="tribulation",
+                    realm_layer=9,
+                    cultivation=2_400_000,
+                    total_cultivation=8_998_960,
+                )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    for index, trial_key in enumerate(
+                        ("trial.body_and_mind", "trial.three_realms", "trial.dao_choice"), start=1
+                    ):
+                        connection.execute(
+                            "INSERT INTO tribulation_trial_sessions(session_id, player_id, operation_id, trial_key, status, starts_at, ends_at, result_json, created_at, updated_at) "
+                            "VALUES (?, ?, ?, ?, 'succeeded', 'start', 'end', '{}', 'created', 'updated')",
+                            (f"{user}-trial-{index}", player_id, f"{user}-trial-op-{index}", trial_key),
+                        )
+                    for task_key in (
+                        "task.dao_origin.guard",
+                        "task.dao_origin.build",
+                        "task.dao_origin.teach",
+                    ):
+                        for index in range(3):
+                            event_season = season_id if index < 2 else "season.final_heaven:stale"
+                            connection.execute(
+                                "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, content_version, rule_version, created_at) "
+                                "VALUES (?, ?, 'completed', ?, 'success', ?, 'content-0.6', 'events-0.6.0', 'created')",
+                                (
+                                    player_id,
+                                    task_key,
+                                    f"{user}-{task_key}-{index}",
+                                    json.dumps({"season_id": event_season}),
+                                ),
+                            )
+
+                blocked = await runtime.dispatch(
+                    _ctx(adapter, user, f"l10-blocked-{adapter}"), "晋升境界"
+                )
+                assert blocked.code == "TRIAL_SEQUENCE_INVALID"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    for task_key in (
+                        "task.dao_origin.guard",
+                        "task.dao_origin.build",
+                        "task.dao_origin.teach",
+                    ):
+                        connection.execute(
+                            "UPDATE quest_events SET payload_json = ? WHERE player_id = ? AND quest_key = ?",
+                            (json.dumps({"season_id": season_id}), player_id, task_key),
+                        )
+
+                advanced = await runtime.dispatch(
+                    _ctx(adapter, user, f"l10-ready-{adapter}"), "晋升境界"
+                )
+                assert advanced.code == "REALM_LAYER_ADVANCED"
+                assert advanced.data["realm_layer"] == 10
             await runtime.close()
 
     asyncio.run(run())

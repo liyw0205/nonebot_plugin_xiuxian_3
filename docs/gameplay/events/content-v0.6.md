@@ -15,11 +15,11 @@
 | `quest_or_task_key` | 前置/目标 | `dao_fruit_progress` | `resource.ascension_merit` | 限制 |
 |:--|:--|--:|--:|:--|
 | `quest.dao_union` | 炼虚 perfect；完成一条三界主线、跨服宗门战或等价个人挑战 1 次、交付本职业终局作品 | 0 | 0 | 合道许可；每角色一次 |
-| `task.dao_origin.guard` | 合道；完成守界防御任务 3 次 | +150 | +150 | 每赛季一次 |
-| `task.dao_origin.build` | 合道；完成留界建设/领域维护任务 3 次 | +160 | +150 | 每赛季一次 |
-| `task.dao_origin.teach` | 合道；完成师徒/道统传承任务 3 次 | +160 | +150 | 每赛季一次 |
+| `task.dao_origin.guard` | 合道；完成守界防御任务 3 次 | +150 | +150 | 每赛季一次；完成时另给世界功勋 300 |
+| `task.dao_origin.build` | 合道；完成留界建设/领域维护任务 3 次 | +160 | +150 | 每赛季一次；完成时另给世界功勋 300 |
+| `task.dao_origin.teach` | 合道；完成师徒/道统传承任务 3 次 | +160 | +150 | 每赛季一次；完成时另给世界功勋 400 |
 
-三道源任务与三次天劫试炼合计提供 1000 道果进度和 1000 `resource.ascension_merit`，满足最终战可达性。任务完成时在同一 operation 写进度、功勋和 `event.dao_origin` 贡献；重复请求只返回原结果。职业终局作品引用 `recipe.dao.fruit_fragment`、`recipe.tribulation.guard` 或道途对应大师作品，按 `quest.dao_union` 快照选择一种。
+三道源任务与三次天劫试炼合计提供 1000 道果进度和 1000 `resource.ascension_merit`，满足最终战可达性。每项任务目标为 3 次，奖励在第 3 次结算；三项任务的世界功勋奖励合计 1,000。任务完成时在同一 operation 写进度、功勋和 `event.dao_origin` 贡献；重复请求只返回原结果。职业终局作品引用 `recipe.dao.fruit_fragment`、`recipe.tribulation.guard` 或道途对应大师作品，按 `quest.dao_union` 快照选择一种。
 
 展示快照字段：角色展示名、结局键、赛季 ID、奖励摘要、完成时间；严禁保存平台用户 ID、token 或私聊数据。赛季结束冻结计分、生成榜单、开放 7 天领奖；结束后未领展示物自动授予，资格类奖励仍需玩家确认以开启新篇章。
 

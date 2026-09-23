@@ -18,6 +18,31 @@ DOMAIN_COMMISSION_TARGET = 3
 ANCIENT_DOMAIN_TARGET = 3
 VOID_TRIAL_TARGET = 3
 
+DAO_UNION_QUEST = "quest.dao_union"
+DAO_UNION_CONTENT_VERSION = "content-0.6"
+DAO_UNION_RULE_VERSION = "quests-0.6.0"
+DAO_UNION_MAINLINE = "three_realm_mainline"
+DAO_UNION_CHALLENGE = "cross_server_challenge"
+DAO_UNION_WORK = "endgame_work"
+DAO_ORIGIN_CONTENT_VERSION = "content-0.6"
+DAO_ORIGIN_RULE_VERSION = "events-0.6.0"
+DAO_ORIGIN_GUARD = "task.dao_origin.guard"
+DAO_ORIGIN_BUILD = "task.dao_origin.build"
+DAO_ORIGIN_TEACH = "task.dao_origin.teach"
+DAO_ORIGIN_TASKS = (DAO_ORIGIN_GUARD, DAO_ORIGIN_BUILD, DAO_ORIGIN_TEACH)
+DAO_ORIGIN_TARGET = 3
+# These values close the documented 1,000/1,000 endgame resource path.
+DAO_ORIGIN_REWARDS = {
+    DAO_ORIGIN_GUARD: {"dao_fruit_progress": 150, "ascension_merit": 150},
+    DAO_ORIGIN_BUILD: {"dao_fruit_progress": 160, "ascension_merit": 150},
+    DAO_ORIGIN_TEACH: {"dao_fruit_progress": 160, "ascension_merit": 150},
+}
+DAO_ORIGIN_WORLD_MERIT = {
+    DAO_ORIGIN_GUARD: 300,
+    DAO_ORIGIN_BUILD: 300,
+    DAO_ORIGIN_TEACH: 400,
+}
+
 
 def realm_rank(realm_key: str) -> int:
     return {
@@ -51,5 +76,20 @@ __all__ = [
     "VOID_QUEST",
     "VOID_TRIAL_TARGET",
     "VOID_WALL_TRIAL",
+    "DAO_ORIGIN_BUILD",
+    "DAO_ORIGIN_CONTENT_VERSION",
+    "DAO_ORIGIN_GUARD",
+    "DAO_ORIGIN_REWARDS",
+    "DAO_ORIGIN_RULE_VERSION",
+    "DAO_ORIGIN_TARGET",
+    "DAO_ORIGIN_TASKS",
+    "DAO_ORIGIN_TEACH",
+    "DAO_ORIGIN_WORLD_MERIT",
+    "DAO_UNION_CHALLENGE",
+    "DAO_UNION_CONTENT_VERSION",
+    "DAO_UNION_MAINLINE",
+    "DAO_UNION_QUEST",
+    "DAO_UNION_RULE_VERSION",
+    "DAO_UNION_WORK",
     "meets_realm",
 ]
