@@ -310,6 +310,40 @@ def test_qq_and_onebot_normalization_reaches_soul_transformation_late_milestone(
     asyncio.run(run())
 
 
+def test_qq_and_onebot_normalization_reaches_void_refining_late_milestone() -> None:
+    qq = normalize_qq_event(_qq_group_event("晋升境界", message_id="qq-void-late"))
+    onebot = normalize_event(_onebot_group_event("晋升境界", message_id=3016))
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for prefix, normalized in (("qq", qq), ("onebot", onebot)):
+                context = replace(normalized.context, operation_id=f"{prefix}-void-create")
+                assert (await runtime.adapters.dispatch(context.adapter, context, "开始修仙")).ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        """
+                        UPDATE players
+                        SET stage = 'cultivator', realm_key = 'void_refining', realm_layer = 8,
+                            cultivation = 1700000, total_cultivation = 2500000, void_route_count = 3
+                        WHERE platform = ? AND platform_user_id = ?
+                        """,
+                        (normalized.context.adapter, normalized.context.user_id),
+                    )
+                advanced = await runtime.adapters.dispatch(
+                    normalized.context.adapter,
+                    replace(normalized.context, operation_id=f"{prefix}-void-advance"),
+                    normalized.text,
+                )
+                assert advanced.code == "REALM_LAYER_ADVANCED"
+                assert {item["key"] for item in advanced.data["unlocks"]} == {
+                    "milestone.void_refining_late"
+                }
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_qq_and_onebot_public_project_flow_reaches_shared_application() -> None:
     qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-public-project"))
     onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3011))

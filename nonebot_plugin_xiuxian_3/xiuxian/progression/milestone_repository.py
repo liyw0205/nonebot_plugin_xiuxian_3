@@ -31,6 +31,7 @@ def record_due_milestones(
         default=0,
     )
     domain_level = int(player["domain_level"])
+    void_route_count = int(player["void_route_count"])
     unlocks: list[LayerUnlock] = []
     for definition in due_milestones(
         realm_key=str(player["realm_key"]),
@@ -38,6 +39,7 @@ def record_due_milestones(
         total_cultivation=int(player["total_cultivation"]),
         maximum_faction_reputation=maximum_faction_reputation,
         domain_level=domain_level,
+        void_route_count=void_route_count,
     ):
         snapshot = {
             "realm_key": str(player["realm_key"]),
@@ -50,6 +52,8 @@ def record_due_milestones(
             "required_max_faction_reputation": definition.required_max_faction_reputation,
             "domain_level": domain_level,
             "required_domain_level": definition.required_domain_level,
+            "void_route_count": void_route_count,
+            "required_void_route_count": definition.required_void_route_count,
         }
         cursor = connection.execute(
             """

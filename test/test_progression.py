@@ -265,8 +265,56 @@ def test_foundation_late_milestone_is_recorded_with_the_layer_advance() -> None:
                     "required_realm": "foundation",
                     "required_total_cultivation": 10000,
                     "total_cultivation": 10000,
+                    "required_void_route_count": 0,
+                    "void_route_count": 0,
                 }
                 assert record[4:] == ("content-0.2", "progression-0.2.0")
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_refining_late_milestone_requires_route_discoveries() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "void-late-user"
+            await _enter_cultivator(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET realm_key = 'void_refining', realm_layer = 8, cultivation = 1700000,
+                        total_cultivation = 2500000, void_route_count = 2
+                    WHERE platform_user_id = ?
+                    """,
+                    (user,),
+                )
+            below = await runtime.dispatch(_context(user, "void-late-below"), "晋升境界")
+            assert below.code == "REALM_LAYER_ADVANCED"
+            assert below.data["unlocks"] == []
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    UPDATE players
+                    SET cultivation = 2150000, total_cultivation = 2500000, void_route_count = 3
+                    WHERE platform_user_id = ?
+                    """,
+                    (user,),
+                )
+            fulfilled = await runtime.dispatch(_context(user, "void-late-fulfilled"), "晋升境界")
+            assert fulfilled.code == "REALM_LAYER_ADVANCED"
+            assert {item["key"] for item in fulfilled.data["unlocks"]} == {
+                "milestone.void_refining_late"
+            }
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                snapshot = json.loads(
+                    connection.execute(
+                        "SELECT snapshot_json FROM progression_milestones WHERE milestone_key = 'milestone.void_refining_late'"
+                    ).fetchone()[0]
+                )
+                assert snapshot["void_route_count"] == snapshot["required_void_route_count"] == 3
             await runtime.close()
 
     asyncio.run(run())

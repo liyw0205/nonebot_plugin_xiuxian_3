@@ -17,6 +17,11 @@
 
 `quest.break_void` 的三次界壁试炼按周计数，失败仍计一次参与但不产出虚空档案；每周最多 5 次，避免通过无限试炼刷许可。
 
+当前运行时在 `progression.advance_layer` 成功进入炼虚 L9（或之后的层数），总修为达到
+2,500,000 且已发现至少 3 条虚空航道时，原子写入 `milestone.void_refining_late` 资格记录。
+快照冻结境界、层数、总修为、航道发现数、内容/规则版本和来源 operation；同一角色只会获得
+一次，并随晋升 operation 回放原结果。
+
 ## 2. 炼虚突破：`progression.breakthrough_void_refining`
 
 | 项目 | 固定值 |
