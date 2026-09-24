@@ -960,6 +960,91 @@ CREATE TABLE IF NOT EXISTS activity_events (
 CREATE INDEX IF NOT EXISTS idx_activity_events_player_key
     ON activity_events(player_id, event_key, occurred_at);
 
+CREATE TABLE IF NOT EXISTS codex_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    entry_key TEXT NOT NULL,
+    category TEXT NOT NULL,
+    first_seen_operation_id TEXT NOT NULL,
+    first_seen_at TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    UNIQUE (player_id, entry_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_codex_entries_player
+    ON codex_entries(player_id, category, first_seen_at);
+
+CREATE TABLE IF NOT EXISTS arena_projection_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id TEXT NOT NULL,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL,
+    mode_key TEXT NOT NULL,
+    side TEXT NOT NULL CHECK (side IN ('challenger', 'defender')),
+    outcome TEXT NOT NULL CHECK (outcome IN ('challenger_won', 'defender_won', 'draw')),
+    reputation_delta INTEGER NOT NULL CHECK (reputation_delta >= 0),
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (match_id, player_id),
+    UNIQUE (operation_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_projection_player
+    ON arena_projection_events(player_id, created_at);
+
+CREATE TABLE IF NOT EXISTS arena_identity_routes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    route_key TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL UNIQUE REFERENCES players(id),
+    shard_key TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    platform_user_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'revoked')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (shard_key, platform, platform_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_identity_routes_shard
+    ON arena_identity_routes(shard_key, status, player_id);
+
+CREATE TABLE IF NOT EXISTS arena_season_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_key TEXT NOT NULL,
+    shard_key TEXT NOT NULL,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    rating INTEGER NOT NULL CHECK (rating >= 0),
+    wins INTEGER NOT NULL CHECK (wins >= 0),
+    losses INTEGER NOT NULL CHECK (losses >= 0),
+    draws INTEGER NOT NULL CHECK (draws >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    frozen_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (season_key, shard_key, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_season_snapshots_rank
+    ON arena_season_snapshots(season_key, shard_key, rating DESC, wins DESC, player_id);
+
+CREATE TABLE IF NOT EXISTS arena_audit_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_key TEXT NOT NULL,
+    match_id TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    mode_key TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (event_key, operation_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_audit_match
+    ON arena_audit_events(match_id, created_at);
+
 CREATE TABLE IF NOT EXISTS world_event_rounds (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     round_id TEXT NOT NULL UNIQUE,

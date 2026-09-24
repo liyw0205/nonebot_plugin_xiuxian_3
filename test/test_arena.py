@@ -158,6 +158,11 @@ def test_arena_async_snapshot_flow_across_qq_and_onebot() -> None:
                 assert players["arena-qq-private"][:2] == (300, 0)
                 assert players["arena-qq-private"][2] in {990, 1025}
                 assert connection.execute("SELECT COUNT(*) FROM battle_sessions").fetchone()[0] == 0
+                assert connection.execute("SELECT COUNT(*) FROM arena_projection_events").fetchone()[0] == 2
+                assert connection.execute("SELECT COUNT(*) FROM codex_entries").fetchone()[0] == 4
+                assert connection.execute("SELECT COUNT(*) FROM activity_events WHERE event_key LIKE 'arena.%'").fetchone()[0] == 4
+                assert connection.execute("SELECT COUNT(*) FROM arena_identity_routes").fetchone()[0] == 2
+                assert connection.execute("SELECT COUNT(*) FROM arena_audit_events").fetchone()[0] == 2
             await runtime.close()
 
     asyncio.run(run())

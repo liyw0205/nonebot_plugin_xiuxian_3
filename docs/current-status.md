@@ -63,7 +63,7 @@
 | 炼虚许可 | 炼虚突破会话、虚空航道和里程碑；三次界壁试炼（失败也计参与）、虚空档案来源/交付和许可领取均有来源 operation 记录 | 虚空档案遗迹的完整航行/守卫副本、档案碎片周任务和赛季奖励 | `gameplay/events`、`gameplay/exploration`、`gameplay/combat` |
 | 合道许可 | 合道入境事务；三界主线三线各 10 关玩家流程与服务端证据；炼虚 L10 道途/辅修大师作品个人生产、失败返还、辅修三艺合成、作品扣除和资格快照已接入 | 个人挑战不等于跨服宗门战；合道许可完整组件链仍需实服内容材料来源与玩家路径验收 | `gameplay/production`、`gameplay/social`、`gameplay/combat` |
 | 终局资源闭环 | 三次试炼、道源任务、证据核验、赛季计数与三榜结算、终局地点/配方和资格预览；最终战与个人结局由独立终局会话驱动 | 来源证据的真实玩家完整路径、试炼链资产/次数隔离和终局生产链实服验收 | `gameplay/world`、`gameplay/events`、`gameplay/production`、`foundation/progression` |
-| 异步竞技场 | `arena.spar`、`arena.practice`、`arena.rank` 和 2v2/3v3/2v3 `arena.team` 已有个人/队伍快照、匹配、15 回合自动战、反刷、积分、回放、结果确认和 QQ/OneBot 验收 | 图鉴/地区名望正式投影与跨服匹配 | `gameplay/specials`、`gameplay/combat` |
+| 异步竞技场 | `arena.spar`、`arena.practice`、`arena.rank` 和 2v2/3v3/2v3 `arena.team` 已有个人/队伍快照、匹配、15 回合自动战、反刷、积分、回放、结果确认、图鉴/地区名望正式投影、身份路由/赛季冻结快照/结算审计和 QQ/OneBot 验收 | 跨服匹配本身仍关闭；还需恢复演练和跨服观测审计 | `gameplay/specials`、`gameplay/combat` |
 
 `quest.prepare_nascent_soul`、`quest.soul_transformation` 和 `quest.break_void` 现已有玩家命令生产者。
 高阶许可通过 `quest_progress` / `quest_events` 保存组件、来源 operation、版本和冻结快照，突破消费端
@@ -88,7 +88,9 @@
 6. **已完成**：`arena.rank`、`arena.practice` 的模式配额、同段/授权匹配、零资产练习、反刷、回放和 QQ/OneBot 验收。
 7. **已完成**：对称 2v2/3v3 `arena.team`；复用已确认双人或三人竞技队伍，保存队伍快照、同段匹配、服务端自动回合、独立回放、积分更新和 QQ/OneBot 验收。
 8. **已完成**：2v3 非对称多方 PvP；双方使用独立队伍快照和服务端自动回合，验证成员隔离、回放和 QQ/OneBot 端到端流程。
-9. **当前阶段**：接入竞技场图鉴/地区名望正式投影与跨服匹配前置，再推进完整三界区域。
+9. **已完成**：竞技场图鉴/地区名望正式投影；每名参与者写入不可变竞技场图鉴首见、活动记录和地方名望流水，投影与对局同事务、可重放且失败回滚。
+10. **已完成**：跨服匹配前置数据层；平台身份路由、只读赛季冻结快照和结算审计已接入，但不开放跨服匹配或身份合并。
+11. **当前阶段**：跨服恢复演练与观测审计，再推进完整三界区域。
 
 每个新切片必须同时提交规则、application DTO、迁移、适配器、测试、观测字段、关闭新建
 语义、历史会话处理和回滚步骤；只有满足[首版验收门槛](content-development.md#22-首版验收门槛)

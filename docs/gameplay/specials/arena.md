@@ -41,9 +41,16 @@
 - `竞技场回放 [match_id]` / `领取竞技场结果 [match_id]`
 - `组队竞技场回放 [match_id]`
 
-持久化由 `specials/arena_repository.py` 独立负责，使用 `arena_snapshots`、`arena_matches`、
-`arena_actions` 和 `arena_reward_claims`；不会创建单人 `battle_sessions`。QQ 官方和 OneBot V11
-均覆盖发布、延迟、挑战、练习授权、回放、确认、反刷和模式配额。三人以上 PvP 与跨服仍关闭。
+竞技场对局由 `specials/arena_repository.py` 负责；结算后的知识/声誉由独立的
+`specials/arena_projection.py` 在同一事务中投影到 `codex_entries`、`activity_events`、
+`player_reputations` 和 `arena_projection_events`。每名参与者每场对局有唯一投影记录：
+参与和胜负图鉴首见、竞技场活动记录；计分胜利增加 `local.xuantian.new_town` 地方名望 1，
+练习、平局、非计分反刷对局不增加名望。投影 operation 与对局 operation 一起幂等，失败时随
+对局整体回滚。对局本身使用 `arena_snapshots`、`arena_matches`、`arena_actions` 和
+`arena_reward_claims`；不会创建单人 `battle_sessions`。跨服前置另外保存平台身份路由、结算审计和
+只读赛季冻结快照（`arena_identity_routes`、`arena_audit_events`、`arena_season_snapshots`），
+这些表不执行跨服匹配、不合并 QQ/OneBot 身份。QQ 官方和 OneBot V11 均覆盖发布、延迟、挑战、
+练习授权、回放、确认、反刷和模式配额。三人以上 PvP 与跨服仍关闭。
 
 `arena.team` 只接受已确认的 `party.exploration_pair` 或 `party.arena_trio` 队伍；双方队伍人数可以相同，也可以组成 2v3，队长发布快照并发起挑战，成员属性和装备在快照中固定。
 战斗由服务端自动选择行动，结果写入独立的 `arena_team_matches` / `arena_team_actions`，不复用单人

@@ -101,6 +101,10 @@ def test_qq_onebot_team_arena_uses_team_snapshots_and_server_replay() -> None:
                 assert connection.execute("SELECT COUNT(*) FROM arena_team_matches").fetchone()[0] == 1
                 assert connection.execute("SELECT COUNT(*) FROM arena_team_actions").fetchone()[0] > 0
                 assert connection.execute("SELECT COUNT(*) FROM battle_sessions").fetchone()[0] == 0
+                assert connection.execute("SELECT COUNT(*) FROM arena_projection_events").fetchone()[0] == 4
+                assert connection.execute("SELECT COUNT(*) FROM codex_entries").fetchone()[0] == 8
+                assert connection.execute("SELECT COUNT(*) FROM arena_identity_routes").fetchone()[0] == 4
+                assert connection.execute("SELECT COUNT(*) FROM arena_audit_events").fetchone()[0] == 4
                 ratings = connection.execute("SELECT arena_rating FROM players WHERE platform_user_id LIKE 'team-%'").fetchall()
             assert all(int(row[0]) != 1000 for row in ratings)
             await runtime.close()

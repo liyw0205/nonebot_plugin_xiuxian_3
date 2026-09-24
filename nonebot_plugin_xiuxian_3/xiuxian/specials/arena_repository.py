@@ -528,6 +528,24 @@ class ArenaRepositoryMixin:
                         now_text,
                     ),
                 )
+            projection = self._project_arena_result(
+                connection,
+                match_id=match_id,
+                operation_id=operation_id,
+                mode_key=mode_key,
+                outcome=outcome,
+                score_counted=score_counted,
+                settled_at=now_text,
+                participants=(
+                    {"player_id": challenger_id, "side": "challenger"},
+                    {"player_id": int(defender["id"]), "side": "defender"},
+                ),
+            )
+            result["projection"] = projection
+            connection.execute(
+                "UPDATE arena_matches SET result_json = ? WHERE match_id = ?",
+                (json.dumps(result, ensure_ascii=False, sort_keys=True), match_id),
+            )
             self._arena_insert_operation(
                 connection,
                 operation_id,

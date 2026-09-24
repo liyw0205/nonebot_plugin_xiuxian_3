@@ -36,6 +36,7 @@ from ..events.repository import EventsRepositoryMixin
 from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
 from ..specials.arena_repository import ArenaRepositoryMixin
 from ..specials.team_arena_repository import TeamArenaRepositoryMixin
+from ..specials.arena_projection import project_arena_result
 from ..quests.repository import QuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
@@ -97,6 +98,10 @@ class SQLitePlayerRepository(
         """Return the injected UTC business date used by routine commands."""
 
         return self._now().date()
+
+    @staticmethod
+    def _project_arena_result(connection, **kwargs):
+        return project_arena_result(connection, **kwargs)
 
     async def initialize(self) -> None:
         if self._initialized:

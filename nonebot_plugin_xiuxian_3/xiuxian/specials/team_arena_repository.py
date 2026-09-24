@@ -176,7 +176,24 @@ class TeamArenaRepositoryMixin:
                 )
             self._team_arena_update_ratings(connection, challenger_snapshot["members"], challenger_delta, outcome == "challenger_won", outcome == "draw", now_text)
             self._team_arena_update_ratings(connection, defender_members, defender_delta, outcome == "defender_won", outcome == "draw", now_text)
-            payload = {"match_id": match_id, "outcome": outcome, "rounds": rounds, "challenger_rating": challenger_rating + challenger_delta, "defender_rating": defender_rating + defender_delta, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta, "opponent_summary": self._json_map(defender["public_json"])}
+            projection = self._project_arena_result(
+                connection,
+                match_id=match_id,
+                operation_id=operation_id,
+                mode_key=TEAM_ARENA_MODE_KEY,
+                outcome=outcome,
+                score_counted=True,
+                settled_at=now_text,
+                participants=(
+                    *({"player_id": int(member["database_id"]), "side": "challenger"} for member in challenger_snapshot["members"]),
+                    *({"player_id": int(member["database_id"]), "side": "defender"} for member in defender_members),
+                ),
+            )
+            payload = {"match_id": match_id, "outcome": outcome, "rounds": rounds, "challenger_rating": challenger_rating + challenger_delta, "defender_rating": defender_rating + defender_delta, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta, "opponent_summary": self._json_map(defender["public_json"]), "projection": projection}
+            connection.execute(
+                "UPDATE arena_team_matches SET result_json = ? WHERE match_id = ?",
+                (json.dumps(payload, ensure_ascii=False, sort_keys=True), match_id),
+            )
             self._team_arena_insert_operation(connection, operation_id, operation_name, int(leader["id"]), request_hash, payload, now_text)
             return self._team_match_from_payload(payload)
 
