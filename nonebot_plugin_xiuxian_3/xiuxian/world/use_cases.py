@@ -23,8 +23,18 @@ from ..repository import (
     VoidTravelBusyError,
     VoidRouteNotFoundError,
     VoidRouteNotReadyError,
+    AdvancedCavePassMissingError,
+    ArrayHallPermissionDeniedError,
+    CloudBoatBusyError,
+    CloudBoatNotFoundError,
+    CloudBoatNotReadyError,
+    CloudFareInsufficientError,
+    CloudRouteLockedError,
+    DemonIntroAlreadyCompletedError,
+    DemonIntroRequirementError,
 )
 from .rules import CAVE_LOCATION, destination_definition, resolve_destination
+from .cloud_rules import cloud_route_definition, resolve_cloud_route
 from .void_rules import resolve_void_route, void_route_definition
 
 
@@ -33,6 +43,7 @@ ITEM_LABELS = {
     "item.dao_fruit_fragment": "道果碎片",
     "item.tribulation_token": "天劫凭证",
     "item.ascension_certificate": "飞升凭证",
+    "item.cave_pass_advanced": "雾隐洞天二层凭证",
 }
 
 
@@ -254,6 +265,148 @@ class WorldApplication:
                   "arrived": record.arrived, "pass_consumed": record.pass_consumed,
                   "idempotent_replay": record.already_completed},
         )
+
+    async def board_cloud_boat(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_CLOUD_ROUTE", "请指定云舟航线：洞天二层、魔界引导或返回云城。", context.request_id)
+        route_key = resolve_cloud_route(context.command_args[0])
+        if route_key is None:
+            return CommandResult(False, "CLOUD_ROUTE_LOCKED", "暂时没有这条云舟航线。", context.request_id)
+        operation_id = self._operation_id(context, "world.board_cloud_boat")
+        try:
+            record = await self.repository.board_cloud_boat(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                route_key=route_key,
+                operation_id=operation_id,
+            )
+        except CloudRouteLockedError:
+            return CommandResult(False, "CLOUD_ROUTE_LOCKED", "当前境界、任务或版本条件不满足这条云舟航线，未扣除资源。", context.request_id, operation_id)
+        except LocationRequirementError:
+            return CommandResult(False, "CLOUD_ROUTE_LOCKED", "请先抵达玄天界·云城或对应云舟终点，未扣除资源。", context.request_id, operation_id)
+        except AdvancedCavePassMissingError:
+            return CommandResult(False, "ADVANCED_CAVE_PASS_MISSING", "缺少雾隐洞天二层凭证，未扣除云舟费用。", context.request_id, operation_id)
+        except CloudFareInsufficientError:
+            return CommandResult(False, "CLOUD_FARE_INSUFFICIENT", "灵石不足，未扣除体力或凭证。", context.request_id, operation_id)
+        except ResourceInsufficientError:
+            return CommandResult(False, "CLOUD_FARE_INSUFFICIENT", "体力不足，未扣除灵石或凭证。", context.request_id, operation_id)
+        except CloudBoatBusyError:
+            return CommandResult(False, "TRAVEL_BUSY", "已有移动、修炼、生产或云舟会话，请先完成后再试。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能乘坐云舟。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他云舟操作，请重新发起。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        definition = cloud_route_definition(record.route_key)
+        pass_label = ITEM_LABELS.get(record.pass_key or "", "通行物品")
+        return CommandResult(
+            True,
+            "CLOUD_BOAT_STARTED",
+            f"## {definition.label}已起航\n\n- **耗时**：{definition.duration_seconds // 60} 分钟\n- **体力**：-{record.stamina_cost}\n- **灵石**：-{record.currency_cost}\n- **凭证**：{pass_label} ×{record.pass_quantity if record.pass_key else 0}\n\n> 抵达后发送 `结算云舟`。航线版本和费用已冻结，重复请求不会重复扣费。",
+            context.request_id,
+            operation_id,
+            data={"session_id": record.session_id, "route_key": record.route_key, "destination": record.destination, "status": record.status, "ends_at": record.ends_at, "idempotent_replay": record.already_completed},
+        )
+
+    async def settle_cloud_boat(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_CLOUD_ROUTE", "结算云舟无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "world.settle_cloud_boat")
+        try:
+            record = await self.repository.settle_cloud_boat(
+                platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id
+            )
+        except CloudBoatNotFoundError:
+            return CommandResult(False, "CLOUD_BOAT_NOT_FOUND", "当前没有等待结算的云舟。", context.request_id, operation_id)
+        except CloudBoatNotReadyError:
+            return CommandResult(False, "CLOUD_BOAT_NOT_READY", "云舟尚未抵达，请稍后再来结算。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他云舟结算，请重新发起。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        definition = cloud_route_definition(record.route_key)
+        return CommandResult(
+            True,
+            "CLOUD_BOAT_ARRIVED",
+            f"## 已抵达{definition.destination}\n\n航线已写入位置状态，凭证只扣除一次，重复结算不会重复移动。",
+            context.request_id,
+            operation_id,
+            data={"session_id": record.session_id, "route_key": record.route_key, "destination": record.destination, "status": record.status, "arrived": record.arrived, "idempotent_replay": record.already_completed},
+        )
+
+    async def recover_cloud_boat(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_CLOUD_ROUTE", "恢复云舟无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "world.recover_cloud_boat")
+        try:
+            record = await self.repository.recover_cloud_boat(
+                platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id
+            )
+        except CloudBoatNotFoundError:
+            return CommandResult(False, "CLOUD_BOAT_NOT_FOUND", "当前没有可恢复的云舟。", context.request_id, operation_id)
+        except CloudBoatNotReadyError:
+            return CommandResult(False, "CLOUD_BOAT_NOT_READY", "云舟尚未超过 24 小时恢复窗口。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他云舟恢复，请重新发起。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "CLOUD_BOAT_RECOVERED",
+            "## 云舟已恢复抵达\n\n已按创建时冻结的航线和费用写入位置，不会再次扣除资源。",
+            context.request_id,
+            operation_id,
+            data={"session_id": record.session_id, "route_key": record.route_key, "destination": record.destination, "status": record.status, "arrived": record.arrived, "idempotent_replay": record.already_completed},
+        )
+
+    async def accept_demon_intro(self, context: CommandContext) -> CommandResult:
+        if context.command_args and context.command_args not in (("确认",), ("确认风险",)):
+            return CommandResult(False, "INVALID_DEMON_INTRO", "魔界引导只需发送 `接受魔界引导` 或 `接受魔界引导 确认风险`。", context.request_id)
+        operation_id = self._operation_id(context, "world.accept_demon_intro")
+        try:
+            record = await self.repository.accept_demon_intro(
+                platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id
+            )
+        except DemonIntroRequirementError:
+            return CommandResult(False, "DEMON_INTRO_REQUIREMENT_MISSING", "需先乘坐云舟抵达魔界深渊门，并确认风险说明；未扣除灵石。", context.request_id, operation_id)
+        except DemonIntroAlreadyCompletedError:
+            return CommandResult(False, "DEMON_INTRO_ALREADY_COMPLETED", "魔界引导已经完成，入口资格不会重复发放。", context.request_id, operation_id)
+        except ResourceInsufficientError:
+            return CommandResult(False, "DEMON_INTRO_STONES_INSUFFICIENT", "提交魔界引导需要 100 灵石，未写入入口资格。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他魔界引导操作，请重新发起。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(True, "DEMON_INTRO_ACCEPTED", "## 魔界引导已完成\n\n已记录污染与契约风险说明，获得魔界入口资格和 20 点魔界声望。魔界核心区、战斗和魔核掉落仍未开放。", context.request_id, operation_id, data={"quest_key": record.quest_key, "status": record.status, "reward": record.reward, "idempotent_replay": record.already_completed})
+
+    async def use_array_hall(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_ARRAY_HALL", "使用阵堂无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "world.use_array_hall")
+        try:
+            record = await self.repository.use_array_hall(
+                platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id
+            )
+        except ArrayHallPermissionDeniedError:
+            return CommandResult(False, "ARRAY_HALL_PERMISSION_DENIED", "阵堂需要聚气境，并且是宗门成员或持有阵法教学邀请；可先申请加入宗门或等待邀请。", context.request_id, operation_id)
+        except ResourceInsufficientError:
+            return CommandResult(False, "ARRAY_HALL_STAMINA_INSUFFICIENT", "使用阵堂需要 3 点体力，未产生学习或生产结果。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他阵堂操作，请重新发起。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(True, "ARRAY_HALL_AUTHORIZED", "## 阵堂权限已确认\n\n可以继续调用布阵学习或阵材委托用例；本次只扣除 3 点体力，不自动创建生产订单。", context.request_id, operation_id, data={"status": record.status, "permission": record.permission, "action": record.action, "idempotent_replay": record.already_completed})
 
     async def enter_void_route(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:

@@ -232,6 +232,8 @@ class TravelRepositoryMixin:
             raise PlayerNotFoundError("player does not exist")
         definition = destination_definition(destination)
         missing: list[str] = []
+        if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
+            missing.append("云舟航线")
         if not meets_realm(player.realm_key, player.realm_layer, definition.required_realm, definition.required_layer):
             required = f"{definition.required_realm} L{definition.required_layer}"
             missing.append(f"境界要求（{required}）")
@@ -351,6 +353,8 @@ class TravelRepositoryMixin:
                 return self._travel_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
             row = self._require_player(connection, platform, platform_user_id, writable=False)
+            if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
+                raise LocationRequirementError("this destination can only be reached by a cloud boat")
             endgame_status = str(row["endgame_status"] or "none")
             if definition.required_endgame_status:
                 if endgame_status != definition.required_endgame_status:
@@ -376,6 +380,12 @@ class TravelRepositoryMixin:
             ).fetchone()
             if active is not None:
                 raise TravelBusyError("travel is already running")
+            cloud_boat = connection.execute(
+                "SELECT 1 FROM cloud_boat_sessions WHERE player_id = ? AND status IN ('created', 'running') LIMIT 1",
+                (player_id,),
+            ).fetchone()
+            if cloud_boat is not None:
+                raise TravelBusyError("cloud boat is already running")
             for table, status in (
                 ("cultivation_sessions", "running"),
                 ("production_orders", "processing"),

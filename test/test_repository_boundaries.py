@@ -9,6 +9,11 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
     expected_modules = {
         "create_player": "nonebot_plugin_xiuxian_3.xiuxian.player.repository",
         "start_travel": "nonebot_plugin_xiuxian_3.xiuxian.world.travel_repository",
+        "board_cloud_boat": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
+        "settle_cloud_boat": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
+        "recover_cloud_boat": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
+        "accept_demon_intro": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
+        "use_array_hall": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
         "start_void_route": "nonebot_plugin_xiuxian_3.xiuxian.world.repository",
         "recover_resources": "nonebot_plugin_xiuxian_3.xiuxian.progression.repository",
         "enter_cultivation": "nonebot_plugin_xiuxian_3.xiuxian.progression.cultivation_repository",

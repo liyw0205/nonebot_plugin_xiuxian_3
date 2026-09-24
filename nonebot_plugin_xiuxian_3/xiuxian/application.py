@@ -390,6 +390,41 @@ class XiuxianApplication:
             write_message="当前事件不允许结算移动。",
         )
 
+    async def board_cloud_boat(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.world.board_cloud_boat(context),
+            write_message="当前事件不允许乘坐云舟。",
+        )
+
+    async def settle_cloud_boat(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.world.settle_cloud_boat(context),
+            write_message="当前事件不允许结算云舟。",
+        )
+
+    async def recover_cloud_boat(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.world.recover_cloud_boat(context),
+            write_message="当前事件不允许恢复云舟。",
+        )
+
+    async def accept_demon_intro(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.world.accept_demon_intro(context),
+            write_message="当前事件不允许确认魔界引导。",
+        )
+
+    async def use_array_hall(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.world.use_array_hall(context),
+            write_message="当前事件不允许使用阵堂。",
+        )
+
     async def enter_void_route(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.world.enter_void_route(context), write_message="当前事件不允许进入虚空航道。")
 

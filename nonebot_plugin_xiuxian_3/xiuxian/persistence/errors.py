@@ -76,6 +76,42 @@ class VoidRouteNotReadyError(RuntimeError):
     """The route has not reached its arrival time."""
 
 
+class CloudRouteLockedError(RuntimeError):
+    """The v0.2 cloud route is unavailable for the current player."""
+
+
+class CloudFareInsufficientError(RuntimeError):
+    """The player lacks the cloud-boat fare."""
+
+
+class CloudBoatBusyError(RuntimeError):
+    """The player already has a cloud-boat or other locked action."""
+
+
+class CloudBoatNotFoundError(RuntimeError):
+    """The player has no cloud-boat session to settle."""
+
+
+class CloudBoatNotReadyError(RuntimeError):
+    """The cloud-boat session has not reached its arrival time."""
+
+
+class AdvancedCavePassMissingError(RuntimeError):
+    """The advanced cave pass is not available for the selected route."""
+
+
+class ArrayHallPermissionDeniedError(RuntimeError):
+    """The player cannot use the formation hall."""
+
+
+class DemonIntroRequirementError(RuntimeError):
+    """The demon-realm introduction prerequisites are incomplete."""
+
+
+class DemonIntroAlreadyCompletedError(RuntimeError):
+    """The one-time demon introduction was already completed."""
+
+
 class ResourceInsufficientError(RuntimeError):
     """A player does not have enough of a spendable resource."""
 

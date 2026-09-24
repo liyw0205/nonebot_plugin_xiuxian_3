@@ -1060,6 +1060,7 @@ class CultivationRepositoryMixin:
             ("production_orders", "status = 'processing'"),
             ("breakthrough_sessions", "status = 'preparing'"),
             ("travel_sessions", "status = 'running'"),
+            ("cloud_boat_sessions", "status IN ('created', 'running')"),
             ("exploration_sessions", "status IN ('created', 'running', 'combat_pending')"),
             ("battle_sessions", "status IN ('created', 'running')"),
             ("party_battle_members", "asset_lock_status = 'locked'"),

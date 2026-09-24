@@ -20,6 +20,7 @@ from ..progression.tribulation_repository import TribulationTrialRepositoryMixin
 from ..progression.breakthrough.repository import BreakthroughRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
 from ..world.travel_repository import TravelRepositoryMixin
+from ..world.cloud_repository import CloudRepositoryMixin
 from ..exploration.repository import ExplorationRepositoryMixin
 from ..combat.repository import CombatRepositoryMixin
 from ..combat.party_repository import PartyCombatRepositoryMixin
@@ -48,6 +49,7 @@ from .schema import SCHEMA
 class SQLitePlayerRepository(
     PlayerRepositoryMixin,
     TravelRepositoryMixin,
+    CloudRepositoryMixin,
     TribulationTrialRepositoryMixin,
     EndgameRepositoryMixin,
     FinalBattleRepositoryMixin,

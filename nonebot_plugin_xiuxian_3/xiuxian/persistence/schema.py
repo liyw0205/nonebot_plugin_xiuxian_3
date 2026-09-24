@@ -830,6 +830,32 @@ CREATE INDEX IF NOT EXISTS idx_travel_sessions_player ON travel_sessions(player_
 CREATE UNIQUE INDEX IF NOT EXISTS idx_travel_sessions_active
     ON travel_sessions(player_id) WHERE status = 'running';
 
+CREATE TABLE IF NOT EXISTS cloud_boat_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    route_key TEXT NOT NULL,
+    source_location TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('created', 'running', 'arrived', 'failed', 'expired')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    stamina_cost INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0),
+    currency_cost INTEGER NOT NULL DEFAULT 0 CHECK (currency_cost >= 0),
+    pass_key TEXT,
+    pass_quantity INTEGER NOT NULL DEFAULT 0 CHECK (pass_quantity >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cloud_boat_sessions_player
+    ON cloud_boat_sessions(player_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cloud_boat_sessions_active
+    ON cloud_boat_sessions(player_id) WHERE status IN ('created', 'running');
+
 CREATE TABLE IF NOT EXISTS exploration_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     exploration_id TEXT NOT NULL UNIQUE,

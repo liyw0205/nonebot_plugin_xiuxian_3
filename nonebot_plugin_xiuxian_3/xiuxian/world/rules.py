@@ -87,6 +87,43 @@ DESTINATIONS = {
         content_version="content-0.6",
         rule_version="world-0.6.0",
     ),
+    "xuantian.cloud_city": DestinationDefinition(
+        "xuantian.cloud_city", "玄天界·云城", 3 * 60, 8, 0,
+        required_realm="golden_core", required_layer=1,
+        source_locations=("xuantian.new_town", "xuantian.outskirts", "xuantian.sect_gate"),
+        content_version="content-0.2", rule_version="world-0.2.0",
+    ),
+    "xuantian.cloud_mine": DestinationDefinition(
+        "xuantian.cloud_mine", "云铁矿区", 2 * 60, 6, 0,
+        required_realm="foundation", required_layer=1,
+        source_locations=("xuantian.cloud_city",),
+        content_version="content-0.2", rule_version="world-0.2.0",
+    ),
+    "xuantian.floating_boat": DestinationDefinition(
+        "xuantian.floating_boat", "云舟渡口", 60, 0, 500,
+        required_realm="foundation", required_layer=1,
+        source_locations=("xuantian.cloud_city",),
+        content_version="content-0.2", rule_version="world-0.2.0",
+    ),
+    "cave.mist_grotto_2": DestinationDefinition(
+        "cave.mist_grotto_2", "雾隐洞天·二层", 3 * 60, 15, 0,
+        required_realm="golden_core", required_layer=1,
+        pass_key="item.cave_pass_advanced", pass_quantity=1,
+        source_locations=("xuantian.floating_boat",),
+        content_version="content-0.2", rule_version="world-0.2.0",
+    ),
+    "xuantian.array_hall": DestinationDefinition(
+        "xuantian.array_hall", "玄天阵堂", 60, 3, 0,
+        required_realm="qi_gathering", required_layer=1,
+        source_locations=("xuantian.cloud_city", "xuantian.sect_gate"),
+        content_version="content-0.2", rule_version="world-0.2.0",
+    ),
+    "demon.abyss_gate": DestinationDefinition(
+        "demon.abyss_gate", "魔界·深渊门", 2 * 60, 10, 0,
+        required_realm="foundation", required_layer=1,
+        source_locations=("xuantian.floating_boat",),
+        content_version="content-0.2", rule_version="world-0.2.0",
+    ),
 }
 
 ALIASES = {
@@ -106,6 +143,18 @@ ALIASES = {
     "ascension.heaven_path": "ascension.heaven_path",
     "留界殿": "ascension.left_world_hall",
     "ascension.left_world_hall": "ascension.left_world_hall",
+    "云城": "xuantian.cloud_city",
+    "玄天界·云城": "xuantian.cloud_city",
+    "云铁矿区": "xuantian.cloud_mine",
+    "云矿": "xuantian.cloud_mine",
+    "云舟渡口": "xuantian.floating_boat",
+    "云舟": "xuantian.floating_boat",
+    "雾隐洞天二层": "cave.mist_grotto_2",
+    "雾隐洞天·二层": "cave.mist_grotto_2",
+    "玄天阵堂": "xuantian.array_hall",
+    "阵堂": "xuantian.array_hall",
+    "魔界深渊门": "demon.abyss_gate",
+    "深渊门": "demon.abyss_gate",
 }
 
 
