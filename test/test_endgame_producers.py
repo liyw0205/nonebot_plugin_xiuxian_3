@@ -353,6 +353,83 @@ def test_endgame_recipes_require_dao_origin_gate_on_qq_and_onebot() -> None:
     asyncio.run(run())
 
 
+def test_dao_fruit_recipe_cap_spans_dao_union_and_tribulation_chain() -> None:
+    async def run() -> None:
+        clock = MutableClock()
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            for adapter, user in (("qq.official", "qq-fruit-chain"), ("onebot.v11", "ob-fruit-chain")):
+                await _create(runtime, adapter, user)
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="dao_union",
+                    realm_layer=1,
+                    endgame_status="dao_union",
+                    location_key="dao.origin_gate",
+                    inventory_json=json.dumps({"item.dao_fruit_fragment": 10, "item.soul_crystal": 5}),
+                )
+                for attempt in range(1, 4):
+                    success = attempt != 2
+                    operation = next(
+                        f"{adapter}-fruit-chain-start-{attempt}-{index}"
+                        for index in range(1_000)
+                        if (recipe_roll_bp(f"{adapter}-fruit-chain-start-{attempt}-{index}") < 8_000) is success
+                    )
+                    _set_player(
+                        runtime,
+                        adapter,
+                        user,
+                        inventory_json=json.dumps({"item.dao_fruit_fragment": 10, "item.soul_crystal": 5}),
+                    )
+                    started = await runtime.dispatch(
+                        _ctx(adapter, user, operation),
+                        "开始终局配方 recipe.dao.fruit_fragment",
+                    )
+                    assert started.code == "ENDGAME_RECIPE_STARTED"
+                    clock.advance(minutes=21)
+                    settled = await runtime.dispatch(
+                        _ctx(adapter, user, f"{adapter}-fruit-chain-settle-{attempt}"), "结算终局配方"
+                    )
+                    assert settled.code == "ENDGAME_RECIPE_SETTLED"
+                    assert settled.data["success"] is success
+                    if attempt == 1:
+                        _set_player(
+                            runtime,
+                            adapter,
+                            user,
+                            realm_key="tribulation",
+                            realm_layer=1,
+                            endgame_status="tribulation",
+                        )
+
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    inventory_json=json.dumps({"item.dao_fruit_fragment": 10, "item.soul_crystal": 5}),
+                )
+                exhausted = await runtime.dispatch(
+                    _ctx(adapter, user, f"{adapter}-fruit-chain-fourth"),
+                    "开始终局配方 recipe.dao.fruit_fragment",
+                )
+                assert exhausted.code == "ENDGAME_RECIPE_ALREADY_CREATED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT inventory_json, (SELECT COUNT(*) FROM endgame_sessions WHERE player_id=p.id "
+                        "AND session_type='recipe.dao.fruit_fragment') FROM players p "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert json.loads(state[0]) == {"item.dao_fruit_fragment": 10, "item.soul_crystal": 5}
+                assert state[1] == 3
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
     async def run() -> None:
         clock = MutableClock()
