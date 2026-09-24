@@ -370,6 +370,9 @@ class PartyRepositoryMixin:
             if member is None or str(member["status"]) != "active":
                 raise PartyNotFoundError("player is not an active party member")
             party_id = str(member["party_id"])
+            party = connection.execute("SELECT current_session_id FROM parties WHERE party_id = ?", (party_id,)).fetchone()
+            if party is not None and party["current_session_id"]:
+                raise PartyStateConflictError("party battle is still active")
             connection.execute(
                 "UPDATE party_members SET status = 'left', left_at = ?, updated_at = ? WHERE id = ? AND status = 'active'",
                 (now_text, now_text, member["id"]),

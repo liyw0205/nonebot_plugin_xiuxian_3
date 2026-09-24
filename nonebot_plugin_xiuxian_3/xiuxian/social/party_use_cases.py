@@ -12,6 +12,11 @@ from ..repository import (
     PartyNotFoundError,
     PartyPermissionDeniedError,
     PartyStateConflictError,
+    PartyBattleBusyError,
+    PartyBattleNotFoundError,
+    PartyBattleNotReadyError,
+    PartyBattlePermissionError,
+    PartyBattleRequirementError,
     PlayerNotFoundError,
     PlayerSuspendedError,
     RepositoryBusyError,
@@ -216,10 +221,111 @@ class PartyApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         message = "## 队伍已就绪\n\n" if record.ready else "## 队伍确认已记录\n\n"
         if record.ready:
-            message += "双方已确认；当前版本只开放队伍状态，探索与战斗运行时仍未开放。"
+            message += "双方已确认；队长可以发起队伍战斗。"
         else:
             message += "等待另一名成员确认。"
         return CommandResult(True, "PARTY_READY" if record.ready else "PARTY_CONFIRMED", message + "\n\n" + self._summary(record), context.request_id, operation_id, data=self._data(record))
+
+    @staticmethod
+    def _party_battle_error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
+        errors = {
+            PartyBattlePermissionError: ("PARTY_BATTLE_PERMISSION_DENIED", "只有队长可以发起队伍战斗，已确认成员可以结算。"),
+            PartyBattleRequirementError: ("PARTY_BATTLE_REQUIREMENT_MISSING", "队伍必须在支持的地点完成双方确认。"),
+            PartyBattleBusyError: ("PARTY_BATTLE_BUSY", "队伍或成员已有锁定中的战斗资产。"),
+            PartyBattleNotFoundError: ("PARTY_BATTLE_NOT_FOUND", "当前没有可查看的队伍战斗。"),
+            PartyBattleNotReadyError: ("PARTY_BATTLE_NOT_READY", "队伍战斗仍在由服务器自动推进。"),
+            PartyNotFoundError: ("PARTY_NOT_FOUND", "当前没有可用的队伍。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于不同的队伍战斗操作。"),
+            PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
+            PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能进行队伍战斗。"),
+            RepositoryBusyError: ("PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。"),
+        }
+        for error_type, (code, message) in errors.items():
+            if isinstance(exc, error_type):
+                return CommandResult(False, code, message, context.request_id, operation_id, retryable=error_type is RepositoryBusyError)
+        return CommandResult(False, "PERSISTENCE_ERROR", "队伍战斗会话暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+
+    async def start_party_battle(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) > 1:
+            return CommandResult(False, "INVALID_PARTY_BATTLE_COMMAND", "开始队伍战斗最多接收一个队伍号。", context.request_id)
+        operation_id = self._operation_id(context, "battle.party.start")
+        party_id = context.command_args[0] if context.command_args else None
+        try:
+            started = await self.repository.start_party_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                party_id=party_id,
+                operation_id=operation_id,
+            )
+            resolved = await self.repository.settle_party_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                battle_id=started.battle_id,
+                operation_id=f"{operation_id}:settle",
+            )
+        except Exception as exc:
+            return self._party_battle_error(context, operation_id, exc)
+        return self._party_battle_result(context, operation_id, resolved)
+
+    async def settle_party_battle(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) > 1:
+            return CommandResult(False, "INVALID_PARTY_BATTLE_COMMAND", "结算队伍战斗最多接收一个战斗编号。", context.request_id)
+        operation_id = self._operation_id(context, "battle.party.settle")
+        try:
+            resolved = await self.repository.settle_party_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                battle_id=context.command_args[0] if context.command_args else None,
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._party_battle_error(context, operation_id, exc)
+        return self._party_battle_result(context, operation_id, resolved)
+
+    @staticmethod
+    def _party_battle_result(context: CommandContext, operation_id: str, record) -> CommandResult:
+        outcome = "胜利" if record.outcome == "won" else ("失败" if record.outcome == "lost" else "超时")
+        rewards = next(iter(record.rewards.values()), {})
+        reward_text = "、".join(
+            (f"修为 +{value}" if key == "cultivation" else f"灵石 ×{value}")
+            for key, value in rewards.items()
+        ) or "无"
+        return CommandResult(
+            True,
+            "PARTY_BATTLE_SETTLED",
+            f"## 队伍战斗结束\n\n- **结果**：{outcome}\n- **回合**：{record.round_no}\n- **每名成员奖励**：{reward_text}\n\n> 服务端已保存全体成员快照与行动回放。",
+            context.request_id,
+            operation_id,
+            data={
+                "battle_id": record.battle_id,
+                "party_id": record.party_id,
+                "enemy_key": record.enemy_key,
+                "outcome": record.outcome,
+                "round_no": record.round_no,
+                "rewards": record.rewards,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def replay_party_battle(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) > 1:
+            return CommandResult(False, "INVALID_PARTY_BATTLE_COMMAND", "队伍战斗回放最多接收一个战斗编号。", context.request_id)
+        try:
+            record = await self.repository.replay_party_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                battle_id=context.command_args[0] if context.command_args else None,
+            )
+        except Exception as exc:
+            return self._party_battle_error(context, "", exc)
+        enemy = record.snapshot.get("enemy", {})
+        return CommandResult(
+            True,
+            "PARTY_BATTLE_REPLAY",
+            f"## 队伍战斗回放\n\n- **战斗**：`{record.battle_id}`\n- **敌人**：{enemy.get('label', record.enemy_key)}\n- **结果**：{record.result.get('outcome', '进行中')}\n- **行动数**：{len(record.actions)}",
+            context.request_id,
+            data={"battle_id": record.battle_id, "party_id": record.party_id, "enemy_key": record.enemy_key, "result": record.result, "actions": list(record.actions)},
+        )
 
     async def leave_party(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -233,6 +339,8 @@ class PartyApplication:
             )
         except PartyNotFoundError:
             return CommandResult(False, "PARTY_NOT_FOUND", "你当前不在可退出的队伍中。", context.request_id, operation_id)
+        except PartyStateConflictError:
+            return CommandResult(False, "PARTY_STATE_CONFLICT", "队伍战斗进行中，结算前不能退出队伍。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerSuspendedError:

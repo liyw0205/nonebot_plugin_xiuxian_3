@@ -692,6 +692,26 @@ class ExplorationCombatPendingError(RuntimeError):
     """The exploration rolled a combat encounter that is still locked."""
 
 
+class PartyBattleNotFoundError(RuntimeError):
+    """The requested party battle does not exist or is not visible to the actor."""
+
+
+class PartyBattleBusyError(RuntimeError):
+    """The party or one of its members already has a locked party battle."""
+
+
+class PartyBattlePermissionError(RuntimeError):
+    """The actor cannot start or settle the party battle."""
+
+
+class PartyBattleRequirementError(RuntimeError):
+    """The party is not ready for its location or enemy encounter."""
+
+
+class PartyBattleNotReadyError(RuntimeError):
+    """The party battle has not reached a terminal result."""
+
+
 class ExplorationQuotaExhaustedError(RuntimeError):
     """The mode reached its business-day quota."""
 

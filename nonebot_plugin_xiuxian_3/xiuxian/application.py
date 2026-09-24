@@ -671,6 +671,15 @@ class XiuxianApplication:
     async def confirm_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.confirm_party(context), write_message="当前事件不允许确认队伍。")
 
+    async def start_party_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.start_party_battle(context), write_message="当前事件不允许发起队伍战斗。")
+
+    async def settle_party_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.settle_party_battle(context), write_message="当前事件不允许结算队伍战斗。")
+
+    async def replay_party_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.replay_party_battle(context), require_write=False)
+
     async def leave_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.leave_party(context), write_message="当前事件不允许退出队伍。")
 

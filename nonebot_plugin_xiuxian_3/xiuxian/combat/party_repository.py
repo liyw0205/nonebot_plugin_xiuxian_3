@@ -1,0 +1,472 @@
+"""Persistence for explicit multi-member automatic PVE sessions.
+
+Party battles intentionally use their own tables and state machine. The
+single-player ``battle_sessions`` contract is not widened to carry implicit
+participants.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import sqlite3
+from datetime import timedelta
+from typing import Any
+from uuid import uuid4
+
+from ...contracts import serialize_datetime
+from ..persistence.errors import (
+    OperationConflictError,
+    PartyBattleBusyError,
+    PartyBattleNotFoundError,
+    PartyBattleNotReadyError,
+    PartyBattlePermissionError,
+    PartyBattleRequirementError,
+    PartyNotFoundError,
+)
+from .party_models import PartyBattleReplayRecord, PartyBattleResolutionRecord, PartyBattleStartRecord
+from .party_rules import (
+    PARTY_BATTLE_CONTENT_VERSION,
+    PARTY_BATTLE_MAX_TURNS,
+    PARTY_BATTLE_REWARD,
+    PARTY_BATTLE_RULE_VERSION,
+    PARTY_BATTLE_TYPE,
+    party_enemy_for_location,
+)
+from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot
+
+
+class PartyCombatRepositoryMixin:
+    """Run a server-authoritative battle for the already-confirmed party."""
+
+    async def start_party_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        party_id: str | None,
+        operation_id: str,
+    ) -> PartyBattleStartRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync,
+                self._start_party_battle_once,
+                platform,
+                platform_user_id,
+                party_id,
+                operation_id,
+            )
+
+    async def settle_party_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        battle_id: str | None,
+        operation_id: str,
+    ) -> PartyBattleResolutionRecord:
+        await self.initialize()
+        selected = await asyncio.to_thread(
+            self._party_battle_access_once,
+            platform,
+            platform_user_id,
+            battle_id,
+        )
+        current_battle_id = str(selected["battle_id"])
+        current_round = int(selected["round_no"])
+        status = str(selected["status"])
+        for expected_round in range(current_round + 1, PARTY_BATTLE_MAX_TURNS + 1):
+            if status not in {"created", "running"}:
+                break
+            turn = await self.run_party_battle_turn(
+                battle_id=current_battle_id,
+                expected_round=expected_round,
+            )
+            status = str(turn["status"])
+        if status in {"created", "running"}:
+            raise PartyBattleNotReadyError("party battle did not reach a terminal result")
+        return await self.resolve_party_battle(
+            platform=platform,
+            platform_user_id=platform_user_id,
+            battle_id=current_battle_id,
+            operation_id=f"{operation_id}:resolve",
+        )
+
+    async def run_party_battle_turn(self, *, battle_id: str, expected_round: int) -> dict[str, Any]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync,
+                self._run_party_battle_turn_once,
+                battle_id,
+                expected_round,
+            )
+
+    async def resolve_party_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        battle_id: str,
+        operation_id: str,
+    ) -> PartyBattleResolutionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync,
+                self._resolve_party_battle_once,
+                platform,
+                platform_user_id,
+                battle_id,
+                operation_id,
+            )
+
+    async def replay_party_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        battle_id: str | None = None,
+    ) -> PartyBattleReplayRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._replay_party_battle_once,
+                platform,
+                platform_user_id,
+                battle_id,
+            )
+
+    def _start_party_battle_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        party_id: str | None,
+        operation_id: str,
+    ) -> PartyBattleStartRecord:
+        operation_name = "battle.party.start"
+        request_hash = self._request_hash(
+            operation_name,
+            {"platform": platform, "platform_user_id": platform_user_id, "party_id": party_id},
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = self._party_battle_operation(connection, operation_id, operation_name, request_hash)
+            if existing is not None:
+                return self._party_battle_start_from_payload(existing, replay=True)
+            leader = self._require_player(connection, platform, platform_user_id)
+            membership = connection.execute(
+                "SELECT * FROM party_members WHERE player_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+                (leader["id"],),
+            ).fetchone()
+            if membership is None or str(membership["role"]) != "leader":
+                raise PartyBattlePermissionError("only the party leader can start a party battle")
+            resolved_party_id = str(party_id or membership["party_id"])
+            if resolved_party_id != str(membership["party_id"]):
+                raise PartyBattlePermissionError("leader is not a member of the requested party")
+            party = connection.execute("SELECT * FROM parties WHERE party_id = ?", (resolved_party_id,)).fetchone()
+            if party is None:
+                raise PartyNotFoundError("party does not exist")
+            if str(party["status"]) != "ready":
+                raise PartyBattleRequirementError("party is not ready")
+            if party["current_session_id"]:
+                raise PartyBattleBusyError("party already has a battle")
+            members = connection.execute(
+                "SELECT m.id AS membership_id, m.player_id AS database_player_id, m.role AS member_role, "
+                "m.confirmed_at AS member_confirmed_at, p.player_id AS stable_player_id, "
+                "p.platform_user_id, p.path_key, p.qualification_json, p.max_hp, p.initiative, "
+                "p.realm_key, p.realm_layer, p.location_key, p.status AS player_status, p.endgame_status "
+                "FROM party_members m JOIN players p ON p.id = m.player_id "
+                "WHERE m.party_id = ? AND m.status = 'active' ORDER BY m.id",
+                (resolved_party_id,),
+            ).fetchall()
+            if len(members) != 2 or any(not row["member_confirmed_at"] for row in members):
+                raise PartyBattleRequirementError("both party members must confirm")
+            try:
+                enemy = party_enemy_for_location(str(party["location_key"]))
+            except ValueError as exc:
+                raise PartyBattleRequirementError("party PVE is not available at this location") from exc
+            snapshots: list[dict[str, Any]] = []
+            for row in members:
+                if str(row["location_key"]) != str(party["location_key"]):
+                    raise PartyBattleRequirementError("party members must share the frozen location")
+                if not self._meets_realm_values(
+                    str(row["realm_key"]), int(row["realm_layer"]), enemy.required_realm, enemy.required_layer
+                ):
+                    raise PartyBattleRequirementError("a party member does not meet the encounter realm")
+                if self._has_active_long_action(connection, int(row["database_player_id"])):
+                    raise PartyBattleBusyError("a party member has another active action")
+                locked = connection.execute(
+                    "SELECT 1 FROM party_battle_members WHERE player_id = ? AND asset_lock_status = 'locked' LIMIT 1",
+                    (row["database_player_id"],),
+                ).fetchone()
+                if locked is not None:
+                    raise PartyBattleBusyError("a party member has locked battle assets")
+                equipment = self._battle_equipment_snapshot(connection, int(row["database_player_id"]))
+                qualification = self._json_object(row["qualification_json"], {})
+                stats = player_stat_snapshot(
+                    qualification,
+                    max_hp=int(row["max_hp"]),
+                    initiative=int(row["initiative"]),
+                    equipment=equipment,
+                )
+                snapshots.append(
+                    {
+                        "player_id": str(row["stable_player_id"]),
+                        "database_id": int(row["database_player_id"]),
+                        "role": str(row["member_role"]),
+                        "realm_key": str(row["realm_key"]),
+                        "realm_layer": int(row["realm_layer"]),
+                        "path_key": row["path_key"],
+                        "qualification": qualification,
+                        "stats": stats,
+                        "equipment": list(equipment),
+                    }
+                )
+            battle_id = f"party-battle-{uuid4().hex}"
+            snapshot = {
+                "battle_type": PARTY_BATTLE_TYPE,
+                "party_id": resolved_party_id,
+                "location_key": str(party["location_key"]),
+                "members": snapshots,
+                "enemy": {
+                    "key": enemy.key,
+                    "label": enemy.label,
+                    "max_hp": enemy.max_hp,
+                    "attack": enemy.attack,
+                    "initiative": enemy.initiative,
+                    "agility": enemy.agility,
+                    "skill_key": enemy.skill_key,
+                },
+                "random_pool": enemy.random_pool,
+                "random_seed": operation_id,
+                "reward": dict(PARTY_BATTLE_REWARD),
+                "content_version": PARTY_BATTLE_CONTENT_VERSION,
+                "rule_version": PARTY_BATTLE_RULE_VERSION,
+            }
+            state = {
+                "round_no": 0,
+                "member_hp": {member["player_id"]: member["stats"]["max_hp"] for member in snapshots},
+                "enemy_hp": enemy.max_hp,
+                "target_index": 0,
+            }
+            deadline = serialize_datetime(now + timedelta(seconds=TURN_TIMEOUT_SECONDS))
+            connection.execute(
+                "INSERT INTO party_battle_sessions(battle_id, party_id, start_operation_id, battle_type, enemy_key, location_key, status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, content_version, rule_version, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, 'created', 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    battle_id,
+                    resolved_party_id,
+                    operation_id,
+                    PARTY_BATTLE_TYPE,
+                    enemy.key,
+                    str(party["location_key"]),
+                    now_text,
+                    deadline,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    json.dumps(state, ensure_ascii=False, sort_keys=True),
+                    PARTY_BATTLE_CONTENT_VERSION,
+                    PARTY_BATTLE_RULE_VERSION,
+                    now_text,
+                    now_text,
+                ),
+            )
+            for member in snapshots:
+                connection.execute(
+                    "INSERT INTO party_battle_members(battle_id, party_id, player_id, role, asset_lock_status, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'locked', ?, ?, ?)",
+                    (battle_id, resolved_party_id, member["database_id"], member["role"], json.dumps(member, ensure_ascii=False, sort_keys=True), now_text, now_text),
+                )
+            connection.execute(
+                "UPDATE parties SET current_session_id = ?, updated_at = ? WHERE party_id = ? AND current_session_id IS NULL",
+                (battle_id, now_text, resolved_party_id),
+            )
+            payload = {
+                "battle_id": battle_id,
+                "party_id": resolved_party_id,
+                "enemy_key": enemy.key,
+                "status": "created",
+                "round_no": 0,
+                "max_rounds": PARTY_BATTLE_MAX_TURNS,
+                "member_player_ids": [member["player_id"] for member in snapshots],
+            }
+            self._party_battle_record_operation(connection, operation_id, operation_name, int(leader["id"]), request_hash, payload, now_text)
+            return self._party_battle_start_from_payload(payload)
+
+    def _party_battle_access_once(self, platform: str, platform_user_id: str, battle_id: str | None) -> sqlite3.Row:
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            if battle_id:
+                row = connection.execute(
+                    "SELECT b.* FROM party_battle_sessions b JOIN party_battle_members m ON m.battle_id = b.battle_id WHERE b.battle_id = ? AND m.player_id = ?",
+                    (battle_id, player["id"]),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    "SELECT b.* FROM party_battle_sessions b JOIN party_battle_members m ON m.battle_id = b.battle_id WHERE m.player_id = ? AND b.status IN ('created', 'running', 'won', 'lost', 'expired') ORDER BY b.id DESC LIMIT 1",
+                    (player["id"],),
+                ).fetchone()
+            if row is None:
+                raise PartyBattleNotFoundError("party battle does not exist")
+            return row
+
+    def _run_party_battle_turn_once(self, battle_id: str, expected_round: int) -> dict[str, Any]:
+        if expected_round < 1 or expected_round > PARTY_BATTLE_MAX_TURNS:
+            raise ValueError("party battle round is invalid")
+        operation_id = f"party-battle.turn:{battle_id}:{expected_round}"
+        operation_name = "battle.party.turn"
+        request_hash = self._request_hash(operation_name, {"battle_id": battle_id, "expected_round": expected_round, "rule_version": PARTY_BATTLE_RULE_VERSION})
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = self._party_battle_operation(connection, operation_id, operation_name, request_hash)
+            if existing is not None:
+                return existing
+            session = connection.execute("SELECT * FROM party_battle_sessions WHERE battle_id = ?", (battle_id,)).fetchone()
+            if session is None:
+                raise PartyBattleNotFoundError("party battle does not exist")
+            if str(session["status"]) not in {"created", "running"}:
+                return {"battle_id": battle_id, "status": session["status"], "outcome": self._json_object(session["result_json"], {}).get("outcome"), "round_no": session["round_no"]}
+            if int(session["round_no"]) != expected_round - 1:
+                raise PartyBattleBusyError("party battle round is not next")
+            snapshot = self._json_object(session["snapshot_json"], {})
+            state = self._json_object(session["state_json"], {})
+            enemy = snapshot["enemy"]
+            member_hp = {str(key): int(value) for key, value in dict(state.get("member_hp", {})).items()}
+            enemy_hp = int(state.get("enemy_hp", enemy["max_hp"]))
+            target_index = int(state.get("target_index", 0))
+            actions: list[dict[str, Any]] = []
+            sequence = int(session["action_sequence"])
+            members = sorted(
+                [member for member in snapshot.get("members", []) if member["player_id"] in member_hp],
+                key=lambda member: (-int(member["stats"]["initiative"]), str(member["player_id"]),),
+            )
+            for member in members:
+                player_id = str(member["player_id"])
+                if member_hp[player_id] <= 0 or enemy_hp <= 0:
+                    continue
+                sequence += 1
+                roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:player")
+                hit_bp = hit_chance_bp(attacker_initiative=int(member["stats"]["initiative"]), defender_agility=int(enemy["agility"]))
+                damage = int(member["stats"]["attack"]) if roll < hit_bp else 0
+                enemy_hp = max(0, enemy_hp - damage)
+                actions.append({"sequence_no": sequence, "actor_key": f"member:{player_id}", "strategy_key": "party.basic_attack", "skill_key": "skill.basic_attack", "target_key": "enemy", "hit_roll_bp": roll, "damage": damage})
+            alive = [member for member in members if member_hp[str(member["player_id"])] > 0]
+            if enemy_hp > 0 and alive:
+                target_index %= len(alive)
+                target = alive[target_index]
+                target_id = str(target["player_id"])
+                sequence += 1
+                roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:enemy")
+                hit_bp = hit_chance_bp(attacker_initiative=int(enemy["initiative"]), defender_agility=int(target["stats"]["agility"]))
+                damage = int(enemy["attack"]) if roll < hit_bp else 0
+                member_hp[target_id] = max(0, member_hp[target_id] - damage)
+                actions.append({"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.auto", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage})
+                target_index += 1
+            for action in actions:
+                state_after = {"member_hp": member_hp, "enemy_hp": enemy_hp}
+                connection.execute(
+                    "INSERT INTO party_battle_actions(action_id, battle_id, sequence_no, round_no, actor_key, strategy_key, skill_key, target_key, hit_roll_bp, damage, state_json, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (uuid4().hex, battle_id, action["sequence_no"], expected_round, action["actor_key"], action["strategy_key"], action["skill_key"], action["target_key"], action["hit_roll_bp"], action["damage"], json.dumps(state_after, ensure_ascii=False, sort_keys=True), f"{operation_id}:{action['sequence_no']}", now_text),
+                )
+            outcome = "won" if enemy_hp <= 0 else ("lost" if not any(value > 0 for value in member_hp.values()) else None)
+            status = outcome or "running"
+            if expected_round >= PARTY_BATTLE_MAX_TURNS and status == "running":
+                status, outcome = "expired", "expired"
+            state.update({"round_no": expected_round, "member_hp": member_hp, "enemy_hp": enemy_hp, "target_index": target_index})
+            connection.execute(
+                "UPDATE party_battle_sessions SET status=?, round_no=?, action_sequence=?, turn_deadline=?, state_json=?, result_json=?, updated_at=? WHERE battle_id=?",
+                (status, expected_round, sequence, serialize_datetime(self._now() + timedelta(seconds=TURN_TIMEOUT_SECONDS)), json.dumps(state, ensure_ascii=False, sort_keys=True), json.dumps({"outcome": outcome, "reason": "party_battle_ended"} if outcome else {}, ensure_ascii=False, sort_keys=True), now_text, battle_id),
+            )
+            payload = {"battle_id": battle_id, "status": status, "outcome": outcome, "round_no": expected_round, "action_count": len(actions)}
+            operation_player = connection.execute(
+                "SELECT player_id FROM party_battle_members WHERE battle_id=? ORDER BY id LIMIT 1",
+                (battle_id,),
+            ).fetchone()
+            if operation_player is None:
+                raise PartyBattleNotFoundError("party battle has no members")
+            self._party_battle_record_operation(connection, operation_id, operation_name, int(operation_player["player_id"]), request_hash, payload, now_text)
+            return payload
+
+    def _resolve_party_battle_once(self, platform: str, platform_user_id: str, battle_id: str, operation_id: str) -> PartyBattleResolutionRecord:
+        operation_name = "battle.party.resolve"
+        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "battle_id": battle_id})
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = self._party_battle_operation(connection, operation_id, operation_name, request_hash)
+            if existing is not None:
+                return self._party_battle_resolution_from_payload(existing, replay=True)
+            actor = self._require_player(connection, platform, platform_user_id, writable=False)
+            session = connection.execute("SELECT * FROM party_battle_sessions WHERE battle_id = ?", (battle_id,)).fetchone()
+            member = connection.execute("SELECT 1 FROM party_battle_members WHERE battle_id = ? AND player_id = ?", (battle_id, actor["id"])).fetchone()
+            if session is None or member is None:
+                raise PartyBattlePermissionError("actor is not a party battle member")
+            if str(session["status"]) == "settled":
+                result = self._json_object(session["result_json"], {})
+                payload = {"battle_id": battle_id, "party_id": session["party_id"], "enemy_key": session["enemy_key"], "status": "settled", "outcome": result.get("outcome", "expired"), "reason": result.get("reason", "party_battle_ended"), "round_no": int(session["round_no"]), "rewards": result.get("rewards", {})}
+                self._party_battle_record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
+                return self._party_battle_resolution_from_payload(payload, replay=True)
+            if str(session["status"]) not in {"won", "lost", "expired"}:
+                raise PartyBattleNotReadyError("party battle is still running")
+            result = self._json_object(session["result_json"], {})
+            outcome = str(result.get("outcome", session["status"]))
+            reward_map: dict[str, dict[str, int]] = {}
+            battle_members = connection.execute("SELECT * FROM party_battle_members WHERE battle_id = ? ORDER BY id", (battle_id,)).fetchall()
+            for battle_member in battle_members:
+                reward = dict(PARTY_BATTLE_REWARD) if outcome == "won" else {}
+                reward_map[str(battle_member["player_id"])] = reward
+                player = connection.execute("SELECT * FROM players WHERE id = ?", (battle_member["player_id"],)).fetchone()
+                if player is None:
+                    raise PartyBattleNotFoundError("party battle member no longer exists")
+                if reward:
+                    inventory = self._json_object(player["inventory_json"], {})
+                    connection.execute(
+                        "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, inventory_json=?, updated_at=? WHERE id=?",
+                        (int(player["cultivation"]) + reward["cultivation"], int(player["total_cultivation"]) + reward["cultivation"], int(player["spirit_stones"]) + reward["spirit_stones"], json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    )
+                connection.execute(
+                    "INSERT INTO party_battle_rewards(battle_id, party_id, player_id, reward_json, status, operation_id, claimed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (battle_id, session["party_id"], battle_member["player_id"], json.dumps(reward, ensure_ascii=False, sort_keys=True), "claimed" if reward else "none", f"{operation_id}:{battle_member['player_id']}", now_text),
+                )
+                connection.execute("UPDATE party_battle_members SET asset_lock_status='released', reward_json=?, settled_at=?, updated_at=? WHERE id=?", (json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text, now_text, battle_member["id"]))
+            result.update({"outcome": outcome, "reason": result.get("reason", "party_battle_ended"), "rewards": reward_map, "settled_at": now_text})
+            connection.execute("UPDATE party_battle_sessions SET status='settled', result_json=?, updated_at=? WHERE battle_id=?", (json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, battle_id))
+            connection.execute("UPDATE parties SET current_session_id=NULL, updated_at=? WHERE party_id=? AND current_session_id=?", (now_text, session["party_id"], battle_id))
+            payload = {"battle_id": battle_id, "party_id": session["party_id"], "enemy_key": session["enemy_key"], "status": "settled", "outcome": outcome, "reason": result["reason"], "round_no": int(session["round_no"]), "rewards": reward_map}
+            self._party_battle_record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
+            return self._party_battle_resolution_from_payload(payload)
+
+    def _replay_party_battle_once(self, platform: str, platform_user_id: str, battle_id: str | None) -> PartyBattleReplayRecord:
+        row = self._party_battle_access_once(platform, platform_user_id, battle_id)
+        with self._connect() as connection:
+            snapshot = self._json_object(row["snapshot_json"], {})
+            result = self._json_object(row["result_json"], {})
+            actions = tuple(dict(action) for action in connection.execute("SELECT * FROM party_battle_actions WHERE battle_id=? ORDER BY sequence_no", (row["battle_id"],)).fetchall())
+            return PartyBattleReplayRecord(str(row["battle_id"]), str(row["party_id"]), str(row["enemy_key"]), str(row["status"]), snapshot, result, actions)
+
+    @staticmethod
+    def _party_battle_operation(connection: sqlite3.Connection, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
+        row = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
+        if row is None:
+            return None
+        if row["operation_name"] != operation_name or row["request_hash"] != request_hash:
+            raise OperationConflictError("operation input differs from its original request")
+        return json.loads(row["result_json"])
+
+    @staticmethod
+    def _party_battle_record_operation(connection: sqlite3.Connection, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
+        connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
+
+    @staticmethod
+    def _party_battle_start_from_payload(payload: dict[str, Any], replay: bool = False) -> PartyBattleStartRecord:
+        return PartyBattleStartRecord(str(payload["battle_id"]), str(payload["party_id"]), str(payload["enemy_key"]), str(payload["status"]), int(payload["round_no"]), int(payload["max_rounds"]), tuple(str(value) for value in payload.get("member_player_ids", [])), replay)
+
+    @staticmethod
+    def _party_battle_resolution_from_payload(payload: dict[str, Any], replay: bool = False) -> PartyBattleResolutionRecord:
+        return PartyBattleResolutionRecord(str(payload["battle_id"]), str(payload["party_id"]), str(payload["enemy_key"]), str(payload["status"]), str(payload["outcome"]), str(payload["reason"]), int(payload["round_no"]), {str(player): {str(key): int(value) for key, value in dict(reward).items()} for player, reward in dict(payload.get("rewards", {})).items()}, replay)
+
+
+__all__ = ["PartyCombatRepositoryMixin"]

@@ -459,6 +459,84 @@ CREATE INDEX IF NOT EXISTS idx_party_members_player ON party_members(player_id, 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_party_members_current_player
     ON party_members(player_id) WHERE status IN ('invited', 'active');
 
+CREATE TABLE IF NOT EXISTS party_battle_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id TEXT NOT NULL UNIQUE,
+    party_id TEXT NOT NULL REFERENCES parties(party_id),
+    start_operation_id TEXT NOT NULL UNIQUE,
+    battle_type TEXT NOT NULL CHECK (battle_type IN ('pve.party')),
+    enemy_key TEXT NOT NULL,
+    location_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('created', 'running', 'won', 'lost', 'expired', 'settled')),
+    round_no INTEGER NOT NULL DEFAULT 0 CHECK (round_no >= 0),
+    action_sequence INTEGER NOT NULL DEFAULT 0 CHECK (action_sequence >= 0),
+    starts_at TEXT NOT NULL,
+    turn_deadline TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    state_json TEXT NOT NULL,
+    result_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_party_battle_sessions_party
+    ON party_battle_sessions(party_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS party_battle_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id TEXT NOT NULL REFERENCES party_battle_sessions(battle_id),
+    party_id TEXT NOT NULL REFERENCES parties(party_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    role TEXT NOT NULL CHECK (role IN ('leader', 'member')),
+    asset_lock_status TEXT NOT NULL CHECK (asset_lock_status IN ('locked', 'released')),
+    snapshot_json TEXT NOT NULL,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    settled_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (battle_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_party_battle_members_player
+    ON party_battle_members(player_id, asset_lock_status, created_at);
+
+CREATE TABLE IF NOT EXISTS party_battle_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL UNIQUE,
+    battle_id TEXT NOT NULL REFERENCES party_battle_sessions(battle_id),
+    sequence_no INTEGER NOT NULL CHECK (sequence_no > 0),
+    round_no INTEGER NOT NULL CHECK (round_no > 0),
+    actor_key TEXT NOT NULL,
+    strategy_key TEXT NOT NULL,
+    skill_key TEXT NOT NULL,
+    target_key TEXT NOT NULL,
+    hit_roll_bp INTEGER NOT NULL,
+    damage INTEGER NOT NULL CHECK (damage >= 0),
+    state_json TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_party_battle_actions_battle
+    ON party_battle_actions(battle_id, sequence_no);
+
+CREATE TABLE IF NOT EXISTS party_battle_rewards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id TEXT NOT NULL REFERENCES party_battle_sessions(battle_id),
+    party_id TEXT NOT NULL REFERENCES parties(party_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL CHECK (status IN ('claimed', 'none')),
+    operation_id TEXT NOT NULL UNIQUE,
+    claimed_at TEXT NOT NULL,
+    UNIQUE (battle_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_party_battle_rewards_player
+    ON party_battle_rewards(player_id, claimed_at);
+
 CREATE TABLE IF NOT EXISTS mentor_relations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     relation_id TEXT NOT NULL UNIQUE,

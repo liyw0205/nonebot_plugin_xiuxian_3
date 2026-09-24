@@ -12,4 +12,9 @@
 
 `Party`：队长、成员序列、地点、准备状态、当前会话、掉线时间和分配规则。
 
+`PartyBattleSession`：独立于单人 `BattleSession` 的队伍战斗 ID、队伍快照、敌人/地点/规则版本、
+行动序号、状态和结果。`PartyBattleMember` 在战斗开始时保存每名成员属性/装备快照并锁定资产；
+结算后释放锁。`PartyBattleReward` 以 `(battle_id, player_id)` 唯一键记录每名成员的奖励，
+任一已确认成员可触发结算，但同一成员不会重复发奖。
+
 `ServiceOrder`：委托人、服务者、服务类型、材料锁定、报价、目标品质、截止时间和交付状态。

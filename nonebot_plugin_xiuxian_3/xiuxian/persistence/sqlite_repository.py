@@ -21,6 +21,7 @@ from ..world.repository import WorldRepositoryMixin
 from ..world.travel_repository import TravelRepositoryMixin
 from ..exploration.repository import ExplorationRepositoryMixin
 from ..combat.repository import CombatRepositoryMixin
+from ..combat.party_repository import PartyCombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
@@ -48,6 +49,7 @@ class SQLitePlayerRepository(
     RoutineRepositoryMixin,
     ExplorationRepositoryMixin,
     CombatRepositoryMixin,
+    PartyCombatRepositoryMixin,
     AdventuresRepositoryMixin,
     DaoEchoesRepositoryMixin,
     ProductionRepositoryMixin,

@@ -19,8 +19,11 @@
 
 ## 3. 队伍与委托
 
-`party.exploration_pair`：最多 2 人、同地点、双方确认窗口 5 分钟；创建后队长可开始探索，奖励按角色贡献分别生成，唯一装备不共享。队长离开且另一成员在线则转移队长，否则解散；队伍不会绕过个人地点、体力、境界或冷却条件。
+`party.exploration_pair`：最多 2 人、同地点、双方确认窗口 5 分钟；确认后队长可发起双人自动 PVE，
+战斗开始时冻结每名成员属性/装备并锁定资产，行动回放写入独立 `party_battle_sessions`；任一已确认成员
+可结算，奖励按 `(battle_id, player_id)` 分别生成，唯一装备不共享。战斗期间不能退出或开始其他长行动。
+队长离开且另一成员在线则转移队长，否则解散；队伍不会绕过个人地点、境界、体力或冷却条件。
 
 `commission.v0.1` 仅支持疗伤丹/木纹剑：委托人先锁报酬（1–500 灵石）和要求，生产者接受后锁材料/精力/工具；完成后从报酬扣 2% 平台费给系统，失败返委托人 80% 报酬和未消耗材料。订单超时 24h：未接受全额解锁，processing 交恢复任务按生产快照结算。
 
-错误：`SECT_ALREADY_JOINED`、`SECT_JOIN_COOLDOWN`、`SECT_PERMISSION_DENIED`、`MASTER_REQUIREMENT_MISSING`、`APPRENTICE_RELATION_CONFLICT`、`PARTY_LOCATION_MISMATCH`、`PARTY_CONFIRMATION_EXPIRED`、`COMMISSION_STATE_CONFLICT`。关闭 v0.1 后停止新关系/订单，旧关系可读、旧订单结算。验收：创建费不双扣；邀请双方确认；毕业只奖一次；离宗冷却生效；队伍奖励不复制；委托锁定/退款原子化。
+错误：`SECT_ALREADY_JOINED`、`SECT_JOIN_COOLDOWN`、`SECT_PERMISSION_DENIED`、`MASTER_REQUIREMENT_MISSING`、`APPRENTICE_RELATION_CONFLICT`、`PARTY_LOCATION_MISMATCH`、`PARTY_CONFIRMATION_EXPIRED`、`PARTY_BATTLE_BUSY`、`PARTY_BATTLE_PERMISSION_DENIED`、`PARTY_BATTLE_REQUIREMENT_MISSING`、`COMMISSION_STATE_CONFLICT`。关闭 v0.1 后停止新关系/订单/队伍战斗，旧关系和已创建战斗可读/结算。验收：创建费不双扣；邀请双方确认；毕业只奖一次；离宗冷却生效；队伍战斗快照和资产锁完整；协助者结算不复制奖励；委托锁定/退款原子化。
