@@ -127,6 +127,9 @@ data/
 ### v0.6
 
 `item.tribulation_token`、`item.dao_fruit_fragment`、
+`item.masterwork.body`、`item.masterwork.spell`、`item.masterwork.device`、
+`item.masterwork.demonic`、`item.masterwork.beast`、`item.masterwork.alchemy`、
+`item.masterwork.artifice`、`item.masterwork.formation`、`item.masterwork.support`、
 `item.ascension_certificate`、`item.weapon.dao_origin`、
 `item.title.ascended`、`item.tribulation_guard`。
 

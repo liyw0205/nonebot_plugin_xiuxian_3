@@ -62,7 +62,7 @@ def resolve_market_item(value: str) -> MarketItem:
     key = _ALIASES.get(value.strip(), value.strip())
     if not key or not key.startswith("item."):
         raise ValueError("item is not tradeable")
-    if any(marker in key for marker in ("manual", "token", "certificate", "bound", "locked")):
+    if any(marker in key for marker in ("manual", "token", "certificate", "bound", "locked", "masterwork")):
         raise ValueError("item is not tradeable")
     return MarketItem(key=key, label=_ITEMS.get(key, key))
 

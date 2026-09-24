@@ -331,7 +331,7 @@ class ProductionRepositoryMixin:
         recipe_key: str,
         operation_id: str,
     ) -> ProductionOrderRecord:
-        from ..production.rules import RECIPE_RULE_VERSION, TOOL_MAX_DURABILITY_BP, random_quality_bp, recipe_definition
+        from ..production.rules import TOOL_MAX_DURABILITY_BP, random_quality_bp, recipe_definition
 
         recipe = recipe_definition(recipe_key)
         operation_payload = {
@@ -419,11 +419,19 @@ class ProductionRepositoryMixin:
             snapshot = {
                 "recipe_key": recipe.key,
                 "recipe_name": recipe.name,
-                "rule_version": RECIPE_RULE_VERSION,
+                "content_version": recipe.content_version,
+                "rule_version": recipe.rule_version,
                 "realm_key": row["realm_key"],
                 "realm_layer": int(row["realm_layer"]),
+                "path_key": row["path_key"],
+                "subprofession_key": row["subprofession_key"],
                 "location_key": row["location_key"],
                 "inputs": dict(recipe.inputs),
+                "outputs": dict(recipe.outputs),
+                "high_quality_bonus": dict(recipe.high_quality_bonus),
+                "failure_refunds": dict(recipe.failure_refunds),
+                "success_threshold_bp": recipe.success_threshold_bp,
+                "high_quality_threshold_bp": recipe.high_quality_threshold_bp,
                 "tool_key": recipe.tool_key,
                 "tool_durability_before": tool_durability_before,
                 "tool_durability_after": durability.get(recipe.tool_key) if recipe.tool_key else None,
@@ -604,23 +612,34 @@ class ProductionRepositoryMixin:
                 raise ProductionNotReadyError("production is not ready for recovery")
             recipe = recipe_definition(str(order["recipe_key"]))
             snapshot = self._json_object(order["snapshot_json"], {})
+            recipe_name = str(snapshot.get("recipe_name", recipe.name))
+            currency_spent = int(snapshot.get("currency_cost", recipe.currency_cost))
             quality = self._production_quality_from_snapshot(snapshot)
-            success = quality >= QUALITY_SUCCESS_THRESHOLD_BP
+            success = quality >= int(snapshot.get("success_threshold_bp", QUALITY_SUCCESS_THRESHOLD_BP))
             inventory = self._json_object(row["inventory_json"], {})
             durability = self._json_object(row["durability_json"], {})
             outputs: dict[str, int] = {}
             refunds: dict[str, int] = {}
             if success:
-                outputs.update(recipe.outputs)
-                if quality >= HIGH_QUALITY_THRESHOLD_BP:
-                    for item_key, quantity in recipe.high_quality_bonus.items():
+                outputs.update(
+                    {str(key): int(value) for key, value in dict(snapshot.get("outputs", recipe.outputs)).items()}
+                )
+                high_quality_threshold = int(
+                    snapshot.get("high_quality_threshold_bp", HIGH_QUALITY_THRESHOLD_BP)
+                )
+                if quality >= high_quality_threshold:
+                    for item_key, quantity in dict(
+                        snapshot.get("high_quality_bonus", recipe.high_quality_bonus)
+                    ).items():
                         outputs[item_key] = outputs.get(item_key, 0) + quantity
                 for item_key, quantity in outputs.items():
                     inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
                 if recipe.key == "recipe.weapon.wood_sword":
                     durability["item.weapon.wood_sword"] = max(8000, min(10000, 8000 + quality // 5))
             else:
-                for item_key, quantity in recipe.failure_refunds.items():
+                for item_key, quantity in dict(
+                    snapshot.get("failure_refunds", recipe.failure_refunds)
+                ).items():
                     if quantity > 0:
                         refunds[item_key] = quantity
                         inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
@@ -639,14 +658,14 @@ class ProductionRepositoryMixin:
             )
             result = {
                 "recipe_key": recipe.key,
-                "recipe_name": recipe.name,
+                "recipe_name": recipe_name,
                 "status": status,
                 "quality_bp": quality,
                 "random_quality_bp": int(snapshot.get("random_quality_bp", 0)),
                 "success": success,
                 "outputs": outputs,
                 "refunds": refunds,
-                "currency_spent": recipe.currency_cost,
+                "currency_spent": currency_spent,
                 "tool_durability_bp": tool_durability,
                 "recovered": recovery,
             }
@@ -674,21 +693,33 @@ class ProductionRepositoryMixin:
                 player=player,
                 order_id=str(order["order_id"]),
                 recipe_key=recipe.key,
-                recipe_name=recipe.name,
+                recipe_name=recipe_name,
                 status=status,
                 quality_bp=quality,
                 random_quality_bp=int(snapshot.get("random_quality_bp", 0)),
                 success=success,
                 outputs=outputs,
                 refunds=refunds,
-                currency_spent=recipe.currency_cost,
+                currency_spent=currency_spent,
                 tool_durability_bp=int(tool_durability) if tool_durability is not None else None,
             )
 
     @staticmethod
     def _check_production_requirements(row: sqlite3.Row, recipe) -> None:
-        teaching = recipe.teaching_allowed and str(row["selected_service"] or "") == recipe.profession
-        profession_ok = str(row["subprofession_key"] or "") == recipe.profession or teaching
+        if recipe.required_path and str(row["path_key"] or "") != recipe.required_path:
+            raise RecipeRequirementError("当前道途不满足这条配方")
+        if recipe.required_subprofession and str(row["subprofession_key"] or "") not in recipe.required_subprofession:
+            raise RecipeRequirementError("当前辅修不满足这条配方")
+        teaching = (
+            recipe.teaching_allowed
+            and recipe.profession is not None
+            and str(row["selected_service"] or "") == recipe.profession
+        )
+        profession_ok = (
+            recipe.profession is None
+            or str(row["subprofession_key"] or "") == recipe.profession
+            or teaching
+        )
         if not profession_ok:
             raise RecipeRequirementError("当前道途或生产教学不满足这条配方")
         if teaching and recipe.required_realm == "qi_sensing":

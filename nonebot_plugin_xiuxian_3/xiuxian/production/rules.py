@@ -2,35 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from hashlib import blake2b
+
+from .endgame_work_rules import (
+    ENDGAME_WORK_RECIPES,
+    ITEM_LABELS as ENDGAME_WORK_ITEM_LABELS,
+    RECIPE_ALIASES as ENDGAME_WORK_RECIPE_ALIASES,
+)
+from .recipe_models import RecipeDefinition
 
 
 RECIPE_RULE_VERSION = "production-0.1.0"
 QUALITY_SUCCESS_THRESHOLD_BP = 4500
 HIGH_QUALITY_THRESHOLD_BP = 8000
 TOOL_MAX_DURABILITY_BP = 2000
-
-
-@dataclass(frozen=True, slots=True)
-class RecipeDefinition:
-    key: str
-    name: str
-    profession: str
-    inputs: dict[str, int]
-    energy_cost: int
-    duration_seconds: int
-    daily_limit: int
-    tool_key: str | None
-    tool_cost_bp: int
-    currency_cost: int
-    outputs: dict[str, int]
-    high_quality_bonus: dict[str, int]
-    failure_refunds: dict[str, int]
-    min_realm_layer: int
-    required_realm: str
-    required_location: tuple[str, ...] = ()
-    teaching_allowed: bool = False
 
 
 RECIPES: dict[str, RecipeDefinition] = {
@@ -88,6 +73,7 @@ RECIPES: dict[str, RecipeDefinition] = {
         required_location=("xuantian.spirit_field", "xuantian.array_hall"),
     ),
 }
+RECIPES.update(ENDGAME_WORK_RECIPES)
 
 
 RECIPE_ALIASES = {
@@ -102,6 +88,8 @@ RECIPE_ALIASES = {
     "基础聚灵阵": "recipe.array.gathering_basic",
     "布阵": "recipe.array.gathering_basic",
 }
+RECIPE_ALIASES.update({key: key for key in ENDGAME_WORK_RECIPES})
+RECIPE_ALIASES.update(ENDGAME_WORK_RECIPE_ALIASES)
 
 ITEM_LABELS = {
     "item.herb.blood_grass": "止血草",
@@ -115,6 +103,7 @@ ITEM_LABELS = {
     "item.tool.basic_furnace": "基础丹炉",
     "item.tool.basic_hammer": "基础炼器锤",
 }
+ITEM_LABELS.update(ENDGAME_WORK_ITEM_LABELS)
 
 
 def resolve_recipe(value: str) -> str | None:

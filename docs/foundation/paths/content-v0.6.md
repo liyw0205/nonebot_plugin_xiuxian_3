@@ -9,7 +9,7 @@
 | 器修 | `fruit.machine_heaven` | 器修、完成机关试炼 | 一件指定机关获得永久耐久化 | 仅一件，不能交易/拆解 |
 | 魔修 | `fruit.free_demon` | 魔修、完成契约试炼 | 免疫普通侵蚀增长 | 阵营敌对、心魔与天劫侵蚀仍生效 |
 | 妖修 | `fruit.ancestral_king` | 妖修、完成族群试炼 | 可在妖界建立一个族群据点 | 据点受领地维护与赛季规则限制 |
-| 辅修 | `fruit.allcraft` | 辅修、完成三类大师作品 | 炼丹/炼器/布阵均视为大师级 | 不能绕过配方、材料、订单与市场限制 |
+| 辅修 | `fruit.allcraft` | 辅修、通过 `recipe.masterwork.alchemy`、`recipe.masterwork.artifice`、`recipe.masterwork.formation` 分别生产三类作品，并以 `recipe.masterwork.support` 合成 | 炼丹/炼器/布阵均视为大师级 | 不能绕过配方、材料、个人订单与市场限制 |
 
 ## 锁定与结局联动
 
