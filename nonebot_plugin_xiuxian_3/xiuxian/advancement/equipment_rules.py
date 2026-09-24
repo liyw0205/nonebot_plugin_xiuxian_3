@@ -34,6 +34,9 @@ EQUIPMENT_DEFINITIONS = {
     "item.weapon.wood_sword": EquipmentDefinition(
         key="item.weapon.wood_sword", label="木纹剑", slot="weapon"
     ),
+    "item.weapon.cloud_sword": EquipmentDefinition(
+        key="item.weapon.cloud_sword", label="云纹剑", slot="weapon"
+    ),
     "item.armor.cotton_robe": EquipmentDefinition(
         key="item.armor.cotton_robe", label="棉袍", slot="armor"
     ),
@@ -42,6 +45,8 @@ EQUIPMENT_DEFINITIONS = {
 EQUIPMENT_ALIASES = {
     "木纹剑": "item.weapon.wood_sword",
     "木剑": "item.weapon.wood_sword",
+    "云纹剑": "item.weapon.cloud_sword",
+    "云剑": "item.weapon.cloud_sword",
     "棉袍": "item.armor.cotton_robe",
     **{key: key for key in EQUIPMENT_DEFINITIONS},
 }

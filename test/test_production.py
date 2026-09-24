@@ -276,3 +276,153 @@ def test_v02_mist_barrier_production_uses_array_hall_permission_for_qq_and_onebo
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_v02_remaining_production_recipes_run_through_qq_and_onebot() -> None:
+    cases = (
+        {
+            "alias": "金丹护脉丹",
+            "recipe_key": "recipe.pill.golden_core_guard",
+            "realm": "golden_core",
+            "location": "cave.mist_grotto_2",
+            "subprofession": "alchemy",
+            "inputs": {
+                "item.herb.spirit_leaf": 3,
+                "item.material.cloud_iron": 1,
+                "item.herb.blood_grass": 2,
+                "item.tool.basic_furnace": 1,
+            },
+            "output": {"item.pill.golden_core_guard": 1},
+        },
+        {
+            "alias": "凝核丹",
+            "recipe_key": "recipe.pill.core_condense",
+            "realm": "golden_core",
+            "location": "cave.mist_grotto_2",
+            "subprofession": "alchemy",
+            "inputs": {
+                "item.herb.spirit_leaf": 5,
+                "item.material.cloud_iron": 2,
+                "item.mat.array_sand": 2,
+                "item.tool.basic_furnace": 1,
+            },
+            "output": {"item.pill.core_condense": 1},
+        },
+        {
+            "alias": "云剑",
+            "recipe_key": "recipe.weapon.cloud_sword",
+            "realm": "golden_core",
+            "location": "cave.mist_grotto_2",
+            "subprofession": "artifice",
+            "inputs": {
+                "item.material.cloud_iron": 4,
+                "item.mat.array_sand": 1,
+                "item.mat.wood": 2,
+                "item.tool.basic_hammer": 1,
+            },
+            "output": {"item.weapon.cloud_sword": 1},
+        },
+        {
+            "alias": "云茶",
+            "recipe_key": "recipe.food.cloud_tea",
+            "realm": "qi_gathering",
+            "location": "xuantian.spirit_field",
+            "subprofession": "cooking",
+            "inputs": {
+                "item.herb.spirit_leaf": 2,
+                "item.food.coarse_spirit_rice": 2,
+            },
+            "output": {"item.food.cloud_tea": 3},
+        },
+    )
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter in ("qq.official", "onebot.v11"):
+                for index, case in enumerate(cases):
+                    user = f"{adapter}-v02-recipe-{index}"
+                    await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, f"create-{adapter}-{index}"),
+                        "开始修仙",
+                    )
+                    await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, f"seek-{adapter}-{index}"),
+                        "寻仙问道",
+                    )
+                    inventory = dict(case["inputs"])
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            """
+                            UPDATE players SET stage='cultivator', realm_key=?, realm_layer=1,
+                                location_key=?, subprofession_key=?, selected_service=?,
+                                energy=30, energy_max=30, spirit_stones=1000,
+                                inventory_json=?, durability_json=?, intro_json='{}'
+                            WHERE platform=? AND platform_user_id=?
+                            """,
+                            (
+                                case["realm"],
+                                case["location"],
+                                case["subprofession"],
+                                case["subprofession"],
+                                json.dumps(inventory),
+                                json.dumps({}),
+                                adapter,
+                                user,
+                            ),
+                        )
+
+                    preview = await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, f"preview-{adapter}-{index}"),
+                        f"生产预览 {case['alias']}",
+                    )
+                    assert preview.code == "RECIPE_PREVIEW"
+                    assert preview.data["recipe_key"] == case["recipe_key"]
+                    operation = next(
+                        f"{adapter}-v02-recipe-{index}-{roll}"
+                        for roll in range(256)
+                        if random_quality_bp(f"{adapter}-v02-recipe-{index}-{roll}") >= 1000
+                    )
+                    started = await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, f"start-{adapter}-{index}", operation),
+                        f"开始生产 {case['alias']}",
+                    )
+                    assert started.code == "PRODUCTION_STARTED"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE production_orders SET ends_at=? WHERE order_id=?",
+                            (
+                                (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
+                                started.data["order_id"],
+                            ),
+                        )
+                    settled = await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, f"settle-{adapter}-{index}", f"settle-{operation}"),
+                        "领取生产",
+                    )
+                    assert settled.code == "PRODUCTION_COMPLETED"
+                    assert settled.data["success"] is True
+                    assert settled.data["outputs"] == case["output"]
+                    replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, f"settle-replay-{adapter}-{index}", f"settle-{operation}"),
+                        "领取生产",
+                    )
+                    assert replay.data["idempotent_replay"] is True
+                    if case["recipe_key"] == "recipe.weapon.cloud_sword":
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            durability = json.loads(
+                                connection.execute(
+                                    "SELECT durability_json FROM players WHERE platform=? AND platform_user_id=?",
+                                    (adapter, user),
+                                ).fetchone()[0]
+                            )
+                        assert durability["item.weapon.cloud_sword"] >= 8500
+            await runtime.close()
+
+    asyncio.run(run())

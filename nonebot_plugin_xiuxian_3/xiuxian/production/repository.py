@@ -636,6 +636,8 @@ class ProductionRepositoryMixin:
                     inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
                 if recipe.key == "recipe.weapon.wood_sword":
                     durability["item.weapon.wood_sword"] = max(8000, min(10000, 8000 + quality // 5))
+                elif recipe.key == "recipe.weapon.cloud_sword":
+                    durability["item.weapon.cloud_sword"] = max(8500, min(10000, 8500 + quality // 10))
             else:
                 for item_key, quantity in dict(
                     snapshot.get("failure_refunds", recipe.failure_refunds)

@@ -234,6 +234,157 @@
       },
       "key": "recipe.food.spirit_rice",
       "status": "active"
+    },
+    {
+      "name": "炼制金丹护脉丹",
+      "profession": "alchemy",
+      "requirements": [
+        {"type": "profession_level", "value": 3},
+        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
+        {"type": "location_any", "values": ["cave.mist_grotto_2"]}
+      ],
+      "inputs": [
+        {"item_key": "item.herb.spirit_leaf", "quantity": 3},
+        {"item_key": "item.material.cloud_iron", "quantity": 1},
+        {"item_key": "item.herb.blood_grass", "quantity": 2}
+      ],
+      "tool": {"item_key": "item.tool.basic_furnace", "durability_cost_bp": 250},
+      "energy_cost": 8,
+      "duration_seconds": 120,
+      "outputs": [{"item_key": "item.pill.golden_core_guard", "quantity": 1}],
+      "daily_limit": 4,
+      "failure": {
+        "input_refund": [
+          {"item_key": "item.herb.spirit_leaf", "quantity": 1},
+          {"item_key": "item.herb.blood_grass", "quantity": 1}
+        ],
+        "currency_refund_bp": 0,
+        "produces_output": false
+      },
+      "content_version": "content-0.2",
+      "rule_version": "production-0.2.0",
+      "key": "recipe.pill.golden_core_guard",
+      "status": "active"
+    },
+    {
+      "name": "炼制凝核丹",
+      "profession": "alchemy",
+      "requirements": [
+        {"type": "profession_level", "value": 4},
+        {"type": "realm", "realm_key": "golden_core", "min_layer": 1}
+      ],
+      "inputs": [
+        {"item_key": "item.herb.spirit_leaf", "quantity": 5},
+        {"item_key": "item.material.cloud_iron", "quantity": 2},
+        {"item_key": "item.mat.array_sand", "quantity": 2}
+      ],
+      "tool": {"item_key": "item.tool.basic_furnace", "durability_cost_bp": 250},
+      "energy_cost": 10,
+      "duration_seconds": 180,
+      "outputs": [{"item_key": "item.pill.core_condense", "quantity": 1}],
+      "daily_limit": 2,
+      "failure": {
+        "input_refund": [
+          {"item_key": "item.herb.spirit_leaf", "quantity": 3},
+          {"item_key": "item.material.cloud_iron", "quantity": 1},
+          {"item_key": "item.mat.array_sand", "quantity": 1}
+        ],
+        "currency_refund_bp": 0,
+        "produces_output": false
+      },
+      "content_version": "content-0.2",
+      "rule_version": "production-0.2.0",
+      "key": "recipe.pill.core_condense",
+      "status": "active"
+    },
+    {
+      "name": "锻造云纹剑",
+      "profession": "artifice",
+      "requirements": [
+        {"type": "profession_level", "value": 3},
+        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
+        {"type": "location_any", "values": ["cave.mist_grotto_2"]}
+      ],
+      "inputs": [
+        {"item_key": "item.material.cloud_iron", "quantity": 4},
+        {"item_key": "item.mat.array_sand", "quantity": 1},
+        {"item_key": "item.mat.wood", "quantity": 2}
+      ],
+      "tool": {"item_key": "item.tool.basic_hammer", "durability_cost_bp": 250},
+      "energy_cost": 10,
+      "duration_seconds": 180,
+      "outputs": [{"item_key": "item.weapon.cloud_sword", "quantity": 1, "durability_bp_min": 8500}],
+      "daily_limit": 2,
+      "failure": {
+        "input_refund": [
+          {"item_key": "item.material.cloud_iron", "quantity": 2},
+          {"item_key": "item.mat.wood", "quantity": 1}
+        ],
+        "currency_refund_bp": 0,
+        "produces_output": false
+      },
+      "content_version": "content-0.2",
+      "rule_version": "production-0.2.0",
+      "key": "recipe.weapon.cloud_sword",
+      "status": "active"
+    },
+    {
+      "name": "布置迷雾屏障阵",
+      "profession": "formation",
+      "requirements": [
+        {"type": "profession_level", "value": 3},
+        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
+        {"type": "location_any", "values": ["xuantian.array_hall", "cave.mist_grotto_2"]}
+      ],
+      "inputs": [
+        {"item_key": "item.mat.array_sand", "quantity": 5},
+        {"item_key": "item.herb.spirit_leaf", "quantity": 2}
+      ],
+      "currency_cost": {"currency_key": "currency.spirit_stone", "amount": 100},
+      "energy_cost": 12,
+      "duration_seconds": 240,
+      "outputs": [{"item_key": "item.array.mist_barrier", "quantity": 1, "duration_seconds": 43200}],
+      "daily_limit": 2,
+      "failure": {
+        "input_refund": [
+          {"item_key": "item.mat.array_sand", "quantity": 3},
+          {"item_key": "item.herb.spirit_leaf", "quantity": 1}
+        ],
+        "currency_refund_bp": 0,
+        "produces_output": false
+      },
+      "content_version": "content-0.2",
+      "rule_version": "production-0.2.0",
+      "key": "recipe.array.mist_barrier",
+      "status": "active"
+    },
+    {
+      "name": "烹饪云灵茶",
+      "profession": "cooking",
+      "requirements": [
+        {"type": "profession_level", "value": 2},
+        {"type": "location_any", "values": ["xuantian.spirit_field"]}
+      ],
+      "inputs": [
+        {"item_key": "item.herb.spirit_leaf", "quantity": 2},
+        {"item_key": "item.food.coarse_spirit_rice", "quantity": 2}
+      ],
+      "energy_cost": 4,
+      "duration_seconds": 60,
+      "outputs": [{"item_key": "item.food.cloud_tea", "quantity": 3}],
+      "daily_limit": 6,
+      "failure": {
+        "input_refund": [
+          {"item_key": "item.herb.spirit_leaf", "quantity": 1},
+          {"item_key": "item.food.coarse_spirit_rice", "quantity": 1}
+        ],
+        "currency_refund_bp": 0,
+        "produces_output": false
+      },
+      "content_version": "content-0.2",
+      "rule_version": "production-0.2.0",
+      "key": "recipe.food.cloud_tea",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"
