@@ -10,6 +10,10 @@ from .models import ExplorationDefinition
 RULE_VERSION = "exploration-0.1.0"
 V02_RULE_VERSION = "exploration-0.2.0"
 V02_CONTENT_VERSION = "content-0.2"
+CLOUD_BOAT_STORM_CHANCE_BP = 2500
+CLOUD_BOAT_STORM_WAIT_SECONDS = 2 * 60
+CLOUD_BOAT_STORM_PAY_COST = 100
+CLOUD_BOAT_STORM_CHOICES = ("wait", "pay", "turn_back")
 CLOUD_MINE_ACCESS_FLAGS = frozenset({
     "permit.cloud_mine",
     "cloud_mine.permit",
@@ -112,6 +116,20 @@ DEFINITIONS = {
         rule_version=V02_RULE_VERSION,
         content_version=V02_CONTENT_VERSION,
     ),
+    "explore.cloud_boat_trial": ExplorationDefinition(
+        key="explore.cloud_boat_trial",
+        label="云舟试炼",
+        location_key="xuantian.floating_boat",
+        duration_seconds=5 * 60,
+        stamina_cost=12,
+        required_realm="golden_core",
+        required_layer=1,
+        daily_limit=3,
+        random_pool="trial.cloud_boat.v0.2",
+        battle_chance_bp=0,
+        rule_version=V02_RULE_VERSION,
+        content_version=V02_CONTENT_VERSION,
+    ),
 }
 
 ALIASES = {
@@ -125,6 +143,8 @@ ALIASES = {
     "云铁矿区采集": "explore.cloud_mine",
     "云铁采集": "explore.cloud_mine",
     "洞天二层探索": "explore.mist_grotto_2",
+    "云舟试炼": "explore.cloud_boat_trial",
+    "云舟历练": "explore.cloud_boat_trial",
 }
 
 
@@ -197,6 +217,10 @@ def battle_roll_bp(seed: str) -> int:
     return int.from_bytes(digest, "big") % 10000
 
 
+def cloud_boat_storm_roll_bp(seed: str) -> int:
+    return battle_roll_bp(seed + ":storm")
+
+
 def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
     if mode_key == "explore.gather_outskirts":
         return {
@@ -234,6 +258,11 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
         return {
             "cultivation": weighted_value(seed + ":cultivation", (900, 1100, 1300), (30, 45, 25)),
             "item.material.cloud_iron": weighted_value(seed + ":material", (1, 2), (60, 40)),
+        }
+    if mode_key == "explore.cloud_boat_trial":
+        return {
+            "cultivation": weighted_value(seed + ":cultivation", (600, 750, 900), (30, 40, 30)),
+            "item.ticket.cloud_boat_fragment": weighted_value(seed + ":ticket", (1, 2), (60, 40)),
         }
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 

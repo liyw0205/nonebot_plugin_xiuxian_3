@@ -728,6 +728,14 @@ class ExplorationCombatPendingError(RuntimeError):
     """The exploration rolled a combat encounter that is still locked."""
 
 
+class ExplorationStormNotPendingError(RuntimeError):
+    """The exploration has no cloud-boat storm choice waiting."""
+
+
+class ExplorationStormChoiceError(RuntimeError):
+    """The requested cloud-boat storm choice is not supported."""
+
+
 class PartyBattleNotFoundError(RuntimeError):
     """The requested party battle does not exist or is not visible to the actor."""
 

@@ -169,6 +169,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("结算虚空航道", application.settle_void_route)
     router.register("开始探索", application.start_exploration)
     router.register("结算探索", application.settle_exploration)
+    router.register("选择云舟风暴", application.choose_cloud_boat_storm, aliases=("处理云舟风暴",))
     router.register("取消探索", application.cancel_exploration)
     router.register("开始训练战", application.start_training_battle, aliases=("训练战", "挑战训练傀儡"))
     router.register("领取战斗奖励", application.claim_battle_reward, aliases=("领取斗法奖励",))

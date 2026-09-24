@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
+    CurrencyInsufficientError,
     ExplorationBusyError,
     ExplorationCombatPendingError,
     ExplorationNotFoundError,
     ExplorationNotReadyError,
     ExplorationQuotaExhaustedError,
+    ExplorationStormChoiceError,
+    ExplorationStormNotPendingError,
     EnergyInsufficientError,
     LocationRequirementError,
     OperationConflictError,
@@ -29,6 +32,7 @@ ITEM_LABELS = {
     "item.herb.spirit_leaf": "灵叶",
     "item.mat.array_sand": "阵砂",
     "item.material.cloud_iron": "云铁",
+    "item.ticket.cloud_boat_fragment": "云舟票碎片",
 }
 
 
@@ -72,7 +76,7 @@ class ExplorationApplication:
             return CommandResult(
                 False,
                 "INVALID_EXPLORATION_MODE",
-                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集` 或 `开始探索 洞天二层探索`。",
+                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集`、`开始探索 洞天二层探索` 或 `开始探索 云舟试炼`。",
                 context.request_id,
             )
         operation_id = self._operation_id(context, "exploration.start")
@@ -180,6 +184,44 @@ class ExplorationApplication:
                 operation_id,
                 data={"exploration_id": record.exploration_id, "status": record.status, "battle_id": record.battle_id, "idempotent_replay": record.already_completed},
             )
+        if record.status == "storm_pending":
+            return CommandResult(
+                False,
+                "EXPLORATION_STORM_PENDING",
+                (
+                    f"## {definition.label}遭遇风暴\n\n"
+                    f"**{self._display_name(record.player)}**需要选择航行方案。\n\n"
+                    "- `选择云舟风暴 等待`：延长 2 分钟，无额外损失\n"
+                    "- `选择云舟风暴 支付`：支付 100 灵石，额外获得修为 +200\n"
+                    "- `选择云舟风暴 返航`：返还本次一半体力，不发放探索奖励\n\n"
+                    f"> 选择窗口截止：{record.storm_deadline or '未知'}。超时默认等待。"
+                ),
+                context.request_id,
+                operation_id,
+                data={
+                    "exploration_id": record.exploration_id,
+                    "status": record.status,
+                    "storm_options": record.storm_options,
+                    "storm_deadline": record.storm_deadline,
+                    "storm_preview": {},
+                    "idempotent_replay": record.already_completed,
+                },
+            )
+        if record.status == "running" and record.storm_choice == "wait":
+            return CommandResult(
+                False,
+                "EXPLORATION_STORM_WAITING",
+                f"风暴已按等待方案处理，新的结算时间为 {record.storm_deadline or '稍后'}。",
+                context.request_id,
+                operation_id,
+                data={
+                    "exploration_id": record.exploration_id,
+                    "status": record.status,
+                    "storm_choice": record.storm_choice,
+                    "ends_at": record.storm_deadline,
+                    "idempotent_replay": record.already_completed,
+                },
+            )
         if record.status == "expired":
             return CommandResult(
                 False,
@@ -224,6 +266,53 @@ class ExplorationApplication:
                 "content_version": record.content_version,
                 "idempotent_replay": record.already_completed,
             },
+        )
+
+    async def choose_cloud_boat_storm(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_EXPLORATION_COMMAND", "请使用 `选择云舟风暴 等待`、`支付` 或 `返航`。", context.request_id)
+        operation_id = self._operation_id(context, "exploration.storm")
+        try:
+            record = await self.repository.choose_exploration_storm(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                choice=context.command_args[0],
+                operation_id=operation_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except ExplorationStormChoiceError:
+            return CommandResult(False, "INVALID_EXPLORATION_COMMAND", "风暴方案只能选择 `等待`、`支付` 或 `返航`。", context.request_id, operation_id)
+        except ExplorationStormNotPendingError:
+            return CommandResult(False, "EXPLORATION_STORM_NOT_PENDING", "当前没有等待处理的云舟风暴。", context.request_id, operation_id)
+        except CurrencyInsufficientError:
+            return CommandResult(False, "SPIRIT_STONES_INSUFFICIENT", "灵石不足，无法支付风暴通行费。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他风暴选择，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if record.status == "running":
+            return CommandResult(
+                False,
+                "EXPLORATION_STORM_WAITING",
+                f"风暴已按等待方案处理，新的结算时间为 {record.storm_deadline or '稍后'}。",
+                context.request_id,
+                operation_id,
+                data={"exploration_id": record.exploration_id, "status": record.status, "storm_choice": record.storm_choice, "ends_at": record.storm_deadline, "idempotent_replay": record.already_completed},
+            )
+        if record.storm_choice == "turn_back":
+            message = f"## 云舟已返航\n\n返还体力 +{record.result.get('stamina_refund', 0)}，本次不发放试炼奖励。"
+        else:
+            message = f"## 云舟试炼已结算\n\n奖励：{'、'.join(f'{key} +{value}' for key, value in record.result.items()) or '无'}。"
+        return CommandResult(
+            True,
+            "EXPLORATION_STORM_SETTLED",
+            message,
+            context.request_id,
+            operation_id,
+            data={"exploration_id": record.exploration_id, "status": record.status, "result": record.result, "storm_choice": record.storm_choice, "idempotent_replay": record.already_completed},
         )
 
     async def cancel_exploration(self, context: CommandContext) -> CommandResult:

@@ -121,6 +121,11 @@ from ..world.repository import WorldRepositoryMixin
 from ..world.rules import destination_definition, meets_realm, RULE_VERSION
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
+    CLOUD_BOAT_STORM_CHANCE_BP,
+    CLOUD_BOAT_STORM_CHOICES,
+    CLOUD_BOAT_STORM_PAY_COST,
+    CLOUD_BOAT_STORM_WAIT_SECONDS,
+    cloud_boat_storm_roll_bp,
     has_cloud_mine_access,
     battle_roll_bp,
     exploration_definition,
@@ -361,6 +366,12 @@ class ExplorationRepositoryMixin:
                 "stamina_cost": definition.stamina_cost,
                 "energy_cost": definition.energy_cost,
                 "content_version": definition.content_version,
+                "storm_chance_bp": (
+                    CLOUD_BOAT_STORM_CHANCE_BP if definition.key == "explore.cloud_boat_trial" else 0
+                ),
+                "storm_roll_bp": (
+                    cloud_boat_storm_roll_bp(operation_id) if definition.key == "explore.cloud_boat_trial" else None
+                ),
                 "max_hp": int(row["max_hp"]),
                 "initiative": int(row["initiative"]),
                 "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
@@ -707,10 +718,80 @@ class ExplorationRepositoryMixin:
                     ),
                 )
                 return self._exploration_settlement_from_payload(payload)
+            snapshot = self._json_object(session["snapshot_json"], {})
+            stored_result = self._json_object(session["result_json"], {})
+            if (
+                str(session["mode_key"]) == "explore.cloud_boat_trial"
+                and bool(stored_result.get("storm_pending"))
+            ):
+                storm_deadline = datetime.fromisoformat(str(stored_result["storm_deadline"]))
+                frozen_result = {
+                    str(key): int(value)
+                    for key, value in dict(stored_result.get("frozen_result", {})).items()
+                }
+                if now < storm_deadline:
+                    payload = {
+                        "player": self._player_payload(self._row_to_player(row)),
+                        "exploration_id": session["exploration_id"],
+                        "mode_key": session["mode_key"],
+                        "location_key": session["location_key"],
+                        "status": "storm_pending",
+                        "result": {},
+                        "battle_pending": False,
+                        "expired": False,
+                        "stamina_cost": int(session["stamina_cost"]),
+                        "energy_cost": int(snapshot.get("energy_cost", 0)),
+                        "content_version": snapshot.get("content_version", "content-0.1"),
+                        "storm_pending": True,
+                        "storm_options": list(CLOUD_BOAT_STORM_CHOICES),
+                        "storm_deadline": stored_result["storm_deadline"],
+                        "storm_preview": frozen_result,
+                    }
+                    connection.execute(
+                        "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+                    )
+                    return self._exploration_settlement_from_payload(payload)
+                # A missed prompt defaults to waiting, preserving the frozen reward.
+                new_ends_at = now + timedelta(seconds=CLOUD_BOAT_STORM_WAIT_SECONDS)
+                stored_result.update(
+                    {
+                        "storm_pending": False,
+                        "storm_choice": "wait",
+                        "storm_resolved": True,
+                        "storm_deadline": serialize_datetime(new_ends_at),
+                    }
+                )
+                connection.execute(
+                    "UPDATE exploration_sessions SET ends_at = ?, result_json = ?, updated_at = ? WHERE id = ? AND status IN ('created', 'running')",
+                    (serialize_datetime(new_ends_at), json.dumps(stored_result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+                )
+                updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+                payload = {
+                    "player": self._player_payload(self._row_to_player(updated)),
+                    "exploration_id": session["exploration_id"],
+                    "mode_key": session["mode_key"],
+                    "location_key": session["location_key"],
+                    "status": "running",
+                    "result": {},
+                    "battle_pending": False,
+                    "expired": False,
+                    "stamina_cost": int(session["stamina_cost"]),
+                    "energy_cost": int(snapshot.get("energy_cost", 0)),
+                    "content_version": snapshot.get("content_version", "content-0.1"),
+                    "storm_pending": False,
+                    "storm_options": [],
+                    "storm_deadline": serialize_datetime(new_ends_at),
+                    "storm_choice": "wait",
+                }
+                connection.execute(
+                    "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+                )
+                return self._exploration_settlement_from_payload(payload)
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now < ends_at:
                 raise ExplorationNotReadyError("exploration is not ready")
-            snapshot = self._json_object(session["snapshot_json"], {})
             expired = now > ends_at + timedelta(hours=24)
             result: dict[str, int] = {}
             battle_pending = False
@@ -719,6 +800,50 @@ class ExplorationRepositoryMixin:
                 seed = str(snapshot.get("random_seed", session["operation_id"]))
                 battle_pending = battle_roll_bp(seed + ":battle") < int(snapshot.get("battle_chance_bp", 0))
                 result = settlement_result(str(session["mode_key"]), seed)
+                storm_hit = (
+                    str(session["mode_key"]) == "explore.cloud_boat_trial"
+                    and not bool(stored_result.get("storm_resolved"))
+                    and int(snapshot.get("storm_roll_bp", 10000)) < int(snapshot.get("storm_chance_bp", 0))
+                )
+                if storm_hit:
+                    storm_deadline = serialize_datetime(now + timedelta(seconds=CLOUD_BOAT_STORM_WAIT_SECONDS))
+                    pending_result = {
+                        "status": "storm_pending",
+                        "result": {},
+                        "frozen_result": result,
+                        "storm_pending": True,
+                        "storm_options": list(CLOUD_BOAT_STORM_CHOICES),
+                        "storm_deadline": storm_deadline,
+                        "energy_cost": int(snapshot.get("energy_cost", 0)),
+                        "content_version": snapshot.get("content_version", "content-0.1"),
+                    }
+                    connection.execute(
+                        "UPDATE exploration_sessions SET result_json = ?, updated_at = ? WHERE id = ? AND status IN ('created', 'running')",
+                        (json.dumps(pending_result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+                    )
+                    updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+                    payload = {
+                        "player": self._player_payload(self._row_to_player(updated)),
+                        "exploration_id": session["exploration_id"],
+                        "mode_key": session["mode_key"],
+                        "location_key": session["location_key"],
+                        "status": "storm_pending",
+                        "result": {},
+                        "battle_pending": False,
+                        "expired": False,
+                        "stamina_cost": int(session["stamina_cost"]),
+                        "energy_cost": int(snapshot.get("energy_cost", 0)),
+                        "content_version": snapshot.get("content_version", "content-0.1"),
+                        "storm_pending": True,
+                        "storm_options": list(CLOUD_BOAT_STORM_CHOICES),
+                        "storm_deadline": storm_deadline,
+                        "storm_preview": result,
+                    }
+                    connection.execute(
+                        "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+                    )
+                    return self._exploration_settlement_from_payload(payload)
                 if battle_pending:
                     status = "combat_pending"
 
@@ -756,6 +881,8 @@ class ExplorationRepositoryMixin:
                 "frozen_result": result,
                 "battle_pending": battle_pending,
                 "expired": expired,
+                "storm_pending": False,
+                "storm_choice": stored_result.get("storm_choice"),
                 "energy_cost": int(snapshot.get("energy_cost", 0)),
                 "content_version": snapshot.get("content_version", "content-0.1"),
                 "settled_at": now_text,
@@ -788,6 +915,10 @@ class ExplorationRepositoryMixin:
                 "content_version": snapshot.get("content_version", "content-0.1"),
                 "battle_id": result_json.get("battle_id"),
                 "battle_outcome": result_json.get("battle_outcome"),
+                "storm_pending": False,
+                "storm_options": [],
+                "storm_deadline": None,
+                "storm_choice": result_json.get("storm_choice"),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -817,8 +948,182 @@ class ExplorationRepositoryMixin:
             content_version=str(payload.get("content_version", "content-0.1")),
             battle_id=str(payload["battle_id"]) if payload.get("battle_id") else None,
             battle_outcome=str(payload["battle_outcome"]) if payload.get("battle_outcome") else None,
+            storm_pending=bool(payload.get("storm_pending", False)),
+            storm_options=tuple(str(item) for item in payload.get("storm_options", ())),
+            storm_deadline=str(payload["storm_deadline"]) if payload.get("storm_deadline") else None,
+            storm_choice=str(payload["storm_choice"]) if payload.get("storm_choice") else None,
             already_completed=replay,
         )
+
+    async def choose_exploration_storm(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        choice: str,
+        operation_id: str,
+    ) -> ExplorationSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._choose_exploration_storm_once,
+                platform,
+                platform_user_id,
+                choice,
+                operation_id,
+            )
+
+    def _choose_exploration_storm_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        choice: str,
+        operation_id: str,
+    ) -> ExplorationSettlementRecord:
+        from ..persistence.errors import (
+            CurrencyInsufficientError,
+            ExplorationStormChoiceError,
+            ExplorationStormNotPendingError,
+        )
+
+        normalized = str(choice).strip()
+        aliases = {
+            "wait": "wait",
+            "等待": "wait",
+            "等候": "wait",
+            "pay": "pay",
+            "支付": "pay",
+            "付费": "pay",
+            "turn_back": "turn_back",
+            "返航": "turn_back",
+            "返回": "turn_back",
+        }
+        normalized = aliases.get(normalized, normalized)
+        if normalized not in CLOUD_BOAT_STORM_CHOICES:
+            raise ExplorationStormChoiceError("unsupported storm choice")
+        operation_name = "exploration.storm"
+        request_hash = self._request_hash(
+            operation_name,
+            {"platform": platform, "platform_user_id": platform_user_id, "choice": normalized},
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            session = connection.execute(
+                "SELECT * FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running') ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if session is None:
+                raise ExplorationStormNotPendingError("no active cloud boat trial")
+            snapshot = self._json_object(session["snapshot_json"], {})
+            stored = self._json_object(session["result_json"], {})
+            if str(session["mode_key"]) != "explore.cloud_boat_trial" or not stored.get("storm_pending"):
+                raise ExplorationStormNotPendingError("storm choice is not pending")
+            effective_choice = normalized
+            deadline = datetime.fromisoformat(str(stored["storm_deadline"]))
+            if now >= deadline:
+                effective_choice = "wait"
+            frozen_result = {
+                str(key): int(value)
+                for key, value in dict(stored.get("frozen_result", {})).items()
+            }
+            result: dict[str, int] = {}
+            status = "settled"
+            ends_at = str(session["ends_at"])
+            stones = int(row["spirit_stones"])
+            cultivation = int(row["cultivation"])
+            total_cultivation = int(row["total_cultivation"])
+            stamina = int(row["stamina"])
+            inventory = self._json_object(row["inventory_json"], {})
+            if effective_choice == "wait":
+                status = "running"
+                ends_at = serialize_datetime(now + timedelta(seconds=CLOUD_BOAT_STORM_WAIT_SECONDS))
+                result_json = {
+                    **stored,
+                    "status": status,
+                    "storm_pending": False,
+                    "storm_resolved": True,
+                    "storm_choice": "wait",
+                    "storm_deadline": ends_at,
+                }
+            elif effective_choice == "pay":
+                if stones < CLOUD_BOAT_STORM_PAY_COST:
+                    raise CurrencyInsufficientError("cloud boat storm payment requires spirit stones")
+                stones -= CLOUD_BOAT_STORM_PAY_COST
+                result = dict(frozen_result)
+                result["cultivation"] = int(result.get("cultivation", 0)) + 200
+                status = "settled"
+                for key, quantity in result.items():
+                    if key == "cultivation":
+                        cultivation += int(quantity)
+                        total_cultivation += int(quantity)
+                    elif key == "spirit_stones":
+                        stones += int(quantity)
+                    else:
+                        inventory[key] = int(inventory.get(key, 0)) + int(quantity)
+                result_json = {
+                    **stored,
+                    "status": status,
+                    "result": result,
+                    "storm_pending": False,
+                    "storm_resolved": True,
+                    "storm_choice": "pay",
+                    "settled_at": now_text,
+                }
+            else:
+                refund = min(int(session["stamina_cost"]) // 2, max(0, int(row["stamina_max"]) - stamina))
+                stamina += refund
+                result = {"stamina_refund": refund}
+                result_json = {
+                    **stored,
+                    "status": status,
+                    "result": result,
+                    "storm_pending": False,
+                    "storm_resolved": True,
+                    "storm_choice": "turn_back",
+                    "settled_at": now_text,
+                }
+            connection.execute(
+                "UPDATE players SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, stamina = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (stones, cultivation, total_cultivation, stamina, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+            )
+            connection.execute(
+                "UPDATE exploration_sessions SET status = ?, ends_at = ?, result_json = ?, updated_at = ? WHERE id = ? AND status IN ('created', 'running')",
+                (status, ends_at, json.dumps(result_json, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "exploration_id": session["exploration_id"],
+                "mode_key": session["mode_key"],
+                "location_key": session["location_key"],
+                "status": status,
+                "result": result,
+                "battle_pending": False,
+                "expired": False,
+                "stamina_cost": int(session["stamina_cost"]),
+                "energy_cost": int(snapshot.get("energy_cost", 0)),
+                "content_version": snapshot.get("content_version", "content-0.1"),
+                "storm_pending": False,
+                "storm_options": [],
+                "storm_deadline": ends_at if effective_choice == "wait" else None,
+                "storm_choice": effective_choice,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return self._exploration_settlement_from_payload(payload)
 
     async def cancel_exploration(
         self,

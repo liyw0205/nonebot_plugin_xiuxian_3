@@ -445,6 +445,13 @@ class XiuxianApplication:
             write_message="当前事件不允许结算探索。",
         )
 
+    async def choose_cloud_boat_storm(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.exploration.choose_cloud_boat_storm(context),
+            write_message="当前事件不允许处理云舟风暴。",
+        )
+
     async def cancel_exploration(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

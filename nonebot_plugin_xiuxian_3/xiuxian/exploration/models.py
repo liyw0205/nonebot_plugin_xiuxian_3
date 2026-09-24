@@ -55,3 +55,7 @@ class ExplorationSettlementRecord:
     already_completed: bool = False
     energy_cost: int = 0
     content_version: str = "content-0.1"
+    storm_pending: bool = False
+    storm_options: tuple[str, ...] = ()
+    storm_deadline: str | None = None
+    storm_choice: str | None = None

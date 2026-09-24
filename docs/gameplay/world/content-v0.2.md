@@ -34,7 +34,7 @@
 ## 当前运行时边界
 
 本阶段开放云城/阵堂移动、三条云舟航线、抵达深渊门后的风险确认、阵堂权限检查，以及
-`explore.cloud_mine`/`explore.mist_grotto_2` 探索入口。矿区入口仍要求采矿标记或矿区许可，
-洞天二层入口要求已经抵达该地点；二层云舟试炼、阵堂实际生产订单、魔界核心区和魔界资源仍
+`explore.cloud_mine`/`explore.cloud_boat_trial`/`explore.mist_grotto_2` 探索入口。矿区入口仍要求采矿标记或矿区许可，
+云舟试炼要求位于云舟渡口且达到金丹 L1；洞天二层入口要求已经抵达该地点；阵堂实际生产订单、魔界核心区和魔界资源仍
 返回关闭或未满足前置；已创建云舟按会话快照结算。`world.accept_demon_intro` 只写入入口资格和
 `faction_reputation.demon=20`，不发魔核或妖血。

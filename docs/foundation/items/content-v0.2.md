@@ -8,6 +8,7 @@
 | `item.pill.golden_core_guard` | 保护丹，9 | 绑定 | 金丹失败保留 70% 修为、震荡 4 小时；成功不消耗 | 金丹炼丹、宗门商店 |
 | `item.pill.golden_core_restore` | 恢复丹，9 | 绑定 | 提前解除 `foundation_shock`；额外灵石 200；每震荡一次 | 金丹配方 |
 | `item.material.cloud_iron` | 矿材，99 | 可交易 | 金丹突破/炼器材料 | 云铁矿区、委托 |
+| `item.ticket.cloud_boat_fragment` | 票碎片，99 | 绑定，不可交易 | 云舟试炼任务物；按冻结奖励池掉落，不直接抵扣航线费用 | 云舟试炼 |
 | `item.weapon.cloud_sword` | 法器，唯一 | 可交易，耐久 10000 bp | 伤害 +35、身法 +5；精英战每场耐久 -150 bp | 云舟秘境 |
 | `item.armor.cloud_robe` | 防具，唯一 | 可交易，耐久 10000 bp | 气血 +120、控制抵抗 +500 bp | 云舟秘境 |
 | `item.cave_pass_advanced` | 凭证，1 | 绑定 | 雾隐洞天二层单次许可；进入后消耗 | 金丹悬赏 |
