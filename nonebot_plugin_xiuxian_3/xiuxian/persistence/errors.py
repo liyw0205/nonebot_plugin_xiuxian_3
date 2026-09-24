@@ -852,6 +852,22 @@ class EventRewardExpiredError(RuntimeError):
     """The event reward window has closed."""
 
 
+class FinalHeavenRankingNotFinalizedError(RuntimeError):
+    """The requested season has not reached its frozen ranking state."""
+
+
+class FinalHeavenRewardNotEligibleError(RuntimeError):
+    """The player has no claimable final-heaven ranking reward."""
+
+
+class FinalHeavenRewardAlreadyClaimedError(RuntimeError):
+    """The player already claimed this season's ranking rewards."""
+
+
+class FinalHeavenClaimExpiredError(RuntimeError):
+    """The final-heaven ranking reward window has closed."""
+
+
 class AchievementInvalidError(RuntimeError):
     """The requested achievement is not registered."""
 

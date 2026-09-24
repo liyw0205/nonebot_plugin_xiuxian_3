@@ -272,6 +272,22 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 `season.final_heaven` 使用 UTC 固定 35 天窗口，以 `2025-01-01T00:00:00Z` 为锚点；角色任务进度按当前窗口统计，不能把旧赛季记录折算到新赛季。每项 `task.dao_origin.*` 的目标为 3 次，奖励只在第 3 次有效结算时发放。客户端只能请求核验任务，不能提交计数、来源 operation 或奖励。
 
+终局榜单使用同一 UTC 窗口 `[starts_at, ends_at)`，规则版本 `events-0.6.1`。飞升榜只消费
+`endgame_endings.ending_key=ascend`，单次 +1000；留界道统榜只消费
+`ending_key=remain_in_world`，单次 +800，不额外要求当前未开放的 `settlement.dao_hall`；
+协作终局战榜只消费至少两名成员且以 `won` 或 `remained` 成功结算的
+`final_battle_sessions`，按成员每场 +50，失败/取消/过期和单人场次为 0。结局以
+`endgame_endings.created_at` 归季，协作以会话 `settled_at` 归季；候选分数由服务器证据计算，
+客户端不能提交分数或身份。
+
+赛季结束后按需在单一事务冻结榜单，按分数降序、首次达到当前总分时间升序、赛季范围内
+内部角色 ID 的 SHA-256 摘要升序确定顺序。只展示前十名，匿名序号为 `匿名道友 001` 等；
+公开快照与 DTO 不得出现角色名、平台身份或内部 ID。前十各得榜单展示称号
+`title.season.final_heaven.<ascension|dao|cooperation>`，榜首另可确认
+`chapter.final_heaven`。领奖窗口为赛季结束后 7 天；窗口内称号和篇章资格由玩家幂等领取，
+逾期称号在首次读取/领奖时自动补发，篇章资格不自动确认。冻结结果不可重算，不发普通经济、
+战斗属性或可交易高阶物；新表归属 `events/season_repository.py`，不能并回灵泉事件仓储。
+
 | 任务 | 可消费的服务端证据 | 不构成证据 |
 |:--|:--|:--|
 | `task.dao_origin.guard` | 当前窗口内，在 `cave.boundary_realm` 结算胜利的 `pve.dao_union_challenge` 战斗 | 挑战开始、失败战斗、客户端报告的胜利 |

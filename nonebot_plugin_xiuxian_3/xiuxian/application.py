@@ -34,6 +34,7 @@ from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
 from .events.use_cases import EventsApplication
+from .events.season_use_cases import FinalHeavenSeasonApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
 
@@ -71,6 +72,7 @@ class XiuxianApplication:
         self.wayfaring = WayfaringApplication(repository)
         self.economy = EconomyApplication(repository)
         self.events = EventsApplication(repository)
+        self.seasons = FinalHeavenSeasonApplication(repository)
         self.quests = QuestApplication(repository)
 
     async def _invoke(
@@ -950,6 +952,20 @@ class XiuxianApplication:
             context,
             lambda: self.events.claim_spirit_spring_event(context),
             write_message="当前事件不允许领取灵泉事件奖励。",
+        )
+
+    async def get_final_heaven_season(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.seasons.get_final_heaven_season(context),
+            require_write=False,
+        )
+
+    async def claim_final_heaven_rewards(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.seasons.claim_final_heaven_rewards(context),
+            write_message="当前事件不允许领取终局赛季奖励。",
         )
 
     async def create_production_commission(self, context: CommandContext) -> CommandResult:

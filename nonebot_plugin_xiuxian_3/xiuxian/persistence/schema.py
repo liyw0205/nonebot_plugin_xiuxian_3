@@ -1407,6 +1407,61 @@ CREATE TABLE IF NOT EXISTS final_battle_rewards (
 CREATE INDEX IF NOT EXISTS idx_final_battle_rewards_player
     ON final_battle_rewards(player_id, claimed_at);
 
+CREATE TABLE IF NOT EXISTS final_heaven_seasons (
+    season_id TEXT PRIMARY KEY,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    claim_expires_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('collecting', 'frozen')),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    rule_version TEXT NOT NULL,
+    frozen_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS final_heaven_rankings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_id TEXT NOT NULL REFERENCES final_heaven_seasons(season_id),
+    board_key TEXT NOT NULL CHECK (board_key IN ('ascension', 'dao', 'cooperation')),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    rank INTEGER NOT NULL CHECK (rank >= 1),
+    score INTEGER NOT NULL CHECK (score > 0),
+    achieved_at TEXT NOT NULL,
+    anonymous_label TEXT NOT NULL,
+    title_key TEXT,
+    claimed_at TEXT,
+    auto_granted_at TEXT,
+    UNIQUE (season_id, board_key, player_id),
+    UNIQUE (season_id, board_key, rank)
+);
+
+CREATE INDEX IF NOT EXISTS idx_final_heaven_rankings_player
+    ON final_heaven_rankings(player_id, season_id, board_key, rank);
+
+CREATE TABLE IF NOT EXISTS final_heaven_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_id TEXT NOT NULL REFERENCES final_heaven_seasons(season_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    claimed_at TEXT NOT NULL,
+    UNIQUE (season_id, player_id)
+);
+
+CREATE TABLE IF NOT EXISTS final_heaven_entitlements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_id TEXT NOT NULL REFERENCES final_heaven_seasons(season_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    entitlement_key TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (season_id, player_id, entitlement_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_final_heaven_entitlements_player
+    ON final_heaven_entitlements(player_id, entitlement_key, created_at);
+
 CREATE TABLE IF NOT EXISTS economy_ledger_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     operation_id TEXT NOT NULL,

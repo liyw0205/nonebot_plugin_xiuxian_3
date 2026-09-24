@@ -68,6 +68,8 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "cancel_production_commission": "nonebot_plugin_xiuxian_3.xiuxian.economy.repository",
         "get_spirit_spring_event": "nonebot_plugin_xiuxian_3.xiuxian.events.repository",
         "claim_spirit_spring_event": "nonebot_plugin_xiuxian_3.xiuxian.events.repository",
+        "get_final_heaven_season": "nonebot_plugin_xiuxian_3.xiuxian.events.season_repository",
+        "claim_final_heaven_rewards": "nonebot_plugin_xiuxian_3.xiuxian.events.season_repository",
         "get_advanced_quests": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
         "complete_domain_material_commission": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
         "complete_ancient_domain_line": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",

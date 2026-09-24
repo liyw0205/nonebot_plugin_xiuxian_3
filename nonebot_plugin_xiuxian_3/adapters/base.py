@@ -280,3 +280,5 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("恢复生产委托", application.recover_production_commission)
     router.register("灵泉事件", application.get_spirit_spring_event)
     router.register("领取灵泉事件奖励", application.claim_spirit_spring_event)
+    router.register("终局赛季", application.get_final_heaven_season)
+    router.register("领取终局赛季奖励", application.claim_final_heaven_rewards)

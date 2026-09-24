@@ -33,6 +33,7 @@ from ..social.sect_repository import SectRepositoryMixin
 from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
+from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
 from ..quests.repository import QuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
@@ -61,6 +62,7 @@ class SQLitePlayerRepository(
     PartyRepositoryMixin,
     MentorRepositoryMixin,
     EventsRepositoryMixin,
+    FinalHeavenSeasonRepositoryMixin,
     QuestRepositoryMixin,
     EconomyRepositoryMixin,
     AdvancementRepositoryMixin,
@@ -174,6 +176,10 @@ class SQLitePlayerRepository(
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("routine.wayfaring.v0.1", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("events.final_heaven.v0.6", serialize_datetime(self._now())),
             )
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "

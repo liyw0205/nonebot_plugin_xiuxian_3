@@ -163,6 +163,21 @@ HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
     ),
     HonorTitleDefinition("title.dispatch_helper", "派遣行者", "specials.dispatch.settled", closed=True),
     HonorTitleDefinition("title.first_tower_clear", "试炼先行", "specials.tower.floor.10", closed=True),
+    HonorTitleDefinition(
+        "title.season.final_heaven.ascension",
+        "凌霄先登",
+        "season.final_heaven.claim.ascension",
+    ),
+    HonorTitleDefinition(
+        "title.season.final_heaven.dao",
+        "留界道统",
+        "season.final_heaven.claim.dao",
+    ),
+    HonorTitleDefinition(
+        "title.season.final_heaven.cooperation",
+        "同道共济",
+        "season.final_heaven.claim.cooperation",
+    ),
 )
 
 
