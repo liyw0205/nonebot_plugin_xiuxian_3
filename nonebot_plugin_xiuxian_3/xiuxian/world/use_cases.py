@@ -77,7 +77,10 @@ class WorldApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         definition = destination_definition(destination)
         missing_labels = tuple(
-            item.replace("qi_gathering", "聚气").replace("qi_sensing", "感气").replace("foundation", "筑基")
+            item.replace("qi_gathering", "聚气")
+            .replace("qi_sensing", "感气")
+            .replace("foundation", "筑基")
+            .replace("dao_union", "合道")
             for item in record.missing
         )
         missing = "、".join(missing_labels) if missing_labels else "无"
@@ -87,9 +90,9 @@ class WorldApplication:
             f"- **预计耗时**：{definition.duration_seconds // 60} 分钟\n"
             f"- **体力消耗**：{definition.stamina_cost}\n"
             f"- **灵石消耗**：{definition.currency_cost}\n"
-            f"- **凭证**：{definition.pass_key and '洞天凭证 ×' + str(definition.pass_quantity) or '无'}\n"
+            f"- **通行物品**：{definition.pass_key and definition.pass_key + ' ×' + str(definition.pass_quantity) or '无'}\n"
             f"- **当前缺少**：{missing}\n\n"
-            f"> {'发送 `前往 雾隐洞天` 开始移动。' if record.ready else '满足条件后才可创建移动会话。'}"
+            f"> {'发送 `前往 ' + definition.label + '` 开始移动。' if record.ready else '满足条件后才可创建移动会话。'}"
         )
         return CommandResult(True, "TRAVEL_PREVIEW", message, context.request_id, data={
             "destination": destination,
@@ -98,6 +101,10 @@ class WorldApplication:
             "duration_seconds": definition.duration_seconds,
             "stamina_cost": definition.stamina_cost,
             "currency_cost": definition.currency_cost,
+            "pass_key": definition.pass_key,
+            "pass_quantity": definition.pass_quantity,
+            "required_dao_fruit_progress": definition.required_dao_fruit_progress,
+            "daily_start_limit": definition.daily_start_limit,
         })
 
     async def start_travel(self, context: CommandContext, destination: str | None = None) -> CommandResult:
@@ -124,6 +131,14 @@ class WorldApplication:
         except WeaknessActiveError:
             return CommandResult(False, "PLAYER_OCCUPIED", "突破虚弱期间不能前往雾隐洞天，请先恢复状态。", context.request_id, operation_id)
         except LocationRequirementError:
+            if resolved == "dao.origin_gate":
+                return CommandResult(
+                    False,
+                    "DAO_ORIGIN_REQUIREMENT_MISSING",
+                    "需从虚空档案遗迹出发，并满足合道六层、道果进度、体力和道果碎片条件；道源门每日限入一次。",
+                    context.request_id,
+                    operation_id,
+                )
             return CommandResult(False, "LOCATION_REQUIREMENT_MISSING", "当前境界、来源地点或凭证不满足进入条件。", context.request_id, operation_id)
         except TravelBusyError:
             return CommandResult(False, "TRAVEL_BUSY", "已有移动、修炼、生产或突破会话，请先完成后再试。", context.request_id, operation_id)

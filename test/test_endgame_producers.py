@@ -350,6 +350,125 @@ def test_endgame_recipes_require_dao_origin_gate_on_qq_and_onebot() -> None:
     asyncio.run(run())
 
 
+def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
+    async def run() -> None:
+        clock = MutableClock()
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            for adapter, user in (("qq.official", "qq-gate-travel"), ("onebot.v11", "ob-gate-travel")):
+                await _create(runtime, adapter, user)
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="dao_union",
+                    realm_layer=6,
+                    location_key="void.archive_ruins",
+                    dao_fruit_progress=499,
+                    stamina=30,
+                    stamina_max=30,
+                    inventory_json=json.dumps({"item.dao_fruit_fragment": 2}),
+                )
+                missing_progress = await runtime.dispatch(
+                    _ctx(adapter, user, f"preview-progress-{adapter}"), "移动预览 道源门"
+                )
+                assert missing_progress.data["ready"] is False
+                assert "道果进度" in missing_progress.data["missing"]
+                blocked = await runtime.dispatch(
+                    _ctx(adapter, user, f"gate-progress-{adapter}"), "前往 道源门"
+                )
+                assert blocked.code == "DAO_ORIGIN_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    unchanged = connection.execute(
+                        "SELECT stamina, inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                assert unchanged == (30, json.dumps({"item.dao_fruit_fragment": 2}))
+
+                _set_player(runtime, adapter, user, dao_fruit_progress=500)
+                ready = await runtime.dispatch(
+                    _ctx(adapter, user, f"preview-ready-{adapter}"), "移动预览 道源门"
+                )
+                assert ready.data["ready"] is True
+                assert ready.data["duration_seconds"] == 3_600
+                assert ready.data["stamina_cost"] == 20
+                assert ready.data["pass_key"] == "item.dao_fruit_fragment"
+                assert ready.data["pass_quantity"] == 2
+                assert ready.data["daily_start_limit"] == 1
+
+                started = await runtime.dispatch(
+                    _ctx(adapter, user, f"gate-start-{adapter}"), "前往 道源门"
+                )
+                assert started.code == "TRAVEL_STARTED"
+                replay = await runtime.dispatch(
+                    _ctx(adapter, user, f"gate-start-{adapter}"), "前往 道源门"
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    row = connection.execute(
+                        "SELECT stamina, inventory_json, location_key FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                    snapshot_json = connection.execute(
+                        "SELECT snapshot_json FROM travel_sessions WHERE session_id = ?",
+                        (started.data["session_id"],),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE travel_sessions SET ends_at = ? WHERE session_id = ?",
+                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    )
+                assert row == (10, "{}", "void.archive_ruins")
+                snapshot = json.loads(snapshot_json)
+                assert snapshot["rule_version"] == "world-0.6.0"
+                assert snapshot["content_version"] == "content-0.6"
+                assert snapshot["required_dao_fruit_progress"] == 500
+                assert snapshot["daily_start_limit"] == 1
+                arrived = await runtime.dispatch(
+                    _ctx(adapter, user, f"gate-settle-{adapter}"), "结算移动"
+                )
+                assert arrived.code == "TRAVEL_COMPLETED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    location = connection.execute(
+                        "SELECT location_key FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert location == "dao.origin_gate"
+
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    location_key="void.archive_ruins",
+                    stamina=30,
+                    inventory_json=json.dumps({"item.dao_fruit_fragment": 2}),
+                )
+                exhausted = await runtime.dispatch(
+                    _ctx(adapter, user, f"preview-daily-{adapter}"), "移动预览 道源门"
+                )
+                assert exhausted.data["ready"] is False
+                assert "今日访问次数" in exhausted.data["missing"]
+                blocked_daily = await runtime.dispatch(
+                    _ctx(adapter, user, f"gate-daily-{adapter}"), "前往 道源门"
+                )
+                assert blocked_daily.code == "DAO_ORIGIN_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    after_daily_block = connection.execute(
+                        "SELECT stamina, inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                assert after_daily_block == (30, json.dumps({"item.dao_fruit_fragment": 2}))
+
+                clock.advance(days=1)
+                next_day = await runtime.dispatch(
+                    _ctx(adapter, user, f"preview-next-day-{adapter}"), "移动预览 道源门"
+                )
+                assert next_day.data["ready"] is True
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_endgame_recipe_replay_failure_refund_and_final_battle_preview_path() -> None:
     async def run() -> None:
         clock = MutableClock()

@@ -112,7 +112,7 @@ from ..world.void_rules import (
 )
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
-from ..world.rules import destination_definition, meets_realm, RULE_VERSION
+from ..world.rules import destination_definition, meets_realm
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     battle_roll_bp,
@@ -237,12 +237,24 @@ class TravelRepositoryMixin:
             missing.append(f"境界要求（{required}）")
         if definition.source_locations and player.location_key not in definition.source_locations:
             missing.append("来源地点")
+        if player.dao_fruit_progress < definition.required_dao_fruit_progress:
+            missing.append("道果进度")
         if player.stamina < definition.stamina_cost:
             missing.append("体力")
         if player.spirit_stones < definition.currency_cost:
             missing.append("灵石")
         if definition.pass_key and player.inventory.get(definition.pass_key, 0) < definition.pass_quantity:
-            missing.append("洞天凭证")
+            missing.append("通行物品")
+        if definition.daily_start_limit:
+            starts_today = await asyncio.to_thread(
+                self._count_destination_starts_today,
+                platform,
+                platform_user_id,
+                destination,
+                self._now(),
+            )
+            if starts_today >= definition.daily_start_limit:
+                missing.append("今日访问次数")
         ready = player.status == "active" and player.stage in {STAGE_MORTAL, "seeker", "cultivator"} and not missing
         return TravelPreview(
             player=player,
@@ -256,6 +268,29 @@ class TravelRepositoryMixin:
             ready=ready,
             missing=tuple(missing),
         )
+
+    def _count_destination_starts_today(
+        self, platform: str, platform_user_id: str, destination: str, now: datetime
+    ) -> int:
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            return self._count_destination_starts_today_in(
+                connection, player_id=int(player["id"]), destination=destination, now=now
+            )
+
+    @staticmethod
+    def _count_destination_starts_today_in(
+        connection: sqlite3.Connection, *, player_id: int, destination: str, now: datetime
+    ) -> int:
+        utc_now = now.astimezone(timezone.utc)
+        day_start = serialize_datetime(utc_now.replace(hour=0, minute=0, second=0, microsecond=0))
+        day_end = serialize_datetime(utc_now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+        row = connection.execute(
+            "SELECT COUNT(*) AS count FROM travel_sessions "
+            "WHERE player_id = ? AND destination = ? AND starts_at >= ? AND starts_at < ?",
+            (player_id, destination, day_start, day_end),
+        ).fetchone()
+        return int(row["count"]) if row else 0
     async def start_travel(
         self,
         *,
@@ -297,7 +332,7 @@ class TravelRepositoryMixin:
             "destination": destination,
         }
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
@@ -320,6 +355,8 @@ class TravelRepositoryMixin:
                 raise LocationRequirementError("source location is not valid")
             if not meets_realm(str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer):
                 raise LocationRequirementError("realm requirement is not met")
+            if int(row["dao_fruit_progress"]) < definition.required_dao_fruit_progress:
+                raise LocationRequirementError("dao fruit progress is insufficient")
 
             player_id = int(row["id"])
             active = connection.execute(
@@ -359,6 +396,10 @@ class TravelRepositoryMixin:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
             if definition.pass_key and inventory.get(definition.pass_key, 0) < definition.pass_quantity:
                 raise LocationRequirementError("travel pass is missing")
+            if definition.daily_start_limit and self._count_destination_starts_today_in(
+                connection, player_id=player_id, destination=destination, now=now
+            ) >= definition.daily_start_limit:
+                raise LocationRequirementError("destination daily visit limit is reached")
 
             if definition.pass_key:
                 remaining = inventory.get(definition.pass_key, 0) - definition.pass_quantity
@@ -369,7 +410,7 @@ class TravelRepositoryMixin:
             session_id = uuid4().hex
             ends_at = now + timedelta(seconds=definition.duration_seconds)
             snapshot = {
-                "rule_version": RULE_VERSION,
+                "rule_version": definition.rule_version,
                 "content_version": definition.content_version,
                 "source": current,
                 "destination": destination,
@@ -377,6 +418,8 @@ class TravelRepositoryMixin:
                 "currency_cost": definition.currency_cost,
                 "pass_key": definition.pass_key,
                 "pass_quantity": definition.pass_quantity,
+                "required_dao_fruit_progress": definition.required_dao_fruit_progress,
+                "daily_start_limit": definition.daily_start_limit,
             }
             connection.execute(
                 """

@@ -22,7 +22,10 @@ class DestinationDefinition:
     pass_key: str | None = None
     pass_quantity: int = 0
     source_locations: tuple[str, ...] = ()
+    required_dao_fruit_progress: int = 0
+    daily_start_limit: int = 0
     content_version: str = "content-0.1"
+    rule_version: str = RULE_VERSION
 
 
 DESTINATIONS = {
@@ -50,6 +53,16 @@ DESTINATIONS = {
         pass_key=CAVE_PASS, pass_quantity=1,
         source_locations=("xuantian.new_town", "xuantian.sect_gate", "xuantian.spirit_field"),
     ),
+    "dao.origin_gate": DestinationDefinition(
+        "dao.origin_gate", "道源门", 60 * 60, 20, 0,
+        required_realm="dao_union", required_layer=6,
+        pass_key="item.dao_fruit_fragment", pass_quantity=2,
+        source_locations=("void.archive_ruins",),
+        required_dao_fruit_progress=500,
+        daily_start_limit=1,
+        content_version="content-0.6",
+        rule_version="world-0.6.0",
+    ),
 }
 
 ALIASES = {
@@ -62,6 +75,7 @@ ALIASES = {
     "雾隐洞天": CAVE_LOCATION,
     "雾隐洞天一层": CAVE_LOCATION,
     "雾隐洞天·一层": CAVE_LOCATION,
+    "道源门": "dao.origin_gate",
 }
 
 
