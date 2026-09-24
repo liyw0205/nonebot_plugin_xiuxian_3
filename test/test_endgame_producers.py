@@ -10,7 +10,15 @@ from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import ENDGAME_RECIPES, recipe_roll_bp
-from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_REWARDS, DAO_ORIGIN_TASKS
+from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
+    DAO_ORIGIN_REWARDS,
+    DAO_ORIGIN_TASKS,
+    DAO_UNION_MAINLINE_CONTENT_VERSION,
+    DAO_UNION_MAINLINE_LANES,
+    DAO_UNION_MAINLINE_RULE_VERSION,
+    DAO_UNION_MAINLINE_STAGE_KEYS,
+    DAO_UNION_MAINLINE_STORY_KEY,
+)
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import (
     TRIBULATION_MERIT_REWARD,
     TRIBULATION_PROGRESS_REWARD,
@@ -258,6 +266,54 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                             "INSERT INTO mainline_runs(player_id, story_key, chapter, stage, stage_key, status, first_clear_key, content_version, rule_version, created_at, updated_at) "
                             "VALUES (?, 'story.mainline.xuantian', 1, ?, ?, 'claimed', ?, 'content-test', 'rule-test', 'created', 'updated')",
                             (player_id, stage, f"chapter.1.stage.{stage}", f"{user}-mainline-{stage}"),
+                        )
+
+                rejected_xuantian = await runtime.dispatch(
+                    _ctx(adapter, user, f"mainline-xuantian-{adapter}"), "记录合道主线"
+                )
+                assert rejected_xuantian.code == "QUEST_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM quest_events WHERE player_id=? AND quest_key='quest.dao_union' "
+                        "AND component_key='three_realm_mainline'",
+                        (player_id,),
+                    ).fetchone()[0] == 0
+                    for lane in DAO_UNION_MAINLINE_LANES[:2]:
+                        for chapter, stage_key in enumerate(DAO_UNION_MAINLINE_STAGE_KEYS[lane], start=1):
+                            connection.execute(
+                                "INSERT INTO mainline_runs(player_id, story_key, chapter, stage, stage_key, status, "
+                                "first_clear_key, content_version, rule_version, created_at, updated_at) "
+                                "VALUES (?, ?, ?, 1, ?, 'claimed', ?, ?, ?, 'created', 'updated')",
+                                (
+                                    player_id,
+                                    DAO_UNION_MAINLINE_STORY_KEY,
+                                    chapter,
+                                    stage_key,
+                                    f"{user}-{stage_key}",
+                                    DAO_UNION_MAINLINE_CONTENT_VERSION,
+                                    DAO_UNION_MAINLINE_RULE_VERSION,
+                                ),
+                            )
+
+                partial_lanes = await runtime.dispatch(
+                    _ctx(adapter, user, f"mainline-partial-{adapter}"), "记录合道主线"
+                )
+                assert partial_lanes.code == "QUEST_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    for chapter, stage_key in enumerate(DAO_UNION_MAINLINE_STAGE_KEYS["traveler"], start=1):
+                        connection.execute(
+                            "INSERT INTO mainline_runs(player_id, story_key, chapter, stage, stage_key, status, "
+                            "first_clear_key, content_version, rule_version, created_at, updated_at) "
+                            "VALUES (?, ?, ?, 1, ?, 'claimed', ?, ?, ?, 'created', 'updated')",
+                            (
+                                player_id,
+                                DAO_UNION_MAINLINE_STORY_KEY,
+                                chapter,
+                                stage_key,
+                                f"{user}-{stage_key}",
+                                DAO_UNION_MAINLINE_CONTENT_VERSION,
+                                DAO_UNION_MAINLINE_RULE_VERSION,
+                            ),
                         )
 
                 mainline = await runtime.dispatch(

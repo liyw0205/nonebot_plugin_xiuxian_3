@@ -28,6 +28,11 @@ from .rules import (
     DAO_UNION_CHALLENGE,
     DAO_UNION_CONTENT_VERSION,
     DAO_UNION_MAINLINE,
+    DAO_UNION_MAINLINE_CONTENT_VERSION,
+    DAO_UNION_MAINLINE_LANES,
+    DAO_UNION_MAINLINE_RULE_VERSION,
+    DAO_UNION_MAINLINE_STAGE_KEYS,
+    DAO_UNION_MAINLINE_STORY_KEY,
     DAO_UNION_QUEST,
     DAO_UNION_RULE_VERSION,
     DAO_UNION_WORK,
@@ -37,6 +42,42 @@ from .rules import (
 
 class EndgameQuestRepositoryMixin:
     """Keep endgame evidence and qualification transactions out of generic quests."""
+
+    @staticmethod
+    def _dao_union_mainline_payload_is_valid(payload: dict[str, Any]) -> bool:
+        if (
+            payload.get("source") != "mainline_runs"
+            or payload.get("story_key") != DAO_UNION_MAINLINE_STORY_KEY
+            or payload.get("content_version") != DAO_UNION_MAINLINE_CONTENT_VERSION
+            or payload.get("rule_version") != DAO_UNION_MAINLINE_RULE_VERSION
+        ):
+            return False
+        lane_stage_keys = payload.get("lane_stage_keys")
+        if not isinstance(lane_stage_keys, dict):
+            return False
+        for lane in DAO_UNION_MAINLINE_LANES:
+            values = lane_stage_keys.get(lane)
+            if not isinstance(values, (list, tuple)):
+                return False
+            if not set(DAO_UNION_MAINLINE_STAGE_KEYS[lane]).issubset({str(key) for key in values}):
+                return False
+        return True
+
+    @classmethod
+    def _valid_dao_union_mainline_event_count(cls, connection: sqlite3.Connection, player_id: int) -> int:
+        rows = connection.execute(
+            "SELECT payload_json FROM quest_events WHERE player_id=? AND quest_key=? AND component_key=? AND outcome='success'",
+            (player_id, DAO_UNION_QUEST, DAO_UNION_MAINLINE),
+        ).fetchall()
+        count = 0
+        for row in rows:
+            try:
+                payload = json.loads(row["payload_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(payload, dict) and cls._dao_union_mainline_payload_is_valid(payload):
+                count += 1
+        return count
 
     async def record_dao_union_mainline(
         self, *, platform: str, platform_user_id: str, operation_id: str
@@ -127,22 +168,43 @@ class EndgameQuestRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if not meets_realm(str(player["realm_key"]), int(player["realm_layer"]), "void_refining", 10):
                 raise QuestRequirementError("dao union qualification requires void refining L10")
-            count = self._event_count(connection, int(player["id"]), DAO_UNION_QUEST, component_key)
+            count = (
+                self._valid_dao_union_mainline_event_count(connection, int(player["id"]))
+                if component_key == DAO_UNION_MAINLINE
+                else self._event_count(connection, int(player["id"]), DAO_UNION_QUEST, component_key)
+            )
             if count >= 1:
                 raise QuestAlreadyCompletedError("dao union component is already complete")
 
             source: dict[str, object]
             if component_key == DAO_UNION_MAINLINE:
-                source_row = connection.execute(
-                    "SELECT story_key, COUNT(DISTINCT stage_key) AS cleared_stages "
-                    "FROM mainline_runs WHERE player_id = ? AND status = 'claimed' "
-                    "GROUP BY story_key HAVING COUNT(DISTINCT stage_key) >= 3 "
-                    "ORDER BY MAX(updated_at) DESC LIMIT 1",
-                    (player["id"],),
-                ).fetchone()
-                if source_row is None:
-                    raise QuestNotCompletedError("all three chapters of a mainline are required")
-                source = {"source": "mainline_runs", "story_key": str(source_row["story_key"]), "cleared_stages": int(source_row["cleared_stages"])}
+                rows = connection.execute(
+                    "SELECT stage_key FROM mainline_runs WHERE player_id=? AND story_key=? AND status='claimed' "
+                    "AND content_version=? AND rule_version=?",
+                    (
+                        player["id"],
+                        DAO_UNION_MAINLINE_STORY_KEY,
+                        DAO_UNION_MAINLINE_CONTENT_VERSION,
+                        DAO_UNION_MAINLINE_RULE_VERSION,
+                    ),
+                ).fetchall()
+                claimed = {str(row["stage_key"]) for row in rows}
+                lane_stage_keys = {
+                    lane: sorted(set(DAO_UNION_MAINLINE_STAGE_KEYS[lane]).intersection(claimed))
+                    for lane in DAO_UNION_MAINLINE_LANES
+                }
+                if any(
+                    len(lane_stage_keys[lane]) != len(DAO_UNION_MAINLINE_STAGE_KEYS[lane])
+                    for lane in DAO_UNION_MAINLINE_LANES
+                ):
+                    raise QuestNotCompletedError("all three dao echoes lanes must be claimed")
+                source = {
+                    "source": "mainline_runs",
+                    "story_key": DAO_UNION_MAINLINE_STORY_KEY,
+                    "content_version": DAO_UNION_MAINLINE_CONTENT_VERSION,
+                    "rule_version": DAO_UNION_MAINLINE_RULE_VERSION,
+                    "lane_stage_keys": lane_stage_keys,
+                }
             elif component_key == DAO_UNION_WORK:
                 path_key = str(player["path_key"] or "")
                 work_key = {
@@ -235,7 +297,11 @@ class EndgameQuestRepositoryMixin:
                 return self._dao_union_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             progress = {
-                component: self._event_count(connection, int(player["id"]), DAO_UNION_QUEST, component)
+                component: (
+                    self._valid_dao_union_mainline_event_count(connection, int(player["id"]))
+                    if component == DAO_UNION_MAINLINE
+                    else self._event_count(connection, int(player["id"]), DAO_UNION_QUEST, component)
+                )
                 for component in (DAO_UNION_MAINLINE, DAO_UNION_CHALLENGE, DAO_UNION_WORK)
             }
             if any(value < 1 for value in progress.values()):

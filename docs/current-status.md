@@ -60,7 +60,7 @@
 | 自动回合战斗 | 训练傀儡单人 PVE、跨界守门人、界壁试炼、开始快照、服务端自动回合、回放、奖励唯一性和失败调息 | 近郊/洞天遭遇、完整技能、多人 PVE 与 PvP | `gameplay/combat` |
 | 化神许可 | 化神突破会话、领域裂痕与领域选择；三次领域材料委托、三次远古洞天任务、跨界战胜利和许可领取均有来源 operation 记录 | 领域前线完整活动、多人跨界副本和赛季奖励 | `gameplay/events`、`gameplay/combat`、`foundation/progression` |
 | 炼虚许可 | 炼虚突破会话、虚空航道和里程碑；三次界壁试炼（失败也计参与）、虚空档案来源/交付和许可领取均有来源 operation 记录 | 虚空档案遗迹的完整航行/守卫副本、档案碎片周任务和赛季奖励 | `gameplay/events`、`gameplay/exploration`、`gameplay/combat` |
-| 合道许可 | 合道入境事务；许可组件、个人自动战斗胜利证据、作品扣除和资格快照已接入 | 主线证据目前只检查同一 story 至少 3 个已领取 stage，不等于三界主线；终局作品缺玩家生产路径，个人挑战也不等于跨服宗门战 | `gameplay/adventures`、`gameplay/social`、`gameplay/production`、`gameplay/combat` |
+| 合道许可 | 合道入境事务；主线资格现只接受 v0.6 三界主线三线各 10 关的有效服务端证据；个人自动战斗胜利证据、作品扣除和资格快照已接入 | `story.mainline.dao_echoes` 尚无玩家可运行的 30 关生产者；终局作品缺玩家生产路径，个人挑战也不等于跨服宗门战 | `gameplay/adventures`、`gameplay/social`、`gameplay/production`、`gameplay/combat` |
 | 终局资源闭环 | 三次试炼和三项道源任务的数值生产者；守界胜场、达标公共项目奖励、已毕业师徒关系可作为服务端证据；35 天赛季计数和 L9→L10 门槛；道源门行程、天劫台行程与试炼地点准入、终局配方地点快照、道果加工、保护阵、凭证及资源总和测试 | 飞升路、留界殿和终局天榜地点尚未接入；试炼仍为确定性检定而非战斗；三类证据尚缺真实玩家路径的完整端到端验收；任务/道果加工目前不是试炼链隔离 | `gameplay/events`、`gameplay/production`、`foundation/progression` |
 | 最终战与赛季 | 最终战只读资格预览、结局选择与历史记录 | 30 分钟终局战会话、至多 5 人协助、凭证锁定/失败不耗、赛季候选/三榜与匿名展示 | `gameplay/combat`、`gameplay/events`、`gameplay/social` |
 

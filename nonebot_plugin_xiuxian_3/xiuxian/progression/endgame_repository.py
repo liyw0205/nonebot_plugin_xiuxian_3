@@ -87,6 +87,18 @@ class EndgameRepositoryMixin:
             flags = set(str(item) for item in self._json_object(row["intro_json"], {}).get("flags", []))
             if "quest.dao_union" not in flags:
                 raise DaoUnionRequirementError("dao union quest is missing")
+            from ..quests.rules import DAO_UNION_CHALLENGE, DAO_UNION_MAINLINE, DAO_UNION_QUEST, DAO_UNION_WORK
+
+            qualification_counts = {
+                component: (
+                    self._valid_dao_union_mainline_event_count(connection, int(row["id"]))
+                    if component == DAO_UNION_MAINLINE
+                    else self._event_count(connection, int(row["id"]), DAO_UNION_QUEST, component)
+                )
+                for component in (DAO_UNION_MAINLINE, DAO_UNION_CHALLENGE, DAO_UNION_WORK)
+            }
+            if any(count < 1 for count in qualification_counts.values()):
+                raise DaoUnionRequirementError("dao union evidence is incomplete or invalid")
             inventory = self._json_object(row["inventory_json"], {})
             if int(inventory.get("item.dao_fruit_fragment", 0)) < DAO_UNION_FRAGMENT_COST:
                 raise MaterialInsufficientError("dao fruit fragments are insufficient")

@@ -12,3 +12,5 @@
 | 斗法留影 | `combat.replay.v0.6` | 终局战日志永久保留但默认私有；公开只显示脱敏摘要和结局编号 |
 
 禁止任何 `bounty`/`instance`/`mainline` operation 写 `ending_state`、道果、天劫债、飞升凭证、`resource.ascension_merit`。最终战与 `ascension.choose_ending` 仍是唯一终局写入口。
+
+`story.mainline.dao_echoes` 的 `stage_key` 固定为 `lane.<builder|witness|traveler>.chapter.<01..10>`，内容版本为 `content-0.6`、规则版本为 `adventures-0.6.0`。`quest.dao_union` 的主线组件必须核验三个 lane 各自 10 个不同 stage 均为 `claimed`；其他 story（包括 `story.mainline.xuantian`）不能代替。旧主线记录保留作历史，不计入该资格。

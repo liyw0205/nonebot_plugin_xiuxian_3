@@ -10,6 +10,13 @@ from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import trial_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
+    DAO_UNION_MAINLINE_CONTENT_VERSION,
+    DAO_UNION_MAINLINE_LANES,
+    DAO_UNION_MAINLINE_RULE_VERSION,
+    DAO_UNION_MAINLINE_STAGE_KEYS,
+    DAO_UNION_MAINLINE_STORY_KEY,
+)
 
 
 def _ctx(adapter: str, user: str, operation: str) -> CommandContext:
@@ -59,6 +66,35 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                     intro_json=json.dumps({"flags": ["quest.dao_union"]}),
                     inventory_json=json.dumps({"item.dao_fruit_fragment": 10}),
                 )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                    ).fetchone()[0]
+                    payloads = {
+                        "three_realm_mainline": {
+                            "source": "mainline_runs",
+                            "story_key": DAO_UNION_MAINLINE_STORY_KEY,
+                            "content_version": DAO_UNION_MAINLINE_CONTENT_VERSION,
+                            "rule_version": DAO_UNION_MAINLINE_RULE_VERSION,
+                            "lane_stage_keys": {
+                                lane: list(DAO_UNION_MAINLINE_STAGE_KEYS[lane]) for lane in DAO_UNION_MAINLINE_LANES
+                            },
+                        },
+                        "cross_server_challenge": {"source": "battle_sessions", "battle_id": f"{user}-battle"},
+                        "endgame_work": {"source": "inventory_delivery", "item_key": "item.masterwork.body"},
+                    }
+                    for component_key, payload in payloads.items():
+                        connection.execute(
+                            "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
+                            "payload_json, content_version, rule_version, created_at) "
+                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, 'content-0.6', 'quests-0.6.0', 'created')",
+                            (
+                                player_id,
+                                component_key,
+                                f"{user}-{component_key}",
+                                json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                            ),
+                        )
                 union = await runtime.dispatch(_ctx(adapter, user, f"union-{adapter}"), "开始合道")
                 assert union.code == "DAO_UNION_STARTED"
                 _set_player(
@@ -101,6 +137,87 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                 )
                 assert replay.code == "TRIAL_SUCCEEDED"
                 assert replay.data["idempotent_replay"] is True
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_legacy_dao_union_flag_does_not_bypass_three_realm_mainline_evidence() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "qq-legacy-dao-union"), ("onebot.v11", "ob-legacy-dao-union")):
+                await _created(runtime, adapter, user)
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="void_refining",
+                    realm_layer=10,
+                    total_cultivation=2_998_960,
+                    spirit_stones=500_000,
+                    world_merit=3_000,
+                    intro_json=json.dumps({"flags": ["quest.dao_union"]}),
+                    inventory_json=json.dumps({"item.dao_fruit_fragment": 10}),
+                )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                    ).fetchone()[0]
+                    evidence = (
+                        ("three_realm_mainline", {"source": "mainline_runs", "story_key": "story.mainline.xuantian", "cleared_stages": 3}),
+                        ("cross_server_challenge", {"source": "battle_sessions", "battle_id": f"{user}-battle"}),
+                        ("endgame_work", {"source": "inventory_delivery", "item_key": "item.masterwork.body"}),
+                    )
+                    for component_key, payload in evidence:
+                        connection.execute(
+                            "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
+                            "payload_json, content_version, rule_version, created_at) "
+                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, 'content-0.6', 'quests-0.6.0', 'created')",
+                            (
+                                player_id,
+                                component_key,
+                                f"{user}-legacy-{component_key}",
+                                json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                            ),
+                        )
+                blocked = await runtime.dispatch(
+                    _ctx(adapter, user, f"blocked-{adapter}"), "开始合道"
+                )
+                assert blocked.code == "DAO_UNION_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT realm_key, inventory_json, spirit_stones FROM players WHERE id=?", (player_id,)
+                    ).fetchone()
+                assert state[0] == "void_refining"
+                assert json.loads(state[1]) == {"item.dao_fruit_fragment": 10}
+                assert state[2] == 500_000
+
+                valid_payload = {
+                    "source": "mainline_runs",
+                    "story_key": DAO_UNION_MAINLINE_STORY_KEY,
+                    "content_version": DAO_UNION_MAINLINE_CONTENT_VERSION,
+                    "rule_version": DAO_UNION_MAINLINE_RULE_VERSION,
+                    "lane_stage_keys": {
+                        lane: list(DAO_UNION_MAINLINE_STAGE_KEYS[lane]) for lane in DAO_UNION_MAINLINE_LANES
+                    },
+                }
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
+                        "payload_json, content_version, rule_version, created_at) "
+                        "VALUES (?, 'quest.dao_union', 'three_realm_mainline', ?, 'success', ?, 'content-0.6', 'quests-0.6.0', 'created')",
+                        (
+                            player_id,
+                            f"{user}-valid-mainline",
+                            json.dumps(valid_payload, ensure_ascii=False, sort_keys=True),
+                        ),
+                    )
+                admitted = await runtime.dispatch(
+                    _ctx(adapter, user, f"admitted-{adapter}"), "开始合道"
+                )
+                assert admitted.code == "DAO_UNION_STARTED"
             await runtime.close()
 
     asyncio.run(run())

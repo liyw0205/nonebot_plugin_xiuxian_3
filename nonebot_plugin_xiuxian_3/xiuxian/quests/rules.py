@@ -24,6 +24,14 @@ DAO_UNION_RULE_VERSION = "quests-0.6.0"
 DAO_UNION_MAINLINE = "three_realm_mainline"
 DAO_UNION_CHALLENGE = "cross_server_challenge"
 DAO_UNION_WORK = "endgame_work"
+DAO_UNION_MAINLINE_STORY_KEY = "story.mainline.dao_echoes"
+DAO_UNION_MAINLINE_CONTENT_VERSION = "content-0.6"
+DAO_UNION_MAINLINE_RULE_VERSION = "adventures-0.6.0"
+DAO_UNION_MAINLINE_LANES = ("builder", "witness", "traveler")
+DAO_UNION_MAINLINE_STAGE_KEYS = {
+    lane: tuple(f"lane.{lane}.chapter.{chapter:02d}" for chapter in range(1, 11))
+    for lane in DAO_UNION_MAINLINE_LANES
+}
 DAO_ORIGIN_CONTENT_VERSION = "content-0.6"
 DAO_ORIGIN_RULE_VERSION = "events-0.6.0"
 DAO_ORIGIN_GUARD = "task.dao_origin.guard"
@@ -88,6 +96,11 @@ __all__ = [
     "DAO_UNION_CHALLENGE",
     "DAO_UNION_CONTENT_VERSION",
     "DAO_UNION_MAINLINE",
+    "DAO_UNION_MAINLINE_CONTENT_VERSION",
+    "DAO_UNION_MAINLINE_LANES",
+    "DAO_UNION_MAINLINE_RULE_VERSION",
+    "DAO_UNION_MAINLINE_STAGE_KEYS",
+    "DAO_UNION_MAINLINE_STORY_KEY",
     "DAO_UNION_QUEST",
     "DAO_UNION_RULE_VERSION",
     "DAO_UNION_WORK",
