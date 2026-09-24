@@ -1,5 +1,7 @@
 # 扩展：数据与内容配置
 
+> **兼容概览，非权威。** 开发时先读[开发文档总入口](development-guide.md)，再进入[数据内容域](extensions/content/)；当前状态以[当前开发状态](current-status.md)为准。
+
 内容范围、首版开关和完整境界/功能路线以[完整内容开发总表](content-development.md)为准；
 本文只说明运行时数据格式、加载校验和发布边界。
 

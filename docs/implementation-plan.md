@@ -1,6 +1,9 @@
 # 修仙 3 实施计划
 
-本计划以 `docs/xiuxian3-design.md`、`docs/index.md` 和[完整内容开发总表](content-development.md)为产品裁决来源；当前分支的运行时状态以[当前开发状态](current-status.md)为准。各域 `content-v*.md` 只是历史发布快照，不是并列规范。修仙3是新游戏：旧项目只能提供通用玩法分类和适配器经验，不能决定境界、数值、命令、物品、表结构或业务流程。
+本计划以 `docs/xiuxian3-design.md`、[开发文档总入口](development-guide.md)、`docs/index.md`
+和[完整内容开发总表](content-development.md)为产品裁决来源；当前分支的运行时状态以
+[当前开发状态](current-status.md)为准。各域 `content-v*.md` 只是历史发布快照，不是并列规范。
+修仙3是新游戏：旧项目只能提供通用玩法分类和适配器经验，不能决定境界、数值、命令、物品、表结构或业务流程。
 
 当前优先级：稳定当前已开放的角色、生产、探索、社交、经济、活动和自动回合 PVE 切片，
 补齐战斗回放/数值/恢复验收，再按独立切片扩展多人 PVE、终局战和 PvP。未出现在

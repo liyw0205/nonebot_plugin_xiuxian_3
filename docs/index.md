@@ -1,6 +1,9 @@
 # 修仙 3 文档总索引
 
-本文档用于开发阶段按主题加载上下文。`xiuxian3-design.md` 是总纲；每个域目录的 `README.md` 是域索引，`model.md`、`workflow.md`、`use-cases.md` 等文件是实现细节权威。顶层同名文档保留为兼容概览，不再承担规则或运行时状态裁决。
+本文档用于开发阶段按主题加载上下文。开始实现前先读[开发文档总入口](development-guide.md)，
+再按本索引进入总纲、状态页、实施计划和领域细节。`xiuxian3-design.md` 是总纲；每个域目录的
+`README.md` 是域索引，`model.md`、`workflow.md`、`use-cases.md` 等文件是实现细节权威。
+顶层同名文档保留为兼容概览，不再承担规则或运行时状态裁决。
 
 ## 先判断该读哪份
 
@@ -17,6 +20,7 @@
 | 文档 | 内容 | 状态 |
 |:--|:--|:--|
 | [修仙 3 总设计](xiuxian3-design.md) | 项目定位、新手流程、世界观、境界、道途、资源、总体循环和子文档裁决原则 | 主文档 |
+| [开发文档总入口](development-guide.md) | 阅读顺序、文档职责、切片交付清单、状态判定和提交前验证 | 开发入口 |
 | [实施计划](implementation-plan.md) | P0-P8 依赖、首版垂直切片、风险、验收与回滚 | 执行权威 |
 | [完整内容开发总表](content-development.md) | 全部境界、功能域、发布边界、首版范围、稳定键依赖和完整切片验收 | 内容开发唯一权威 |
 | [当前开发状态](current-status.md) | 当前分支已开放、合同/锁定和下一步开发顺序 | 状态唯一入口 |
@@ -86,12 +90,12 @@
 
 首次了解项目：
 
-1. `xiuxian3-design.md`
-2. `content-development.md`，确定首版范围和完整境界/功能路线
-3. `current-status.md`，确认哪些内容已经接入运行时
-4. `foundation/README.md`，再进入对应域的模型、流程和用例
-5. `gameplay/README.md`，再进入对应玩法域目录；特色运营先读 `routine/`、`adventures/`、`companions/`、`specials/`
-6. `extensions/README.md`，再进入对应扩展域目录
+1. `development-guide.md`
+2. `xiuxian3-design.md`
+3. `content-development.md`，确定首版范围和完整境界/功能路线
+4. `current-status.md`，确认哪些内容已经接入运行时
+5. `foundation/README.md`、`gameplay/README.md` 或 `extensions/README.md`
+6. 进入对应域目录的模型、流程和用例
 7. 只有需要复原历史发布参数时才读取对应的 `content-v*.md`
 
 开始实现一个功能：

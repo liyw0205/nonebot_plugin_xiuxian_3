@@ -1,5 +1,7 @@
 # 扩展：Web 与运营
 
+> **兼容概览，非权威。** 开发时先读[开发文档总入口](development-guide.md)，再进入[Web 运营域](extensions/web/)；当前状态以[当前开发状态](current-status.md)为准。
+
 ## 1. 定位
 
 Web 是运维、查询和受控运营入口，不是第二套游戏逻辑。所有资产写入调用 application use case，查询调用 query service。
