@@ -127,6 +127,62 @@
       ],
       "key": "enemy.mist_guardian",
       "status": "active"
+    },
+    {
+      "name": "三劫天尊",
+      "location_key": "tribulation.sky_terrace",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 3
+        }
+      ],
+      "stats": {
+        "hp": 150000,
+        "attack": 5500,
+        "initiative": 1600,
+        "agility": 650
+      },
+      "skills": [
+        "skill.tribulation.thunder",
+        "skill.tribulation.heart",
+        "skill.tribulation.dao"
+      ],
+      "phases": [
+        {
+          "key": "thunder",
+          "min_hp_bp": 6667,
+          "attack": 5500,
+          "skill_key": "skill.tribulation.thunder",
+          "enemy_hit_bonus_bp": 0,
+          "player_damage_bp": 10000
+        },
+        {
+          "key": "heart",
+          "min_hp_bp": 3334,
+          "attack": 8000,
+          "skill_key": "skill.tribulation.heart",
+          "enemy_hit_bonus_bp": 200,
+          "player_damage_bp": 9500
+        },
+        {
+          "key": "dao",
+          "min_hp_bp": 0,
+          "attack": 12000,
+          "skill_key": "skill.tribulation.dao",
+          "enemy_hit_bonus_bp": 400,
+          "player_damage_bp": 9000
+        }
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false,
+        "automatic_phase_selection": true
+      },
+      "reward_refs": [],
+      "key": "enemy.tribulation_heaven",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

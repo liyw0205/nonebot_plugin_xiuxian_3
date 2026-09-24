@@ -19,6 +19,53 @@
       "status": "active"
     },
     {
+      "name": "雷劫",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {
+        "type": "physical_damage_absolute",
+        "attack": 5500,
+        "phase_key": "thunder",
+        "player_damage_modifier_bp": 10000
+      },
+      "cost": {},
+      "cooldown_rounds": 0,
+      "key": "skill.tribulation.thunder",
+      "status": "active"
+    },
+    {
+      "name": "心劫",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {
+        "type": "physical_damage_absolute",
+        "attack": 8000,
+        "phase_key": "heart",
+        "hit_bonus_bp": 200,
+        "player_damage_modifier_bp": 9500
+      },
+      "cost": {},
+      "cooldown_rounds": 0,
+      "key": "skill.tribulation.heart",
+      "status": "active"
+    },
+    {
+      "name": "道劫",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {
+        "type": "physical_damage_absolute",
+        "attack": 12000,
+        "phase_key": "dao",
+        "hit_bonus_bp": 400,
+        "player_damage_modifier_bp": 9000
+      },
+      "cost": {},
+      "cooldown_rounds": 0,
+      "key": "skill.tribulation.dao",
+      "status": "active"
+    },
+    {
       "name": "重击",
       "owner_type": "player",
       "path_key": "body",

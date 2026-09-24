@@ -30,11 +30,27 @@
 | `messaging-copywriting.md` | QQ/OneBot 投递能力和中文文案 | 业务结算和权限判断 |
 | `testing.md`、`operations.md` | 测试、备份、观测和运行手册 | 产品规则 |
 
+### 2.1 当前配置与运行状态的边界
+
+运行时内容包和开发状态是两条不同的轴，不能互相替代：
+
+| 需要判断的事实 | 读取位置 | 判断方式 |
+|:--|:--|:--|
+| 稳定键、境界和完整功能范围 | `content-development.md` | 以总表的定义、依赖和首版边界为准 |
+| 静态配置是否存在、引用是否闭合 | `data/内容清单.json`、`static-data-inventory.md` | 只读加载配置；`active/open` 表示已注册，不代表玩家可执行 |
+| 当前命令或 Web 入口是否可用 | `current-status.md` | 只有 `open` 能新增玩家入口；`partial` 不能把测试夹具当成入口 |
+| 本条切片的实体、流程和结算 | 对应域的 `README.md`、`model.md`、`workflow.md`、`use-cases.md` | 领域文档覆盖实现细节，不在命令层补规则 |
+| 某次历史发布的参数 | 对应域的 `content-v0.*.md` | 仅用于回放/迁移/发布复原，不作为当前状态 |
+
+因此，新增内容时先登记稳定键，再决定是否进入静态包，最后由当前状态页决定是否接入
+运行时。配置包可以提前登记未来境界或天劫敌人，但在状态页为 `locked`、`contract` 或
+`partial` 时，命令、按钮和 Web 写入口必须拒绝创建会话且不得扣除资产。
+
 ## 三、开始一条开发切片
 
 按以下顺序处理，每一步都要能在提交中找到对应文件：
 
-1. 读 `current-status.md`，确认功能不是 `locked`、`contract` 或 `planned`，并记录现有前置。
+1. 读 `current-status.md`，确认功能不是 `partial`、`locked`、`contract` 或 `planned`，并记录现有前置。
 2. 读 `content-development.md`，确定稳定键、内容版本、规则版本、成本、产出和关闭语义。
 3. 进入对应领域目录，阅读 `README.md`、`model.md`、`workflow.md`、`use-cases.md`。
 4. 先补领域规则和应用测试，再实现 repository、迁移和 operation ledger。

@@ -175,12 +175,16 @@ class CombatApplication:
             return self._error(context, "", exc)
         result = record.result
         outcome = result.get("outcome", "进行中")
-        lines = ["## 战斗回放", "", f"- **战斗**：`{record.battle_id}`", f"- **敌人**：{record.enemy_key}", f"- **结果**：{outcome}", ""]
+        enemy_snapshot = record.snapshot.get("enemy", {})
+        enemy_label = str(enemy_snapshot.get("label") or record.enemy_key)
+        lines = ["## 战斗回放", "", f"- **战斗**：`{record.battle_id}`", f"- **敌人**：{enemy_label}", f"- **结果**：{outcome}", ""]
         for action in record.actions:
-            actor = "你" if action["actor_key"] == "player" else "训练傀儡"
-            target = "训练傀儡" if action["target_key"] == "enemy" else "你"
+            actor = "你" if action["actor_key"] == "player" else enemy_label
+            target = enemy_label if action["target_key"] == "enemy" else "你"
+            phase = action.get("state", {}).get("tribulation_phase")
+            phase_text = f"（{phase}阶段）" if phase else ""
             lines.append(
-                f"- 回合 {action['round_no']}：{actor} 使用 `{action['skill_key']}` 攻击 {target}，伤害 {action['damage']}。"
+                f"- 回合 {action['round_no']}：{actor}{phase_text} 使用 `{action['skill_key']}` 攻击 {target}，伤害 {action['damage']}。"
             )
         return CommandResult(
             True,

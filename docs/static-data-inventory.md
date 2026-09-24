@@ -5,7 +5,9 @@
 
 ## 1. 建议的内容包文件
 
-运行时统一从 `data/内容清单.json` 读取文件清单。每个领域文件都带
+运行时统一从 `data/内容清单.json` 读取文件清单。当前清单是 `content-0.6` 的活动配置包，
+但配置包的注册状态不决定玩家入口；入口和关闭语义仍由[当前开发状态](current-status.md)
+裁决。每个领域文件都带
 `schema_version`、`content_version`、`rule_version`、`generated_at`、`kind` 和
 `records`；每条记录统一使用 `key`，引用仍使用带类型的 `item_key`、`realm_key`
 等字段：
@@ -141,11 +143,11 @@ data/
 |:--|:--|:--|
 | `境界/境界.json` | 境界键、中文名、开放状态、L1–L10 阈值、跨境门槛 | `foundation/progression/layers.md`、`content-v0.1.md` |
 | `道途/道途.json` | 六大道途、被动、主动技能和状态资源 | `foundation/paths/content-v0.1.md` |
-| `技能/技能.json` | 基础攻击、六条道途技能、敌方技能 | `gameplay/combat/content-v0.1.md` |
+| `技能/技能.json` | 基础攻击、六条道途技能、敌方技能，以及天劫三阶段技能 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/workflow.md` |
 | `战斗/实体.json` | 召唤机关等独立战斗实体 | `gameplay/combat/content-v0.1.md` |
 | `引导/引导.json` | 凡人世界阅读、教学采集和生产教学 | `foundation/player/content-v0.1.md` |
 | `地图/地点.json` | 玄天起步区、洞天地点、准入、移动成本 | `gameplay/world/content-v0.1.md` |
-| `战斗/敌人.json` | 五个首版敌人、属性、技能和奖励池引用 | `gameplay/combat/content-v0.1.md` |
+| `战斗/敌人.json` | 五个首版敌人和 `enemy.tribulation_heaven` 的阶段配置 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/model.md` |
 | `生产/配方.json` | 五条首版生产配方、输入、工具、产出和失败规则 | `gameplay/production/content-v0.1.md` |
 | `任务/任务.json` | 四条新手任务、完成条件和奖励引用 | `gameplay/events/content-v0.1.md` |
 | `事件/事件.json` | 灵泉事件和贡献/领奖规则 | `gameplay/events/content-v0.1.md` |
@@ -155,6 +157,15 @@ data/
 
 `skill.*`、`enemy.*`、`recipe.*`、`quest.*` 和 `event.*` 是内容键；战斗、生产、
 探索会话以及奖励抽取结果不能直接写回这些静态文件。
+
+### 当前战斗配置的版本解释
+
+`技能/技能.json` 和 `战斗/敌人.json` 同时承载历史首版键与当前高阶键。文件中的
+`content_version` 说明它们属于活动内容包；具体战斗结算使用的 `rule_version` 必须
+由战斗开始快照记录，不能用文件名、记录顺序或历史 `content-v0.1.md` 的版本猜测。
+天劫三阶段当前使用 `combat-0.6.1`，其阶段边界、技能选择、债务护盾和回放字段以
+[战斗模型](gameplay/combat/model.md)与[行动流程](gameplay/combat/workflow.md)为准；
+`gameplay/combat/content-v0.6.md` 仍是 `combat-0.6.0` 的历史发布快照。
 
 ## 5. 已裁决的兼容问题
 

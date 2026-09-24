@@ -1,6 +1,11 @@
 # v0.6 战斗内容基线：道果、天劫与飞升终局
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=combat-0.6.0`。终局战最多 5 人，采用自动回合；只有发起者的 `BattleResult` 可以推进境界/结局，协助者领取绑定世界功勋与终局材料。玩家不提交战斗行动，服务端按快照和策略自动推进。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=combat-0.6.0`。
+这是 v0.6 的历史发布快照，不裁决当前运行时状态。当前已验收的天劫三阶段自动回合
+是独立的 `combat-0.6.1` 规则切片，细节见[战斗模型](model.md)、[行动流程](workflow.md)
+和[用例验收](use-cases.md)；
+终局战最多 5 人的规则仍保持合同状态，未因此开放玩家入口。玩家不提交战斗行动，服务端
+按快照和策略自动推进。
 
 | `enemy_key` | 气血/攻击 | 阶段与机制 | 发起者结算 |
 |:--|:--|:--|:--|
