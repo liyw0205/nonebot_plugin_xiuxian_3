@@ -107,6 +107,10 @@ class PlayerView:
     total_cultivation: int = 0
     foundation_quality: int = 0
     world_merit: int = 0
+    arena_rating: int = 1000
+    arena_wins: int = 0
+    arena_losses: int = 0
+    arena_draws: int = 0
     weakness_until: datetime | None = None
     battle_defeat_until: datetime | None = None
     breakthrough_pity_bp: int = 0

@@ -35,6 +35,7 @@ from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
 from .events.use_cases import EventsApplication
 from .events.season_use_cases import FinalHeavenSeasonApplication
+from .specials.arena_use_cases import ArenaApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
 
@@ -73,6 +74,7 @@ class XiuxianApplication:
         self.economy = EconomyApplication(repository)
         self.events = EventsApplication(repository)
         self.seasons = FinalHeavenSeasonApplication(repository)
+        self.arena = ArenaApplication(repository)
         self.quests = QuestApplication(repository)
 
     async def _invoke(
@@ -966,6 +968,40 @@ class XiuxianApplication:
             context,
             lambda: self.seasons.claim_final_heaven_rewards(context),
             write_message="当前事件不允许领取终局赛季奖励。",
+        )
+
+    async def publish_arena_snapshot(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.publish_snapshot(context),
+            write_message="当前事件不允许发布竞技场防守快照。",
+        )
+
+    async def revoke_arena_snapshot(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.revoke_snapshot(context),
+            write_message="当前事件不允许撤销竞技场防守快照。",
+        )
+
+    async def list_arena_snapshots(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.arena.list_snapshots(context), require_write=False)
+
+    async def challenge_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.challenge(context),
+            write_message="当前事件不允许发起竞技场挑战。",
+        )
+
+    async def replay_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.arena.replay(context), require_write=False)
+
+    async def claim_arena_result(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.claim_result(context),
+            write_message="当前事件不允许确认竞技场结果。",
         )
 
     async def create_production_commission(self, context: CommandContext) -> CommandResult:

@@ -34,6 +34,7 @@ from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
 from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
+from ..specials.arena_repository import ArenaRepositoryMixin
 from ..quests.repository import QuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
@@ -63,6 +64,7 @@ class SQLitePlayerRepository(
     MentorRepositoryMixin,
     EventsRepositoryMixin,
     FinalHeavenSeasonRepositoryMixin,
+    ArenaRepositoryMixin,
     QuestRepositoryMixin,
     EconomyRepositoryMixin,
     AdvancementRepositoryMixin,
@@ -254,6 +256,10 @@ class SQLitePlayerRepository(
             ("total_cultivation", "INTEGER NOT NULL DEFAULT 0"),
             ("foundation_quality", "INTEGER NOT NULL DEFAULT 0"),
             ("world_merit", "INTEGER NOT NULL DEFAULT 0"),
+            ("arena_rating", "INTEGER NOT NULL DEFAULT 1000"),
+            ("arena_wins", "INTEGER NOT NULL DEFAULT 0"),
+            ("arena_losses", "INTEGER NOT NULL DEFAULT 0"),
+            ("arena_draws", "INTEGER NOT NULL DEFAULT 0"),
             ("talent_points", "INTEGER NOT NULL DEFAULT 0"),
             ("skill_insights", "INTEGER NOT NULL DEFAULT 0"),
             ("weakness_until", "TEXT"),

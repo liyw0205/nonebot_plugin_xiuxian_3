@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS players (
     total_cultivation INTEGER NOT NULL DEFAULT 0 CHECK (total_cultivation >= 0),
     foundation_quality INTEGER NOT NULL DEFAULT 0 CHECK (foundation_quality >= 0),
     world_merit INTEGER NOT NULL DEFAULT 0 CHECK (world_merit >= 0),
+    arena_rating INTEGER NOT NULL DEFAULT 1000 CHECK (arena_rating >= 0),
+    arena_wins INTEGER NOT NULL DEFAULT 0 CHECK (arena_wins >= 0),
+    arena_losses INTEGER NOT NULL DEFAULT 0 CHECK (arena_losses >= 0),
+    arena_draws INTEGER NOT NULL DEFAULT 0 CHECK (arena_draws >= 0),
     talent_points INTEGER NOT NULL DEFAULT 0 CHECK (talent_points >= 0),
     skill_insights INTEGER NOT NULL DEFAULT 0 CHECK (skill_insights >= 0),
     weakness_until TEXT,
@@ -1406,6 +1410,91 @@ CREATE TABLE IF NOT EXISTS final_battle_rewards (
 
 CREATE INDEX IF NOT EXISTS idx_final_battle_rewards_player
     ON final_battle_rewards(player_id, claimed_at);
+
+CREATE TABLE IF NOT EXISTS arena_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    status TEXT NOT NULL CHECK (status IN ('published', 'revoked', 'expired')),
+    arena_mode_key TEXT NOT NULL CHECK (arena_mode_key = 'arena.spar'),
+    rating INTEGER NOT NULL CHECK (rating >= 0),
+    matchable_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    public_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_snapshots_pool
+    ON arena_snapshots(status, rating, matchable_at, expires_at);
+CREATE INDEX IF NOT EXISTS idx_arena_snapshots_player
+    ON arena_snapshots(player_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_arena_snapshots_active_player
+    ON arena_snapshots(player_id) WHERE status = 'published';
+
+CREATE TABLE IF NOT EXISTS arena_matches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id TEXT NOT NULL UNIQUE,
+    challenger_id INTEGER NOT NULL REFERENCES players(id),
+    defender_id INTEGER NOT NULL REFERENCES players(id),
+    challenger_snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
+    defender_snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
+    arena_mode_key TEXT NOT NULL CHECK (arena_mode_key = 'arena.spar'),
+    status TEXT NOT NULL CHECK (status IN ('settled')),
+    outcome TEXT NOT NULL CHECK (outcome IN ('challenger_won', 'defender_won', 'draw')),
+    rounds INTEGER NOT NULL CHECK (rounds BETWEEN 1 AND 15),
+    score_counted INTEGER NOT NULL CHECK (score_counted IN (0, 1)),
+    challenger_rating_delta INTEGER NOT NULL,
+    defender_rating_delta INTEGER NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    settled_at TEXT NOT NULL,
+    CHECK (challenger_id <> defender_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_matches_challenger
+    ON arena_matches(challenger_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_arena_matches_defender_snapshot
+    ON arena_matches(challenger_id, defender_snapshot_id, created_at);
+
+CREATE TABLE IF NOT EXISTS arena_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL UNIQUE,
+    match_id TEXT NOT NULL REFERENCES arena_matches(match_id),
+    sequence_no INTEGER NOT NULL CHECK (sequence_no >= 1),
+    round_no INTEGER NOT NULL CHECK (round_no BETWEEN 1 AND 15),
+    actor_key TEXT NOT NULL CHECK (actor_key IN ('challenger', 'defender')),
+    strategy_key TEXT NOT NULL,
+    skill_key TEXT NOT NULL,
+    target_key TEXT NOT NULL CHECK (target_key IN ('challenger', 'defender')),
+    hit_roll_bp INTEGER NOT NULL CHECK (hit_roll_bp BETWEEN 0 AND 9999),
+    damage INTEGER NOT NULL CHECK (damage >= 0),
+    state_json TEXT NOT NULL DEFAULT '{}',
+    operation_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (match_id, sequence_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_actions_match
+    ON arena_actions(match_id, sequence_no);
+
+CREATE TABLE IF NOT EXISTS arena_reward_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id TEXT NOT NULL UNIQUE REFERENCES arena_matches(match_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    claimed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_reward_claims_player
+    ON arena_reward_claims(player_id, claimed_at);
 
 CREATE TABLE IF NOT EXISTS final_heaven_seasons (
     season_id TEXT PRIMARY KEY,

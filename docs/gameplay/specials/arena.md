@@ -27,3 +27,16 @@
 对手只显示公开昵称、道途、境界/层数区间和快照摘要；不暴露平台 ID、背包、私密故事旗标或精确装备来源。关闭时停止新匹配，queued/running 按快照结算；赛季结算后 7 天内领奖，逾期转展示记录。
 
 验收：发布/撤销不影响已开始对局；同快照对刷不超每日计分；挑战次数/积分/赛季奖励幂等；快照过期不能匹配；战斗结果不可被挑战者输入伤害/胜负篡改；输赢不发生玩家间资产转移。
+
+## 4. 当前运行时切片
+
+当前开放 `arena.spar`，入口统一经过 application：
+
+- `发布竞技场快照` / `撤销竞技场快照 [snapshot_id]`
+- `竞技场列表` / `挑战竞技场 [snapshot_id]`
+- `竞技场回放 [match_id]` / `领取竞技场结果 [match_id]`
+
+持久化由 `specials/arena_repository.py` 独立负责，使用 `arena_snapshots`、`arena_matches`、
+`arena_actions` 和 `arena_reward_claims`；不会创建单人 `battle_sessions`。QQ 官方和 OneBot V11
+均覆盖发布、延迟、挑战、回放、确认、反刷和每日上限。`arena.rank`、`arena.practice`、多方
+PvP 与跨服仍关闭。

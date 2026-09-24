@@ -852,6 +852,46 @@ class EventRewardExpiredError(RuntimeError):
     """The event reward window has closed."""
 
 
+class ArenaSnapshotRequirementError(RuntimeError):
+    """The player cannot publish an arena snapshot in the current state."""
+
+
+class ArenaPlayerBusyError(RuntimeError):
+    """The player has another asset-locking session in progress."""
+
+
+class ArenaSnapshotNotFoundError(RuntimeError):
+    """The requested arena snapshot does not exist or is not owned by the player."""
+
+
+class ArenaSnapshotExpiredError(RuntimeError):
+    """The selected arena snapshot is no longer matchable."""
+
+
+class ArenaOpponentUnavailableError(RuntimeError):
+    """No compatible published arena snapshot is available."""
+
+
+class ArenaChallengeCapError(RuntimeError):
+    """The player's daily arena challenge cap has been reached."""
+
+
+class ArenaMatchRequirementError(RuntimeError):
+    """The requested arena challenge does not satisfy mode requirements."""
+
+
+class ArenaMatchNotFoundError(RuntimeError):
+    """The requested arena match does not exist or is not visible to the player."""
+
+
+class ArenaRewardAlreadyClaimedError(RuntimeError):
+    """The arena match result has already been acknowledged."""
+
+
+class ArenaRewardNotAvailableError(RuntimeError):
+    """The player has no pending arena result to acknowledge."""
+
+
 class FinalHeavenRankingNotFinalizedError(RuntimeError):
     """The requested season has not reached its frozen ranking state."""
 
