@@ -233,3 +233,123 @@ def test_qq_and_onebot_sky_terrace_travel_and_trial_location_gate() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_endgame_destinations_consume_certificate_on_arrival_and_preserve_failures() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "qq-ending-travel"), ("onebot.v11", "ob-ending-travel")):
+                context = lambda request, operation="": CommandContext(
+                    adapter=adapter, user_id=user, request_id=request, operation_id=operation
+                )
+                await runtime.dispatch(context(f"create-{adapter}"), "开始修仙")
+                await runtime.dispatch(context(f"seek-{adapter}"), "寻仙问道")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=10, "
+                        "endgame_status='ascension_ready', location_key='tribulation.sky_terrace', stamina=30, "
+                        "stamina_max=30, inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.ascension_certificate": 1}), adapter, user),
+                    )
+
+                preview = await runtime.dispatch(context(f"preview-{adapter}"), "移动预览 飞升路")
+                assert preview.code == "TRAVEL_PREVIEW"
+                assert preview.data["ready"] is True
+                started = await runtime.dispatch(
+                    context(f"start-{adapter}", f"start-{adapter}"), "前往 飞升路"
+                )
+                assert started.code == "TRAVEL_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    row = connection.execute(
+                        "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    assert json.loads(row[0]) == {"item.ascension_certificate": 1}
+                    assert row[1] == "tribulation.sky_terrace"
+                    connection.execute(
+                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
+                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    )
+                    connection.execute(
+                        "UPDATE players SET inventory_json='{}' WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+
+                blocked = await runtime.dispatch(
+                    context(f"settle-missing-{adapter}", f"settle-{adapter}"), "结算移动"
+                )
+                assert blocked.code == "TRAVEL_PASS_INSUFFICIENT"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    assert json.loads(state[0]) == {}
+                    assert state[1] == "tribulation.sky_terrace"
+                    assert connection.execute(
+                        "SELECT status FROM travel_sessions WHERE session_id=?", (started.data["session_id"],)
+                    ).fetchone()[0] == "running"
+                    connection.execute(
+                        "UPDATE players SET inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.ascension_certificate": 1}), adapter, user),
+                    )
+
+                settled = await runtime.dispatch(
+                    context(f"settle-{adapter}", f"settle-{adapter}"), "结算移动"
+                )
+                assert settled.code == "TRAVEL_COMPLETED"
+                assert settled.data["pass_consumed"] is True
+                assert "抵达时消耗" in settled.message
+                replay = await runtime.dispatch(
+                    context(f"settle-replay-{adapter}", f"settle-{adapter}"), "结算移动"
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    assert json.loads(state[0]) == {}
+                    assert state[1] == "ascension.heaven_path"
+
+                    connection.execute(
+                        "UPDATE players SET endgame_status='remained_in_world', location_key='ascension.heaven_path', stamina=30 "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                left_preview = await runtime.dispatch(context(f"left-preview-{adapter}"), "移动预览 留界殿")
+                assert left_preview.data["ready"] is True
+                left_started = await runtime.dispatch(
+                    context(f"left-start-{adapter}", f"left-start-{adapter}"), "前往 留界殿"
+                )
+                assert left_started.code == "TRAVEL_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
+                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), left_started.data["session_id"]),
+                    )
+                left_settled = await runtime.dispatch(
+                    context(f"left-settle-{adapter}", f"left-settle-{adapter}"), "结算移动"
+                )
+                assert left_settled.code == "TRAVEL_COMPLETED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT stamina, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    assert state == (20, "ascension.left_world_hall")
+
+                    connection.execute(
+                        "UPDATE players SET endgame_status='ascended', location_key='xuantian.new_town' "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                frozen_preview = await runtime.dispatch(context(f"frozen-preview-{adapter}"), "移动预览 近郊")
+                assert frozen_preview.data["ready"] is False
+                assert "当前状态" in frozen_preview.data["missing"]
+                frozen_start = await runtime.dispatch(context(f"frozen-start-{adapter}"), "前往 近郊")
+                assert frozen_start.code == "LOCATION_LOCKED"
+            await runtime.close()
+
+    asyncio.run(run())

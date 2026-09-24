@@ -24,6 +24,8 @@ class DestinationDefinition:
     source_locations: tuple[str, ...] = ()
     required_dao_fruit_progress: int = 0
     daily_start_limit: int = 0
+    required_endgame_status: str | None = None
+    consume_pass_on_arrival: bool = False
     content_version: str = "content-0.1"
     rule_version: str = RULE_VERSION
 
@@ -71,6 +73,22 @@ DESTINATIONS = {
         content_version="content-0.6",
         rule_version="world-0.6.0",
     ),
+    "ascension.heaven_path": DestinationDefinition(
+        "ascension.heaven_path", "飞升路", 90 * 60, 0, 0,
+        pass_key="item.ascension_certificate", pass_quantity=1,
+        source_locations=("tribulation.sky_terrace",),
+        required_endgame_status="ascension_ready",
+        consume_pass_on_arrival=True,
+        content_version="content-0.6",
+        rule_version="world-0.6.0",
+    ),
+    "ascension.left_world_hall": DestinationDefinition(
+        "ascension.left_world_hall", "留界殿", 30 * 60, 10, 0,
+        source_locations=("ascension.heaven_path",),
+        required_endgame_status="remained_in_world",
+        content_version="content-0.6",
+        rule_version="world-0.6.0",
+    ),
 }
 
 ALIASES = {
@@ -86,6 +104,10 @@ ALIASES = {
     "道源门": "dao.origin_gate",
     "天劫台": "tribulation.sky_terrace",
     "tribulation.sky_terrace": "tribulation.sky_terrace",
+    "飞升路": "ascension.heaven_path",
+    "ascension.heaven_path": "ascension.heaven_path",
+    "留界殿": "ascension.left_world_hall",
+    "ascension.left_world_hall": "ascension.left_world_hall",
 }
 
 

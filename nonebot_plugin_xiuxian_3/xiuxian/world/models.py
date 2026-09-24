@@ -49,4 +49,5 @@ class TravelSettlementRecord:
     currency_cost: int
     pass_key: str | None
     pass_quantity: int
+    pass_consumed: bool = False
     already_completed: bool = False

@@ -552,7 +552,7 @@ def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
                     ).fetchone()[0]
                     connection.execute(
                         "UPDATE travel_sessions SET ends_at = ? WHERE session_id = ?",
-                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                        ((clock() - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
                     )
                 assert row == (10, "{}", "void.archive_ruins")
                 snapshot = json.loads(snapshot_json)

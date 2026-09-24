@@ -27,6 +27,15 @@ from ..repository import (
 from .rules import CAVE_LOCATION, destination_definition, resolve_destination
 from .void_rules import resolve_void_route, void_route_definition
 
+
+ITEM_LABELS = {
+    "item.cave_pass_basic": "雾隐洞天凭证",
+    "item.dao_fruit_fragment": "道果碎片",
+    "item.tribulation_token": "天劫凭证",
+    "item.ascension_certificate": "飞升凭证",
+}
+
+
 class WorldApplication:
     """Coordinates movement commands while keeping adapter text out of storage."""
 
@@ -81,16 +90,21 @@ class WorldApplication:
             .replace("qi_sensing", "感气")
             .replace("foundation", "筑基")
             .replace("dao_union", "合道")
+            .replace("ascension_ready", "飞升候选")
+            .replace("remained_in_world", "留界")
+            .replace("当前状态", "当前终局状态")
             for item in record.missing
         )
         missing = "、".join(missing_labels) if missing_labels else "无"
+        pass_label = ITEM_LABELS.get(definition.pass_key or "", "通行物品")
+        pass_summary = f"{pass_label} ×{definition.pass_quantity}" if definition.pass_key else "无"
         message = (
             f"## {definition.label} · 移动预览\n\n"
             f"**{self._display_name(record.player)}**可以查看这条路线。\n\n"
             f"- **预计耗时**：{definition.duration_seconds // 60} 分钟\n"
             f"- **体力消耗**：{definition.stamina_cost}\n"
             f"- **灵石消耗**：{definition.currency_cost}\n"
-            f"- **通行物品**：{definition.pass_key and definition.pass_key + ' ×' + str(definition.pass_quantity) or '无'}\n"
+            f"- **通行物品**：{pass_summary}\n"
             f"- **当前缺少**：{missing}\n\n"
             f"> {'发送 `前往 ' + definition.label + '` 开始移动。' if record.ready else '满足条件后才可创建移动会话。'}"
         )
@@ -105,6 +119,8 @@ class WorldApplication:
             "pass_quantity": definition.pass_quantity,
             "required_dao_fruit_progress": definition.required_dao_fruit_progress,
             "daily_start_limit": definition.daily_start_limit,
+            "required_endgame_status": definition.required_endgame_status,
+            "consume_pass_on_arrival": definition.consume_pass_on_arrival,
         })
 
     async def start_travel(self, context: CommandContext, destination: str | None = None) -> CommandResult:
@@ -127,9 +143,9 @@ class WorldApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能移动。", context.request_id, operation_id)
         except PlayerStageConflictError:
-            return CommandResult(False, "LOCATION_LOCKED", "完成入道后才能开始这段移动。", context.request_id, operation_id)
+            return CommandResult(False, "LOCATION_LOCKED", "当前状态不能开始这段移动。", context.request_id, operation_id)
         except WeaknessActiveError:
-            return CommandResult(False, "PLAYER_OCCUPIED", "突破虚弱期间不能前往雾隐洞天，请先恢复状态。", context.request_id, operation_id)
+            return CommandResult(False, "PLAYER_OCCUPIED", "当前处于突破虚弱，暂时不能移动，请先恢复状态。", context.request_id, operation_id)
         except LocationRequirementError:
             if resolved == "dao.origin_gate":
                 return CommandResult(
@@ -144,6 +160,22 @@ class WorldApplication:
                     False,
                     "TRIBULATION_TERRACE_REQUIREMENT_MISSING",
                     "需从道源门出发、达到渡劫 L3 并持有 1 张天劫凭证；本次未扣除资源。",
+                    context.request_id,
+                    operation_id,
+                )
+            if resolved == "ascension.heaven_path":
+                return CommandResult(
+                    False,
+                    "ASCENSION_REQUIREMENT_MISSING",
+                    "需处于飞升候选状态、从天劫台出发并持有飞升凭证；凭证将在抵达飞升路时消耗。",
+                    context.request_id,
+                    operation_id,
+                )
+            if resolved == "ascension.left_world_hall":
+                return CommandResult(
+                    False,
+                    "ENDING_STATE_REQUIRED",
+                    "需先完成留界结局，并从飞升路出发。",
                     context.request_id,
                     operation_id,
                 )
@@ -194,6 +226,8 @@ class WorldApplication:
             return CommandResult(False, "TRAVEL_NOT_FOUND", "当前没有等待结算的移动。", context.request_id, operation_id)
         except TravelNotReadyError:
             return CommandResult(False, "TRAVEL_NOT_READY", "移动尚未到达，请稍后再来结算。", context.request_id, operation_id)
+        except LocationRequirementError:
+            return CommandResult(False, "TRAVEL_PASS_INSUFFICIENT", "抵达所需凭证不足，位置和移动状态均未改变。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能结算移动。", context.request_id, operation_id)
         except OperationConflictError:
@@ -212,12 +246,13 @@ class WorldApplication:
                 f"- **当前位置**：{definition.label}\n"
                 f"- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
                 f"- **灵石**：{record.player.spirit_stones}\n\n"
-                "> 已写入位置状态，重复结算不会重复消耗资源。"
+                f"> 已写入位置状态，重复结算不会重复消耗资源。{('飞升凭证已在抵达时消耗。' if record.pass_consumed else '')}"
             ),
             context.request_id,
             operation_id,
             data={"session_id": record.session_id, "destination": record.destination, "status": record.status,
-                  "arrived": record.arrived, "idempotent_replay": record.already_completed},
+                  "arrived": record.arrived, "pass_consumed": record.pass_consumed,
+                  "idempotent_replay": record.already_completed},
         )
 
     async def enter_void_route(self, context: CommandContext) -> CommandResult:

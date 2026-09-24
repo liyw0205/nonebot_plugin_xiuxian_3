@@ -245,6 +245,12 @@ class TravelRepositoryMixin:
             missing.append("灵石")
         if definition.pass_key and player.inventory.get(definition.pass_key, 0) < definition.pass_quantity:
             missing.append("通行物品")
+        endgame_status = player.endgame_status or "none"
+        if definition.required_endgame_status:
+            if endgame_status != definition.required_endgame_status:
+                missing.append("终局状态")
+        elif endgame_status in {"ascension_ready", "ascended", "remained_in_world"}:
+            missing.append("当前状态")
         if definition.daily_start_limit:
             starts_today = await asyncio.to_thread(
                 self._count_destination_starts_today,
@@ -344,7 +350,13 @@ class TravelRepositoryMixin:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._travel_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
-            row = self._require_player(connection, platform, platform_user_id)
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            endgame_status = str(row["endgame_status"] or "none")
+            if definition.required_endgame_status:
+                if endgame_status != definition.required_endgame_status:
+                    raise LocationRequirementError("endgame status is not ready for this destination")
+            elif endgame_status in {"ascension_ready", "ascended", "remained_in_world"}:
+                raise PlayerStageConflictError("endgame state has frozen ordinary travel")
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 raise PlayerStageConflictError("player is not ready for travel")
             weakness_until = row["weakness_until"]
@@ -403,7 +415,7 @@ class TravelRepositoryMixin:
             ) >= definition.daily_start_limit:
                 raise LocationRequirementError("destination daily visit limit is reached")
 
-            if definition.pass_key:
+            if definition.pass_key and not definition.consume_pass_on_arrival:
                 remaining = inventory.get(definition.pass_key, 0) - definition.pass_quantity
                 if remaining:
                     inventory[definition.pass_key] = remaining
@@ -422,6 +434,8 @@ class TravelRepositoryMixin:
                 "pass_quantity": definition.pass_quantity,
                 "required_dao_fruit_progress": definition.required_dao_fruit_progress,
                 "daily_start_limit": definition.daily_start_limit,
+                "required_endgame_status": definition.required_endgame_status,
+                "consume_pass_on_arrival": definition.consume_pass_on_arrival,
             }
             connection.execute(
                 """
@@ -494,7 +508,7 @@ class TravelRepositoryMixin:
         operation_name = "world.settle_travel"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
@@ -504,7 +518,7 @@ class TravelRepositoryMixin:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._travel_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
-            row = self._require_player(connection, platform, platform_user_id)
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
             session = connection.execute(
                 "SELECT * FROM travel_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1", (row["id"],)
             ).fetchone()
@@ -513,13 +527,36 @@ class TravelRepositoryMixin:
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now < ends_at:
                 raise TravelNotReadyError("travel is not ready")
-            connection.execute(
-                "UPDATE players SET location_key = ?, updated_at = ? WHERE id = ?",
-                (session["destination"], serialize_datetime(now), row["id"]),
-            )
+            snapshot = self._json_object(session["snapshot_json"], {})
+            pass_key = str(snapshot.get("pass_key") or session["pass_key"] or "") or None
+            pass_quantity = int(snapshot.get("pass_quantity", session["pass_quantity"] or 0))
+            consume_pass_on_arrival = bool(snapshot.get("consume_pass_on_arrival", False))
+            inventory = self._json_object(row["inventory_json"], {})
+            pass_consumed = False
+            if consume_pass_on_arrival and pass_key and pass_quantity:
+                available = int(inventory.get(pass_key, 0))
+                if available < pass_quantity:
+                    raise LocationRequirementError("travel pass is missing at arrival")
+                remaining = available - pass_quantity
+                if remaining:
+                    inventory[pass_key] = remaining
+                else:
+                    inventory.pop(pass_key, None)
+                pass_consumed = True
+            updated_at = serialize_datetime(now)
+            if pass_consumed:
+                connection.execute(
+                    "UPDATE players SET location_key = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                    (session["destination"], json.dumps(inventory, ensure_ascii=False, sort_keys=True), updated_at, row["id"]),
+                )
+            else:
+                connection.execute(
+                    "UPDATE players SET location_key = ?, updated_at = ? WHERE id = ?",
+                    (session["destination"], updated_at, row["id"]),
+                )
             connection.execute(
                 "UPDATE travel_sessions SET status = 'arrived', result_json = ?, updated_at = ? WHERE id = ? AND status = 'running'",
-                (json.dumps({"arrived": True, "settled_at": serialize_datetime(now)}, ensure_ascii=False, sort_keys=True), serialize_datetime(now), session["id"]),
+                (json.dumps({"arrived": True, "pass_consumed": pass_consumed, "settled_at": updated_at}, ensure_ascii=False, sort_keys=True), updated_at, session["id"]),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             player = self._row_to_player(updated)
@@ -528,6 +565,7 @@ class TravelRepositoryMixin:
                 "source": session["source_location"], "destination": session["destination"], "status": "arrived",
                 "arrived": True, "stamina_cost": int(session["stamina_cost"]), "currency_cost": int(session["currency_cost"]),
                 "pass_key": session["pass_key"], "pass_quantity": int(session["pass_quantity"]),
+                "pass_consumed": pass_consumed,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -543,5 +581,6 @@ class TravelRepositoryMixin:
             destination=str(payload["destination"]), status=str(payload["status"]),
             arrived=bool(payload.get("arrived", False)), stamina_cost=int(payload.get("stamina_cost", 0)),
             currency_cost=int(payload.get("currency_cost", 0)), pass_key=payload.get("pass_key"),
-            pass_quantity=int(payload.get("pass_quantity", 0)), already_completed=replay,
+            pass_quantity=int(payload.get("pass_quantity", 0)), pass_consumed=bool(payload.get("pass_consumed", False)),
+            already_completed=replay,
         )
