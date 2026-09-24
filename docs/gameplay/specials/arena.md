@@ -55,3 +55,13 @@
 `arena.team` 只接受已确认的 `party.exploration_pair` 或 `party.arena_trio` 队伍；双方队伍人数可以相同，也可以组成 2v3，队长发布快照并发起挑战，成员属性和装备在快照中固定。
 战斗由服务端自动选择行动，结果写入独立的 `arena_team_matches` / `arena_team_actions`，不复用单人
 `battle_sessions` 或队伍 PVE 会话，也不发生灵石、修为、装备等玩家资产转移。
+
+## 5. 恢复演练与观测
+
+竞技场前置数据提供独立的恢复仓储接口：
+
+- `create_arena_recovery_backup(artifact_key, request_id, operation_id)` 使用 SQLite online backup 创建数据根 `backups/` 下的逻辑工件和 JSON 清单；工件记录 SHA-256、schema 摘要、表行数、内容/规则版本。
+- `verify_arena_recovery_backup(artifact_key)` 拒绝绝对路径、路径穿越、符号链接、校验和/schema/行数不一致的工件。
+- `restore_arena_recovery_backup(...)` 先验证工件并创建独立恢复前快照，再写入临时数据库；通过 `integrity_check`、`foreign_key_check`、对局/投影/身份路由/赛季快照/审计引用检查后才原子替换。失败不激活工件，保留原库和恢复前快照。
+
+`arena_audit_events` 的结算 payload 和 `arena_recovery_events` 均保留 `request_id`、`operation_id`、`match_id`、`player_id`、`mode_key`、`content_version`、`rule_version`、结果/失败原因和耗时。恢复后重放历史 operation 只返回同一结果，不重复写入投影、身份路由或审计记录。恢复演练不开放跨服匹配，也不合并 QQ/OneBot 身份。

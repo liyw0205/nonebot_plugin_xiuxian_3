@@ -1045,6 +1045,28 @@ CREATE TABLE IF NOT EXISTS arena_audit_events (
 CREATE INDEX IF NOT EXISTS idx_arena_audit_match
     ON arena_audit_events(match_id, created_at);
 
+CREATE TABLE IF NOT EXISTS arena_recovery_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_key TEXT NOT NULL,
+    request_id TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    artifact_id TEXT NOT NULL,
+    match_id TEXT NOT NULL DEFAULT '',
+    player_id INTEGER REFERENCES players(id),
+    mode_key TEXT NOT NULL DEFAULT 'arena.federation',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('requested', 'verified', 'snapshot_created', 'restoring', 'integrity_checked', 'active', 'failed')),
+    result_json TEXT NOT NULL DEFAULT '{}',
+    failure_reason TEXT NOT NULL DEFAULT '',
+    elapsed_ms INTEGER NOT NULL DEFAULT 0 CHECK (elapsed_ms >= 0),
+    created_at TEXT NOT NULL,
+    UNIQUE (event_key, operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_recovery_events_operation
+    ON arena_recovery_events(operation_id, created_at);
+
 CREATE TABLE IF NOT EXISTS world_event_rounds (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     round_id TEXT NOT NULL UNIQUE,

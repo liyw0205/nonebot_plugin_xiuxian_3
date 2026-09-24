@@ -9,6 +9,11 @@ from .arena_models import (
 from .arena_repository import ArenaRepositoryMixin
 from .team_arena_models import TeamArenaMatchRecord, TeamArenaReplayRecord, TeamArenaSnapshotRecord
 from .team_arena_repository import TeamArenaRepositoryMixin
+from .arena_recovery_repository import (
+    ArenaRecoveryArtifact,
+    ArenaRecoveryReport,
+    ArenaRecoveryRepositoryMixin,
+)
 
 __all__ = [
     "ArenaClaimRecord",
@@ -20,4 +25,7 @@ __all__ = [
     "TeamArenaReplayRecord",
     "TeamArenaRepositoryMixin",
     "TeamArenaSnapshotRecord",
+    "ArenaRecoveryArtifact",
+    "ArenaRecoveryReport",
+    "ArenaRecoveryRepositoryMixin",
 ]

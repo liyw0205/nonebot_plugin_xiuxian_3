@@ -48,10 +48,10 @@ class TeamArenaRepositoryMixin:
         async with self._inflight:
             return await asyncio.to_thread(self._list_team_arena_snapshots_once, platform, platform_user_id)
 
-    async def challenge_team_arena(self, *, platform: str, platform_user_id: str, snapshot_id: str | None, operation_id: str) -> TeamArenaMatchRecord:
+    async def challenge_team_arena(self, *, platform: str, platform_user_id: str, snapshot_id: str | None, operation_id: str, request_id: str = "") -> TeamArenaMatchRecord:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._retry_sync, self._challenge_team_arena_once, platform, platform_user_id, snapshot_id, operation_id)
+            return await asyncio.to_thread(self._retry_sync, self._challenge_team_arena_once, platform, platform_user_id, snapshot_id, operation_id, request_id)
 
     async def replay_team_arena(self, *, platform: str, platform_user_id: str, match_id: str | None = None) -> TeamArenaReplayRecord:
         await self.initialize()
@@ -107,7 +107,7 @@ class TeamArenaRepositoryMixin:
             ).fetchall()
             return tuple(self._team_snapshot_from_row(row) for row in rows if compatible_team_rating(int(player["arena_rating"]), int(row["rating"])))
 
-    def _challenge_team_arena_once(self, platform: str, platform_user_id: str, requested_snapshot_id: str | None, operation_id: str) -> TeamArenaMatchRecord:
+    def _challenge_team_arena_once(self, platform: str, platform_user_id: str, requested_snapshot_id: str | None, operation_id: str, request_id: str = "") -> TeamArenaMatchRecord:
         operation_name = "specials.challenge_team_arena"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id, "snapshot_id": requested_snapshot_id, "mode_key": TEAM_ARENA_MODE_KEY}
         request_hash = self._request_hash(operation_name, request_payload)
@@ -164,7 +164,7 @@ class TeamArenaRepositoryMixin:
             outcome, rounds, actions = simulate_team_match(challenger_snapshot["members"], defender_members, seed=match_id)
             challenger_delta, defender_delta = self._team_rating_deltas(outcome)
             full_snapshot = {"mode_key": TEAM_ARENA_MODE_KEY, "challenger": challenger_snapshot, "defender": defender_snapshot}
-            result = {"outcome": outcome, "rounds": rounds, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta}
+            result = {"outcome": outcome, "rounds": rounds, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta, "request_id": request_id, "operation_id": operation_id, "content_version": "content-0.6", "rule_version": "arena.team-0.1.0"}
             connection.execute(
                 "INSERT INTO arena_team_matches(match_id, challenger_leader_id, defender_leader_id, challenger_snapshot_id, defender_snapshot_id, status, outcome, rounds, challenger_rating_delta, defender_rating_delta, snapshot_json, result_json, operation_id, created_at, settled_at) VALUES (?, ?, ?, ?, ?, 'settled', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (match_id, leader["id"], defender["leader_id"], challenger_row["snapshot_id"], defender["snapshot_id"], outcome, rounds, challenger_delta, defender_delta, json.dumps(full_snapshot, ensure_ascii=False, sort_keys=True), json.dumps(result, ensure_ascii=False, sort_keys=True), operation_id, now_text, now_text),
@@ -184,6 +184,7 @@ class TeamArenaRepositoryMixin:
                 outcome=outcome,
                 score_counted=True,
                 settled_at=now_text,
+                request_id=request_id,
                 participants=(
                     *({"player_id": int(member["database_id"]), "side": "challenger"} for member in challenger_snapshot["members"]),
                     *({"player_id": int(member["database_id"]), "side": "defender"} for member in defender_members),

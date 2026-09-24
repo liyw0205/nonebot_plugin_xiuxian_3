@@ -189,6 +189,7 @@ class ArenaApplication:
                 snapshot_id=context.command_args[0] if context.command_args else None,
                 operation_id=operation_id,
                 mode_key=mode_key,
+                request_id=context.request_id,
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)

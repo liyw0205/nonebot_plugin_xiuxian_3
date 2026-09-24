@@ -68,6 +68,7 @@ def record_settlement_audit(
     outcome: str,
     payload: Mapping[str, Any],
     created_at: str,
+    request_id: str = "",
 ) -> None:
     """Append one idempotent settlement audit event for a participant."""
 
@@ -84,7 +85,21 @@ def record_settlement_audit(
             player_id,
             mode_key,
             outcome,
-            json.dumps(dict(payload), ensure_ascii=False, sort_keys=True),
+            json.dumps(
+                {
+                    **dict(payload),
+                    "request_id": request_id,
+                    "operation_id": operation_id,
+                    "match_id": match_id,
+                    "player_id": player_id,
+                    "mode_key": mode_key,
+                    "content_version": payload.get("content_version", ""),
+                    "rule_version": payload.get("rule_version", ""),
+                    "result": outcome,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
             created_at,
         ),
     )

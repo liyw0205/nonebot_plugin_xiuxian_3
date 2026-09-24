@@ -31,6 +31,8 @@ def project_arena_result(
     score_counted: bool,
     settled_at: str,
     participants: Iterable[Mapping[str, Any]],
+    request_id: str = "",
+    elapsed_ms: int = 0,
 ) -> dict[str, Any]:
     """Project one settled match for every participant in the same transaction.
 
@@ -82,6 +84,12 @@ def project_arena_result(
             "entry_keys": entry_keys,
             "content_version": CONTENT_VERSION,
             "rule_version": RULE_VERSION,
+            "request_id": request_id,
+            "operation_id": operation_id,
+            "match_id": match_id,
+            "player_id": player_id,
+            "elapsed_ms": max(0, int(elapsed_ms)),
+            "result": outcome,
         }
         ensure_identity_route(connection, player_id=player_id, now_text=settled_at)
         existing = connection.execute(
@@ -175,6 +183,7 @@ def project_arena_result(
             outcome=outcome,
             payload=payload,
             created_at=settled_at,
+            request_id=request_id,
         )
         projected.append(payload)
     return {

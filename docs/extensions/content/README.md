@@ -15,8 +15,8 @@
 [版本内容开发合同](../../content-development-contract.md)，并在提交前执行 JSON 格式校验和项目测试：
 
 ```bash
-find data -name '*.json' -print0 | xargs -0 -n1 python3 -m json.tool >/dev/null
-python3 -m pytest -q
+find data -name '*.json' -print0 | xargs -0 -n1 $HOME/myenv/bin/python -m json.tool >/dev/null
+$HOME/myenv/bin/python -m pytest -q
 ```
 
 这些检查是发布前的最低门槛；实际内容发布还必须执行引用闭合检查、dry-run、创建备份、

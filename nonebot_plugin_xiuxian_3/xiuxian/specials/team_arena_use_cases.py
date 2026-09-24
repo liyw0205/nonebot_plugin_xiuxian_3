@@ -92,7 +92,7 @@ class TeamArenaApplication:
             return CommandResult(False, "INVALID_TEAM_ARENA_COMMAND", "挑战组队竞技场最多接收一个快照编号。", context.request_id)
         operation_id = self._operation_id(context, "arena.team.challenge")
         try:
-            record = await self.repository.challenge_team_arena(platform=context.adapter, platform_user_id=context.user_id, snapshot_id=context.command_args[0] if context.command_args else None, operation_id=operation_id)
+            record = await self.repository.challenge_team_arena(platform=context.adapter, platform_user_id=context.user_id, snapshot_id=context.command_args[0] if context.command_args else None, operation_id=operation_id, request_id=context.request_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
         outcome = {"challenger_won": "胜利", "defender_won": "落败", "draw": "平局"}.get(record.outcome, record.outcome)

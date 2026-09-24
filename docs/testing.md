@@ -43,7 +43,7 @@
 本仓库的标准 Python 入口使用 `$HOME/myenv`：`$HOME/myenv/bin/python -m pytest -q`；
 不要用系统 Python 代替，因为 QQ/OneBot fixture 依赖安装在该虚拟环境中。
 
-1. 校验 `data/**/*.json` 的格式，运行 `python3 -m pytest -q`，并执行 `git diff --check`。内容合同、首版开放/占位边界、关键稳定键、跨域任务、终局可达性、十层境界、常驻经营、道历运营、冒险、养成、灵兽灵骑与上游隔离约束，以[完整内容开发总表](content-development.md)为审查清单；娱乐目录或娱乐内容包回归必须拒绝。
+1. 校验 `data/**/*.json` 的格式，运行 `$HOME/myenv/bin/python -m pytest -q`，并执行 `git diff --check`。内容合同、首版开放/占位边界、关键稳定键、跨域任务、终局可达性、十层境界、常驻经营、道历运营、冒险、养成、灵兽灵骑与上游隔离约束，以[完整内容开发总表](content-development.md)为审查清单；娱乐目录或娱乐内容包回归必须拒绝。
 2. 检查 `docs/index.md`、`docs/xiuxian3-design.md`、`docs/implementation-plan.md`、`docs/current-status.md` 和对应域 `README.md` 都能定位到该功能的权威内容文件，并且没有把历史快照误写成当前运行时状态。
 3. 对新增稳定键执行内容包 dry-run：每个消耗品有可达来源、每个配方产出有 `item.*` 定义、每个地点/突破前置有已发布或明确 locked 的任务定义；不得使用显示名代替稳定键。境界必须以 `realm_key + realm_layer` 表示，只有 L10 混元可跨境；常驻经营结算不得写修为/突破准备度。
 4. 检查 [上游参考与复用边界](reference-sources.md) 中的禁止继承项仍然存在：上游境界、数值、命令、物品、表结构和业务模块不得成为新玩法默认来源。

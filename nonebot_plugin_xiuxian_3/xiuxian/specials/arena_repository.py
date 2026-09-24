@@ -106,6 +106,7 @@ class ArenaRepositoryMixin:
         snapshot_id: str | None,
         operation_id: str,
         mode_key: str = ARENA_MODE_KEY,
+        request_id: str = "",
     ) -> ArenaMatchRecord:
         await self.initialize()
         async with self._inflight:
@@ -117,6 +118,7 @@ class ArenaRepositoryMixin:
                 snapshot_id,
                 operation_id,
                 mode_key,
+                request_id,
             )
 
     async def grant_arena_practice_consent(
@@ -358,6 +360,7 @@ class ArenaRepositoryMixin:
         requested_snapshot_id: str | None,
         operation_id: str,
         mode_key: str,
+        request_id: str = "",
     ) -> ArenaMatchRecord:
         if mode_key not in {ARENA_MODE_KEY, ARENA_RANK_MODE_KEY, ARENA_PRACTICE_MODE_KEY}:
             raise ArenaMatchRequirementError("unsupported arena mode")
@@ -467,6 +470,10 @@ class ArenaRepositoryMixin:
                 "defender_rating_delta": defender_delta,
                 "mode_key": mode_key,
                 "opponent_summary": self._json_map(defender_snapshot["public_json"]),
+                "request_id": request_id,
+                "operation_id": operation_id,
+                "content_version": CONTENT_VERSION,
+                "rule_version": RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, snapshot_json, public_json, content_version, rule_version, created_at, updated_at) "
@@ -536,6 +543,7 @@ class ArenaRepositoryMixin:
                 outcome=outcome,
                 score_counted=score_counted,
                 settled_at=now_text,
+                request_id=request_id,
                 participants=(
                     {"player_id": challenger_id, "side": "challenger"},
                     {"player_id": int(defender["id"]), "side": "defender"},
