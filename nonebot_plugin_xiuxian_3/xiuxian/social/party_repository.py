@@ -22,16 +22,23 @@ from ..persistence.errors import (
     PlayerSuspendedError,
 )
 from .party_models import PartyMemberRecord, PartyRecord
-from .party_rules import PARTY_DEFINITION
+from .party_rules import PARTY_DEFINITION, party_definition_for
 
 
 class PartyRepositoryMixin:
     """Own party membership, confirmation and leader-transfer transactions."""
 
-    async def create_party(self, *, platform: str, platform_user_id: str, operation_id: str) -> PartyRecord:
+    async def create_party(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        party_type: str = PARTY_DEFINITION.party_type,
+    ) -> PartyRecord:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._party_create_once, platform, platform_user_id, operation_id)
+            return await asyncio.to_thread(self._party_create_once, platform, platform_user_id, operation_id, party_type)
 
     async def invite_party(
         self,
@@ -115,11 +122,12 @@ class PartyRepositoryMixin:
         async with self._inflight:
             return await asyncio.to_thread(self._party_get_once, platform, platform_user_id)
 
-    def _party_create_once(self, platform: str, platform_user_id: str, operation_id: str) -> PartyRecord:
+    def _party_create_once(self, platform: str, platform_user_id: str, operation_id: str, party_type: str) -> PartyRecord:
         operation_name = "social.create_party"
+        definition = party_definition_for(party_type)
         request_hash = self._request_hash(
             operation_name,
-            {"platform": platform, "platform_user_id": platform_user_id, "party_type": PARTY_DEFINITION.party_type},
+            {"platform": platform, "platform_user_id": platform_user_id, "party_type": definition.party_type},
         )
         now = self._now()
         now_text = serialize_datetime(now)
@@ -133,7 +141,7 @@ class PartyRepositoryMixin:
             if self._party_current_membership(connection, int(player["id"])) is not None:
                 raise PartyAlreadyMemberError("player already belongs to a party")
             party_id = f"party-{uuid4().hex}"
-            deadline = now + timedelta(seconds=PARTY_DEFINITION.confirmation_ttl_seconds)
+            deadline = now + timedelta(seconds=definition.confirmation_ttl_seconds)
             connection.execute(
                 """
                 INSERT INTO parties(
@@ -144,13 +152,13 @@ class PartyRepositoryMixin:
                 """,
                 (
                     party_id,
-                    PARTY_DEFINITION.party_type,
+                    definition.party_type,
                     player["id"],
                     str(player["location_key"]),
                     serialize_datetime(deadline),
-                    PARTY_DEFINITION.distribution_key,
-                    PARTY_DEFINITION.content_version,
-                    PARTY_DEFINITION.rule_version,
+                    definition.distribution_key,
+                    definition.content_version,
+                    definition.rule_version,
                     now_text,
                     now_text,
                 ),
@@ -207,7 +215,8 @@ class PartyRepositoryMixin:
                 "SELECT COUNT(*) AS count FROM party_members WHERE party_id = ? AND status IN ('invited', 'active')",
                 (party["party_id"],),
             ).fetchone()
-            if member_count is not None and int(member_count["count"]) >= PARTY_DEFINITION.max_members:
+            definition = party_definition_for(str(party["party_type"]))
+            if member_count is not None and int(member_count["count"]) >= definition.max_members:
                 raise PartyStateConflictError("party is full")
             target = connection.execute(
                 "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
@@ -348,7 +357,8 @@ class PartyRepositoryMixin:
                 "SELECT COUNT(*) AS count FROM party_members WHERE party_id = ? AND status = 'active' AND confirmed_at IS NOT NULL",
                 (party_id,),
             ).fetchone()
-            status = "ready" if active is not None and confirmed is not None and int(active["count"]) == 2 and int(confirmed["count"]) == 2 else "forming"
+            expected_members = party_definition_for(str(party["party_type"])).max_members
+            status = "ready" if active is not None and confirmed is not None and int(active["count"]) == expected_members and int(confirmed["count"]) == expected_members else "forming"
             connection.execute("UPDATE parties SET status = ?, updated_at = ? WHERE party_id = ?", (status, now_text, party_id))
             payload = self._party_payload(connection, party_id)
             self._party_record_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)

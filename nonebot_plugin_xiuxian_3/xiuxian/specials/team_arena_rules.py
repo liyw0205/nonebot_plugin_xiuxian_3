@@ -7,7 +7,8 @@ from typing import Mapping, Sequence
 from .arena_rules import MAX_ROUNDS, battle_roll_bp, rating_band
 
 TEAM_ARENA_MODE_KEY = "arena.team"
-TEAM_SIZE = 2
+MIN_TEAM_SIZE = 2
+MAX_TEAM_SIZE = 3
 TEAM_SNAPSHOT_VALID_DAYS = 7
 TEAM_SNAPSHOT_MATCH_DELAY_SECONDS = 30 * 60
 TEAM_DAILY_CHALLENGE_LIMIT = 3
@@ -128,7 +129,8 @@ def team_public_summary(snapshot: Mapping[str, object], *, snapshot_id: str, rat
 __all__ = [
     "TEAM_ARENA_MODE_KEY",
     "TEAM_DAILY_CHALLENGE_LIMIT",
-    "TEAM_SIZE",
+    "MAX_TEAM_SIZE",
+    "MIN_TEAM_SIZE",
     "TEAM_SNAPSHOT_MATCH_DELAY_SECONDS",
     "TEAM_SNAPSHOT_VALID_DAYS",
     "TEAM_LOSS_RATING_DELTA",

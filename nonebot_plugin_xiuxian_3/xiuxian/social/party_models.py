@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .party_rules import party_definition_for
+
 
 @dataclass(frozen=True, slots=True)
 class PartyMemberRecord:
@@ -30,7 +32,8 @@ class PartyRecord:
     @property
     def ready(self) -> bool:
         active = [member for member in self.members if member.status == "active"]
-        return self.status == "ready" and len(active) == 2 and all(member.confirmed_at for member in active)
+        expected = party_definition_for(self.party_type).max_members
+        return self.status == "ready" and len(active) == expected and all(member.confirmed_at for member in active)
 
 
 @dataclass(frozen=True, slots=True)

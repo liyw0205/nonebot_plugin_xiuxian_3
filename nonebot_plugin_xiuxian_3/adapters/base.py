@@ -221,6 +221,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("离开宗门", application.leave_sect, aliases=("离宗",))
     router.register("我的宗门", application.get_sect_profile, aliases=("宗门信息",))
     router.register("创建双人队伍", application.create_party, aliases=("创建探索队伍",))
+    router.register("创建三人竞技队伍", application.create_arena_party, aliases=("创建竞技队伍",))
     router.register("邀请入队", application.invite_party, aliases=("邀请队伍",))
     router.register("接受入队", application.accept_party, aliases=("同意入队",))
     router.register("拒绝入队", application.reject_party)

@@ -48,6 +48,25 @@ async def _ready_party(runtime, adapter: str, leader: str, member: str, prefix: 
     return party_id
 
 
+async def _ready_trio_party(runtime, adapter: str, leader: str, members: tuple[str, str], prefix: str) -> str:
+    created = await runtime.adapters.dispatch(adapter, _ctx(adapter, leader, prefix + "-create"), "创建三人竞技队伍")
+    assert created.code == "PARTY_CREATED"
+    assert created.data["party_type"] == "arena_trio"
+    party_id = str(created.data["party_id"])
+    for index, member in enumerate(members):
+        invited = await runtime.adapters.dispatch(adapter, _ctx(adapter, leader, f"{prefix}-invite-{index}"), f"邀请入队 {member}")
+        assert invited.code == "PARTY_INVITED"
+        accepted = await runtime.adapters.dispatch(adapter, _ctx(adapter, member, f"{prefix}-accept-{index}"), f"接受入队 {party_id}")
+        assert accepted.code == "PARTY_JOINED"
+    for index, user in enumerate((leader, *members)):
+        confirmed = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"{prefix}-confirm-{index}"), f"确认入队 {party_id}")
+        assert confirmed.code in {"PARTY_CONFIRMED", "PARTY_READY"}
+    profile = await runtime.adapters.dispatch(adapter, _ctx(adapter, leader, prefix + "-profile"), "队伍状态")
+    assert profile.code == "PARTY_PROFILE"
+    assert profile.data["ready"] is True
+    return party_id
+
+
 def test_qq_onebot_team_arena_uses_team_snapshots_and_server_replay() -> None:
     async def run() -> None:
         clock = MutableClock(datetime(2026, 9, 25, tzinfo=timezone.utc))
@@ -84,6 +103,36 @@ def test_qq_onebot_team_arena_uses_team_snapshots_and_server_replay() -> None:
                 assert connection.execute("SELECT COUNT(*) FROM battle_sessions").fetchone()[0] == 0
                 ratings = connection.execute("SELECT arena_rating FROM players WHERE platform_user_id LIKE 'team-%'").fetchall()
             assert all(int(row[0]) != 1000 for row in ratings)
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_three_member_arena_party_matches_three_member_snapshot_without_party_pve() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            qq_members = ("trio-qq-member-1", "trio-qq-member-2")
+            ob_members = ("trio-ob-member-1", "trio-ob-member-2")
+            for user in ("trio-qq-leader", *qq_members):
+                await _player(runtime, "qq.official", user, "create-" + user)
+            for user in ("trio-ob-leader", *ob_members):
+                await _player(runtime, "onebot.v11", user, "create-" + user)
+            await _ready_trio_party(runtime, "qq.official", "trio-qq-leader", qq_members, "qq-trio")
+            await _ready_trio_party(runtime, "onebot.v11", "trio-ob-leader", ob_members, "ob-trio")
+            pve = await runtime.adapters.dispatch("qq.official", _ctx("qq.official", "trio-qq-leader", "trio-pve"), "开始队伍战斗")
+            assert pve.code == "PARTY_BATTLE_REQUIREMENT_MISSING"
+            left = await runtime.adapters.dispatch("qq.official", _ctx("qq.official", "trio-qq-leader", "trio-publish"), "发布组队竞技场快照")
+            right = await runtime.adapters.dispatch("onebot.v11", _ctx("onebot.v11", "trio-ob-leader", "trio-ob-publish"), "发布组队竞技场快照")
+            assert left.code == right.code == "TEAM_ARENA_SNAPSHOT_PUBLISHED"
+            clock.advance(minutes=31)
+            result = await runtime.adapters.dispatch("qq.official", _ctx("qq.official", "trio-qq-leader", "trio-challenge"), f"挑战组队竞技场 {right.data['snapshot_id']}")
+            assert result.code == "TEAM_ARENA_MATCH_SETTLED", result.message
+            replay = await runtime.adapters.dispatch("onebot.v11", _ctx("onebot.v11", "trio-ob-member-2", "trio-replay"), f"组队竞技场回放 {result.data['match_id']}")
+            assert replay.code == "TEAM_ARENA_REPLAY"
+            assert len(replay.data["snapshot"]["challenger"]["members"]) == 3
+            assert len(replay.data["snapshot"]["defender"]["members"]) == 3
             await runtime.close()
 
     asyncio.run(run())

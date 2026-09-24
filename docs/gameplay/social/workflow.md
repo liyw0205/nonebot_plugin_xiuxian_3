@@ -9,9 +9,9 @@ party_battle -> created -> running -> won/lost/expired -> settled
 service -> created -> accepted -> locked -> processing -> delivered -> settled
 ```
 
-当前运行时开放 `forming -> ready -> disbanded/expired` 的双人探索队伍状态机，以及独立的
-双人 `party_battle` 自动 PVE 会话；队伍自身不伪装成单人战斗会话。邀请和双方确认窗口为 5 分钟，
-队伍最多 2 名成员，队伍创建时保存地点和分配规则。队长退出时转移给活动成员，
+当前运行时开放 `forming -> ready -> disbanded/expired` 的双人探索队伍和三人竞技队伍状态机，以及独立的
+双人 `party_battle` 自动 PVE 会话；队伍自身不伪装成单人战斗会话。邀请和全员确认窗口为 5 分钟，
+探索队伍最多 2 名成员，竞技队伍最多 3 名成员，队伍创建时保存地点和分配规则。队长退出时转移给活动成员，
 无活动成员则解散；超时会将邀请和活动成员标记为 `expired`。
 
 宗门职位首版：成员、执事、长老、副宗主、宗主。公共仓库、成员管理、职位和解散均需要权限与审计。

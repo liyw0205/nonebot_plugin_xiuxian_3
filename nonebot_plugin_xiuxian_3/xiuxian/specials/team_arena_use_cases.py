@@ -40,7 +40,7 @@ class TeamArenaApplication:
         errors = {
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能进行组队竞技场操作。"),
-            TeamArenaSnapshotRequirementError: ("TEAM_ARENA_REQUIREMENT_MISSING", "需要一支已确认的双人队伍，且队伍没有进行中的战斗。"),
+            TeamArenaSnapshotRequirementError: ("TEAM_ARENA_REQUIREMENT_MISSING", "需要一支已确认的双人或三人竞技队伍，且队伍没有进行中的战斗。"),
             TeamArenaPermissionError: ("TEAM_ARENA_PERMISSION_DENIED", "只有已确认队伍的队长可以操作组队竞技场。"),
             TeamArenaBusyError: ("TEAM_ARENA_BUSY", "队伍当前已有锁定中的会话。"),
             TeamArenaSnapshotNotFoundError: ("TEAM_ARENA_SNAPSHOT_NOT_FOUND", "没有找到可用的组队竞技场快照。"),

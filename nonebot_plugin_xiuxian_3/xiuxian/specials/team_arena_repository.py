@@ -23,7 +23,8 @@ from .team_arena_rules import (
     TEAM_ARENA_MODE_KEY,
     TEAM_DAILY_CHALLENGE_LIMIT,
     TEAM_LOSS_RATING_DELTA,
-    TEAM_SIZE,
+    MAX_TEAM_SIZE,
+    MIN_TEAM_SIZE,
     TEAM_SNAPSHOT_MATCH_DELAY_SECONDS,
     TEAM_SNAPSHOT_VALID_DAYS,
     TEAM_WIN_RATING_DELTA,
@@ -149,7 +150,7 @@ class TeamArenaRepositoryMixin:
             if challenger_row is None:
                 raise TeamArenaSnapshotRequirementError("publish a team snapshot before challenging")
             challenger_snapshot = self._json_map(challenger_row["snapshot_json"])
-            if len(challenger_snapshot.get("members", [])) != TEAM_SIZE:
+            if not MIN_TEAM_SIZE <= len(challenger_snapshot.get("members", [])) <= MAX_TEAM_SIZE:
                 raise TeamArenaSnapshotRequirementError("challenger team snapshot is invalid")
             defender_snapshot = self._json_map(defender["snapshot_json"])
             challenger_rating = team_rating(challenger_snapshot["members"])
@@ -157,7 +158,7 @@ class TeamArenaRepositoryMixin:
             if not compatible_team_rating(challenger_rating, defender_rating):
                 raise TeamArenaOpponentUnavailableError("team snapshot is outside the compatible rating band")
             defender_members = list(defender_snapshot.get("members", []))
-            if len(defender_members) != TEAM_SIZE or {member.get("database_id") for member in challenger_snapshot["members"]} & {member.get("database_id") for member in defender_members}:
+            if len(defender_members) != len(challenger_snapshot["members"]) or not MIN_TEAM_SIZE <= len(defender_members) <= MAX_TEAM_SIZE or {member.get("database_id") for member in challenger_snapshot["members"]} & {member.get("database_id") for member in defender_members}:
                 raise TeamArenaSnapshotRequirementError("team snapshots must contain two distinct members")
             match_id = f"arena.team.match:{uuid4().hex}"
             outcome, rounds, actions = simulate_team_match(challenger_snapshot["members"], defender_members, seed=match_id)
@@ -216,8 +217,9 @@ class TeamArenaRepositoryMixin:
 
     @staticmethod
     def _team_arena_require_ready(party, members) -> None:
-        if str(party["status"]) != "ready" or len(members) != TEAM_SIZE or any(not member["confirmed_at"] or str(member["player_status"]) != "active" for member in members):
-            raise TeamArenaSnapshotRequirementError("a confirmed active two-player party is required")
+        expected = {"exploration_pair": 2, "arena_trio": 3}.get(str(party["party_type"]))
+        if expected is None or str(party["status"]) != "ready" or len(members) != expected or any(not member["confirmed_at"] or str(member["player_status"]) != "active" for member in members):
+            raise TeamArenaSnapshotRequirementError("a confirmed active two- or three-player arena party is required")
 
     def _team_arena_build_snapshot(self, connection, party, members, snapshot_id: str) -> dict[str, object]:
         result: list[dict[str, object]] = []

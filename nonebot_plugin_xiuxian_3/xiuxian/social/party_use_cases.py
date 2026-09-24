@@ -22,6 +22,7 @@ from ..repository import (
     RepositoryBusyError,
     SQLitePlayerRepository,
 )
+from .party_rules import PARTY_TYPE_ARENA_TRIO
 
 
 class PartyApplication:
@@ -73,14 +74,21 @@ class PartyApplication:
         return f"- **队伍号**：`{record.party_id}`\n- **状态**：{state}\n- **地点**：`{record.location_key}`\n- **成员**：{members}\n- **确认截止**：{record.confirmation_deadline}"
 
     async def create_party(self, context: CommandContext) -> CommandResult:
+        return await self._create_party(context, party_type="exploration_pair", title="双人探索队伍", invite_hint="一名同地点道友")
+
+    async def create_arena_party(self, context: CommandContext) -> CommandResult:
+        return await self._create_party(context, party_type=PARTY_TYPE_ARENA_TRIO, title="三人竞技队伍", invite_hint="两名同地点道友")
+
+    async def _create_party(self, context: CommandContext, *, party_type: str, title: str, invite_hint: str) -> CommandResult:
         if context.command_args:
-            return CommandResult(False, "INVALID_PARTY_COMMAND", "创建双人队伍无需附加参数。", context.request_id)
+            return CommandResult(False, "INVALID_PARTY_COMMAND", f"创建{title}无需附加参数。", context.request_id)
         operation_id = self._operation_id(context, "social.create_party")
         try:
             record = await self.repository.create_party(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 operation_id=operation_id,
+                party_type=party_type,
             )
         except PartyAlreadyMemberError:
             return CommandResult(False, "PARTY_ALREADY_MEMBER", "你已经在队伍或待处理邀请中。", context.request_id, operation_id)
@@ -97,7 +105,7 @@ class PartyApplication:
         return CommandResult(
             True,
             "PARTY_CREATED",
-            "## 双人探索队伍已创建\n\n" + self._summary(record) + "\n\n请邀请一名同地点道友。",
+            f"## {title}已创建\n\n" + self._summary(record) + f"\n\n请邀请{invite_hint}。",
             context.request_id,
             operation_id,
             data=self._data(record),

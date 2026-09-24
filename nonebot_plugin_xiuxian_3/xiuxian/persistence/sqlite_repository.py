@@ -163,6 +163,7 @@ class SQLitePlayerRepository(
             connection.executescript(SCHEMA)
             self._migrate_legacy_schema(connection)
             self._migrate_arena_mode_schema(connection)
+            self._migrate_party_type_schema(connection)
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
             connection.execute(
@@ -315,6 +316,45 @@ class SQLitePlayerRepository(
         connection.execute(
             "CREATE INDEX idx_arena_matches_defender_snapshot ON arena_matches(challenger_id, defender_snapshot_id, created_at)"
         )
+        connection.execute("PRAGMA foreign_keys = ON")
+
+    @staticmethod
+    def _migrate_party_type_schema(connection: sqlite3.Connection) -> None:
+        """Allow the arena-specific three-member party type in old databases."""
+
+        table = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'parties'"
+        ).fetchone()
+        schema_sql = str(table[0]) if table and table[0] else ""
+        if "'arena_trio'" in schema_sql:
+            return
+        connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute("DROP INDEX IF EXISTS idx_parties_leader")
+        connection.execute("DROP INDEX IF EXISTS idx_parties_status")
+        connection.execute(
+            """
+            CREATE TABLE parties_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                party_id TEXT NOT NULL UNIQUE,
+                party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio')),
+                status TEXT NOT NULL CHECK (status IN ('forming', 'ready', 'disbanded', 'expired')),
+                leader_id INTEGER NOT NULL REFERENCES players(id),
+                location_key TEXT NOT NULL,
+                confirmation_deadline TEXT NOT NULL,
+                current_session_id TEXT,
+                distribution_key TEXT NOT NULL DEFAULT 'contribution',
+                content_version TEXT NOT NULL,
+                rule_version TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute("INSERT INTO parties_new SELECT * FROM parties")
+        connection.execute("DROP TABLE parties")
+        connection.execute("ALTER TABLE parties_new RENAME TO parties")
+        connection.execute("CREATE INDEX idx_parties_leader ON parties(leader_id, status, created_at)")
+        connection.execute("CREATE INDEX idx_parties_status ON parties(status, confirmation_deadline)")
         connection.execute("PRAGMA foreign_keys = ON")
 
     @staticmethod

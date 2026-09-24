@@ -10,7 +10,8 @@
 毕业时间、毕业 operation 和师傅贡献快照；毕业奖励通过同一事务写入 `player_reputations`，
 不会修改修为、突破材料或突破概率。
 
-`Party`：队长、成员序列、地点、准备状态、当前会话、掉线时间和分配规则。
+`Party`：队伍类型、队长、成员序列、地点、准备状态、当前会话、掉线时间和分配规则；当前类型为
+`party.exploration_pair`（最多 2 人）或 `party.arena_trio`（最多 3 人）。
 
 `PartyBattleSession`：独立于单人 `BattleSession` 的队伍战斗 ID、队伍快照、敌人/地点/规则版本、
 行动序号、状态和结果。`PartyBattleMember` 在战斗开始时保存每名成员属性/装备快照并锁定资产；

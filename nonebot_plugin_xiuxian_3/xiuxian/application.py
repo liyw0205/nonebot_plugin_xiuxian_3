@@ -688,6 +688,9 @@ class XiuxianApplication:
     async def create_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_party(context), write_message="当前事件不允许创建队伍。")
 
+    async def create_arena_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.create_arena_party(context), write_message="当前事件不允许创建竞技队伍。")
+
     async def invite_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.invite_party(context), write_message="当前事件不允许邀请队伍成员。")
 

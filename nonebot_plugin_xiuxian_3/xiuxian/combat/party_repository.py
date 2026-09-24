@@ -170,6 +170,8 @@ class PartyCombatRepositoryMixin:
             party = connection.execute("SELECT * FROM parties WHERE party_id = ?", (resolved_party_id,)).fetchone()
             if party is None:
                 raise PartyNotFoundError("party does not exist")
+            if str(party["party_type"]) != "exploration_pair":
+                raise PartyBattleRequirementError("only exploration pairs can start party PVE")
             if str(party["status"]) != "ready":
                 raise PartyBattleRequirementError("party is not ready")
             if party["current_session_id"]:

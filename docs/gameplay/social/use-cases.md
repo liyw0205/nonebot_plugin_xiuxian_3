@@ -7,12 +7,12 @@
 `create_party`、`invite_party`、`accept_party`、`reject_party`、`confirm_party`、`leave_party`、
 `get_party`、`start_party_battle`、`settle_party_battle`、`replay_party_battle`、`start_service_order`、`deliver_service`。
 
-当前开放的队伍为 `party.exploration_pair`：最多两人、创建时冻结地点、五分钟双方确认窗口，
+当前开放的队伍为 `party.exploration_pair` 和 `party.arena_trio`：探索队伍最多两人，竞技队伍最多三人；创建时冻结地点，五分钟全员确认窗口，
 队长退出时转移给仍在线的成员，否则队伍解散。确认后队长可在近郊或雾隐洞天发起独立队伍 PVE；
 服务端冻结全体成员属性/装备、锁定资产并自动推进回合，任一已确认成员可结算，奖励按成员唯一键发放。
 每次写操作均使用 operation ledger 幂等回放。
 
-已确认双人队伍还可以由队长发布 `arena.team` 防守快照并发起 2v2 异步挑战；组队竞技场使用独立快照、
+已确认双人或三人竞技队伍还可以由队长发布 `arena.team` 防守快照并发起对称 2v2/3v3 异步挑战；组队竞技场使用独立快照、
 匹配和回放表，不复用队伍 PVE 会话，也不转移任何玩家资产。三人以上队伍 PvP 和跨服匹配仍关闭。
 
 当前开放的师徒关系要求师傅筑基 L4、徒弟处于凡人至聚气 L6；邀请 24 小时过期，接受后为
