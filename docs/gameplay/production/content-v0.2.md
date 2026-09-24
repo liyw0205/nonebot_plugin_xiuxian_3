@@ -10,6 +10,8 @@
 | `recipe.array.mist_barrier` | `formation` 3、阵堂/洞天二层 | 阵砂 5、灵石 100、灵叶 2 | 12 精力，240 秒 | `item.array.mist_barrier` 1 | 每日 2；覆盖半径 1 地点、12 小时 |
 | `recipe.food.cloud_tea` | 烹饪 2、灵泉谷 | 灵叶 2、粗糙灵米 2 | 4 精力，60 秒 | `item.food.cloud_tea` 3 | 每日 6；修炼会话 +500 bp |
 
+当前运行时只开放 `recipe.array.mist_barrier` 的个人预览、生产和结算；其它 v0.2 配方仍保留为静态合同，不能从命令入口创建。该配方的 `formation 3` 在订单质量快照中冻结为基础熟练度 `4000 bp`，质量仍按 v0.1 公式和服务端随机池计算，因此随机质量为 0 时按 6000 阈值失败，随机质量为 1000 时可成功。
+
 ## 洞天二层设施
 
 `cave.mist_grotto_2` 开放 4 块灵田、炼丹房、炼器台、阵基各 1 个基础槽。宗门/个人必须通过 `production.claim_facility_slot` 锁定槽位：每槽 1 个 running 订单；维护费每业务日 100 灵石由所有者支付，余额不足时设施 `inactive`，不取消已 processing 订单。`item.array.gathering_basic` 使绑定设施订单时长 -1000 bp；同类阵法不叠加。

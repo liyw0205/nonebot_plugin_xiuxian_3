@@ -72,6 +72,29 @@ RECIPES: dict[str, RecipeDefinition] = {
         required_realm="qi_gathering",
         required_location=("xuantian.spirit_field", "xuantian.array_hall"),
     ),
+    "recipe.array.mist_barrier": RecipeDefinition(
+        key="recipe.array.mist_barrier",
+        name="迷雾屏障阵",
+        profession="formation",
+        inputs={"item.mat.array_sand": 5, "item.herb.spirit_leaf": 2},
+        energy_cost=12,
+        duration_seconds=240,
+        daily_limit=2,
+        tool_key=None,
+        tool_cost_bp=0,
+        currency_cost=100,
+        outputs={"item.array.mist_barrier": 1},
+        high_quality_bonus={},
+        failure_refunds={"item.mat.array_sand": 3, "item.herb.spirit_leaf": 1},
+        min_realm_layer=1,
+        required_realm="golden_core",
+        proficiency_bp=4000,
+        required_location=("xuantian.array_hall", "cave.mist_grotto_2"),
+        content_version="content-0.2",
+        rule_version="production-0.2.0",
+        success_threshold_bp=6000,
+        high_quality_threshold_bp=8000,
+    ),
 }
 RECIPES.update(ENDGAME_WORK_RECIPES)
 
@@ -87,12 +110,15 @@ RECIPE_ALIASES = {
     "聚灵阵": "recipe.array.gathering_basic",
     "基础聚灵阵": "recipe.array.gathering_basic",
     "布阵": "recipe.array.gathering_basic",
+    "迷雾屏障阵": "recipe.array.mist_barrier",
+    "迷雾屏障": "recipe.array.mist_barrier",
 }
 RECIPE_ALIASES.update({key: key for key in ENDGAME_WORK_RECIPES})
 RECIPE_ALIASES.update(ENDGAME_WORK_RECIPE_ALIASES)
 
 ITEM_LABELS = {
     "item.herb.blood_grass": "止血草",
+    "item.herb.spirit_leaf": "灵叶",
     "item.food.coarse_spirit_rice": "粗糙灵米",
     "item.ore.ironstone": "铁石",
     "item.mat.wood": "木材",
@@ -100,6 +126,7 @@ ITEM_LABELS = {
     "item.pill.healing_low": "低阶疗伤丹",
     "item.weapon.wood_sword": "木纹剑",
     "item.array.gathering_basic": "基础聚灵阵",
+    "item.array.mist_barrier": "迷雾屏障阵",
     "item.tool.basic_furnace": "基础丹炉",
     "item.tool.basic_hammer": "基础炼器锤",
 }

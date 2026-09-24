@@ -15,7 +15,6 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from .cloud_models import ArrayHallRecord, CloudBoatSettlementRecord, CloudBoatStartRecord, DemonIntroRecord
 from .cloud_rules import (
-    ARRAY_HALL_INVITE_FLAG,
     CLOUD_ROUTES,
     CONTENT_VERSION,
     DEMON_INTRO_FLAG,
@@ -23,6 +22,7 @@ from .cloud_rules import (
     RULE_VERSION,
     cloud_route_definition,
 )
+from .permissions import array_hall_permission
 
 
 class CloudRepositoryMixin:
@@ -426,12 +426,8 @@ class CloudRepositoryMixin:
                 raise ArrayHallPermissionDeniedError("array hall location is required")
             if not self._cloud_meets_realm(str(player["realm_key"]), int(player["realm_layer"]), "qi_gathering", 1):
                 raise ArrayHallPermissionDeniedError("array hall requires qi gathering")
-            intro = self._json_object(player["intro_json"], {})
-            flags = {str(item) for item in intro.get("flags", [])}
-            membership = connection.execute(
-                "SELECT 1 FROM sect_members WHERE player_id = ? AND status = 'active' LIMIT 1", (player["id"],)
-            ).fetchone()
-            if membership is None and not ({ARRAY_HALL_INVITE_FLAG, "array_hall_invite"} & flags):
+            permission = array_hall_permission(connection, player)
+            if permission is None:
                 raise ArrayHallPermissionDeniedError("array hall permission is not granted")
             if int(player["stamina"]) < 3:
                 raise ResourceInsufficientError("array hall requires 3 stamina")
@@ -442,7 +438,7 @@ class CloudRepositoryMixin:
             payload = {
                 "player": self._player_payload(self._row_to_player(updated)),
                 "status": "authorized",
-                "permission": "sect_member" if membership is not None else "teaching_invite",
+                "permission": permission,
                 "action": "formation_learning_or_production_request",
             }
             self._cloud_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)

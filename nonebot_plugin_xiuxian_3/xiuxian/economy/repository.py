@@ -919,7 +919,7 @@ class EconomyRepositoryMixin:
                 raise CommissionStateConflictError("producer already has an active commission")
             recipe = self._commission_recipe(str(order["recipe_key"]))
             try:
-                self._check_production_requirements(producer, recipe)
+                self._check_production_requirements(connection, producer, recipe)
             except Exception as exc:
                 raise CommissionRequirementError("producer does not satisfy recipe requirements") from exc
             inventory = self._json_object(producer["inventory_json"], {})

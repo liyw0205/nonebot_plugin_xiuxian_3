@@ -251,7 +251,7 @@ class ProductionRepositoryMixin:
         now = self._now()
         with self._connect() as connection:
             row = self._require_player(connection, platform, platform_user_id)
-            self._check_production_requirements(row, recipe)
+            self._check_production_requirements(connection, row, recipe)
             day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             day_end = day_start + timedelta(days=1)
             used = connection.execute(
@@ -356,7 +356,7 @@ class ProductionRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "cultivator":
                 raise PlayerStageConflictError("player is not ready for production")
-            self._check_production_requirements(row, recipe)
+            self._check_production_requirements(connection, row, recipe)
             active = connection.execute(
                 "SELECT 1 FROM production_orders WHERE player_id = ? AND status = 'processing' LIMIT 1",
                 (row["id"],),
@@ -436,7 +436,7 @@ class ProductionRepositoryMixin:
                 "tool_durability_before": tool_durability_before,
                 "tool_durability_after": durability.get(recipe.tool_key) if recipe.tool_key else None,
                 "material_quality_bp": 10000,
-                "proficiency_bp": 0,
+                "proficiency_bp": recipe.proficiency_bp,
                 "random_quality_bp": random_quality_bp(operation_id),
                 "currency_cost": recipe.currency_cost,
             }
@@ -705,7 +705,7 @@ class ProductionRepositoryMixin:
             )
 
     @staticmethod
-    def _check_production_requirements(row: sqlite3.Row, recipe) -> None:
+    def _check_production_requirements(connection: sqlite3.Connection, row: sqlite3.Row, recipe) -> None:
         if recipe.required_path and str(row["path_key"] or "") != recipe.required_path:
             raise RecipeRequirementError("当前道途不满足这条配方")
         if recipe.required_subprofession and str(row["subprofession_key"] or "") not in recipe.required_subprofession:
@@ -733,6 +733,11 @@ class ProductionRepositoryMixin:
             raise RecipeRequirementError("当前境界不满足这条配方")
         if recipe.required_location and str(row["location_key"]) not in recipe.required_location:
             raise RecipeRequirementError("当前地点不满足这条配方")
+        if str(row["location_key"]) == "xuantian.array_hall":
+            from ..world.permissions import array_hall_permission
+
+            if array_hall_permission(connection, row) is None:
+                raise RecipeRequirementError("阵堂权限不足")
 
     @staticmethod
     def _production_quality_from_snapshot(snapshot: dict[str, Any]) -> int:

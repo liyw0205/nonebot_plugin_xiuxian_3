@@ -22,6 +22,7 @@ class RecipeDefinition:
     failure_refunds: dict[str, int]
     min_realm_layer: int
     required_realm: str
+    proficiency_bp: int = 0
     required_location: tuple[str, ...] = ()
     teaching_allowed: bool = False
     required_path: str | None = None

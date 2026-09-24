@@ -9,7 +9,7 @@
 - `board_cloud_boat(player_id, route_key, operation_id)` -> v0.2 云舟会话，冻结路线、费用和凭证。
 - `settle_cloud_boat(player_id, operation_id)` -> 按冻结快照抵达洞天二层、深渊门或返回云城。
 - `accept_demon_intro(player_id, operation_id)` -> 在深渊门确认风险，写入一次性入口资格和魔界声望，不发魔界资源。
-- `use_array_hall(player_id, operation_id)` -> 再次校验宗门/教学邀请，只确认阵堂权限，不自动创建生产订单。
+- `use_array_hall(player_id, operation_id)` -> 再次校验宗门/教学邀请，只确认阵堂权限，不自动创建生产订单；生产域的阵堂配方在预览和开始时复用同一校验。
 - `leave_closed_location(player_id, operation_id)` -> 撤离结果。
 
 ## 错误码

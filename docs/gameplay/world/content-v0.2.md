@@ -27,7 +27,7 @@
 
 ## 阵堂与魔界引导
 
-阵堂的生产/学习不是地点自动效果：每个 `production` 或 `paths` 用例需再次校验宗门/邀请和订单成本。`quest.demon_intro` 只提供魔界风险、污染与契约说明，完成后开放入口资格但不开放魔渊集市、战斗或掉落；所有这类动作返回 `CONTENT_CLOSED` 至 v0.3。
+阵堂的生产/学习不是地点自动效果：每个 `production` 或 `paths` 用例需再次校验宗门/邀请和订单成本；当前只开放 `recipe.array.mist_barrier`。`quest.demon_intro` 只提供魔界风险、污染与契约说明，完成后开放入口资格但不开放魔渊集市、战斗或掉落；魔界核心区相关动作返回 `CONTENT_CLOSED` 至 v0.3。
 
 错误：`CLOUD_ROUTE_LOCKED`、`CLOUD_FARE_INSUFFICIENT`、`ARRAY_HALL_PERMISSION_DENIED`、`ADVANCED_CAVE_PASS_MISSING`。关闭 v0.2 时新航线/洞天二层停止，已运行航线按原版本结算。验收：云舟费用不因重试双扣；洞天二层凭证锁定正确；阵堂无权限不泄露生产结果；魔界引导不产生魔界资源。
 
@@ -35,6 +35,6 @@
 
 本阶段开放云城/阵堂移动、三条云舟航线、抵达深渊门后的风险确认、阵堂权限检查，以及
 `explore.cloud_mine`/`explore.cloud_boat_trial`/`explore.mist_grotto_2` 探索入口。矿区入口仍要求采矿标记或矿区许可，
-云舟试炼要求位于云舟渡口且达到金丹 L1；洞天二层入口要求已经抵达该地点；阵堂实际生产订单、魔界核心区和魔界资源仍
+云舟试炼要求位于云舟渡口且达到金丹 L1；洞天二层入口要求已经抵达该地点；`recipe.array.mist_barrier` 已开放预览、生产和结算，阵堂地点仍会再次校验宗门成员/教学邀请；v0.2 其它金丹配方、设施槽位维护、魔界核心区和魔界资源仍
 返回关闭或未满足前置；已创建云舟按会话快照结算。`world.accept_demon_intro` 只写入入口资格和
 `faction_reputation.demon=20`，不发魔核或妖血。
