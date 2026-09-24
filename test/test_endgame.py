@@ -63,6 +63,7 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                     spirit_stones=500_000,
                     world_merit=3_000,
                     path_key="body",
+                    qualification_json=json.dumps({"body": 2_000, "agility": 2_000}),
                     intro_json=json.dumps({"flags": ["quest.dao_union"]}),
                     inventory_json=json.dumps({"item.dao_fruit_fragment": 10}),
                 )
@@ -118,6 +119,8 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                     location_key="tribulation.sky_terrace",
                     inventory_json=json.dumps({"item.tribulation_token": 1}),
                 )
+                # Pick the lower-pressure battle pool; success is asserted from
+                # the automatic BattleResult, not from the fate roll itself.
                 operation = next(
                     f"{adapter}-trial-{index}"
                     for index in range(1000)
@@ -127,6 +130,7 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                     _ctx(adapter, user, operation), "开始天劫试炼 身心劫"
                 )
                 assert started.code == "TRIAL_STARTED"
+                assert started.data["battle_outcome"] == "won"
                 _past_trial(runtime, started.data["session_id"])
                 settled = await runtime.dispatch(
                     _ctx(adapter, user, f"settle-{adapter}"), "结算天劫试炼"

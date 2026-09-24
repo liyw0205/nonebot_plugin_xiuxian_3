@@ -25,6 +25,7 @@ class TribulationEntryRecord:
 class TrialSessionRecord:
     player: PlayerView
     session_id: str
+    battle_id: str
     trial_key: str
     choice_key: str | None
     status: str
@@ -41,13 +42,15 @@ class TrialSettlementRecord:
     trial_key: str
     status: str
     success: bool
-    roll_bp: int
+    roll_bp: int | None
     debt_delta: int
     reward_progress: int
     reward_merit: int
     reward_items: dict[str, int]
     reward_world_merit: int = 0
     dao_fruit_key: str | None = None
+    battle_id: str | None = None
+    battle_outcome: str | None = None
     already_completed: bool = False
 
 

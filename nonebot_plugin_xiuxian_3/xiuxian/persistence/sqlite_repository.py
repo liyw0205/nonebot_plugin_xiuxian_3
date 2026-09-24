@@ -15,6 +15,7 @@ from ..player.repository import PlayerRepositoryMixin
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.cultivation_repository import CultivationRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
+from ..progression.tribulation_repository import TribulationTrialRepositoryMixin
 from ..progression.breakthrough.repository import BreakthroughRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
 from ..world.travel_repository import TravelRepositoryMixin
@@ -40,6 +41,7 @@ from .schema import SCHEMA
 class SQLitePlayerRepository(
     PlayerRepositoryMixin,
     TravelRepositoryMixin,
+    TribulationTrialRepositoryMixin,
     EndgameRepositoryMixin,
     WorldRepositoryMixin,
     ProgressionRepositoryMixin,

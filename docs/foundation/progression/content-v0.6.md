@@ -2,6 +2,10 @@
 
 本文件遵守 [版本内容开发合同](../../content-development-contract.md)。v0.6 的终局结算不可用普通突破替代，所有选择由长期状态、三次试炼与最终战共同决定。
 
+本文件是 `content-0.6` 的历史发布快照，不裁决当前运行时状态。当前代码状态以
+[当前开发状态](../../current-status.md) 和战斗域的自动回合合同为准；快照中的数值、稳定键和
+终局前置仍是实现必须引用的内容基线。
+
 - `content_version`：`content-0.6`
 - `rule_version`：`progression-0.6.0`
 - 正式开放：`dao_union`（合道）、`tribulation`（渡劫）、`ascension_ready`（飞升候选）。两境均使用 L1–L10，阈值和段位以[十层规范](layers.md)为准。
@@ -42,7 +46,7 @@ void_refining/L10 混元
 
 三次试炼和三项道源任务的固定奖励合计为道果进度 1,000、`resource.ascension_merit` 1,000。`trial.three_realms` 另给世界功勋 500；道源任务另给世界功勋共 1,000。债务达到 100 时，下一次试炼追加 `difficulty_bp=2000`，表现为敌方护盾/环境机制，不能直接扣除角色资产。
 
-三次试炼只能在 `tribulation.sky_terrace` 启动；从 `dao.origin_gate` 前往天劫台的移动另消耗 1 张天劫凭证，不替代每次试炼自身的凭证成本。当前运行时仍是可回放的确定性检定，不代表战斗已开放。
+三次试炼只能在 `tribulation.sky_terrace` 启动；从 `dao.origin_gate` 前往天劫台的移动另消耗 1 张天劫凭证，不替代每次试炼自身的凭证成本。原始 v0.6 规则曾以确定性检定描述试炼；当前运行时已将试炼接入共享服务端自动回合 `BattleSession`，客户端仍不能提交技能、目标、伤害或结果。最终战仍未开放。
 
 ## 4. 最终战与飞升候选
 

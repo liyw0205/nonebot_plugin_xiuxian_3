@@ -43,6 +43,7 @@ from .rules import (
     player_goes_first,
     player_stat_snapshot,
 )
+from .tribulation_rules import PROFILE_KEY, phase_for_hp
 
 
 class CombatRepositoryMixin:
@@ -312,6 +313,9 @@ class CombatRepositoryMixin:
             snapshot = self._json_object(session["snapshot_json"], {})
             player_stats = dict(snapshot["player"]["stats"])
             enemy = dict(snapshot["enemy"])
+            is_tribulation_trial = str(snapshot.get("profile_key", "")) == PROFILE_KEY
+            tribulation = self._json_object(snapshot.get("tribulation"), {})
+            debt_shield_bp = int(tribulation.get("debt_shield_bp", 0)) if is_tribulation_trial else 0
             player_hp = int(state["player_hp"])
             enemy_hp = int(state["enemy_hp"])
             timeout = now >= datetime.fromisoformat(str(session["turn_deadline"]))
@@ -328,6 +332,7 @@ class CombatRepositoryMixin:
             outcome: str | None = None
             reason = ""
             for actor in actor_order:
+                phase = phase_for_hp(enemy_hp, int(enemy["max_hp"])) if is_tribulation_trial else None
                 if actor == "player" and timeout:
                     action = self._defend_action(
                         battle_id=battle_id,
@@ -349,31 +354,58 @@ class CombatRepositoryMixin:
                         attacker_attack=int(player_stats["attack"]),
                         attacker_initiative=int(player_stats["initiative"]),
                         defender_agility=int(enemy["agility"]),
-                        target_hp=enemy_hp,
+                        target_hp=(
+                            enemy_hp
+                            if not is_tribulation_trial
+                            else max(enemy_hp, int(player_stats["attack"])) + int(player_stats["attack"])
+                        ),
                         seed=str(snapshot["random_seed"]),
                         operation_id=operation_id,
                     )
+                    if phase is not None:
+                        effective_damage_bp = phase.player_damage_bp * (10_000 - debt_shield_bp) // 10_000
+                        action["damage"] = min(
+                            enemy_hp,
+                            int(action["damage"])
+                            * effective_damage_bp
+                            // 10_000,
+                        )
                     enemy_hp = max(0, enemy_hp - int(action["damage"]))
                 else:
+                    if actor == "enemy" and is_tribulation_trial:
+                        phase = phase_for_hp(enemy_hp, int(enemy["max_hp"]))
                     action = self._attack_action(
                         battle_id=battle_id,
                         round_no=expected_round,
                         sequence=sequence + 1,
                         actor_key="enemy",
-                        skill_key=str(enemy["skill_key"]),
-                        strategy_key="strategy.training_dummy.v0.1",
-                        attacker_attack=int(enemy["attack"]),
+                        skill_key=phase.skill_key if phase is not None else str(enemy["skill_key"]),
+                        strategy_key=(
+                            "strategy.tribulation_phase.v0.6"
+                            if phase is not None
+                            else "strategy.training_dummy.v0.1"
+                        ),
+                        attacker_attack=phase.attack if phase is not None else int(enemy["attack"]),
                         attacker_initiative=int(enemy["initiative"]),
                         defender_agility=int(player_stats["agility"]),
                         target_hp=player_hp,
                         seed=str(snapshot["random_seed"]),
                         operation_id=operation_id,
+                        skill_hit_bp=phase.enemy_hit_bonus_bp if phase is not None else 0,
                     )
                     if defending:
                         action["damage"] = int(action["damage"]) * 8_000 // 10_000
                     player_hp = max(0, player_hp - int(action["damage"]))
                 sequence += 1
                 action["state"] = {"player_hp": player_hp, "enemy_hp": enemy_hp}
+                if phase is not None:
+                    action["state"].update(
+                        {
+                            "tribulation_phase": phase.key,
+                            "debt_shield_bp": debt_shield_bp,
+                            "phase_player_damage_bp": phase.player_damage_bp,
+                        }
+                    )
                 actions.append(action)
                 if enemy_hp <= 0:
                     outcome, reason = "won", "enemy_defeated"
@@ -419,6 +451,13 @@ class CombatRepositoryMixin:
                 "enemy_hp": enemy_hp,
                 "timeout_count": timeout_count,
             }
+            if is_tribulation_trial:
+                state.update(
+                    {
+                        "tribulation_phase": phase_for_hp(enemy_hp, int(enemy["max_hp"])).key,
+                        "debt_shield_bp": debt_shield_bp,
+                    }
+                )
             status = outcome or "running"
             connection.execute(
                 """
@@ -502,7 +541,7 @@ class CombatRepositoryMixin:
             } if outcome == "won" else {}
             reward_status = "pending" if outcome == "won" and reward else "none"
             durability_loss = 0
-            if outcome == "won":
+            if outcome == "won" and str(session["battle_type"]) != "pve.tribulation_trial":
                 durable_ids = [
                     str(item["instance_id"])
                     for item in list(snapshot.get("player", {}).get("equipment", []))
@@ -794,10 +833,12 @@ class CombatRepositoryMixin:
         target_hp: int,
         seed: str,
         operation_id: str,
+        skill_hit_bp: int = 0,
     ) -> dict[str, object]:
         hit_bp = hit_chance_bp(
             attacker_initiative=attacker_initiative,
             defender_agility=defender_agility,
+            skill_hit_bp=skill_hit_bp,
         )
         hit_roll = battle_roll_bp(f"{seed}:round:{round_no}:action:{sequence}:hit")
         crit_roll = battle_roll_bp(f"{seed}:round:{round_no}:action:{sequence}:crit")

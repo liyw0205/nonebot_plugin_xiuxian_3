@@ -768,6 +768,9 @@ def test_tribulation_guard_is_locked_returned_on_success_and_consumed_on_failure
                     realm_layer=3,
                     location_key="tribulation.sky_terrace",
                     path_key="body",
+                    qualification_json=json.dumps(
+                        {"body": 2_000, "agility": 2_000} if succeeded else {"body": 0, "agility": 0}
+                    ),
                     inventory_json=json.dumps({"item.tribulation_token": 1, "item.tribulation_guard": 1}),
                 )
                 operation = next(
@@ -791,6 +794,7 @@ def test_tribulation_guard_is_locked_returned_on_success_and_consumed_on_failure
                 settled = await runtime.dispatch(
                     _ctx(adapter, user, f"settle-{user}"), "结算天劫试炼"
                 )
+                assert settled.data["battle_outcome"] == ("won" if succeeded else "lost")
                 assert settled.data["success"] is succeeded
                 assert settled.data["tribulation_debt"] == (0 if succeeded else 5)
                 with sqlite3.connect(runtime.settings.database_path) as connection:

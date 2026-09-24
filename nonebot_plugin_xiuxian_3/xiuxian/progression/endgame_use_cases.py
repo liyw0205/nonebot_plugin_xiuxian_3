@@ -233,6 +233,7 @@ class EndgameApplication:
                 choice_key=choice_key,
                 operation_id=operation_id,
             )
+            battle = await self._run_trial_battle(record.battle_id)
         except PlayerNotFoundError:
             return self._failure(context, operation_id, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。")
         except LocationRequirementError:
@@ -260,13 +261,14 @@ class EndgameApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         label = TRIAL_LABELS[record.trial_key]
+        battle_label = "胜利" if battle.outcome == "won" else "失败"
         return CommandResult(
             True,
             "TRIAL_STARTED",
-            f"## {label}已开始\n\n预计 30 分钟后发送 `结算天劫试炼`。凭证已锁定，重复请求会回放同一场试炼。",
+            f"## {label}战斗已结束\n\n服务端自动回合结果：**{battle_label}**。发送 `结算天劫试炼` 领取试炼结算。",
             context.request_id,
             operation_id,
-            data={"session_id": record.session_id, "trial_key": record.trial_key, "ends_at": record.ends_at, "idempotent_replay": record.already_completed},
+            data={"session_id": record.session_id, "battle_id": record.battle_id, "battle_outcome": battle.outcome, "trial_key": record.trial_key, "ends_at": record.ends_at, "idempotent_replay": record.already_completed},
         )
 
     async def settle_trial(self, context: CommandContext) -> CommandResult:
@@ -274,6 +276,12 @@ class EndgameApplication:
             return CommandResult(False, "INVALID_TRIAL_COMMAND", "结算天劫试炼无需附加参数。", context.request_id)
         operation_id = self._operation_id(context, "tribulation.settle_trial")
         try:
+            battle_id = await self.repository.active_tribulation_trial_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+            if battle_id:
+                await self._run_trial_battle(battle_id)
             record = await self.repository.settle_tribulation_trial(
                 platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id
             )
@@ -293,14 +301,33 @@ class EndgameApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         label = TRIAL_LABELS[record.trial_key]
         status = "成功" if record.success else "失败"
+        battle_line = f"自动战斗 `{'胜利' if record.battle_outcome == 'won' else '失败'}`，" if record.battle_outcome else ""
         return CommandResult(
             True,
             "TRIAL_SUCCEEDED" if record.success else "TRIAL_FAILED",
-            f"## {label}结算{status}\n\n道果进度 +{record.reward_progress}，道源功勋 +{record.reward_merit}，世界功勋 +{record.reward_world_merit}，天劫债 +{record.debt_delta}。",
+            f"## {label}结算{status}\n\n{battle_line}道果进度 +{record.reward_progress}，道源功勋 +{record.reward_merit}，世界功勋 +{record.reward_world_merit}，天劫债 +{record.debt_delta}。",
             context.request_id,
             operation_id,
-            data={"session_id": record.session_id, "trial_key": record.trial_key, "success": record.success, "roll_bp": record.roll_bp, "dao_fruit_progress": record.player.dao_fruit_progress, "ascension_merit": record.player.ascension_merit, "world_merit": record.player.world_merit, "reward_world_merit": record.reward_world_merit, "tribulation_debt": record.player.tribulation_debt, "dao_fruit_key": record.dao_fruit_key, "idempotent_replay": record.already_completed},
+            data={"session_id": record.session_id, "battle_id": record.battle_id, "battle_outcome": record.battle_outcome, "trial_key": record.trial_key, "success": record.success, "roll_bp": record.roll_bp, "dao_fruit_progress": record.player.dao_fruit_progress, "ascension_merit": record.player.ascension_merit, "world_merit": record.player.world_merit, "reward_world_merit": record.reward_world_merit, "tribulation_debt": record.player.tribulation_debt, "dao_fruit_key": record.dao_fruit_key, "idempotent_replay": record.already_completed},
         )
+
+    async def _run_trial_battle(self, battle_id: str):
+        expected_round = 1
+        turn = None
+        while expected_round <= 20:
+            turn = await self.repository.run_battle_turn(
+                battle_id=battle_id,
+                expected_round=expected_round,
+            )
+            if turn.status not in {"created", "running"}:
+                break
+            next_round = turn.round_no + 1
+            if next_round <= expected_round:
+                raise TribulationTrialNotReadyError("automatic tribulation battle did not advance")
+            expected_round = next_round
+        if turn is None or turn.status in {"created", "running"}:
+            raise TribulationTrialNotReadyError("automatic tribulation battle did not finish")
+        return await self.repository.resolve_battle(battle_id=battle_id)
 
 
 __all__ = ["EndgameApplication"]
