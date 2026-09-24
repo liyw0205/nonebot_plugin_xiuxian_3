@@ -15,6 +15,7 @@ from .exploration.use_cases import ExplorationApplication
 from .combat.use_cases import CombatApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
+from .adventures.dao_echoes_use_cases import DaoEchoesApplication
 from .advancement.use_cases import AdvancementApplication
 from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
@@ -50,6 +51,7 @@ class XiuxianApplication:
         self.combat = CombatApplication(repository)
         self.adventures = AdventuresApplication(repository)
         self.mainline = AdventuresMainlineApplication(repository)
+        self.dao_echoes = DaoEchoesApplication(repository)
         self.advancement = AdvancementApplication(repository)
         self.constitution = ConstitutionApplication(repository)
         self.talent = TalentApplication(repository)
@@ -485,6 +487,23 @@ class XiuxianApplication:
             context,
             lambda: self.mainline.claim_reward(context),
             write_message="当前事件不允许领取主线奖励。",
+        )
+
+    async def get_dao_echoes_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dao_echoes.get_status(context), require_write=False)
+
+    async def start_dao_echoes_stage(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_echoes.start_stage(context),
+            write_message="当前事件不允许开始道源主线。",
+        )
+
+    async def claim_dao_echoes_stage(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_echoes.claim_reward(context),
+            write_message="当前事件不允许领取道源主线奖励。",
         )
 
     async def preview_retreat(self, context: CommandContext) -> CommandResult:

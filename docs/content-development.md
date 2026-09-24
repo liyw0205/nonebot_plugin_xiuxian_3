@@ -276,6 +276,47 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 任务事件必须在同一事务内引用证据记录和来源 operation、写入赛季键并发放对应奖励；同一来源 operation 对同一任务只能消费一次。`quest.dao_union` 的主线证据只接受 `story.mainline.dao_echoes` 三条 lane 各 10 个已领取 stage；历史旧 story 记录不会折算。渡劫 L9 晋升 L10 还要求三个道源任务都在当前赛季各有 3 条成功事件。`dao.origin_gate` 从 `void.archive_ruins` 开放服务端移动：合道 L6、道果进度 >=500、2 个道果碎片、20 体力、60 分钟，每个 UTC 日最多创建 1 次行程。`tribulation.sky_terrace` 从 `dao.origin_gate` 开放移动：渡劫 L3、1 张天劫凭证、30 分钟；移动凭证独立于每次试炼消耗的 1 张凭证。试炼只能在天劫台启动，移动与试炼会话互斥。所有 v0.6 终局配方仅允许在道源门开始，创建会话时冻结地点；试炼、作品和最终战必须使用可回放的服务端战斗/生产/结算记录，不接受概率命令或手工资格标记替代。
 
+#### 5.4.2 三界回响主线
+
+`story.mainline.dao_echoes` 是 `quest.dao_union` 的一条玩家可完成来源，不替代跨服宗门战或等价个人挑战，也不直接授予合道许可。玩家达到炼虚 L10 后可开始；建设者、见证者、远行者三条 lane 各有 10 关，lane 之间可任意切换，每条 lane 必须按序完成。开始和领取分成两个幂等 operation；首通只记录故事事件和对应图鉴旗标，不消耗资源、不发资产、不修改地点/道途/结局。重试只写新的故事事件，不重复发首通旗标。随机池为 `none`，每名角色每关只计一个有效首通。
+
+稳定 stage 键为 `lane.<builder|witness|traveler>.chapter.<01..10>`；图鉴旗标为 `codex.story.dao_echoes.<lane>.chapter.<01..10>`。故事事件键为 `story.mainline.dao_echoes:<stage_key>`。前置为炼虚 L10 加同 lane 前一关的有效首通，第一关没有 lane 内前置；三条 lane 互不依赖。内容/规则版本分别为 `content-0.6`、`adventures-0.6.0`。关卡叙事如下，描述是每关开始时呈现的故事摘要：
+
+| lane | stage key | 关卡 | 故事摘要 |
+|:--|:--|:--|:--|
+| builder | `lane.builder.chapter.01` | 检校旧碑 | 从玄天旧碑校正三界道路的刻痕 |
+| builder | `lane.builder.chapter.02` | 补绘河图 | 把魔界商路与玄天水脉补入共用地图 |
+| builder | `lane.builder.chapter.03` | 修复灵脉 | 记录妖界愿意开放的灵脉节点，不取走源头 |
+| builder | `lane.builder.chapter.04` | 搭建互市 | 三界代表确认互市只交换自愿交付的物资 |
+| builder | `lane.builder.chapter.05` | 重立界标 | 为并存的语言和习俗立下新界标 |
+| builder | `lane.builder.chapter.06` | 补缀界壁 | 与各界工匠修补裂隙，不抹去旧有疆界 |
+| builder | `lane.builder.chapter.07` | 汇合三源 | 三界各自交出一枚可撤回的道源校验印 |
+| builder | `lane.builder.chapter.08` | 立约共修 | 把维护责任分给三界，而非交给单一宗门 |
+| builder | `lane.builder.chapter.09` | 回望代价 | 登记工程代价与未解决的异议 |
+| builder | `lane.builder.chapter.10` | 道统新章 | 三界共同确认工程可延续，也可由后人修改 |
+| witness | `lane.witness.chapter.01` | 收录旧誓 | 收录三界旧约原文，不删去互相矛盾的誓言 |
+| witness | `lane.witness.chapter.02` | 听取三界 | 分别记录玄天、魔界和妖界的陈述与诉求 |
+| witness | `lane.witness.chapter.03` | 辨清旧争 | 将事实、推测和传闻分开存档 |
+| witness | `lane.witness.chapter.04` | 见证守卫 | 记录一次边境防御的参与者与各方损失 |
+| witness | `lane.witness.chapter.05` | 见证互助 | 将一次跨界救援记为共同完成，而非单方恩赐 |
+| witness | `lane.witness.chapter.06` | 核验盟约 | 逐条核对盟约文本与实际履行记录 |
+| witness | `lane.witness.chapter.07` | 保留异议 | 为未签署盟约的意见保留可查档案 |
+| witness | `lane.witness.chapter.08` | 确认代价 | 将停战与合作的代价写入公开记录 |
+| witness | `lane.witness.chapter.09` | 保存全录 | 完成由三界共同核验的档案副本 |
+| witness | `lane.witness.chapter.10` | 不替众人选择 | 把记录交还三界，不替任何人决定结局 |
+| traveler | `lane.traveler.chapter.01` | 走访玄天 | 从玄天出发，确认旧有道路仍可安全通行 |
+| traveler | `lane.traveler.chapter.02` | 渡过魔土 | 沿许可路线穿过魔界，记录沿途补给点 |
+| traveler | `lane.traveler.chapter.03` | 寻访妖庭 | 到访妖界聚落，依当地规矩递交来意 |
+| traveler | `lane.traveler.chapter.04` | 巡查界隙 | 标记交界处可通行与需避让的区域 |
+| traveler | `lane.traveler.chapter.05` | 抵达档案 | 把一路见闻交给虚空档案遗迹保存 |
+| traveler | `lane.traveler.chapter.06` | 重返三界 | 带回三地各自认可的路线副本 |
+| traveler | `lane.traveler.chapter.07` | 交接道路 | 向接任者说明沿途风险与通行约定 |
+| traveler | `lane.traveler.chapter.08` | 携行消息 | 传递各界允许公开的消息，不带走私密档案 |
+| traveler | `lane.traveler.chapter.09` | 拒绝捷径 | 放弃未经许可的捷径，保留可复核的行程 |
+| traveler | `lane.traveler.chapter.10` | 归来开篇 | 回到出发地，确认道路由后来者继续书写 |
+
+`道源主线` 查询三条 lane 进度；`开始道源主线 <lane> <stage>`、`领取道源主线奖励 <lane> <stage>` 执行单关。lane 参数接受稳定英文键或“建设者/见证者/远行者”。前置不足不创建 run；相同 operation 和输入回放原结果，不同输入返回 `OPERATION_CONFLICT`。关闭后停止新关卡；已开始关卡仍可按其快照领取，历史首通记录不删除。
+
 ### 5.5 适配器、Web 和内容发布
 
 | 域 | 首版 | 完整扩展 |

@@ -21,6 +21,7 @@ from ..world.travel_repository import TravelRepositoryMixin
 from ..exploration.repository import ExplorationRepositoryMixin
 from ..combat.repository import CombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
+from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
 from ..production.endgame_repository import EndgameProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
@@ -46,6 +47,7 @@ class SQLitePlayerRepository(
     ExplorationRepositoryMixin,
     CombatRepositoryMixin,
     AdventuresRepositoryMixin,
+    DaoEchoesRepositoryMixin,
     ProductionRepositoryMixin,
     EndgameProductionRepositoryMixin,
     LivelihoodRepositoryMixin,

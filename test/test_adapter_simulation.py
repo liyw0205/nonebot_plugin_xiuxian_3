@@ -156,6 +156,42 @@ def test_qq_and_onebot_normalized_events_reach_sky_terrace_flow() -> None:
     asyncio.run(run())
 
 
+def test_qq_and_onebot_run_dao_echoes_mainline_commands() -> None:
+    qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-dao-echoes"))
+    onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3060))
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for prefix, normalized in (("qq", qq), ("onebot", onebot)):
+                base = normalized.context
+
+                async def dispatch(operation: str, text: str):
+                    context = replace(base, operation_id=f"{prefix}-{operation}")
+                    return await runtime.adapters.dispatch(base.adapter, context, text)
+
+                assert (await dispatch("create", "开始修仙")).code == "PLAYER_CREATED"
+                assert (await dispatch("seek", "寻仙问道")).code == "SEEKING_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=10 "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (base.adapter, base.user_id),
+                    )
+
+                started = await dispatch("start", "开始道源主线 建设者 1")
+                assert started.code == "DAO_ECHOES_STAGE_STARTED"
+                claimed = await dispatch("claim", "领取道源主线奖励 建设者 1")
+                assert claimed.code == "DAO_ECHOES_STAGE_CLAIMED"
+                assert claimed.data["stage_key"] == "lane.builder.chapter.01"
+                status = await dispatch("status", "道源主线")
+                assert status.code == "DAO_ECHOES_STATUS"
+                assert status.data["lanes"][0]["completed"] == 1
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_qq_and_onebot_normalization_reaches_automatic_training_battle() -> None:
     qq = normalize_qq_event(_qq_group_event("开始训练战", message_id="qq-training-battle"))
     onebot = normalize_event(_onebot_group_event("开始训练战", message_id=3020))
