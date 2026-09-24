@@ -286,5 +286,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("撤销竞技场快照", application.revoke_arena_snapshot, aliases=("撤销防守快照",))
     router.register("竞技场列表", application.list_arena_snapshots, aliases=("竞技场快照", "竞技场匹配池"))
     router.register("挑战竞技场", application.challenge_arena, aliases=("竞技场挑战",))
+    router.register("竞技场排位", application.rank_arena, aliases=("挑战竞技场排位",))
+    router.register("竞技场练习", application.practice_arena, aliases=("练习竞技场",))
+    router.register("允许竞技场练习", application.grant_arena_practice_consent, aliases=("同意竞技场练习",))
     router.register("竞技场回放", application.replay_arena, aliases=("查看竞技场回放",))
     router.register("领取竞技场结果", application.claim_arena_result, aliases=("确认竞技场结果",))

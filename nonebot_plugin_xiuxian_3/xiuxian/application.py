@@ -994,6 +994,27 @@ class XiuxianApplication:
             write_message="当前事件不允许发起竞技场挑战。",
         )
 
+    async def rank_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.rank(context),
+            write_message="当前事件不允许发起竞技场排位。",
+        )
+
+    async def practice_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.practice(context),
+            write_message="当前事件不允许进行竞技场练习。",
+        )
+
+    async def grant_arena_practice_consent(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.grant_practice_consent(context),
+            write_message="当前事件不允许授权竞技场练习。",
+        )
+
     async def replay_arena(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.arena.replay(context), require_write=False)
 

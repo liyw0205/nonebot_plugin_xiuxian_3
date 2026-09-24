@@ -19,6 +19,7 @@ class ArenaSnapshotRecord:
 @dataclass(frozen=True, slots=True)
 class ArenaMatchRecord:
     match_id: str
+    mode_key: str
     outcome: str
     rounds: int
     score_counted: bool

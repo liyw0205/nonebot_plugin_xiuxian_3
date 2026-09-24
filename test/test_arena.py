@@ -211,3 +211,89 @@ def test_arena_snapshot_antifarm_cap_and_revoke() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_arena_practice_consent_is_zero_score_and_has_separate_daily_cap() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, tzinfo=timezone.utc))
+        qq, onebot = _adapter_contexts()
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            qq = replace(qq, user_id="arena-practice-qq")
+            onebot = replace(onebot, user_id="arena-practice-ob")
+            await _cultivator(runtime, qq, "practice-qq")
+            await _cultivator(runtime, onebot, "practice-ob")
+            published = await runtime.adapters.dispatch(
+                onebot.adapter, replace(onebot, operation_id="practice-publish"), "发布竞技场快照"
+            )
+            snapshot_id = published.data["snapshot_id"]
+            consent = await runtime.adapters.dispatch(
+                onebot.adapter,
+                replace(onebot, operation_id="practice-consent"),
+                f"允许竞技场练习 {snapshot_id} arena-practice-qq",
+            )
+            assert consent.code == "ARENA_PRACTICE_CONSENT_GRANTED"
+            clock.advance(minutes=31)
+            first = await runtime.adapters.dispatch(
+                qq.adapter,
+                replace(qq, operation_id="practice-1"),
+                f"竞技场练习 {snapshot_id}",
+            )
+            assert first.code == "ARENA_MATCH_SETTLED"
+            assert first.data["mode_key"] == "arena.practice"
+            assert first.data["score_counted"] is False
+            for index in (2, 3):
+                result = await runtime.adapters.dispatch(
+                    qq.adapter,
+                    replace(qq, operation_id=f"practice-{index}"),
+                    f"竞技场练习 {snapshot_id}",
+                )
+                assert result.code == "ARENA_MATCH_SETTLED"
+            fourth = await runtime.adapters.dispatch(
+                qq.adapter,
+                replace(qq, operation_id="practice-4"),
+                f"竞技场练习 {snapshot_id}",
+            )
+            assert fourth.code == "ARENA_DAILY_CAP"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                rating = connection.execute(
+                    "SELECT arena_rating FROM players WHERE platform_user_id = ?", ("arena-practice-qq",)
+                ).fetchone()[0]
+                assert rating == 1000
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM arena_matches WHERE arena_mode_key = 'arena.practice'"
+                ).fetchone()[0] == 3
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_arena_rank_uses_same_rating_band_and_weekly_mode_budget() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, tzinfo=timezone.utc))
+        qq, onebot = _adapter_contexts()
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            qq = replace(qq, user_id="arena-rank-qq")
+            onebot = replace(onebot, user_id="arena-rank-ob")
+            await _cultivator(runtime, qq, "rank-qq")
+            await _cultivator(runtime, onebot, "rank-ob")
+            published = await runtime.adapters.dispatch(
+                onebot.adapter, replace(onebot, operation_id="rank-publish"), "发布竞技场快照"
+            )
+            clock.advance(minutes=31)
+            result = await runtime.adapters.dispatch(
+                qq.adapter,
+                replace(qq, operation_id="rank-challenge"),
+                f"竞技场排位 {published.data['snapshot_id']}",
+            )
+            assert result.code == "ARENA_MATCH_SETTLED"
+            assert result.data["mode_key"] == "arena.rank"
+            assert result.data["score_counted"] is True
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM arena_matches WHERE arena_mode_key = 'arena.rank'"
+                ).fetchone()[0] == 1
+            await runtime.close()
+
+    asyncio.run(run())

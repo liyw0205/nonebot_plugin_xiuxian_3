@@ -21,6 +21,7 @@ from ..persistence.errors import (
 )
 from .arena_models import ArenaMatchRecord, ArenaSnapshotRecord
 from .arena_repository import ArenaRepositoryMixin
+from .arena_rules import ARENA_MODE_KEY, ARENA_PRACTICE_MODE_KEY, ARENA_RANK_MODE_KEY
 
 
 class ArenaApplication:
@@ -100,6 +101,7 @@ class ArenaApplication:
     def _match_data(record: ArenaMatchRecord) -> dict[str, object]:
         return {
             "match_id": record.match_id,
+            "mode_key": record.mode_key,
             "outcome": record.outcome,
             "rounds": record.rounds,
             "score_counted": record.score_counted,
@@ -176,7 +178,7 @@ class ArenaApplication:
         lines.extend(["", "对手仅展示公开道号、道途、境界层数区间与快照摘要。"])
         return CommandResult(True, "ARENA_SNAPSHOT_LIST", "\n".join(lines), context.request_id, data=data)
 
-    async def challenge(self, context: CommandContext) -> CommandResult:
+    async def challenge(self, context: CommandContext, *, mode_key: str = ARENA_MODE_KEY) -> CommandResult:
         if len(context.command_args) > 1:
             return CommandResult(False, "INVALID_ARENA_COMMAND", "挑战竞技场最多接收一个快照编号。", context.request_id)
         operation_id = self._operation_id(context, "arena.challenge")
@@ -186,6 +188,7 @@ class ArenaApplication:
                 platform_user_id=context.user_id,
                 snapshot_id=context.command_args[0] if context.command_args else None,
                 operation_id=operation_id,
+                mode_key=mode_key,
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
@@ -195,14 +198,49 @@ class ArenaApplication:
             "draw": "平局",
         }.get(record.outcome, record.outcome)
         count_text = "计入积分" if record.score_counted else "本次仅作练习，不计入积分（同一快照今日已达 2 场）"
+        mode_label = {ARENA_MODE_KEY: "切磋", ARENA_RANK_MODE_KEY: "排位", ARENA_PRACTICE_MODE_KEY: "练习"}.get(mode_key, mode_key)
         return CommandResult(
             True,
             "ARENA_MATCH_SETTLED",
-            f"## 竞技场异步斗法结束\n\n- **结果**：{outcome}\n- **回合**：{record.rounds}/15\n- **积分**：{count_text}\n- **对手**：{self._display(record.opponent_summary.get('display_name'))}\n\n服务器已固定双方快照并保存完整行动回放。",
+            f"## 竞技场{mode_label}结束\n\n- **结果**：{outcome}\n- **回合**：{record.rounds}/15\n- **积分**：{count_text}\n- **对手**：{self._display(record.opponent_summary.get('display_name'))}\n\n服务器已固定双方快照并保存完整行动回放。",
             context.request_id,
             operation_id,
             data=self._match_data(record),
         )
+
+    async def grant_practice_consent(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 2:
+            return CommandResult(
+                False,
+                "INVALID_ARENA_COMMAND",
+                "请使用 `允许竞技场练习 <快照编号> <对手用户标识>`。",
+                context.request_id,
+            )
+        operation_id = self._operation_id(context, "arena.practice_consent")
+        try:
+            await self.repository.grant_arena_practice_consent(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                snapshot_id=context.command_args[0],
+                challenger_identity=context.command_args[1],
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(
+            True,
+            "ARENA_PRACTICE_CONSENT_GRANTED",
+            "已允许指定道友使用该快照进行竞技场练习；练习不计积分，也不转移玩家资产。",
+            context.request_id,
+            operation_id,
+            data={"snapshot_id": context.command_args[0], "idempotent_replay": False},
+        )
+
+    async def practice(self, context: CommandContext) -> CommandResult:
+        return await self.challenge(context, mode_key=ARENA_PRACTICE_MODE_KEY)
+
+    async def rank(self, context: CommandContext) -> CommandResult:
+        return await self.challenge(context, mode_key=ARENA_RANK_MODE_KEY)
 
     async def replay(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1:

@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import timedelta
 from typing import Mapping
 
 CONTENT_VERSION = "content-0.6"
 RULE_VERSION = "arena-0.1.0"
 ARENA_MODE_KEY = "arena.spar"
+ARENA_RANK_MODE_KEY = "arena.rank"
+ARENA_PRACTICE_MODE_KEY = "arena.practice"
 SNAPSHOT_VALID_DAYS = 7
 SNAPSHOT_MATCH_DELAY_SECONDS = 30 * 60
 DAILY_CHALLENGE_LIMIT = 5
+WEEKLY_RANK_LIMIT = 20
+DAILY_PRACTICE_LIMIT = 3
 DAILY_COUNTED_OPPONENT_LIMIT = 2
 MAX_ROUNDS = 15
 WIN_RATING_DELTA = 25
@@ -45,6 +50,23 @@ def rating_delta(outcome: str, *, challenger: bool) -> int:
     if not challenger:
         won = not won
     return WIN_RATING_DELTA if won else LOSS_RATING_DELTA
+
+
+def mode_period_prefix(mode_key: str, now) -> str:
+    """Return the UTC period prefix used for mode-specific attempt limits."""
+
+    if mode_key == ARENA_RANK_MODE_KEY:
+        monday = now.date() - timedelta(days=now.weekday())
+        return monday.isoformat() + "%"
+    return now.date().isoformat() + "%"
+
+
+def mode_attempt_limit(mode_key: str) -> int:
+    if mode_key == ARENA_RANK_MODE_KEY:
+        return WEEKLY_RANK_LIMIT
+    if mode_key == ARENA_PRACTICE_MODE_KEY:
+        return DAILY_PRACTICE_LIMIT
+    return DAILY_CHALLENGE_LIMIT
 
 
 def _stats(player: Mapping[str, object]) -> dict[str, int]:
@@ -132,14 +154,20 @@ def public_summary(player: Mapping[str, object], *, snapshot_id: str, rating: in
 
 __all__ = [
     "ARENA_MODE_KEY",
+    "ARENA_PRACTICE_MODE_KEY",
+    "ARENA_RANK_MODE_KEY",
     "CONTENT_VERSION",
     "DAILY_CHALLENGE_LIMIT",
     "DAILY_COUNTED_OPPONENT_LIMIT",
+    "DAILY_PRACTICE_LIMIT",
     "MAX_ROUNDS",
     "RULE_VERSION",
     "SNAPSHOT_MATCH_DELAY_SECONDS",
     "SNAPSHOT_VALID_DAYS",
+    "WEEKLY_RANK_LIMIT",
     "compatible_rating",
+    "mode_attempt_limit",
+    "mode_period_prefix",
     "public_summary",
     "rating_band",
     "rating_delta",

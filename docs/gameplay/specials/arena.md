@@ -30,13 +30,14 @@
 
 ## 4. 当前运行时切片
 
-当前开放 `arena.spar`，入口统一经过 application：
+当前开放 `arena.spar`、`arena.practice` 和 `arena.rank`，入口统一经过 application：
 
 - `发布竞技场快照` / `撤销竞技场快照 [snapshot_id]`
 - `竞技场列表` / `挑战竞技场 [snapshot_id]`
+- `竞技场练习 [snapshot_id]` / `允许竞技场练习 <snapshot_id> <对手用户标识>`
+- `竞技场排位 [snapshot_id]`
 - `竞技场回放 [match_id]` / `领取竞技场结果 [match_id]`
 
 持久化由 `specials/arena_repository.py` 独立负责，使用 `arena_snapshots`、`arena_matches`、
 `arena_actions` 和 `arena_reward_claims`；不会创建单人 `battle_sessions`。QQ 官方和 OneBot V11
-均覆盖发布、延迟、挑战、回放、确认、反刷和每日上限。`arena.rank`、`arena.practice`、多方
-PvP 与跨服仍关闭。
+均覆盖发布、延迟、挑战、练习授权、回放、确认、反刷和模式配额。多方 PvP 与跨服仍关闭。

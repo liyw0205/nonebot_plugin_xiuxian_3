@@ -160,6 +160,7 @@ class SQLitePlayerRepository(
         with self._connect() as connection:
             connection.executescript(SCHEMA)
             self._migrate_legacy_schema(connection)
+            self._migrate_arena_mode_schema(connection)
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
             connection.execute(
@@ -221,6 +222,98 @@ class SQLitePlayerRepository(
                     "UPDATE redemption_codes SET status = 'revoked', updated_at = ? WHERE code_key = ?",
                     (now_text, definition.code_key),
                 )
+
+    @staticmethod
+    def _migrate_arena_mode_schema(connection: sqlite3.Connection) -> None:
+        """Expand spar-only arena tables without losing existing rows."""
+
+        tables = {
+            name: connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+            ).fetchone()
+            for name in ("arena_snapshots", "arena_matches")
+        }
+        if all(
+            table and "'arena.rank'" in str(table[0]) and "'arena.practice'" in str(table[0])
+            for table in tables.values()
+        ):
+            return
+        connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute("DROP INDEX IF EXISTS idx_arena_snapshots_pool")
+        connection.execute("DROP INDEX IF EXISTS idx_arena_snapshots_player")
+        connection.execute("DROP INDEX IF EXISTS idx_arena_snapshots_active_player")
+        connection.execute("DROP INDEX IF EXISTS idx_arena_matches_challenger")
+        connection.execute("DROP INDEX IF EXISTS idx_arena_matches_defender_snapshot")
+        connection.execute(
+            """
+            CREATE TABLE arena_snapshots_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id TEXT NOT NULL UNIQUE,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                status TEXT NOT NULL CHECK (status IN ('published', 'revoked', 'expired')),
+                arena_mode_key TEXT NOT NULL CHECK (arena_mode_key IN ('arena.spar', 'arena.rank', 'arena.practice')),
+                rating INTEGER NOT NULL CHECK (rating >= 0),
+                matchable_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                snapshot_json TEXT NOT NULL DEFAULT '{}',
+                public_json TEXT NOT NULL DEFAULT '{}',
+                content_version TEXT NOT NULL,
+                rule_version TEXT NOT NULL,
+                revoked_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute("INSERT INTO arena_snapshots_new SELECT * FROM arena_snapshots")
+        connection.execute("DROP TABLE arena_snapshots")
+        connection.execute("ALTER TABLE arena_snapshots_new RENAME TO arena_snapshots")
+        connection.execute(
+            "CREATE INDEX idx_arena_snapshots_pool ON arena_snapshots(status, rating, matchable_at, expires_at)"
+        )
+        connection.execute(
+            "CREATE INDEX idx_arena_snapshots_player ON arena_snapshots(player_id, status, created_at)"
+        )
+        connection.execute(
+            "CREATE UNIQUE INDEX idx_arena_snapshots_active_player ON arena_snapshots(player_id) WHERE status = 'published'"
+        )
+        connection.execute(
+            """
+            CREATE TABLE arena_matches_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                match_id TEXT NOT NULL UNIQUE,
+                challenger_id INTEGER NOT NULL REFERENCES players(id),
+                defender_id INTEGER NOT NULL REFERENCES players(id),
+                challenger_snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
+                defender_snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
+                arena_mode_key TEXT NOT NULL CHECK (arena_mode_key IN ('arena.spar', 'arena.rank', 'arena.practice')),
+                status TEXT NOT NULL CHECK (status IN ('settled')),
+                outcome TEXT NOT NULL CHECK (outcome IN ('challenger_won', 'defender_won', 'draw')),
+                rounds INTEGER NOT NULL CHECK (rounds BETWEEN 1 AND 15),
+                score_counted INTEGER NOT NULL CHECK (score_counted IN (0, 1)),
+                challenger_rating_delta INTEGER NOT NULL,
+                defender_rating_delta INTEGER NOT NULL,
+                snapshot_json TEXT NOT NULL DEFAULT '{}',
+                result_json TEXT NOT NULL DEFAULT '{}',
+                operation_id TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL,
+                settled_at TEXT NOT NULL,
+                CHECK (challenger_id <> defender_id)
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO arena_matches_new SELECT * FROM arena_matches"
+        )
+        connection.execute("DROP TABLE arena_matches")
+        connection.execute("ALTER TABLE arena_matches_new RENAME TO arena_matches")
+        connection.execute(
+            "CREATE INDEX idx_arena_matches_challenger ON arena_matches(challenger_id, created_at)"
+        )
+        connection.execute(
+            "CREATE INDEX idx_arena_matches_defender_snapshot ON arena_matches(challenger_id, defender_snapshot_id, created_at)"
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
 
     @staticmethod
     def _migrate_legacy_schema(connection: sqlite3.Connection) -> None:

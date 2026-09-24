@@ -36,6 +36,8 @@ from .arena_models import (
 )
 from .arena_rules import (
     ARENA_MODE_KEY,
+    ARENA_PRACTICE_MODE_KEY,
+    ARENA_RANK_MODE_KEY,
     CONTENT_VERSION,
     DAILY_CHALLENGE_LIMIT,
     DAILY_COUNTED_OPPONENT_LIMIT,
@@ -43,7 +45,10 @@ from .arena_rules import (
     SNAPSHOT_MATCH_DELAY_SECONDS,
     SNAPSHOT_VALID_DAYS,
     compatible_rating,
+    mode_attempt_limit,
+    mode_period_prefix,
     public_summary,
+    rating_band,
     rating_delta,
     simulate_match,
 )
@@ -100,6 +105,7 @@ class ArenaRepositoryMixin:
         platform_user_id: str,
         snapshot_id: str | None,
         operation_id: str,
+        mode_key: str = ARENA_MODE_KEY,
     ) -> ArenaMatchRecord:
         await self.initialize()
         async with self._inflight:
@@ -110,6 +116,79 @@ class ArenaRepositoryMixin:
                 platform_user_id,
                 snapshot_id,
                 operation_id,
+                mode_key,
+            )
+
+    async def grant_arena_practice_consent(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        snapshot_id: str,
+        challenger_identity: str,
+        operation_id: str,
+    ) -> None:
+        await self.initialize()
+        async with self._inflight:
+            await asyncio.to_thread(
+                self._retry_sync,
+                self._grant_arena_practice_consent_once,
+                platform,
+                platform_user_id,
+                snapshot_id,
+                challenger_identity,
+                operation_id,
+            )
+
+    def _grant_arena_practice_consent_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        snapshot_id: str,
+        challenger_identity: str,
+        operation_id: str,
+    ) -> None:
+        operation_name = "specials.grant_arena_practice_consent"
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "snapshot_id": snapshot_id,
+            "challenger_identity": challenger_identity,
+        }
+        request_hash = self._request_hash(operation_name, request_payload)
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            replay = self._arena_operation(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return
+            owner = self._arena_require_player(connection, platform, platform_user_id)
+            snapshot = self._find_owned_snapshot(connection, int(owner["id"]), snapshot_id)
+            self._expire_snapshot_row(connection, snapshot, now)
+            if str(snapshot["status"]) != "published":
+                raise ArenaSnapshotExpiredError("snapshot is not available for practice")
+            target = connection.execute(
+                "SELECT * FROM players WHERE status = 'active' AND stage = 'cultivator' AND "
+                "(platform_user_id = ? OR player_id = ?)",
+                (challenger_identity, challenger_identity),
+            ).fetchone()
+            if target is None or int(target["id"]) == int(owner["id"]):
+                raise ArenaMatchRequirementError("practice challenger is not eligible")
+            expires_at = min(datetime.fromisoformat(str(snapshot["expires_at"])), now + timedelta(days=SNAPSHOT_VALID_DAYS))
+            connection.execute(
+                "INSERT INTO arena_practice_consents(snapshot_id, owner_id, challenger_id, operation_id, expires_at, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(snapshot_id, challenger_id) DO UPDATE SET operation_id = excluded.operation_id, expires_at = excluded.expires_at, created_at = excluded.created_at",
+                (snapshot_id, owner["id"], target["id"], operation_id, serialize_datetime(expires_at), now_text),
+            )
+            self._arena_insert_operation(
+                connection,
+                operation_id,
+                operation_name,
+                int(owner["id"]),
+                request_hash,
+                {"snapshot_id": snapshot_id, "challenger_id": int(target["id"]), "expires_at": serialize_datetime(expires_at)},
+                now_text,
             )
 
     async def replay_arena(
@@ -278,20 +357,23 @@ class ArenaRepositoryMixin:
         platform_user_id: str,
         requested_snapshot_id: str | None,
         operation_id: str,
+        mode_key: str,
     ) -> ArenaMatchRecord:
+        if mode_key not in {ARENA_MODE_KEY, ARENA_RANK_MODE_KEY, ARENA_PRACTICE_MODE_KEY}:
+            raise ArenaMatchRequirementError("unsupported arena mode")
         operation_name = "specials.challenge_arena"
         request_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
             "snapshot_id": requested_snapshot_id,
-            "arena_mode_key": ARENA_MODE_KEY,
+            "arena_mode_key": mode_key,
             "content_version": CONTENT_VERSION,
             "rule_version": RULE_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
         now_text = serialize_datetime(now)
-        today_prefix = now.date().isoformat() + "%"
+        period_prefix = mode_period_prefix(mode_key, now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             replay = self._arena_operation(connection, operation_id, operation_name, request_hash)
@@ -302,10 +384,10 @@ class ArenaRepositoryMixin:
             self._arena_require_free(connection, challenger_id)
             attempts = connection.execute(
                 "SELECT COUNT(*) AS total FROM arena_matches WHERE challenger_id = ? AND arena_mode_key = ? AND created_at LIKE ?",
-                (challenger_id, ARENA_MODE_KEY, today_prefix),
+                (challenger_id, mode_key, period_prefix),
             ).fetchone()
-            if int(attempts["total"]) >= DAILY_CHALLENGE_LIMIT:
-                raise ArenaChallengeCapError("daily arena challenge cap has been reached")
+            if int(attempts["total"]) >= mode_attempt_limit(mode_key):
+                raise ArenaChallengeCapError("arena mode attempt cap has been reached")
             connection.execute(
                 "UPDATE arena_snapshots SET status = 'expired', updated_at = ? WHERE status = 'published' AND expires_at <= ?",
                 (now_text, now_text),
@@ -316,6 +398,7 @@ class ArenaRepositoryMixin:
                 int(challenger["arena_rating"]),
                 requested_snapshot_id,
                 now_text,
+                mode_key,
             )
             defender = connection.execute(
                 "SELECT * FROM players WHERE id = ? AND status = 'active'", (defender_snapshot["player_id"],)
@@ -334,9 +417,9 @@ class ArenaRepositoryMixin:
             counted_row = connection.execute(
                 "SELECT COUNT(*) AS total FROM arena_matches WHERE challenger_id = ? AND defender_snapshot_id = ? "
                 "AND score_counted = 1 AND created_at LIKE ?",
-                (challenger_id, defender_snapshot["snapshot_id"], today_prefix),
+                (challenger_id, defender_snapshot["snapshot_id"], now.date().isoformat() + "%"),
             ).fetchone()
-            score_counted = int(counted_row["total"]) < DAILY_COUNTED_OPPONENT_LIMIT
+            score_counted = mode_key != ARENA_PRACTICE_MODE_KEY and int(counted_row["total"]) < DAILY_COUNTED_OPPONENT_LIMIT
             challenger_delta = rating_delta(outcome, challenger=True) if score_counted else 0
             defender_delta = rating_delta(outcome, challenger=False) if score_counted else 0
             challenger_rating = max(0, int(challenger["arena_rating"]) + challenger_delta)
@@ -370,7 +453,7 @@ class ArenaRepositoryMixin:
             snapshot = {
                 "challenger": challenger_snapshot,
                 "defender": defender_snapshot_data,
-                "arena_mode_key": ARENA_MODE_KEY,
+                "arena_mode_key": mode_key,
                 "content_version": CONTENT_VERSION,
                 "rule_version": RULE_VERSION,
             }
@@ -382,6 +465,7 @@ class ArenaRepositoryMixin:
                 "defender_rating": defender_rating,
                 "challenger_rating_delta": challenger_delta,
                 "defender_rating_delta": defender_delta,
+                "mode_key": mode_key,
                 "opponent_summary": self._json_map(defender_snapshot["public_json"]),
             }
             connection.execute(
@@ -411,7 +495,7 @@ class ArenaRepositoryMixin:
                     defender["id"],
                     challenger_snapshot_id,
                     defender_snapshot["snapshot_id"],
-                    ARENA_MODE_KEY,
+                    mode_key,
                     outcome,
                     rounds,
                     1 if score_counted else 0,
@@ -557,6 +641,7 @@ class ArenaRepositoryMixin:
         challenger_rating: int,
         requested_snapshot_id: str | None,
         now_text: str,
+        mode_key: str,
     ) -> sqlite3.Row:
         if requested_snapshot_id:
             row = connection.execute(
@@ -569,13 +654,22 @@ class ArenaRepositoryMixin:
                 raise ArenaSnapshotExpiredError("arena snapshot is not matchable")
             if str(row["matchable_at"]) > now_text:
                 raise ArenaMatchRequirementError("arena snapshot is still in its publication delay")
-            if not compatible_rating(challenger_rating, int(row["rating"])):
+            if mode_key == ARENA_RANK_MODE_KEY and rating_band(challenger_rating) != rating_band(int(row["rating"])):
+                raise ArenaMatchRequirementError("rank snapshot is outside the same rating band")
+            if mode_key != ARENA_RANK_MODE_KEY and not compatible_rating(challenger_rating, int(row["rating"])):
                 raise ArenaMatchRequirementError("arena snapshot is outside the adjacent rating bands")
             owner = connection.execute(
                 "SELECT stage, status FROM players WHERE id = ?", (row["player_id"],)
             ).fetchone()
             if owner is None or owner["status"] != "active" or owner["stage"] != "cultivator":
                 raise ArenaOpponentUnavailableError("opponent is not currently eligible")
+            if mode_key == ARENA_PRACTICE_MODE_KEY:
+                consent = connection.execute(
+                    "SELECT 1 FROM arena_practice_consents WHERE snapshot_id = ? AND challenger_id = ? AND expires_at > ?",
+                    (row["snapshot_id"], challenger_id, now_text),
+                ).fetchone()
+                if consent is None:
+                    raise ArenaMatchRequirementError("practice requires the snapshot owner's consent")
             return row
         rows = connection.execute(
             "SELECT s.* FROM arena_snapshots s JOIN players p ON p.id = s.player_id "
@@ -584,7 +678,17 @@ class ArenaRepositoryMixin:
             (challenger_id, now_text, now_text, challenger_rating),
         ).fetchall()
         for row in rows:
-            if compatible_rating(challenger_rating, int(row["rating"])):
+            if mode_key == ARENA_PRACTICE_MODE_KEY:
+                consent = connection.execute(
+                    "SELECT 1 FROM arena_practice_consents WHERE snapshot_id = ? AND challenger_id = ? AND expires_at > ?",
+                    (row["snapshot_id"], challenger_id, now_text),
+                ).fetchone()
+                if consent is None:
+                    continue
+            if (
+                (mode_key == ARENA_RANK_MODE_KEY and rating_band(challenger_rating) == rating_band(int(row["rating"])))
+                or (mode_key != ARENA_RANK_MODE_KEY and compatible_rating(challenger_rating, int(row["rating"])))
+            ):
                 return row
         raise ArenaOpponentUnavailableError("no compatible arena snapshot is available")
 
@@ -762,6 +866,7 @@ class ArenaRepositoryMixin:
     def _match_from_payload(payload: dict[str, Any], *, already_completed: bool = False) -> ArenaMatchRecord:
         return ArenaMatchRecord(
             match_id=str(payload["match_id"]),
+            mode_key=str(payload.get("mode_key", ARENA_MODE_KEY)),
             outcome=str(payload["outcome"]),
             rounds=int(payload["rounds"]),
             score_counted=bool(payload.get("score_counted", False)),

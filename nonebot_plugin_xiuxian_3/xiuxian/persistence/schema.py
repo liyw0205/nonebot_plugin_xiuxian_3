@@ -1416,7 +1416,7 @@ CREATE TABLE IF NOT EXISTS arena_snapshots (
     snapshot_id TEXT NOT NULL UNIQUE,
     player_id INTEGER NOT NULL REFERENCES players(id),
     status TEXT NOT NULL CHECK (status IN ('published', 'revoked', 'expired')),
-    arena_mode_key TEXT NOT NULL CHECK (arena_mode_key = 'arena.spar'),
+    arena_mode_key TEXT NOT NULL CHECK (arena_mode_key IN ('arena.spar', 'arena.rank', 'arena.practice')),
     rating INTEGER NOT NULL CHECK (rating >= 0),
     matchable_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
@@ -1443,7 +1443,7 @@ CREATE TABLE IF NOT EXISTS arena_matches (
     defender_id INTEGER NOT NULL REFERENCES players(id),
     challenger_snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
     defender_snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
-    arena_mode_key TEXT NOT NULL CHECK (arena_mode_key = 'arena.spar'),
+    arena_mode_key TEXT NOT NULL CHECK (arena_mode_key IN ('arena.spar', 'arena.rank', 'arena.practice')),
     status TEXT NOT NULL CHECK (status IN ('settled')),
     outcome TEXT NOT NULL CHECK (outcome IN ('challenger_won', 'defender_won', 'draw')),
     rounds INTEGER NOT NULL CHECK (rounds BETWEEN 1 AND 15),
@@ -1483,6 +1483,21 @@ CREATE TABLE IF NOT EXISTS arena_actions (
 
 CREATE INDEX IF NOT EXISTS idx_arena_actions_match
     ON arena_actions(match_id, sequence_no);
+
+CREATE TABLE IF NOT EXISTS arena_practice_consents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
+    owner_id INTEGER NOT NULL REFERENCES players(id),
+    challenger_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (snapshot_id, challenger_id),
+    CHECK (owner_id <> challenger_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_practice_consents_challenger
+    ON arena_practice_consents(challenger_id, expires_at);
 
 CREATE TABLE IF NOT EXISTS arena_reward_claims (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
