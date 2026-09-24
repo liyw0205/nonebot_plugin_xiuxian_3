@@ -8,6 +8,9 @@
 技能、目标、伤害或结算结果；`run_turn` 只供内部 worker/application 调用，并记录自动
 策略版本、随机池和 operation ID。
 
+具名遭遇必须在敌人定义的 `location_key` 开始；战斗快照冻结该地点。境界、地点或已有
+行动锁任一前置不满足时，不创建会话，也不能生成任务资格证据。
+
 ## 错误码
 
 `BATTLE_NOT_FOUND`、`BATTLE_BUSY`、`SKILL_NOT_AVAILABLE`、`TARGET_INVALID`、`RESOURCE_INSUFFICIENT`、`BATTLE_EXPIRED`、`BATTLE_ALREADY_SETTLED`。

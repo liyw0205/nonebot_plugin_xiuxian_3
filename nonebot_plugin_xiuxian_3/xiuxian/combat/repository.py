@@ -175,7 +175,7 @@ class CombatRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if not self._meets_enemy_requirement(player, enemy.required_realm, enemy.required_layer):
                 raise BattleRequirementError("realm requirement is not met")
-            if battle_type == "pve.training" and str(player["location_key"]) != enemy.location_key:
+            if str(player["location_key"]) != enemy.location_key:
                 raise BattleRequirementError("battle requires a specific location")
             cooldown = player["battle_defeat_until"]
             if battle_type == "pve.training" and cooldown and now < datetime.fromisoformat(str(cooldown)):

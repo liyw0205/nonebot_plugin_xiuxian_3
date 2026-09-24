@@ -13,14 +13,20 @@ def _context(adapter: str, user: str, request: str, operation: str = "") -> Comm
     return CommandContext(adapter=adapter, user_id=user, request_id=request, operation_id=operation)
 
 
-async def _high_realm_player(runtime, adapter: str, user: str, realm: str = "nascent_soul") -> None:
+async def _high_realm_player(
+    runtime,
+    adapter: str,
+    user: str,
+    realm: str = "nascent_soul",
+    location_key: str = "xuantian.new_town",
+) -> None:
     created = await runtime.dispatch(_context(adapter, user, f"create-{user}"), "开始修仙")
     assert created.ok, created
     with sqlite3.connect(runtime.settings.database_path) as db:
         db.execute(
             """
             UPDATE players
-            SET stage = 'cultivator', realm_key = ?, realm_layer = 10,
+            SET stage = 'cultivator', realm_key = ?, realm_layer = 10, location_key = ?,
                 cultivation = 100000, total_cultivation = 848960,
                 max_hp = 1200, initiative = 80,
                 qualification_json = ?, stamina = 100, stamina_max = 100,
@@ -29,6 +35,7 @@ async def _high_realm_player(runtime, adapter: str, user: str, realm: str = "nas
             """,
             (
                 realm,
+                location_key,
                 json.dumps({"body": 40, "agility": 30, "spirit": 30, "root": 30, "insight": 30, "fortune": 10}),
                 json.dumps(
                     {
@@ -67,6 +74,20 @@ def test_soul_transformation_permit_is_player_reachable_and_idempotent() -> None
                     _context("qq.official", user, f"line-{index}", f"line-{index}"), "完成远古洞天任务"
                 )
                 assert result.code == "QUEST_ACTION_RECORDED"
+            wrong_location = await runtime.dispatch(
+                _context("qq.official", user, "cross-wrong-location", "cross-wrong-location"), "开始跨界战"
+            )
+            assert wrong_location.code == "BATTLE_REQUIREMENT_MISSING"
+            with sqlite3.connect(runtime.settings.database_path) as db:
+                assert db.execute(
+                    "SELECT COUNT(*) FROM battle_sessions WHERE player_id = "
+                    "(SELECT id FROM players WHERE platform = ? AND platform_user_id = ?)",
+                    ("qq.official", user),
+                ).fetchone()[0] == 0
+                db.execute(
+                    "UPDATE players SET location_key = 'cave.boundary_realm' WHERE platform = ? AND platform_user_id = ?",
+                    ("qq.official", user),
+                )
             battle = await runtime.dispatch(
                 _context("qq.official", user, "cross", "cross-battle"), "开始跨界战"
             )
@@ -98,7 +119,9 @@ def test_void_permit_counts_failed_trials_and_requires_archive_delivery() -> Non
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
             user = "quest-void"
-            await _high_realm_player(runtime, "onebot.v11", user, realm="soul_transformation")
+            await _high_realm_player(
+                runtime, "onebot.v11", user, realm="soul_transformation", location_key="void.portal"
+            )
             for index in range(3):
                 result = await runtime.dispatch(
                     _context("onebot.v11", user, f"trial-{index}", f"trial-{index}"), "开始界壁试炼"
