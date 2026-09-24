@@ -122,6 +122,10 @@ class TribulationTrialRepositoryMixin:
             ).fetchone() is not None:
                 raise TribulationTrialBusyError("an endgame recipe is already preparing")
             if connection.execute(
+                "SELECT 1 FROM final_battle_members WHERE player_id=? AND asset_lock_status='locked' LIMIT 1", (row["id"],)
+            ).fetchone() is not None:
+                raise TribulationTrialBusyError("final battle assets are locked")
+            if connection.execute(
                 "SELECT 1 FROM travel_sessions WHERE player_id=? AND status='running' LIMIT 1", (row["id"],)
             ).fetchone() is not None:
                 raise TribulationTrialBusyError("travel is already running")

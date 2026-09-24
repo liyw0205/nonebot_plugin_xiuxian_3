@@ -75,10 +75,8 @@ DESTINATIONS = {
     ),
     "ascension.heaven_path": DestinationDefinition(
         "ascension.heaven_path", "飞升路", 90 * 60, 0, 0,
-        pass_key="item.ascension_certificate", pass_quantity=1,
         source_locations=("tribulation.sky_terrace",),
         required_endgame_status="ascension_ready",
-        consume_pass_on_arrival=True,
         content_version="content-0.6",
         rule_version="world-0.6.0",
     ),

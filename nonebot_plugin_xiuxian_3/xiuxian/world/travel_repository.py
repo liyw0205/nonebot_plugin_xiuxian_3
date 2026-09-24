@@ -381,11 +381,18 @@ class TravelRepositoryMixin:
                 ("production_orders", "processing"),
                 ("breakthrough_sessions", "preparing"),
                 ("endgame_sessions", "preparing"),
+                ("final_battle_members", "asset_lock_status = 'locked'"),
                 ("tribulation_trial_sessions", "preparing"),
             ):
-                busy = connection.execute(
-                    f"SELECT 1 FROM {table} WHERE player_id = ? AND status = ? LIMIT 1", (player_id, status)
-                ).fetchone()
+                if table == "final_battle_members":
+                    busy = connection.execute(
+                        "SELECT 1 FROM final_battle_members WHERE player_id = ? AND asset_lock_status = 'locked' LIMIT 1",
+                        (player_id,),
+                    ).fetchone()
+                else:
+                    busy = connection.execute(
+                        f"SELECT 1 FROM {table} WHERE player_id = ? AND status = ? LIMIT 1", (player_id, status)
+                    ).fetchone()
                 if busy is not None:
                     raise TravelBusyError("another action is already running")
             exploration = connection.execute(

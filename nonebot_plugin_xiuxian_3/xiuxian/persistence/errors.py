@@ -712,6 +712,34 @@ class PartyBattleNotReadyError(RuntimeError):
     """The party battle has not reached a terminal result."""
 
 
+class FinalBattleNotFoundError(RuntimeError):
+    """The final battle does not exist or is not visible to the actor."""
+
+
+class FinalBattleRequirementError(RuntimeError):
+    """The initiator or helper does not meet the final battle requirements."""
+
+
+class FinalBattleBusyError(RuntimeError):
+    """The player already has an active action or final battle lock."""
+
+
+class FinalBattlePermissionError(RuntimeError):
+    """The actor cannot perform this final battle operation."""
+
+
+class FinalBattleNotReadyError(RuntimeError):
+    """The final battle is not ready for the requested transition."""
+
+
+class FinalBattleCooldownError(RuntimeError):
+    """The initiator is still in the final battle retry cooldown."""
+
+
+class FinalBattleMemberLimitError(RuntimeError):
+    """The final battle already has its maximum number of participants."""
+
+
 class ExplorationQuotaExhaustedError(RuntimeError):
     """The mode reached its business-day quota."""
 

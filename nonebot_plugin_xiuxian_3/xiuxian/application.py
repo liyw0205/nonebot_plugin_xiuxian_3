@@ -9,6 +9,7 @@ from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
 from .progression.use_cases import ProgressionApplication
 from .progression.endgame_use_cases import EndgameApplication
+from .progression.final_battle_use_cases import FinalBattleApplication
 from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
@@ -44,6 +45,7 @@ class XiuxianApplication:
         self.player = PlayerApplication(repository)
         self.progression = ProgressionApplication(repository)
         self.endgame = EndgameApplication(repository)
+        self.final_battle = FinalBattleApplication(repository)
         self.breakthrough = BreakthroughApplication(repository)
         self.production = ProductionApplication(repository)
         self.world = WorldApplication(repository)
@@ -197,6 +199,27 @@ class XiuxianApplication:
             lambda: self.endgame.preview_final_battle(context),
             require_write=False,
         )
+
+    async def create_final_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.final_battle.create(context), write_message="当前事件不允许创建终局战。")
+
+    async def join_final_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.final_battle.join(context), write_message="当前事件不允许加入终局战。")
+
+    async def start_final_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.final_battle.start(context), write_message="当前事件不允许开始终局战。")
+
+    async def choose_final_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.final_battle.choose(context), write_message="当前事件不允许选择终局战分支。")
+
+    async def recover_final_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.final_battle.start(context, recover=True), write_message="当前事件不允许恢复终局战。")
+
+    async def cancel_final_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.final_battle.cancel(context), write_message="当前事件不允许取消终局战。")
+
+    async def replay_final_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.final_battle.replay(context), require_write=False)
 
     async def start_tribulation_trial(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

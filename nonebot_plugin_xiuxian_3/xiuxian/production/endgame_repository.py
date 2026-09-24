@@ -83,6 +83,12 @@ class EndgameProductionRepositoryMixin:
             ).fetchone()
             if active is not None:
                 raise EndgameRecipeBusyError("another endgame recipe is processing")
+            final_battle = connection.execute(
+                "SELECT 1 FROM final_battle_members WHERE player_id = ? AND asset_lock_status = 'locked' LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            if final_battle is not None:
+                raise EndgameRecipeBusyError("final battle assets are locked")
             active_trial = connection.execute(
                 "SELECT 1 FROM tribulation_trial_sessions WHERE player_id = ? AND status = 'preparing' LIMIT 1",
                 (player["id"],),

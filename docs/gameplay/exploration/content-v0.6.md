@@ -1,6 +1,6 @@
 # v0.6 探索内容基线：道源、天劫与飞升路
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=exploration-0.6.0`。终局探索由 progression/world 状态机驱动，不能使用普通取消或重复刷取。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=exploration-0.6.0`。此处 `explore.ascension_route` / `AscensionSession` 是早期方案快照，当前终局战由独立 `combat-final-0.1.0` 会话驱动，规则见[战斗用例](../combat/use-cases.md)；不要将该历史探索会话视为当前入口。
 
 | `mode_key` | 准入 | 时长/成本 | 结算 | 失败 |
 |:--|:--|:--|:--|:--|

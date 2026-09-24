@@ -94,7 +94,7 @@ class EndgameApplication:
         elif record.ready:
             message = (
                 "## 终局战前置已满足\n\n"
-                "当前版本的自动回合战斗运行时尚未开放，预览不会锁定飞升凭证或创建战斗会话。"
+                "可以创建终局战队伍。创建时会托管飞升凭证；成功消耗，失败或取消返还。"
             )
         else:
             message = "## 终局战前置未满足\n\n" + "、".join(record.missing)

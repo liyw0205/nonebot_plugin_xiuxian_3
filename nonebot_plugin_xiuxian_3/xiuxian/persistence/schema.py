@@ -1329,6 +1329,84 @@ CREATE INDEX IF NOT EXISTS idx_endgame_sessions_player
 CREATE UNIQUE INDEX IF NOT EXISTS idx_endgame_sessions_active
     ON endgame_sessions(player_id) WHERE status = 'preparing';
 
+CREATE TABLE IF NOT EXISTS final_battle_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id TEXT NOT NULL UNIQUE,
+    initiator_id INTEGER NOT NULL REFERENCES players(id),
+    create_operation_id TEXT NOT NULL UNIQUE,
+    start_operation_id TEXT UNIQUE,
+    status TEXT NOT NULL CHECK (status IN ('lobby', 'running', 'won', 'lost', 'expired', 'settled')),
+    round_no INTEGER NOT NULL DEFAULT 0 CHECK (round_no >= 0),
+    action_sequence INTEGER NOT NULL DEFAULT 0 CHECK (action_sequence >= 0),
+    starts_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    cooldown_until TEXT,
+    snapshot_json TEXT NOT NULL,
+    state_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_final_battle_sessions_initiator
+    ON final_battle_sessions(initiator_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_final_battle_sessions_active_initiator
+    ON final_battle_sessions(initiator_id) WHERE status IN ('lobby', 'running', 'won', 'lost');
+
+CREATE TABLE IF NOT EXISTS final_battle_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id TEXT NOT NULL REFERENCES final_battle_sessions(battle_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    role TEXT NOT NULL CHECK (role IN ('initiator', 'helper')),
+    asset_lock_status TEXT NOT NULL CHECK (asset_lock_status IN ('locked', 'released')),
+    contribution_damage INTEGER NOT NULL DEFAULT 0 CHECK (contribution_damage >= 0),
+    snapshot_json TEXT NOT NULL,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (battle_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_final_battle_members_player
+    ON final_battle_members(player_id, asset_lock_status, created_at);
+
+CREATE TABLE IF NOT EXISTS final_battle_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL UNIQUE,
+    battle_id TEXT NOT NULL REFERENCES final_battle_sessions(battle_id),
+    sequence_no INTEGER NOT NULL CHECK (sequence_no > 0),
+    round_no INTEGER NOT NULL CHECK (round_no > 0),
+    actor_key TEXT NOT NULL,
+    strategy_key TEXT NOT NULL,
+    skill_key TEXT NOT NULL,
+    target_key TEXT NOT NULL,
+    hit_roll_bp INTEGER NOT NULL,
+    damage INTEGER NOT NULL CHECK (damage >= 0),
+    state_json TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    UNIQUE (battle_id, sequence_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_final_battle_actions_battle
+    ON final_battle_actions(battle_id, sequence_no);
+
+CREATE TABLE IF NOT EXISTS final_battle_rewards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id TEXT NOT NULL REFERENCES final_battle_sessions(battle_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL CHECK (status IN ('claimed', 'none')),
+    operation_id TEXT NOT NULL UNIQUE,
+    claimed_at TEXT NOT NULL,
+    UNIQUE (battle_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_final_battle_rewards_player
+    ON final_battle_rewards(player_id, claimed_at);
+
 CREATE TABLE IF NOT EXISTS economy_ledger_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     operation_id TEXT NOT NULL,

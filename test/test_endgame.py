@@ -467,7 +467,7 @@ def test_qq_and_onebot_final_battle_preview_is_read_only() -> None:
                 blocked = await runtime.dispatch(_ctx(adapter, user, f"preview-blocked-{adapter}"), command)
                 assert blocked.code == "FINAL_BATTLE_PREVIEW"
                 assert blocked.data["ready"] is False
-                assert blocked.data["runtime_open"] is False
+                assert blocked.data["runtime_open"] is True
                 assert blocked.data["missing"] == (
                     "TRIBULATION_L10_REQUIRED",
                     "TRIBULATION_TRIALS_INCOMPLETE",
@@ -519,7 +519,7 @@ def test_qq_and_onebot_final_battle_preview_is_read_only() -> None:
                     "trial.dao_choice",
                 )
                 assert ready.data["certificate_count"] == 1
-                assert ready.data["runtime_open"] is False
+                assert ready.data["runtime_open"] is True
                 replay = await runtime.dispatch(_ctx(adapter, user, f"preview-ready-{adapter}"), command)
                 assert replay.data == ready.data
 

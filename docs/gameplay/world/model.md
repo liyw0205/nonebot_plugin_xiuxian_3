@@ -8,8 +8,9 @@
 `snapshot_json` 必须冻结来源、终点、内容/规则版本、资源成本、通行物品和
 `consume_pass_on_arrival`；终局凭证不能依赖抵达时重新读取当前地点规则。
 
-终局移动额外读取角色的 `endgame_status`：`ascension_ready` 只允许从天劫台前往飞升路，
-`remained_in_world` 只允许从飞升路前往留界殿。普通移动在 `ascended`、`remained_in_world`
+终局移动额外读取角色的 `endgame_status`：终局战胜利原子将发起者放到
+`ascension.heaven_path` 并置为 `ascension_ready`，无需再次移动或扣飞升凭证；
+`remained_in_world` 角色可从飞升路前往留界殿。普通移动在 `ascended`、`remained_in_world`
 等冻结状态下拒绝写入。
 
 地点开放条件由境界、任务、声望、道途、物品、时间窗口和前置事件组成。

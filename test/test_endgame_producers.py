@@ -710,7 +710,7 @@ def test_endgame_recipe_replay_failure_refund_and_final_battle_preview_path() ->
 
             preview = await runtime.dispatch(_ctx(adapter, user, "final-preview"), "终局战预览")
             assert preview.data["ready"] is True
-            assert preview.data["runtime_open"] is False
+            assert preview.data["runtime_open"] is True
             await runtime.close()
 
     asyncio.run(run())

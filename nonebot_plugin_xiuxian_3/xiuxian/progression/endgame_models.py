@@ -72,6 +72,37 @@ class FinalBattlePreviewRecord:
     runtime_open: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class FinalBattleSessionRecord:
+    battle_id: str
+    status: str
+    member_player_ids: tuple[str, ...]
+    expires_at: str
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class FinalBattleResolutionRecord:
+    battle_id: str
+    status: str
+    outcome: str
+    round_no: int
+    debt_delta: int
+    cooldown_until: str | None
+    rewards: dict[str, dict[str, int]]
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class FinalBattleReplayRecord:
+    battle_id: str
+    status: str
+    snapshot: dict[str, object]
+    state: dict[str, object]
+    result: dict[str, object]
+    actions: tuple[dict[str, object], ...]
+
+
 __all__ = [
     "DaoUnionRecord",
     "TribulationEntryRecord",
@@ -79,4 +110,7 @@ __all__ = [
     "TrialSettlementRecord",
     "EndgameEndingRecord",
     "FinalBattlePreviewRecord",
+    "FinalBattleReplayRecord",
+    "FinalBattleResolutionRecord",
+    "FinalBattleSessionRecord",
 ]

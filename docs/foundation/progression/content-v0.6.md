@@ -46,13 +46,13 @@ void_refining/L10 混元
 
 三次试炼和三项道源任务的固定奖励合计为道果进度 1,000、`resource.ascension_merit` 1,000。`trial.three_realms` 另给世界功勋 500；道源任务另给世界功勋共 1,000。债务达到 100 时，下一次试炼追加 `difficulty_bp=2000`，表现为敌方护盾/环境机制，不能直接扣除角色资产。
 
-三次试炼只能在 `tribulation.sky_terrace` 启动；从 `dao.origin_gate` 前往天劫台的移动另消耗 1 张天劫凭证，不替代每次试炼自身的凭证成本。原始 v0.6 规则曾以确定性检定描述试炼；当前运行时已将试炼接入共享服务端自动回合 `BattleSession`，客户端仍不能提交技能、目标、伤害或结果。最终战仍未开放。
+三次试炼只能在 `tribulation.sky_terrace` 启动；从 `dao.origin_gate` 前往天劫台的移动另消耗 1 张天劫凭证，不替代每次试炼自身的凭证成本。原始 v0.6 规则曾以确定性检定描述试炼；当前运行时已将试炼接入共享服务端自动回合 `BattleSession`，客户端仍不能提交技能、目标、伤害或结果。终局多人战已接入独立自动回合会话，细节见[战斗域用例](../../gameplay/combat/use-cases.md)。
 
 ## 4. 最终战与飞升候选
 
-第三次试炼成功后，三项道源任务补足道果/功勋并开放渡劫 L10；`progression.advance_layer` 仍必须逐层结算，不能直接跳过 L10。`tribulation.final_battle` 前置：渡劫 L10、三次试炼成功、`resource.dao_fruit_progress>=1,000`、`resource.ascension_merit>=1,000`、`resource.tribulation_debt<100`。成本：`item.ascension_certificate` 1；会话锁 30 分钟；队伍最多 5 人，只有发起者结算终局，协助者按贡献获得绑定世界功勋。
+第三次试炼成功后，三项道源任务补足道果/功勋并开放渡劫 L10；`progression.advance_layer` 仍必须逐层结算，不能直接跳过 L10。`tribulation.final_battle` 前置：渡劫 L10、三次试炼成功、`resource.dao_fruit_progress>=1,000`、`resource.ascension_merit>=1,000`、`resource.tribulation_debt<100`。创建大厅时托管 `item.ascension_certificate` 1；大厅和战斗各最长 30 分钟；队伍最多 5 人，只有发起者推进、选择和结算，协助者按贡献获得绑定世界功勋。
 
-成功：状态改为 `ascension_ready`、发放 `item.title.ascended`、生成可选择的 `ascension.ending.<player_id>` 记录；失败：保留所有试炼进度，`tribulation_debt +25`，7 天内不可再次发起最终战。最终战失败不消耗 `item.ascension_certificate`，但尝试记录永久保留。
+胜利：状态改为 `ascension_ready`、位置进入 `ascension.heaven_path`，凭证消耗；失败：保留所有试炼进度，`tribulation_debt +25`，7 天内不可再次发起最终战并返还托管凭证。守界人半血时发起者须选择 `continue` 或 `remain`；留界分支要求已锁定道果，复用 `ascension.choose_ending` 写入不可逆结局历史，不增加失败债务/冷却并消耗凭证。飞升/留界个人结局选择各发放一次绑定称号 `item.title.ascended`。取消/大厅超时返还凭证；所有尝试和行动永久可回放。
 
 ## 5. 终局选择：`ascension.choose_ending`
 

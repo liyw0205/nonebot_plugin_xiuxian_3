@@ -15,6 +15,7 @@ from ..player.repository import PlayerRepositoryMixin
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.cultivation_repository import CultivationRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
+from ..progression.final_battle_repository import FinalBattleRepositoryMixin
 from ..progression.tribulation_repository import TribulationTrialRepositoryMixin
 from ..progression.breakthrough.repository import BreakthroughRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
@@ -44,6 +45,7 @@ class SQLitePlayerRepository(
     TravelRepositoryMixin,
     TribulationTrialRepositoryMixin,
     EndgameRepositoryMixin,
+    FinalBattleRepositoryMixin,
     WorldRepositoryMixin,
     ProgressionRepositoryMixin,
     RoutineRepositoryMixin,
@@ -143,6 +145,11 @@ class SQLitePlayerRepository(
             "remained_in_world",
         }:
             raise PlayerSuspendedError("endgame state has frozen ordinary writes")
+        if writable and connection.execute(
+            "SELECT 1 FROM final_battle_members WHERE player_id=? AND asset_lock_status='locked' LIMIT 1",
+            (row["id"],),
+        ).fetchone() is not None:
+            raise PlayerSuspendedError("final battle assets are locked")
         return row
 
     def _initialize_sync(self) -> None:

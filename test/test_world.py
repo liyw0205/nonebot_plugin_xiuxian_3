@@ -235,7 +235,7 @@ def test_qq_and_onebot_sky_terrace_travel_and_trial_location_gate() -> None:
     asyncio.run(run())
 
 
-def test_endgame_destinations_consume_certificate_on_arrival_and_preserve_failures() -> None:
+def test_ascension_path_is_reached_by_final_battle_without_a_second_certificate() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
@@ -271,36 +271,11 @@ def test_endgame_destinations_consume_certificate_on_arrival_and_preserve_failur
                         "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
                         ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
                     )
-                    connection.execute(
-                        "UPDATE players SET inventory_json='{}' WHERE platform=? AND platform_user_id=?",
-                        (adapter, user),
-                    )
-
-                blocked = await runtime.dispatch(
-                    context(f"settle-missing-{adapter}", f"settle-{adapter}"), "结算移动"
-                )
-                assert blocked.code == "TRAVEL_PASS_INSUFFICIENT"
-                with sqlite3.connect(runtime.settings.database_path) as connection:
-                    state = connection.execute(
-                        "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
-                        (adapter, user),
-                    ).fetchone()
-                    assert json.loads(state[0]) == {}
-                    assert state[1] == "tribulation.sky_terrace"
-                    assert connection.execute(
-                        "SELECT status FROM travel_sessions WHERE session_id=?", (started.data["session_id"],)
-                    ).fetchone()[0] == "running"
-                    connection.execute(
-                        "UPDATE players SET inventory_json=? WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"item.ascension_certificate": 1}), adapter, user),
-                    )
-
                 settled = await runtime.dispatch(
                     context(f"settle-{adapter}", f"settle-{adapter}"), "结算移动"
                 )
                 assert settled.code == "TRAVEL_COMPLETED"
-                assert settled.data["pass_consumed"] is True
-                assert "抵达时消耗" in settled.message
+                assert settled.data["pass_consumed"] is False
                 replay = await runtime.dispatch(
                     context(f"settle-replay-{adapter}", f"settle-{adapter}"), "结算移动"
                 )
@@ -310,7 +285,7 @@ def test_endgame_destinations_consume_certificate_on_arrival_and_preserve_failur
                         "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
                         (adapter, user),
                     ).fetchone()
-                    assert json.loads(state[0]) == {}
+                    assert json.loads(state[0]) == {"item.ascension_certificate": 1}
                     assert state[1] == "ascension.heaven_path"
 
                     connection.execute(

@@ -479,6 +479,12 @@ class CultivationRepositoryMixin:
             ).fetchone()
             if party_battle is not None:
                 raise CultivationBusyError("party battle assets are locked")
+            final_battle = connection.execute(
+                "SELECT 1 FROM final_battle_members WHERE player_id = ? AND asset_lock_status = 'locked' LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if final_battle is not None:
+                raise CultivationBusyError("final battle assets are locked")
             if mode.requires_solitude:
                 party = connection.execute(
                     "SELECT 1 FROM party_members WHERE player_id = ? AND status IN ('invited', 'active') LIMIT 1",
@@ -1057,6 +1063,7 @@ class CultivationRepositoryMixin:
             ("exploration_sessions", "status IN ('created', 'running', 'combat_pending')"),
             ("battle_sessions", "status IN ('created', 'running')"),
             ("party_battle_members", "asset_lock_status = 'locked'"),
+            ("final_battle_members", "asset_lock_status = 'locked'"),
             ("void_route_sessions", "status = 'running'"),
         )
         for table, predicate in checks:

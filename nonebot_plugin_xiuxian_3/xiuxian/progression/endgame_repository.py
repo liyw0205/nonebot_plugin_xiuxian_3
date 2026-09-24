@@ -148,6 +148,30 @@ class EndgameRepositoryMixin:
         ending_key: str,
         operation_id: str,
     ) -> EndgameEndingRecord:
+        ending_key = ending_key.strip().lower()
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            return self._choose_ending_in_transaction(
+                connection,
+                platform=platform,
+                platform_user_id=platform_user_id,
+                ending_key=ending_key,
+                operation_id=operation_id,
+                now_text=now_text,
+            )
+
+    def _choose_ending_in_transaction(
+        self,
+        connection,
+        *,
+        platform: str,
+        platform_user_id: str,
+        ending_key: str,
+        operation_id: str,
+        now_text: str,
+        allow_final_battle: bool = False,
+    ) -> EndgameEndingRecord:
         from ..repository import (
             AscensionRequirementError,
             EndingAlreadyChosenError,
@@ -170,64 +194,71 @@ class EndgameRepositoryMixin:
                 "rule_version": RULE_VERSION,
             },
         )
-        now_text = serialize_datetime(self._now())
-        with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._ending_from_payload(json.loads(existing["result_json"]), replay=True)
+        existing = connection.execute(
+            "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+            (operation_id,),
+        ).fetchone()
+        if existing is not None:
+            if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                raise OperationConflictError("operation input differs from its original request")
+            return self._ending_from_payload(json.loads(existing["result_json"]), replay=True)
 
-            row = self._require_player(connection, platform, platform_user_id, writable=False)
-            if str(row["status"]) != "active":
-                raise PlayerSuspendedError("player is not active")
-            current_key = str(row["ending_key"] or "")
-            if current_key:
-                if current_key != ending_key:
-                    raise EndingAlreadyChosenError("a different ending has already been chosen")
-                payload = self._ending_payload(row, ending_key=current_key, status=str(row["endgame_status"]))
-                connection.execute(
-                    "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-                )
-                return self._ending_from_payload(payload, replay=True)
-            if str(row["endgame_status"]) != ASCENSION_READY_STATUS:
-                raise AscensionRequirementError("player is not ready for an ending")
-            fruit_key = str(row["dao_fruit_key"] or "") or None
-            if ending_key == "remain_in_world" and not fruit_key:
-                raise AscensionRequirementError("remain in world requires a locked dao fruit")
-            status = ASCENDED_STATUS if ending_key == "ascend" else REMAINED_IN_WORLD_STATUS
-            connection.execute(
-                "UPDATE players SET endgame_status = ?, ending_key = ?, updated_at = ? WHERE id = ?",
-                (status, ending_key, now_text, row["id"]),
-            )
-            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
-            if updated is None:
-                raise RuntimeError("ending choice returned no player")
-            payload = self._ending_payload(updated, ending_key=ending_key, status=status)
-            connection.execute(
-                "INSERT INTO endgame_endings(player_id, ending_key, status, fruit_key, snapshot_json, operation_id, content_version, rule_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    updated["id"],
-                    ending_key,
-                    status,
-                    fruit_key,
-                    json.dumps(payload["snapshot"], ensure_ascii=False, sort_keys=True),
-                    operation_id,
-                    CONTENT_VERSION,
-                    RULE_VERSION,
-                    now_text,
-                ),
-            )
+        row = self._require_player(connection, platform, platform_user_id, writable=False)
+        if str(row["status"]) != "active":
+            raise PlayerSuspendedError("player is not active")
+        current_key = str(row["ending_key"] or "")
+        if current_key:
+            if current_key != ending_key:
+                raise EndingAlreadyChosenError("a different ending has already been chosen")
+            payload = self._ending_payload(row, ending_key=current_key, status=str(row["endgame_status"]))
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (operation_id, operation_name, updated["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+                (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
             )
-            return self._ending_from_payload(payload, replay=False)
+            return self._ending_from_payload(payload, replay=True)
+        fruit_key = str(row["dao_fruit_key"] or "") or None
+        if allow_final_battle and str(row["endgame_status"]) == "tribulation" and ending_key == "remain_in_world":
+            if not fruit_key:
+                raise AscensionRequirementError("remain in world requires a locked dao fruit")
+            connection.execute(
+                "UPDATE players SET endgame_status=?, location_key='ascension.heaven_path', updated_at=? WHERE id=?",
+                (ASCENSION_READY_STATUS, now_text, row["id"]),
+            )
+            row = connection.execute("SELECT * FROM players WHERE id=?", (row["id"],)).fetchone()
+        if str(row["endgame_status"]) != ASCENSION_READY_STATUS:
+            raise AscensionRequirementError("player is not ready for an ending")
+        if ending_key == "remain_in_world" and not fruit_key:
+            raise AscensionRequirementError("remain in world requires a locked dao fruit")
+        status = ASCENDED_STATUS if ending_key == "ascend" else REMAINED_IN_WORLD_STATUS
+        inventory = self._json_object(row["inventory_json"], {})
+        inventory["item.title.ascended"] = max(1, int(inventory.get("item.title.ascended", 0)))
+        connection.execute(
+            "UPDATE players SET endgame_status = ?, ending_key = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+            (status, ending_key, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+        )
+        updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+        if updated is None:
+            raise RuntimeError("ending choice returned no player")
+        payload = self._ending_payload(updated, ending_key=ending_key, status=status)
+        connection.execute(
+            "INSERT INTO endgame_endings(player_id, ending_key, status, fruit_key, snapshot_json, operation_id, content_version, rule_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                updated["id"],
+                ending_key,
+                status,
+                fruit_key,
+                json.dumps(payload["snapshot"], ensure_ascii=False, sort_keys=True),
+                operation_id,
+                CONTENT_VERSION,
+                RULE_VERSION,
+                now_text,
+            ),
+        )
+        connection.execute(
+            "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (operation_id, operation_name, updated["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+        )
+        return self._ending_from_payload(payload, replay=False)
 
     async def preview_final_battle(
         self,
@@ -286,7 +317,7 @@ class EndgameRepositoryMixin:
                 missing=tuple(missing),
                 trial_keys=completed,
                 certificate_count=certificate_count,
-                runtime_open=False,
+                runtime_open=True,
             )
 
     async def begin_tribulation(self, *, platform: str, platform_user_id: str, operation_id: str) -> TribulationEntryRecord:
