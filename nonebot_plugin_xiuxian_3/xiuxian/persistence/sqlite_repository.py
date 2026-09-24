@@ -35,6 +35,7 @@ from ..social.mentor_repository import MentorRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
 from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
 from ..specials.arena_repository import ArenaRepositoryMixin
+from ..specials.team_arena_repository import TeamArenaRepositoryMixin
 from ..quests.repository import QuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
@@ -65,6 +66,7 @@ class SQLitePlayerRepository(
     EventsRepositoryMixin,
     FinalHeavenSeasonRepositoryMixin,
     ArenaRepositoryMixin,
+    TeamArenaRepositoryMixin,
     QuestRepositoryMixin,
     EconomyRepositoryMixin,
     AdvancementRepositoryMixin,

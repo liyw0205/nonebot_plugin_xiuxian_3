@@ -892,6 +892,30 @@ class ArenaRewardNotAvailableError(RuntimeError):
     """The player has no pending arena result to acknowledge."""
 
 
+class TeamArenaSnapshotRequirementError(RuntimeError):
+    """The party cannot publish a usable team arena snapshot."""
+
+
+class TeamArenaSnapshotNotFoundError(RuntimeError):
+    """The requested team arena snapshot does not exist."""
+
+
+class TeamArenaOpponentUnavailableError(RuntimeError):
+    """No compatible team snapshot is currently matchable."""
+
+
+class TeamArenaPermissionError(RuntimeError):
+    """The actor is not allowed to operate the team arena party."""
+
+
+class TeamArenaBusyError(RuntimeError):
+    """The team is already committed to another battle."""
+
+
+class TeamArenaChallengeCapError(RuntimeError):
+    """The team arena daily challenge cap has been reached."""
+
+
 class FinalHeavenRankingNotFinalizedError(RuntimeError):
     """The requested season has not reached its frozen ranking state."""
 

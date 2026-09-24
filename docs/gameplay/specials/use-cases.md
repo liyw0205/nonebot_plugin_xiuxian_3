@@ -7,11 +7,12 @@
 - `specials.record_codex_discovery`、`specials.get_codex`、`specials.claim_codex_milestone`
 - `specials.preview_tower`、`specials.start_tower`、`specials.claim_tower_reward`
 - `specials.publish_arena_snapshot`、`specials.challenge_arena`、`specials.claim_arena_reward`
+- `specials.publish_team_arena_snapshot`、`specials.challenge_team_arena`、`specials.replay_team_arena`
 - `specials.start_story`、`specials.choose_story_node`、`specials.claim_story_ending`
 
 ## 通用错误码
 
-`SPECIAL_CONTENT_CLOSED`、`SPECIAL_SESSION_BUSY`、`SPECIAL_REWARD_ALREADY_CLAIMED`、`IDLE_ASSIGNMENT_ACTIVE`、`IDLE_CLAIM_TOO_EARLY`、`DISPATCH_REQUIREMENT_MISSING`、`DISPATCH_SLOT_BUSY`、`CODEX_ENTRY_UNKNOWN`、`CODEX_ALREADY_DISCOVERED`、`TOWER_FLOOR_LOCKED`、`TOWER_ATTEMPT_CAP`、`ARENA_SNAPSHOT_EXPIRED`、`ARENA_CHALLENGE_CAP`、`STORY_NODE_LOCKED`、`STORY_CHOICE_CONFLICT`、`STORY_ENDING_ALREADY_CLAIMED`。
+`SPECIAL_CONTENT_CLOSED`、`SPECIAL_SESSION_BUSY`、`SPECIAL_REWARD_ALREADY_CLAIMED`、`IDLE_ASSIGNMENT_ACTIVE`、`IDLE_CLAIM_TOO_EARLY`、`DISPATCH_REQUIREMENT_MISSING`、`DISPATCH_SLOT_BUSY`、`CODEX_ENTRY_UNKNOWN`、`CODEX_ALREADY_DISCOVERED`、`TOWER_FLOOR_LOCKED`、`TOWER_ATTEMPT_CAP`、`ARENA_SNAPSHOT_EXPIRED`、`ARENA_CHALLENGE_CAP`、`TEAM_ARENA_REQUIREMENT_MISSING`、`TEAM_ARENA_OPPONENT_UNAVAILABLE`、`TEAM_ARENA_DAILY_CAP`、`STORY_NODE_LOCKED`、`STORY_CHOICE_CONFLICT`、`STORY_ENDING_ALREADY_CLAIMED`。
 
 ## 验收
 
@@ -20,5 +21,6 @@
 3. 同一图鉴发现只写一条首见记录；同一集合里程碑只奖励一次。
 4. 同一塔层首通奖励、竞技场赛季奖励和故事结局奖励都按唯一键回放。
 5. 竞技场对局固定双方快照；对局中角色修改装备/道途不会改变已开始结果。
-6. 故事选择、派遣失败、挂机过期、塔战斗失败都保留可审计原因与版本，恢复不重抽。
-7. 文本、按钮与 Web 入口重试同一 operation，渲染/投递失败不改变会话或奖励。
+6. 固定 2v2 组队竞技场只接受已确认双人队伍，服务端保存双方队伍成员快照和行动回放，不创建单人战斗会话或转移玩家资产。
+7. 故事选择、派遣失败、挂机过期、塔战斗失败都保留可审计原因与版本，恢复不重抽。
+8. 文本、按钮与 Web 入口重试同一 operation，渲染/投递失败不改变会话或奖励。

@@ -36,6 +36,7 @@ from .economy.use_cases import EconomyApplication
 from .events.use_cases import EventsApplication
 from .events.season_use_cases import FinalHeavenSeasonApplication
 from .specials.arena_use_cases import ArenaApplication
+from .specials.team_arena_use_cases import TeamArenaApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
 
@@ -75,6 +76,7 @@ class XiuxianApplication:
         self.events = EventsApplication(repository)
         self.seasons = FinalHeavenSeasonApplication(repository)
         self.arena = ArenaApplication(repository)
+        self.team_arena = TeamArenaApplication(repository)
         self.quests = QuestApplication(repository)
 
     async def _invoke(
@@ -1024,6 +1026,26 @@ class XiuxianApplication:
             lambda: self.arena.claim_result(context),
             write_message="当前事件不允许确认竞技场结果。",
         )
+
+    async def publish_team_arena_snapshot(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.team_arena.publish_snapshot(context),
+            write_message="当前事件不允许发布组队竞技场快照。",
+        )
+
+    async def list_team_arena_snapshots(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.team_arena.list_snapshots(context), require_write=False)
+
+    async def challenge_team_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.team_arena.challenge(context),
+            write_message="当前事件不允许发起组队竞技场挑战。",
+        )
+
+    async def replay_team_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.team_arena.replay(context), require_write=False)
 
     async def create_production_commission(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.create_production_commission(context), write_message="当前事件不允许发布生产委托。")

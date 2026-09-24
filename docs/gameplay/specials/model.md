@@ -12,6 +12,11 @@
 
 `ArenaMatch`：对局 ID、赛季/轮次、挑战者与防守快照、匹配规则、战斗日志、积分变化、奖励状态和 operation ID。
 
+`TeamArenaSnapshot`：队伍快照 ID、已确认双人队伍、队长、成员构筑/装备快照、积分段、匹配延迟、有效期和版本。
+
+`TeamArenaMatch`：2v2 对局 ID、双方队伍快照、服务端行动序列、双方成员积分变化、最终结果和 operation ID；不创建
+单人 `battle_sessions`，不转移玩家资产。
+
 `StoryRun`：运行 ID、玩家、故事键、章节/节点键、已锁选择、条件快照、旗标集合、状态、结局键、版本和 operation ID。
 
 `StoryFlag`：玩家、旗标键、故事运行、首次设置 operation、是否不可逆、内容版本。旗标不能通过普通重试删除或覆盖。
