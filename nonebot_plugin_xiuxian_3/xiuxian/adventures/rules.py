@@ -22,6 +22,7 @@ class BountyDefinition:
     target_key: str | None
     target_amount: int
     reward: tuple[tuple[str, int], ...]
+    reputation_key: str = "local.xuantian.new_town"
     runtime_status: str = "open"
     rule_version: str = RULE_VERSION
     content_version: str = CONTENT_VERSION
@@ -68,6 +69,22 @@ DEFINITIONS: dict[str, BountyDefinition] = {
         target_amount=1,
         reward=(("energy", 10), ("service_reputation", 2)),
     ),
+    "bounty.cloud_mine": BountyDefinition(
+        key="bounty.cloud_mine",
+        label="云铁矿区悬赏",
+        description="交付云铁 3 块",
+        required_realm="foundation",
+        required_layer=4,
+        duration_seconds=2 * 60 * 60,
+        daily_limit=1,
+        target_kind="inventory_gain",
+        target_key="item.material.cloud_iron",
+        target_amount=3,
+        reward=(("spirit_stones", 120), ("local_reputation", 8)),
+        reputation_key="local.xuantian.cloud_city",
+        rule_version="adventures-0.2.0",
+        content_version="content-0.2",
+    ),
 }
 
 
@@ -78,6 +95,8 @@ ALIASES = {
     "训练傀儡": "bounty.training_dummy",
     "生产订单": "bounty.craft_order",
     "生产": "bounty.craft_order",
+    "云铁矿区悬赏": "bounty.cloud_mine",
+    "云铁悬赏": "bounty.cloud_mine",
 }
 
 

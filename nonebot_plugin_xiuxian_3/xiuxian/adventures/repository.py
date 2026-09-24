@@ -121,6 +121,7 @@ from ..exploration.rules import (
     meets_realm as exploration_meets_realm,
     settlement_result,
 )
+from ..exploration.rules import has_cloud_mine_access
 from ..adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from ..adventures.mainline_models import (
     MainlineClaimRecord,
@@ -286,7 +287,23 @@ class AdventuresRepositoryMixin:
             return False
         realm_key = str(row["realm_key"] if isinstance(row, sqlite3.Row) else row.get("realm_key", "mortal"))
         layer = int(row["realm_layer"] if isinstance(row, sqlite3.Row) else row.get("realm_layer", 0))
-        return bounty_meets_realm(realm_key, layer, definition.required_realm, definition.required_layer)
+        if bounty_meets_realm(realm_key, layer, definition.required_realm, definition.required_layer):
+            return True
+        if definition.key == "bounty.cloud_mine":
+            if isinstance(row, sqlite3.Row):
+                inventory = SQLitePlayerRepository._json_object(row["inventory_json"], {})
+                intro = SQLitePlayerRepository._json_object(row["intro_json"], {})
+                subprofession = row["subprofession_key"]
+            else:
+                inventory = SQLitePlayerRepository._json_object(row.get("inventory_json", {}), {})
+                intro = SQLitePlayerRepository._json_object(row.get("intro_json", {}), {})
+                subprofession = row.get("subprofession_key")
+            return has_cloud_mine_access(
+                subprofession_key=subprofession,
+                inventory=inventory,
+                intro_flags={str(flag) for flag in intro.get("flags", [])},
+            )
+        return False
 
     @staticmethod
     def _bounty_progress(connection: sqlite3.Connection, row: sqlite3.Row, offer: sqlite3.Row, definition) -> int:
@@ -376,6 +393,7 @@ class AdventuresRepositoryMixin:
                 "target_kind": definition.target_kind,
                 "target_key": definition.target_key,
                 "target_amount": definition.target_amount,
+                "reputation_key": definition.reputation_key,
                 "baseline_quantity": int(inventory.get(str(definition.target_key), 0)) if definition.target_key else 0,
                 "baseline_completed_orders": int(completed_orders["count"]),
             }
@@ -536,7 +554,9 @@ class AdventuresRepositoryMixin:
                 (row["id"],),
             ).fetchone()
             local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
+            snapshot = self._json_object(offer["snapshot_json"], {})
+            reputation_key = str(snapshot.get("reputation_key", "local.xuantian.new_town"))
+            local[reputation_key] = int(local.get(reputation_key, 0)) + local_reputation
             current_service = int(reputation["service_reputation"]) if reputation is not None else 0
             current_service = min(100, current_service + service_reputation)
             connection.execute(
