@@ -5,6 +5,7 @@ from __future__ import annotations
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
     ExplorationBusyError,
+    ExplorationCombatPendingError,
     ExplorationNotFoundError,
     ExplorationNotReadyError,
     ExplorationQuotaExhaustedError,
@@ -145,6 +146,15 @@ class ExplorationApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能结算探索。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他探索结算，请重新发起。", context.request_id, operation_id)
+        except ExplorationCombatPendingError:
+            return CommandResult(
+                False,
+                "EXPLORATION_COMBAT_PENDING",
+                "探索遭遇战仍在自动回合中，奖励已冻结，请稍后重试结算。",
+                context.request_id,
+                operation_id,
+                retryable=True,
+            )
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -157,11 +167,11 @@ class ExplorationApplication:
                 (
                     f"## {definition.label}遭遇战斗\n\n"
                     f"**{self._display_name(record.player)}**在探索中触发了战斗遭遇。\n\n"
-                    "> 当前版本只冻结战斗规则和回放合同，战斗运行时尚未开放；探索奖励不会被重复抽取。"
+                    "> 自动回合战斗正在恢复，探索奖励已冻结；请稍后重试结算。"
                 ),
                 context.request_id,
                 operation_id,
-                data={"exploration_id": record.exploration_id, "status": record.status, "idempotent_replay": record.already_completed},
+                data={"exploration_id": record.exploration_id, "status": record.status, "battle_id": record.battle_id, "idempotent_replay": record.already_completed},
             )
         if record.status == "expired":
             return CommandResult(
@@ -180,12 +190,14 @@ class ExplorationApplication:
                 reward_lines.append(f"灵石 ×{quantity}")
             else:
                 reward_lines.append(f"{ITEM_LABELS.get(key, '探索材料')} ×{quantity}")
+        battle_text = f"- **遭遇战**：{'胜利' if record.battle_outcome == 'won' else '失败'}\n" if record.battle_outcome else ""
         return CommandResult(
             True,
             "EXPLORATION_SETTLED",
             (
                 f"## {definition.label}完成\n\n"
                 f"**{self._display_name(record.player)}**已完成探索。\n\n"
+                f"{battle_text}"
                 f"- **探索收获**：{'、'.join(reward_lines) or '无'}\n"
                 f"- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
                 f"- **灵石**：{record.player.spirit_stones}\n\n"
@@ -198,6 +210,8 @@ class ExplorationApplication:
                 "mode_key": record.mode_key,
                 "status": record.status,
                 "result": record.result,
+                "battle_id": record.battle_id,
+                "battle_outcome": record.battle_outcome,
                 "idempotent_replay": record.already_completed,
             },
         )

@@ -1034,7 +1034,12 @@ class CultivationRepositoryMixin:
             )
 
     @staticmethod
-    def _has_active_long_action(connection: sqlite3.Connection, player_id: int) -> bool:
+    def _has_active_long_action(
+        connection: sqlite3.Connection,
+        player_id: int,
+        *,
+        ignore_exploration_id: str | None = None,
+    ) -> bool:
         """Return whether a player has any session that locks another action."""
 
         checks = (
@@ -1047,14 +1052,20 @@ class CultivationRepositoryMixin:
             ("battle_sessions", "status IN ('created', 'running')"),
             ("void_route_sessions", "status = 'running'"),
         )
-        return any(
-            connection.execute(
-                f"SELECT 1 FROM {table} WHERE player_id = ? AND {predicate} LIMIT 1",
-                (player_id,),
-            ).fetchone()
-            is not None
-            for table, predicate in checks
-        )
+        for table, predicate in checks:
+            if table == "exploration_sessions" and ignore_exploration_id is not None:
+                active = connection.execute(
+                    "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') AND exploration_id != ? LIMIT 1",
+                    (player_id, ignore_exploration_id),
+                ).fetchone()
+            else:
+                active = connection.execute(
+                    f"SELECT 1 FROM {table} WHERE player_id = ? AND {predicate} LIMIT 1",
+                    (player_id,),
+                ).fetchone()
+            if active is not None:
+                return True
+        return False
 
     @staticmethod
     def _retreat_start_from_payload(payload: dict[str, Any], *, replay: bool = False) -> RetreatSessionRecord:

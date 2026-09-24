@@ -8,6 +8,13 @@ from .models import ExplorationDefinition
 
 
 RULE_VERSION = "exploration-0.1.0"
+BATTLE_ENEMY_BY_MODE = {
+    "explore.gather_outskirts": "enemy.wood_rat",
+    # Short training is available at qi-sensing L2; the L3 iron boar remains
+    # reserved for later named encounters.
+    "explore.trial_outskirts": "enemy.wood_rat",
+    "explore.mist_grotto": "enemy.mist_guardian",
+}
 
 DEFINITIONS = {
     "explore.gather_outskirts": ExplorationDefinition(
@@ -89,6 +96,10 @@ def exploration_definition(mode_key: str) -> ExplorationDefinition:
         raise ValueError(f"unsupported exploration mode: {mode_key}") from exc
 
 
+def exploration_enemy_key(mode_key: str) -> str | None:
+    return BATTLE_ENEMY_BY_MODE.get(mode_key)
+
+
 def realm_rank(realm_key: str) -> int:
     return {
         "mortal": 0,
@@ -156,9 +167,11 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
 
 __all__ = [
     "DEFINITIONS",
+    "BATTLE_ENEMY_BY_MODE",
     "RULE_VERSION",
     "battle_roll_bp",
     "exploration_definition",
+    "exploration_enemy_key",
     "meets_realm",
     "resolve_exploration_mode",
     "settlement_result",

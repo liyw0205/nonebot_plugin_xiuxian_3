@@ -188,7 +188,7 @@ def test_exploration_ready_cancel_quota_and_resource_guards() -> None:
     asyncio.run(run())
 
 
-def test_exploration_conflicts_and_combat_pending_are_stable() -> None:
+def test_exploration_conflicts_and_combat_encounters_are_settled_once() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
@@ -219,15 +219,15 @@ def test_exploration_conflicts_and_combat_pending_are_stable() -> None:
             assert battle.code == "EXPLORATION_STARTED"
             _expire_exploration(runtime, user, battle.data["exploration_id"])
             pending = await runtime.dispatch(_context(user, "battle-settle"), "结算探索")
-            assert pending.code == "EXPLORATION_COMBAT_PENDING"
+            assert pending.code == "EXPLORATION_SETTLED"
+            assert pending.data["battle_outcome"] in {"won", "lost"}
             pending_again = await runtime.dispatch(_context(user, "battle-settle-again"), "结算探索")
-            assert pending_again.code == "EXPLORATION_COMBAT_PENDING"
-            assert pending_again.data["idempotent_replay"] is False
+            assert pending_again.code == "EXPLORATION_NOT_FOUND"
             replay = await runtime.dispatch(
                 _context(user, "battle-replay", operation_id=pending.operation_id or ""),
                 "结算探索",
             )
-            assert replay.code == "EXPLORATION_COMBAT_PENDING"
+            assert replay.code == "EXPLORATION_SETTLED"
             assert replay.data["idempotent_replay"] is True
             await runtime.close()
 

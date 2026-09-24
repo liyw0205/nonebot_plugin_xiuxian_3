@@ -87,6 +87,35 @@ class CombatRepositoryMixin:
                 battle_type,
             )
 
+    async def start_exploration_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        exploration_id: str,
+        mode_key: str,
+        operation_id: str,
+    ) -> BattleStartRecord:
+        """Create the encounter linked to an already frozen exploration result."""
+
+        from ..exploration.rules import exploration_enemy_key
+
+        enemy_key = exploration_enemy_key(mode_key)
+        if enemy_key is None:
+            raise BattleRequirementError("exploration mode has no battle encounter")
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync,
+                self._start_training_battle_once,
+                platform,
+                platform_user_id,
+                operation_id,
+                enemy_key,
+                "pve.exploration",
+                exploration_id,
+            )
+
     async def run_battle_turn(self, *, battle_id: str, expected_round: int) -> BattleTurnRecord:
         await self.initialize()
         async with self._inflight:
@@ -146,6 +175,7 @@ class CombatRepositoryMixin:
         operation_id: str,
         enemy_key: str = "enemy.training_dummy",
         battle_type: str = "pve.training",
+        exploration_id: str | None = None,
     ) -> BattleStartRecord:
         enemy = enemy_definition(enemy_key)
         operation_name = "battle.start" if battle_type == "pve.training" else f"battle.start.{battle_type}"
@@ -156,6 +186,7 @@ class CombatRepositoryMixin:
                 "platform_user_id": platform_user_id,
                 "enemy_key": enemy.key,
                 "battle_type": battle_type,
+                "exploration_id": exploration_id,
                 "content_version": CONTENT_VERSION,
                 "rule_version": RULE_VERSION,
             },
@@ -174,15 +205,42 @@ class CombatRepositoryMixin:
                 return self._battle_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
             player = self._require_player(connection, platform, platform_user_id)
-            if not self._meets_enemy_requirement(player, enemy.required_realm, enemy.required_layer):
-                raise BattleRequirementError("realm requirement is not met")
-            if str(player["location_key"]) != enemy.location_key:
+            if str(player["location_key"]) != enemy.location_key and exploration_id is None:
                 raise BattleRequirementError("battle requires a specific location")
             cooldown = player["battle_defeat_until"]
             if battle_type == "pve.training" and cooldown and now < datetime.fromisoformat(str(cooldown)):
                 raise BattleCooldownError("battle defeat cooldown is active")
-            if self._has_active_long_action(connection, int(player["id"])):
+            if self._has_active_long_action(
+                connection,
+                int(player["id"]),
+                ignore_exploration_id=exploration_id,
+            ):
                 raise BattleBusyError("another long action is active")
+            exploration = None
+            exploration_snapshot: dict[str, Any] = {}
+            if exploration_id is not None:
+                exploration = connection.execute(
+                    "SELECT * FROM exploration_sessions WHERE exploration_id = ? AND player_id = ? AND status = 'combat_pending'",
+                    (exploration_id, player["id"]),
+                ).fetchone()
+                if exploration is None:
+                    raise BattleRequirementError("exploration encounter is not pending")
+                exploration_snapshot = self._json_object(exploration["snapshot_json"], {})
+                if str(exploration_snapshot.get("location_key", "")) != enemy.location_key:
+                    raise BattleRequirementError("battle location differs from exploration snapshot")
+                if not self._meets_realm_values(
+                    str(exploration_snapshot.get("realm_key", "")),
+                    int(exploration_snapshot.get("realm_layer", 0)),
+                    enemy.required_realm,
+                    enemy.required_layer,
+                ):
+                    raise BattleRequirementError("exploration snapshot does not meet encounter requirement")
+            elif not self._meets_enemy_requirement(player, enemy.required_realm, enemy.required_layer):
+                raise BattleRequirementError("realm requirement is not met")
+            if exploration is not None:
+                location_key = str(exploration_snapshot.get("location_key", enemy.location_key))
+            else:
+                location_key = enemy.location_key
             active = connection.execute(
                 "SELECT 1 FROM battle_sessions WHERE player_id = ? AND status IN ('created', 'running') LIMIT 1",
                 (player["id"],),
@@ -190,18 +248,27 @@ class CombatRepositoryMixin:
             if active is not None:
                 raise BattleBusyError("battle is already active")
 
-            equipment = self._battle_equipment_snapshot(connection, int(player["id"]))
-            qualification = self._json_object(player["qualification_json"], {})
+            equipment = (
+                tuple(exploration_snapshot.get("equipment", ()))
+                if exploration is not None
+                else self._battle_equipment_snapshot(connection, int(player["id"]))
+            )
+            qualification = (
+                self._json_object(exploration_snapshot.get("qualification"), {})
+                if exploration is not None
+                else self._json_object(player["qualification_json"], {})
+            )
             stats = player_stat_snapshot(
                 qualification,
-                max_hp=int(player["max_hp"]),
-                initiative=int(player["initiative"]),
+                max_hp=int(exploration_snapshot.get("max_hp", player["max_hp"])),
+                initiative=int(exploration_snapshot.get("initiative", player["initiative"])),
                 equipment=equipment,
             )
             battle_id = uuid4().hex
             snapshot = {
                 "battle_type": battle_type,
-                "location_key": enemy.location_key,
+                "exploration_id": exploration_id,
+                "location_key": location_key,
                 "player": {
                     "player_id": str(player["player_id"]),
                     "path_key": player["path_key"],
@@ -274,6 +341,14 @@ class CombatRepositoryMixin:
                 payload=payload,
                 now_text=now_text,
             )
+            if exploration is not None:
+                result = self._json_object(exploration["result_json"], {})
+                result["battle_id"] = battle_id
+                result["battle_enemy_key"] = enemy.key
+                connection.execute(
+                    "UPDATE exploration_sessions SET result_json = ?, updated_at = ? WHERE id = ? AND status = 'combat_pending'",
+                    (json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, exploration["id"]),
+                )
             return self._battle_start_from_payload(payload)
 
     def _run_battle_turn_once(self, battle_id: str, expected_round: int) -> BattleTurnRecord:
@@ -775,6 +850,14 @@ class CombatRepositoryMixin:
 
     @staticmethod
     def _meets_enemy_requirement(player: Any, required_realm: str, required_layer: int) -> bool:
+        return CombatRepositoryMixin._meets_realm_values(
+            str(player["realm_key"]), int(player["realm_layer"]), required_realm, required_layer
+        )
+
+    @staticmethod
+    def _meets_realm_values(
+        realm_key: str, layer: int, required_realm: str, required_layer: int
+    ) -> bool:
         ranks = {
             "mortal": 0,
             "qi_sensing": 1,
@@ -787,9 +870,9 @@ class CombatRepositoryMixin:
             "dao_union": 8,
             "tribulation": 9,
         }
-        player_rank = ranks.get(str(player["realm_key"]), -1)
+        player_rank = ranks.get(str(realm_key), -1)
         required_rank = ranks.get(required_realm, 99)
-        return (player_rank, int(player["realm_layer"])) >= (required_rank, required_layer)
+        return (player_rank, int(layer)) >= (required_rank, required_layer)
 
     def _battle_equipment_snapshot(
         self, connection: sqlite3.Connection, player_id: int

@@ -45,6 +45,51 @@ TRAINING_DUMMY = EnemyDefinition(
     reward={"cultivation": 20, "spirit_stones": 5},
 )
 
+WOOD_RAT = EnemyDefinition(
+    key="enemy.wood_rat",
+    label="木鼠",
+    location_key="xuantian.outskirts",
+    required_realm="mortal",
+    required_layer=0,
+    max_hp=45,
+    attack=8,
+    initiative=10,
+    agility=8,
+    skill_key="enemy_skill.scratch",
+    random_pool="battle.enemy.wood_rat.v0.1",
+    reward={},
+)
+
+IRON_BOAR = EnemyDefinition(
+    key="enemy.iron_boar",
+    label="铁鬃野猪",
+    location_key="xuantian.outskirts",
+    required_realm="qi_sensing",
+    required_layer=3,
+    max_hp=100,
+    attack=15,
+    initiative=7,
+    agility=8,
+    skill_key="enemy_skill.charge",
+    random_pool="battle.enemy.iron_boar.v0.1",
+    reward={},
+)
+
+MIST_GUARDIAN = EnemyDefinition(
+    key="enemy.mist_guardian",
+    label="雾隐守卫",
+    location_key="cave.mist_grotto",
+    required_realm="qi_gathering",
+    required_layer=4,
+    max_hp=320,
+    attack=42,
+    initiative=10,
+    agility=14,
+    skill_key="enemy_skill.mist_shield",
+    random_pool="battle.enemy.mist_guardian.v0.1",
+    reward={},
+)
+
 CROSS_REALM_SENTINEL = EnemyDefinition(
     key="enemy.cross_realm_sentinel",
     label="跨界守门人",
@@ -77,6 +122,9 @@ BOUNDARY_TRIAL_GUARDIAN = EnemyDefinition(
 
 ENEMIES = {
     TRAINING_DUMMY.key: TRAINING_DUMMY,
+    WOOD_RAT.key: WOOD_RAT,
+    IRON_BOAR.key: IRON_BOAR,
+    MIST_GUARDIAN.key: MIST_GUARDIAN,
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
 }
@@ -153,6 +201,9 @@ __all__ = [
     "RULE_VERSION",
     "TURN_TIMEOUT_SECONDS",
     "EnemyDefinition",
+    "IRON_BOAR",
+    "MIST_GUARDIAN",
+    "WOOD_RAT",
     "battle_roll_bp",
     "clamp",
     "enemy_definition",

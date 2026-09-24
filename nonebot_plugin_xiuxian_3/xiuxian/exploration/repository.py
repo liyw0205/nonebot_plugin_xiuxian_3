@@ -1,7 +1,8 @@
 """SQLite transactions for exploration sessions.
 
-Exploration keeps its deterministic combat-pending contract here; this
-module does not start a combat runtime.
+The exploration repository owns session and reward state. Encounter execution
+delegates to the shared automatic-combat repository and only commits frozen
+exploration rewards after that battle reaches a terminal result.
 """
 
 from __future__ import annotations
@@ -344,6 +345,9 @@ class ExplorationRepositoryMixin:
                 "battle_chance_bp": definition.battle_chance_bp,
                 "business_date": business_date,
                 "stamina_cost": definition.stamina_cost,
+                "max_hp": int(row["max_hp"]),
+                "initiative": int(row["initiative"]),
+                "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
             }
             connection.execute(
                 "UPDATE players SET stamina = ?, updated_at = ? WHERE id = ?",
@@ -423,7 +427,192 @@ class ExplorationRepositoryMixin:
     ) -> ExplorationSettlementRecord:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._settle_exploration_sync, platform, platform_user_id, operation_id)
+            record = await asyncio.to_thread(
+                self._settle_exploration_sync,
+                platform,
+                platform_user_id,
+                operation_id,
+            )
+        if record.status != "combat_pending":
+            return record
+        battle = await self.start_exploration_battle(
+            platform=platform,
+            platform_user_id=platform_user_id,
+            exploration_id=record.exploration_id,
+            mode_key=record.mode_key,
+            operation_id=f"exploration.battle:{record.exploration_id}",
+        )
+        resolved = await self._run_exploration_battle(battle.battle_id, battle.round_no)
+        return await self.settle_exploration_combat(
+            platform=platform,
+            platform_user_id=platform_user_id,
+            exploration_id=record.exploration_id,
+            battle_id=resolved.battle_id,
+            operation_id=f"{operation_id}:combat",
+        )
+
+    async def _run_exploration_battle(self, battle_id: str, completed_round: int):
+        turn = None
+        for expected_round in range(completed_round + 1, 21):
+            turn = await self.run_battle_turn(
+                battle_id=battle_id,
+                expected_round=expected_round,
+            )
+            if turn.status not in {"created", "running"}:
+                break
+        if turn is None or turn.status in {"created", "running"}:
+            from ..persistence.errors import BattleNotReadyError
+
+            raise BattleNotReadyError("automatic exploration battle did not reach a terminal state")
+        return await self.resolve_battle(battle_id=battle_id)
+
+    async def settle_exploration_combat(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        exploration_id: str,
+        battle_id: str,
+        operation_id: str,
+    ) -> ExplorationSettlementRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync,
+                self._settle_exploration_combat_once,
+                platform,
+                platform_user_id,
+                exploration_id,
+                battle_id,
+                operation_id,
+            )
+
+    def _settle_exploration_combat_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        exploration_id: str,
+        battle_id: str,
+        operation_id: str,
+    ) -> ExplorationSettlementRecord:
+        operation_name = "exploration.settle_combat"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "exploration_id": exploration_id,
+                "battle_id": battle_id,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            row = self._require_player(connection, platform, platform_user_id)
+            session = connection.execute(
+                "SELECT * FROM exploration_sessions WHERE exploration_id = ? AND player_id = ?",
+                (exploration_id, row["id"]),
+            ).fetchone()
+            if session is None:
+                raise ExplorationNotFoundError("exploration does not exist")
+            if str(session["status"]) != "combat_pending":
+                stored = self._json_object(session["result_json"], {})
+                payload = {
+                    "player": self._player_payload(self._row_to_player(row)),
+                    "exploration_id": exploration_id,
+                    "mode_key": session["mode_key"],
+                    "location_key": session["location_key"],
+                    "status": session["status"],
+                    "result": self._json_object(stored.get("result"), {}),
+                    "battle_pending": False,
+                    "expired": str(session["status"]) == "expired",
+                    "stamina_cost": int(session["stamina_cost"]),
+                    "battle_id": stored.get("battle_id"),
+                    "battle_outcome": stored.get("battle_outcome"),
+                }
+                connection.execute(
+                    "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+                )
+                return self._exploration_settlement_from_payload(payload, replay=True)
+            battle = connection.execute(
+                "SELECT status, result_json FROM battle_sessions WHERE battle_id = ? AND player_id = ?",
+                (battle_id, row["id"]),
+            ).fetchone()
+            if battle is None or str(battle["status"]) != "settled":
+                raise ExplorationCombatPendingError("exploration battle is not settled")
+            battle_result = self._json_object(battle["result_json"], {})
+            battle_outcome = str(battle_result.get("outcome", ""))
+            frozen = self._json_object(session["result_json"], {})
+            frozen_result = {
+                str(key): int(value) for key, value in dict(frozen.get("result", {})).items()
+            }
+            result = frozen_result if battle_outcome == "won" else {}
+            inventory = self._json_object(row["inventory_json"], {})
+            stones = int(row["spirit_stones"])
+            cultivation = int(row["cultivation"])
+            total_cultivation = int(row["total_cultivation"])
+            for key, quantity in result.items():
+                if key == "spirit_stones":
+                    stones += quantity
+                elif key == "cultivation":
+                    cultivation += quantity
+                    total_cultivation += quantity
+                else:
+                    inventory[key] = int(inventory.get(key, 0)) + quantity
+            connection.execute(
+                "UPDATE players SET spirit_stones=?, cultivation=?, total_cultivation=?, inventory_json=?, updated_at=? WHERE id=?",
+                (stones, cultivation, total_cultivation, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+            )
+            result_json = {
+                "status": "settled",
+                "result": result,
+                "frozen_result": frozen_result,
+                "battle_pending": False,
+                "battle_id": battle_id,
+                "battle_outcome": battle_outcome,
+                "expired": False,
+                "settled_at": now_text,
+            }
+            connection.execute(
+                "UPDATE exploration_sessions SET status='settled', result_json=?, updated_at=? WHERE id=? AND status='combat_pending'",
+                (json.dumps(result_json, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
+            if str(session["mode_key"]) == "explore.spring_gather":
+                self._record_spirit_spring_contribution(
+                    connection,
+                    player_id=int(row["id"]),
+                    source_operation_id=str(session["operation_id"]),
+                    quantity=int(result.get("item.herb.spirit_leaf", 0)),
+                    occurred_at=datetime.fromisoformat(str(session["starts_at"])),
+                )
+            updated = connection.execute("SELECT * FROM players WHERE id=?", (row["id"],)).fetchone()
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "exploration_id": exploration_id,
+                "mode_key": session["mode_key"],
+                "location_key": session["location_key"],
+                "status": "settled",
+                "result": result,
+                "battle_pending": False,
+                "expired": False,
+                "stamina_cost": int(session["stamina_cost"]),
+                "battle_id": battle_id,
+                "battle_outcome": battle_outcome,
+            }
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return self._exploration_settlement_from_payload(payload)
 
     def _settle_exploration_sync(self, platform: str, platform_user_id: str, operation_id: str) -> ExplorationSettlementRecord:
         last_error: Exception | None = None
@@ -478,6 +667,8 @@ class ExplorationRepositoryMixin:
                     "battle_pending": True,
                     "expired": False,
                     "stamina_cost": int(session["stamina_cost"]),
+                    "battle_id": stored_result.get("battle_id"),
+                    "battle_outcome": stored_result.get("battle_outcome"),
                 }
                 connection.execute(
                     "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -502,10 +693,9 @@ class ExplorationRepositoryMixin:
             if not expired:
                 seed = str(snapshot.get("random_seed", session["operation_id"]))
                 battle_pending = battle_roll_bp(seed + ":battle") < int(snapshot.get("battle_chance_bp", 0))
+                result = settlement_result(str(session["mode_key"]), seed)
                 if battle_pending:
                     status = "combat_pending"
-                else:
-                    result = settlement_result(str(session["mode_key"]), seed)
 
             inventory = self._json_object(row["inventory_json"], {})
             stones = int(row["spirit_stones"])
@@ -538,6 +728,7 @@ class ExplorationRepositoryMixin:
             result_json = {
                 "status": status,
                 "result": result,
+                "frozen_result": result,
                 "battle_pending": battle_pending,
                 "expired": expired,
                 "settled_at": now_text,
@@ -566,6 +757,8 @@ class ExplorationRepositoryMixin:
                 "battle_pending": battle_pending,
                 "expired": expired,
                 "stamina_cost": int(session["stamina_cost"]),
+                "battle_id": result_json.get("battle_id"),
+                "battle_outcome": result_json.get("battle_outcome"),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -591,6 +784,8 @@ class ExplorationRepositoryMixin:
             battle_pending=bool(payload.get("battle_pending", False)),
             expired=bool(payload.get("expired", False)),
             stamina_cost=int(payload.get("stamina_cost", 0)),
+            battle_id=str(payload["battle_id"]) if payload.get("battle_id") else None,
+            battle_outcome=str(payload["battle_outcome"]) if payload.get("battle_outcome") else None,
             already_completed=replay,
         )
 

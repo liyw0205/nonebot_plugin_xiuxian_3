@@ -47,4 +47,6 @@ class ExplorationSettlementRecord:
     battle_pending: bool
     expired: bool
     stamina_cost: int
+    battle_id: str | None = None
+    battle_outcome: str | None = None
     already_completed: bool = False
