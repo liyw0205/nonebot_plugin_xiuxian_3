@@ -85,6 +85,22 @@ DEFINITIONS: dict[str, BountyDefinition] = {
         rule_version="adventures-0.2.0",
         content_version="content-0.2",
     ),
+    "bounty.elite_hunt": BountyDefinition(
+        key="bounty.elite_hunt",
+        label="洞天精英悬赏",
+        description="在洞天二层击败雾隐精英 1 次",
+        required_realm="golden_core",
+        required_layer=1,
+        duration_seconds=4 * 60 * 60,
+        daily_limit=1,
+        target_kind="exploration_battle_wins",
+        target_key="enemy.mist_elite",
+        target_amount=1,
+        reward=(("item.cave_pass_advanced", 1), ("local_reputation", 12)),
+        reputation_key="local.xuantian.cloud_city",
+        rule_version="adventures-0.2.0",
+        content_version="content-0.2",
+    ),
 }
 
 
@@ -97,6 +113,8 @@ ALIASES = {
     "生产": "bounty.craft_order",
     "云铁矿区悬赏": "bounty.cloud_mine",
     "云铁悬赏": "bounty.cloud_mine",
+    "洞天精英悬赏": "bounty.elite_hunt",
+    "精英悬赏": "bounty.elite_hunt",
 }
 
 

@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
 
 
 def _context(adapter: str, user: str, request_id: str, *, operation_id: str = "") -> CommandContext:
@@ -42,6 +43,14 @@ def _inventory(runtime, adapter: str, user: str, **changes: int) -> dict[str, in
             (json.dumps(inventory, ensure_ascii=False, sort_keys=True), adapter, user),
         )
         return inventory
+
+
+def _expire_exploration(runtime, exploration_id: str) -> None:
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        connection.execute(
+            "UPDATE exploration_sessions SET ends_at = ? WHERE exploration_id = ?",
+            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), exploration_id),
+        )
 
 
 def test_cloud_mine_bounty_qq_and_onebot_full_claim_flow() -> None:
@@ -198,6 +207,72 @@ def test_cloud_mine_bounty_requires_access_and_expiry_does_not_reward() -> None:
             assert stones == 50
             assert json.loads(local_json or "{}") == {}
             assert status == "expired"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_elite_bounty_grants_advanced_cave_pass_after_exploration_win() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "elite-bounty-qq"), ("onebot.v11", "elite-bounty-ob")):
+                created = await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")
+                assert created.code == "PLAYER_CREATED"
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="golden_core",
+                    realm_layer=1,
+                    location_key="cave.mist_grotto_2",
+                    stamina=30,
+                    max_hp=10000,
+                    initiative=100,
+                    qualification_json=json.dumps({"body": 10000, "agility": 10000}),
+                    inventory_json=json.dumps({}),
+                )
+                accepted = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "accept", operation_id=f"{adapter}:elite-accept"),
+                    "接取悬赏 洞天精英悬赏",
+                )
+                assert accepted.code == "BOUNTY_ACCEPTED"
+                operation = next(
+                    f"{adapter}:elite-explore:{index}"
+                    for index in range(1000)
+                    if battle_roll_bp(f"{adapter}:elite-explore:{index}:battle") < 4000
+                )
+                started = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "start", operation_id=operation),
+                    "开始探索 洞天二层探索",
+                )
+                assert started.code == "EXPLORATION_STARTED"
+                _expire_exploration(runtime, started.data["exploration_id"])
+                settled = await runtime.adapters.dispatch(adapter, _context(adapter, user, "settle"), "结算探索")
+                assert settled.code == "EXPLORATION_SETTLED"
+                assert settled.data["battle_outcome"] == "won"
+                claimed = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "claim", operation_id=f"{adapter}:elite-claim"),
+                    "领取悬赏",
+                )
+                assert claimed.code == "BOUNTY_CLAIMED"
+                assert claimed.data["rewards"] == {"item.cave_pass_advanced": 1, "local_reputation": 12}
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "claim-replay", operation_id=f"{adapter}:elite-claim"),
+                    "领取悬赏",
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    inventory = connection.execute(
+                        "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert json.loads(inventory)["item.cave_pass_advanced"] == 1
             await runtime.close()
 
     asyncio.run(run())
