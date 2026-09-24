@@ -9,6 +9,7 @@ from ..repository import (
     ExplorationNotFoundError,
     ExplorationNotReadyError,
     ExplorationQuotaExhaustedError,
+    EnergyInsufficientError,
     LocationRequirementError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -27,6 +28,7 @@ ITEM_LABELS = {
     "item.ore.ironstone": "铁石",
     "item.herb.spirit_leaf": "灵叶",
     "item.mat.array_sand": "阵砂",
+    "item.material.cloud_iron": "云铁",
 }
 
 
@@ -70,7 +72,7 @@ class ExplorationApplication:
             return CommandResult(
                 False,
                 "INVALID_EXPLORATION_MODE",
-                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集` 或 `开始探索 雾隐洞天探索`。",
+                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集` 或 `开始探索 洞天二层探索`。",
                 context.request_id,
             )
         operation_id = self._operation_id(context, "exploration.start")
@@ -95,6 +97,8 @@ class ExplorationApplication:
             return CommandResult(False, "EXPLORATION_QUOTA_EXHAUSTED", "这项探索今日次数已用尽。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，未扣除任何资源。", context.request_id, operation_id)
+        except EnergyInsufficientError:
+            return CommandResult(False, "ENERGY_INSUFFICIENT", "精力不足，未扣除任何资源。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他探索输入，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
@@ -111,6 +115,7 @@ class ExplorationApplication:
                 f"- **地点**：{self._location_text(definition.location_key)}\n"
                 f"- **预计耗时**：{definition.duration_seconds // 60 if definition.duration_seconds >= 60 else definition.duration_seconds} {'分钟' if definition.duration_seconds >= 60 else '秒'}\n"
                 f"- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
+                f"- **精力**：{record.player.energy}/{record.player.energy_max}（消耗 {record.energy_cost}）\n"
                 f"- **今日上限**：{definition.daily_limit} 次\n\n"
                 "> 完成后发送 `结算探索`；准备期间不能移动、修炼、生产、突破或再次探索。"
             ),
@@ -122,6 +127,8 @@ class ExplorationApplication:
                 "status": record.status,
                 "ends_at": record.ends_at,
                 "stamina_cost": record.stamina_cost,
+                "energy_cost": record.energy_cost,
+                "content_version": definition.content_version,
                 "idempotent_replay": record.already_completed,
             },
         )
@@ -200,6 +207,7 @@ class ExplorationApplication:
                 f"{battle_text}"
                 f"- **探索收获**：{'、'.join(reward_lines) or '无'}\n"
                 f"- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
+                f"- **精力**：{record.player.energy}/{record.player.energy_max}\n"
                 f"- **灵石**：{record.player.spirit_stones}\n\n"
                 "> 结果按开始时的规则快照结算，重复结算不会重复发放。"
             ),
@@ -212,6 +220,8 @@ class ExplorationApplication:
                 "result": record.result,
                 "battle_id": record.battle_id,
                 "battle_outcome": record.battle_outcome,
+                "energy_cost": record.energy_cost,
+                "content_version": record.content_version,
                 "idempotent_replay": record.already_completed,
             },
         )
@@ -245,11 +255,12 @@ class ExplorationApplication:
                 "## 探索已取消\n\n"
                 f"**{self._display_name(record.player)}**取消了尚未运行的探索。\n\n"
                 f"- **返还体力**：{record.result.get('stamina_refund', 0)}\n"
+                f"- **返还精力**：{record.result.get('energy_refund', 0)}\n"
                 f"- **体力**：{record.player.stamina}/{record.player.stamina_max}"
             ),
             context.request_id,
             operation_id,
-            data={"exploration_id": record.exploration_id, "status": record.status, "stamina_refund": record.result.get("stamina_refund", 0), "idempotent_replay": record.already_completed},
+            data={"exploration_id": record.exploration_id, "status": record.status, "stamina_refund": record.result.get("stamina_refund", 0), "energy_refund": record.result.get("energy_refund", 0), "idempotent_replay": record.already_completed},
         )
 
 

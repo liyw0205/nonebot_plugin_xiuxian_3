@@ -121,6 +121,7 @@ from ..world.repository import WorldRepositoryMixin
 from ..world.rules import destination_definition, meets_realm, RULE_VERSION
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
+    has_cloud_mine_access,
     battle_roll_bp,
     exploration_definition,
     meets_realm as exploration_meets_realm,
@@ -293,6 +294,15 @@ class ExplorationRepositoryMixin:
                 if "guide.gather_blood_grass" not in set(intro_state.get("flags", [])):
                     raise LocationRequirementError("spring gathering requires the gathering lesson")
 
+            inventory = self._json_object(row["inventory_json"], {})
+            intro_state = self._json_object(row["intro_json"], {})
+            if definition.key == "explore.cloud_mine" and not has_cloud_mine_access(
+                subprofession_key=row["subprofession_key"],
+                inventory=inventory,
+                intro_flags={str(flag) for flag in intro_state.get("flags", [])},
+            ):
+                raise LocationRequirementError("cloud mine access is missing")
+
             player_id = int(row["id"])
             active = connection.execute(
                 "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') LIMIT 1",
@@ -305,6 +315,7 @@ class ExplorationRepositoryMixin:
                 ("cultivation_sessions", ("running",)),
                 ("production_orders", ("processing",)),
                 ("breakthrough_sessions", ("preparing",)),
+                ("cloud_boat_sessions", ("created", "running")),
             ):
                 placeholders = ", ".join("?" for _ in statuses)
                 busy = connection.execute(
@@ -328,6 +339,9 @@ class ExplorationRepositoryMixin:
             stamina = int(row["stamina"])
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
+            energy = int(row["energy"])
+            if energy < definition.energy_cost:
+                raise EnergyInsufficientError("energy is insufficient")
 
             exploration_id = uuid4().hex
             starts_at = serialize_datetime(now)
@@ -345,13 +359,15 @@ class ExplorationRepositoryMixin:
                 "battle_chance_bp": definition.battle_chance_bp,
                 "business_date": business_date,
                 "stamina_cost": definition.stamina_cost,
+                "energy_cost": definition.energy_cost,
+                "content_version": definition.content_version,
                 "max_hp": int(row["max_hp"]),
                 "initiative": int(row["initiative"]),
                 "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
             }
             connection.execute(
-                "UPDATE players SET stamina = ?, updated_at = ? WHERE id = ?",
-                (stamina - definition.stamina_cost, starts_at, player_id),
+                "UPDATE players SET stamina = ?, energy = ?, updated_at = ? WHERE id = ?",
+                (stamina - definition.stamina_cost, energy - definition.energy_cost, starts_at, player_id),
             )
             connection.execute(
                 """
@@ -388,6 +404,8 @@ class ExplorationRepositoryMixin:
                 "starts_at": starts_at,
                 "ends_at": ends_at,
                 "stamina_cost": definition.stamina_cost,
+                "energy_cost": definition.energy_cost,
+                "content_version": definition.content_version,
                 "daily_limit": definition.daily_limit,
             }
             connection.execute(
@@ -415,6 +433,7 @@ class ExplorationRepositoryMixin:
             ends_at=str(payload["ends_at"]),
             stamina_cost=int(payload["stamina_cost"]),
             daily_limit=int(payload["daily_limit"]),
+            energy_cost=int(payload.get("energy_cost", 0)),
             already_completed=replay,
         )
 
@@ -535,6 +554,8 @@ class ExplorationRepositoryMixin:
                     "battle_pending": False,
                     "expired": str(session["status"]) == "expired",
                     "stamina_cost": int(session["stamina_cost"]),
+                    "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
+                    "content_version": self._json_object(session["snapshot_json"], {}).get("content_version", "content-0.1"),
                     "battle_id": stored.get("battle_id"),
                     "battle_outcome": stored.get("battle_outcome"),
                 }
@@ -605,6 +626,8 @@ class ExplorationRepositoryMixin:
                 "battle_pending": False,
                 "expired": False,
                 "stamina_cost": int(session["stamina_cost"]),
+                "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
+                "content_version": self._json_object(session["snapshot_json"], {}).get("content_version", "content-0.1"),
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
             }
@@ -667,6 +690,8 @@ class ExplorationRepositoryMixin:
                     "battle_pending": True,
                     "expired": False,
                     "stamina_cost": int(session["stamina_cost"]),
+                    "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
+                    "content_version": self._json_object(session["snapshot_json"], {}).get("content_version", "content-0.1"),
                     "battle_id": stored_result.get("battle_id"),
                     "battle_outcome": stored_result.get("battle_outcome"),
                 }
@@ -731,6 +756,8 @@ class ExplorationRepositoryMixin:
                 "frozen_result": result,
                 "battle_pending": battle_pending,
                 "expired": expired,
+                "energy_cost": int(snapshot.get("energy_cost", 0)),
+                "content_version": snapshot.get("content_version", "content-0.1"),
                 "settled_at": now_text,
             }
             connection.execute(
@@ -757,6 +784,8 @@ class ExplorationRepositoryMixin:
                 "battle_pending": battle_pending,
                 "expired": expired,
                 "stamina_cost": int(session["stamina_cost"]),
+                "energy_cost": int(snapshot.get("energy_cost", 0)),
+                "content_version": snapshot.get("content_version", "content-0.1"),
                 "battle_id": result_json.get("battle_id"),
                 "battle_outcome": result_json.get("battle_outcome"),
             }
@@ -784,6 +813,8 @@ class ExplorationRepositoryMixin:
             battle_pending=bool(payload.get("battle_pending", False)),
             expired=bool(payload.get("expired", False)),
             stamina_cost=int(payload.get("stamina_cost", 0)),
+            energy_cost=int(payload.get("energy_cost", 0)),
+            content_version=str(payload.get("content_version", "content-0.1")),
             battle_id=str(payload["battle_id"]) if payload.get("battle_id") else None,
             battle_outcome=str(payload["battle_outcome"]) if payload.get("battle_outcome") else None,
             already_completed=replay,
@@ -820,11 +851,18 @@ class ExplorationRepositoryMixin:
             ).fetchone()
             if session is None:
                 raise ExplorationNotFoundError("exploration cannot be cancelled")
-            stamina = int(row["stamina"]) + int(session["stamina_cost"])
-            connection.execute("UPDATE players SET stamina = ?, updated_at = ? WHERE id = ?", (stamina, now_text, row["id"]))
+            snapshot = self._json_object(session["snapshot_json"], {})
+            stamina_refund = int(session["stamina_cost"])
+            energy_refund = int(snapshot.get("energy_cost", 0))
+            stamina = min(int(row["stamina_max"]), int(row["stamina"]) + stamina_refund)
+            energy = min(int(row["energy_max"]), int(row["energy"]) + energy_refund)
+            connection.execute(
+                "UPDATE players SET stamina = ?, energy = ?, updated_at = ? WHERE id = ?",
+                (stamina, energy, now_text, row["id"]),
+            )
             connection.execute(
                 "UPDATE exploration_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ? AND status = 'created'",
-                (json.dumps({"status": "cancelled", "stamina_refund": int(session["stamina_cost"])}, ensure_ascii=False), now_text, session["id"]),
+                (json.dumps({"status": "cancelled", "stamina_refund": stamina_refund, "energy_refund": energy_refund}, ensure_ascii=False), now_text, session["id"]),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             player = self._row_to_player(updated)
@@ -834,10 +872,12 @@ class ExplorationRepositoryMixin:
                 "mode_key": session["mode_key"],
                 "location_key": session["location_key"],
                 "status": "cancelled",
-                "result": {"stamina_refund": int(session["stamina_cost"])},
+                "result": {"stamina_refund": stamina_refund, "energy_refund": energy_refund},
                 "battle_pending": False,
                 "expired": False,
                 "stamina_cost": int(session["stamina_cost"]),
+                "energy_cost": energy_refund,
+                "content_version": snapshot.get("content_version", "content-0.1"),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",

@@ -8,12 +8,26 @@ from .models import ExplorationDefinition
 
 
 RULE_VERSION = "exploration-0.1.0"
+V02_RULE_VERSION = "exploration-0.2.0"
+V02_CONTENT_VERSION = "content-0.2"
+CLOUD_MINE_ACCESS_FLAGS = frozenset({
+    "permit.cloud_mine",
+    "cloud_mine.permit",
+    "commission.cloud_mine",
+})
+CLOUD_MINE_ACCESS_ITEMS = frozenset({
+    "item.permit.cloud_mine",
+    "item.tool.mining_pickaxe",
+    "item.tool.mining_pickaxe_t2",
+})
 BATTLE_ENEMY_BY_MODE = {
     "explore.gather_outskirts": "enemy.wood_rat",
     # Short training is available at qi-sensing L2; the L3 iron boar remains
     # reserved for later named encounters.
     "explore.trial_outskirts": "enemy.wood_rat",
     "explore.mist_grotto": "enemy.mist_guardian",
+    "explore.cloud_mine": "enemy.cloud_beast",
+    "explore.mist_grotto_2": "enemy.mist_elite",
 }
 
 DEFINITIONS = {
@@ -69,6 +83,35 @@ DEFINITIONS = {
         battle_chance_bp=2500,
         rule_version=RULE_VERSION,
     ),
+    "explore.cloud_mine": ExplorationDefinition(
+        key="explore.cloud_mine",
+        label="云铁矿区采集",
+        location_key="xuantian.cloud_mine",
+        duration_seconds=2 * 60,
+        stamina_cost=8,
+        required_realm="foundation",
+        required_layer=1,
+        daily_limit=6,
+        random_pool="gather.cloud_mine.v0.2",
+        battle_chance_bp=3000,
+        rule_version=V02_RULE_VERSION,
+        energy_cost=2,
+        content_version=V02_CONTENT_VERSION,
+    ),
+    "explore.mist_grotto_2": ExplorationDefinition(
+        key="explore.mist_grotto_2",
+        label="雾隐洞天二层探索",
+        location_key="cave.mist_grotto_2",
+        duration_seconds=10 * 60,
+        stamina_cost=15,
+        required_realm="golden_core",
+        required_layer=1,
+        daily_limit=2,
+        random_pool="cave.mist_grotto_2.v0.2",
+        battle_chance_bp=4000,
+        rule_version=V02_RULE_VERSION,
+        content_version=V02_CONTENT_VERSION,
+    ),
 }
 
 ALIASES = {
@@ -79,6 +122,9 @@ ALIASES = {
     "灵泉采集": "explore.spring_gather",
     "雾隐洞天探索": "explore.mist_grotto",
     "洞天探索": "explore.mist_grotto",
+    "云铁矿区采集": "explore.cloud_mine",
+    "云铁采集": "explore.cloud_mine",
+    "洞天二层探索": "explore.mist_grotto_2",
 }
 
 
@@ -98,6 +144,22 @@ def exploration_definition(mode_key: str) -> ExplorationDefinition:
 
 def exploration_enemy_key(mode_key: str) -> str | None:
     return BATTLE_ENEMY_BY_MODE.get(mode_key)
+
+
+def has_cloud_mine_access(*, subprofession_key: str | None, inventory: dict[str, int], intro_flags: set[str]) -> bool:
+    """Return whether the player has the v0.2 mining/commission gate.
+
+    ``mining`` is accepted as a forward-compatible sub-class key even though
+    the first path picker only exposes the three production sub-professions.
+    Existing commission and permit flows can grant one of the stable flags or
+    item keys without adding a second player column.
+    """
+
+    if str(subprofession_key or "") in {"mining", "mining.t2", "artifice.mining"}:
+        return True
+    if CLOUD_MINE_ACCESS_FLAGS & {str(flag) for flag in intro_flags}:
+        return True
+    return any(int(inventory.get(key, 0)) > 0 for key in CLOUD_MINE_ACCESS_ITEMS)
 
 
 def realm_rank(realm_key: str) -> int:
@@ -162,6 +224,17 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
             "cultivation": weighted_value(seed + ":cultivation", (300, 400, 500), (30, 45, 25)),
             keys[material]: weighted_value(seed + ":quantity", (1, 2, 3), (45, 35, 20)),
         }
+    if mode_key == "explore.cloud_mine":
+        return {
+            "item.material.cloud_iron": weighted_value(
+                seed + ":cloud_iron", (1, 2, 3, 4), (25, 40, 25, 10)
+            )
+        }
+    if mode_key == "explore.mist_grotto_2":
+        return {
+            "cultivation": weighted_value(seed + ":cultivation", (900, 1100, 1300), (30, 45, 25)),
+            "item.material.cloud_iron": weighted_value(seed + ":material", (1, 2), (60, 40)),
+        }
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 
 
@@ -169,9 +242,14 @@ __all__ = [
     "DEFINITIONS",
     "BATTLE_ENEMY_BY_MODE",
     "RULE_VERSION",
+    "V02_CONTENT_VERSION",
+    "V02_RULE_VERSION",
     "battle_roll_bp",
+    "CLOUD_MINE_ACCESS_FLAGS",
+    "CLOUD_MINE_ACCESS_ITEMS",
     "exploration_definition",
     "exploration_enemy_key",
+    "has_cloud_mine_access",
     "meets_realm",
     "resolve_exploration_mode",
     "settlement_result",

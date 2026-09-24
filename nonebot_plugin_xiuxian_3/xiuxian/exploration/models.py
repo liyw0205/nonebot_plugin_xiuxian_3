@@ -20,6 +20,8 @@ class ExplorationDefinition:
     random_pool: str
     battle_chance_bp: int
     rule_version: str
+    energy_cost: int = 0
+    content_version: str = "content-0.1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +36,7 @@ class ExplorationStartRecord:
     stamina_cost: int
     daily_limit: int
     already_completed: bool = False
+    energy_cost: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,3 +53,5 @@ class ExplorationSettlementRecord:
     battle_id: str | None = None
     battle_outcome: str | None = None
     already_completed: bool = False
+    energy_cost: int = 0
+    content_version: str = "content-0.1"

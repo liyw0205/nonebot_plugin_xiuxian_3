@@ -90,6 +90,38 @@ MIST_GUARDIAN = EnemyDefinition(
     reward={},
 )
 
+CLOUD_BEAST = EnemyDefinition(
+    key="enemy.cloud_beast",
+    label="云铁矿兽",
+    location_key="xuantian.cloud_mine",
+    required_realm="foundation",
+    required_layer=1,
+    max_hp=700,
+    attack=85,
+    initiative=14,
+    agility=14,
+    skill_key="enemy_skill.cloud_armor",
+    random_pool="battle.enemy.cloud_beast.v0.2",
+    # Exploration owns the frozen reward. Keeping this empty prevents the
+    # generic battle reward claim from duplicating exploration materials.
+    reward={},
+)
+
+MIST_ELITE = EnemyDefinition(
+    key="enemy.mist_elite",
+    label="雾隐精英",
+    location_key="cave.mist_grotto_2",
+    required_realm="golden_core",
+    required_layer=1,
+    max_hp=1800,
+    attack=190,
+    initiative=15,
+    agility=18,
+    skill_key="enemy_skill.mist_exposed",
+    random_pool="battle.enemy.mist_elite.v0.2",
+    reward={},
+)
+
 CROSS_REALM_SENTINEL = EnemyDefinition(
     key="enemy.cross_realm_sentinel",
     label="跨界守门人",
@@ -125,6 +157,8 @@ ENEMIES = {
     WOOD_RAT.key: WOOD_RAT,
     IRON_BOAR.key: IRON_BOAR,
     MIST_GUARDIAN.key: MIST_GUARDIAN,
+    CLOUD_BEAST.key: CLOUD_BEAST,
+    MIST_ELITE.key: MIST_ELITE,
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
 }
@@ -201,7 +235,9 @@ __all__ = [
     "RULE_VERSION",
     "TURN_TIMEOUT_SECONDS",
     "EnemyDefinition",
+    "CLOUD_BEAST",
     "IRON_BOAR",
+    "MIST_ELITE",
     "MIST_GUARDIAN",
     "WOOD_RAT",
     "battle_roll_bp",
