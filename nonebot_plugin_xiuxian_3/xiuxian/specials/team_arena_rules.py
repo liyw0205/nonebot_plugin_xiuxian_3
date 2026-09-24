@@ -121,7 +121,7 @@ def team_public_summary(snapshot: Mapping[str, object], *, snapshot_id: str, rat
             if isinstance(member, Mapping)
         ],
         "rating": rating,
-        "summary": f"2v2 · {rating_band(rating) + 1}段",
+        "summary": f"{len(members) if isinstance(members, list) else 0}人队伍 · {rating_band(rating) + 1}段",
         "created_at": created_at,
     }
 

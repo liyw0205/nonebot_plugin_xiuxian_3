@@ -136,3 +136,29 @@ def test_three_member_arena_party_matches_three_member_snapshot_without_party_pv
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_asymmetric_two_vs_three_team_arena_replays_both_team_sizes() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            for user in ("asym-qq-leader", "asym-qq-member"):
+                await _player(runtime, "qq.official", user, "create-" + user)
+            for user in ("asym-ob-leader", "asym-ob-member-1", "asym-ob-member-2"):
+                await _player(runtime, "onebot.v11", user, "create-" + user)
+            await _ready_party(runtime, "qq.official", "asym-qq-leader", "asym-qq-member", "asym-pair")
+            await _ready_trio_party(runtime, "onebot.v11", "asym-ob-leader", ("asym-ob-member-1", "asym-ob-member-2"), "asym-trio")
+            pair = await runtime.adapters.dispatch("qq.official", _ctx("qq.official", "asym-qq-leader", "asym-pair-publish"), "发布组队竞技场快照")
+            trio = await runtime.adapters.dispatch("onebot.v11", _ctx("onebot.v11", "asym-ob-leader", "asym-trio-publish"), "发布组队竞技场快照")
+            assert pair.code == trio.code == "TEAM_ARENA_SNAPSHOT_PUBLISHED"
+            clock.advance(minutes=31)
+            result = await runtime.adapters.dispatch("qq.official", _ctx("qq.official", "asym-qq-leader", "asym-challenge"), f"挑战组队竞技场 {trio.data['snapshot_id']}")
+            assert result.code == "TEAM_ARENA_MATCH_SETTLED", result.message
+            replay = await runtime.adapters.dispatch("onebot.v11", _ctx("onebot.v11", "asym-ob-member-1", "asym-replay"), f"组队竞技场回放 {result.data['match_id']}")
+            assert replay.code == "TEAM_ARENA_REPLAY"
+            assert len(replay.data["snapshot"]["challenger"]["members"]) == 2
+            assert len(replay.data["snapshot"]["defender"]["members"]) == 3
+            await runtime.close()
+
+    asyncio.run(run())

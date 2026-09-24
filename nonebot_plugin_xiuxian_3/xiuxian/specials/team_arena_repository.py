@@ -158,8 +158,8 @@ class TeamArenaRepositoryMixin:
             if not compatible_team_rating(challenger_rating, defender_rating):
                 raise TeamArenaOpponentUnavailableError("team snapshot is outside the compatible rating band")
             defender_members = list(defender_snapshot.get("members", []))
-            if len(defender_members) != len(challenger_snapshot["members"]) or not MIN_TEAM_SIZE <= len(defender_members) <= MAX_TEAM_SIZE or {member.get("database_id") for member in challenger_snapshot["members"]} & {member.get("database_id") for member in defender_members}:
-                raise TeamArenaSnapshotRequirementError("team snapshots must contain two distinct members")
+            if not MIN_TEAM_SIZE <= len(defender_members) <= MAX_TEAM_SIZE or {member.get("database_id") for member in challenger_snapshot["members"]} & {member.get("database_id") for member in defender_members}:
+                raise TeamArenaSnapshotRequirementError("team snapshots must contain two or three distinct members")
             match_id = f"arena.team.match:{uuid4().hex}"
             outcome, rounds, actions = simulate_team_match(challenger_snapshot["members"], defender_members, seed=match_id)
             challenger_delta, defender_delta = self._team_rating_deltas(outcome)
