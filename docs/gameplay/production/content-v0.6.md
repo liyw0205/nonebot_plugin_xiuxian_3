@@ -8,6 +8,8 @@
 | `recipe.tribulation.guard` | 渡劫准备、领域已选 | 天劫 token 1、领域核心 3 | 30 分钟 / `item.tribulation_guard` 1 | 每次天劫最多 1；失败 token 不返 |
 | `recipe.ascension.certificate` | 三试炼成功、道果进度 >=800、功勋 >=1000 | 世界功勋 1000；道果进度只作门槛、不扣除 | 10 分钟 / `item.ascension_certificate` 1 | 每角色 1；失败返还世界功勋，仅记录诊断 |
 
+道果加工只允许 `endgame_status=dao_union` 或 `tribulation`；保护阵和飞升凭证只允许 `endgame_status=tribulation`。终局配方会话与天劫试炼会话互斥，二者的启动事务彼此检查活动会话；配方创建快照冻结当时的终局状态。进入 `ascension_ready`、飞升或留界状态后，不再开放终局生产。
+
 当前终局配方使用启动 operation ID 的 BLAKE2b 摘要生成稳定检定值，`roll_bp < 8000` 成功；相同 operation 重放原结果。道果加工失败返还 5 个道果碎片，其他投入按配方失败语义处理；道果进度总上限为 1,300。
 
 `item.tribulation_guard` 只能在下一次天劫试炼开始时锁定：失败时使债务增加量 -5（最低 0），成功不消耗；最终战不可使用。飞升凭证成功产出后立即绑定，不能用于普通市场、拆解或赠送。

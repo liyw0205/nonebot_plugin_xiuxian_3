@@ -241,7 +241,7 @@ class EndgameApplication:
         except TribulationDebtBlockedError:
             return self._failure(context, operation_id, "TRIBULATION_DEBT_BLOCKED", "天劫债已达到 100，暂不能开启新的试炼。")
         except TribulationTrialBusyError:
-            return self._failure(context, operation_id, "TRIBULATION_TRIAL_BUSY", "已有天劫试炼进行中，请先结算。")
+            return self._failure(context, operation_id, "TRIBULATION_TRIAL_BUSY", "已有天劫试炼或终局配方会话进行中，请先结算。")
         except TribulationTokenInsufficientError:
             return self._failure(context, operation_id, "TRIBULATION_TOKEN_INSUFFICIENT", "缺少天劫凭证，试炼未开始。")
         except ThreeRealmReputationInsufficientError:

@@ -24,6 +24,7 @@ class EndgameRecipeDefinition:
     required_progress: int = 0
     required_ascension_merit: int = 0
     required_realm: str = "dao_union"
+    required_endgame_statuses: tuple[str, ...] = ()
     required_location: str = "dao.origin_gate"
 
 
@@ -34,6 +35,7 @@ ENDGAME_RECIPES = {
         inputs={"item.dao_fruit_fragment": 10, "item.soul_crystal": 5},
         output_progress=100,
         required_realm="dao_union",
+        required_endgame_statuses=("dao_union", "tribulation"),
     ),
     "recipe.tribulation.guard": EndgameRecipeDefinition(
         key="recipe.tribulation.guard",
@@ -41,6 +43,7 @@ ENDGAME_RECIPES = {
         inputs={"item.tribulation_token": 1, "item.domain_core": 3},
         output_item="item.tribulation_guard",
         required_realm="tribulation",
+        required_endgame_statuses=("tribulation",),
     ),
     "recipe.ascension.certificate": EndgameRecipeDefinition(
         key="recipe.ascension.certificate",
@@ -51,6 +54,7 @@ ENDGAME_RECIPES = {
         required_progress=800,
         required_ascension_merit=1_000,
         required_realm="tribulation",
+        required_endgame_statuses=("tribulation",),
     ),
 }
 

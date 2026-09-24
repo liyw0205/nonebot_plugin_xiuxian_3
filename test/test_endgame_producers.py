@@ -333,6 +333,7 @@ def test_endgame_recipes_require_dao_origin_gate_on_qq_and_onebot() -> None:
                     user,
                     realm_key="dao_union",
                     realm_layer=1,
+                    endgame_status="dao_union",
                     location_key="dao.origin_gate",
                     inventory_json=json.dumps({"item.dao_fruit_fragment": 10, "item.soul_crystal": 5}),
                 )
@@ -666,6 +667,118 @@ def test_tribulation_guard_is_locked_returned_on_success_and_consumed_on_failure
                         ).fetchone()[0]
                     )
                 assert after.get("item.tribulation_guard", 0) == (1 if succeeded else 0)
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_endgame_recipes_and_trials_are_state_gated_and_mutually_exclusive() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            recipe_user = "qq-trial-recipe-lock"
+            await _create(runtime, "qq.official", recipe_user)
+            _set_player(
+                runtime,
+                "qq.official",
+                recipe_user,
+                realm_key="tribulation",
+                realm_layer=3,
+                endgame_status="tribulation",
+                domain_key="domain.body",
+                location_key="dao.origin_gate",
+                inventory_json=json.dumps({"item.tribulation_token": 1, "item.domain_core": 3}),
+            )
+            recipe = await runtime.dispatch(
+                _ctx("qq.official", recipe_user, "guard-recipe"), "开始终局配方 recipe.tribulation.guard"
+            )
+            assert recipe.code == "ENDGAME_RECIPE_STARTED"
+            blocked_trial = await runtime.dispatch(
+                _ctx("qq.official", recipe_user, "trial-blocked"), "开始天劫试炼 身心劫"
+            )
+            assert blocked_trial.code == "TRIBULATION_TRIAL_BUSY"
+
+            trial_user = "onebot-trial-recipe-lock"
+            await _create(runtime, "onebot.v11", trial_user)
+            _set_player(
+                runtime,
+                "onebot.v11",
+                trial_user,
+                realm_key="tribulation",
+                realm_layer=3,
+                endgame_status="tribulation",
+                domain_key="domain.body",
+                location_key="dao.origin_gate",
+                inventory_json=json.dumps({"item.tribulation_token": 1, "item.domain_core": 3}),
+            )
+            trial = await runtime.dispatch(
+                _ctx("onebot.v11", trial_user, "trial-first"), "开始天劫试炼 身心劫"
+            )
+            assert trial.code == "TRIAL_STARTED"
+            blocked_recipe = await runtime.dispatch(
+                _ctx("onebot.v11", trial_user, "recipe-blocked"), "开始终局配方 recipe.tribulation.guard"
+            )
+            assert blocked_recipe.code == "ENDGAME_RECIPE_BUSY"
+
+            ended_user = "onebot-ended-recipe"
+            await _create(runtime, "onebot.v11", ended_user)
+            _set_player(
+                runtime,
+                "onebot.v11",
+                ended_user,
+                realm_key="tribulation",
+                realm_layer=10,
+                endgame_status="ascended",
+                domain_key="domain.body",
+                location_key="dao.origin_gate",
+                inventory_json=json.dumps({"item.tribulation_token": 1, "item.domain_core": 3}),
+            )
+            ended_recipe = await runtime.dispatch(
+                _ctx("onebot.v11", ended_user, "ended-recipe"), "开始终局配方 recipe.tribulation.guard"
+            )
+            assert ended_recipe.code == "PLAYER_SUSPENDED"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM endgame_sessions WHERE player_id = "
+                    "(SELECT id FROM players WHERE platform_user_id = ?)",
+                    (ended_user,),
+                ).fetchone()[0] == 0
+
+            race_user = "qq-trial-recipe-race"
+            await _create(runtime, "qq.official", race_user)
+            _set_player(
+                runtime,
+                "qq.official",
+                race_user,
+                realm_key="tribulation",
+                realm_layer=3,
+                endgame_status="tribulation",
+                domain_key="domain.body",
+                location_key="dao.origin_gate",
+                inventory_json=json.dumps({"item.tribulation_token": 1, "item.domain_core": 3}),
+            )
+            trial_result, recipe_result = await asyncio.gather(
+                runtime.dispatch(
+                    _ctx("qq.official", race_user, "race-trial"), "开始天劫试炼 身心劫"
+                ),
+                runtime.dispatch(
+                    _ctx("qq.official", race_user, "race-recipe"),
+                    "开始终局配方 recipe.tribulation.guard",
+                ),
+            )
+            assert {trial_result.code, recipe_result.code} in (
+                {"TRIAL_STARTED", "ENDGAME_RECIPE_BUSY"},
+                {"TRIBULATION_TRIAL_BUSY", "ENDGAME_RECIPE_STARTED"},
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                active_count = connection.execute(
+                    "SELECT "
+                    "(SELECT COUNT(*) FROM tribulation_trial_sessions WHERE player_id = p.id AND status = 'preparing') + "
+                    "(SELECT COUNT(*) FROM endgame_sessions WHERE player_id = p.id AND status = 'preparing') "
+                    "FROM players p WHERE p.platform = ? AND p.platform_user_id = ?",
+                    ("qq.official", race_user),
+                ).fetchone()[0]
+            assert active_count == 1
             await runtime.close()
 
     asyncio.run(run())

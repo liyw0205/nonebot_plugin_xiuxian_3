@@ -83,9 +83,18 @@ class EndgameProductionRepositoryMixin:
             ).fetchone()
             if active is not None:
                 raise EndgameRecipeBusyError("another endgame recipe is processing")
+            active_trial = connection.execute(
+                "SELECT 1 FROM tribulation_trial_sessions WHERE player_id = ? AND status = 'preparing' LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            if active_trial is not None:
+                raise EndgameRecipeBusyError("a tribulation trial is processing")
             realm_rank = {"mortal": 0, "qi_sensing": 1, "qi_gathering": 2, "foundation": 3, "golden_core": 4, "nascent_soul": 5, "soul_transformation": 6, "void_refining": 7, "dao_union": 8, "tribulation": 9}
             if realm_rank.get(str(player["realm_key"]), -1) < realm_rank[recipe.required_realm]:
                 raise EndgameRecipeRequirementError("endgame recipe realm gate is not met")
+            current_endgame_status = str(player["endgame_status"] or "none")
+            if recipe.required_endgame_statuses and current_endgame_status not in recipe.required_endgame_statuses:
+                raise EndgameRecipeRequirementError("endgame recipe state gate is not met")
             if recipe.required_location and str(player["location_key"]) != recipe.required_location:
                 raise EndgameRecipeRequirementError("endgame recipe requires its designated location")
             if recipe.key == "recipe.dao.fruit_fragment":
@@ -145,6 +154,7 @@ class EndgameProductionRepositoryMixin:
                 "output_progress": recipe.output_progress,
                 "world_merit_cost": recipe.world_merit_cost,
                 "location_key": str(player["location_key"]),
+                "endgame_status": current_endgame_status,
                 "progress_before": int(player["dao_fruit_progress"]),
                 "roll_bp": roll_bp,
                 "content_version": CONTENT_VERSION,

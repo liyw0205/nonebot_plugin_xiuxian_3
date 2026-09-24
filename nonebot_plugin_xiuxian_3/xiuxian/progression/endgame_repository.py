@@ -405,6 +405,10 @@ class EndgameRepositoryMixin:
                 "SELECT 1 FROM tribulation_trial_sessions WHERE player_id=? AND status='preparing' LIMIT 1", (row["id"],)
             ).fetchone() is not None:
                 raise TribulationTrialBusyError("tribulation trial is already preparing")
+            if connection.execute(
+                "SELECT 1 FROM endgame_sessions WHERE player_id=? AND status='preparing' LIMIT 1", (row["id"],)
+            ).fetchone() is not None:
+                raise TribulationTrialBusyError("an endgame recipe is already preparing")
             previous = connection.execute(
                 "SELECT trial_key, status, result_json FROM tribulation_trial_sessions WHERE player_id=? ORDER BY id",
                 (row["id"],),

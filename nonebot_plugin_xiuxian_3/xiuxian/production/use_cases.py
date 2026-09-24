@@ -250,7 +250,7 @@ class ProductionApplication:
         except EndgameRecipeAlreadyCreatedError:
             return CommandResult(False, "ENDGAME_RECIPE_ALREADY_CREATED", "该终局配方的次数已用尽。", context.request_id, operation_id)
         except EndgameRecipeBusyError:
-            return CommandResult(False, "ENDGAME_RECIPE_BUSY", "已有终局配方正在制作，请先结算。", context.request_id, operation_id)
+            return CommandResult(False, "ENDGAME_RECIPE_BUSY", "已有终局配方或天劫试炼会话正在进行，请先结算。", context.request_id, operation_id)
         except EndgameRecipeRequirementError:
             return CommandResult(False, "ENDGAME_RECIPE_CONTEXT_INVALID", "需在道源门制作，并满足境界、试炼、领域及资源前置。", context.request_id, operation_id)
         except QuestResourceInsufficientError:
