@@ -79,6 +79,7 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                     realm_key="tribulation",
                     realm_layer=3,
                     cultivation=220_000,
+                    location_key="tribulation.sky_terrace",
                     inventory_json=json.dumps({"item.tribulation_token": 1}),
                 )
                 operation = next(
@@ -120,6 +121,7 @@ def test_trial_order_token_atomicity_and_failure_cooldown() -> None:
                 realm_layer=6,
                 cultivation=850_000,
                 total_cultivation=8_998_960,
+                location_key="tribulation.sky_terrace",
                 path_key="body",
                 faction_reputation_json=json.dumps({"xuantian": 2_000, "demon": 2_000, "beast": 2_000}),
                 inventory_json=json.dumps({}),

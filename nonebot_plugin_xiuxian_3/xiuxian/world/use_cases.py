@@ -139,6 +139,14 @@ class WorldApplication:
                     context.request_id,
                     operation_id,
                 )
+            if resolved == "tribulation.sky_terrace":
+                return CommandResult(
+                    False,
+                    "TRIBULATION_TERRACE_REQUIREMENT_MISSING",
+                    "需从道源门出发、达到渡劫 L3 并持有 1 张天劫凭证；本次未扣除资源。",
+                    context.request_id,
+                    operation_id,
+                )
             return CommandResult(False, "LOCATION_REQUIREMENT_MISSING", "当前境界、来源地点或凭证不满足进入条件。", context.request_id, operation_id)
         except TravelBusyError:
             return CommandResult(False, "TRAVEL_BUSY", "已有移动、修炼、生产或突破会话，请先完成后再试。", context.request_id, operation_id)

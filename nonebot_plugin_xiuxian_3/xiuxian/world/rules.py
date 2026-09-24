@@ -63,6 +63,14 @@ DESTINATIONS = {
         content_version="content-0.6",
         rule_version="world-0.6.0",
     ),
+    "tribulation.sky_terrace": DestinationDefinition(
+        "tribulation.sky_terrace", "天劫台", 30 * 60, 0, 0,
+        required_realm="tribulation", required_layer=3,
+        pass_key="item.tribulation_token", pass_quantity=1,
+        source_locations=("dao.origin_gate",),
+        content_version="content-0.6",
+        rule_version="world-0.6.0",
+    ),
 }
 
 ALIASES = {
@@ -76,6 +84,8 @@ ALIASES = {
     "雾隐洞天一层": CAVE_LOCATION,
     "雾隐洞天·一层": CAVE_LOCATION,
     "道源门": "dao.origin_gate",
+    "天劫台": "tribulation.sky_terrace",
+    "tribulation.sky_terrace": "tribulation.sky_terrace",
 }
 
 

@@ -368,6 +368,8 @@ class TravelRepositoryMixin:
                 ("cultivation_sessions", "running"),
                 ("production_orders", "processing"),
                 ("breakthrough_sessions", "preparing"),
+                ("endgame_sessions", "preparing"),
+                ("tribulation_trial_sessions", "preparing"),
             ):
                 busy = connection.execute(
                     f"SELECT 1 FROM {table} WHERE player_id = ? AND status = ? LIMIT 1", (player_id, status)

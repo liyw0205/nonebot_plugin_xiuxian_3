@@ -42,6 +42,8 @@ void_refining/L10 混元
 
 三次试炼和三项道源任务的固定奖励合计为道果进度 1,000、`resource.ascension_merit` 1,000。`trial.three_realms` 另给世界功勋 500；道源任务另给世界功勋共 1,000。债务达到 100 时，下一次试炼追加 `difficulty_bp=2000`，表现为敌方护盾/环境机制，不能直接扣除角色资产。
 
+三次试炼只能在 `tribulation.sky_terrace` 启动；从 `dao.origin_gate` 前往天劫台的移动另消耗 1 张天劫凭证，不替代每次试炼自身的凭证成本。当前运行时仍是可回放的确定性检定，不代表战斗已开放。
+
 ## 4. 最终战与飞升候选
 
 第三次试炼成功后，三项道源任务补足道果/功勋并开放渡劫 L10；`progression.advance_layer` 仍必须逐层结算，不能直接跳过 L10。`tribulation.final_battle` 前置：渡劫 L10、三次试炼成功、`resource.dao_fruit_progress>=1,000`、`resource.ascension_merit>=1,000`、`resource.tribulation_debt<100`。成本：`item.ascension_certificate` 1；会话锁 30 分钟；队伍最多 5 人，只有发起者结算终局，协助者按贡献获得绑定世界功勋。

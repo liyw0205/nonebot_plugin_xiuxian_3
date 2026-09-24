@@ -106,3 +106,130 @@ def test_cave_travel_is_mutually_exclusive_with_cultivation() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_qq_and_onebot_sky_terrace_travel_and_trial_location_gate() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "qq-sky-terrace"), ("onebot.v11", "onebot-sky-terrace")):
+                await runtime.dispatch(
+                    CommandContext(adapter=adapter, user_id=user, request_id=f"create-{adapter}"), "开始修仙"
+                )
+                await runtime.dispatch(
+                    CommandContext(adapter=adapter, user_id=user, request_id=f"seek-{adapter}"), "寻仙问道"
+                )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=3, "
+                        "endgame_status='tribulation', location_key='xuantian.new_town', stamina=30, "
+                        "inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.tribulation_token": 2}), adapter, user),
+                    )
+
+                context = lambda request, operation="": CommandContext(
+                    adapter=adapter, user_id=user, request_id=request, operation_id=operation
+                )
+                wrong_location = await runtime.dispatch(
+                    context(f"wrong-location-{adapter}", f"wrong-location-{adapter}"),
+                    "开始天劫试炼 身心劫",
+                )
+                assert wrong_location.code == "TRIBULATION_LOCATION_REQUIRED"
+                blocked_route = await runtime.dispatch(
+                    context(f"blocked-route-{adapter}", f"blocked-route-{adapter}"), "前往 天劫台"
+                )
+                assert blocked_route.code == "TRIBULATION_TERRACE_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player = connection.execute(
+                        "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert json.loads(player[0]) == {"item.tribulation_token": 2}
+                assert player[1] == "xuantian.new_town"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET location_key='dao.origin_gate' WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                    connection.execute(
+                        "UPDATE players SET inventory_json='{}' WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                missing_pass = await runtime.dispatch(context(f"missing-pass-preview-{adapter}"), "移动预览 天劫台")
+                assert missing_pass.data["ready"] is False
+                assert "通行物品" in missing_pass.data["missing"]
+                missing_pass_start = await runtime.dispatch(
+                    context(f"missing-pass-{adapter}", f"missing-pass-{adapter}"), "前往 天劫台"
+                )
+                assert missing_pass_start.code == "TRIBULATION_TERRACE_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.tribulation_token": 2}), adapter, user),
+                    )
+                preview = await runtime.dispatch(context(f"preview-{adapter}"), "移动预览 天劫台")
+                assert preview.code == "TRAVEL_PREVIEW"
+                assert preview.data["ready"] is True
+                started = await runtime.dispatch(
+                    context(f"travel-{adapter}", f"travel-{adapter}"), "前往 天劫台"
+                )
+                assert started.code == "TRAVEL_STARTED"
+                replay = await runtime.dispatch(
+                    context(f"travel-replay-{adapter}", f"travel-{adapter}"), "前往 天劫台"
+                )
+                assert replay.data["idempotent_replay"] is True
+                during_travel = await runtime.dispatch(
+                    context(f"trial-during-travel-{adapter}", f"trial-during-travel-{adapter}"),
+                    "开始天劫试炼 身心劫",
+                )
+                assert during_travel.code == "TRIBULATION_TRIAL_BUSY"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
+                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    )
+                    player = connection.execute(
+                        "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert json.loads(player[0]) == {"item.tribulation_token": 1}
+                assert player[1] == "dao.origin_gate"
+                arrived = await runtime.dispatch(
+                    context(f"settle-travel-{adapter}", f"settle-travel-{adapter}"), "结算移动"
+                )
+                assert arrived.code == "TRAVEL_COMPLETED"
+                arrival_replay = await runtime.dispatch(
+                    context(f"settle-travel-replay-{adapter}", f"settle-travel-{adapter}"), "结算移动"
+                )
+                assert arrival_replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player = connection.execute(
+                        "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert json.loads(player[0]) == {"item.tribulation_token": 1}
+                assert player[1] == "tribulation.sky_terrace"
+
+                trial = await runtime.dispatch(
+                    context(f"trial-{adapter}", f"trial-{adapter}"), "开始天劫试炼 身心劫"
+                )
+                assert trial.code == "TRIAL_STARTED"
+                trial_replay = await runtime.dispatch(
+                    context(f"trial-replay-{adapter}", f"trial-{adapter}"), "开始天劫试炼 身心劫"
+                )
+                assert trial_replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player = connection.execute(
+                        "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    assert json.loads(player) == {}
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM tribulation_trial_sessions WHERE player_id=("
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                        (adapter, user),
+                    ).fetchone()[0] == 1
+            await runtime.close()
+
+    asyncio.run(run())

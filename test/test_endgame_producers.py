@@ -633,6 +633,7 @@ def test_tribulation_guard_is_locked_returned_on_success_and_consumed_on_failure
                     stage="cultivator",
                     realm_key="tribulation",
                     realm_layer=3,
+                    location_key="tribulation.sky_terrace",
                     path_key="body",
                     inventory_json=json.dumps({"item.tribulation_token": 1, "item.tribulation_guard": 1}),
                 )
@@ -708,7 +709,7 @@ def test_endgame_recipes_and_trials_are_state_gated_and_mutually_exclusive() -> 
                 realm_layer=3,
                 endgame_status="tribulation",
                 domain_key="domain.body",
-                location_key="dao.origin_gate",
+                location_key="tribulation.sky_terrace",
                 inventory_json=json.dumps({"item.tribulation_token": 1, "item.domain_core": 3}),
             )
             trial = await runtime.dispatch(
@@ -769,6 +770,7 @@ def test_endgame_recipes_and_trials_are_state_gated_and_mutually_exclusive() -> 
             assert {trial_result.code, recipe_result.code} in (
                 {"TRIAL_STARTED", "ENDGAME_RECIPE_BUSY"},
                 {"TRIBULATION_TRIAL_BUSY", "ENDGAME_RECIPE_STARTED"},
+                {"TRIBULATION_LOCATION_REQUIRED", "ENDGAME_RECIPE_STARTED"},
             )
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 active_count = connection.execute(

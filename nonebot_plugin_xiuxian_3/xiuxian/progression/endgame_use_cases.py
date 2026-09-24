@@ -10,6 +10,7 @@ from ..repository import (
     DaoUnionRequirementError,
     EndingAlreadyChosenError,
     EndingInvalidError,
+    LocationRequirementError,
     MaterialInsufficientError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -234,6 +235,8 @@ class EndgameApplication:
             )
         except PlayerNotFoundError:
             return self._failure(context, operation_id, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。")
+        except LocationRequirementError:
+            return self._failure(context, operation_id, "TRIBULATION_LOCATION_REQUIRED", "请先抵达天劫台，再开始天劫试炼。")
         except TrialSequenceError:
             return self._failure(context, operation_id, "TRIAL_SEQUENCE_INVALID", "天劫试炼必须按身心劫、三界劫、道果劫顺序完成。")
         except TribulationCooldownError:

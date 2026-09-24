@@ -4,7 +4,7 @@ import asyncio
 import json
 import sqlite3
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
@@ -109,6 +109,48 @@ def test_real_qq_group_event_reaches_shared_application() -> None:
             assert created.code == "PLAYER_CREATED"
             assert profile.code == "PROFILE_READ"
             assert profile.data["dao_name"] == "青云"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_qq_and_onebot_normalized_events_reach_sky_terrace_flow() -> None:
+    qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-sky-terrace"))
+    onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3050))
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for prefix, normalized in (("qq", qq), ("onebot", onebot)):
+                base = normalized.context
+
+                async def dispatch(operation: str, text: str):
+                    context = replace(base, operation_id=f"{prefix}-{operation}")
+                    return await runtime.adapters.dispatch(base.adapter, context, text)
+
+                assert (await dispatch("create", "开始修仙")).code == "PLAYER_CREATED"
+                assert (await dispatch("seek", "寻仙问道")).code == "SEEKING_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=3, "
+                        "endgame_status='tribulation', location_key='dao.origin_gate', "
+                        "inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.tribulation_token": 2}), base.adapter, base.user_id),
+                    )
+
+                started = await dispatch("travel", "前往 天劫台")
+                assert started.code == "TRAVEL_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
+                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    )
+                arrived = await dispatch("travel-settle", "结算移动")
+                assert arrived.code == "TRAVEL_COMPLETED"
+                trial = await dispatch("trial", "开始天劫试炼 身心劫")
+                assert trial.code == "TRIAL_STARTED"
+                replay = await dispatch("trial", "开始天劫试炼 身心劫")
+                assert replay.data["idempotent_replay"] is True
             await runtime.close()
 
     asyncio.run(run())

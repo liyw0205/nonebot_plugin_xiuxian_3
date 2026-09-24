@@ -357,6 +357,7 @@ class EndgameRepositoryMixin:
     ) -> TrialSessionRecord:
         from ..repository import (
             DaoFruitChoiceError,
+            LocationRequirementError,
             OperationConflictError,
             ThreeRealmReputationInsufficientError,
             TribulationCooldownError,
@@ -409,6 +410,12 @@ class EndgameRepositoryMixin:
                 "SELECT 1 FROM endgame_sessions WHERE player_id=? AND status='preparing' LIMIT 1", (row["id"],)
             ).fetchone() is not None:
                 raise TribulationTrialBusyError("an endgame recipe is already preparing")
+            if connection.execute(
+                "SELECT 1 FROM travel_sessions WHERE player_id=? AND status='running' LIMIT 1", (row["id"],)
+            ).fetchone() is not None:
+                raise TribulationTrialBusyError("travel is already running")
+            if str(row["location_key"]) != "tribulation.sky_terrace":
+                raise LocationRequirementError("tribulation trial requires the sky terrace")
             previous = connection.execute(
                 "SELECT trial_key, status, result_json FROM tribulation_trial_sessions WHERE player_id=? ORDER BY id",
                 (row["id"],),
