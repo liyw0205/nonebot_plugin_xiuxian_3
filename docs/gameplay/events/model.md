@@ -28,5 +28,11 @@
 `VoidArchiveTask`：角色、周次、`task.archive_fragment.alpha|beta|gamma`、服务端证据进度、奖励和领取 operation；
 三项均领取后写入唯一 `event.archive_unlock` 窗口，任务不接受客户端提交进度。
 
+`VoidFrontierSeason`：28 日 UTC 赛季、收集/冻结状态、匿名快照和 7 日领奖截止时间。
+`VoidFrontierScoreEvent`：航道完成、风暴救援、跨服战胜利或自然结束联盟合同的服务端来源投影；
+每个来源按赛季/角色/来源键唯一，客户端不能提交分数。`VoidFrontierWeeklyReward` 是每周最多 5 次的
+待领取箱，领取时发放 20 虚空功勋与 10 联盟积分，赛季结束 7 日后未领取箱转换为绑定功勋。
+冻结快照保存匿名玩家榜和宗门榜，前 3 宗门另写 7 日虚空集市优先权；公开 DTO 不返回角色、平台或宗门身份。
+
 排行使用冻结快照；活动结束后的奖励进入待领取、自动补发或过期状态。终局赛季和三界赛季均有独立的
 season repository，不与灵泉轮次仓储混放。

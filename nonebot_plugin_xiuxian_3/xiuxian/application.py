@@ -48,6 +48,7 @@ from .events.season_use_cases import FinalHeavenSeasonApplication
 from .events.three_realms_use_cases import ThreeRealmsSeasonApplication
 from .events.domain_front_use_cases import DomainFrontApplication
 from .events.void_archive_use_cases import VoidArchiveApplication
+from .events.void_frontier_use_cases import VoidFrontierApplication
 from .specials.arena_use_cases import ArenaApplication
 from .specials.team_arena_use_cases import TeamArenaApplication
 from .quests.use_cases import QuestApplication
@@ -102,6 +103,7 @@ class XiuxianApplication:
         self.three_realms_seasons = ThreeRealmsSeasonApplication(repository)
         self.domain_front = DomainFrontApplication(repository)
         self.void_archive = VoidArchiveApplication(repository)
+        self.void_frontier = VoidFrontierApplication(repository)
         self.arena = ArenaApplication(repository)
         self.team_arena = TeamArenaApplication(repository)
         self.quests = QuestApplication(repository)
@@ -553,6 +555,15 @@ class XiuxianApplication:
 
     async def deliver_void_archive(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.deliver_void_archive(context), write_message="当前事件不允许交付虚空档案。")
+
+    async def get_void_frontier_season(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.void_frontier.get_void_frontier_season(context), require_write=False)
+
+    async def claim_void_frontier_weekly(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.void_frontier.claim_void_frontier_weekly(context), write_message="当前事件不允许领取虚空前线周任务。")
+
+    async def claim_void_frontier_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.void_frontier.claim_void_frontier_reward(context), write_message="当前事件不允许领取虚空前线赛季奖励。")
 
     async def claim_soul_transformation_quest(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.claim_soul_transformation(context), write_message="当前事件不允许领取化神许可。")

@@ -310,6 +310,7 @@ class PlayerApplication:
                 f"- **道基质量**：{player.foundation_quality}\n"
                 f"- **世界功勋**：{player.world_merit}\n"
                 f"- **虚空功勋**：{player.void_merit}\n"
+                f"- **联盟积分**：{player.alliance_points}\n"
                 f"{soul_summary}"
                 f"{domain_summary}"
                 f"{void_summary}"
@@ -333,6 +334,7 @@ class PlayerApplication:
                 "foundation_quality": player.foundation_quality,
                 "world_merit": player.world_merit,
                 "void_merit": player.void_merit,
+                "alliance_points": player.alliance_points,
                 "rule_version": player.rule_version,
                 "spirit_stones": player.spirit_stones,
                 "stamina": player.stamina,

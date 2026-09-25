@@ -22,6 +22,11 @@ operation ledger 保护。
 接入：结局榜读取正式结局，协作榜仅读取成功多人终局战；到期按需冻结匿名快照，称号领取幂等，
 逾期补发展示称号但不自动确认篇章资格。`event.heart_demon_trial` 由元婴突破失败在同一事务写入独立 `heart_demon_event_projections`，记录事件、突破结算 operation、版本快照和 24 小时截止时间；`心魔事件` 只读查询会先处理到期事件，按 `heart_demon.face` 自动结算。`化解心魔` 回写事件投影；已结算事件再次选择返回 `HEART_DEMON_ALREADY_RESOLVED`，不进入公共排行。`content-v*.md` 是规则合同，不代表所有后续入口已接入。
 
+虚空前线赛季由独立 `void_frontier` 模块接入：`虚空前线` 查询/冻结 28 日匿名玩家与宗门榜，
+`领取虚空前线周任务` 领取每周最多 5 次的待领取箱，`领取虚空前线奖励 <赛季编号>` 领取前 100 名赛季奖励。
+赛季分数由航道、风暴救援、跨服胜利和自然结束联盟合同来源实时投影；前 3 宗门写入 7 日虚空集市优先权。
+QQ 官方与 OneBot V11 共用 application、迁移、operation ledger 和冻结快照。
+
 - [事件模型](model.md)
 - [事件状态机](workflow.md)
 - [用例与验收](use-cases.md)

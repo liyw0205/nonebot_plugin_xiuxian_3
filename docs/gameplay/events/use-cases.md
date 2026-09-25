@@ -46,6 +46,13 @@ v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战�
 虚空档案补充错误码：`ARCHIVE_ROUTE_REQUIRED`、`ARCHIVE_GUARD_ALREADY_SETTLED`、
 `ARCHIVE_TASK_NOT_COMPLETE`、`ARCHIVE_TASK_ALREADY_CLAIMED`、`INVALID_ARCHIVE_TASK`。
 
+虚空前线用例为 `虚空前线`、`领取虚空前线周任务` 和 `领取虚空前线奖励 <赛季编号>`。
+赛季分数只读取已结算服务端来源：航道完成 +30、风暴救援 +50、跨服战胜利 +100、自然结束联盟合同 +20；
+周任务每 UTC 周最多 5 个箱，每箱领取 20 虚空功勋与 10 联盟积分。赛季结束后冻结匿名玩家/宗门榜，前 3
+宗门获得 7 日虚空集市队列优先，前 100 名可在 7 日窗口领奖；未领取周箱在窗口结束后转换为绑定功勋。
+错误码：`VOID_FRONTIER_SEASON_NOT_FINALIZED`、`VOID_FRONTIER_REWARD_NOT_ELIGIBLE`、
+`VOID_FRONTIER_REWARD_ALREADY_CLAIMED`、`VOID_FRONTIER_REWARD_EXPIRED`、`VOID_FRONTIER_WEEKLY_NOT_AVAILABLE`。
+
 ## 验收
 
 重复事件只推进一次；活动关闭后不能新增进度；奖励重试不重复发放；排行按冻结快照结算；时区和日切由服务端 Clock 决定。心魔事件投影与突破失败同事务写入，已结算事件不能再次选择。

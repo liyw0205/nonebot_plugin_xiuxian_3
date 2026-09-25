@@ -51,6 +51,8 @@ from ..events.domain_front_repository import DomainFrontRepositoryMixin
 from ..events.domain_front_migration import ensure_domain_front_schema
 from ..events.void_archive_repository import VoidArchiveRepositoryMixin
 from ..events.void_archive_migration import ensure_void_archive_schema
+from ..events.void_frontier_repository import VoidFrontierRepositoryMixin
+from ..events.void_frontier_migration import ensure_void_frontier_schema
 from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
 from ..events.three_realms_repository import ThreeRealmsSeasonRepositoryMixin
 from ..specials.arena_repository import ArenaRepositoryMixin
@@ -104,6 +106,7 @@ class SQLitePlayerRepository(
     CrossRealmEventRepositoryMixin,
     DomainFrontRepositoryMixin,
     VoidArchiveRepositoryMixin,
+    VoidFrontierRepositoryMixin,
     FinalHeavenSeasonRepositoryMixin,
     ThreeRealmsSeasonRepositoryMixin,
     ArenaRepositoryMixin,
@@ -222,6 +225,7 @@ class SQLitePlayerRepository(
             ensure_social_recovery_schema(connection)
             ensure_domain_front_schema(connection)
             ensure_void_archive_schema(connection)
+            ensure_void_frontier_schema(connection)
             self._migrate_heart_demon_event_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("

@@ -32,3 +32,15 @@ three claimed -> event.archive_unlock active (7 days)
 
 `探索档案遗迹` 只读取已结算航道和服务端战斗结果；失败不计 beta，重复航道或重复 operation 不重复发奖。
 任务领取时在同一事务内投影来源 operation、写入周次唯一 claim、发放碎片/功勋并按三项状态激活解锁事件。
+
+虚空前线流程为：
+
+```text
+season.void_frontier: collecting -> frozen
+server source -> score projection -> weekly reward box (max 5/week)
+season frozen -> anonymous player/sect snapshot -> claim (7 days)
+claim window expired -> pending weekly boxes become bound merit
+```
+
+赛季查询、冻结和领奖事务都会先投影已结算航道、风暴救援、跨服宗门战胜利和自然结束联盟合同；
+冻结后不再读取来源变化。周箱与赛季奖励分别按来源键和角色/赛季唯一，重放 operation 只返回原结果。

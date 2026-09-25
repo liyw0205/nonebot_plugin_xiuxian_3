@@ -96,6 +96,26 @@ class VoidArchiveTaskInvalidError(RuntimeError):
     """The requested archive-fragment task key is not part of the content."""
 
 
+class VoidFrontierSeasonNotFinalizedError(RuntimeError):
+    """The void-frontier season is still collecting score events."""
+
+
+class VoidFrontierRewardNotEligibleError(RuntimeError):
+    """The player is outside the frozen void-frontier ranking."""
+
+
+class VoidFrontierRewardAlreadyClaimedError(RuntimeError):
+    """The player already claimed the season reward."""
+
+
+class VoidFrontierRewardExpiredError(RuntimeError):
+    """The seven-day void-frontier claim window has closed."""
+
+
+class VoidFrontierWeeklyNotAvailableError(RuntimeError):
+    """There is no pending weekly void-frontier box for the player."""
+
+
 class CloudRouteLockedError(RuntimeError):
     """The v0.2 cloud route is unavailable for the current player."""
 
