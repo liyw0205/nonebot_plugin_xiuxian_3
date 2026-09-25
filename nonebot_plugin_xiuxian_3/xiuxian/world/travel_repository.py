@@ -237,6 +237,12 @@ class TravelRepositoryMixin:
         if not meets_realm(player.realm_key, player.realm_layer, definition.required_realm, definition.required_layer):
             required = f"{definition.required_realm} L{definition.required_layer}"
             missing.append(f"境界要求（{required}）")
+        if destination == "xuantian.war_front":
+            from ..events.demon_rules import demon_event_times, demon_scheduled_start
+
+            start = demon_scheduled_start(self._now())
+            if start is None or not (start <= self._now() < demon_event_times(start)[1]):
+                missing.append("活动窗口")
         if definition.source_locations and player.location_key not in definition.source_locations:
             missing.append("来源地点")
         if definition.required_intro_flag and definition.required_intro_flag not in set(player.intro_flags):
@@ -355,6 +361,12 @@ class TravelRepositoryMixin:
                 return self._travel_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
             row = self._require_player(connection, platform, platform_user_id, writable=False)
+            if destination == "xuantian.war_front":
+                from ..events.demon_rules import demon_event_times, demon_scheduled_start
+
+                start = demon_scheduled_start(now)
+                if start is None or not (start <= now < demon_event_times(start)[1]):
+                    raise EventNotActiveError("demon invasion war front is closed")
             if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
                 raise LocationRequirementError("this destination can only be reached by a cloud boat")
             endgame_status = str(row["endgame_status"] or "none")

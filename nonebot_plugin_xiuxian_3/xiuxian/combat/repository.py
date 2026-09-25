@@ -34,6 +34,7 @@ from .models import (
 from .rules import (
     CONTENT_VERSION,
     DEMON_OVERLORD,
+    DEMON_WAR_FRONT,
     DEFEAT_COOLDOWN_SECONDS,
     MAX_TURNS,
     RULE_VERSION,
@@ -88,6 +89,23 @@ class CombatRepositoryMixin:
                 operation_id,
                 enemy_key,
                 battle_type,
+            )
+
+    async def start_demon_war_front_battle(
+        self, *, platform: str, platform_user_id: str, operation_id: str
+    ) -> BattleStartRecord:
+        """Start the fixed, rewardless v0.3 war-front encounter."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync,
+                self._start_training_battle_once,
+                platform,
+                platform_user_id,
+                operation_id,
+                DEMON_WAR_FRONT.key,
+                "pve.demon_war_front",
             )
 
     async def start_exploration_battle(
@@ -181,8 +199,9 @@ class CombatRepositoryMixin:
         exploration_id: str | None = None,
     ) -> BattleStartRecord:
         enemy = enemy_definition(enemy_key)
-        battle_content_version = V03_CONTENT_VERSION if enemy.key == DEMON_OVERLORD.key else CONTENT_VERSION
-        battle_rule_version = V03_RULE_VERSION if enemy.key == DEMON_OVERLORD.key else RULE_VERSION
+        v03_enemy_keys = {DEMON_OVERLORD.key, DEMON_WAR_FRONT.key}
+        battle_content_version = V03_CONTENT_VERSION if enemy.key in v03_enemy_keys else CONTENT_VERSION
+        battle_rule_version = V03_RULE_VERSION if enemy.key in v03_enemy_keys else RULE_VERSION
         operation_name = "battle.start" if battle_type == "pve.training" else f"battle.start.{battle_type}"
         request_hash = self._request_hash(
             operation_name,
@@ -208,6 +227,14 @@ class CombatRepositoryMixin:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._battle_start_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            if battle_type == "pve.demon_war_front":
+                from ..events.demon_rules import demon_event_times, demon_scheduled_start
+                from ..persistence.errors import EventNotActiveError
+
+                start = demon_scheduled_start(now)
+                if start is None or not (start <= now < demon_event_times(start)[1]):
+                    raise EventNotActiveError("demon invasion war front is closed")
 
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["location_key"]) != enemy.location_key and exploration_id is None:

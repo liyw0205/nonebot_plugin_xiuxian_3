@@ -132,6 +132,12 @@ DESTINATIONS = {
         required_intro_flag="access.demon.fallen_ruins",
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
+    "xuantian.war_front": DestinationDefinition(
+        "xuantian.war_front", "玄天·魔界战场", 5 * 60, 15, 0,
+        required_realm="nascent_soul", required_layer=1,
+        source_locations=("xuantian.new_town", "xuantian.outskirts"),
+        content_version="content-0.3", rule_version="world-0.3.0",
+    ),
 }
 
 ALIASES = {
@@ -165,6 +171,8 @@ ALIASES = {
     "深渊门": "demon.abyss_gate",
     "魔界堕落遗迹": "demon.fallen_ruins",
     "堕落遗迹": "demon.fallen_ruins",
+    "魔界战场": "xuantian.war_front",
+    "玄天魔界战场": "xuantian.war_front",
 }
 
 

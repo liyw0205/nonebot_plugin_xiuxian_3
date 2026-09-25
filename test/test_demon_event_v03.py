@@ -353,3 +353,71 @@ def test_personal_facility_maintenance_is_player_scoped_and_idempotent_on_qq_and
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_demon_war_front_travel_and_battle_are_server_authoritative_on_qq_and_onebot() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(
+                    data_dir=Path(data_dir) / adapter,
+                    clock=lambda: datetime(2026, 9, 23, 20, 5, tzinfo=timezone.utc),
+                )
+                user = f"war-front-{adapter}"
+                created = await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")
+                assert created.ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, location_key='xuantian.outskirts', stamina=60, stamina_max=60, max_hp=10000, initiative=10000, qualification_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"body": 10000, "agility": 10000}), adapter, user),
+                    )
+                started_travel = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "travel", "war-travel"), "前往 魔界战场"
+                )
+                assert started_travel.code == "TRAVEL_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
+                        ((datetime(2026, 9, 23, 19, 59, tzinfo=timezone.utc)).isoformat(), started_travel.data["session_id"]),
+                    )
+                arrived = await runtime.adapters.dispatch(adapter, _context(adapter, user, "arrive"), "结算移动")
+                assert arrived.code == "TRAVEL_COMPLETED"
+
+                battle = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "battle", "war-battle"), "开始魔界战"
+                )
+                assert battle.code == "DEMON_WAR_FRONT_SETTLED"
+                assert battle.data["enemy_key"] == "enemy.demon_war_front"
+                assert battle.data["reward"] == {}
+                replay = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "battle-replay", "war-battle"), "开始魔界战"
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    snapshot = connection.execute(
+                        "SELECT battle_type, location_key, status, content_version, rule_version FROM battle_sessions WHERE start_operation_id=?",
+                        ("war-battle",),
+                    ).fetchone()
+                assert snapshot == ("pve.demon_war_front", "xuantian.war_front", "settled", "content-0.3", "combat-0.3.0")
+                contributed = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "contribute-battle", "war-contribution"), "贡献魔界战场 战斗"
+                )
+                assert contributed.code == "EVENT_CONTRIBUTION_RECORDED"
+                assert contributed.data["player_contribution"] > 0
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    source = connection.execute(
+                        "SELECT source_operation_id FROM world_event_contribution_events ORDER BY id DESC LIMIT 1",
+                    ).fetchone()[0]
+                assert source == "war-battle"
+                invalid = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "battle-invalid"), "开始魔界战 enemy.demon_overlord"
+                )
+                assert invalid.code == "INVALID_BATTLE_COMMAND"
+                runtime.repository._clock = lambda: datetime(2026, 9, 23, 23, 5, tzinfo=timezone.utc)
+                closed = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "battle-closed", "war-closed"), "开始魔界战"
+                )
+                assert closed.code == "EVENT_NOT_ACTIVE"
+                await runtime.close()
+
+    asyncio.run(run())

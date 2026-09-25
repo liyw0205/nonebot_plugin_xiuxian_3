@@ -13,7 +13,7 @@
 | `beast.ten_thousand_hills` | 元婴、妖界声望 `>=200` | 5 分钟 / 12 体力 | 妖兽资源、血脉任务；`risk=medium` | 非妖修有环境惩罚，盟约可抵消 |
 | `beast.shapeshift_sanctum` | 妖修、元婴、血脉稳定 `>=40` | 8 分钟 / 18 体力、`item.beast_blood` 2 | 化形/血脉会话 | 非妖修永久拒绝；稳定不足不耗血 |
 | `cave.boundary_realm` | 元婴、三界主线、2–5 人队伍 | 10 分钟 / 30 体力、`item.soul_crystal` 1 | 多人副本、神魂材料；`risk=high` | 队伍任一不满足则整体拒绝 |
-| `xuantian.war_front` | 元婴、阵营资格、每周活动窗口 | 5 分钟 / 15 体力 | 阵营战争、世界功勋 | 窗口外 `EVENT_NOT_ACTIVE` |
+| `xuantian.war_front` | 元婴 L1、每周活动窗口 | 5 分钟 / 15 体力 | 固定战场先锋自动战、世界功勋贡献 | 窗口外 `EVENT_NOT_ACTIVE` |
 
 ## 跨界移动与队伍规则
 

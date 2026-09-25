@@ -139,6 +139,21 @@ DEMON_OVERLORD = EnemyDefinition(
     reward={},
 )
 
+DEMON_WAR_FRONT = EnemyDefinition(
+    key="enemy.demon_war_front",
+    label="魔界战场先锋",
+    location_key="xuantian.war_front",
+    required_realm="nascent_soul",
+    required_layer=1,
+    max_hp=600,
+    attack=35,
+    initiative=12,
+    agility=10,
+    skill_key="skill.demonic.war_front_strike",
+    random_pool="combat.demon_war_front.v0.3",
+    reward={},
+)
+
 CROSS_REALM_SENTINEL = EnemyDefinition(
     key="enemy.cross_realm_sentinel",
     label="跨界守门人",
@@ -177,6 +192,7 @@ ENEMIES = {
     CLOUD_BEAST.key: CLOUD_BEAST,
     MIST_ELITE.key: MIST_ELITE,
     DEMON_OVERLORD.key: DEMON_OVERLORD,
+    DEMON_WAR_FRONT.key: DEMON_WAR_FRONT,
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
 }
@@ -257,6 +273,7 @@ __all__ = [
     "EnemyDefinition",
     "CLOUD_BEAST",
     "DEMON_OVERLORD",
+    "DEMON_WAR_FRONT",
     "IRON_BOAR",
     "MIST_ELITE",
     "MIST_GUARDIAN",

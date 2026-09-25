@@ -32,6 +32,7 @@ from ..repository import (
     CloudRouteLockedError,
     DemonIntroAlreadyCompletedError,
     DemonIntroRequirementError,
+    EventNotActiveError,
 )
 from .rules import CAVE_LOCATION, destination_definition, resolve_destination
 from .cloud_rules import cloud_route_definition, resolve_cloud_route
@@ -158,6 +159,8 @@ class WorldApplication:
             return CommandResult(False, "LOCATION_LOCKED", "当前状态不能开始这段移动。", context.request_id, operation_id)
         except WeaknessActiveError:
             return CommandResult(False, "PLAYER_OCCUPIED", "当前处于突破虚弱，暂时不能移动，请先恢复状态。", context.request_id, operation_id)
+        except EventNotActiveError:
+            return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战场只在每周三 20:00 UTC 起的活动窗口开放。", context.request_id, operation_id)
         except LocationRequirementError:
             if resolved == "dao.origin_gate":
                 return CommandResult(

@@ -12,6 +12,7 @@ from ..persistence.errors import (
     BattleRequirementError,
     BattleRewardAlreadyClaimedError,
     BattleRewardNotAvailableError,
+    EventNotActiveError,
     OperationConflictError,
     PlayerNotFoundError,
     PlayerSuspendedError,
@@ -109,6 +110,55 @@ class CombatApplication:
                 f"- **回合**：{resolved.round_no}/{20}\n"
                 f"- **奖励**：{reward_text}\n\n"
                 "> 服务器已记录完整行动回放；胜利后发送 `领取战斗奖励`。"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "battle_id": resolved.battle_id,
+                "enemy_key": resolved.enemy_key,
+                "status": resolved.status,
+                "outcome": resolved.outcome,
+                "reason": resolved.reason,
+                "round_no": resolved.round_no,
+                "reward": resolved.reward,
+                "reward_status": resolved.reward_status,
+                "idempotent_replay": started.already_completed or resolved.already_completed,
+            },
+        )
+
+    async def start_demon_war_front_battle(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(
+                False,
+                "INVALID_BATTLE_COMMAND",
+                "开始魔界战不接受敌人、技能、目标、伤害或其他参数。",
+                context.request_id,
+            )
+        operation_id = self._operation_id(context, "battle.start.pve.demon_war_front")
+        try:
+            started = await self.repository.start_demon_war_front_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+            resolved = await self._run_to_resolution(started.battle_id, started.round_no)
+        except EventNotActiveError:
+            return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战只在活动窗口内开放。", context.request_id, operation_id)
+        except BattleRequirementError:
+            return CommandResult(False, "BATTLE_REQUIREMENT_MISSING", "需在魔界战场达到元婴 L1 后开始魔界战。", context.request_id, operation_id)
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        outcome_text = "胜利" if resolved.outcome == "won" else "落败"
+        return CommandResult(
+            True,
+            "DEMON_WAR_FRONT_SETTLED",
+            (
+                "## 魔界战场战斗结束\n\n"
+                f"**{self._display_name(resolved.player)}**完成了魔界战场自动战斗。\n\n"
+                f"- **结果**：{outcome_text}\n"
+                f"- **回合**：{resolved.round_no}/{20}\n"
+                "- **奖励**：战场贡献将按已结算伤害核验，无额外战斗奖励\n\n"
+                "> 服务器已记录完整行动回放；发送 `贡献魔界战场 战斗` 投影本场贡献。"
             ),
             context.request_id,
             operation_id,

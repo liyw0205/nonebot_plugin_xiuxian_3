@@ -483,6 +483,13 @@ class XiuxianApplication:
             write_message="当前事件不允许开始训练战。",
         )
 
+    async def start_demon_war_front_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.combat.start_demon_war_front_battle(context),
+            write_message="当前事件不允许开始魔界战。",
+        )
+
     async def claim_battle_reward(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,
