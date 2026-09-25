@@ -39,6 +39,8 @@ from ..social.mentor_repository import MentorRepositoryMixin
 from ..social.sect_war_repository import SectWarRepositoryMixin
 from ..social.sect_war_federation_repository import SectWarFederationRepositoryMixin
 from ..social.sect_war_cross_server_repository import SectWarCrossServerRepositoryMixin
+from ..social.sect_beacon_repository import SectBeaconRepositoryMixin
+from ..social.sect_alliance_repository import SectAllianceRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
 from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
@@ -87,6 +89,8 @@ class SQLitePlayerRepository(
     SectWarRepositoryMixin,
     SectWarFederationRepositoryMixin,
     SectWarCrossServerRepositoryMixin,
+    SectBeaconRepositoryMixin,
+    SectAllianceRepositoryMixin,
     EventsRepositoryMixin,
     HeartDemonEventRepositoryMixin,
     DemonInvasionRepositoryMixin,
@@ -205,6 +209,7 @@ class SQLitePlayerRepository(
             self._migrate_economy_ledger_asset_kind(connection)
             self._migrate_facility_schema(connection)
             self._migrate_sect_war_schema(connection)
+            self._migrate_sect_alliance_schema(connection)
             self._migrate_heart_demon_event_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
@@ -234,6 +239,10 @@ class SQLitePlayerRepository(
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("events.heart_demon.v0.3", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("social.alliance_beacon.v0.5", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
@@ -295,6 +304,13 @@ class SQLitePlayerRepository(
             connection.execute("ALTER TABLE sects ADD COLUMN sect_merit INTEGER NOT NULL DEFAULT 0 CHECK (sect_merit >= 0)")
         if "warehouse_json" not in columns:
             connection.execute("ALTER TABLE sects ADD COLUMN warehouse_json TEXT NOT NULL DEFAULT '{}'")
+
+    @staticmethod
+    def _migrate_sect_alliance_schema(connection: sqlite3.Connection) -> None:
+        """Keep the v0.5 alliance/beacon tables available on existing DBs."""
+
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_sect_void_beacons_status ON sect_void_beacons(status, maintenance_due_at)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_sect_alliance_contracts_sect ON sect_alliance_contracts(sect_a_id, sect_b_id, status, ends_at)")
 
     @staticmethod
     def _migrate_heart_demon_event_schema(connection: sqlite3.Connection) -> None:

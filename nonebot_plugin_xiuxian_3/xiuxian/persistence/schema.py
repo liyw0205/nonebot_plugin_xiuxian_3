@@ -544,6 +544,82 @@ CREATE TABLE IF NOT EXISTS sect_void_fortresses (
 CREATE INDEX IF NOT EXISTS idx_sect_void_fortresses_status
     ON sect_void_fortresses(status, maintenance_due_at);
 
+CREATE TABLE IF NOT EXISTS sect_void_beacons (
+    sect_id TEXT PRIMARY KEY REFERENCES sects(sect_id),
+    status TEXT NOT NULL CHECK (status IN ('building', 'active', 'inactive')),
+    build_operation_id TEXT NOT NULL UNIQUE,
+    build_ends_at TEXT,
+    maintenance_due_at TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_void_beacons_status
+    ON sect_void_beacons(status, maintenance_due_at);
+
+CREATE TABLE IF NOT EXISTS sect_alliance_contracts (
+    alliance_id TEXT PRIMARY KEY,
+    sect_a_id TEXT NOT NULL REFERENCES sects(sect_id),
+    sect_b_id TEXT NOT NULL REFERENCES sects(sect_id),
+    proposer_sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    proposer_player_id INTEGER NOT NULL REFERENCES players(id),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'active', 'ended', 'expired')),
+    sect_a_confirmed INTEGER NOT NULL DEFAULT 0 CHECK (sect_a_confirmed IN (0, 1)),
+    sect_b_confirmed INTEGER NOT NULL DEFAULT 0 CHECK (sect_b_confirmed IN (0, 1)),
+    confirmation_expires_at TEXT NOT NULL,
+    starts_at TEXT,
+    ends_at TEXT,
+    termination_requested_by TEXT REFERENCES sects(sect_id),
+    termination_requested_at TEXT,
+    breach_fee_operation_id TEXT UNIQUE,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK (sect_a_id <> sect_b_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_alliance_contracts_sect
+    ON sect_alliance_contracts(sect_a_id, sect_b_id, status, ends_at);
+
+CREATE TABLE IF NOT EXISTS sect_alliance_cooldowns (
+    sect_id TEXT PRIMARY KEY REFERENCES sects(sect_id),
+    cooldown_until TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT 'early_termination',
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sect_recipe_unlocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    recipe_key TEXT NOT NULL,
+    source_operation_id TEXT NOT NULL DEFAULT '',
+    unlocked_at TEXT NOT NULL,
+    UNIQUE (sect_id, recipe_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_recipe_unlocks_sect
+    ON sect_recipe_unlocks(sect_id, recipe_key);
+
+CREATE TABLE IF NOT EXISTS sect_alliance_research (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alliance_id TEXT NOT NULL REFERENCES sect_alliance_contracts(alliance_id),
+    week_id TEXT NOT NULL,
+    recipe_key TEXT NOT NULL,
+    source_sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    target_sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    operation_id TEXT NOT NULL UNIQUE,
+    synced_at TEXT NOT NULL,
+    UNIQUE (alliance_id, week_id, recipe_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_alliance_research_week
+    ON sect_alliance_research(alliance_id, week_id, synced_at);
+
 CREATE TABLE IF NOT EXISTS sect_cross_server_war_rounds (
     round_id TEXT PRIMARY KEY,
     week_id TEXT NOT NULL UNIQUE,

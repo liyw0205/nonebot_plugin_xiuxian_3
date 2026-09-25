@@ -106,6 +106,10 @@ class WorldRepositoryMixin:
                 raise VoidTravelBusyError("another long action is active")
             inventory = self._json_object(row["inventory_json"], {})
             anchor_cost = navigation_anchor_cost(definition.anchor_cost, int(row["space_resistance_bp"]), unstable)
+            beacon_discount = 0
+            if route_key == "void.sect_fortress":
+                beacon_discount = int(self._active_void_beacon_discount(connection, int(row["id"]), now))
+                anchor_cost = max(1, anchor_cost - beacon_discount)
             if int(inventory.get("item.void_anchor", 0)) < anchor_cost:
                 raise VoidAnchorInsufficientError("void anchors are insufficient")
             if int(row["stamina"]) < definition.stamina_cost:
@@ -121,6 +125,7 @@ class WorldRepositoryMixin:
                 "space_resistance_bp": int(row["space_resistance_bp"]),
                 "void_instability_until": instability_until,
                 "anchor_cost": anchor_cost,
+                "beacon_discount": beacon_discount,
                 "stamina_cost": definition.stamina_cost,
                 "content_version": "content-0.5",
                 "rule_version": "world-0.5.0",

@@ -1546,3 +1546,35 @@ class CrossServerRewardNotAvailableError(RuntimeError):
 
 class CrossServerRewardAllocationError(RuntimeError):
     """A public reward-box allocation is invalid."""
+
+
+class VoidBeaconRequiredError(RuntimeError):
+    """The sect does not have the requested void beacon."""
+
+
+class VoidBeaconBuildError(RuntimeError):
+    """The void beacon cannot be built or maintained with current assets."""
+
+
+class AllianceConfirmationExpiredError(RuntimeError):
+    """The production alliance confirmation window expired."""
+
+
+class AllianceResearchWeeklyCapError(RuntimeError):
+    """The production alliance reached its weekly research sync cap."""
+
+
+class SectAllianceCooldownError(RuntimeError):
+    """A sect is cooling down after an early alliance termination."""
+
+
+class AllianceBreachFeeError(RuntimeError):
+    """The early alliance termination fee cannot be charged."""
+
+
+class AllianceNotFoundError(RuntimeError):
+    """The requested production alliance does not exist."""
+
+
+class AllianceRequirementError(RuntimeError):
+    """The production alliance prerequisites are not met."""

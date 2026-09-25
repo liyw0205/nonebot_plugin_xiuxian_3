@@ -33,6 +33,8 @@ from .social.party_use_cases import PartyApplication
 from .social.mentor_use_cases import MentorApplication
 from .social.sect_war_use_cases import SectWarApplication
 from .social.sect_war_cross_server_use_cases import SectWarCrossServerApplication
+from .social.sect_beacon_use_cases import SectBeaconApplication
+from .social.sect_alliance_use_cases import SectAllianceApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -81,6 +83,8 @@ class XiuxianApplication:
         self.mentor = MentorApplication(repository)
         self.sect_war = SectWarApplication(repository)
         self.cross_server_sect_war = SectWarCrossServerApplication(repository)
+        self.sect_beacon = SectBeaconApplication(repository)
+        self.sect_alliance = SectAllianceApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -817,6 +821,30 @@ class XiuxianApplication:
 
     async def allocate_cross_server_sect_war_reward(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.cross_server_sect_war.allocate(context), write_message="当前事件不允许分配跨服宗门战奖励。")
+
+    async def get_void_beacon(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_beacon.get(context), require_write=False)
+
+    async def build_void_beacon(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_beacon.build(context), write_message="当前事件不允许建造虚空信标。")
+
+    async def maintain_void_beacon(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_beacon.maintain(context), write_message="当前事件不允许维护虚空信标。")
+
+    async def create_sect_alliance(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_alliance.create(context), write_message="当前事件不允许发起生产联盟。")
+
+    async def get_sect_alliance(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_alliance.get(context), require_write=False)
+
+    async def confirm_sect_alliance(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_alliance.confirm(context), write_message="当前事件不允许确认生产联盟。")
+
+    async def end_sect_alliance(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_alliance.end(context), write_message="当前事件不允许解除生产联盟。")
+
+    async def sync_sect_alliance_research(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_alliance.sync_research(context), write_message="当前事件不允许同步联盟配方。")
 
     async def create_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_party(context), write_message="当前事件不允许创建队伍。")
