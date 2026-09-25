@@ -11,6 +11,10 @@ from .heart_demon_repository import HEART_DEMON_EVENT_KEY, HeartDemonEventReposi
 from .season_models import FinalHeavenClaimRecord, FinalHeavenSeasonRecord, FinalHeavenStanding
 from .season_repository import FinalHeavenSeasonRepositoryMixin
 from .season_use_cases import FinalHeavenSeasonApplication
+from .three_realms_models import ThreeRealmsClaimRecord, ThreeRealmsSeasonRecord, ThreeRealmsStanding
+from .three_realms_repository import ThreeRealmsSeasonRepositoryMixin
+from .three_realms_use_cases import ThreeRealmsSeasonApplication
+from .three_realms_rules import BOARDS as THREE_REALMS_BOARDS
 from .rules import (
     EVENT_KEY,
     EVENT_LOCATION,
@@ -40,6 +44,12 @@ __all__ = [
     "FinalHeavenSeasonRecord",
     "FinalHeavenSeasonRepositoryMixin",
     "FinalHeavenStanding",
+    "THREE_REALMS_BOARDS",
+    "ThreeRealmsClaimRecord",
+    "ThreeRealmsSeasonApplication",
+    "ThreeRealmsSeasonRecord",
+    "ThreeRealmsSeasonRepositoryMixin",
+    "ThreeRealmsStanding",
     "PERSONAL_CONTRIBUTION_CAP",
     "PERSONAL_REWARD_THRESHOLD",
     "SpiritSpringEventRecord",

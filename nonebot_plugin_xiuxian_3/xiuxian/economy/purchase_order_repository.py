@@ -286,8 +286,10 @@ class PurchaseOrderRepositoryMixin:
             if available < quantity:
                 raise PurchaseItemLockedError("seller inventory is unavailable")
             bound = connection.execute(
-                "SELECT COALESCE(SUM(quantity),0) AS quantity, MIN(bound_until) AS first_bound_until FROM item_bindings WHERE player_id=? AND item_key=? AND bound_until>?",
-                (seller["id"], item_key, now_text),
+                "SELECT COALESCE(SUM(quantity),0) AS quantity, MIN(bound_until) AS first_bound_until FROM ("
+                "SELECT quantity, bound_until FROM item_bindings WHERE player_id=? AND item_key=? AND bound_until>? "
+                "UNION ALL SELECT quantity, bound_until FROM season_item_bindings WHERE player_id=? AND item_key=? AND bound_until>?)",
+                (seller["id"], item_key, now_text, seller["id"], item_key, now_text),
             ).fetchone()
             if available - int(bound["quantity"] or 0) < quantity:
                 raise ItemBindingActiveError("item binding is still active")

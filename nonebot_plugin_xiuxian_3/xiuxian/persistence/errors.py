@@ -1036,6 +1036,22 @@ class FinalHeavenClaimExpiredError(RuntimeError):
     """The final-heaven ranking reward window has closed."""
 
 
+class ThreeRealmsRankingNotFinalizedError(RuntimeError):
+    """The requested three-realms season has not reached frozen rankings."""
+
+
+class ThreeRealmsRewardNotEligibleError(RuntimeError):
+    """The player has no claimable three-realms ranking reward."""
+
+
+class ThreeRealmsRewardAlreadyClaimedError(RuntimeError):
+    """The player already claimed the three-realms rewards for this season."""
+
+
+class ThreeRealmsRewardExpiredError(RuntimeError):
+    """The three-realms ranking reward window has closed."""
+
+
 class AchievementInvalidError(RuntimeError):
     """The requested achievement is not registered."""
 

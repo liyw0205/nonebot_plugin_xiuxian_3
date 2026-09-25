@@ -351,6 +351,10 @@ class MentorRepositoryMixin:
             self._mentor_add_reputation(connection, int(master["id"]), 0, MENTOR_SERVICE_REPUTATION, now_text)
             # Sect contribution is the existing shared contribution ledger. The
             # relation row remains the source of truth when the mentor is not in a sect.
+            sect_member = connection.execute(
+                "SELECT sect_id FROM sect_members WHERE player_id = ? AND status = 'active'",
+                (master["id"],),
+            ).fetchone()
             connection.execute(
                 """
                 UPDATE sect_members
@@ -359,6 +363,11 @@ class MentorRepositoryMixin:
                 """,
                 (MENTOR_CONTRIBUTION, now_text, now_text, master["id"]),
             )
+            if sect_member is not None:
+                connection.execute(
+                    "INSERT OR IGNORE INTO sect_contribution_events(sect_id, player_id, source_operation_id, quantity, occurred_at) VALUES (?, ?, ?, ?, ?)",
+                    (sect_member["sect_id"], master["id"], operation_id, MENTOR_CONTRIBUTION, now_text),
+                )
             payload = self._mentor_payload(
                 connection,
                 relation_id,

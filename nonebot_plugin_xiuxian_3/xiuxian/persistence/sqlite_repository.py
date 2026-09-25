@@ -41,6 +41,7 @@ from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
 from ..events.cross_realm_repository import CrossRealmEventRepositoryMixin
 from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
+from ..events.three_realms_repository import ThreeRealmsSeasonRepositoryMixin
 from ..specials.arena_repository import ArenaRepositoryMixin
 from ..specials.team_arena_repository import TeamArenaRepositoryMixin
 from ..specials.arena_recovery_repository import ArenaRecoveryRepositoryMixin
@@ -85,6 +86,7 @@ class SQLitePlayerRepository(
     DemonInvasionRepositoryMixin,
     CrossRealmEventRepositoryMixin,
     FinalHeavenSeasonRepositoryMixin,
+    ThreeRealmsSeasonRepositoryMixin,
     ArenaRepositoryMixin,
     TeamArenaRepositoryMixin,
     ArenaRecoveryRepositoryMixin,

@@ -114,8 +114,10 @@ class AuctionRepositoryMixin:
                 (seller["id"], item.key),
             ).fetchone()[0]
             bound = connection.execute(
-                "SELECT COALESCE(SUM(quantity), 0) FROM item_bindings WHERE player_id=? AND item_key=? AND bound_until > ?",
-                (seller["id"], item.key, now_text),
+                "SELECT COALESCE(SUM(quantity), 0) FROM ("
+                "SELECT quantity FROM item_bindings WHERE player_id=? AND item_key=? AND bound_until > ? "
+                "UNION ALL SELECT quantity FROM season_item_bindings WHERE player_id=? AND item_key=? AND bound_until > ?)",
+                (seller["id"], item.key, now_text, seller["id"], item.key, now_text),
             ).fetchone()[0]
             available = int(inventory.get(item.key, 0)) - int(locked_market) - int(locked_auction)
             if available < int(quantity):

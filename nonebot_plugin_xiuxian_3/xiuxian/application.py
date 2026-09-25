@@ -40,6 +40,7 @@ from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
 from .events.season_use_cases import FinalHeavenSeasonApplication
+from .events.three_realms_use_cases import ThreeRealmsSeasonApplication
 from .specials.arena_use_cases import ArenaApplication
 from .specials.team_arena_use_cases import TeamArenaApplication
 from .quests.use_cases import QuestApplication
@@ -86,6 +87,7 @@ class XiuxianApplication:
         self.purchase = self.purchase_orders
         self.events = EventsApplication(repository)
         self.seasons = FinalHeavenSeasonApplication(repository)
+        self.three_realms_seasons = ThreeRealmsSeasonApplication(repository)
         self.arena = ArenaApplication(repository)
         self.team_arena = TeamArenaApplication(repository)
         self.quests = QuestApplication(repository)
@@ -1141,6 +1143,20 @@ class XiuxianApplication:
             context,
             lambda: self.seasons.claim_final_heaven_rewards(context),
             write_message="当前事件不允许领取终局赛季奖励。",
+        )
+
+    async def get_three_realms_season(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.three_realms_seasons.get_three_realms_season(context),
+            require_write=False,
+        )
+
+    async def claim_three_realms_rewards(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.three_realms_seasons.claim_three_realms_rewards(context),
+            write_message="当前事件不允许领取三界赛季奖励。",
         )
 
     async def publish_arena_snapshot(self, context: CommandContext) -> CommandResult:

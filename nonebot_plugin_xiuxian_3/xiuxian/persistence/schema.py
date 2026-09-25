@@ -422,6 +422,18 @@ CREATE INDEX IF NOT EXISTS idx_sect_members_player ON sect_members(player_id, st
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sect_members_active_player
     ON sect_members(player_id) WHERE status = 'active';
 
+CREATE TABLE IF NOT EXISTS sect_contribution_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    source_operation_id TEXT NOT NULL UNIQUE,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    occurred_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_contribution_events_window
+    ON sect_contribution_events(player_id, occurred_at);
+
 CREATE TABLE IF NOT EXISTS sect_applications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     application_id TEXT NOT NULL UNIQUE,
@@ -1868,6 +1880,49 @@ CREATE TABLE IF NOT EXISTS final_heaven_entitlements (
 CREATE INDEX IF NOT EXISTS idx_final_heaven_entitlements_player
     ON final_heaven_entitlements(player_id, entitlement_key, created_at);
 
+CREATE TABLE IF NOT EXISTS three_realms_seasons (
+    season_id TEXT PRIMARY KEY,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    claim_expires_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('collecting', 'frozen')),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    rule_version TEXT NOT NULL,
+    frozen_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS three_realms_rankings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_id TEXT NOT NULL REFERENCES three_realms_seasons(season_id),
+    board_key TEXT NOT NULL CHECK (board_key IN ('faction_merit', 'party_contribution', 'sect_contribution')),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    rank INTEGER NOT NULL CHECK (rank >= 1),
+    score INTEGER NOT NULL CHECK (score > 0),
+    achieved_at TEXT NOT NULL,
+    anonymous_label TEXT NOT NULL,
+    claimed_at TEXT,
+    UNIQUE (season_id, board_key, player_id),
+    UNIQUE (season_id, board_key, rank)
+);
+
+CREATE INDEX IF NOT EXISTS idx_three_realms_rankings_player
+    ON three_realms_rankings(player_id, season_id, board_key, rank);
+
+CREATE TABLE IF NOT EXISTS three_realms_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_id TEXT NOT NULL REFERENCES three_realms_seasons(season_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    claimed_at TEXT NOT NULL,
+    UNIQUE (season_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_three_realms_claims_player
+    ON three_realms_claims(player_id, season_id);
+
 CREATE TABLE IF NOT EXISTS economy_ledger_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     operation_id TEXT NOT NULL,
@@ -2048,6 +2103,21 @@ CREATE TABLE IF NOT EXISTS item_bindings (
 
 CREATE INDEX IF NOT EXISTS idx_item_bindings_active
     ON item_bindings(player_id, item_key, bound_until);
+
+CREATE TABLE IF NOT EXISTS season_item_bindings (
+    binding_id TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    bound_until TEXT NOT NULL,
+    season_id TEXT NOT NULL,
+    source_operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_season_item_bindings_active
+    ON season_item_bindings(player_id, item_key, bound_until);
 
 CREATE TABLE IF NOT EXISTS production_commission_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

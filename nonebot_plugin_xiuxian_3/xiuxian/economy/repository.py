@@ -306,10 +306,15 @@ class EconomyRepositoryMixin:
             bound_quantity = connection.execute(
                 """
                 SELECT COALESCE(SUM(quantity), 0) AS quantity
-                FROM item_bindings
-                WHERE player_id = ? AND item_key = ? AND bound_until > ?
+                FROM (
+                    SELECT quantity, bound_until FROM item_bindings
+                    WHERE player_id = ? AND item_key = ? AND bound_until > ?
+                    UNION ALL
+                    SELECT quantity, bound_until FROM season_item_bindings
+                    WHERE player_id = ? AND item_key = ? AND bound_until > ?
+                )
                 """,
-                (player["id"], item.key, now_text),
+                (player["id"], item.key, now_text, player["id"], item.key, now_text),
             ).fetchone()
             unbound_inventory = int(inventory.get(item.key, 0)) - market_locked
             available = unbound_inventory - int(bound_quantity["quantity"] if bound_quantity else 0)

@@ -318,6 +318,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("领取界隙裂痕奖励", application.claim_boundary_rift_event)
     router.register("终局赛季", application.get_final_heaven_season)
     router.register("领取终局赛季奖励", application.claim_final_heaven_rewards)
+    router.register("三界赛季", application.get_three_realms_season)
+    router.register("领取三界赛季奖励", application.claim_three_realms_rewards)
     router.register("发布竞技场快照", application.publish_arena_snapshot, aliases=("发布防守快照",))
     router.register("撤销竞技场快照", application.revoke_arena_snapshot, aliases=("撤销防守快照",))
     router.register("竞技场列表", application.list_arena_snapshots, aliases=("竞技场快照", "竞技场匹配池"))
