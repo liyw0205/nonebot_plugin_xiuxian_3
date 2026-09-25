@@ -24,6 +24,7 @@ COMMISSION_TTL_SECONDS = 24 * 60 * 60
 COMMISSION_RECOVERY_GRACE_SECONDS = 24 * 60 * 60
 COMMISSION_RECIPES = frozenset({"recipe.pill.healing_low", "recipe.weapon.wood_sword"})
 NON_TRADEABLE_ITEMS = frozenset({
+    "item.pill.foundation_draft",
     "item.pill.core_condense",
     "item.pill.golden_core_guard",
     "item.array.mist_barrier",
@@ -48,6 +49,7 @@ _ITEMS = {
     "item.demon_core": "魔核",
     "item.mat.array_sand": "阵砂",
     "item.pill.healing_low": "低阶疗伤丹",
+    "item.pill.foundation_draft": "筑基丹",
     "item.weapon.wood_sword": "木纹剑",
     "item.contract.beast_pact": "妖兽契约",
 }
@@ -64,6 +66,7 @@ _ALIASES = {
     "魔核": "item.demon_core",
     "阵砂": "item.mat.array_sand",
     "低阶疗伤丹": "item.pill.healing_low",
+    "筑基丹": "item.pill.foundation_draft",
     "木纹剑": "item.weapon.wood_sword",
     "木剑": "item.weapon.wood_sword",
 }
