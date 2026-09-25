@@ -377,8 +377,7 @@ class SQLitePlayerRepository(
             """
         )
 
-    @staticmethod
-    def _migrate_facility_schema(connection: sqlite3.Connection) -> None:
+    def _migrate_facility_schema(self, connection: sqlite3.Connection) -> None:
         """Add v0.2 facility ownership fields to databases created earlier."""
 
         sect_columns = {row["name"] for row in connection.execute("PRAGMA table_info(sects)")}
@@ -431,7 +430,7 @@ class SQLitePlayerRepository(
             "created_at TEXT NOT NULL,"
             "UNIQUE (slot_id, business_date))"
         )
-        now_text = serialize_datetime(datetime.now(timezone.utc))
+        now_text = serialize_datetime(self._now())
         from ..production.facility_rules import FACILITY_DEFINITIONS
 
         for definition in FACILITY_DEFINITIONS:

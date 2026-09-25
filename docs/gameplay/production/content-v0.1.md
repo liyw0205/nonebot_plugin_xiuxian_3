@@ -27,9 +27,9 @@ quality = floor(material_quality*4000/10000)
 
 `item.mat.wood`、`item.array.gathering_basic`、`item.food.spirit_rice` 是本文件首次注册的 v0.1 稳定键：木材来自近郊采集；聚灵阵为绑定 24 小时阵法实例；灵米饭可交易、10 分钟使用冷却。
 
-当前运行时切片开放 `recipe.pill.healing_low`、`recipe.weapon.wood_sword` 和
+当前运行时切片开放 `recipe.pill.healing_low`、`recipe.pill.focus_low`、`recipe.weapon.wood_sword` 和
 `recipe.array.gathering_basic` 的个人订单；命令为 `生产预览 <配方>`、`开始生产 <配方>`、
-`领取生产` 和 `恢复生产`。炼丹教学完成且选择炼丹辅修的感气角色可以制作低阶疗伤丹；
+`领取生产` 和 `恢复生产`。炼丹教学完成且选择炼丹辅修的感气角色可以制作低阶疗伤丹和焦点丹；
 炼器、布阵仍按表中聚气和地点条件校验。五条配方的其余内容键保留在静态配置中，但未
 接入命令入口时不能被当作已开放玩法。
 

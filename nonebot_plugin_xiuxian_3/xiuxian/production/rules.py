@@ -19,6 +19,26 @@ TOOL_MAX_DURABILITY_BP = 2000
 
 
 RECIPES: dict[str, RecipeDefinition] = {
+    "recipe.pill.focus_low": RecipeDefinition(
+        key="recipe.pill.focus_low",
+        name="焦点丹",
+        profession="alchemy",
+        inputs={"item.herb.spirit_leaf": 2, "item.herb.blood_grass": 1},
+        energy_cost=5,
+        duration_seconds=45,
+        daily_limit=6,
+        tool_key="item.tool.basic_furnace",
+        tool_cost_bp=100,
+        currency_cost=0,
+        outputs={"item.pill.focus_low": 1},
+        high_quality_bonus={},
+        failure_refunds={"item.herb.spirit_leaf": 1, "item.herb.blood_grass": 0},
+        min_realm_layer=1,
+        required_realm="qi_sensing",
+        teaching_allowed=True,
+        content_version="content-0.1",
+        rule_version="production-0.1.0",
+    ),
     "recipe.pill.healing_low": RecipeDefinition(
         key="recipe.pill.healing_low",
         name="低阶疗伤丹",
@@ -296,6 +316,8 @@ RECIPE_ALIASES = {
     "疗伤丹": "recipe.pill.healing_low",
     "低阶疗伤丹": "recipe.pill.healing_low",
     "炼丹": "recipe.pill.healing_low",
+    "焦点丹": "recipe.pill.focus_low",
+    "焦点": "recipe.pill.focus_low",
     "木纹剑": "recipe.weapon.wood_sword",
     "木剑": "recipe.weapon.wood_sword",
     "炼器": "recipe.weapon.wood_sword",
@@ -331,6 +353,7 @@ ITEM_LABELS = {
     "item.mat.wood": "木材",
     "item.mat.array_sand": "阵砂",
     "item.pill.healing_low": "低阶疗伤丹",
+    "item.pill.focus_low": "焦点丹",
     "item.weapon.wood_sword": "木纹剑",
     "item.array.gathering_basic": "基础聚灵阵",
     "item.array.mist_barrier": "迷雾屏障阵",

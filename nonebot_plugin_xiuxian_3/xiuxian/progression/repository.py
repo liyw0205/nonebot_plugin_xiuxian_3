@@ -6,7 +6,7 @@ import asyncio
 import json
 import sqlite3
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from ...contracts import serialize_datetime
 from .models import ResourceRecoveryRecord
@@ -48,7 +48,7 @@ class ProgressionRepositoryMixin:
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("player.recover_resources", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")

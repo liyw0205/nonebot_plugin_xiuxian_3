@@ -235,7 +235,7 @@ class BreakthroughRepositoryMixin:
         operation_name = "progression.prepare_nascent_soul"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash(operation_name, request_payload)
-        now_text = serialize_datetime(datetime.now(timezone.utc))
+        now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
@@ -712,7 +712,7 @@ class BreakthroughRepositoryMixin:
         definition = domain_definition(path_key)
         operation_name = "paths.choose_domain"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "path_key": path_key})
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -767,7 +767,7 @@ class BreakthroughRepositoryMixin:
     def _cancel_domain_once(self, platform: str, platform_user_id: str, operation_id: str) -> DomainSelectionRecord:
         operation_name = "paths.cancel_domain"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
-        now_text = serialize_datetime(datetime.now(timezone.utc))
+        now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
@@ -794,7 +794,7 @@ class BreakthroughRepositoryMixin:
     def _confirm_domain_once(self, platform: str, platform_user_id: str, operation_id: str) -> DomainSelectionRecord:
         operation_name = "paths.confirm_domain"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -845,7 +845,7 @@ class BreakthroughRepositoryMixin:
     def _recover_domain_crack_once(self, platform: str, platform_user_id: str, early: bool, operation_id: str) -> WeaknessRecoveryRecord:
         operation_name = "progression.recover_domain_crack"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "early": early})
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -1344,7 +1344,7 @@ class BreakthroughRepositoryMixin:
         operation_name = "progression.recover_soul_fatigue"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -1430,7 +1430,7 @@ class BreakthroughRepositoryMixin:
         operation_name = "progression.recover_foundation_shock" if recovery_kind == "foundation_shock" else "progression.recover_weakness"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id, "early": early}
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")

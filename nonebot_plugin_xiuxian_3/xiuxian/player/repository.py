@@ -288,7 +288,7 @@ class PlayerRepositoryMixin:
             "dao_name": dao_name,
         }
         request_hash = self._request_hash("player.create", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
@@ -575,7 +575,7 @@ class PlayerRepositoryMixin:
             "service_key": service_key,
         }
         request_hash = self._request_hash("player.complete_intro", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
@@ -746,7 +746,7 @@ class PlayerRepositoryMixin:
             "destination": destination,
         }
         request_hash = self._request_hash("world.travel_intro", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
@@ -908,7 +908,7 @@ class PlayerRepositoryMixin:
             "dao_name": dao_name,
         }
         request_hash = self._request_hash("player.rename", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(

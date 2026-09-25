@@ -231,7 +231,7 @@ class AdventuresRepositoryMixin:
         return await asyncio.to_thread(self._get_bounty_board_sync, platform, platform_user_id)
 
     def _get_bounty_board_sync(self, platform: str, platform_user_id: str) -> BountyBoardRecord:
-        now = datetime.now(timezone.utc)
+        now = self._now()
         business_date = now.date().isoformat()
         with self._connect() as connection:
             row = self._require_player(connection, platform, platform_user_id, writable=False)
@@ -371,7 +371,7 @@ class AdventuresRepositoryMixin:
             "bounty_key": definition.key,
         }
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         business_date = now.date().isoformat()
         starts_at = serialize_datetime(now)
         expires_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
@@ -507,7 +507,7 @@ class AdventuresRepositoryMixin:
         operation_name = "bounty.claim"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")

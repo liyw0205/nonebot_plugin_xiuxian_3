@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
@@ -81,12 +81,11 @@ class AdventuresApplication:
             parts.append(f"{label} +{quantity}")
         return "、".join(parts) or "无"
 
-    @staticmethod
-    def _deadline_text(expires_at: str | None) -> str:
+    def _deadline_text(self, expires_at: str | None) -> str:
         if not expires_at:
             return ""
         try:
-            seconds = max(0, int((datetime.fromisoformat(expires_at) - datetime.now(timezone.utc)).total_seconds()))
+            seconds = max(0, int((datetime.fromisoformat(expires_at) - self.repository._now()).total_seconds()))
         except ValueError:
             return ""
         if seconds >= 3600:

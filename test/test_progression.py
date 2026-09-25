@@ -19,6 +19,17 @@ def _context(user_id: str, request_id: str, *, operation_id: str = "") -> Comman
     )
 
 
+class MutableClock:
+    def __init__(self) -> None:
+        self.current = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    def __call__(self) -> datetime:
+        return self.current
+
+    def advance(self, **kwargs: int) -> None:
+        self.current += timedelta(**kwargs)
+
+
 async def _enter_cultivator(runtime, user_id: str) -> None:
     await runtime.dispatch(_context(user_id, "create"), "开始修仙")
     await runtime.dispatch(_context(user_id, "seek"), "寻仙问道")
@@ -635,5 +646,40 @@ def test_seclusion_rejects_party_combat_and_production_locks() -> None:
                     "SELECT stamina, energy FROM players WHERE id = ?", (player_id,)
                 ).fetchone() == resources_before_locks
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_resource_recovery_uses_injected_clock_for_qq_and_onebot() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                clock = MutableClock()
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                user = f"recovery-{adapter}"
+                for index, command in enumerate(("开始修仙", "寻仙问道", "前往近郊")):
+                    result = await runtime.dispatch(
+                        CommandContext(
+                            adapter=adapter,
+                            user_id=user,
+                            request_id=f"{adapter}-setup-{index}",
+                        ),
+                        command,
+                    )
+                    assert result.ok
+                clock.advance(minutes=30)
+                recovered = await runtime.dispatch(
+                    CommandContext(
+                        adapter=adapter,
+                        user_id=user,
+                        request_id=f"{adapter}-recover",
+                        operation_id=f"{adapter}-recover",
+                    ),
+                    "恢复状态",
+                )
+                assert recovered.code == "RESOURCES_RECOVERED"
+                assert recovered.data["recovered_stamina"] == 1
+                assert recovered.data["stamina"] == 29
+                await runtime.close()
 
     asyncio.run(run())

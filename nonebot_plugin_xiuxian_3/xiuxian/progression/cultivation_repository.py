@@ -284,7 +284,7 @@ class CultivationRepositoryMixin:
             "subprofession_key": subprofession_key,
         }
         request_hash = self._request_hash("player.enter_cultivation", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
