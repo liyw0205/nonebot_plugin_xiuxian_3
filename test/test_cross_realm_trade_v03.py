@@ -235,3 +235,108 @@ def test_fixed_beast_trade_caps_binding_and_replays_on_qq_and_onebot() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_three_realms_trade_uses_trade_port_both_reputations_and_three_weekly_uses() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=Path(data_dir))
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"three-realms-{adapter}"
+                await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        """
+                        UPDATE players
+                        SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
+                            location_key='beast.three_realms_trade_port', spirit_stones=0,
+                            faction_reputation_json=?, inventory_json=?
+                        WHERE platform=? AND platform_user_id=?
+                        """,
+                        (
+                            json.dumps({"demon": 200, "beast": 200}),
+                            json.dumps({"item.demon_core": 6, "item.beast_blood": 6}),
+                            adapter,
+                            user,
+                        ),
+                    )
+
+                first = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "three-first", f"{adapter}-three-first"),
+                    "跨界贸易 三界贸易口",
+                )
+                assert first.code == "CROSS_REALM_TRADE_COMPLETED"
+                assert first.data["trade_key"] == "trade.three_realms"
+                assert first.data["output_items"] == {"item.soul_crystal": 1}
+                assert first.data["binding_expires_at"]
+
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "three-replay", f"{adapter}-three-first"),
+                    "固定贸易 trade.three_realms",
+                )
+                assert replay.code == "CROSS_REALM_TRADE_COMPLETED"
+                assert replay.data["idempotent_replay"] is True
+
+                for index in (2, 3):
+                    completed = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, f"three-{index}", f"{adapter}-three-{index}"),
+                        "三界贸易 三界互市",
+                    )
+                    assert completed.code == "CROSS_REALM_TRADE_COMPLETED"
+
+                capped = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "three-capped", f"{adapter}-three-capped"),
+                    "跨界贸易 三界贸易口",
+                )
+                assert capped.code == "TRADE_WEEKLY_CAP"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    assert state[0] == 0
+                    assert json.loads(state[1]) == {"item.soul_crystal": 3}
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM cross_realm_trades WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND trade_key=?",
+                        (adapter, user, "trade.three_realms"),
+                    ).fetchone()[0] == 3
+                    binding = connection.execute(
+                        "SELECT item_key, quantity, bound_until FROM item_bindings WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) ORDER BY created_at LIMIT 1",
+                        (adapter, user),
+                    ).fetchone()
+                assert binding[0:2] == ("item.soul_crystal", 1)
+                assert binding[2] == first.data["binding_expires_at"]
+
+                denied_user = f"three-denied-{adapter}"
+                await runtime.adapters.dispatch(adapter, _context(adapter, denied_user, "create-denied"), "开始修仙")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, "
+                        "location_key='beast.three_realms_trade_port', spirit_stones=0, "
+                        "faction_reputation_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (
+                            json.dumps({"beast": 200}),
+                            json.dumps({"item.demon_core": 2, "item.beast_blood": 2}),
+                            adapter,
+                            denied_user,
+                        ),
+                    )
+                denied = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, denied_user, "three-denied", f"{adapter}-three-denied"),
+                    "跨界贸易 三界贸易口",
+                )
+                assert denied.code == "CROSS_REALM_TRADE_PERMISSION_DENIED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    denied_state = connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, denied_user),
+                    ).fetchone()
+                assert denied_state == (0, json.dumps({"item.demon_core": 2, "item.beast_blood": 2}))
+            await runtime.close()
+
+    asyncio.run(run())

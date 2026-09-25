@@ -169,7 +169,8 @@ class WorldApplication:
         except EventNotActiveError:
             return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战场只在每周三 20:00 UTC 起的活动窗口开放。", context.request_id, operation_id)
         except FactionReputationInsufficientError:
-            faction_label = "妖界" if resolved == "beast.ten_thousand_hills" else "魔界"
+            required_faction = destination_definition(resolved).required_faction
+            faction_label = {"demon": "魔界", "beast": "妖界"}.get(required_faction, "对应阵营")
             return CommandResult(
                 False,
                 "FACTION_REPUTATION_INSUFFICIENT",

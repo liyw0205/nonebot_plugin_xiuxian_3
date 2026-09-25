@@ -148,6 +148,13 @@ DESTINATIONS = {
         required_faction="beast", required_faction_reputation=200,
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
+    "beast.three_realms_trade_port": DestinationDefinition(
+        "beast.three_realms_trade_port", "妖界·三界贸易口", 3 * 60, 8, 0,
+        required_realm="nascent_soul", required_layer=1,
+        source_locations=("beast.ten_thousand_hills",),
+        required_faction="beast", required_faction_reputation=200,
+        content_version="content-0.3", rule_version="world-0.3.0",
+    ),
     "xuantian.war_front": DestinationDefinition(
         "xuantian.war_front", "玄天·魔界战场", 5 * 60, 15, 0,
         required_realm="nascent_soul", required_layer=1,
@@ -192,6 +199,10 @@ ALIASES = {
     "契约集市": "demon.abyss_market",
     "妖界万兽山": "beast.ten_thousand_hills",
     "万兽山": "beast.ten_thousand_hills",
+    "妖界三界贸易口": "beast.three_realms_trade_port",
+    "三界贸易口": "beast.three_realms_trade_port",
+    "三界互市": "beast.three_realms_trade_port",
+    "贸易口": "beast.three_realms_trade_port",
     "魔界战场": "xuantian.war_front",
     "玄天魔界战场": "xuantian.war_front",
 }

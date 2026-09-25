@@ -245,6 +245,36 @@
       "key": "demon.abyss_market"
     },
     {
+      "name": "三界贸易口",
+      "world": "妖界",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        },
+        {
+          "type": "faction_reputation",
+          "faction": "beast",
+          "min": 200
+        }
+      ],
+      "travel": {
+        "duration_seconds": 180,
+        "stamina": 8,
+        "spirit_stone": 0
+      },
+      "environment": {
+        "risk": "low",
+        "non_beast_penalty_bp": -500
+      },
+      "actions": [
+        "economy.trade.three_realms"
+      ],
+      "key": "beast.three_realms_trade_port"
+    },
+    {
       "name": "玄天界·云城",
       "world": "玄天界",
       "status": "locked",

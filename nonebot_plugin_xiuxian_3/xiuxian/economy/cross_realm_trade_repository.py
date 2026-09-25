@@ -73,7 +73,13 @@ class CrossRealmTradeRepositoryMixin:
             if str(player["location_key"]) != definition.location_key:
                 raise CrossRealmTradePermissionDeniedError("trade must start at the configured trade location")
             reputation = self._json_object(player["faction_reputation_json"], {})
-            if int(reputation.get(definition.required_faction, 0)) < definition.required_reputation:
+            required_reputations = definition.required_reputations or {
+                definition.required_faction: definition.required_reputation
+            }
+            if any(
+                int(reputation.get(faction, 0)) < minimum
+                for faction, minimum in required_reputations.items()
+            ):
                 raise CrossRealmTradePermissionDeniedError("trade reputation permission is missing")
             weekly_count = connection.execute(
                 """
@@ -118,6 +124,7 @@ class CrossRealmTradeRepositoryMixin:
                 f"{definition.required_faction}_reputation": int(reputation.get(definition.required_faction, 0)),
                 "required_faction": definition.required_faction,
                 "required_reputation": definition.required_reputation,
+                "required_reputations": required_reputations,
             }
             connection.execute(
                 """

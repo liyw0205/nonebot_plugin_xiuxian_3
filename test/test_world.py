@@ -4,6 +4,7 @@ import asyncio
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
@@ -74,6 +75,57 @@ def test_cave_travel_locks_costs_and_settles_idempotently() -> None:
                 assert connection.execute(
                     "SELECT location_key FROM players WHERE platform_user_id = ?", (user,)
                 ).fetchone()[0] == "cave.mist_grotto"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_three_realms_trade_port_travel_is_reachable_from_beast_hills_on_both_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = datetime(2026, 9, 21, 12, tzinfo=timezone.utc)
+            runtime = create_runtime(data_dir=Path(data_dir), clock=lambda: clock)
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"trade-port-{adapter}"
+                context = lambda request, operation="": CommandContext(
+                    adapter=adapter,
+                    user_id=user,
+                    request_id=request,
+                    operation_id=operation,
+                    can_write_assets=True,
+                )
+                await runtime.adapters.dispatch(adapter, context(f"create-{adapter}"), "开始修仙")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, "
+                        "location_key='beast.ten_thousand_hills', stamina=20, stamina_max=20, "
+                        "faction_reputation_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"beast": 200}), adapter, user),
+                    )
+                preview = await runtime.adapters.dispatch(
+                    adapter, context(f"preview-{adapter}"), "移动预览 三界贸易口"
+                )
+                assert preview.code == "TRAVEL_PREVIEW"
+                assert preview.data["ready"] is True
+                started = await runtime.adapters.dispatch(
+                    adapter, context(f"start-{adapter}", f"start-{adapter}"), "前往 三界贸易口"
+                )
+                assert started.code == "TRAVEL_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
+                        ("2026-09-20T12:00:00+00:00", started.data["session_id"]),
+                    )
+                settled = await runtime.adapters.dispatch(
+                    adapter, context(f"settle-{adapter}", f"settle-{adapter}"), "结算移动"
+                )
+                assert settled.code == "TRAVEL_COMPLETED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT stamina, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert state == (12, "beast.three_realms_trade_port")
             await runtime.close()
 
     asyncio.run(run())

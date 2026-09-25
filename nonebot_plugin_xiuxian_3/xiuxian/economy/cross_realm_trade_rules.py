@@ -12,6 +12,7 @@ WEEKLY_LIMIT = 5
 BINDING_SECONDS = 24 * 60 * 60
 TRADE_LOCATION = "demon.abyss_market"
 BEAST_TRADE_LOCATION = "beast.ten_thousand_hills"
+THREE_REALMS_TRADE_LOCATION = "beast.three_realms_trade_port"
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,7 @@ class CrossRealmTradeDefinition:
     rule_version: str = RULE_VERSION
     required_faction: str = "demon"
     required_reputation: int = 200
+    required_reputations: dict[str, int] | None = None
 
 
 TRADE_DEFINITIONS = {
@@ -48,6 +50,17 @@ TRADE_DEFINITIONS = {
         output_items={"item.beast_blood": 1},
         required_faction="beast",
     ),
+    "trade.three_realms": CrossRealmTradeDefinition(
+        key="trade.three_realms",
+        label="三界贸易口兑换神魂晶",
+        location_key=THREE_REALMS_TRADE_LOCATION,
+        input_items={"item.demon_core": 2, "item.beast_blood": 2},
+        currency_cost=0,
+        output_items={"item.soul_crystal": 1},
+        weekly_limit=3,
+        required_faction="beast",
+        required_reputations={"demon": 200, "beast": 200},
+    ),
 }
 
 TRADE_ALIASES = {
@@ -64,6 +77,12 @@ TRADE_ALIASES = {
     "灵叶换妖血": "trade.xuantian_to_beast",
     "玄天到妖界": "trade.xuantian_to_beast",
     "妖界贸易": "trade.xuantian_to_beast",
+    "trade.three_realms": "trade.three_realms",
+    "three_realms": "trade.three_realms",
+    "三界贸易": "trade.three_realms",
+    "三界贸易口": "trade.three_realms",
+    "三界互市": "trade.three_realms",
+    "魔核妖血换神魂晶": "trade.three_realms",
 }
 
 
@@ -95,6 +114,7 @@ __all__ = [
     "TRADE_DEFINITIONS",
     "TRADE_LOCATION",
     "BEAST_TRADE_LOCATION",
+    "THREE_REALMS_TRADE_LOCATION",
     "WEEKLY_LIMIT",
     "resolve_trade",
     "trade_definition",

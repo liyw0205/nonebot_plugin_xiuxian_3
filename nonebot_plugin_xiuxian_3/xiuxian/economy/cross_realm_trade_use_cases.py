@@ -29,6 +29,17 @@ class CrossRealmTradeApplication:
     }
     FACTION_LABELS = {"demon": "魔", "beast": "妖", "xuantian": "玄天"}
 
+    @classmethod
+    def _permission_text(cls, definition) -> str:
+        requirements = definition.required_reputations or {
+            definition.required_faction: definition.required_reputation
+        }
+        summary = "、".join(
+            f"{cls.FACTION_LABELS.get(faction, faction)}界声望 {minimum}"
+            for faction, minimum in requirements.items()
+        )
+        return f"需在{definition.label}且满足{summary}才能进行这条贸易，未扣除任何资源。"
+
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
 
@@ -67,7 +78,7 @@ class CrossRealmTradeApplication:
             return CommandResult(
                 False,
                 "CROSS_REALM_TRADE_PERMISSION_DENIED",
-                f"需在对应三界贸易地点且{self.FACTION_LABELS.get(definition.required_faction, definition.required_faction)}界声望达到 {definition.required_reputation} 才能进行这条贸易，未扣除任何资源。",
+                self._permission_text(definition),
                 context.request_id,
                 operation_id,
             )
@@ -75,7 +86,7 @@ class CrossRealmTradeApplication:
             return CommandResult(
                 False,
                 "TRADE_WEEKLY_CAP",
-                "这条贸易本周已达到每角色 5 次上限，未扣除任何资源。",
+                f"这条贸易本周已达到每角色 {definition.weekly_limit} 次上限，未扣除任何资源。",
                 context.request_id,
                 operation_id,
             )

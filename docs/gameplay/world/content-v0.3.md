@@ -11,6 +11,7 @@
 | `demon.abyss_market` | 元婴、魔界声望 `>=200` | 5 分钟 / 12 体力、500 灵石 | 魔核交易、魔修契约；环境惩罚按 stats v0.3 | 非魔修默认 `-1000 bp` 环境；盟约可抵消 |
 | `demon.fallen_ruins` | 元婴、完成 `quest.demon_main_1` | 8 分钟 / 20 体力、污染上限 <80 | 心魔、魔界精英、线索；`risk=high` | 污染 >=80 拒绝；失败进 `soul_exhaustion` |
 | `beast.ten_thousand_hills` | 元婴、妖界声望 `>=200` | 5 分钟 / 12 体力 | 妖兽资源、血脉任务；`risk=medium` | 非妖修有环境惩罚，盟约可抵消 |
+| `beast.three_realms_trade_port` | 元婴、妖界声望 `>=200`，从万兽山出发 | 3 分钟 / 8 体力 | 三界贸易口固定兑换；`risk=low` | 贸易还需魔界声望 `>=200`；不满足时不扣资源 |
 | `beast.shapeshift_sanctum` | 妖修、元婴、血脉稳定 `>=40` | 8 分钟 / 18 体力、`item.beast_blood` 2 | 化形/血脉会话 | 非妖修永久拒绝；稳定不足不耗血 |
 | `cave.boundary_realm` | 元婴、三界主线、2–5 人队伍 | 10 分钟 / 30 体力、`item.soul_crystal` 1 | 多人副本、神魂材料；`risk=high` | 队伍任一不满足则整体拒绝 |
 | `xuantian.war_front` | 元婴 L1、每周活动窗口 | 5 分钟 / 15 体力 | 固定战场先锋自动战、世界功勋贡献 | 窗口外 `EVENT_NOT_ACTIVE` |
