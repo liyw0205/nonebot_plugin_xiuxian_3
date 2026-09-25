@@ -71,10 +71,10 @@ class CrossRealmTradeRepositoryMixin:
 
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["location_key"]) != definition.location_key:
-                raise CrossRealmTradePermissionDeniedError("trade must start at the demon abyss market")
+                raise CrossRealmTradePermissionDeniedError("trade must start at the configured trade location")
             reputation = self._json_object(player["faction_reputation_json"], {})
-            if int(reputation.get("demon", 0)) < 200:
-                raise CrossRealmTradePermissionDeniedError("demon trade reputation permission is missing")
+            if int(reputation.get(definition.required_faction, 0)) < definition.required_reputation:
+                raise CrossRealmTradePermissionDeniedError("trade reputation permission is missing")
             weekly_count = connection.execute(
                 """
                 SELECT COUNT(*) AS count FROM cross_realm_trades
@@ -115,6 +115,9 @@ class CrossRealmTradeRepositoryMixin:
                 "weekly_limit": definition.weekly_limit,
                 "week_start": current_week,
                 "demon_reputation": int(reputation.get("demon", 0)),
+                f"{definition.required_faction}_reputation": int(reputation.get(definition.required_faction, 0)),
+                "required_faction": definition.required_faction,
+                "required_reputation": definition.required_reputation,
             }
             connection.execute(
                 """

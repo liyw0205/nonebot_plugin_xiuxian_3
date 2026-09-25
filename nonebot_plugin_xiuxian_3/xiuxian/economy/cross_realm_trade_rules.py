@@ -11,6 +11,7 @@ RULE_VERSION = "economy-0.3.0"
 WEEKLY_LIMIT = 5
 BINDING_SECONDS = 24 * 60 * 60
 TRADE_LOCATION = "demon.abyss_market"
+BEAST_TRADE_LOCATION = "beast.ten_thousand_hills"
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +26,8 @@ class CrossRealmTradeDefinition:
     binding_seconds: int = BINDING_SECONDS
     content_version: str = CONTENT_VERSION
     rule_version: str = RULE_VERSION
+    required_faction: str = "demon"
+    required_reputation: int = 200
 
 
 TRADE_DEFINITIONS = {
@@ -36,6 +39,15 @@ TRADE_DEFINITIONS = {
         currency_cost=200,
         output_items={"item.demon_core": 1},
     ),
+    "trade.xuantian_to_beast": CrossRealmTradeDefinition(
+        key="trade.xuantian_to_beast",
+        label="灵叶兑换妖血",
+        location_key=BEAST_TRADE_LOCATION,
+        input_items={"item.herb.spirit_leaf": 10},
+        currency_cost=200,
+        output_items={"item.beast_blood": 1},
+        required_faction="beast",
+    ),
 }
 
 TRADE_ALIASES = {
@@ -46,6 +58,12 @@ TRADE_ALIASES = {
     "玄天到魔界": "trade.xuantian_to_demon",
     "玄天界到魔界": "trade.xuantian_to_demon",
     "魔界贸易": "trade.xuantian_to_demon",
+    "trade.xuantian_to_beast": "trade.xuantian_to_beast",
+    "xuantian_to_beast": "trade.xuantian_to_beast",
+    "灵叶兑换妖血": "trade.xuantian_to_beast",
+    "灵叶换妖血": "trade.xuantian_to_beast",
+    "玄天到妖界": "trade.xuantian_to_beast",
+    "妖界贸易": "trade.xuantian_to_beast",
 }
 
 
@@ -76,6 +94,7 @@ __all__ = [
     "RULE_VERSION",
     "TRADE_DEFINITIONS",
     "TRADE_LOCATION",
+    "BEAST_TRADE_LOCATION",
     "WEEKLY_LIMIT",
     "resolve_trade",
     "trade_definition",

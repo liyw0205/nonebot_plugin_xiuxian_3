@@ -174,3 +174,64 @@ def test_fixed_demon_trade_permission_and_input_fail_without_mutation() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_fixed_beast_trade_caps_binding_and_replays_on_qq_and_onebot() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=Path(data_dir))
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"beast-trade-{adapter}"
+                await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, location_key='beast.ten_thousand_hills', spirit_stones=1200, faction_reputation_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (
+                            json.dumps({"beast": 200}),
+                            json.dumps({"item.herb.spirit_leaf": 70}),
+                            adapter,
+                            user,
+                        ),
+                    )
+                first = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "beast-first", f"{adapter}-beast-first"),
+                    "跨界贸易 灵叶换妖血",
+                )
+                assert first.code == "CROSS_REALM_TRADE_COMPLETED"
+                assert first.data["output_items"] == {"item.beast_blood": 1}
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "beast-replay", f"{adapter}-beast-first"),
+                    "固定贸易 trade.xuantian_to_beast",
+                )
+                assert replay.data["idempotent_replay"] is True
+                bound_listing = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "beast-listing", f"{adapter}-beast-listing"),
+                    "发布摆摊 item.beast_blood 1 1",
+                )
+                assert bound_listing.code == "ITEM_BINDING_ACTIVE"
+                for index in range(2, 6):
+                    completed = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, f"beast-{index}", f"{adapter}-beast-{index}"),
+                        "跨界贸易 妖界贸易",
+                    )
+                    assert completed.code == "CROSS_REALM_TRADE_COMPLETED"
+                capped = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "beast-capped", f"{adapter}-beast-capped"),
+                    "跨界贸易 灵叶兑换妖血",
+                )
+                assert capped.code == "TRADE_WEEKLY_CAP"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert state[0] == 200
+                assert json.loads(state[1]) == {"item.herb.spirit_leaf": 20, "item.beast_blood": 5}
+            await runtime.close()
+
+    asyncio.run(run())
