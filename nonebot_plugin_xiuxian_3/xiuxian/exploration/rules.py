@@ -284,8 +284,17 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
             "item.ticket.cloud_boat_fragment": weighted_value(seed + ":ticket", (1, 2), (60, 40)),
         }
     if mode_key == "explore.demon_abyss":
-        reward = weighted_value(seed + ":reward", (0, 1), (45, 55))
-        return {"item.demon_core": 1} if reward == 0 else {"faction_reputation.demon": 15}
+        # Keep the pool stable in the session snapshot: the final 10% is the
+        # documented heart-demon encounter, whose separate event flow remains
+        # closed in this slice and therefore yields no asset here.
+        reward = weighted_value(seed + ":reward", (0, 1, 2, 3), (45, 30, 15, 10))
+        if reward == 0:
+            return {"item.demon_core": 1}
+        if reward == 1:
+            return {"faction_reputation.demon": 15}
+        if reward == 2:
+            return {"item.clue.demon_contract": 1}
+        return {}
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 
 

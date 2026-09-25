@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import weighted_value
 
 
@@ -121,6 +122,72 @@ def test_demon_abyss_success_and_replay_on_qq_and_onebot() -> None:
                     ).fetchone()
                 assert json.loads(inventory_text)["item.demon_core"] == 1
                 assert pollution == 10
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_demon_abyss_contract_clue_is_frozen_and_idempotent_on_both_adapters() -> None:
+    async def run() -> None:
+        operation = next(
+            f"demon-contract-{index}"
+            for index in range(1000)
+            if weighted_value(f"demon-contract-{index}:reward", (0, 1, 2, 3), (45, 30, 15, 10)) == 2
+        )
+        assert ContentBundle.load(Path(__file__).parents[1] / "data").require(
+            "item", "item.clue.demon_contract"
+        )["bind_type"] == "character_bound"
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=Path(data_dir) / adapter)
+                user = f"demon-contract-{adapter}"
+                await _player(runtime, adapter, user, strong=True)
+                travel = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "contract-travel-start"),
+                    "前往 魔界堕落遗迹",
+                )
+                assert travel.code == "TRAVEL_STARTED"
+                _expire_travel(runtime, travel.data["session_id"])
+                arrived = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "contract-travel-settle"),
+                    "结算移动",
+                )
+                assert arrived.code == "TRAVEL_COMPLETED"
+                started = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "contract-explore-start", operation),
+                    "开始探索 魔界堕落遗迹探索",
+                )
+                assert started.code == "EXPLORATION_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    snapshot = connection.execute(
+                        "SELECT snapshot_json FROM exploration_sessions WHERE exploration_id=?",
+                        (started.data["exploration_id"],),
+                    ).fetchone()[0]
+                assert json.loads(snapshot)["random_pool"] == "loot.demon.abyss.v0.3"
+                _expire(runtime, started.data["exploration_id"])
+                settled = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "contract-explore-settle", "demon-contract-settle"),
+                    "结算探索",
+                )
+                assert settled.code == "EXPLORATION_SETTLED"
+                assert settled.data["battle_outcome"] == "won"
+                assert settled.data["result"] == {"item.clue.demon_contract": 1}
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "contract-explore-replay", "demon-contract-settle"),
+                    "结算探索",
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    inventory = connection.execute(
+                        "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert json.loads(inventory)["item.clue.demon_contract"] == 1
                 await runtime.close()
 
     asyncio.run(run())

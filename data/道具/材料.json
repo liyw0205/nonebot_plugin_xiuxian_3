@@ -210,6 +210,30 @@
       "key": "item.clue.manual_basic"
     },
     {
+      "name": "魔界契约线索",
+      "item_type": "clue",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "contract_clue",
+          "scope": "demon"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "status": "active",
+      "key": "item.clue.demon_contract"
+    },
+    {
       "name": "云铁",
       "item_type": "material",
       "quality": "rare",

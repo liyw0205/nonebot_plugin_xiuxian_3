@@ -36,6 +36,7 @@ ITEM_LABELS = {
     "item.material.cloud_iron": "云铁",
     "item.ticket.cloud_boat_fragment": "云舟票碎片",
     "item.demon_core": "魔核",
+    "item.clue.demon_contract": "魔界契约线索",
 }
 
 

@@ -4,7 +4,7 @@
 
 | `mode_key` | 前置 | 时长/成本 | 奖励池与保底 | 失败 |
 |:--|:--|:--|:--|:--|
-| `explore.demon_abyss` | 魔渊地点、元婴、污染 <80 | 15 分钟 / 20 体力、污染 +10 | `loot.demon.abyss.v0.3`；魔核 1 或魔界声望 15 | 失败神魂 -2000 bp、虚弱 30 分钟 |
+| `explore.demon_abyss` | 魔渊地点、元婴、污染 <80 | 15 分钟 / 20 体力、污染 +10 | `loot.demon.abyss.v0.3`；魔核 1、魔界声望 15 或 `item.clue.demon_contract` 1 | 失败神魂 -2000 bp、虚弱 30 分钟 |
 | `explore.beast_hunt` | 万兽山、元婴 | 15 分钟 / 20 体力 | `loot.beast.hills.v0.3`；妖血 1 或妖界声望 15 | 同上，无污染增加 |
 | `explore.boundary_realm` | 界隙、2–5 队、门票 | 30 分钟 / 30 体力、`item.soul_crystal` 1 | 神魂晶 1、元婴材料 1；多人战 | 队伍全灭仅扣神魂，不掉永久装备 |
 
