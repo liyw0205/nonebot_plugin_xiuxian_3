@@ -1877,6 +1877,41 @@ CREATE TABLE IF NOT EXISTS market_item_locks (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS cross_realm_trades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trade_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    trade_key TEXT NOT NULL,
+    week_start TEXT NOT NULL,
+    location_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('completed', 'cancelled')),
+    input_json TEXT NOT NULL DEFAULT '{}',
+    currency_cost INTEGER NOT NULL CHECK (currency_cost >= 0),
+    output_json TEXT NOT NULL DEFAULT '{}',
+    binding_expires_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cross_realm_trades_week
+    ON cross_realm_trades(player_id, trade_key, week_start, status);
+
+CREATE TABLE IF NOT EXISTS item_bindings (
+    binding_id TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    bound_until TEXT NOT NULL,
+    source_trade_id TEXT NOT NULL REFERENCES cross_realm_trades(trade_id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_bindings_active
+    ON item_bindings(player_id, item_key, bound_until);
+
 CREATE TABLE IF NOT EXISTS production_commission_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     commission_id TEXT NOT NULL UNIQUE,

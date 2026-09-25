@@ -1204,6 +1204,26 @@ class MarketItemForbiddenError(RuntimeError):
     """The requested item is bound, a credential, or otherwise non-tradeable."""
 
 
+class CrossRealmTradePermissionDeniedError(RuntimeError):
+    """The player is not at the required cross-realm trade location."""
+
+
+class TradeWeeklyCapError(RuntimeError):
+    """The player has reached the fixed trade's weekly limit."""
+
+
+class CrossRealmTradeInputInsufficientError(RuntimeError):
+    """The player lacks one of the fixed trade inputs."""
+
+
+class CrossRealmTradeCurrencyInsufficientError(RuntimeError):
+    """The player lacks the fixed trade's spirit-stone cost."""
+
+
+class ItemBindingActiveError(RuntimeError):
+    """The requested inventory quantity is still character-bound."""
+
+
 class CommissionRecipeForbiddenError(RuntimeError):
     """The recipe is not available for player production commissions."""
 

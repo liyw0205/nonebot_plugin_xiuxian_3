@@ -45,6 +45,7 @@ from ..specials.arena_projection import project_arena_result
 from ..quests.repository import QuestRepositoryMixin
 from ..quests.cross_realm_repository import DemonQuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
+from ..economy.cross_realm_trade_repository import CrossRealmTradeRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
 from .errors import *  # noqa: F401,F403
 from .schema import SCHEMA
@@ -82,6 +83,7 @@ class SQLitePlayerRepository(
     DemonQuestRepositoryMixin,
     QuestRepositoryMixin,
     EconomyRepositoryMixin,
+    CrossRealmTradeRepositoryMixin,
     AdvancementRepositoryMixin,
     CultivationRepositoryMixin,
     BreakthroughRepositoryMixin,

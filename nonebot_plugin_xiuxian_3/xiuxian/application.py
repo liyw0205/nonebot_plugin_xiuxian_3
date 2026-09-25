@@ -35,6 +35,7 @@ from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
+from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
 from .events.use_cases import EventsApplication
 from .events.season_use_cases import FinalHeavenSeasonApplication
 from .specials.arena_use_cases import ArenaApplication
@@ -77,6 +78,7 @@ class XiuxianApplication:
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
         self.economy = EconomyApplication(repository)
+        self.cross_realm_trade = CrossRealmTradeApplication(repository)
         self.events = EventsApplication(repository)
         self.seasons = FinalHeavenSeasonApplication(repository)
         self.arena = ArenaApplication(repository)
@@ -1019,6 +1021,13 @@ class XiuxianApplication:
 
     async def list_market_orders(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.list_market_orders(context), require_write=False)
+
+    async def execute_cross_realm_trade(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.cross_realm_trade.execute(context),
+            write_message="当前事件不允许执行跨界贸易。",
+        )
 
     async def get_spirit_spring_event(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.events.get_spirit_spring_event(context), require_write=False)

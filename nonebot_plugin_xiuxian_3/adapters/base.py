@@ -282,6 +282,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("取消摆摊", application.cancel_market_order)
     router.register("清理摆摊", application.expire_market_order)
     router.register("摆摊列表", application.list_market_orders)
+    router.register("跨界贸易", application.execute_cross_realm_trade, aliases=("固定贸易", "三界贸易"))
     router.register("发布生产委托", application.create_production_commission)
     router.register("生产委托列表", application.list_production_commissions, aliases=("委托生产列表",))
     router.register("接取生产委托", application.accept_production_commission)

@@ -21,6 +21,7 @@ from ..persistence.errors import (
     MarketOrderNotListedError,
     MarketPriceInvalidError,
     MarketSelfTradeError,
+    ItemBindingActiveError,
     OperationConflictError,
     PlayerNotFoundError,
     PlayerSuspendedError,
@@ -301,9 +302,21 @@ class EconomyRepositoryMixin:
             if int(active_count) >= MARKET_MAX_LISTINGS:
                 raise MarketOrderLimitError("listing limit reached")
             inventory = self._json_object(player["inventory_json"], {})
-            available = int(inventory.get(item.key, 0)) - self._market_locked_quantity(
-                connection, int(player["id"]), item.key
-            )
+            market_locked = self._market_locked_quantity(connection, int(player["id"]), item.key)
+            bound_quantity = connection.execute(
+                """
+                SELECT COALESCE(SUM(quantity), 0) AS quantity
+                FROM item_bindings
+                WHERE player_id = ? AND item_key = ? AND bound_until > ?
+                """,
+                (player["id"], item.key, now_text),
+            ).fetchone()
+            unbound_inventory = int(inventory.get(item.key, 0)) - market_locked
+            available = unbound_inventory - int(bound_quantity["quantity"] if bound_quantity else 0)
+            if unbound_inventory < quantity:
+                raise MarketItemLockedError("not enough unlocked inventory")
+            if available < quantity:
+                raise ItemBindingActiveError("item binding is still active")
             if available < quantity:
                 raise MarketItemLockedError("not enough unlocked inventory")
             if int(player["spirit_stones"]) < fee:
