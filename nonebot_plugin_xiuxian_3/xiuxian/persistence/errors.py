@@ -924,6 +924,10 @@ class EventRewardExpiredError(RuntimeError):
     """The event reward window has closed."""
 
 
+class EventSourceNotEligibleError(RuntimeError):
+    """No server-settled operation can be projected into the event."""
+
+
 class ArenaSnapshotRequirementError(RuntimeError):
     """The player cannot publish an arena snapshot in the current state."""
 

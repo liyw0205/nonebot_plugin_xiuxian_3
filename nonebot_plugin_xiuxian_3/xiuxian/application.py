@@ -1020,6 +1020,19 @@ class XiuxianApplication:
             write_message="当前事件不允许领取灵泉事件奖励。",
         )
 
+    async def get_demon_invasion_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.get_demon_invasion_event(context), require_write=False)
+
+    async def contribute_demon_invasion(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.contribute_demon_invasion(context), write_message="当前事件不允许贡献魔界战场。")
+
+    async def claim_demon_invasion_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.events.claim_demon_invasion_event(context),
+            write_message="当前事件不允许领取魔界入侵奖励。",
+        )
+
     async def get_final_heaven_season(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

@@ -36,6 +36,7 @@ from ..social.sect_repository import SectRepositoryMixin
 from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
+from ..events.demon_repository import DemonInvasionRepositoryMixin
 from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
 from ..specials.arena_repository import ArenaRepositoryMixin
 from ..specials.team_arena_repository import TeamArenaRepositoryMixin
@@ -73,6 +74,7 @@ class SQLitePlayerRepository(
     PartyRepositoryMixin,
     MentorRepositoryMixin,
     EventsRepositoryMixin,
+    DemonInvasionRepositoryMixin,
     FinalHeavenSeasonRepositoryMixin,
     ArenaRepositoryMixin,
     TeamArenaRepositoryMixin,

@@ -1,6 +1,8 @@
 """World events and task projections."""
 
 from .models import SpiritSpringEventRecord
+from .demon_models import DemonInvasionEventRecord
+from .demon_repository import DemonInvasionRepositoryMixin
 from .repository import EventsRepositoryMixin
 from .season_models import FinalHeavenClaimRecord, FinalHeavenSeasonRecord, FinalHeavenStanding
 from .season_repository import FinalHeavenSeasonRepositoryMixin
@@ -22,6 +24,8 @@ __all__ = [
     "EVENT_TARGET",
     "EventsApplication",
     "EventsRepositoryMixin",
+    "DemonInvasionEventRecord",
+    "DemonInvasionRepositoryMixin",
     "FinalHeavenClaimRecord",
     "FinalHeavenSeasonApplication",
     "FinalHeavenSeasonRecord",
