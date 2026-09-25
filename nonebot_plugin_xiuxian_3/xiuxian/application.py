@@ -37,6 +37,7 @@ from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
 from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
 from .economy.auction_use_cases import AuctionApplication
+from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
 from .events.season_use_cases import FinalHeavenSeasonApplication
 from .specials.arena_use_cases import ArenaApplication
@@ -81,6 +82,8 @@ class XiuxianApplication:
         self.economy = EconomyApplication(repository)
         self.cross_realm_trade = CrossRealmTradeApplication(repository)
         self.auction = AuctionApplication(repository)
+        self.purchase_orders = PurchaseOrderApplication(repository)
+        self.purchase = self.purchase_orders
         self.events = EventsApplication(repository)
         self.seasons = FinalHeavenSeasonApplication(repository)
         self.arena = ArenaApplication(repository)
@@ -1014,6 +1017,24 @@ class XiuxianApplication:
 
     async def buy_market_order(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.buy_market_order(context), write_message="当前事件不允许购买摆摊。")
+
+    async def create_purchase_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.purchase_orders.create(context), write_message="当前事件不允许发布求购。")
+
+    async def list_purchase_orders(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.purchase_orders.list(context), require_write=False)
+
+    async def match_purchase_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.purchase_orders.match(context), write_message="当前事件不允许匹配求购。")
+
+    async def deliver_purchase_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.purchase_orders.deliver(context), write_message="当前事件不允许交付求购。")
+
+    async def cancel_purchase_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.purchase_orders.cancel(context), write_message="当前事件不允许取消求购。")
+
+    async def expire_purchase_order(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.purchase_orders.expire(context), write_message="当前事件不允许清理求购。")
 
     async def cancel_market_order(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.cancel_market_order(context), write_message="当前事件不允许取消摆摊。")

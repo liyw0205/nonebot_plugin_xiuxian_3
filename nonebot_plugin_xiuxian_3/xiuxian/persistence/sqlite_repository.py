@@ -49,6 +49,7 @@ from ..quests.cross_realm_repository import DemonQuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
 from ..economy.cross_realm_trade_repository import CrossRealmTradeRepositoryMixin
 from ..economy.auction_repository import AuctionRepositoryMixin
+from ..economy.purchase_order_repository import PurchaseOrderRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
 from .errors import *  # noqa: F401,F403
 from .schema import SCHEMA
@@ -90,6 +91,7 @@ class SQLitePlayerRepository(
     EconomyRepositoryMixin,
     CrossRealmTradeRepositoryMixin,
     AuctionRepositoryMixin,
+    PurchaseOrderRepositoryMixin,
     AdvancementRepositoryMixin,
     CultivationRepositoryMixin,
     BreakthroughRepositoryMixin,
@@ -225,6 +227,10 @@ class SQLitePlayerRepository(
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("economy.auction.v0.3", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("economy.purchase_order.v0.3", serialize_datetime(self._now())),
             )
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "

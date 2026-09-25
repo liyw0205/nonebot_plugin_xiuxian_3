@@ -1918,6 +1918,57 @@ CREATE TABLE IF NOT EXISTS market_item_locks (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT NOT NULL UNIQUE,
+    buyer_player_id INTEGER NOT NULL REFERENCES players(id),
+    seller_player_id INTEGER REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    unit_price INTEGER NOT NULL CHECK (unit_price > 0),
+    purchase_fee INTEGER NOT NULL CHECK (purchase_fee >= 0),
+    total_price INTEGER NOT NULL CHECK (total_price > 0),
+    escrow_amount INTEGER NOT NULL CHECK (escrow_amount > 0),
+    buyer_faction TEXT NOT NULL,
+    seller_faction TEXT,
+    item_region TEXT,
+    item_source_location TEXT,
+    first_binding_expires_at TEXT,
+    alliance_key TEXT,
+    status TEXT NOT NULL CHECK (status IN ('draft', 'listed', 'matched', 'delivered', 'settled', 'cancelled', 'expired', 'failed')),
+    expires_at TEXT NOT NULL,
+    delivery_deadline TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_status
+    ON purchase_orders(status, expires_at);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_buyer
+    ON purchase_orders(buyer_player_id, status);
+
+CREATE TABLE IF NOT EXISTS purchase_order_funds (
+    order_id TEXT PRIMARY KEY REFERENCES purchase_orders(order_id),
+    buyer_player_id INTEGER NOT NULL REFERENCES players(id),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS purchase_item_locks (
+    order_id TEXT PRIMARY KEY REFERENCES purchase_orders(order_id),
+    seller_player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_purchase_item_locks_seller
+    ON purchase_item_locks(seller_player_id, item_key);
+
 CREATE TABLE IF NOT EXISTS auction_lots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     auction_id TEXT NOT NULL UNIQUE,

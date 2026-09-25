@@ -1208,6 +1208,50 @@ class MarketBuyerCapacityInsufficientError(RuntimeError):
     """The buyer cannot fit the purchased stack in their inventory."""
 
 
+class PurchaseOrderCapError(RuntimeError):
+    """The buyer has reached the simultaneous purchase-order limit."""
+
+
+class PurchaseItemForbiddenError(RuntimeError):
+    """The requested purchase item is not an explicit tradeable item."""
+
+
+class PurchaseEscrowInsufficientError(RuntimeError):
+    """The buyer cannot reserve the purchase amount and fee."""
+
+
+class PurchaseOrderNotFoundError(RuntimeError):
+    """The requested purchase order does not exist."""
+
+
+class PurchaseOrderStateConflictError(RuntimeError):
+    """The purchase order is not in a state valid for the requested action."""
+
+
+class PurchaseSelfMatchError(RuntimeError):
+    """A buyer cannot match their own purchase order."""
+
+
+class PurchaseItemLockedError(RuntimeError):
+    """The seller does not have enough unlocked inventory to match the order."""
+
+
+class PurchaseOrderExpiredError(RuntimeError):
+    """The purchase order has expired."""
+
+
+class PurchaseDeliveryExpiredError(RuntimeError):
+    """The seller missed the ten-minute delivery window."""
+
+
+class PurchaseBuyerCapacityInsufficientError(RuntimeError):
+    """The buyer cannot fit the delivered purchase in their inventory."""
+
+
+class PurchasePermissionDeniedError(RuntimeError):
+    """The buyer lacks the reputation required to create a cross-realm order."""
+
+
 class MarketSelfTradeError(RuntimeError):
     """A seller cannot purchase their own order."""
 
