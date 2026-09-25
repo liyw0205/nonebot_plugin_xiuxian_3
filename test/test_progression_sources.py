@@ -98,6 +98,25 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
                 clock.advance(seconds=90)
                 explored = await _dispatch(runtime, adapter, user, 34, "结算探索")
                 assert explored.data["result"]["item.herb.spirit_leaf"] >= 1
+                extra_gather_operation = next(
+                    f"{adapter}-spring-extra-{index}"
+                    for index in range(100)
+                    if settlement_result("explore.spring_gather", f"{adapter}-spring-extra-{index}")[
+                        "item.herb.spirit_leaf"
+                    ]
+                    >= 2
+                )
+                await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    35,
+                    "开始探索 灵泉采集",
+                    operation_id=extra_gather_operation,
+                )
+                clock.advance(seconds=90)
+                extra_explored = await _dispatch(runtime, adapter, user, 35, "结算探索")
+                assert extra_explored.data["result"]["item.herb.spirit_leaf"] >= 2
 
                 operation = next(
                     f"{adapter}-focus-{index}"
@@ -113,6 +132,20 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
                 completed = await _dispatch(runtime, adapter, user, 36, "领取生产")
                 assert completed.code == "PRODUCTION_COMPLETED"
                 assert completed.data["outputs"] == {"item.pill.focus_low": 1}
+
+                extra_guard_operation = next(
+                    f"{adapter}-qi-guard-{index}"
+                    for index in range(1000)
+                    if random_quality_bp(f"{adapter}-qi-guard-{index}") >= 500
+                )
+                started_guard = await runtime.dispatch(
+                    _context(adapter, user, "qi-guard-start", extra_guard_operation),
+                    "开始生产 聚气护脉丹",
+                )
+                assert started_guard.code == "PRODUCTION_STARTED"
+                clock.advance(seconds=60)
+                completed_guard = await _dispatch(runtime, adapter, user, 37, "领取生产")
+                assert completed_guard.data["outputs"] == {"item.pill.qi_guard": 1}
                 await runtime.close()
 
     asyncio.run(run())
@@ -316,6 +349,16 @@ def test_qq_and_onebot_can_produce_foundation_draft_from_player_path() -> None:
                 assert completed_draft.code == "PRODUCTION_COMPLETED"
                 assert completed_draft.data["success"] is True
                 assert completed_draft.data["outputs"] == {"item.pill.foundation_draft": 1}
+                started_guard = await runtime.dispatch(
+                    _context(adapter, user, "foundation-guard-start", f"{adapter}-foundation-guard"),
+                    "开始生产 筑基护脉丹",
+                )
+                assert started_guard.code == "PRODUCTION_STARTED", started_guard.message
+                clock.advance(seconds=180)
+                completed_guard = await _dispatch(runtime, adapter, user, 95, "领取生产")
+                assert completed_guard.code == "PRODUCTION_COMPLETED"
+                assert completed_guard.data["success"] is True
+                assert completed_guard.data["outputs"] == {"item.pill.foundation_guard": 1}
                 forbidden_market = await runtime.dispatch(
                     _context(adapter, user, "foundation-draft-market"),
                     "发布摆摊 筑基丹 1 1",

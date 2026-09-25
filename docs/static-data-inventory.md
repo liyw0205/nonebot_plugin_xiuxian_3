@@ -50,8 +50,8 @@ data/
 - 锁定地点：`demon.abyss_gate`、`beast.ten_thousand_hills`，只能展示条件。
 - 敌人：`enemy.training_dummy`、`enemy.wood_rat`、`enemy.iron_boar`、
   `enemy.bandit_apprentice`、`enemy.mist_guardian`。
-- 配方：`recipe.pill.healing_low`、`recipe.pill.focus_low`、
-  `recipe.weapon.wood_sword`、`recipe.array.gathering_basic`、
+- 配方：`recipe.pill.healing_low`、`recipe.pill.focus_low`、`recipe.pill.qi_guard`、
+  `recipe.pill.foundation_draft`、`recipe.pill.foundation_guard`、`recipe.weapon.wood_sword`、`recipe.array.gathering_basic`、
   `recipe.food.spirit_rice`。
 - 任务：`quest.first_seeking`、`quest.first_cultivation`、
   `quest.first_gather`、`quest.first_craft`。

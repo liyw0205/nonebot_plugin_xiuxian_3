@@ -117,7 +117,7 @@ class BreakthroughApplication:
         for arg in args:
             if arg in {"聚气", "聚气突破", "qi_gathering"}:
                 target = "qi_gathering"
-            elif arg in {"护脉", "保护", "聚气护脉丹", "qi_guard"}:
+            elif arg in {"护脉", "保护", "聚气护脉丹", "筑基护脉丹", "聚气保护丹", "筑基保护丹", "qi_guard", "foundation_guard"}:
                 protection = True
             elif arg in {"筑基", "foundation", "筑基突破"}:
                 target = "foundation"

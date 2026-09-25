@@ -57,6 +57,7 @@
   ],
   "placeholder_realms": [],
   "review_notes": [
+    "v0.1 的 recipe.pill.qi_guard 与 recipe.pill.foundation_guard 使用 production-0.1.1；筑基护脉丹宗门商店来源待固定兑换入口切片。",
     "item.pill.foundation_guard 仅用于 v0.1 筑基失败保护；v0.2 使用 item.pill.golden_core_guard。",
     "item.token.constitution_reset 仅管理员测试可用，不进入普通掉落。",
     "content-0.6 开放合道、渡劫和三次非战斗试炼状态机；终局战斗与结局选择仍按后续切片锁定。"

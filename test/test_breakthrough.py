@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
@@ -142,7 +143,15 @@ def test_breakthrough_success_changes_realm_and_concurrent_start_is_unique() -> 
             runtime = create_runtime(data_dir=data_dir)
             user = "breakthrough-success"
             await _cultivator(runtime, user)
-            _prepare_player(runtime, user, inventory={"item.pill.focus_low": 2, "item.herb.spirit_leaf": 6})
+            _prepare_player(
+                runtime,
+                user,
+                inventory={
+                    "item.pill.focus_low": 2,
+                    "item.herb.spirit_leaf": 6,
+                    "item.pill.qi_guard": 1,
+                },
+            )
             first, second = await asyncio.gather(
                 runtime.dispatch(_context(user, "a", operation_id="same-start"), "开始突破 聚气"),
                 runtime.dispatch(_context(user, "b", operation_id="other-start"), "开始突破 聚气"),
@@ -155,6 +164,69 @@ def test_breakthrough_success_changes_realm_and_concurrent_start_is_unique() -> 
             assert settled.data["cultivation_after"] == 0
             profile = await runtime.dispatch(_context(user, "profile"), "我的状态")
             assert "聚气 L1" in profile.message
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                inventory = json.loads(
+                    connection.execute(
+                        "SELECT inventory_json FROM players WHERE platform_user_id = ?",
+                        (user,),
+                    ).fetchone()[0]
+                )
+            assert inventory["item.pill.qi_guard"] == 1
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_foundation_breakthrough_failure_consumes_foundation_guard() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "foundation-breakthrough-failure"
+            await _cultivator(runtime, user)
+            _prepare_player(
+                runtime,
+                user,
+                inventory={
+                    "item.pill.foundation_draft": 1,
+                    "item.mat.array_sand": 3,
+                    "item.ore.ironstone": 3,
+                    "item.pill.foundation_guard": 1,
+                },
+                stones=1_000,
+                layer=10,
+                cultivation=2_900,
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key = 'qi_gathering', total_cultivation = 4260 WHERE platform_user_id = ?",
+                    (user,),
+                )
+            operation_id = next(
+                f"foundation-failure-{index}"
+                for index in range(1000)
+                if breakthrough_roll_bp(f"foundation-failure-{index}") >= 7500
+            )
+            started = await runtime.dispatch(
+                _context(user, "foundation-start", operation_id=operation_id),
+                "开始突破 筑基 筑基护脉丹",
+            )
+            assert started.code == "BREAKTHROUGH_STARTED"
+            _finish_breakthrough(runtime, started.data["session_id"])
+            settled = await runtime.dispatch(
+                _context(user, "foundation-settle", operation_id="foundation-failure-settle"),
+                "结算突破",
+            )
+            assert settled.code == "BREAKTHROUGH_FAILED"
+            assert settled.data["protection_consumed"] is True
+            assert settled.data["cultivation_after"] == 2465
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                inventory = json.loads(
+                    connection.execute(
+                        "SELECT inventory_json FROM players WHERE platform_user_id = ?",
+                        (user,),
+                    ).fetchone()[0]
+                )
+            assert inventory["item.pill.foundation_guard"] == 0
             await runtime.close()
 
     asyncio.run(run())

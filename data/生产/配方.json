@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "content_version": "content-0.6",
-  "rule_version": "production-0.1.0",
+  "rule_version": "production-0.1.1",
   "generated_at": "2026-09-22T00:00:00Z",
   "kind": "recipe",
   "records": [
@@ -95,6 +95,152 @@
         "produces_output": false
       },
       "key": "recipe.pill.focus_low",
+      "status": "active"
+    },
+    {
+      "name": "炼制聚气护脉丹",
+      "profession": "alchemy",
+      "requirements": [
+        {
+          "type": "profession_level",
+          "value": 1
+        },
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 1
+        }
+      ],
+      "inputs": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 2
+        },
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 2
+        }
+      ],
+      "tool": {
+        "item_key": "item.tool.basic_furnace",
+        "durability_cost_bp": 100
+      },
+      "energy_cost": 6,
+      "duration_seconds": 60,
+      "outputs": [
+        {
+          "item_key": "item.pill.qi_guard",
+          "quantity": 1
+        }
+      ],
+      "daily_limit": 3,
+      "failure": {
+        "input_refund_bp": 5000,
+        "produces_output": false
+      },
+      "content_version": "content-0.1",
+      "rule_version": "production-0.1.1",
+      "key": "recipe.pill.qi_guard",
+      "status": "active"
+    },
+    {
+      "name": "炼制筑基丹",
+      "profession": "alchemy",
+      "requirements": [
+        {
+          "type": "profession_level",
+          "value": 2
+        },
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 1
+        }
+      ],
+      "inputs": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 3
+        },
+        {
+          "item_key": "item.mat.array_sand",
+          "quantity": 2
+        },
+        {
+          "item_key": "item.ore.ironstone",
+          "quantity": 2
+        }
+      ],
+      "tool": {
+        "item_key": "item.tool.basic_furnace",
+        "durability_cost_bp": 100
+      },
+      "energy_cost": 8,
+      "duration_seconds": 120,
+      "outputs": [
+        {
+          "item_key": "item.pill.foundation_draft",
+          "quantity": 1
+        }
+      ],
+      "daily_limit": 3,
+      "failure": {
+        "input_refund_bp": 5000,
+        "produces_output": false
+      },
+      "content_version": "content-0.1",
+      "rule_version": "production-0.1.0",
+      "key": "recipe.pill.foundation_draft",
+      "status": "active"
+    },
+    {
+      "name": "炼制筑基护脉丹",
+      "profession": "alchemy",
+      "requirements": [
+        {
+          "type": "profession_level",
+          "value": 2
+        },
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 1
+        }
+      ],
+      "inputs": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 2
+        },
+        {
+          "item_key": "item.mat.array_sand",
+          "quantity": 1
+        },
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 1
+        }
+      ],
+      "tool": {
+        "item_key": "item.tool.basic_furnace",
+        "durability_cost_bp": 100
+      },
+      "energy_cost": 10,
+      "duration_seconds": 180,
+      "outputs": [
+        {
+          "item_key": "item.pill.foundation_guard",
+          "quantity": 1
+        }
+      ],
+      "daily_limit": 2,
+      "failure": {
+        "input_refund_bp": 5000,
+        "produces_output": false
+      },
+      "content_version": "content-0.1",
+      "rule_version": "production-0.1.1",
+      "key": "recipe.pill.foundation_guard",
       "status": "active"
     },
     {

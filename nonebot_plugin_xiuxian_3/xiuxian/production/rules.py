@@ -12,7 +12,7 @@ from .endgame_work_rules import (
 from .recipe_models import RecipeDefinition
 
 
-RECIPE_RULE_VERSION = "production-0.1.0"
+RECIPE_RULE_VERSION = "production-0.1.1"
 QUALITY_SUCCESS_THRESHOLD_BP = 4500
 HIGH_QUALITY_THRESHOLD_BP = 8000
 TOOL_MAX_DURABILITY_BP = 2000
@@ -38,6 +38,32 @@ RECIPES: dict[str, RecipeDefinition] = {
         teaching_allowed=True,
         content_version="content-0.1",
         rule_version="production-0.1.0",
+    ),
+    "recipe.pill.qi_guard": RecipeDefinition(
+        key="recipe.pill.qi_guard",
+        name="聚气护脉丹",
+        profession="alchemy",
+        inputs={
+            "item.herb.spirit_leaf": 2,
+            "item.herb.blood_grass": 2,
+        },
+        energy_cost=6,
+        duration_seconds=60,
+        daily_limit=3,
+        tool_key="item.tool.basic_furnace",
+        tool_cost_bp=100,
+        currency_cost=0,
+        outputs={"item.pill.qi_guard": 1},
+        high_quality_bonus={},
+        failure_refunds={
+            "item.herb.spirit_leaf": 1,
+            "item.herb.blood_grass": 1,
+        },
+        min_realm_layer=1,
+        required_realm="qi_sensing",
+        proficiency_bp=2000,
+        content_version="content-0.1",
+        rule_version="production-0.1.1",
     ),
     "recipe.pill.healing_low": RecipeDefinition(
         key="recipe.pill.healing_low",
@@ -84,6 +110,34 @@ RECIPES: dict[str, RecipeDefinition] = {
         proficiency_bp=3000,
         content_version="content-0.1",
         rule_version="production-0.1.0",
+    ),
+    "recipe.pill.foundation_guard": RecipeDefinition(
+        key="recipe.pill.foundation_guard",
+        name="筑基护脉丹",
+        profession="alchemy",
+        inputs={
+            "item.herb.spirit_leaf": 2,
+            "item.mat.array_sand": 1,
+            "item.herb.blood_grass": 1,
+        },
+        energy_cost=10,
+        duration_seconds=180,
+        daily_limit=2,
+        tool_key="item.tool.basic_furnace",
+        tool_cost_bp=100,
+        currency_cost=0,
+        outputs={"item.pill.foundation_guard": 1},
+        high_quality_bonus={},
+        failure_refunds={
+            "item.herb.spirit_leaf": 1,
+            "item.mat.array_sand": 0,
+            "item.herb.blood_grass": 0,
+        },
+        min_realm_layer=1,
+        required_realm="qi_gathering",
+        proficiency_bp=3000,
+        content_version="content-0.1",
+        rule_version="production-0.1.1",
     ),
     "recipe.weapon.wood_sword": RecipeDefinition(
         key="recipe.weapon.wood_sword",
@@ -347,6 +401,10 @@ RECIPE_ALIASES = {
     "焦点丹": "recipe.pill.focus_low",
     "焦点": "recipe.pill.focus_low",
     "筑基丹": "recipe.pill.foundation_draft",
+    "聚气护脉丹": "recipe.pill.qi_guard",
+    "聚气保护丹": "recipe.pill.qi_guard",
+    "筑基护脉丹": "recipe.pill.foundation_guard",
+    "筑基保护丹": "recipe.pill.foundation_guard",
     "木纹剑": "recipe.weapon.wood_sword",
     "木剑": "recipe.weapon.wood_sword",
     "炼器": "recipe.weapon.wood_sword",
@@ -384,6 +442,8 @@ ITEM_LABELS = {
     "item.pill.healing_low": "低阶疗伤丹",
     "item.pill.focus_low": "焦点丹",
     "item.pill.foundation_draft": "筑基丹",
+    "item.pill.qi_guard": "聚气护脉丹",
+    "item.pill.foundation_guard": "筑基护脉丹",
     "item.weapon.wood_sword": "木纹剑",
     "item.array.gathering_basic": "基础聚灵阵",
     "item.array.mist_barrier": "迷雾屏障阵",

@@ -20,9 +20,9 @@
 | `item.array.gathering_basic` | 阵法实例，唯一 | 绑定 24 小时 | 绑定生产设施订单时间 -1000 bp；不叠加 | `recipe.array.gathering_basic` |
 | `item.pill.healing_low` | 丹药，99 | 可交易 | 恢复当前气血 3000 bp；战斗每场一次 | 炼丹、任务 |
 | `item.pill.focus_low` | 丹药，99 | 可交易 | 一次修炼 `state_bp+1000`；持续到该会话结算 | 炼丹 |
-| `item.pill.qi_guard` | 突破丹，9 | 绑定 | 聚气失败保护；成功不消耗 | 任务/炼丹 |
+| `item.pill.qi_guard` | 突破丹，9 | 绑定 | 聚气失败保护；成功不消耗 | 任务/`recipe.pill.qi_guard`（灵叶 2、止血草 2） |
 | `item.pill.foundation_draft` | 突破丹，9 | 绑定 | 筑基必需材料 | `recipe.pill.foundation_draft`（灵叶 3、阵砂 2、铁石 2）/筑基悬赏 |
-| `item.pill.foundation_guard` | 突破丹，9 | 绑定 | 筑基失败保护；成功不消耗 | 炼丹/宗门商店 |
+| `item.pill.foundation_guard` | 突破丹，9 | 绑定 | 筑基失败保护；成功不消耗 | `recipe.pill.foundation_guard`（灵叶 2、阵砂 1、止血草 1）/宗门商店（待固定兑换入口） |
 | `item.manual.basic_qi` | 功法，唯一 | 绑定 | 感气修炼许可；学习后不消耗 | 入道奖励 |
 | `item.tool.basic_furnace` | 工具，唯一 | 绑定，耐久 2000 bp | 炼丹；订单每次 -100 bp | 入道/生产任务 |
 | `item.tool.basic_hammer` | 工具，唯一 | 绑定，耐久 2000 bp | 炼器；订单每次 -100 bp | 入道/生产任务 |
