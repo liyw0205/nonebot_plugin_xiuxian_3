@@ -27,6 +27,7 @@ from ..combat.party_repository import PartyCombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
+from ..production.facility_repository import FacilityRepositoryMixin
 from ..production.endgame_repository import EndgameProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
 from ..livelihood.repository import LivelihoodRepositoryMixin
@@ -62,6 +63,7 @@ class SQLitePlayerRepository(
     AdventuresRepositoryMixin,
     DaoEchoesRepositoryMixin,
     ProductionRepositoryMixin,
+    FacilityRepositoryMixin,
     EndgameProductionRepositoryMixin,
     LivelihoodRepositoryMixin,
     SectRepositoryMixin,
@@ -175,6 +177,7 @@ class SQLitePlayerRepository(
             self._migrate_party_type_schema(connection)
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
+            self._migrate_facility_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
@@ -234,6 +237,78 @@ class SQLitePlayerRepository(
                     "UPDATE redemption_codes SET status = 'revoked', updated_at = ? WHERE code_key = ?",
                     (now_text, definition.code_key),
                 )
+
+    @staticmethod
+    def _migrate_facility_schema(connection: sqlite3.Connection) -> None:
+        """Add v0.2 facility ownership fields to databases created earlier."""
+
+        sect_columns = {row["name"] for row in connection.execute("PRAGMA table_info(sects)")}
+        if "spirit_stones" not in sect_columns:
+            connection.execute(
+                "ALTER TABLE sects ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0 CHECK (spirit_stones >= 0)"
+            )
+        order_columns = {row["name"] for row in connection.execute("PRAGMA table_info(production_orders)")}
+        if "facility_slot_id" not in order_columns:
+            connection.execute(
+                "ALTER TABLE production_orders ADD COLUMN facility_slot_id INTEGER REFERENCES production_facility_slots(id)"
+            )
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_production_orders_facility_active "
+            "ON production_orders(facility_slot_id) "
+            "WHERE facility_slot_id IS NOT NULL AND status = 'processing'"
+        )
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS production_facility_slots ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "slot_key TEXT NOT NULL UNIQUE,"
+            "location_key TEXT NOT NULL,"
+            "facility_kind TEXT NOT NULL,"
+            "slot_index INTEGER NOT NULL CHECK (slot_index > 0),"
+            "owner_type TEXT CHECK (owner_type IN ('personal', 'sect')),"
+            "owner_id TEXT,"
+            "status TEXT NOT NULL CHECK (status IN ('unclaimed', 'active', 'inactive')),"
+            "last_maintenance_date TEXT,"
+            "created_at TEXT NOT NULL,"
+            "updated_at TEXT NOT NULL,"
+            "CHECK ((status = 'unclaimed' AND owner_type IS NULL AND owner_id IS NULL) OR "
+            "(status IN ('active', 'inactive') AND owner_type IS NOT NULL AND owner_id IS NOT NULL)),"
+            "UNIQUE (location_key, facility_kind, slot_index))"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_production_facility_owner "
+            "ON production_facility_slots(owner_type, owner_id, status)"
+        )
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS production_facility_maintenance ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "slot_id INTEGER NOT NULL REFERENCES production_facility_slots(id),"
+            "business_date TEXT NOT NULL,"
+            "owner_type TEXT NOT NULL CHECK (owner_type IN ('personal', 'sect')),"
+            "owner_id TEXT NOT NULL,"
+            "fee INTEGER NOT NULL CHECK (fee > 0),"
+            "paid INTEGER NOT NULL CHECK (paid IN (0, 1)),"
+            "status TEXT NOT NULL CHECK (status IN ('active', 'inactive')),"
+            "operation_id TEXT NOT NULL UNIQUE,"
+            "created_at TEXT NOT NULL,"
+            "UNIQUE (slot_id, business_date))"
+        )
+        now_text = serialize_datetime(datetime.now(timezone.utc))
+        from ..production.facility_rules import FACILITY_DEFINITIONS
+
+        for definition in FACILITY_DEFINITIONS:
+            connection.execute(
+                "INSERT OR IGNORE INTO production_facility_slots("
+                "slot_key, location_key, facility_kind, slot_index, status, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 'unclaimed', ?, ?)",
+                (
+                    definition.slot_key,
+                    definition.location_key,
+                    definition.facility_kind,
+                    definition.slot_index,
+                    now_text,
+                    now_text,
+                ),
+            )
 
     @staticmethod
     def _migrate_arena_mode_schema(connection: sqlite3.Connection) -> None:

@@ -10,6 +10,9 @@ from ..repository import (
     EndgameRecipeNotReadyError,
     EndgameRecipeRequirementError,
     EnergyInsufficientError,
+    FacilityMaintenanceUnpaidError,
+    FacilitySlotNotClaimedError,
+    FacilitySlotOccupiedError,
     MaterialInsufficientError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -145,6 +148,12 @@ class ProductionApplication:
             return CommandResult(False, "PRODUCTION_BUSY", "已有生产订单正在进行，请先领取结果。", context.request_id, operation_id)
         except ProductionDailyLimitError:
             return CommandResult(False, "RECIPE_DAILY_CAP", "该配方今日次数已用尽，明日再来。", context.request_id, operation_id)
+        except FacilitySlotNotClaimedError:
+            return CommandResult(False, "FACILITY_SLOT_REQUIRED", "请先认领对应的洞天设施槽位，再开始这条生产。", context.request_id, operation_id)
+        except FacilityMaintenanceUnpaidError:
+            return CommandResult(False, "FACILITY_MAINTENANCE_UNPAID", "对应设施维护费未缴清，暂时无法开始新订单。", context.request_id, operation_id)
+        except FacilitySlotOccupiedError:
+            return CommandResult(False, "FACILITY_SLOT_OCCUPIED", "对应设施已有进行中的订单，请稍后再试。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能生产。", context.request_id, operation_id)
         except OperationConflictError:

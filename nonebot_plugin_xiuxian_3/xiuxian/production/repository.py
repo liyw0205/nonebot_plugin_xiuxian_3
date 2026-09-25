@@ -273,12 +273,13 @@ class ProductionRepositoryMixin:
                         json.dumps({"recipe_key": recipe.key}, ensure_ascii=False, sort_keys=True),
                     ),
                 )
+            duration_seconds = self._facility_duration_seconds(row, recipe)
             return ProductionPreviewRecord(
                 player=self._row_to_player(row),
                 recipe_key=recipe.key,
                 recipe_name=recipe.name,
                 energy_cost=recipe.energy_cost,
-                duration_seconds=recipe.duration_seconds,
+                duration_seconds=duration_seconds,
                 daily_limit=recipe.daily_limit,
                 daily_used=int(used["count"] if used is not None else 0),
                 inputs=dict(recipe.inputs),
@@ -393,6 +394,9 @@ class ProductionRepositoryMixin:
             if used is not None and int(used["count"]) >= recipe.daily_limit:
                 raise ProductionDailyLimitError("recipe daily cap reached")
 
+            facility_slot = self._facility_reserve_for_recipe(connection, row, recipe)
+            duration_seconds = self._facility_duration_seconds(row, recipe)
+
             inventory = self._json_object(row["inventory_json"], {})
             for item_key, quantity in recipe.inputs.items():
                 if int(inventory.get(item_key, 0)) < quantity:
@@ -415,7 +419,7 @@ class ProductionRepositoryMixin:
                 inventory[item_key] = int(inventory[item_key]) - quantity
             order_id = uuid4().hex
             starts_at = now_text
-            ends_at = serialize_datetime(now + timedelta(seconds=recipe.duration_seconds))
+            ends_at = serialize_datetime(now + timedelta(seconds=duration_seconds))
             snapshot = {
                 "recipe_key": recipe.key,
                 "recipe_name": recipe.name,
@@ -439,6 +443,9 @@ class ProductionRepositoryMixin:
                 "proficiency_bp": recipe.proficiency_bp,
                 "random_quality_bp": random_quality_bp(operation_id),
                 "currency_cost": recipe.currency_cost,
+                "duration_seconds": duration_seconds,
+                "facility_slot_key": facility_slot["slot_key"] if facility_slot is not None else None,
+                "facility_slot_id": int(facility_slot["id"]) if facility_slot is not None else None,
             }
             connection.execute(
                 """
@@ -460,8 +467,8 @@ class ProductionRepositoryMixin:
                 """
                 INSERT INTO production_orders(
                     order_id, player_id, operation_id, recipe_key, status, starts_at, ends_at,
-                    energy_cost, currency_cost, snapshot_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?, ?)
+                    energy_cost, currency_cost, facility_slot_id, snapshot_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     order_id,
@@ -472,6 +479,7 @@ class ProductionRepositoryMixin:
                     ends_at,
                     recipe.energy_cost,
                     recipe.currency_cost,
+                    int(facility_slot["id"]) if facility_slot is not None else None,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     now_text,
                     now_text,

@@ -94,6 +94,7 @@ RECIPES: dict[str, RecipeDefinition] = {
         rule_version="production-0.2.0",
         success_threshold_bp=6000,
         high_quality_threshold_bp=8000,
+        facility_kind="array",
     ),
     "recipe.pill.golden_core_guard": RecipeDefinition(
         key="recipe.pill.golden_core_guard",
@@ -125,6 +126,7 @@ RECIPES: dict[str, RecipeDefinition] = {
         rule_version="production-0.2.0",
         success_threshold_bp=6000,
         high_quality_threshold_bp=8000,
+        facility_kind="alchemy",
     ),
     "recipe.pill.core_condense": RecipeDefinition(
         key="recipe.pill.core_condense",
@@ -155,6 +157,7 @@ RECIPES: dict[str, RecipeDefinition] = {
         rule_version="production-0.2.0",
         success_threshold_bp=6000,
         high_quality_threshold_bp=8000,
+        facility_kind="alchemy",
     ),
     "recipe.weapon.cloud_sword": RecipeDefinition(
         key="recipe.weapon.cloud_sword",
@@ -186,6 +189,7 @@ RECIPES: dict[str, RecipeDefinition] = {
         rule_version="production-0.2.0",
         success_threshold_bp=6000,
         high_quality_threshold_bp=8000,
+        facility_kind="artifice",
     ),
     "recipe.food.cloud_tea": RecipeDefinition(
         key="recipe.food.cloud_tea",

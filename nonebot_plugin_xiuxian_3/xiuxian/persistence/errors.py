@@ -156,6 +156,26 @@ class ProductionExpiredError(RuntimeError):
     """A production order missed its normal completion window."""
 
 
+class FacilitySlotNotFoundError(RuntimeError):
+    """The requested cave facility slot is unknown."""
+
+
+class FacilitySlotOccupiedError(RuntimeError):
+    """Another owner already claimed the requested facility slot."""
+
+
+class FacilitySlotNotClaimedError(RuntimeError):
+    """The player or sect has no claimed slot for the requested production."""
+
+
+class FacilityMaintenanceUnpaidError(RuntimeError):
+    """The facility is inactive because its business-day fee was not paid."""
+
+
+class FacilityOwnerRequirementError(RuntimeError):
+    """The actor cannot claim or use a facility for the requested owner scope."""
+
+
 class PathAlreadySelectedError(RuntimeError):
     """The player already has a first path and cannot select another one."""
 

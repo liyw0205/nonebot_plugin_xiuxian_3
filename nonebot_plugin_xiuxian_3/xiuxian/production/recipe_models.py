@@ -31,6 +31,7 @@ class RecipeDefinition:
     rule_version: str = "production-0.1.0"
     success_threshold_bp: int = 4500
     high_quality_threshold_bp: int = 8000
+    facility_kind: str | None = None
 
 
 __all__ = ["RecipeDefinition"]

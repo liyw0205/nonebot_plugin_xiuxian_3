@@ -154,6 +154,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("开始生产", application.start_production)
     router.register("领取生产", application.complete_production)
     router.register("恢复生产", application.recover_production)
+    router.register("认领设施槽位", application.claim_facility_slot)
     router.register("开始终局配方", application.start_endgame_recipe)
     router.register("结算终局配方", application.settle_endgame_recipe)
     router.register("移动预览", application.preview_travel)

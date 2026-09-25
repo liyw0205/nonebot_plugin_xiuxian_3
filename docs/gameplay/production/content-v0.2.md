@@ -16,4 +16,4 @@
 
 `cave.mist_grotto_2` 开放 4 块灵田、炼丹房、炼器台、阵基各 1 个基础槽。宗门/个人必须通过 `production.claim_facility_slot` 锁定槽位：每槽 1 个 running 订单；维护费每业务日 100 灵石由所有者支付，余额不足时设施 `inactive`，不取消已 processing 订单。`item.array.gathering_basic` 使绑定设施订单时长 -1000 bp；同类阵法不叠加。
 
-错误：`FACILITY_SLOT_OCCUPIED`、`FACILITY_MAINTENANCE_UNPAID`、`RECIPE_QUALITY_INSUFFICIENT`、`GOLDEN_CORE_REQUIREMENT_MISSING`。关闭后新订单停止，已锁材料按原版本结算。验收：维护 job 幂等；槽位并发唯一；阵法不叠加；失败材料/耐久准确；绑定突破丹不可市场出售。
+错误：`FACILITY_SLOT_REQUIRED`、`FACILITY_SLOT_OCCUPIED`、`FACILITY_MAINTENANCE_UNPAID`、`FACILITY_OWNER_INVALID`、`RECIPE_QUALITY_INSUFFICIENT`、`GOLDEN_CORE_REQUIREMENT_MISSING`。关闭后新订单停止，已锁材料按原版本结算。验收：维护 job 幂等；槽位并发唯一；阵法不叠加；失败材料/耐久准确；绑定突破丹不可市场出售。

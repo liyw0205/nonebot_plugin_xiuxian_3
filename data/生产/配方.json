@@ -241,6 +241,7 @@
       "requirements": [
         {"type": "profession_level", "value": 3},
         {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
+        {"type": "facility", "facility_kind": "alchemy"},
         {"type": "location_any", "values": ["cave.mist_grotto_2"]}
       ],
       "inputs": [
@@ -271,7 +272,8 @@
       "profession": "alchemy",
       "requirements": [
         {"type": "profession_level", "value": 4},
-        {"type": "realm", "realm_key": "golden_core", "min_layer": 1}
+        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
+        {"type": "facility", "facility_kind": "alchemy"}
       ],
       "inputs": [
         {"item_key": "item.herb.spirit_leaf", "quantity": 5},
@@ -303,6 +305,7 @@
       "requirements": [
         {"type": "profession_level", "value": 3},
         {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
+        {"type": "facility", "facility_kind": "artifice"},
         {"type": "location_any", "values": ["cave.mist_grotto_2"]}
       ],
       "inputs": [
@@ -334,6 +337,7 @@
       "requirements": [
         {"type": "profession_level", "value": 3},
         {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
+        {"type": "facility", "facility_kind": "array"},
         {"type": "location_any", "values": ["xuantian.array_hall", "cave.mist_grotto_2"]}
       ],
       "inputs": [

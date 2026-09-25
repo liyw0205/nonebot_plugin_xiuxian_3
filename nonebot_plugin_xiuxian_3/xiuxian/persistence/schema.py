@@ -376,6 +376,7 @@ CREATE TABLE IF NOT EXISTS sects (
     max_members INTEGER NOT NULL CHECK (max_members > 0),
     warehouse_capacity INTEGER NOT NULL CHECK (warehouse_capacity >= 0),
     construction INTEGER NOT NULL DEFAULT 0 CHECK (construction >= 0),
+    spirit_stones INTEGER NOT NULL DEFAULT 0 CHECK (spirit_stones >= 0),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     content_version TEXT NOT NULL,
@@ -739,6 +740,7 @@ CREATE TABLE IF NOT EXISTS production_orders (
     ends_at TEXT NOT NULL,
     energy_cost INTEGER NOT NULL DEFAULT 0 CHECK (energy_cost >= 0),
     currency_cost INTEGER NOT NULL DEFAULT 0 CHECK (currency_cost >= 0),
+    facility_slot_id INTEGER REFERENCES production_facility_slots(id),
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     result_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
@@ -748,6 +750,43 @@ CREATE TABLE IF NOT EXISTS production_orders (
 CREATE INDEX IF NOT EXISTS idx_production_orders_player ON production_orders(player_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_production_orders_active
     ON production_orders(player_id) WHERE status = 'processing';
+
+CREATE TABLE IF NOT EXISTS production_facility_slots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slot_key TEXT NOT NULL UNIQUE,
+    location_key TEXT NOT NULL,
+    facility_kind TEXT NOT NULL,
+    slot_index INTEGER NOT NULL CHECK (slot_index > 0),
+    owner_type TEXT CHECK (owner_type IN ('personal', 'sect')),
+    owner_id TEXT,
+    status TEXT NOT NULL CHECK (status IN ('unclaimed', 'active', 'inactive')),
+    last_maintenance_date TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK ((status = 'unclaimed' AND owner_type IS NULL AND owner_id IS NULL) OR
+           (status IN ('active', 'inactive') AND owner_type IS NOT NULL AND owner_id IS NOT NULL)),
+    UNIQUE (location_key, facility_kind, slot_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_production_facility_owner
+    ON production_facility_slots(owner_type, owner_id, status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_production_orders_facility_active
+    ON production_orders(facility_slot_id) WHERE facility_slot_id IS NOT NULL AND status = 'processing';
+
+CREATE TABLE IF NOT EXISTS production_facility_maintenance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slot_id INTEGER NOT NULL REFERENCES production_facility_slots(id),
+    business_date TEXT NOT NULL,
+    owner_type TEXT NOT NULL CHECK (owner_type IN ('personal', 'sect')),
+    owner_id TEXT NOT NULL,
+    fee INTEGER NOT NULL CHECK (fee > 0),
+    paid INTEGER NOT NULL CHECK (paid IN (0, 1)),
+    status TEXT NOT NULL CHECK (status IN ('active', 'inactive')),
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    UNIQUE (slot_id, business_date)
+);
 
 CREATE TABLE IF NOT EXISTS breakthrough_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

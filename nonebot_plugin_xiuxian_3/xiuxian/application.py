@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from ..contracts import CommandContext, CommandResult, validate_command_identity
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
+from .production.facility_use_cases import FacilityApplication
 from .progression.use_cases import ProgressionApplication
 from .progression.endgame_use_cases import EndgameApplication
 from .progression.final_battle_use_cases import FinalBattleApplication
@@ -51,6 +52,7 @@ class XiuxianApplication:
         self.final_battle = FinalBattleApplication(repository)
         self.breakthrough = BreakthroughApplication(repository)
         self.production = ProductionApplication(repository)
+        self.facilities = FacilityApplication(repository)
         self.world = WorldApplication(repository)
         self.exploration = ExplorationApplication(repository)
         self.combat = CombatApplication(repository)
@@ -365,6 +367,9 @@ class XiuxianApplication:
             lambda: self.production.recover_production(context),
             write_message="当前事件不允许恢复生产订单。",
         )
+
+    async def claim_facility_slot(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.facilities.claim_facility_slot(context))
 
     async def preview_travel(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.world.preview_travel(context), require_write=False)

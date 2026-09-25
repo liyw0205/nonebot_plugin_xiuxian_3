@@ -4,6 +4,7 @@ import asyncio
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
@@ -338,10 +339,10 @@ def test_v02_remaining_production_recipes_run_through_qq_and_onebot() -> None:
 
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
             for adapter in ("qq.official", "onebot.v11"):
+                runtime = create_runtime(data_dir=Path(data_dir) / adapter)
                 for index, case in enumerate(cases):
-                    user = f"{adapter}-v02-recipe-{index}"
+                    user = f"{adapter}-v02-recipe"
                     await runtime.adapters.dispatch(
                         adapter,
                         _adapter_context(adapter, user, f"create-{adapter}-{index}"),
@@ -373,6 +374,19 @@ def test_v02_remaining_production_recipes_run_through_qq_and_onebot() -> None:
                                 user,
                             ),
                         )
+
+                    facility_name = {
+                        "alchemy": "炼丹房",
+                        "artifice": "炼器台",
+                    }.get(case["subprofession"])
+                    if facility_name:
+                        claimed = await runtime.adapters.dispatch(
+                            adapter,
+                            _adapter_context(adapter, user, f"claim-{adapter}-{index}"),
+                            f"认领设施槽位 {facility_name}",
+                        )
+                        assert claimed.code == "FACILITY_SLOT_CLAIMED"
+                        await runtime.repository.maintain_facilities()
 
                     preview = await runtime.adapters.dispatch(
                         adapter,
@@ -423,6 +437,125 @@ def test_v02_remaining_production_recipes_run_through_qq_and_onebot() -> None:
                                 ).fetchone()[0]
                             )
                         assert durability["item.weapon.cloud_sword"] >= 8500
-            await runtime.close()
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_v02_facility_claim_maintenance_and_order_slot_lifecycle_for_qq_and_onebot() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir)
+                user = f"{adapter}-facility"
+                assert (
+                    await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, f"facility-create-{adapter}"),
+                        "开始修仙",
+                    )
+                ).ok
+                assert (
+                    await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, f"facility-seek-{adapter}"),
+                        "寻仙问道",
+                    )
+                ).ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        """UPDATE players SET stage='cultivator', realm_key='golden_core', realm_layer=1,
+                        location_key='cave.mist_grotto_2', subprofession_key='alchemy', selected_service='alchemy',
+                        energy=30, energy_max=30, spirit_stones=100,
+                        inventory_json=?, durability_json='{}', intro_json='{}'
+                        WHERE platform=? AND platform_user_id=?""",
+                        (
+                            json.dumps(
+                                {
+                                    "item.herb.spirit_leaf": 20,
+                                    "item.material.cloud_iron": 20,
+                                    "item.herb.blood_grass": 20,
+                                    "item.tool.basic_furnace": 1,
+                                    "item.array.gathering_basic": 3,
+                                }
+                            ),
+                            adapter,
+                            user,
+                        ),
+                    )
+                claimed = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"facility-claim-{adapter}", "facility-claim-op"),
+                    "认领设施槽位 炼丹房",
+                )
+                assert claimed.code == "FACILITY_SLOT_CLAIMED"
+                replay_claim = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"facility-claim-replay-{adapter}", "facility-claim-op"),
+                    "认领设施槽位 炼丹房",
+                )
+                assert replay_claim.data["idempotent_replay"] is True
+                first_maintenance = await runtime.repository.maintain_facilities(business_date="2099-01-01")
+                assert [(item.paid, item.status) for item in first_maintenance] == [(True, "active")]
+                replay_maintenance = await runtime.repository.maintain_facilities(business_date="2099-01-01")
+                assert replay_maintenance[0].already_completed is True
+                preview = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"facility-preview-{adapter}"),
+                    "生产预览 金丹护脉丹",
+                )
+                assert preview.data["duration_seconds"] == 108
+                started = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"facility-start-{adapter}", f"facility-start-{adapter}"),
+                    "开始生产 金丹护脉丹",
+                )
+                assert started.code == "PRODUCTION_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE production_orders SET ends_at=? WHERE order_id=?",
+                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["order_id"]),
+                    )
+                unpaid = await runtime.repository.maintain_facilities(business_date="2099-01-02")
+                assert [(item.paid, item.status) for item in unpaid] == [(False, "inactive")]
+                settled = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"facility-settle-{adapter}"),
+                    "领取生产",
+                )
+                assert settled.code == "PRODUCTION_COMPLETED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        """UPDATE players SET spirit_stones=100, energy=30,
+                        inventory_json=? WHERE platform=? AND platform_user_id=?""",
+                        (
+                            json.dumps(
+                                {
+                                    "item.herb.spirit_leaf": 20,
+                                    "item.material.cloud_iron": 20,
+                                    "item.herb.blood_grass": 20,
+                                    "item.tool.basic_furnace": 1,
+                                    "item.array.gathering_basic": 3,
+                                }
+                            ),
+                            adapter,
+                            user,
+                        ),
+                    )
+                blocked = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"facility-blocked-{adapter}", f"facility-blocked-{adapter}"),
+                    "开始生产 金丹护脉丹",
+                )
+                assert blocked.code == "FACILITY_MAINTENANCE_UNPAID"
+                restored = await runtime.repository.maintain_facilities(business_date="2099-01-03")
+                assert [(item.paid, item.status) for item in restored] == [(True, "active")]
+                restarted = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"facility-restart-{adapter}", f"facility-restart-{adapter}"),
+                    "开始生产 金丹护脉丹",
+                )
+                assert restarted.code == "PRODUCTION_STARTED"
+                await runtime.close()
 
     asyncio.run(run())
