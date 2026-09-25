@@ -49,6 +49,7 @@ from .rules import (
     player_stat_snapshot,
 )
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
+from ..advancement.skill_rules import effective_skill_effect, skill_definition
 
 
 class CombatRepositoryMixin:
@@ -297,6 +298,11 @@ class CombatRepositoryMixin:
                 initiative=int(exploration_snapshot.get("initiative", player["initiative"])),
                 equipment=equipment,
             )
+            skills = self._battle_skill_snapshot(
+                connection,
+                int(player["id"]),
+                str(player["path_key"] or ""),
+            )
             battle_id = uuid4().hex
             snapshot = {
                 "battle_type": battle_type,
@@ -308,6 +314,7 @@ class CombatRepositoryMixin:
                     "qualification": qualification,
                     "stats": stats,
                     "equipment": list(equipment),
+                    "skills": skills,
                     "cross_realm_penalty_bp": int(exploration_snapshot.get("cross_realm_penalty_bp", 0)),
                 },
                 "enemy": {
@@ -425,6 +432,8 @@ class CombatRepositoryMixin:
             is_tribulation_trial = str(snapshot.get("profile_key", "")) == PROFILE_KEY
             tribulation = self._json_object(snapshot.get("tribulation"), {})
             debt_shield_bp = int(tribulation.get("debt_shield_bp", 0)) if is_tribulation_trial else 0
+            player_skills = list(snapshot.get("player", {}).get("skills", []))
+            selected_skill = self._select_battle_skill(player_skills)
             player_hp = int(state["player_hp"])
             enemy_hp = int(state["enemy_hp"])
             timeout = now >= datetime.fromisoformat(str(session["turn_deadline"]))
@@ -458,8 +467,12 @@ class CombatRepositoryMixin:
                         round_no=expected_round,
                         sequence=sequence + 1,
                         actor_key="player",
-                        skill_key="skill.basic_attack",
-                        strategy_key="strategy.basic_attack.v0.1",
+                        skill_key=str(selected_skill.get("skill_key", "skill.basic_attack")),
+                        strategy_key=(
+                            "strategy.basic_attack.v0.1"
+                            if str(selected_skill.get("skill_key", "skill.basic_attack")) == "skill.basic_attack"
+                            else "strategy.mastered_skill.v0.3"
+                        ),
                         attacker_attack=int(player_stats["attack"]),
                         attacker_initiative=int(player_stats["initiative"]),
                         defender_agility=int(enemy["agility"]),
@@ -470,6 +483,7 @@ class CombatRepositoryMixin:
                         ),
                         seed=str(snapshot["random_seed"]),
                         operation_id=operation_id,
+                        damage_multiplier_bp=self._skill_damage_multiplier(selected_skill),
                     )
                     if phase is not None:
                         effective_damage_bp = phase.player_damage_bp * (10_000 - debt_shield_bp) // 10_000
@@ -945,6 +959,68 @@ class CombatRepositoryMixin:
             for row in rows
         )
 
+    def _battle_skill_snapshot(
+        self,
+        connection: sqlite3.Connection,
+        player_id: int,
+        path_key: str,
+    ) -> list[dict[str, object]]:
+        """Freeze mastered skills and their effective effects at battle start."""
+
+        rows = connection.execute(
+            "SELECT skill_key, path_key, level, snapshot_json FROM skill_masteries "
+            "WHERE player_id = ? ORDER BY level DESC, skill_key",
+            (player_id,),
+        ).fetchall()
+        skills: list[dict[str, object]] = []
+        for row in rows:
+            try:
+                definition = skill_definition(str(row["skill_key"]))
+            except ValueError:
+                continue
+            if definition.path_key not in {None, path_key}:
+                continue
+            level = int(row["level"])
+            stored = self._json_object(row["snapshot_json"], {})
+            effect = dict(stored.get("effective_effect", effective_skill_effect(definition, level)))
+            skills.append(
+                {
+                    "skill_key": str(row["skill_key"]),
+                    "path_key": row["path_key"],
+                    "level": level,
+                    "effect": effect,
+                    "content_version": definition.content_version,
+                    "rule_version": definition.rule_version,
+                }
+            )
+        return skills
+
+    @staticmethod
+    def _select_battle_skill(skills: list[dict[str, object]]) -> dict[str, object]:
+        """Choose the strongest mastered active skill deterministically."""
+
+        if not skills:
+            return {"skill_key": "skill.basic_attack", "effect": {"value": 10000, "level": 0}}
+        return sorted(
+            skills,
+            key=lambda item: (
+                str(item.get("skill_key", "")) == "skill.basic_attack",
+                -int(item.get("level", 0)),
+                str(item.get("skill_key", "")),
+            ),
+        )[0]
+
+    @staticmethod
+    def _skill_damage_multiplier(skill: dict[str, object]) -> int:
+        effect = dict(skill.get("effect", {}))
+        value = int(effect.get("value", 10_000))
+        effect_type = str(effect.get("type", ""))
+        if effect_type == "damage_bonus_bp":
+            return 10_000 + value
+        if effect_type.endswith("_multiplier_bp"):
+            return value
+        return 10_000
+
     @staticmethod
     def _attack_action(
         *,
@@ -961,6 +1037,7 @@ class CombatRepositoryMixin:
         seed: str,
         operation_id: str,
         skill_hit_bp: int = 0,
+        damage_multiplier_bp: int = 10_000,
     ) -> dict[str, object]:
         hit_bp = hit_chance_bp(
             attacker_initiative=attacker_initiative,
@@ -980,7 +1057,7 @@ class CombatRepositoryMixin:
             "hit_roll_bp": hit_roll,
             "crit_roll_bp": crit_roll,
             "hit_bp": hit_bp,
-            "damage": min(target_hp, max(0, attacker_attack)) if hit else 0,
+            "damage": min(target_hp, max(0, attacker_attack) * max(0, int(damage_multiplier_bp)) // 10_000) if hit else 0,
             "operation_id": operation_id,
         }
 

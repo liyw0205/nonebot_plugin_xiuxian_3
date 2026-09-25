@@ -83,6 +83,9 @@ def test_boundary_party_qq_onebot_three_members_is_atomic_and_unique() -> None:
             )
             assert resolved.outcome == "won"
             assert set(resolved.rewards) == {"1", "2", "3"}
+            assert len(resolved.contributions) == 3
+            assert len(resolved.reward_order) == 3
+            assert set(resolved.reward_rolls) == set(resolved.contributions)
             with sqlite3.connect(runtime.settings.database_path) as db:
                 rewards = db.execute("SELECT COUNT(*) FROM party_battle_rewards WHERE battle_id=?", (started.battle_id,)).fetchone()[0]
                 crystals = db.execute(
@@ -129,7 +132,7 @@ def test_boundary_requirement_failure_does_not_debit_and_loss_applies_soul_fatig
     asyncio.run(run())
 
 
-def test_boundary_battle_loss_only_applies_soul_fatigue_and_releases_locks() -> None:
+def test_boundary_battle_loss_applies_soul_fatigue_after_one_revival_per_member_and_releases_locks() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
@@ -148,6 +151,11 @@ def test_boundary_battle_loss_only_applies_soul_fatigue_and_releases_locks() -> 
                 platform="onebot.v11", platform_user_id="boundary-loss-member", battle_id=started.battle_id, operation_id="loss-resolve"
             )
             assert result.outcome == "lost"
+            replay = await runtime.repository.replay_party_battle(
+                platform="qq.official", platform_user_id="boundary-loss-leader", battle_id=started.battle_id
+            )
+            assert sum(action["skill_key"] == "skill.soul.revival" for action in replay.actions) == 2
+            assert any("soul_power_cost" in str(action["state_json"]) for action in replay.actions)
             with sqlite3.connect(runtime.settings.database_path) as db:
                 rows = db.execute(
                     "SELECT soul_power, soul_fatigue_until FROM players WHERE platform_user_id IN (?, ?) ORDER BY platform_user_id",
@@ -157,9 +165,86 @@ def test_boundary_battle_loss_only_applies_soul_fatigue_and_releases_locks() -> 
                     "SELECT COUNT(*) FROM party_battle_members WHERE battle_id=? AND asset_lock_status='locked'",
                     (started.battle_id,),
                 ).fetchone()[0]
-            assert [row[0] for row in rows] == [8000, 8000]
+            assert [row[0] for row in rows] == [7975, 7975]
             assert all(row[1] for row in rows)
             assert locked == 0
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_boundary_battle_without_revival_ends_and_fatigue_is_idempotent() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            await _player(runtime, "qq.official", "boundary-no-revive-leader", strong=False, ticket=1)
+            await _player(runtime, "onebot.v11", "boundary-no-revive-member", strong=False)
+            with sqlite3.connect(runtime.settings.database_path) as db:
+                db.execute(
+                    "UPDATE players SET soul_power=1 WHERE platform_user_id IN (?, ?)",
+                    ("boundary-no-revive-leader", "boundary-no-revive-member"),
+                )
+            created = await runtime.adapters.dispatch(
+                "qq.official",
+                _ctx("qq.official", "boundary-no-revive-leader", "no-revive-create"),
+                "创建界隙队伍",
+            )
+            party_id = str(created.data["party_id"])
+            await runtime.adapters.dispatch(
+                "qq.official",
+                _ctx("qq.official", "boundary-no-revive-leader", "no-revive-invite"),
+                "邀请入队 onebot.v11:boundary-no-revive-member",
+            )
+            await runtime.adapters.dispatch(
+                "onebot.v11",
+                _ctx("onebot.v11", "boundary-no-revive-member", "no-revive-accept"),
+                f"接受入队 {party_id}",
+            )
+            for index, (adapter, user) in enumerate(
+                (("qq.official", "boundary-no-revive-leader"), ("onebot.v11", "boundary-no-revive-member"))
+            ):
+                await runtime.adapters.dispatch(
+                    adapter,
+                    _ctx(adapter, user, f"no-revive-confirm-{index}"),
+                    f"确认入队 {party_id}",
+                )
+            started = await runtime.repository.start_party_battle(
+                platform="qq.official",
+                platform_user_id="boundary-no-revive-leader",
+                party_id=party_id,
+                operation_id="no-revive-start",
+            )
+            resolved = await runtime.repository.settle_party_battle(
+                platform="onebot.v11",
+                platform_user_id="boundary-no-revive-member",
+                battle_id=started.battle_id,
+                operation_id="no-revive-resolve",
+            )
+            replay = await runtime.repository.replay_party_battle(
+                platform="qq.official",
+                platform_user_id="boundary-no-revive-leader",
+                battle_id=started.battle_id,
+            )
+            assert resolved.outcome == "lost"
+            assert not any(action["skill_key"] == "skill.soul.revival" for action in replay.actions)
+            repeated = await runtime.repository.settle_party_battle(
+                platform="qq.official",
+                platform_user_id="boundary-no-revive-leader",
+                battle_id=started.battle_id,
+                operation_id="no-revive-resolve-replay",
+            )
+            assert repeated.rewards == resolved.rewards
+            with sqlite3.connect(runtime.settings.database_path) as db:
+                rows = db.execute(
+                    "SELECT soul_power, soul_fatigue_until FROM players WHERE platform_user_id IN (?, ?) ORDER BY platform_user_id",
+                    ("boundary-no-revive-leader", "boundary-no-revive-member"),
+                ).fetchall()
+                reward_count = db.execute(
+                    "SELECT COUNT(*) FROM party_battle_rewards WHERE battle_id=?", (started.battle_id,)
+                ).fetchone()[0]
+            assert [row[0] for row in rows] == [0, 0]
+            assert all(row[1] for row in rows)
+            assert reward_count == 2
             await runtime.close()
 
     asyncio.run(run())

@@ -78,6 +78,50 @@ SKILL_DEFINITIONS = {
         effect={"type": "next_item_or_device_effect_bp", "value": 1000},
         description="洞察物性，强化下一次器物效果。",
     ),
+    # v0.3 combat keys are registered here so their mastery snapshots can be
+    # consumed by the automatic battle engine without a second skill catalog.
+    "skill.body.mountain_domain": SkillDefinition(
+        key="skill.body.mountain_domain",
+        label="山岳领域",
+        path_key="body",
+        effect={"type": "physical_damage_multiplier_bp", "value": 16000},
+        description="以山岳之势压制敌手。",
+    ),
+    "skill.spell.five_element_cycle": SkillDefinition(
+        key="skill.spell.five_element_cycle",
+        label="五行轮转",
+        path_key="spell",
+        effect={"type": "spell_damage_multiplier_bp", "value": 17000},
+        description="引五行循环造成术法伤害。",
+    ),
+    "skill.device.thousand_doll_array": SkillDefinition(
+        key="skill.device.thousand_doll_array",
+        label="千机傀儡阵",
+        path_key="device",
+        effect={"type": "summon_attack_multiplier_bp", "value": 9000},
+        description="以千机傀儡阵协同攻击。",
+    ),
+    "skill.demonic.abyss_communion": SkillDefinition(
+        key="skill.demonic.abyss_communion",
+        label="深渊共鸣",
+        path_key="demonic",
+        effect={"type": "damage_bonus_bp", "value": 7000},
+        description="借深渊回响换取伤害增幅。",
+    ),
+    "skill.beast.ancestral_form": SkillDefinition(
+        key="skill.beast.ancestral_form",
+        label="祖灵真形",
+        path_key="beast",
+        effect={"type": "physical_damage_multiplier_bp", "value": 15500},
+        description="唤醒祖灵真形强化攻击。",
+    ),
+    "skill.soul.suppression": SkillDefinition(
+        key="skill.soul.suppression",
+        label="神魂镇压",
+        path_key="soul",
+        effect={"type": "soul_damage_multiplier_bp", "value": 15000},
+        description="以神魂之力压制敌方行动。",
+    ),
 }
 
 SKILL_ALIASES = {
@@ -88,6 +132,12 @@ SKILL_ALIASES = {
     "痛苦交换": "skill.demonic.pain_exchange",
     "半化形": "skill.beast.partial_transform",
     "快速鉴定": "skill.support.quick_assessment",
+    "山岳领域": "skill.body.mountain_domain",
+    "五行轮转": "skill.spell.five_element_cycle",
+    "千机傀儡阵": "skill.device.thousand_doll_array",
+    "深渊共鸣": "skill.demonic.abyss_communion",
+    "祖灵真形": "skill.beast.ancestral_form",
+    "神魂镇压": "skill.soul.suppression",
     **{key: key for key in SKILL_DEFINITIONS},
 }
 

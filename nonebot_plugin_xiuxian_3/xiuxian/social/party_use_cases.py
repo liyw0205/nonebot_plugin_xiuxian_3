@@ -330,6 +330,9 @@ class PartyApplication:
                 "outcome": record.outcome,
                 "round_no": record.round_no,
                 "rewards": record.rewards,
+                "contributions": record.contributions,
+                "reward_order": list(record.reward_order),
+                "reward_rolls": record.reward_rolls,
                 "idempotent_replay": record.already_completed,
             },
         )

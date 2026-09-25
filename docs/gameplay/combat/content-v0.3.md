@@ -9,15 +9,17 @@
 | `enemy.beast_ancestor` | 万兽副本 | 7500 / 480 | 血脉召唤 2 小怪；小怪存活时首领狂暴 +2000 bp | 妖血、功勋、妖界声望 |
 | `enemy.boundary_watcher` | 界隙秘境 | 10000 / 600 | 回合 5/10 时间轴冲击，需至少 2 人防御否则全队神魂 -10 | 神魂晶、元婴材料 |
 
-副本会话最多 5 人，至少 2 人；全员资格、体力、门票、跨界状态锁定后才创建。死亡角色进入 `downed`，队友可消耗神魂 25 复起一次；无人复起则战斗结束，该角色仅得贡献奖励。首领奖励按贡献/每角色上限独立结算；唯一物排序和 roll 固定在 `BattleResult`。
+副本会话最多 5 人，至少 2 人；全员资格、体力、门票、跨界状态锁定后才创建。死亡角色进入 `downed`，服务端按稳定成员顺序寻找存活队友，原子消耗 25 点神魂复起；每名被复起成员最多一次，神魂不足或无存活队友时不复起并结束战斗。复起、神魂扣除、贡献和时间轴行动均写入队伍回放状态。首领奖励按贡献/每角色上限独立结算；唯一物排序和 roll 固定在 `BattleResult`，重复结算只读取已保存结果。
 
 | `skill_key` | 效果 | 成本/限制 |
 |:--|:--|:--|
-| `skill.body.mountain_domain` | 队伍范围伤害 -2000 bp，3 回合 | 战意 40 / 每场一次 |
-| `skill.spell.five_element_cycle` | 下次元素技能取得目标弱点 +1500 bp | 灵力 25 / 2 回合 |
-| `skill.device.thousand_doll_array` | 召唤 2 机关，5 回合 | 灵力 35、每场一次 |
-| `skill.demonic.abyss_communion` | 2 回合伤害 +2500 bp | 污染 20 / 每场一次 |
-| `skill.beast.ancestral_form` | 4 回合派生属性 +1500 bp | 妖力 25、稳定 -8 / 每场一次 |
-| `skill.soul.suppression` | 目标伤害 -1500 bp，2 回合 | 神魂 25 / 3 回合 |
+| `skill.body.mountain_domain` | 体术伤害倍率 16000 bp，随参悟等级每级 +300 bp | 体修主动技能 |
+| `skill.spell.five_element_cycle` | 术法伤害倍率 17000 bp，随参悟等级每级 +300 bp | 法修主动技能 |
+| `skill.device.thousand_doll_array` | 机关攻击倍率 9000 bp，随参悟等级每级 +300 bp | 器修主动技能 |
+| `skill.demonic.abyss_communion` | 伤害加成 7000 bp，随参悟等级每级 +300 bp | 魔修主动技能 |
+| `skill.beast.ancestral_form` | 体术伤害倍率 15500 bp，随参悟等级每级 +300 bp | 妖修主动技能 |
+| `skill.soul.suppression` | 神魂伤害倍率 15000 bp，随参悟等级每级 +300 bp | 复合/事件技能 |
+
+开战时读取 `skill_masteries`，只冻结当前道途可用技能及等级效果；服务端优先选择已参悟的非基础主动技能，未参悟时回退 `skill.basic_attack`。技能选择、版本和实际伤害都写入 `ActionRecord`，客户端不能提交技能或伤害。
 
 阵营战按 `event.*.round_id` 进行，使用贡献积分而非直接掉落；切磋需双方确认、固定属性/规则版本、无奖励。错误：`BATTLE_CROSS_REALM_REQUIREMENT_MISSING`、`BATTLE_SOUL_POWER_INSUFFICIENT`、`BATTLE_REVIVE_LIMIT_REACHED`、`BATTLE_EVENT_NOT_ACTIVE`。关闭后旧副本结算，阵营轮次按原奖励池领奖。验收：护盾阶段只触发一次；复起不超过一次；贡献奖励与首领掉落分离；污染/神魂一次结算；切磋不产生资产。

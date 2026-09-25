@@ -27,6 +27,9 @@ class PartyBattleResolutionRecord:
     reason: str
     round_no: int
     rewards: dict[str, dict[str, int]] = field(default_factory=dict)
+    contributions: dict[str, int] = field(default_factory=dict)
+    reward_order: tuple[str, ...] = ()
+    reward_rolls: dict[str, int] = field(default_factory=dict)
     already_completed: bool = False
 
 

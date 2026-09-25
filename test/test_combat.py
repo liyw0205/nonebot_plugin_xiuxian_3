@@ -134,6 +134,32 @@ def test_training_battle_rejects_client_action_fields_and_missing_prerequisites(
     asyncio.run(run())
 
 
+def test_mastered_skill_is_frozen_and_used_by_automatic_battle() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "combat-skilled"
+            await _enter_cultivator(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET skill_insights=1, spirit_stones=20 WHERE platform='web' AND platform_user_id=?",
+                    (user,),
+                )
+            trained = await runtime.dispatch(_context(user, "skill-train"), "参悟神通 重击")
+            assert trained.code == "SKILL_TRAINED"
+            settled = await runtime.dispatch(
+                _context(user, "skill-battle", operation_id="combat-skilled-start"), "开始训练战"
+            )
+            assert settled.code == "BATTLE_SETTLED"
+            replay = await runtime.dispatch(_context(user, "skill-replay"), "战斗回放")
+            skills = replay.data["snapshot"]["player"]["skills"]
+            assert skills[0]["skill_key"] == "skill.body.heavy_strike"
+            assert any(action["skill_key"] == "skill.body.heavy_strike" for action in replay.data["actions"])
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_training_battle_recovers_from_created_session_after_runtime_restart() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:

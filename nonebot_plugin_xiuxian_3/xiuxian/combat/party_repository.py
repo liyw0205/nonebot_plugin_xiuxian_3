@@ -242,6 +242,11 @@ class PartyCombatRepositoryMixin:
                 if locked is not None:
                     raise PartyBattleBusyError("a party member has locked battle assets")
                 equipment = self._battle_equipment_snapshot(connection, int(row["database_player_id"]))
+                skills = self._battle_skill_snapshot(
+                    connection,
+                    int(row["database_player_id"]),
+                    str(row["path_key"] or ""),
+                )
                 qualification = self._json_object(row["qualification_json"], {})
                 inventory = self._json_object(row["inventory_json"], {})
                 if boundary_party and row["database_player_id"] == leader["id"]:
@@ -272,6 +277,8 @@ class PartyCombatRepositoryMixin:
                         "qualification": qualification,
                         "stats": stats,
                         "equipment": list(equipment),
+                        "skills": skills,
+                        "soul_power": int(row["soul_power"]),
                         "cross_realm": cross_realm_snapshot,
                         "pollution": cross_realm_snapshot["pollution"],
                         "bloodline_stability": cross_realm_snapshot["bloodline_stability"],
@@ -327,6 +334,10 @@ class PartyCombatRepositoryMixin:
             state = {
                 "round_no": 0,
                 "member_hp": {member["player_id"]: member["stats"]["max_hp"] for member in snapshots},
+                "member_status": {member["player_id"]: "active" for member in snapshots},
+                "member_soul_power": {member["player_id"]: int(member.get("soul_power", 0)) for member in snapshots},
+                "revive_count": {member["player_id"]: 0 for member in snapshots},
+                "contribution": {member["player_id"]: 1 for member in snapshots},
                 "enemy_hp": enemy.max_hp,
                 "target_index": 0,
             }
@@ -432,25 +443,112 @@ class PartyCombatRepositoryMixin:
             state = self._json_object(session["state_json"], {})
             enemy = snapshot["enemy"]
             member_hp = {str(key): int(value) for key, value in dict(state.get("member_hp", {})).items()}
+            member_status = {
+                str(key): str(value)
+                for key, value in dict(state.get("member_status", {})).items()
+            }
+            member_status.update(
+                {
+                    str(key): ("active" if int(value) > 0 else "downed")
+                    for key, value in member_hp.items()
+                    if str(key) not in member_status
+                }
+            )
+            member_soul_power = {
+                str(key): int(value)
+                for key, value in dict(state.get("member_soul_power", {})).items()
+            }
+            member_soul_power.update(
+                {
+                    str(member["player_id"]): int(member.get("soul_power", 0))
+                    for member in snapshot.get("members", [])
+                    if str(member["player_id"]) not in member_soul_power
+                }
+            )
+            revive_count = {
+                str(key): int(value)
+                for key, value in dict(state.get("revive_count", {})).items()
+            }
+            revive_count.update(
+                {
+                    str(member["player_id"]): 0
+                    for member in snapshot.get("members", [])
+                    if str(member["player_id"]) not in revive_count
+                }
+            )
+            contribution = {
+                str(key): int(value)
+                for key, value in dict(state.get("contribution", {})).items()
+            }
+            contribution.update(
+                {
+                    str(member["player_id"]): 1
+                    for member in snapshot.get("members", [])
+                    if str(member["player_id"]) not in contribution
+                }
+            )
             enemy_hp = int(state.get("enemy_hp", enemy["max_hp"]))
             target_index = int(state.get("target_index", 0))
             actions: list[dict[str, Any]] = []
             sequence = int(session["action_sequence"])
+            boundary_party = str(snapshot.get("party_type", "")) in {
+                PARTY_TYPE_BOUNDARY_REALM,
+                PARTY_TYPE_PARTY_BOUNDARY,
+            }
             members = sorted(
                 [member for member in snapshot.get("members", []) if member["player_id"] in member_hp],
                 key=lambda member: (-int(member["stats"]["initiative"]), str(member["player_id"]),),
             )
+            timeline_defenders: set[str] = set()
             for member in members:
                 player_id = str(member["player_id"])
-                if member_hp[player_id] <= 0 or enemy_hp <= 0:
+                if member_hp[player_id] <= 0 or member_status.get(player_id) == "downed" or enemy_hp <= 0:
                     continue
                 sequence += 1
+                timeline_defend = boundary_party and expected_round in {5, 10}
+                if timeline_defend:
+                    timeline_defenders.add(player_id)
+                    contribution[player_id] += 2
+                    actions.append(
+                        {
+                            "sequence_no": sequence,
+                            "actor_key": f"member:{player_id}",
+                            "strategy_key": "party.timeline_defend",
+                            "skill_key": "skill.defend",
+                            "target_key": f"member:{player_id}",
+                            "hit_roll_bp": 0,
+                            "damage": 0,
+                        }
+                    )
+                    continue
+                selected_skill = self._select_battle_skill(list(member.get("skills", [])))
                 roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:player")
-                hit_bp = hit_chance_bp(attacker_initiative=int(member["stats"]["initiative"]), defender_agility=int(enemy["agility"]))
-                damage = int(member["stats"]["attack"]) if roll < hit_bp else 0
+                hit_bp = hit_chance_bp(
+                    attacker_initiative=int(member["stats"]["initiative"]),
+                    defender_agility=int(enemy["agility"]),
+                )
+                multiplier = self._skill_damage_multiplier(selected_skill)
+                damage = int(member["stats"]["attack"]) * multiplier // 10_000 if roll < hit_bp else 0
+                damage = min(enemy_hp, max(0, damage))
                 enemy_hp = max(0, enemy_hp - damage)
-                actions.append({"sequence_no": sequence, "actor_key": f"member:{player_id}", "strategy_key": "party.basic_attack", "skill_key": "skill.basic_attack", "target_key": "enemy", "hit_roll_bp": roll, "damage": damage})
-            alive = [member for member in members if member_hp[str(member["player_id"])] > 0]
+                contribution[player_id] += damage
+                actions.append(
+                    {
+                        "sequence_no": sequence,
+                        "actor_key": f"member:{player_id}",
+                        "strategy_key": "party.auto_skill",
+                        "skill_key": str(selected_skill.get("skill_key", "skill.basic_attack")),
+                        "target_key": "enemy",
+                        "hit_roll_bp": roll,
+                        "damage": damage,
+                    }
+                )
+            alive = [
+                member
+                for member in members
+                if member_hp[str(member["player_id"])] > 0
+                and member_status.get(str(member["player_id"])) != "downed"
+            ]
             if enemy_hp > 0 and alive:
                 target_index %= len(alive)
                 target = alive[target_index]
@@ -459,20 +557,125 @@ class PartyCombatRepositoryMixin:
                 roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:enemy")
                 hit_bp = hit_chance_bp(attacker_initiative=int(enemy["initiative"]), defender_agility=int(target["stats"]["agility"]))
                 damage = int(enemy["attack"]) if roll < hit_bp else 0
+                if len(timeline_defenders) >= 2 and expected_round in {5, 10}:
+                    damage = damage * 8_000 // 10_000
                 member_hp[target_id] = max(0, member_hp[target_id] - damage)
+                if member_hp[target_id] <= 0:
+                    member_status[target_id] = "downed"
                 actions.append({"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.auto", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage})
                 target_index += 1
+            if boundary_party and expected_round in {5, 10} and len(timeline_defenders) < 2:
+                for member in members:
+                    player_id = str(member["player_id"])
+                    member_soul_power[player_id] = max(0, member_soul_power[player_id] - 10)
+                    connection.execute(
+                        "UPDATE players SET soul_power=MAX(0, soul_power-10), updated_at=? WHERE id=?",
+                        (now_text, member["database_id"]),
+                    )
+                sequence += 1
+                actions.append(
+                    {
+                        "sequence_no": sequence,
+                        "actor_key": "system",
+                        "strategy_key": "enemy.timeline_impact",
+                        "skill_key": "skill.soul.suppression",
+                        "target_key": "party",
+                        "hit_roll_bp": 0,
+                        "damage": 0,
+                        "soul_power_loss": 10,
+                    }
+                )
+            # Revive deterministically after the enemy action; each downed
+            # member can be restored once and the debit is guarded in SQL.
+            if boundary_party:
+                alive = [
+                    member
+                    for member in members
+                    if member_hp[str(member["player_id"])] > 0
+                    and member_status.get(str(member["player_id"])) != "downed"
+                ]
+                for downed in sorted(members, key=lambda item: str(item["player_id"])):
+                    downed_id = str(downed["player_id"])
+                    if member_status.get(downed_id) != "downed" or revive_count.get(downed_id, 0) >= 1 or not alive:
+                        continue
+                    reviver = next(
+                        (
+                            candidate
+                            for candidate in alive
+                            if member_soul_power.get(str(candidate["player_id"]), 0) >= 25
+                        ),
+                        None,
+                    )
+                    if reviver is None:
+                        continue
+                    reviver_id = str(reviver["player_id"])
+                    debited = connection.execute(
+                        "UPDATE players SET soul_power=soul_power-25, updated_at=? WHERE id=? AND soul_power>=25",
+                        (now_text, reviver["database_id"]),
+                    ).rowcount
+                    if debited != 1:
+                        continue
+                    member_soul_power[reviver_id] = max(0, member_soul_power.get(reviver_id, 0) - 25)
+                    member_hp[downed_id] = max(1, int(downed["stats"]["max_hp"]) // 2)
+                    member_status[downed_id] = "active"
+                    revive_count[downed_id] = 1
+                    contribution[reviver_id] += 25
+                    sequence += 1
+                    actions.append(
+                        {
+                            "sequence_no": sequence,
+                            "actor_key": f"member:{reviver_id}",
+                            "strategy_key": "party.revive",
+                            "skill_key": "skill.soul.revival",
+                            "target_key": f"member:{downed_id}",
+                            "hit_roll_bp": 10_000,
+                            "damage": 0,
+                            "soul_power_cost": 25,
+                        }
+                    )
+                    alive.append(downed)
             for action in actions:
-                state_after = {"member_hp": member_hp, "enemy_hp": enemy_hp}
+                state_after = {
+                    "member_hp": member_hp,
+                    "member_status": member_status,
+                    "member_soul_power": member_soul_power,
+                    "revive_count": revive_count,
+                    "contribution": contribution,
+                    "enemy_hp": enemy_hp,
+                }
+                for metadata_key in ("soul_power_cost", "soul_power_loss"):
+                    if metadata_key in action:
+                        state_after[metadata_key] = int(action[metadata_key])
                 connection.execute(
                     "INSERT INTO party_battle_actions(action_id, battle_id, sequence_no, round_no, actor_key, strategy_key, skill_key, target_key, hit_roll_bp, damage, state_json, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (uuid4().hex, battle_id, action["sequence_no"], expected_round, action["actor_key"], action["strategy_key"], action["skill_key"], action["target_key"], action["hit_roll_bp"], action["damage"], json.dumps(state_after, ensure_ascii=False, sort_keys=True), f"{operation_id}:{action['sequence_no']}", now_text),
                 )
-            outcome = "won" if enemy_hp <= 0 else ("lost" if not any(value > 0 for value in member_hp.values()) else None)
+            unresolved_downed = boundary_party and any(
+                member_status.get(player_id) == "downed" for player_id in member_hp
+            )
+            outcome = "won" if enemy_hp <= 0 else ("lost" if unresolved_downed else (
+                "lost"
+                if not any(
+                    value > 0 and member_status.get(player_id) != "downed"
+                    for player_id, value in member_hp.items()
+                )
+                else None
+            ))
             status = outcome or "running"
             if expected_round >= PARTY_BATTLE_MAX_TURNS and status == "running":
                 status, outcome = "expired", "expired"
-            state.update({"round_no": expected_round, "member_hp": member_hp, "enemy_hp": enemy_hp, "target_index": target_index})
+            state.update(
+                {
+                    "round_no": expected_round,
+                    "member_hp": member_hp,
+                    "member_status": member_status,
+                    "member_soul_power": member_soul_power,
+                    "revive_count": revive_count,
+                    "contribution": contribution,
+                    "enemy_hp": enemy_hp,
+                    "target_index": target_index,
+                }
+            )
             connection.execute(
                 "UPDATE party_battle_sessions SET status=?, round_no=?, action_sequence=?, turn_deadline=?, state_json=?, result_json=?, updated_at=? WHERE battle_id=?",
                 (status, expected_round, sequence, serialize_datetime(self._now() + timedelta(seconds=TURN_TIMEOUT_SECONDS)), json.dumps(state, ensure_ascii=False, sort_keys=True), json.dumps({"outcome": outcome, "reason": "party_battle_ended"} if outcome else {}, ensure_ascii=False, sort_keys=True), now_text, battle_id),
@@ -503,7 +706,7 @@ class PartyCombatRepositoryMixin:
                 raise PartyBattlePermissionError("actor is not a party battle member")
             if str(session["status"]) == "settled":
                 result = self._json_object(session["result_json"], {})
-                payload = {"battle_id": battle_id, "party_id": session["party_id"], "enemy_key": session["enemy_key"], "status": "settled", "outcome": result.get("outcome", "expired"), "reason": result.get("reason", "party_battle_ended"), "round_no": int(session["round_no"]), "rewards": result.get("rewards", {})}
+                payload = {"battle_id": battle_id, "party_id": session["party_id"], "enemy_key": session["enemy_key"], "status": "settled", "outcome": result.get("outcome", "expired"), "reason": result.get("reason", "party_battle_ended"), "round_no": int(session["round_no"]), "rewards": result.get("rewards", {}), "contributions": result.get("contribution", {}), "reward_order": result.get("reward_order", []), "reward_rolls": result.get("reward_rolls", {})}
                 self._party_battle_record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
                 return self._party_battle_resolution_from_payload(payload, replay=True)
             if str(session["status"]) not in {"won", "lost", "expired"}:
@@ -518,8 +721,53 @@ class PartyCombatRepositoryMixin:
                 for key, value in dict(snapshot.get("reward", BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
             }
             battle_members = connection.execute("SELECT * FROM party_battle_members WHERE battle_id = ? ORDER BY id", (battle_id,)).fetchall()
+            state = self._json_object(session["state_json"], {})
+            contribution = {
+                str(key): int(value)
+                for key, value in dict(state.get("contribution", {})).items()
+            }
+            snapshot_by_database_id = {
+                int(member.get("database_id")): member
+                for member in snapshot.get("members", [])
+                if member.get("database_id") is not None
+            }
+            reward_order = sorted(
+                battle_members,
+                key=lambda row: (
+                    -contribution.get(
+                        str(snapshot_by_database_id.get(int(row["player_id"]), {}).get("player_id", "")),
+                        0,
+                    ),
+                    int(row["id"]),
+                ),
+            )
+            ordered_player_ids = [
+                str(snapshot_by_database_id.get(int(row["player_id"]), {}).get("player_id", row["player_id"]))
+                for row in reward_order
+            ]
+            reward_rolls = {
+                str(snapshot_by_database_id.get(int(row["player_id"]), {}).get("player_id", row["player_id"])): battle_roll_bp(
+                    f"{battle_id}:reward:{snapshot_by_database_id.get(int(row['player_id']), {}).get('player_id', row['player_id'])}"
+                )
+                for row in battle_members
+            }
             for battle_member in battle_members:
-                reward = dict(reward_template) if outcome == "won" else {}
+                stable_player_id = str(
+                    snapshot_by_database_id.get(int(battle_member["player_id"]), {}).get(
+                        "player_id", battle_member["player_id"]
+                    )
+                )
+                score = contribution.get(stable_player_id, 0)
+                role_cap = 1 if str(battle_member["role"]) in {"leader", "member"} else 0
+                if outcome == "won" and score > 0 and role_cap > 0:
+                    reward = dict(reward_template)
+                    for key, value in tuple(reward.items()):
+                        if key.startswith("item."):
+                            reward[key] = min(value, role_cap)
+                else:
+                    reward = {}
+                if boundary_party and outcome in {"lost", "expired"} and score > 0:
+                    reward = {"world_merit": min(10, max(1, score // 100))}
                 reward_map[str(battle_member["player_id"])] = reward
                 player = connection.execute("SELECT * FROM players WHERE id = ?", (battle_member["player_id"],)).fetchone()
                 if player is None:
@@ -529,14 +777,15 @@ class PartyCombatRepositoryMixin:
                     cultivation = int(player["cultivation"]) + int(reward.get("cultivation", 0))
                     total_cultivation = int(player["total_cultivation"]) + int(reward.get("cultivation", 0))
                     spirit_stones = int(player["spirit_stones"]) + int(reward.get("spirit_stones", 0))
+                    world_merit = int(player["world_merit"]) + int(reward.get("world_merit", 0))
                     for item_key, quantity in reward.items():
                         if item_key.startswith("item."):
                             inventory[item_key] = int(inventory.get(item_key, 0)) + int(quantity)
                     connection.execute(
-                        "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, inventory_json=?, updated_at=? WHERE id=?",
-                        (cultivation, total_cultivation, spirit_stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                        "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, world_merit=?, inventory_json=?, updated_at=? WHERE id=?",
+                        (cultivation, total_cultivation, spirit_stones, world_merit, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
                     )
-                elif boundary_party and outcome in {"lost", "expired"}:
+                if boundary_party and outcome in {"lost", "expired"}:
                     fatigue_until = serialize_datetime(self._now() + timedelta(hours=2))
                     connection.execute(
                         "UPDATE players SET soul_power=MAX(0, soul_power-2000), soul_fatigue_until=?, updated_at=? WHERE id=?",
@@ -547,10 +796,20 @@ class PartyCombatRepositoryMixin:
                     (battle_id, session["party_id"], battle_member["player_id"], json.dumps(reward, ensure_ascii=False, sort_keys=True), "claimed" if reward else "none", f"{operation_id}:{battle_member['player_id']}", now_text),
                 )
                 connection.execute("UPDATE party_battle_members SET asset_lock_status='released', reward_json=?, settled_at=?, updated_at=? WHERE id=?", (json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text, now_text, battle_member["id"]))
-            result.update({"outcome": outcome, "reason": result.get("reason", "party_battle_ended"), "rewards": reward_map, "settled_at": now_text})
+            result.update(
+                {
+                    "outcome": outcome,
+                    "reason": result.get("reason", "party_battle_ended"),
+                    "rewards": reward_map,
+                    "contribution": contribution,
+                    "reward_order": ordered_player_ids,
+                    "reward_rolls": reward_rolls,
+                    "settled_at": now_text,
+                }
+            )
             connection.execute("UPDATE party_battle_sessions SET status='settled', result_json=?, updated_at=? WHERE battle_id=?", (json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, battle_id))
             connection.execute("UPDATE parties SET current_session_id=NULL, updated_at=? WHERE party_id=? AND current_session_id=?", (now_text, session["party_id"], battle_id))
-            payload = {"battle_id": battle_id, "party_id": session["party_id"], "enemy_key": session["enemy_key"], "status": "settled", "outcome": outcome, "reason": result["reason"], "round_no": int(session["round_no"]), "rewards": reward_map}
+            payload = {"battle_id": battle_id, "party_id": session["party_id"], "enemy_key": session["enemy_key"], "status": "settled", "outcome": outcome, "reason": result["reason"], "round_no": int(session["round_no"]), "rewards": reward_map, "contributions": contribution, "reward_order": ordered_player_ids, "reward_rolls": reward_rolls}
             self._party_battle_record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
             return self._party_battle_resolution_from_payload(payload)
 
@@ -617,7 +876,20 @@ class PartyCombatRepositoryMixin:
 
     @staticmethod
     def _party_battle_resolution_from_payload(payload: dict[str, Any], replay: bool = False) -> PartyBattleResolutionRecord:
-        return PartyBattleResolutionRecord(str(payload["battle_id"]), str(payload["party_id"]), str(payload["enemy_key"]), str(payload["status"]), str(payload["outcome"]), str(payload["reason"]), int(payload["round_no"]), {str(player): {str(key): int(value) for key, value in dict(reward).items()} for player, reward in dict(payload.get("rewards", {})).items()}, replay)
+        return PartyBattleResolutionRecord(
+            str(payload["battle_id"]),
+            str(payload["party_id"]),
+            str(payload["enemy_key"]),
+            str(payload["status"]),
+            str(payload["outcome"]),
+            str(payload["reason"]),
+            int(payload["round_no"]),
+            {str(player): {str(key): int(value) for key, value in dict(reward).items()} for player, reward in dict(payload.get("rewards", {})).items()},
+            {str(player): int(value) for player, value in dict(payload.get("contributions", {})).items()},
+            tuple(str(value) for value in payload.get("reward_order", [])),
+            {str(player): int(value) for player, value in dict(payload.get("reward_rolls", {})).items()},
+            replay,
+        )
 
 
 __all__ = ["PartyCombatRepositoryMixin"]
