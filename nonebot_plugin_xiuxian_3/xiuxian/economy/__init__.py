@@ -2,5 +2,6 @@
 
 from .models import MarketOrderRecord
 from .cross_realm_trade_models import CrossRealmTradeRecord
+from .auction_models import AuctionRecord
 
-__all__ = ["CrossRealmTradeRecord", "MarketOrderRecord"]
+__all__ = ["AuctionRecord", "CrossRealmTradeRecord", "MarketOrderRecord"]

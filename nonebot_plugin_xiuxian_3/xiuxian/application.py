@@ -36,6 +36,7 @@ from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
 from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
+from .economy.auction_use_cases import AuctionApplication
 from .events.use_cases import EventsApplication
 from .events.season_use_cases import FinalHeavenSeasonApplication
 from .specials.arena_use_cases import ArenaApplication
@@ -79,6 +80,7 @@ class XiuxianApplication:
         self.wayfaring = WayfaringApplication(repository)
         self.economy = EconomyApplication(repository)
         self.cross_realm_trade = CrossRealmTradeApplication(repository)
+        self.auction = AuctionApplication(repository)
         self.events = EventsApplication(repository)
         self.seasons = FinalHeavenSeasonApplication(repository)
         self.arena = ArenaApplication(repository)
@@ -1027,6 +1029,30 @@ class XiuxianApplication:
             context,
             lambda: self.cross_realm_trade.execute(context),
             write_message="当前事件不允许执行跨界贸易。",
+        )
+
+    async def create_auction(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.auction.create(context),
+            write_message="当前事件不允许发布拍卖。",
+        )
+
+    async def list_auctions(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.auction.list(context), require_write=False)
+
+    async def bid_auction(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.auction.bid(context),
+            write_message="当前事件不允许竞价。",
+        )
+
+    async def settle_auction(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.auction.settle(context),
+            write_message="当前事件不允许结算拍卖。",
         )
 
     async def get_spirit_spring_event(self, context: CommandContext) -> CommandResult:

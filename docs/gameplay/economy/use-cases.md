@@ -2,13 +2,15 @@
 
 ## 用例
 
-`credit_wallet`、`debit_wallet`、`create_market_order`、`buy_market_order`、`cancel_market_order`、`expire_market_order`、`create_service_order`、`settle_order`、`execute_cross_realm_trade`。
+`credit_wallet`、`debit_wallet`、`create_market_order`、`buy_market_order`、`cancel_market_order`、`expire_market_order`、`create_service_order`、`settle_order`、`execute_cross_realm_trade`、`create_auction`、`bid_auction`、`settle_auction`、`list_auctions`。
 
 ## 错误码
 
 `WALLET_NOT_FOUND`、`BALANCE_INSUFFICIENT`、`LOCKED_BALANCE`、`CURRENCY_INVALID`、`LEDGER_CONFLICT`、`ORDER_NOT_FOUND`、`ORDER_EXPIRED`、`ORDER_ALREADY_SETTLED`、`PRICE_OUT_OF_RANGE`。
 固定跨界贸易另有 `CROSS_REALM_TRADE_PERMISSION_DENIED`、`TRADE_WEEKLY_CAP`、
 `TRADE_INPUT_INSUFFICIENT`、`ITEM_BINDING_ACTIVE`。
+限量拍卖另有 `AUCTION_SLOT_FULL`、`AUCTION_BID_TOO_LOW`、`AUCTION_SETTLEMENT_EXPIRED`、`AUCTION_STATE_CONFLICT`、
+`AUCTION_ITEM_LOCKED`。
 
 ## 风控
 

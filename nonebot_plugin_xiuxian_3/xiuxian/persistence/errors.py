@@ -1216,6 +1216,34 @@ class MarketOrderLimitError(RuntimeError):
     """The seller has reached the simultaneous listing limit."""
 
 
+class AuctionSlotFullError(RuntimeError):
+    """The weekly auction has no free slots."""
+
+
+class AuctionNotFoundError(RuntimeError):
+    """The requested auction does not exist."""
+
+
+class AuctionBidTooLowError(RuntimeError):
+    """The bid does not meet the minimum increment."""
+
+
+class AuctionSelfBidError(RuntimeError):
+    """The seller cannot bid on their own auction."""
+
+
+class AuctionStateConflictError(RuntimeError):
+    """The auction is not in a state valid for the requested action."""
+
+
+class AuctionSettlementExpiredError(RuntimeError):
+    """The auction settlement recovery window has expired."""
+
+
+class AuctionItemLockedError(RuntimeError):
+    """The auction item lock is missing or unavailable."""
+
+
 class MarketItemForbiddenError(RuntimeError):
     """The requested item is bound, a credential, or otherwise non-tradeable."""
 

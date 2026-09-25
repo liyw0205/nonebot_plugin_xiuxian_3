@@ -1918,6 +1918,51 @@ CREATE TABLE IF NOT EXISTS market_item_locks (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS auction_lots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    auction_id TEXT NOT NULL UNIQUE,
+    seller_player_id INTEGER NOT NULL REFERENCES players(id),
+    week_start TEXT NOT NULL,
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    starting_bid INTEGER NOT NULL CHECK (starting_bid > 0),
+    current_bid INTEGER NOT NULL DEFAULT 0 CHECK (current_bid >= 0),
+    current_bidder_player_id INTEGER REFERENCES players(id),
+    status TEXT NOT NULL CHECK (status IN ('open', 'settling', 'settled', 'unsold', 'expired')),
+    ends_at TEXT NOT NULL,
+    settlement_deadline TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_auction_lots_week_status
+    ON auction_lots(week_start, status, ends_at);
+
+CREATE TABLE IF NOT EXISTS auction_item_locks (
+    auction_id TEXT PRIMARY KEY REFERENCES auction_lots(auction_id),
+    seller_player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS auction_bids (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bid_id TEXT NOT NULL UNIQUE,
+    auction_id TEXT NOT NULL REFERENCES auction_lots(auction_id),
+    bidder_player_id INTEGER NOT NULL REFERENCES players(id),
+    bid_amount INTEGER NOT NULL CHECK (bid_amount > 0),
+    status TEXT NOT NULL CHECK (status IN ('active', 'outbid', 'won', 'refunded')),
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_auction_bids_active
+    ON auction_bids(auction_id, status, bid_amount DESC);
+
 CREATE TABLE IF NOT EXISTS cross_realm_trades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     trade_id TEXT NOT NULL UNIQUE,
