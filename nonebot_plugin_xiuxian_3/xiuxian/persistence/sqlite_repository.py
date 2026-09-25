@@ -38,6 +38,7 @@ from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
 from ..social.sect_war_repository import SectWarRepositoryMixin
 from ..social.sect_war_federation_repository import SectWarFederationRepositoryMixin
+from ..social.sect_war_cross_server_repository import SectWarCrossServerRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
 from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
@@ -85,6 +86,7 @@ class SQLitePlayerRepository(
     MentorRepositoryMixin,
     SectWarRepositoryMixin,
     SectWarFederationRepositoryMixin,
+    SectWarCrossServerRepositoryMixin,
     EventsRepositoryMixin,
     HeartDemonEventRepositoryMixin,
     DemonInvasionRepositoryMixin,
@@ -291,6 +293,8 @@ class SQLitePlayerRepository(
             connection.execute("ALTER TABLE sects ADD COLUMN level INTEGER NOT NULL DEFAULT 1 CHECK (level >= 1)")
         if "sect_merit" not in columns:
             connection.execute("ALTER TABLE sects ADD COLUMN sect_merit INTEGER NOT NULL DEFAULT 0 CHECK (sect_merit >= 0)")
+        if "warehouse_json" not in columns:
+            connection.execute("ALTER TABLE sects ADD COLUMN warehouse_json TEXT NOT NULL DEFAULT '{}'")
 
     @staticmethod
     def _migrate_heart_demon_event_schema(connection: sqlite3.Connection) -> None:
@@ -575,6 +579,7 @@ class SQLitePlayerRepository(
             ("total_cultivation", "INTEGER NOT NULL DEFAULT 0"),
             ("foundation_quality", "INTEGER NOT NULL DEFAULT 0"),
             ("world_merit", "INTEGER NOT NULL DEFAULT 0"),
+            ("void_merit", "INTEGER NOT NULL DEFAULT 0"),
             ("arena_rating", "INTEGER NOT NULL DEFAULT 1000"),
             ("arena_wins", "INTEGER NOT NULL DEFAULT 0"),
             ("arena_losses", "INTEGER NOT NULL DEFAULT 0"),

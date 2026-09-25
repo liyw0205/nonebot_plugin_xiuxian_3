@@ -1506,3 +1506,43 @@ class ItemEffectAlreadyActiveError(RuntimeError):
 
 class ItemEffectAlreadyPendingError(RuntimeError):
     """A one-shot consumable effect is already waiting to be applied."""
+
+
+class CrossServerFortressRequiredError(RuntimeError):
+    """The sect does not have an active void fortress."""
+
+
+class CrossServerFortressBuildError(RuntimeError):
+    """The fortress cannot be built or maintained with current assets."""
+
+
+class CrossServerRegistrationClosedError(RuntimeError):
+    """The cross-server war registration window is closed."""
+
+
+class CrossServerRegistrationCapError(RuntimeError):
+    """The cross-server war reached its registration cap."""
+
+
+class CrossServerRosterCapError(RuntimeError):
+    """The frozen cross-server roster is invalid."""
+
+
+class CrossServerWarNotActiveError(RuntimeError):
+    """The cross-server war is not accepting score sources."""
+
+
+class CrossServerSourceInvalidError(RuntimeError):
+    """A score source operation is missing or not owned by the roster member."""
+
+
+class CrossServerBranchLockedError(RuntimeError):
+    """The automatic battle branch was already selected."""
+
+
+class CrossServerRewardNotAvailableError(RuntimeError):
+    """The requested cross-server reward is not available."""
+
+
+class CrossServerRewardAllocationError(RuntimeError):
+    """A public reward-box allocation is invalid."""

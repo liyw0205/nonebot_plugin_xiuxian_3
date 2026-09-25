@@ -107,6 +107,7 @@ class PlayerView:
     total_cultivation: int = 0
     foundation_quality: int = 0
     world_merit: int = 0
+    void_merit: int = 0
     arena_rating: int = 1000
     arena_wins: int = 0
     arena_losses: int = 0

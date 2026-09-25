@@ -32,6 +32,7 @@ from .social.sect_use_cases import SectApplication
 from .social.party_use_cases import PartyApplication
 from .social.mentor_use_cases import MentorApplication
 from .social.sect_war_use_cases import SectWarApplication
+from .social.sect_war_cross_server_use_cases import SectWarCrossServerApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -79,6 +80,7 @@ class XiuxianApplication:
         self.party = PartyApplication(repository)
         self.mentor = MentorApplication(repository)
         self.sect_war = SectWarApplication(repository)
+        self.cross_server_sect_war = SectWarCrossServerApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -788,6 +790,33 @@ class XiuxianApplication:
             lambda: self.sect_war.claim(context),
             write_message="当前事件不允许领取宗门战奖励。",
         )
+
+    async def get_void_fortress(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.fortress(context), require_write=False)
+
+    async def build_void_fortress(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.build_fortress(context), write_message="当前事件不允许建造虚空堡垒。")
+
+    async def maintain_void_fortress(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.maintain_fortress(context), write_message="当前事件不允许维护虚空堡垒。")
+
+    async def get_cross_server_sect_war(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.get(context), require_write=False)
+
+    async def register_cross_server_sect_war(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.register(context), write_message="当前事件不允许报名跨服宗门战。")
+
+    async def choose_cross_server_sect_war_branch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.choose_branch(context), write_message="当前事件不允许选择战争机关分支。")
+
+    async def contribute_cross_server_sect_war(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.score(context), write_message="当前事件不允许记录跨服宗门战积分。")
+
+    async def claim_cross_server_sect_war_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.claim(context), write_message="当前事件不允许领取跨服宗门战奖励。")
+
+    async def allocate_cross_server_sect_war_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cross_server_sect_war.allocate(context), write_message="当前事件不允许分配跨服宗门战奖励。")
 
     async def create_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_party(context), write_message="当前事件不允许创建队伍。")

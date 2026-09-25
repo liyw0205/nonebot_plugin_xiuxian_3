@@ -5,6 +5,7 @@ from .party_models import PartyInvitationRecord, PartyMemberRecord, PartyRecord
 from .mentor_models import MentorRelationRecord
 from .sect_war_models import SectWarClaimRecord, SectWarRecord, SectWarStanding
 from .sect_war_federation_models import SectWarFederationResultRecord, SectWarFederationSnapshotRecord
+from .sect_war_cross_server_models import CrossServerFortressRecord, CrossServerRewardRecord, CrossServerStanding, CrossServerWarRecord
 from .sect_war_rules import (
     SECT_WAR_CLAIM_HOURS,
     SECT_WAR_CONTENT_VERSION,
@@ -55,6 +56,10 @@ __all__ = [
     "SectWarStanding",
     "SectWarFederationResultRecord",
     "SectWarFederationSnapshotRecord",
+    "CrossServerFortressRecord",
+    "CrossServerRewardRecord",
+    "CrossServerStanding",
+    "CrossServerWarRecord",
     "SECT_WAR_CLAIM_HOURS",
     "SECT_WAR_CONTENT_VERSION",
     "SECT_WAR_DURATION_MINUTES",

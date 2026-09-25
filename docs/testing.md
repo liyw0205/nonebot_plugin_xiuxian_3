@@ -51,4 +51,6 @@
 6. 运行 `$HOME/myenv/bin/python -m pytest -q test/test_documentation.py`。该测试校验
    `README.md`、`CONTRIBUTING.md` 与 `docs/` 内的本地 Markdown 链接，入口文档重组后不得留下断链。
 
+跨服宗门战专项验收位于 `test/test_sect_war_cross_server_v05.py`，覆盖 QQ 官方与 OneBot V11、堡垒建造/维护、30/15 名额、服务端自动战、分支锁定、来源 operation 反刷、公共奖励箱、周奖励幂等、并发建造和 7 日过期恢复。
+
 文档验证通过不等于玩法代码已经通过。若当前测试有未完成探索代码引起的失败，报告必须区分“文档门槛通过”和“工程测试未通过”，不得以文档检查掩盖代码回归。

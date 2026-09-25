@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS players (
     total_cultivation INTEGER NOT NULL DEFAULT 0 CHECK (total_cultivation >= 0),
     foundation_quality INTEGER NOT NULL DEFAULT 0 CHECK (foundation_quality >= 0),
     world_merit INTEGER NOT NULL DEFAULT 0 CHECK (world_merit >= 0),
+    void_merit INTEGER NOT NULL DEFAULT 0 CHECK (void_merit >= 0),
     arena_rating INTEGER NOT NULL DEFAULT 1000 CHECK (arena_rating >= 0),
     arena_wins INTEGER NOT NULL DEFAULT 0 CHECK (arena_wins >= 0),
     arena_losses INTEGER NOT NULL DEFAULT 0 CHECK (arena_losses >= 0),
@@ -397,6 +398,7 @@ CREATE TABLE IF NOT EXISTS sects (
     construction INTEGER NOT NULL DEFAULT 0 CHECK (construction >= 0),
     spirit_stones INTEGER NOT NULL DEFAULT 0 CHECK (spirit_stones >= 0),
     sect_merit INTEGER NOT NULL DEFAULT 0 CHECK (sect_merit >= 0),
+    warehouse_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     content_version TEXT NOT NULL,
@@ -524,6 +526,149 @@ CREATE TABLE IF NOT EXISTS sect_war_federation_results (
 
 CREATE INDEX IF NOT EXISTS idx_sect_war_federation_results_round
     ON sect_war_federation_results(round_id, shard_key, score DESC, sect_id);
+
+CREATE TABLE IF NOT EXISTS sect_void_fortresses (
+    sect_id TEXT PRIMARY KEY REFERENCES sects(sect_id),
+    status TEXT NOT NULL CHECK (status IN ('building', 'active', 'inactive')),
+    anchor_balance INTEGER NOT NULL DEFAULT 0 CHECK (anchor_balance >= 0),
+    build_operation_id TEXT NOT NULL UNIQUE,
+    build_ends_at TEXT,
+    maintenance_due_at TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_void_fortresses_status
+    ON sect_void_fortresses(status, maintenance_due_at);
+
+CREATE TABLE IF NOT EXISTS sect_cross_server_war_rounds (
+    round_id TEXT PRIMARY KEY,
+    week_id TEXT NOT NULL UNIQUE,
+    registration_open_at TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    claim_expires_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('scheduled', 'open', 'running', 'settled', 'failed')),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_cross_server_war_rounds_status
+    ON sect_cross_server_war_rounds(status, starts_at, claim_expires_at);
+
+CREATE TABLE IF NOT EXISTS sect_cross_server_war_registrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL REFERENCES sect_cross_server_war_rounds(round_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    operation_id TEXT NOT NULL UNIQUE,
+    entry_fee INTEGER NOT NULL CHECK (entry_fee >= 0),
+    status TEXT NOT NULL CHECK (status IN ('registered', 'withdrawn')),
+    roster_size INTEGER NOT NULL CHECK (roster_size BETWEEN 1 AND 15),
+    score INTEGER NOT NULL DEFAULT 0 CHECK (score >= 0),
+    rank INTEGER,
+    winner INTEGER NOT NULL DEFAULT 0 CHECK (winner IN (0, 1)),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    registered_at TEXT NOT NULL,
+    settled_at TEXT,
+    UNIQUE (round_id, sect_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_cross_server_war_registrations_round
+    ON sect_cross_server_war_registrations(round_id, status, score DESC, sect_id);
+
+CREATE TABLE IF NOT EXISTS sect_cross_server_war_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL REFERENCES sect_cross_server_war_rounds(round_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    roster_slot INTEGER NOT NULL CHECK (roster_slot BETWEEN 1 AND 15),
+    contribution INTEGER NOT NULL DEFAULT 0 CHECK (contribution >= 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (round_id, player_id),
+    UNIQUE (round_id, sect_id, roster_slot)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_cross_server_war_members_player
+    ON sect_cross_server_war_members(player_id, round_id, contribution);
+
+CREATE TABLE IF NOT EXISTS sect_cross_server_war_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL UNIQUE,
+    round_id TEXT NOT NULL REFERENCES sect_cross_server_war_rounds(round_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    target_key TEXT NOT NULL,
+    action_key TEXT NOT NULL CHECK (action_key IN ('占点', '击败', '摧毁战争机关')),
+    score INTEGER NOT NULL CHECK (score > 0),
+    source_operation_id TEXT NOT NULL UNIQUE,
+    operation_id TEXT NOT NULL UNIQUE,
+    occurred_at TEXT NOT NULL,
+    UNIQUE (round_id, player_id, target_key, action_key, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_cross_server_war_actions_round
+    ON sect_cross_server_war_actions(round_id, sect_id, target_key, action_key, occurred_at);
+
+CREATE TABLE IF NOT EXISTS sect_cross_server_war_sessions (
+    session_id TEXT PRIMARY KEY,
+    round_id TEXT NOT NULL REFERENCES sect_cross_server_war_rounds(round_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    status TEXT NOT NULL CHECK (status IN ('running', 'settled', 'failed')),
+    turn_no INTEGER NOT NULL DEFAULT 0 CHECK (turn_no >= 0),
+    engine_hp INTEGER NOT NULL CHECK (engine_hp >= 0),
+    branch_key TEXT CHECK (branch_key IN ('repair', 'break')),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    replay_json TEXT NOT NULL DEFAULT '[]',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (round_id, sect_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_cross_server_war_sessions_round
+    ON sect_cross_server_war_sessions(round_id, status, updated_at);
+
+CREATE TABLE IF NOT EXISTS sect_cross_server_reward_boxes (
+    box_id TEXT PRIMARY KEY,
+    round_id TEXT NOT NULL REFERENCES sect_cross_server_war_rounds(round_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'partial', 'distributed')),
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    distributed_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (round_id, sect_id)
+);
+
+CREATE TABLE IF NOT EXISTS sect_cross_server_reward_allocations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    box_id TEXT NOT NULL REFERENCES sect_cross_server_reward_boxes(box_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    allocated_at TEXT NOT NULL,
+    UNIQUE (box_id, player_id, item_key)
+);
+
+CREATE TABLE IF NOT EXISTS sect_cross_server_weekly_rewards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reward_key TEXT NOT NULL UNIQUE,
+    round_id TEXT NOT NULL,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_cross_server_weekly_rewards_player
+    ON sect_cross_server_weekly_rewards(player_id, round_id);
 
 CREATE TABLE IF NOT EXISTS sect_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
