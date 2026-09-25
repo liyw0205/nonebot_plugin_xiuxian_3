@@ -37,6 +37,7 @@ from .rules import (
     DAO_UNION_QUEST,
     meets_realm,
 )
+from .cross_realm_rules import DEMON_MAINLINE
 
 
 class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
@@ -555,7 +556,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
 
     def _quest_status_payload(self, connection: sqlite3.Connection, player_id: int) -> dict[str, dict[str, object]]:
         result: dict[str, dict[str, object]] = {}
-        for quest_key in (DOMAIN_COMMISSION, ANCIENT_DOMAIN_LINE, SOUL_QUEST, VOID_QUEST):
+        for quest_key in (DOMAIN_COMMISSION, ANCIENT_DOMAIN_LINE, SOUL_QUEST, VOID_QUEST, DEMON_MAINLINE):
             result[quest_key] = self._quest_status_for_player(connection, player_id, quest_key)
         result[CROSS_REALM_VICTORY] = self._quest_status_for_player(connection, player_id, CROSS_REALM_VICTORY)
         for quest_key in (DAO_UNION_QUEST, *DAO_ORIGIN_TASKS):
@@ -753,6 +754,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             quest_key=str(payload["quest_key"]),
             status=str(payload["status"]),
             progress={str(key): int(value) for key, value in dict(payload.get("progress", {})).items()},
+            snapshot=dict(payload.get("snapshot", {})),
             already_completed=replay,
         )
 

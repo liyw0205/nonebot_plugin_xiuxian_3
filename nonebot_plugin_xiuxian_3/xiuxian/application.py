@@ -521,6 +521,9 @@ class XiuxianApplication:
     async def claim_void_refining_quest(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.claim_void_refining(context), write_message="当前事件不允许领取炼虚许可。")
 
+    async def claim_demon_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.claim_demon_mainline(context), write_message="当前事件不允许领取魔界主线。")
+
     async def record_dao_union_mainline(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.record_dao_union_mainline(context), write_message="当前事件不允许记录合道主线资格。")
 

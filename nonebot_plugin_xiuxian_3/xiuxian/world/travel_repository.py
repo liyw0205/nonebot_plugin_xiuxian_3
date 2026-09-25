@@ -239,6 +239,8 @@ class TravelRepositoryMixin:
             missing.append(f"境界要求（{required}）")
         if definition.source_locations and player.location_key not in definition.source_locations:
             missing.append("来源地点")
+        if definition.required_intro_flag and definition.required_intro_flag not in set(player.intro_flags):
+            missing.append("任务权限")
         if player.dao_fruit_progress < definition.required_dao_fruit_progress:
             missing.append("道果进度")
         if player.stamina < definition.stamina_cost:
@@ -369,6 +371,10 @@ class TravelRepositoryMixin:
             current = str(row["location_key"])
             if definition.source_locations and current not in definition.source_locations:
                 raise LocationRequirementError("source location is not valid")
+            if definition.required_intro_flag:
+                intro = self._json_object(row["intro_json"], {})
+                if definition.required_intro_flag not in {str(item) for item in intro.get("flags", [])}:
+                    raise LocationRequirementError("destination quest permission is missing")
             if not meets_realm(str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer):
                 raise LocationRequirementError("realm requirement is not met")
             if int(row["dao_fruit_progress"]) < definition.required_dao_fruit_progress:
@@ -452,6 +458,7 @@ class TravelRepositoryMixin:
                 "required_dao_fruit_progress": definition.required_dao_fruit_progress,
                 "daily_start_limit": definition.daily_start_limit,
                 "required_endgame_status": definition.required_endgame_status,
+                "required_intro_flag": definition.required_intro_flag,
                 "consume_pass_on_arrival": definition.consume_pass_on_arrival,
             }
             connection.execute(

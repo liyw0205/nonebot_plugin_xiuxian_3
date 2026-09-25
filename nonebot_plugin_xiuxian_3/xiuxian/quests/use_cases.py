@@ -138,6 +138,14 @@ class QuestApplication:
             "炼虚许可",
         )
 
+    async def claim_demon_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._claim(
+            context,
+            "quest.demon_main_1.claim",
+            self.repository.claim_demon_mainline,
+            "魔界主线",
+        )
+
     async def record_dao_union_mainline(self, context: CommandContext) -> CommandResult:
         return await self._simple_action(
             context,
@@ -362,6 +370,7 @@ class QuestApplication:
                 "quest_key": record.quest_key,
                 "status": record.status,
                 "progress": record.progress,
+                "snapshot": record.snapshot,
                 "idempotent_replay": record.already_completed,
             },
         )

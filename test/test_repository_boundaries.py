@@ -80,6 +80,7 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "complete_ancient_domain_line": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
         "claim_soul_transformation_quest": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
         "claim_void_refining_quest": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
+        "claim_demon_mainline": "nonebot_plugin_xiuxian_3.xiuxian.quests.cross_realm_repository",
         "record_dao_union_mainline": "nonebot_plugin_xiuxian_3.xiuxian.quests.endgame_repository",
         "record_dao_union_challenge": "nonebot_plugin_xiuxian_3.xiuxian.quests.endgame_repository",
         "deliver_dao_union_work": "nonebot_plugin_xiuxian_3.xiuxian.quests.endgame_repository",

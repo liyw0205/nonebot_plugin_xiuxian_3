@@ -185,6 +185,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("交付虚空档案", application.deliver_void_archive, aliases=("上交虚空档案", "交付档案"))
     router.register("领取化神许可", application.claim_soul_transformation_quest, aliases=("完成化神任务", "领取化神任务"))
     router.register("领取炼虚许可", application.claim_void_refining_quest, aliases=("完成炼虚任务", "领取炼虚任务"))
+    router.register("领取魔界主线", application.claim_demon_mainline, aliases=("领取魔界主线任务", "完成魔界主线"))
     router.register("记录合道主线", application.record_dao_union_mainline)
     router.register("开始合道挑战", application.start_dao_union_challenge)
     router.register("交付合道作品", application.deliver_dao_union_work)

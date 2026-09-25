@@ -31,7 +31,8 @@ async def _player(runtime, adapter: str, user: str, *, strong: bool, pollution: 
             UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
                 location_key='demon.abyss_gate', path_key='spell', stamina=60, stamina_max=60,
                 energy=30, energy_max=30, soul_power=100, soul_power_max=100,
-                pollution=?, max_hp=?, initiative=?, qualification_json=?, faction_reputation_json='{}'
+                pollution=?, max_hp=?, initiative=?, qualification_json=?, faction_reputation_json='{}',
+                intro_json='{"flags":["access.demon.fallen_ruins"]}'
             WHERE platform=? AND platform_user_id=?
             """,
             (

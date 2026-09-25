@@ -30,6 +30,7 @@ class QuestClaimRecord:
     quest_key: str
     status: str
     progress: dict[str, int]
+    snapshot: dict[str, object] = field(default_factory=dict)
     already_completed: bool = False
 
 

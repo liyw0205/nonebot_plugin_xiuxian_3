@@ -42,6 +42,7 @@ from ..specials.team_arena_repository import TeamArenaRepositoryMixin
 from ..specials.arena_recovery_repository import ArenaRecoveryRepositoryMixin
 from ..specials.arena_projection import project_arena_result
 from ..quests.repository import QuestRepositoryMixin
+from ..quests.cross_realm_repository import DemonQuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
 from .errors import *  # noqa: F401,F403
@@ -76,6 +77,7 @@ class SQLitePlayerRepository(
     ArenaRepositoryMixin,
     TeamArenaRepositoryMixin,
     ArenaRecoveryRepositoryMixin,
+    DemonQuestRepositoryMixin,
     QuestRepositoryMixin,
     EconomyRepositoryMixin,
     AdvancementRepositoryMixin,

@@ -9,7 +9,7 @@ operation ledger 保护。
 
 化神/炼虚许可任务已开放最小玩家闭环：`完成领域委托`、`完成远古洞天任务`、`开始跨界战`、
 `开始界壁试炼`、`探索档案遗迹`、`交付虚空档案` 和对应许可领取命令均进入统一 application，
-任务组件由 `quest_progress` / `quest_events` 审计。领域前线、完整虚空档案副本、复杂世界事件和
+任务组件由 `quest_progress` / `quest_events` 审计。v0.3 `quest.demon_main_1` 已接入服务端探索证据核验：魔界声望达到 200 且有两次已结算的 `explore.demon_abyss` 胜利后，`领取魔界主线` 原子写入任务事件、版本快照和 `access.demon.fallen_ruins`。领域前线、完整虚空档案副本、复杂世界事件和
 多人战斗仍按[当前开发状态](../../current-status.md)逐步开放。终局赛季三榜由独立 season repository
 接入：结局榜读取正式结局，协作榜仅读取成功多人终局战；到期按需冻结匿名快照，称号领取幂等，
 逾期补发展示称号但不自动确认篇章资格。`content-v*.md` 是规则合同，不代表所有后续入口已接入。

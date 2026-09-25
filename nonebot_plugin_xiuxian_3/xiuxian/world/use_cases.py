@@ -131,6 +131,7 @@ class WorldApplication:
             "required_dao_fruit_progress": definition.required_dao_fruit_progress,
             "daily_start_limit": definition.daily_start_limit,
             "required_endgame_status": definition.required_endgame_status,
+            "required_intro_flag": definition.required_intro_flag,
             "consume_pass_on_arrival": definition.consume_pass_on_arrival,
         })
 

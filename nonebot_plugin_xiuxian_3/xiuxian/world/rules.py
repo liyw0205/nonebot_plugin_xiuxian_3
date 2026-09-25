@@ -25,6 +25,7 @@ class DestinationDefinition:
     required_dao_fruit_progress: int = 0
     daily_start_limit: int = 0
     required_endgame_status: str | None = None
+    required_intro_flag: str | None = None
     consume_pass_on_arrival: bool = False
     content_version: str = "content-0.1"
     rule_version: str = RULE_VERSION
@@ -128,6 +129,7 @@ DESTINATIONS = {
         "demon.fallen_ruins", "魔界·堕落遗迹", 8 * 60, 20, 0,
         required_realm="nascent_soul", required_layer=1,
         source_locations=("demon.abyss_gate",),
+        required_intro_flag="access.demon.fallen_ruins",
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
 }
