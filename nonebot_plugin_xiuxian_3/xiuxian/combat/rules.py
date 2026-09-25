@@ -184,6 +184,21 @@ CROSS_REALM_SENTINEL = EnemyDefinition(
     reward={},
 )
 
+BOUNDARY_WATCHER = EnemyDefinition(
+    key="enemy.boundary_watcher",
+    label="界隙守望者",
+    location_key="cave.boundary_realm",
+    required_realm="nascent_soul",
+    required_layer=1,
+    max_hp=10_000,
+    attack=600,
+    initiative=24,
+    agility=28,
+    skill_key="enemy_skill.boundary_impact",
+    random_pool="combat.boundary_watcher.v0.3",
+    reward={},
+)
+
 BOUNDARY_TRIAL_GUARDIAN = EnemyDefinition(
     key="enemy.boundary_trial_guardian",
     label="界壁试炼守卫",
@@ -210,6 +225,7 @@ ENEMIES = {
     BEAST_GUARDIAN.key: BEAST_GUARDIAN,
     DEMON_WAR_FRONT.key: DEMON_WAR_FRONT,
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
+    BOUNDARY_WATCHER.key: BOUNDARY_WATCHER,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
 }
 

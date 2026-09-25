@@ -32,8 +32,12 @@ class PartyRecord:
     @property
     def ready(self) -> bool:
         active = [member for member in self.members if member.status == "active"]
-        expected = party_definition_for(self.party_type).max_members
-        return self.status == "ready" and len(active) == expected and all(member.confirmed_at for member in active)
+        definition = party_definition_for(self.party_type)
+        return (
+            self.status == "ready"
+            and definition.min_members <= len(active) <= definition.max_members
+            and all(member.confirmed_at for member in active)
+        )
 
 
 @dataclass(frozen=True, slots=True)

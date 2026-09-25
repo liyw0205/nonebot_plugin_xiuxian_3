@@ -137,6 +137,8 @@ class PartyRepositoryMixin:
             if existing is not None:
                 return self._party_record_from_payload(existing, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
+            if definition.required_location and str(player["location_key"]) != definition.required_location:
+                raise PartyLocationMismatchError("party must be created at its required location")
             self._party_expire_due(connection, now, now_text)
             if self._party_current_membership(connection, int(player["id"])) is not None:
                 raise PartyAlreadyMemberError("player already belongs to a party")
@@ -357,8 +359,10 @@ class PartyRepositoryMixin:
                 "SELECT COUNT(*) AS count FROM party_members WHERE party_id = ? AND status = 'active' AND confirmed_at IS NOT NULL",
                 (party_id,),
             ).fetchone()
-            expected_members = party_definition_for(str(party["party_type"])).max_members
-            status = "ready" if active is not None and confirmed is not None and int(active["count"]) == expected_members and int(confirmed["count"]) == expected_members else "forming"
+            definition = party_definition_for(str(party["party_type"]))
+            active_count = int(active["count"]) if active is not None else 0
+            confirmed_count = int(confirmed["count"]) if confirmed is not None else 0
+            status = "ready" if definition.min_members <= active_count <= definition.max_members and confirmed_count == active_count else "forming"
             connection.execute("UPDATE parties SET status = ?, updated_at = ? WHERE party_id = ?", (status, now_text, party_id))
             payload = self._party_payload(connection, party_id)
             self._party_record_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)

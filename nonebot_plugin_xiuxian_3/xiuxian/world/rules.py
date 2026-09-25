@@ -161,6 +161,13 @@ DESTINATIONS = {
         source_locations=("xuantian.new_town", "xuantian.outskirts"),
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
+    "cave.boundary_realm": DestinationDefinition(
+        "cave.boundary_realm", "界隙秘境", 10 * 60, 30, 0,
+        required_realm="nascent_soul", required_layer=1,
+        source_locations=("cave.mist_grotto_2", "demon.fallen_ruins", "beast.ten_thousand_hills", "xuantian.war_front"),
+        required_intro_flag="story.mainline.three_realms",
+        content_version="content-0.3", rule_version="world-0.3.0",
+    ),
 }
 
 ALIASES = {
@@ -205,6 +212,9 @@ ALIASES = {
     "贸易口": "beast.three_realms_trade_port",
     "魔界战场": "xuantian.war_front",
     "玄天魔界战场": "xuantian.war_front",
+    "界隙秘境": "cave.boundary_realm",
+    "界隙": "cave.boundary_realm",
+    "边界秘境": "cave.boundary_realm",
 }
 
 

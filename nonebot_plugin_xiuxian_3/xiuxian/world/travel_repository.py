@@ -394,7 +394,14 @@ class TravelRepositoryMixin:
                 raise LocationRequirementError("source location is not valid")
             if definition.required_intro_flag:
                 intro = self._json_object(row["intro_json"], {})
-                if definition.required_intro_flag not in {str(item) for item in intro.get("flags", [])}:
+                has_flag = definition.required_intro_flag in {str(item) for item in intro.get("flags", [])}
+                if not has_flag and destination == "cave.boundary_realm":
+                    progress = connection.execute(
+                        "SELECT status FROM quest_progress WHERE player_id=? AND quest_key=?",
+                        (row["id"], "story.mainline.three_realms"),
+                    ).fetchone()
+                    has_flag = progress is not None and str(progress["status"]) in {"completed", "claimed"}
+                if not has_flag:
                     raise LocationRequirementError("destination quest permission is missing")
             if not meets_realm(str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer):
                 raise LocationRequirementError("realm requirement is not met")

@@ -796,6 +796,14 @@ class PartyBattleRequirementError(RuntimeError):
     """The party is not ready for its location or enemy encounter."""
 
 
+class BoundaryRealmRequirementError(PartyBattleRequirementError):
+    """A boundary-realm member is missing the cross-realm qualification."""
+
+
+class BoundaryRealmResourceError(PartyBattleRequirementError):
+    """A boundary-realm party lacks stamina or its team ticket."""
+
+
 class PartyBattleNotReadyError(RuntimeError):
     """The party battle has not reached a terminal result."""
 

@@ -17,12 +17,16 @@ from ..repository import (
     PartyBattleNotReadyError,
     PartyBattlePermissionError,
     PartyBattleRequirementError,
+    BoundaryRealmRequirementError,
+    BoundaryRealmResourceError,
+    SoulExhaustionActiveError,
+    SoulPowerInsufficientError,
     PlayerNotFoundError,
     PlayerSuspendedError,
     RepositoryBusyError,
     SQLitePlayerRepository,
 )
-from .party_rules import PARTY_TYPE_ARENA_TRIO
+from .party_rules import PARTY_TYPE_ARENA_TRIO, PARTY_TYPE_BOUNDARY_REALM
 
 
 class PartyApplication:
@@ -79,6 +83,9 @@ class PartyApplication:
     async def create_arena_party(self, context: CommandContext) -> CommandResult:
         return await self._create_party(context, party_type=PARTY_TYPE_ARENA_TRIO, title="三人竞技队伍", invite_hint="两名同地点道友")
 
+    async def create_boundary_party(self, context: CommandContext) -> CommandResult:
+        return await self._create_party(context, party_type=PARTY_TYPE_BOUNDARY_REALM, title="界隙队伍", invite_hint="一至四名同地点、已完成三界主线的元婴道友")
+
     async def _create_party(self, context: CommandContext, *, party_type: str, title: str, invite_hint: str) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_PARTY_COMMAND", f"创建{title}无需附加参数。", context.request_id)
@@ -96,6 +103,8 @@ class PartyApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能创建队伍。", context.request_id, operation_id)
+        except PartyLocationMismatchError:
+            return CommandResult(False, "PARTY_LOCATION_MISMATCH", "界隙队伍必须在 `cave.boundary_realm` 创建。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他队伍操作。", context.request_id, operation_id)
         except RepositoryBusyError:
@@ -229,14 +238,18 @@ class PartyApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         message = "## 队伍已就绪\n\n" if record.ready else "## 队伍确认已记录\n\n"
         if record.ready:
-            message += "双方已确认；队长可以发起队伍战斗。"
+            message += "全体成员已确认；队长可以发起队伍战斗。"
         else:
-            message += "等待另一名成员确认。"
+            message += "等待其他成员确认。"
         return CommandResult(True, "PARTY_READY" if record.ready else "PARTY_CONFIRMED", message + "\n\n" + self._summary(record), context.request_id, operation_id, data=self._data(record))
 
     @staticmethod
     def _party_battle_error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
         errors = {
+            BoundaryRealmRequirementError: ("BATTLE_CROSS_REALM_REQUIREMENT_MISSING", "队伍成员必须满足元婴、三界主线和界隙地点要求。"),
+            BoundaryRealmResourceError: ("SOUL_CRYSTAL_INSUFFICIENT", "队伍需要全员 30 体力，并由队长支付 1 枚神魂晶。"),
+            SoulExhaustionActiveError: ("SOUL_EXHAUSTION_ACTIVE", "队伍成员的神魂疲劳尚未结束，暂时不能进入界隙秘境。"),
+            SoulPowerInsufficientError: ("BATTLE_SOUL_POWER_INSUFFICIENT", "队伍成员神魂不足，暂时不能进入界隙秘境。"),
             PartyBattlePermissionError: ("PARTY_BATTLE_PERMISSION_DENIED", "只有队长可以发起队伍战斗，已确认成员可以结算。"),
             PartyBattleRequirementError: ("PARTY_BATTLE_REQUIREMENT_MISSING", "队伍必须在支持的地点完成双方确认。"),
             PartyBattleBusyError: ("PARTY_BATTLE_BUSY", "队伍或成员已有锁定中的战斗资产。"),
@@ -295,7 +308,13 @@ class PartyApplication:
         outcome = "胜利" if record.outcome == "won" else ("失败" if record.outcome == "lost" else "超时")
         rewards = next(iter(record.rewards.values()), {})
         reward_text = "、".join(
-            (f"修为 +{value}" if key == "cultivation" else f"灵石 ×{value}")
+            (
+                f"修为 +{value}"
+                if key == "cultivation"
+                else f"灵石 ×{value}"
+                if key == "spirit_stones"
+                else f"{key} ×{value}"
+            )
             for key, value in rewards.items()
         ) or "无"
         return CommandResult(

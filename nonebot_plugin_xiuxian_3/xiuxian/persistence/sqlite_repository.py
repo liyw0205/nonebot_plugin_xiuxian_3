@@ -482,13 +482,13 @@ class SQLitePlayerRepository(
 
     @staticmethod
     def _migrate_party_type_schema(connection: sqlite3.Connection) -> None:
-        """Allow the arena-specific three-member party type in old databases."""
+        """Keep old party tables readable while adding v0.3 boundary parties."""
 
         table = connection.execute(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'parties'"
         ).fetchone()
         schema_sql = str(table[0]) if table and table[0] else ""
-        if "'arena_trio'" in schema_sql:
+        if "'boundary_realm'" in schema_sql and "'party_boundary'" in schema_sql:
             return
         connection.execute("PRAGMA foreign_keys = OFF")
         connection.execute("DROP INDEX IF EXISTS idx_parties_leader")
@@ -498,7 +498,7 @@ class SQLitePlayerRepository(
             CREATE TABLE parties_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 party_id TEXT NOT NULL UNIQUE,
-                party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio')),
+                party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio', 'boundary_realm', 'party_boundary')),
                 status TEXT NOT NULL CHECK (status IN ('forming', 'ready', 'disbanded', 'expired')),
                 leader_id INTEGER NOT NULL REFERENCES players(id),
                 location_key TEXT NOT NULL,

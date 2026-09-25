@@ -446,7 +446,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_sect_applications_pending
 CREATE TABLE IF NOT EXISTS parties (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     party_id TEXT NOT NULL UNIQUE,
-    party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio')),
+    party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio', 'boundary_realm', 'party_boundary')),
     status TEXT NOT NULL CHECK (status IN ('forming', 'ready', 'disbanded', 'expired')),
     leader_id INTEGER NOT NULL REFERENCES players(id),
     location_key TEXT NOT NULL,
