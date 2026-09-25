@@ -10,6 +10,8 @@ from .models import ExplorationDefinition
 RULE_VERSION = "exploration-0.1.0"
 V02_RULE_VERSION = "exploration-0.2.0"
 V02_CONTENT_VERSION = "content-0.2"
+V03_RULE_VERSION = "exploration-0.3.0"
+V03_CONTENT_VERSION = "content-0.3"
 CLOUD_BOAT_STORM_CHANCE_BP = 2500
 CLOUD_BOAT_STORM_WAIT_SECONDS = 2 * 60
 CLOUD_BOAT_STORM_PAY_COST = 100
@@ -32,6 +34,7 @@ BATTLE_ENEMY_BY_MODE = {
     "explore.mist_grotto": "enemy.mist_guardian",
     "explore.cloud_mine": "enemy.cloud_beast",
     "explore.mist_grotto_2": "enemy.mist_elite",
+    "explore.demon_abyss": "enemy.demon_overlord",
 }
 
 DEFINITIONS = {
@@ -130,6 +133,20 @@ DEFINITIONS = {
         rule_version=V02_RULE_VERSION,
         content_version=V02_CONTENT_VERSION,
     ),
+    "explore.demon_abyss": ExplorationDefinition(
+        key="explore.demon_abyss",
+        label="魔界堕落遗迹探索",
+        location_key="demon.fallen_ruins",
+        duration_seconds=15 * 60,
+        stamina_cost=20,
+        required_realm="nascent_soul",
+        required_layer=1,
+        daily_limit=2,
+        random_pool="loot.demon.abyss.v0.3",
+        battle_chance_bp=10000,
+        rule_version=V03_RULE_VERSION,
+        content_version=V03_CONTENT_VERSION,
+    ),
 }
 
 ALIASES = {
@@ -145,6 +162,8 @@ ALIASES = {
     "洞天二层探索": "explore.mist_grotto_2",
     "云舟试炼": "explore.cloud_boat_trial",
     "云舟历练": "explore.cloud_boat_trial",
+    "魔界堕落遗迹探索": "explore.demon_abyss",
+    "堕落遗迹探索": "explore.demon_abyss",
 }
 
 
@@ -264,6 +283,9 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
             "cultivation": weighted_value(seed + ":cultivation", (600, 750, 900), (30, 40, 30)),
             "item.ticket.cloud_boat_fragment": weighted_value(seed + ":ticket", (1, 2), (60, 40)),
         }
+    if mode_key == "explore.demon_abyss":
+        reward = weighted_value(seed + ":reward", (0, 1), (45, 55))
+        return {"item.demon_core": 1} if reward == 0 else {"faction_reputation.demon": 15}
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 
 
@@ -273,6 +295,8 @@ __all__ = [
     "RULE_VERSION",
     "V02_CONTENT_VERSION",
     "V02_RULE_VERSION",
+    "V03_CONTENT_VERSION",
+    "V03_RULE_VERSION",
     "battle_roll_bp",
     "CLOUD_MINE_ACCESS_FLAGS",
     "CLOUD_MINE_ACCESS_ITEMS",

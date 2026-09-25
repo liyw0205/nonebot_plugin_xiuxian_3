@@ -9,6 +9,8 @@ from typing import Mapping
 
 CONTENT_VERSION = "content-0.1"
 RULE_VERSION = "combat-0.1.0"
+V03_CONTENT_VERSION = "content-0.3"
+V03_RULE_VERSION = "combat-0.3.0"
 MAX_TURNS = 20
 TURN_TIMEOUT_SECONDS = 60
 DEFEAT_COOLDOWN_SECONDS = 15 * 60
@@ -122,6 +124,21 @@ MIST_ELITE = EnemyDefinition(
     reward={},
 )
 
+DEMON_OVERLORD = EnemyDefinition(
+    key="enemy.demon_overlord",
+    label="魔界堕落领主",
+    location_key="demon.fallen_ruins",
+    required_realm="nascent_soul",
+    required_layer=1,
+    max_hp=8000,
+    attack=520,
+    initiative=22,
+    agility=24,
+    skill_key="skill.demonic.abyss_communion",
+    random_pool="combat.demon_overlord.v0.3",
+    reward={},
+)
+
 CROSS_REALM_SENTINEL = EnemyDefinition(
     key="enemy.cross_realm_sentinel",
     label="跨界守门人",
@@ -159,6 +176,7 @@ ENEMIES = {
     MIST_GUARDIAN.key: MIST_GUARDIAN,
     CLOUD_BEAST.key: CLOUD_BEAST,
     MIST_ELITE.key: MIST_ELITE,
+    DEMON_OVERLORD.key: DEMON_OVERLORD,
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
 }
@@ -230,12 +248,15 @@ def player_goes_first(*, player_initiative: int, enemy_initiative: int, seed: st
 __all__ = [
     "CONTENT_VERSION",
     "DEFEAT_COOLDOWN_SECONDS",
+    "V03_CONTENT_VERSION",
+    "V03_RULE_VERSION",
     "ENEMIES",
     "MAX_TURNS",
     "RULE_VERSION",
     "TURN_TIMEOUT_SECONDS",
     "EnemyDefinition",
     "CLOUD_BEAST",
+    "DEMON_OVERLORD",
     "IRON_BOAR",
     "MIST_ELITE",
     "MIST_GUARDIAN",

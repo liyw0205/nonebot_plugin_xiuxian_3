@@ -38,6 +38,9 @@ class ExplorationStartRecord:
     already_completed: bool = False
     energy_cost: int = 0
     risk_reduction_bp: int = 0
+    pollution_before: int = 0
+    pollution_after: int = 0
+    cross_realm_penalty_bp: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,3 +63,7 @@ class ExplorationSettlementRecord:
     storm_options: tuple[str, ...] = ()
     storm_deadline: str | None = None
     storm_choice: str | None = None
+    pollution_before: int = 0
+    pollution_after: int = 0
+    soul_power_loss: int = 0
+    soul_fatigue_until: str | None = None

@@ -55,6 +55,7 @@ LOCATION_LABELS = {
     "xuantian.domain_front": "玄天界·领域前线",
     "cave.ancient_domain": "远古洞天",
     "demon.abyss_depths": "魔渊深层",
+    "demon.fallen_ruins": "魔界·堕落遗迹",
     "beast.ancestral_lake": "祖灵湖",
     "void.portal": "虚空门户",
     "void.first_route": "虚空第一航道",

@@ -716,6 +716,14 @@ class SoulFatigueActiveError(RuntimeError):
     """The player's soul fatigue window is still active."""
 
 
+class PollutionTooHighError(RuntimeError):
+    """Cross-realm exploration is blocked by excessive pollution."""
+
+
+class SoulExhaustionActiveError(RuntimeError):
+    """A failed cross-realm action left the player temporarily exhausted."""
+
+
 class TravelBusyError(RuntimeError):
     """The player has another active movement or long-running action."""
 

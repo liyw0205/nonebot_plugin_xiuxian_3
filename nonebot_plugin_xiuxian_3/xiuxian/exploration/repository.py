@@ -295,6 +295,22 @@ class ExplorationRepositoryMixin:
                 str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer
             ):
                 raise LocationRequirementError("realm requirement is not met")
+            pollution_before = int(row["pollution"])
+            pollution_after = pollution_before
+            cross_realm_penalty_bp = 0
+            if definition.key == "explore.demon_abyss":
+                if pollution_before >= 80:
+                    raise PollutionTooHighError("pollution is too high for the demon abyss")
+                fatigue_until = row["soul_fatigue_until"]
+                if fatigue_until:
+                    try:
+                        if datetime.fromisoformat(str(fatigue_until)) > now:
+                            raise SoulExhaustionActiveError("soul exhaustion is active")
+                    except ValueError:
+                        pass
+                faction = self._json_object(row["faction_reputation_json"], {})
+                cross_realm_penalty_bp = 0 if str(row["path_key"] or "") == "demonic" or int(faction.get("demon_alliance", 0)) > 0 else 1000
+                pollution_after = min(100, pollution_before + 10)
             if definition.key == "explore.spring_gather":
                 intro_state = self._json_object(row["intro_json"], {})
                 if "guide.gather_blood_grass" not in set(intro_state.get("flags", [])):
@@ -375,6 +391,9 @@ class ExplorationRepositoryMixin:
                 "realm_layer": int(row["realm_layer"]),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "path_key": row["path_key"],
+                "pollution_before": pollution_before,
+                "pollution_after": pollution_after,
+                "cross_realm_penalty_bp": cross_realm_penalty_bp,
                 "rule_version": definition.rule_version,
                 "random_pool": definition.random_pool,
                 "random_seed": operation_id,
@@ -397,8 +416,8 @@ class ExplorationRepositoryMixin:
                 "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
             }
             connection.execute(
-                "UPDATE players SET stamina = ?, energy = ?, updated_at = ? WHERE id = ?",
-                (stamina - definition.stamina_cost, energy - definition.energy_cost, starts_at, player_id),
+                "UPDATE players SET stamina = ?, energy = ?, pollution = ?, updated_at = ? WHERE id = ?",
+                (stamina - definition.stamina_cost, energy - definition.energy_cost, pollution_after, starts_at, player_id),
             )
             connection.execute(
                 """
@@ -439,6 +458,9 @@ class ExplorationRepositoryMixin:
                 "content_version": definition.content_version,
                 "daily_limit": definition.daily_limit,
                 "risk_reduction_bp": barrier_risk_reduction_bp,
+                "pollution_before": pollution_before,
+                "pollution_after": pollution_after,
+                "cross_realm_penalty_bp": cross_realm_penalty_bp,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -467,6 +489,9 @@ class ExplorationRepositoryMixin:
             daily_limit=int(payload["daily_limit"]),
             energy_cost=int(payload.get("energy_cost", 0)),
             risk_reduction_bp=int(payload.get("risk_reduction_bp", 0)),
+            pollution_before=int(payload.get("pollution_before", 0)),
+            pollution_after=int(payload.get("pollution_after", 0)),
+            cross_realm_penalty_bp=int(payload.get("cross_realm_penalty_bp", 0)),
             already_completed=replay,
         )
 
@@ -611,20 +636,29 @@ class ExplorationRepositoryMixin:
             }
             result = frozen_result if battle_outcome == "won" else {}
             inventory = self._json_object(row["inventory_json"], {})
+            faction_reputation = self._json_object(row["faction_reputation_json"], {})
             stones = int(row["spirit_stones"])
             cultivation = int(row["cultivation"])
             total_cultivation = int(row["total_cultivation"])
+            soul_power_loss = 0
+            soul_fatigue_until = row["soul_fatigue_until"]
             for key, quantity in result.items():
                 if key == "spirit_stones":
                     stones += quantity
                 elif key == "cultivation":
                     cultivation += quantity
                     total_cultivation += quantity
+                elif key.startswith("faction_reputation."):
+                    faction_key = key.removeprefix("faction_reputation.")
+                    faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + quantity
                 else:
                     inventory[key] = int(inventory.get(key, 0)) + quantity
+            if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
+                soul_power_loss = min(20, int(row["soul_power"]))
+                soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
             connection.execute(
-                "UPDATE players SET spirit_stones=?, cultivation=?, total_cultivation=?, inventory_json=?, updated_at=? WHERE id=?",
-                (stones, cultivation, total_cultivation, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                "UPDATE players SET spirit_stones=?, cultivation=?, total_cultivation=?, inventory_json=?, faction_reputation_json=?, soul_power=?, soul_fatigue_until=?, updated_at=? WHERE id=?",
+                (stones, cultivation, total_cultivation, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True), max(0, int(row["soul_power"]) - soul_power_loss), soul_fatigue_until, now_text, row["id"]),
             )
             result_json = {
                 "status": "settled",
@@ -634,6 +668,10 @@ class ExplorationRepositoryMixin:
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
                 "expired": False,
+                "pollution_before": int(self._json_object(session["snapshot_json"], {}).get("pollution_before", 0)),
+                "pollution_after": int(self._json_object(session["snapshot_json"], {}).get("pollution_after", 0)),
+                "soul_power_loss": soul_power_loss,
+                "soul_fatigue_until": soul_fatigue_until,
                 "settled_at": now_text,
             }
             connection.execute(
@@ -663,6 +701,10 @@ class ExplorationRepositoryMixin:
                 "content_version": self._json_object(session["snapshot_json"], {}).get("content_version", "content-0.1"),
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
+                "pollution_before": int(self._json_object(session["snapshot_json"], {}).get("pollution_before", 0)),
+                "pollution_after": int(self._json_object(session["snapshot_json"], {}).get("pollution_after", 0)),
+                "soul_power_loss": soul_power_loss,
+                "soul_fatigue_until": soul_fatigue_until,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -870,6 +912,7 @@ class ExplorationRepositoryMixin:
                     status = "combat_pending"
 
             inventory = self._json_object(row["inventory_json"], {})
+            faction_reputation = self._json_object(row["faction_reputation_json"], {})
             stones = int(row["spirit_stones"])
             cultivation = int(row["cultivation"])
             total_cultivation = int(row["total_cultivation"])
@@ -880,12 +923,15 @@ class ExplorationRepositoryMixin:
                     elif key == "cultivation":
                         cultivation += int(quantity)
                         total_cultivation += int(quantity)
+                    elif key.startswith("faction_reputation."):
+                        faction_key = key.removeprefix("faction_reputation.")
+                        faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + int(quantity)
                     else:
                         inventory[key] = int(inventory.get(key, 0)) + int(quantity)
                 connection.execute(
                     """
                     UPDATE players
-                    SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, inventory_json = ?, updated_at = ?
+                    SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, inventory_json = ?, faction_reputation_json = ?, updated_at = ?
                     WHERE id = ?
                     """,
                     (
@@ -893,6 +939,7 @@ class ExplorationRepositoryMixin:
                         cultivation,
                         total_cultivation,
                         json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                        json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
                         now_text,
                         row["id"],
                     ),
@@ -907,6 +954,8 @@ class ExplorationRepositoryMixin:
                 "storm_choice": stored_result.get("storm_choice"),
                 "energy_cost": int(snapshot.get("energy_cost", 0)),
                 "content_version": snapshot.get("content_version", "content-0.1"),
+                "pollution_before": int(snapshot.get("pollution_before", 0)),
+                "pollution_after": int(snapshot.get("pollution_after", 0)),
                 "settled_at": now_text,
             }
             connection.execute(
@@ -941,6 +990,10 @@ class ExplorationRepositoryMixin:
                 "storm_options": [],
                 "storm_deadline": None,
                 "storm_choice": result_json.get("storm_choice"),
+                "pollution_before": int(snapshot.get("pollution_before", 0)),
+                "pollution_after": int(snapshot.get("pollution_after", 0)),
+                "soul_power_loss": 0,
+                "soul_fatigue_until": None,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -974,6 +1027,10 @@ class ExplorationRepositoryMixin:
             storm_options=tuple(str(item) for item in payload.get("storm_options", ())),
             storm_deadline=str(payload["storm_deadline"]) if payload.get("storm_deadline") else None,
             storm_choice=str(payload["storm_choice"]) if payload.get("storm_choice") else None,
+            pollution_before=int(payload.get("pollution_before", 0)),
+            pollution_after=int(payload.get("pollution_after", 0)),
+            soul_power_loss=int(payload.get("soul_power_loss", 0)),
+            soul_fatigue_until=str(payload["soul_fatigue_until"]) if payload.get("soul_fatigue_until") else None,
             already_completed=replay,
         )
 

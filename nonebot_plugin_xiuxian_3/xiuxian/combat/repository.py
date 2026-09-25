@@ -33,10 +33,13 @@ from .models import (
 )
 from .rules import (
     CONTENT_VERSION,
+    DEMON_OVERLORD,
     DEFEAT_COOLDOWN_SECONDS,
     MAX_TURNS,
     RULE_VERSION,
     TURN_TIMEOUT_SECONDS,
+    V03_CONTENT_VERSION,
+    V03_RULE_VERSION,
     battle_roll_bp,
     enemy_definition,
     hit_chance_bp,
@@ -178,6 +181,8 @@ class CombatRepositoryMixin:
         exploration_id: str | None = None,
     ) -> BattleStartRecord:
         enemy = enemy_definition(enemy_key)
+        battle_content_version = V03_CONTENT_VERSION if enemy.key == DEMON_OVERLORD.key else CONTENT_VERSION
+        battle_rule_version = V03_RULE_VERSION if enemy.key == DEMON_OVERLORD.key else RULE_VERSION
         operation_name = "battle.start" if battle_type == "pve.training" else f"battle.start.{battle_type}"
         request_hash = self._request_hash(
             operation_name,
@@ -187,8 +192,8 @@ class CombatRepositoryMixin:
                 "enemy_key": enemy.key,
                 "battle_type": battle_type,
                 "exploration_id": exploration_id,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
+                "content_version": battle_content_version,
+                "rule_version": battle_rule_version,
             },
         )
         now = self._now()
@@ -275,6 +280,7 @@ class CombatRepositoryMixin:
                     "qualification": qualification,
                     "stats": stats,
                     "equipment": list(equipment),
+                    "cross_realm_penalty_bp": int(exploration_snapshot.get("cross_realm_penalty_bp", 0)),
                 },
                 "enemy": {
                     "key": enemy.key,
@@ -288,8 +294,8 @@ class CombatRepositoryMixin:
                 "random_pool": enemy.random_pool,
                 "random_seed": operation_id,
                 "reward": dict(enemy.reward),
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
+                "content_version": battle_content_version,
+                "rule_version": battle_rule_version,
             }
             state = {
                 "round_no": 0,
@@ -318,8 +324,8 @@ class CombatRepositoryMixin:
                     turn_deadline,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(state, ensure_ascii=False, sort_keys=True),
-                    CONTENT_VERSION,
-                    RULE_VERSION,
+                    battle_content_version,
+                    battle_rule_version,
                     now_text,
                     now_text,
                 ),
@@ -439,11 +445,21 @@ class CombatRepositoryMixin:
                     )
                     if phase is not None:
                         effective_damage_bp = phase.player_damage_bp * (10_000 - debt_shield_bp) // 10_000
+                        base_damage = int(action["damage"])
                         action["damage"] = min(
                             enemy_hp,
-                            int(action["damage"])
-                            * effective_damage_bp
-                            // 10_000,
+                            max(1, base_damage * effective_damage_bp // 10_000) if base_damage > 0 else 0,
+                        )
+                    elif int(snapshot["player"].get("cross_realm_penalty_bp", 0)) > 0:
+                        base_damage = int(action["damage"])
+                        action["damage"] = min(
+                            enemy_hp,
+                            max(
+                                1,
+                                base_damage
+                                * (10_000 - int(snapshot["player"].get("cross_realm_penalty_bp", 0)))
+                                // 10_000,
+                            ) if base_damage > 0 else 0,
                         )
                     enemy_hp = max(0, enemy_hp - int(action["damage"]))
                 else:

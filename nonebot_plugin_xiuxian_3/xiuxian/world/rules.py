@@ -124,6 +124,12 @@ DESTINATIONS = {
         source_locations=("xuantian.floating_boat",),
         content_version="content-0.2", rule_version="world-0.2.0",
     ),
+    "demon.fallen_ruins": DestinationDefinition(
+        "demon.fallen_ruins", "魔界·堕落遗迹", 8 * 60, 20, 0,
+        required_realm="nascent_soul", required_layer=1,
+        source_locations=("demon.abyss_gate",),
+        content_version="content-0.3", rule_version="world-0.3.0",
+    ),
 }
 
 ALIASES = {
@@ -155,6 +161,8 @@ ALIASES = {
     "阵堂": "xuantian.array_hall",
     "魔界深渊门": "demon.abyss_gate",
     "深渊门": "demon.abyss_gate",
+    "魔界堕落遗迹": "demon.fallen_ruins",
+    "堕落遗迹": "demon.fallen_ruins",
 }
 
 

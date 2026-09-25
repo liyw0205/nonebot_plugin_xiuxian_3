@@ -20,6 +20,8 @@ from ..repository import (
     PlayerSuspendedError,
     RepositoryBusyError,
     ResourceInsufficientError,
+    PollutionTooHighError,
+    SoulExhaustionActiveError,
     SQLitePlayerRepository,
 )
 from ..player.rules import LOCATION_LABELS
@@ -33,6 +35,7 @@ ITEM_LABELS = {
     "item.mat.array_sand": "阵砂",
     "item.material.cloud_iron": "云铁",
     "item.ticket.cloud_boat_fragment": "云舟票碎片",
+    "item.demon_core": "魔核",
 }
 
 
@@ -76,7 +79,7 @@ class ExplorationApplication:
             return CommandResult(
                 False,
                 "INVALID_EXPLORATION_MODE",
-                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集`、`开始探索 洞天二层探索` 或 `开始探索 云舟试炼`。",
+                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集`、`开始探索 洞天二层探索`、`开始探索 云舟试炼` 或 `开始探索 魔界堕落遗迹探索`。",
                 context.request_id,
             )
         operation_id = self._operation_id(context, "exploration.start")
@@ -103,6 +106,10 @@ class ExplorationApplication:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，未扣除任何资源。", context.request_id, operation_id)
         except EnergyInsufficientError:
             return CommandResult(False, "ENERGY_INSUFFICIENT", "精力不足，未扣除任何资源。", context.request_id, operation_id)
+        except PollutionTooHighError:
+            return CommandResult(False, "POLLUTION_TOO_HIGH", "污染已达到 80，暂时不能进入魔界堕落遗迹。", context.request_id, operation_id)
+        except SoulExhaustionActiveError:
+            return CommandResult(False, "SOUL_EXHAUSTION_ACTIVE", "神魂疲劳尚未结束，暂时不能进行跨界探索。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他探索输入，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
@@ -135,6 +142,9 @@ class ExplorationApplication:
                 "energy_cost": record.energy_cost,
                 "content_version": definition.content_version,
                 "risk_reduction_bp": record.risk_reduction_bp,
+                "pollution_before": record.pollution_before,
+                "pollution_after": record.pollution_after,
+                "cross_realm_penalty_bp": record.cross_realm_penalty_bp,
                 "idempotent_replay": record.already_completed,
             },
         )
@@ -239,6 +249,8 @@ class ExplorationApplication:
                 reward_lines.append(f"境内修为 +{quantity}")
             elif key == "spirit_stones":
                 reward_lines.append(f"灵石 ×{quantity}")
+            elif key.startswith("faction_reputation."):
+                reward_lines.append(f"{key.removeprefix('faction_reputation.')}界声望 +{quantity}")
             else:
                 reward_lines.append(f"{ITEM_LABELS.get(key, '探索材料')} ×{quantity}")
         battle_text = f"- **遭遇战**：{'胜利' if record.battle_outcome == 'won' else '失败'}\n" if record.battle_outcome else ""
@@ -247,13 +259,15 @@ class ExplorationApplication:
             "EXPLORATION_SETTLED",
             (
                 f"## {definition.label}完成\n\n"
-                f"**{self._display_name(record.player)}**已完成探索。\n\n"
-                f"{battle_text}"
-                f"- **探索收获**：{'、'.join(reward_lines) or '无'}\n"
-                f"- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
-                f"- **精力**：{record.player.energy}/{record.player.energy_max}\n"
-                f"- **灵石**：{record.player.spirit_stones}\n\n"
-                "> 结果按开始时的规则快照结算，重复结算不会重复发放。"
+                + f"**{self._display_name(record.player)}**已完成探索。\n\n"
+                + f"{battle_text}"
+                + f"- **探索收获**：{'、'.join(reward_lines) or '无'}\n"
+                + f"- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
+                + f"- **精力**：{record.player.energy}/{record.player.energy_max}\n"
+                + f"- **灵石**：{record.player.spirit_stones}\n"
+                + f"- **污染**：{record.pollution_after}\n"
+                + (f"- **神魂损失**：{record.soul_power_loss}\n" if record.soul_power_loss else "")
+                + "\n> 结果按开始时的规则快照结算，重复结算不会重复发放。"
             ),
             context.request_id,
             operation_id,
@@ -266,6 +280,10 @@ class ExplorationApplication:
                 "battle_outcome": record.battle_outcome,
                 "energy_cost": record.energy_cost,
                 "content_version": record.content_version,
+                "pollution_before": record.pollution_before,
+                "pollution_after": record.pollution_after,
+                "soul_power_loss": record.soul_power_loss,
+                "soul_fatigue_until": record.soul_fatigue_until,
                 "idempotent_replay": record.already_completed,
             },
         )
