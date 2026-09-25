@@ -208,7 +208,8 @@
         "non_beast_penalty_bp": -1000
       },
       "actions": [
-        "explore.beast_hunt"
+        "explore.beast_hunt",
+        "production.beast_contract"
       ],
       "key": "beast.ten_thousand_hills"
     },

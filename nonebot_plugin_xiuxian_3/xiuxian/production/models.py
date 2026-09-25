@@ -49,6 +49,7 @@ class ProductionSettlementRecord:
     refunds: dict[str, int]
     currency_spent: int
     tool_durability_bp: int | None
+    binding_expires_at: str | None = None
     already_completed: bool = False
 
 

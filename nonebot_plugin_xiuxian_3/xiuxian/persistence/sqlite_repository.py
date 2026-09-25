@@ -27,6 +27,7 @@ from ..combat.party_repository import PartyCombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
+from ..production.contract_repository import ContractProductionRepositoryMixin
 from ..production.facility_repository import FacilityRepositoryMixin
 from ..items.repository import ItemRepositoryMixin
 from ..production.endgame_repository import EndgameProductionRepositoryMixin
@@ -66,6 +67,7 @@ class SQLitePlayerRepository(
     PartyCombatRepositoryMixin,
     AdventuresRepositoryMixin,
     DaoEchoesRepositoryMixin,
+    ContractProductionRepositoryMixin,
     ProductionRepositoryMixin,
     FacilityRepositoryMixin,
     ItemRepositoryMixin,
@@ -206,6 +208,10 @@ class SQLitePlayerRepository(
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("events.final_heaven.v0.6", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("production.contract.v0.3", serialize_datetime(self._now())),
             )
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "

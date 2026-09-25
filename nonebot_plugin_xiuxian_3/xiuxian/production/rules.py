@@ -215,6 +215,35 @@ RECIPES: dict[str, RecipeDefinition] = {
         success_threshold_bp=4500,
         high_quality_threshold_bp=8000,
     ),
+    "recipe.contract.beast_pact": RecipeDefinition(
+        key="recipe.contract.beast_pact",
+        name="妖兽契约",
+        profession=None,
+        inputs={"item.beast_blood": 3},
+        energy_cost=10,
+        duration_seconds=180,
+        daily_limit=99,
+        tool_key=None,
+        tool_cost_bp=0,
+        currency_cost=500,
+        outputs={"item.contract.beast_pact": 1},
+        high_quality_bonus={},
+        failure_refunds={},
+        min_realm_layer=1,
+        required_realm="nascent_soul",
+        required_path="beast",
+        required_paths=("beast", "demonic"),
+        required_location=("beast.ten_thousand_hills", "demon.abyss_market"),
+        content_version="content-0.3",
+        rule_version="production-0.3.0",
+        success_threshold_bp=4500,
+        high_quality_threshold_bp=8000,
+        failure_refund_bp=6000,
+        binding_kind="contract",
+        binding_duration_seconds=24 * 60 * 60,
+        binding_slot_limit=1,
+        cross_realm_faction="beast",
+    ),
 }
 RECIPES.update(ENDGAME_WORK_RECIPES)
 
@@ -239,6 +268,10 @@ RECIPE_ALIASES = {
     "云剑": "recipe.weapon.cloud_sword",
     "云灵茶": "recipe.food.cloud_tea",
     "云茶": "recipe.food.cloud_tea",
+    "recipe.contract.beast_pact": "recipe.contract.beast_pact",
+    "beast_pact": "recipe.contract.beast_pact",
+    "妖兽契约": "recipe.contract.beast_pact",
+    "兽契": "recipe.contract.beast_pact",
 }
 RECIPE_ALIASES.update({key: key for key in ENDGAME_WORK_RECIPES})
 RECIPE_ALIASES.update(ENDGAME_WORK_RECIPE_ALIASES)
@@ -259,6 +292,7 @@ ITEM_LABELS = {
     "item.pill.core_condense": "凝核丹",
     "item.weapon.cloud_sword": "云纹剑",
     "item.food.cloud_tea": "云灵茶",
+    "item.contract.beast_pact": "妖兽契约",
     "item.tool.basic_furnace": "基础丹炉",
     "item.tool.basic_hammer": "基础炼器锤",
 }

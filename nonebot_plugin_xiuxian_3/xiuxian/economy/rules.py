@@ -27,6 +27,7 @@ NON_TRADEABLE_ITEMS = frozenset({
     "item.pill.core_condense",
     "item.pill.golden_core_guard",
     "item.array.mist_barrier",
+    "item.contract.beast_pact",
 })
 
 
@@ -48,6 +49,7 @@ _ITEMS = {
     "item.mat.array_sand": "阵砂",
     "item.pill.healing_low": "低阶疗伤丹",
     "item.weapon.wood_sword": "木纹剑",
+    "item.contract.beast_pact": "妖兽契约",
 }
 _ALIASES = {
     "粗糙灵米": "item.food.coarse_spirit_rice",

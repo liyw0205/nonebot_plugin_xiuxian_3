@@ -389,6 +389,30 @@
       "rule_version": "production-0.2.0",
       "key": "recipe.food.cloud_tea",
       "status": "active"
+    },
+    {
+      "name": "缔结妖兽契约",
+      "profession": null,
+      "requirements": [
+        {"type": "path_any", "values": ["beast", "demonic"]},
+        {"type": "realm", "realm_key": "nascent_soul", "min_layer": 1},
+        {"type": "location_any", "values": ["beast.ten_thousand_hills", "demon.abyss_market"]}
+      ],
+      "inputs": [{"item_key": "item.beast_blood", "quantity": 3}],
+      "currency_cost": {"currency_key": "currency.spirit_stone", "amount": 500},
+      "energy_cost": 10,
+      "duration_seconds": 180,
+      "outputs": [{"item_key": "item.contract.beast_pact", "quantity": 1, "binding_seconds": 86400}],
+      "daily_limit": 99,
+      "failure": {
+        "input_refund_bp": 6000,
+        "currency_refund_bp": 0,
+        "produces_output": false
+      },
+      "content_version": "content-0.3",
+      "rule_version": "production-0.3.0",
+      "key": "recipe.contract.beast_pact",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

@@ -8,7 +8,7 @@ import json
 import sqlite3
 import time
 from dataclasses import replace
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -341,7 +341,7 @@ class ProductionRepositoryMixin:
             "recipe_key": recipe.key,
         }
         request_hash = self._request_hash("production.start", operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -358,6 +358,7 @@ class ProductionRepositoryMixin:
             if row["stage"] != "cultivator":
                 raise PlayerStageConflictError("player is not ready for production")
             self._check_production_requirements(connection, row, recipe)
+            self._check_production_special_requirements(connection, row, recipe, now)
             active = connection.execute(
                 "SELECT 1 FROM production_orders WHERE player_id = ? AND status = 'processing' LIMIT 1",
                 (row["id"],),
@@ -442,6 +443,11 @@ class ProductionRepositoryMixin:
                 "material_quality_bp": 10000,
                 "proficiency_bp": recipe.proficiency_bp,
                 "random_quality_bp": random_quality_bp(operation_id),
+                "location_quality_bonus_bp": self._production_location_quality_bonus(recipe, row),
+                "failure_refund_bp": recipe.failure_refund_bp,
+                "binding_kind": recipe.binding_kind,
+                "binding_duration_seconds": recipe.binding_duration_seconds,
+                "binding_slot_limit": recipe.binding_slot_limit,
                 "currency_cost": recipe.currency_cost,
                 "duration_seconds": duration_seconds,
                 "facility_slot_key": facility_slot["slot_key"] if facility_slot is not None else None,
@@ -585,7 +591,7 @@ class ProductionRepositoryMixin:
         operation_name = "production.recover" if recovery else "production.complete"
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash(operation_name, operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -668,13 +674,24 @@ class ProductionRepositoryMixin:
                             ),
                         )
             else:
-                for item_key, quantity in dict(
-                    snapshot.get("failure_refunds", recipe.failure_refunds)
-                ).items():
+                refund_bp = snapshot.get("failure_refund_bp")
+                if refund_bp is not None:
+                    failure_refunds = {
+                        str(item_key): (int(quantity) * int(refund_bp)) // 10000
+                        for item_key, quantity in dict(snapshot.get("inputs", recipe.inputs)).items()
+                    }
+                else:
+                    failure_refunds = dict(snapshot.get("failure_refunds", recipe.failure_refunds))
+                for item_key, quantity in failure_refunds.items():
                     if quantity > 0:
                         refunds[item_key] = quantity
                         inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
             tool_durability = snapshot.get("tool_durability_after")
+            binding_expires_at: str | None = None
+            if success and snapshot.get("binding_kind") and int(snapshot.get("binding_duration_seconds", 0)) > 0:
+                binding_expires_at = serialize_datetime(
+                    now + timedelta(seconds=int(snapshot["binding_duration_seconds"]))
+                )
             status = "completed" if success else "failed"
             connection.execute(
                 """
@@ -687,6 +704,17 @@ class ProductionRepositoryMixin:
                     row["id"],
                 ),
             )
+            self._persist_production_bindings(
+                connection,
+                player_id=int(row["id"]),
+                order_id=str(order["order_id"]),
+                operation_id=operation_id,
+                recipe=recipe,
+                outputs=outputs,
+                bound_until=binding_expires_at,
+                snapshot=snapshot,
+                now_text=now_text,
+            )
             result = {
                 "recipe_key": recipe.key,
                 "recipe_name": recipe_name,
@@ -698,6 +726,7 @@ class ProductionRepositoryMixin:
                 "refunds": refunds,
                 "currency_spent": currency_spent,
                 "tool_durability_bp": tool_durability,
+                "binding_expires_at": binding_expires_at,
                 "recovered": recovery,
             }
             connection.execute(
@@ -733,11 +762,18 @@ class ProductionRepositoryMixin:
                 refunds=refunds,
                 currency_spent=currency_spent,
                 tool_durability_bp=int(tool_durability) if tool_durability is not None else None,
+                binding_expires_at=binding_expires_at,
             )
 
     @staticmethod
     def _check_production_requirements(connection: sqlite3.Connection, row: sqlite3.Row, recipe) -> None:
-        if recipe.required_path and str(row["path_key"] or "") != recipe.required_path:
+        cross_realm = bool(getattr(recipe, "cross_realm_faction", None))
+        required_paths = tuple(getattr(recipe, "required_paths", ()))
+        if not required_paths and recipe.required_path:
+            required_paths = (recipe.required_path,)
+        if required_paths and str(row["path_key"] or "") not in required_paths:
+            if cross_realm:
+                raise CrossRealmAllianceMissingError("当前道途或契约盟约不满足这条跨界配方")
             raise RecipeRequirementError("当前道途不满足这条配方")
         if recipe.required_subprofession and str(row["subprofession_key"] or "") not in recipe.required_subprofession:
             raise RecipeRequirementError("当前辅修不满足这条配方")
@@ -761,8 +797,12 @@ class ProductionRepositoryMixin:
         else:
             realm_ok = str(row["realm_key"]) == recipe.required_realm and int(row["realm_layer"]) >= recipe.min_realm_layer
         if not realm_ok:
+            if cross_realm:
+                raise CrossRealmRecipeLockedError("当前境界不满足这条跨界配方")
             raise RecipeRequirementError("当前境界不满足这条配方")
         if recipe.required_location and str(row["location_key"]) not in recipe.required_location:
+            if cross_realm:
+                raise CrossRealmRecipeLockedError("当前地点不满足这条跨界配方")
             raise RecipeRequirementError("当前地点不满足这条配方")
         if str(row["location_key"]) == "xuantian.array_hall":
             from ..world.permissions import array_hall_permission
@@ -771,15 +811,23 @@ class ProductionRepositoryMixin:
                 raise RecipeRequirementError("阵堂权限不足")
 
     @staticmethod
+    def _production_location_quality_bonus(recipe, row: sqlite3.Row) -> int:
+        faction = getattr(recipe, "cross_realm_faction", None)
+        if not faction:
+            return 0
+        return 500 if str(row["location_key"]).startswith(f"{faction}.") else -1000
+
+    @staticmethod
     def _production_quality_from_snapshot(snapshot: dict[str, Any]) -> int:
         from ..production.rules import production_quality
 
-        return production_quality(
+        value = production_quality(
             material_quality_bp=int(snapshot.get("material_quality_bp", 10000)),
             proficiency_bp=int(snapshot.get("proficiency_bp", 0)),
             tool_durability_bp=int(snapshot.get("tool_durability_before", 0) or 0),
             random_quality_bp_value=int(snapshot.get("random_quality_bp", 0)),
-        )
+        ) + int(snapshot.get("location_quality_bonus_bp", 0))
+        return max(0, min(10000, value))
     @staticmethod
     def _production_order_from_payload(payload: dict[str, Any], *, replay: bool) -> ProductionOrderRecord:
         return ProductionOrderRecord(
@@ -811,6 +859,11 @@ class ProductionRepositoryMixin:
             tool_durability_bp=(
                 int(payload["tool_durability_bp"])
                 if payload.get("tool_durability_bp") is not None
+                else None
+            ),
+            binding_expires_at=(
+                str(payload["binding_expires_at"])
+                if payload.get("binding_expires_at") is not None
                 else None
             ),
             already_completed=replay,

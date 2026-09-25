@@ -9,6 +9,9 @@ from ..repository import (
     EndgameRecipeNotFoundError,
     EndgameRecipeNotReadyError,
     EndgameRecipeRequirementError,
+    ContractSlotOccupiedError,
+    CrossRealmAllianceMissingError,
+    CrossRealmRecipeLockedError,
     EnergyInsufficientError,
     FacilityMaintenanceUnpaidError,
     FacilitySlotNotClaimedError,
@@ -78,6 +81,10 @@ class ProductionApplication:
             )
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except CrossRealmAllianceMissingError:
+            return CommandResult(False, "CROSS_REALM_ALLIANCE_MISSING", "缺少妖修道途或契约盟约，暂不能制作跨界契约。", context.request_id)
+        except CrossRealmRecipeLockedError:
+            return CommandResult(False, "CROSS_REALM_RECIPE_LOCKED", "跨界契约配方尚未在当前境界或地点开放。", context.request_id)
         except RecipeRequirementError:
             return CommandResult(False, "RECIPE_REQUIREMENT_MISSING", "当前道途、境界或地点不满足这条配方。", context.request_id)
         except PlayerStageConflictError:
@@ -134,6 +141,10 @@ class ProductionApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerStageConflictError:
             return CommandResult(False, "RECIPE_REQUIREMENT_MISSING", "完成入道后才能进行正式生产。", context.request_id, operation_id)
+        except CrossRealmAllianceMissingError:
+            return CommandResult(False, "CROSS_REALM_ALLIANCE_MISSING", "缺少妖修道途或契约盟约，暂不能制作跨界契约。", context.request_id, operation_id)
+        except CrossRealmRecipeLockedError:
+            return CommandResult(False, "CROSS_REALM_RECIPE_LOCKED", "跨界契约配方尚未在当前境界或地点开放。", context.request_id, operation_id)
         except RecipeRequirementError:
             return CommandResult(False, "RECIPE_REQUIREMENT_MISSING", "当前道途、境界或地点不满足这条配方。", context.request_id, operation_id)
         except ToolMissingError:
@@ -146,6 +157,8 @@ class ProductionApplication:
             return CommandResult(False, "ENERGY_INSUFFICIENT", "精力不足，未扣除任何资源。", context.request_id, operation_id)
         except ProductionBusyError:
             return CommandResult(False, "PRODUCTION_BUSY", "已有生产订单正在进行，请先领取结果。", context.request_id, operation_id)
+        except ContractSlotOccupiedError:
+            return CommandResult(False, "CONTRACT_SLOT_OCCUPIED", "已有有效妖兽契约，请待其到期后再制作。", context.request_id, operation_id)
         except ProductionDailyLimitError:
             return CommandResult(False, "RECIPE_DAILY_CAP", "该配方今日次数已用尽，明日再来。", context.request_id, operation_id)
         except FacilitySlotNotClaimedError:
@@ -323,6 +336,7 @@ class ProductionApplication:
         outcome = "成功" if record.success else "失败"
         outputs = "、".join(f"{item_label(key)} ×{value}" for key, value in record.outputs.items()) or "无成品"
         refunds = "、".join(f"{item_label(key)} ×{value}" for key, value in record.refunds.items()) or "无"
+        binding = f"\n- **绑定至**：{record.binding_expires_at}" if record.binding_expires_at else ""
         return CommandResult(
             True,
             "PRODUCTION_RECOVERED" if recovered else "PRODUCTION_COMPLETED",
@@ -332,6 +346,7 @@ class ProductionApplication:
                 f"- **质量**：{record.quality_bp}/10000\n"
                 f"- **获得**：{outputs}\n"
                 f"- **返还材料**：{refunds}\n"
+                f"{binding}"
                 f"- **剩余精力**：{record.player.energy}/{record.player.energy_max}\n\n"
                 "> 下一步：可使用成品，或查看 `我的状态`。"
             ),
@@ -348,6 +363,7 @@ class ProductionApplication:
                 "refunds": record.refunds,
                 "currency_spent": record.currency_spent,
                 "tool_durability_bp": record.tool_durability_bp,
+                "binding_expires_at": record.binding_expires_at,
                 "energy": record.player.energy,
                 "inventory": record.player.inventory,
                 "idempotent_replay": record.already_completed,

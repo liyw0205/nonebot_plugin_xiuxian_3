@@ -769,6 +769,25 @@ CREATE INDEX IF NOT EXISTS idx_production_orders_player ON production_orders(pla
 CREATE UNIQUE INDEX IF NOT EXISTS idx_production_orders_active
     ON production_orders(player_id) WHERE status = 'processing';
 
+CREATE TABLE IF NOT EXISTS production_item_bindings (
+    binding_id TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    binding_kind TEXT NOT NULL CHECK (binding_kind IN ('contract', 'temporary', 'permanent')),
+    status TEXT NOT NULL CHECK (status IN ('active', 'expired')),
+    bound_until TEXT NOT NULL,
+    source_order_id TEXT NOT NULL REFERENCES production_orders(order_id),
+    source_operation_id TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (source_order_id, item_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_production_item_bindings_active
+    ON production_item_bindings(player_id, binding_kind, status, bound_until);
+
 CREATE TABLE IF NOT EXISTS production_facility_slots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     slot_key TEXT NOT NULL UNIQUE,

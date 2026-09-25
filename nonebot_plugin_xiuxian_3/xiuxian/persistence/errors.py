@@ -136,6 +136,18 @@ class RecipeRequirementError(RuntimeError):
     """The player does not satisfy a recipe's profession, realm or location gate."""
 
 
+class CrossRealmRecipeLockedError(RecipeRequirementError):
+    """The cross-realm recipe is not available in the current context."""
+
+
+class CrossRealmAllianceMissingError(RecipeRequirementError):
+    """The player lacks the path or alliance required by a cross-realm recipe."""
+
+
+class ContractSlotOccupiedError(RuntimeError):
+    """The player's active contract slot is already occupied."""
+
+
 class ProductionBusyError(RuntimeError):
     """The player already has a processing production order."""
 

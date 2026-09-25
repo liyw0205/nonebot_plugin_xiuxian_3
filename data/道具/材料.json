@@ -331,6 +331,19 @@
       "key": "item.beast_blood"
     },
     {
+      "name": "妖兽契约",
+      "item_type": "contract",
+      "quality": "heaven",
+      "stack_limit": 1,
+      "instance_mode": "instance",
+      "bind_type": "character_bound_24h",
+      "tradeable": false,
+      "effects": [{"type": "temporary_beast_pact", "duration_seconds": 86400}],
+      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
+      "status": "active",
+      "key": "item.contract.beast_pact"
+    },
+    {
       "name": "化神魂种",
       "item_type": "breakthrough_material",
       "quality": "heaven",

@@ -49,6 +49,7 @@ nonebot_plugin_xiuxian_3/
 `*_repository.py`），并由 `SQLitePlayerRepository` 组合提供原有 API。
 高阶任务通用许可在 `quests/repository.py`，合道资格与道源赛季事务在
 `quests/endgame_repository.py`；终局配方在 `production/endgame_repository.py`，
+契约成品绑定与槽位状态在 `production/contract_repository.py`，
 境界状态机在 `progression/endgame_repository.py`。新增事务应按领域职责放置，
 不要继续扩张兼容门面或无边界的通用仓储文件。
 公共异常集中在 `persistence/errors.py`，DDL 集中在 `persistence/schema.py`。

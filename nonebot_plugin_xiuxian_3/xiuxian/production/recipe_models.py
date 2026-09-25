@@ -26,12 +26,18 @@ class RecipeDefinition:
     required_location: tuple[str, ...] = ()
     teaching_allowed: bool = False
     required_path: str | None = None
+    required_paths: tuple[str, ...] = ()
     required_subprofession: tuple[str, ...] = ()
     content_version: str = "content-0.1"
     rule_version: str = "production-0.1.0"
     success_threshold_bp: int = 4500
     high_quality_threshold_bp: int = 8000
     facility_kind: str | None = None
+    failure_refund_bp: int | None = None
+    binding_kind: str | None = None
+    binding_duration_seconds: int = 0
+    binding_slot_limit: int = 0
+    cross_realm_faction: str | None = None
 
 
 __all__ = ["RecipeDefinition"]
