@@ -391,10 +391,12 @@ CREATE TABLE IF NOT EXISTS sects (
     motto TEXT NOT NULL DEFAULT '',
     leader_id INTEGER NOT NULL REFERENCES players(id),
     status TEXT NOT NULL CHECK (status IN ('active', 'dissolving', 'dissolved')),
+    level INTEGER NOT NULL DEFAULT 1 CHECK (level >= 1),
     max_members INTEGER NOT NULL CHECK (max_members > 0),
     warehouse_capacity INTEGER NOT NULL CHECK (warehouse_capacity >= 0),
     construction INTEGER NOT NULL DEFAULT 0 CHECK (construction >= 0),
     spirit_stones INTEGER NOT NULL DEFAULT 0 CHECK (spirit_stones >= 0),
+    sect_merit INTEGER NOT NULL DEFAULT 0 CHECK (sect_merit >= 0),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     content_version TEXT NOT NULL,
@@ -402,6 +404,87 @@ CREATE TABLE IF NOT EXISTS sects (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sects_status ON sects(status, created_at);
+
+CREATE TABLE IF NOT EXISTS sect_war_rounds (
+    round_id TEXT PRIMARY KEY,
+    registration_open_at TEXT NOT NULL,
+    registration_close_at TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    claim_expires_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('scheduled', 'open', 'running', 'settled', 'failed')),
+    winner_sect_id TEXT REFERENCES sects(sect_id),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_war_rounds_status
+    ON sect_war_rounds(status, starts_at, claim_expires_at);
+
+CREATE TABLE IF NOT EXISTS sect_war_registrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL REFERENCES sect_war_rounds(round_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    operation_id TEXT NOT NULL UNIQUE,
+    entry_fee INTEGER NOT NULL CHECK (entry_fee >= 0),
+    status TEXT NOT NULL CHECK (status IN ('registered', 'withdrawn')),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    registered_at TEXT NOT NULL,
+    UNIQUE (round_id, sect_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_war_registrations_round
+    ON sect_war_registrations(round_id, status, registered_at);
+
+CREATE TABLE IF NOT EXISTS sect_war_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL REFERENCES sect_war_rounds(round_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    roster_slot INTEGER NOT NULL CHECK (roster_slot BETWEEN 1 AND 10),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    contribution INTEGER NOT NULL DEFAULT 0 CHECK (contribution >= 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (round_id, player_id),
+    UNIQUE (round_id, sect_id, roster_slot)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_war_members_player
+    ON sect_war_members(player_id, round_id, contribution);
+
+CREATE TABLE IF NOT EXISTS sect_war_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL UNIQUE,
+    round_id TEXT NOT NULL REFERENCES sect_war_rounds(round_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    source_operation_id TEXT NOT NULL,
+    action_key TEXT NOT NULL CHECK (action_key IN ('占点', '击败', '运输', '维修')),
+    score INTEGER NOT NULL CHECK (score > 0),
+    occurred_at TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    UNIQUE (round_id, player_id, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_war_actions_round
+    ON sect_war_actions(round_id, sect_id, occurred_at);
+
+CREATE TABLE IF NOT EXISTS sect_war_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id TEXT NOT NULL REFERENCES sect_war_rounds(round_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL CHECK (status IN ('claimed', 'auto_granted')),
+    claimed_at TEXT NOT NULL,
+    auto_granted_at TEXT,
+    UNIQUE (round_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_war_claims_player
+    ON sect_war_claims(player_id, round_id);
 
 CREATE TABLE IF NOT EXISTS sect_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

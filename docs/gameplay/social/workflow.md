@@ -7,7 +7,16 @@ mentor -> invited -> active -> graduated/rejected/expired
 party -> forming -> ready -> disbanded
 party_battle -> created -> running -> won/lost/expired -> settled
 service -> created -> accepted -> locked -> processing -> delivered -> settled
+sect_war -> scheduled -> open -> running -> settled
 ```
+
+宗门战每周生成两轮，报名从轮次开始周一 00:00 开放至战斗开始；每轮持续 30 分钟。宗主报名时扣除
+2000 宗门灵石并冻结最多 10 名 active 成员快照，普通成员不能代报名。战斗期间仅快照成员可提交
+来源 operation 贡献，四类行动按固定分值和单轮次数上限计分；同一来源 operation 重放不得重复计分。
+
+轮次结束由查询、贡献或领奖请求推进为 `settled`，按宗门总贡献固定排序并只给胜方宗门增加 100 宗门功勋。
+实际出战成员贡献达到 20 可在 24 小时内领取 30 点世界功勋；窗口结束时恢复流程自动发放合格未领奖奖励，
+所有状态变化和奖励均有独立 operation/claim 记录。
 
 当前运行时开放 `forming -> ready -> disbanded/expired` 的双人探索队伍、三人竞技队伍、界隙/魔渊/万兽 2–5 人队伍状态机，
 以及独立的 `party_battle` 自动 PVE 会话；队伍自身不伪装成单人战斗会话。邀请和全员确认窗口为 5 分钟，

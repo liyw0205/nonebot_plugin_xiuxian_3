@@ -484,6 +484,38 @@ class SectAssetLockedError(RuntimeError):
     """The player has an active session or order that blocks leaving."""
 
 
+class SectWarRegistrationClosedError(RuntimeError):
+    """The requested sect-war round is outside its registration window."""
+
+
+class SectWarParticipantCapError(RuntimeError):
+    """The sect-war roster has reached its participant cap."""
+
+
+class SectWarRequirementError(RuntimeError):
+    """The sect or actor does not satisfy sect-war prerequisites."""
+
+
+class SectWarRoundNotActiveError(RuntimeError):
+    """The sect-war round is not accepting contributions or claims."""
+
+
+class SectWarSourceInvalidError(RuntimeError):
+    """The supplied settled source operation cannot score for the war."""
+
+
+class SectWarRewardAlreadyClaimedError(RuntimeError):
+    """The player already claimed or received this round's reward."""
+
+
+class SectWarRewardNotEligibleError(RuntimeError):
+    """The player did not reach the sect-war contribution threshold."""
+
+
+class SectWarRewardExpiredError(RuntimeError):
+    """The sect-war claim window has closed."""
+
+
 class SectLeaderCannotLeaveError(RuntimeError):
     """The sect leader must transfer leadership before leaving."""
 

@@ -36,6 +36,7 @@ from ..livelihood.repository import LivelihoodRepositoryMixin
 from ..social.sect_repository import SectRepositoryMixin
 from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
+from ..social.sect_war_repository import SectWarRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
 from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
@@ -81,6 +82,7 @@ class SQLitePlayerRepository(
     SectRepositoryMixin,
     PartyRepositoryMixin,
     MentorRepositoryMixin,
+    SectWarRepositoryMixin,
     EventsRepositoryMixin,
     HeartDemonEventRepositoryMixin,
     DemonInvasionRepositoryMixin,
@@ -198,6 +200,7 @@ class SQLitePlayerRepository(
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
             self._migrate_facility_schema(connection)
+            self._migrate_sect_war_schema(connection)
             self._migrate_heart_demon_event_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
@@ -278,6 +281,14 @@ class SQLitePlayerRepository(
                     "UPDATE redemption_codes SET status = 'revoked', updated_at = ? WHERE code_key = ?",
                     (now_text, definition.code_key),
                 )
+
+    @staticmethod
+    def _migrate_sect_war_schema(connection: sqlite3.Connection) -> None:
+        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(sects)").fetchall()}
+        if "level" not in columns:
+            connection.execute("ALTER TABLE sects ADD COLUMN level INTEGER NOT NULL DEFAULT 1 CHECK (level >= 1)")
+        if "sect_merit" not in columns:
+            connection.execute("ALTER TABLE sects ADD COLUMN sect_merit INTEGER NOT NULL DEFAULT 0 CHECK (sect_merit >= 0)")
 
     @staticmethod
     def _migrate_heart_demon_event_schema(connection: sqlite3.Connection) -> None:

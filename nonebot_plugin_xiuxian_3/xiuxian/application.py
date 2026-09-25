@@ -31,6 +31,7 @@ from .livelihood.project_use_cases import ProjectApplication
 from .social.sect_use_cases import SectApplication
 from .social.party_use_cases import PartyApplication
 from .social.mentor_use_cases import MentorApplication
+from .social.sect_war_use_cases import SectWarApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -77,6 +78,7 @@ class XiuxianApplication:
         self.social = SectApplication(repository)
         self.party = PartyApplication(repository)
         self.mentor = MentorApplication(repository)
+        self.sect_war = SectWarApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -762,6 +764,30 @@ class XiuxianApplication:
 
     async def get_sect_profile(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.social.get_profile(context), require_write=False)
+
+    async def get_sect_war(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_war.get(context), require_write=False)
+
+    async def register_sect_war(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.sect_war.register(context),
+            write_message="当前事件不允许报名宗门战。",
+        )
+
+    async def contribute_sect_war(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.sect_war.contribute(context),
+            write_message="当前事件不允许贡献宗门战。",
+        )
+
+    async def claim_sect_war_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.sect_war.claim(context),
+            write_message="当前事件不允许领取宗门战奖励。",
+        )
 
     async def create_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_party(context), write_message="当前事件不允许创建队伍。")
