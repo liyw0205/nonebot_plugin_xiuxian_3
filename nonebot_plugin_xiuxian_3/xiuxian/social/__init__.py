@@ -6,6 +6,8 @@ from .mentor_models import MentorRelationRecord
 from .sect_war_models import SectWarClaimRecord, SectWarRecord, SectWarStanding
 from .sect_war_federation_models import SectWarFederationResultRecord, SectWarFederationSnapshotRecord
 from .sect_war_cross_server_models import CrossServerFortressRecord, CrossServerRewardRecord, CrossServerStanding, CrossServerWarRecord
+from .sect_social_recovery_models import SocialRecoveryArtifact, SocialRecoveryReport
+from .sect_social_recovery_repository import SectSocialRecoveryRepositoryMixin
 from .sect_war_rules import (
     SECT_WAR_CLAIM_HOURS,
     SECT_WAR_CONTENT_VERSION,
@@ -60,6 +62,9 @@ __all__ = [
     "CrossServerRewardRecord",
     "CrossServerStanding",
     "CrossServerWarRecord",
+    "SocialRecoveryArtifact",
+    "SocialRecoveryReport",
+    "SectSocialRecoveryRepositoryMixin",
     "SECT_WAR_CLAIM_HOURS",
     "SECT_WAR_CONTENT_VERSION",
     "SECT_WAR_DURATION_MINUTES",

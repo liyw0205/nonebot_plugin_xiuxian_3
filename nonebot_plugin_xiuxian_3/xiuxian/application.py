@@ -35,6 +35,7 @@ from .social.sect_war_use_cases import SectWarApplication
 from .social.sect_war_cross_server_use_cases import SectWarCrossServerApplication
 from .social.sect_beacon_use_cases import SectBeaconApplication
 from .social.sect_alliance_use_cases import SectAllianceApplication
+from .social.sect_social_recovery_use_cases import SectSocialRecoveryApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -85,6 +86,7 @@ class XiuxianApplication:
         self.cross_server_sect_war = SectWarCrossServerApplication(repository)
         self.sect_beacon = SectBeaconApplication(repository)
         self.sect_alliance = SectAllianceApplication(repository)
+        self.sect_social_recovery = SectSocialRecoveryApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -845,6 +847,15 @@ class XiuxianApplication:
 
     async def sync_sect_alliance_research(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.sect_alliance.sync_research(context), write_message="当前事件不允许同步联盟配方。")
+
+    async def create_social_recovery_backup(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_social_recovery.create(context), write_message="当前事件不允许创建跨服社交备份。")
+
+    async def verify_social_recovery_backup(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_social_recovery.verify(context), require_write=False)
+
+    async def restore_social_recovery_backup(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.sect_social_recovery.restore(context), write_message="当前事件不允许恢复跨服社交备份。")
 
     async def create_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_party(context), write_message="当前事件不允许创建队伍。")

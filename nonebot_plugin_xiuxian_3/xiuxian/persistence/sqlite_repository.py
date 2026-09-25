@@ -41,6 +41,8 @@ from ..social.sect_war_federation_repository import SectWarFederationRepositoryM
 from ..social.sect_war_cross_server_repository import SectWarCrossServerRepositoryMixin
 from ..social.sect_beacon_repository import SectBeaconRepositoryMixin
 from ..social.sect_alliance_repository import SectAllianceRepositoryMixin
+from ..social.sect_social_recovery_repository import SectSocialRecoveryRepositoryMixin
+from ..social.sect_social_recovery_migration import ensure_social_recovery_schema
 from ..events.repository import EventsRepositoryMixin
 from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
@@ -91,6 +93,7 @@ class SQLitePlayerRepository(
     SectWarCrossServerRepositoryMixin,
     SectBeaconRepositoryMixin,
     SectAllianceRepositoryMixin,
+    SectSocialRecoveryRepositoryMixin,
     EventsRepositoryMixin,
     HeartDemonEventRepositoryMixin,
     DemonInvasionRepositoryMixin,
@@ -210,6 +213,7 @@ class SQLitePlayerRepository(
             self._migrate_facility_schema(connection)
             self._migrate_sect_war_schema(connection)
             self._migrate_sect_alliance_schema(connection)
+            ensure_social_recovery_schema(connection)
             self._migrate_heart_demon_event_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
@@ -243,6 +247,10 @@ class SQLitePlayerRepository(
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("social.alliance_beacon.v0.5", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("social.cross_server_recovery.v0.5", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
