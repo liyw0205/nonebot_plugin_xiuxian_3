@@ -40,7 +40,6 @@ async def _high_realm_player(
                 json.dumps({"body": 40, "agility": 30, "spirit": 30, "root": 30, "insight": 30, "fortune": 10}),
                 json.dumps(
                     {
-                        "item.soul_seed": 1,
                         "item.domain_core": 1,
                         "item.ancient_fruit": 3,
                         "item.soul_crystal": 3,
@@ -112,6 +111,7 @@ def test_soul_transformation_permit_is_player_reachable_and_idempotent() -> None
                 inventory = json.loads(db.execute("SELECT inventory_json FROM players WHERE platform_user_id = ?", (user,)).fetchone()[0])
                 assert "quest.soul_transformation" in intro["flags"]
                 assert inventory.get("item.ancient_fruit") == 4
+                assert inventory.get("item.soul_seed") == 1
                 assert "item.soul_crystal" not in inventory
                 assert db.execute("SELECT COUNT(*) FROM quest_events WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)", (user,)).fetchone()[0] == 7
             replay_permit = await runtime.dispatch(

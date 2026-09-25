@@ -196,6 +196,10 @@ class ProductionDailyLimitError(RuntimeError):
     """The recipe reached its business-day cap."""
 
 
+class ProductionWeeklyLimitError(RuntimeError):
+    """The recipe reached its rolling seven-day cap."""
+
+
 class ProductionNotFoundError(RuntimeError):
     """The player has no production order to settle."""
 

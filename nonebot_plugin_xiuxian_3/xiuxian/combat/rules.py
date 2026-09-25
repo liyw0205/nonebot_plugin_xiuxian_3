@@ -169,6 +169,21 @@ BEAST_ANCESTOR = EnemyDefinition(
     reward={},
 )
 
+ANCESTRAL_SPIRIT = EnemyDefinition(
+    key="enemy.ancestral_spirit",
+    label="祖灵湖守灵",
+    location_key="beast.ancestral_lake",
+    required_realm="soul_transformation",
+    required_layer=1,
+    max_hp=16_000,
+    attack=820,
+    initiative=26,
+    agility=30,
+    skill_key="skill.beast.ancestral_form",
+    random_pool="combat.ancestral_spirit.v0.4",
+    reward={},
+)
+
 DEMON_WAR_FRONT = EnemyDefinition(
     key="enemy.demon_war_front",
     label="魔界战场先锋",
@@ -258,6 +273,7 @@ ENEMIES = {
     DEMON_OVERLORD.key: DEMON_OVERLORD,
     BEAST_GUARDIAN.key: BEAST_GUARDIAN,
     BEAST_ANCESTOR.key: BEAST_ANCESTOR,
+    ANCESTRAL_SPIRIT.key: ANCESTRAL_SPIRIT,
     DEMON_WAR_FRONT.key: DEMON_WAR_FRONT,
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_WATCHER.key: BOUNDARY_WATCHER,
@@ -343,6 +359,7 @@ __all__ = [
     "DEMON_OVERLORD",
     "BEAST_GUARDIAN",
     "BEAST_ANCESTOR",
+    "ANCESTRAL_SPIRIT",
     "DEMON_WAR_FRONT",
     "IRON_BOAR",
     "MIST_ELITE",

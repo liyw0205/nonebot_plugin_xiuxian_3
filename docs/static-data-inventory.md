@@ -116,7 +116,7 @@ data/
 
 ### v0.4
 
-`item.soul_seed`、`item.domain_core`、`item.domain_core_fragment`、
+`item.soul_seed`、`item.ancestral_blood`、`item.spirit_water`、`item.domain_core`、`item.domain_core_fragment`、
 `item.ancient_fruit`、`item.pill.domain_restore`、`item.weapon.domain_blade`、
 `item.array.domain_guard`。
 

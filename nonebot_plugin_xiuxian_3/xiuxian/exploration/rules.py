@@ -12,6 +12,8 @@ V02_RULE_VERSION = "exploration-0.2.0"
 V02_CONTENT_VERSION = "content-0.2"
 V03_RULE_VERSION = "exploration-0.3.0"
 V03_CONTENT_VERSION = "content-0.3"
+V04_RULE_VERSION = "exploration-0.4.0"
+V04_CONTENT_VERSION = "content-0.4"
 CLOUD_BOAT_STORM_CHANCE_BP = 2500
 CLOUD_BOAT_STORM_WAIT_SECONDS = 2 * 60
 CLOUD_BOAT_STORM_PAY_COST = 100
@@ -36,6 +38,7 @@ BATTLE_ENEMY_BY_MODE = {
     "explore.mist_grotto_2": "enemy.mist_elite",
     "explore.demon_abyss": "enemy.demon_overlord",
     "explore.beast_hunt": "enemy.beast_guardian",
+    "explore.ancestral_lake": "enemy.ancestral_spirit",
 }
 
 DEFINITIONS = {
@@ -162,6 +165,20 @@ DEFINITIONS = {
         rule_version=V03_RULE_VERSION,
         content_version=V03_CONTENT_VERSION,
     ),
+    "explore.ancestral_lake": ExplorationDefinition(
+        key="explore.ancestral_lake",
+        label="祖灵湖探索",
+        location_key="beast.ancestral_lake",
+        duration_seconds=20 * 60,
+        stamina_cost=25,
+        required_realm="soul_transformation",
+        required_layer=1,
+        daily_limit=2,
+        random_pool="event.ancestral_lake.v0.4",
+        battle_chance_bp=3500,
+        rule_version=V04_RULE_VERSION,
+        content_version=V04_CONTENT_VERSION,
+    ),
 }
 
 ALIASES = {
@@ -181,6 +198,8 @@ ALIASES = {
     "堕落遗迹探索": "explore.demon_abyss",
     "万兽山狩猎": "explore.beast_hunt",
     "妖界万兽山探索": "explore.beast_hunt",
+    "祖灵湖探索": "explore.ancestral_lake",
+    "祖灵湖": "explore.ancestral_lake",
 }
 
 
@@ -272,6 +291,7 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
         return {
             "item.herb.spirit_leaf": 1 + weighted_value(seed + ":leaf", (0, 1), (60, 40)),
             "item.mat.array_sand": weighted_value(seed + ":sand", (0, 1), (60, 40)),
+            "item.spirit_water": 1,
         }
     if mode_key == "explore.mist_grotto":
         material = weighted_value(
@@ -323,6 +343,11 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
         if reward == 2:
             return {"item.clue.beast_bloodline": 1}
         return {}
+    if mode_key == "explore.ancestral_lake":
+        return {
+            "item.ancestral_blood": 1,
+            "faction_reputation.beast": 30,
+        }
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 
 
@@ -334,6 +359,8 @@ __all__ = [
     "V02_RULE_VERSION",
     "V03_CONTENT_VERSION",
     "V03_RULE_VERSION",
+    "V04_CONTENT_VERSION",
+    "V04_RULE_VERSION",
     "battle_roll_bp",
     "CLOUD_MINE_ACCESS_FLAGS",
     "CLOUD_MINE_ACCESS_ITEMS",

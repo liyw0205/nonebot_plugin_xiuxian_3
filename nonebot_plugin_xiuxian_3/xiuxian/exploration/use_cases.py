@@ -38,6 +38,8 @@ ITEM_LABELS = {
     "item.demon_core": "魔核",
     "item.clue.demon_contract": "魔界契约线索",
     "item.clue.beast_bloodline": "妖界血脉线索",
+    "item.ancestral_blood": "祖灵血",
+    "item.spirit_water": "灵泉水",
 }
 
 
@@ -81,7 +83,7 @@ class ExplorationApplication:
             return CommandResult(
                 False,
                 "INVALID_EXPLORATION_MODE",
-                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集`、`开始探索 洞天二层探索`、`开始探索 云舟试炼`、`开始探索 魔界堕落遗迹探索` 或 `开始探索 万兽山狩猎`。",
+                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集`、`开始探索 洞天二层探索`、`开始探索 云舟试炼`、`开始探索 魔界堕落遗迹探索`、`开始探索 万兽山狩猎` 或 `开始探索 祖灵湖探索`。",
                 context.request_id,
             )
         operation_id = self._operation_id(context, "exploration.start")
@@ -270,7 +272,7 @@ class ExplorationApplication:
                 + f"- **精力**：{record.player.energy}/{record.player.energy_max}\n"
                 + f"- **灵石**：{record.player.spirit_stones}\n"
                 + f"- **污染**：{record.pollution_after}\n"
-                + (f"- **血脉稳定**：{record.bloodline_stability_after}\n" if record.mode_key == "explore.beast_hunt" else "")
+                + (f"- **血脉稳定**：{record.bloodline_stability_after}\n" if record.mode_key in {"explore.beast_hunt", "explore.ancestral_lake"} else "")
                 + (f"- **神魂损失**：{record.soul_power_loss}\n" if record.soul_power_loss else "")
                 + "\n> 结果按开始时的规则快照结算，重复结算不会重复发放。"
             ),

@@ -375,6 +375,7 @@ class FinalBattleRepositoryMixin:
             enemy_hp = int(state.get("enemy_hp", enemy["max_hp"]))
             target_index = int(state.get("target_index", 0))
             members = sorted(snapshot.get("members", []), key=lambda item: (-int(item["stats"]["initiative"]), str(item["player_id"])))
+            battle_seed = str(snapshot.get("random_seed", battle_id))
             actions: list[dict[str, Any]] = []
             sequence = int(session["action_sequence"])
             for member in members:
@@ -382,7 +383,7 @@ class FinalBattleRepositoryMixin:
                 if hp.get(player_id, 0) <= 0 or enemy_hp <= 0:
                     continue
                 sequence += 1
-                roll = battle_roll_bp(f"{battle_id}:{expected_round}:{sequence}:player")
+                roll = battle_roll_bp(f"{battle_seed}:{expected_round}:{sequence}:player")
                 hit_bp = hit_chance_bp(attacker_initiative=int(member["stats"]["initiative"]), defender_agility=int(enemy["agility"]))
                 damage = int(member["stats"]["attack"]) if roll < hit_bp else 0
                 enemy_hp = max(0, enemy_hp - damage)
@@ -395,7 +396,7 @@ class FinalBattleRepositoryMixin:
                 target = alive[target_index]
                 target_id = str(target["player_id"])
                 sequence += 1
-                roll = battle_roll_bp(f"{battle_id}:{expected_round}:{sequence}:enemy")
+                roll = battle_roll_bp(f"{battle_seed}:{expected_round}:{sequence}:enemy")
                 hit_bp = hit_chance_bp(attacker_initiative=int(enemy["initiative"]), defender_agility=int(target["stats"]["agility"]))
                 damage = int(enemy["attack"]) if roll < hit_bp else 0
                 hp[target_id] = max(0, hp[target_id] - damage)

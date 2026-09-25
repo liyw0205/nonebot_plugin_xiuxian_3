@@ -519,14 +519,30 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             }
             if existing_progress is not None and str(existing_progress["status"]) in {"completed", "claimed"}:
                 raise QuestAlreadyCompletedError("quest permit is already claimed")
+            permit_rewards = {"item.soul_seed": 1} if quest_key == SOUL_QUEST else {}
             flags_state = self._json_object(player["intro_json"], {})
             flags = [str(item) for item in flags_state.get("flags", [])]
             if quest_key not in flags:
                 flags.append(quest_key)
             flags_state["flags"] = flags
             connection.execute(
-                "UPDATE players SET intro_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(flags_state, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                "UPDATE players SET intro_json = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (
+                    json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
+                    json.dumps(
+                        {
+                            **self._json_object(player["inventory_json"], {}),
+                            **{
+                                key: int(self._json_object(player["inventory_json"], {}).get(key, 0)) + amount
+                                for key, amount in permit_rewards.items()
+                            },
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    now_text,
+                    player["id"],
+                ),
             )
             self._upsert_progress(
                 connection,
@@ -544,6 +560,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 "quest_key": quest_key,
                 "status": "completed",
                 "progress": progress,
+                "snapshot": {"rewards": permit_rewards, "source": "quest.soul_transformation"} if permit_rewards else {},
             }
             self._insert_operation(
                 connection,

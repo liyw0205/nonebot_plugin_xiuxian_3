@@ -359,6 +359,14 @@ class ProductionRepositoryMixin:
                 raise PlayerStageConflictError("player is not ready for production")
             self._check_production_requirements(connection, row, recipe)
             self._check_production_special_requirements(connection, row, recipe, now)
+            if recipe.key == "recipe.fruit.soul_seed":
+                cooldown_start = serialize_datetime(now - timedelta(days=7))
+                recent = connection.execute(
+                    "SELECT 1 FROM production_orders WHERE player_id = ? AND recipe_key = ? AND starts_at >= ? LIMIT 1",
+                    (row["id"], recipe.key, cooldown_start),
+                ).fetchone()
+                if recent is not None:
+                    raise ProductionWeeklyLimitError("soul seed field is on cooldown")
             active = connection.execute(
                 "SELECT 1 FROM production_orders WHERE player_id = ? AND status = 'processing' LIMIT 1",
                 (row["id"],),

@@ -265,6 +265,28 @@ RECIPES: dict[str, RecipeDefinition] = {
         success_threshold_bp=1,
         high_quality_threshold_bp=10001,
     ),
+    "recipe.fruit.soul_seed": RecipeDefinition(
+        key="recipe.fruit.soul_seed",
+        name="化神魂种",
+        profession=None,
+        inputs={"item.ancestral_blood": 2, "item.spirit_water": 5},
+        energy_cost=15,
+        duration_seconds=6 * 60 * 60,
+        daily_limit=1,
+        tool_key=None,
+        tool_cost_bp=0,
+        currency_cost=0,
+        outputs={"item.soul_seed": 1},
+        high_quality_bonus={},
+        failure_refunds={"item.ancestral_blood": 1, "item.spirit_water": 2},
+        min_realm_layer=1,
+        required_realm="soul_transformation",
+        required_location=("beast.ancestral_lake",),
+        content_version="content-0.4",
+        rule_version="production-0.4.0",
+        success_threshold_bp=1,
+        high_quality_threshold_bp=10001,
+    ),
 }
 RECIPES.update(ENDGAME_WORK_RECIPES)
 
@@ -295,6 +317,8 @@ RECIPE_ALIASES = {
     "兽契": "recipe.contract.beast_pact",
     "虚空晶炼制": "recipe.void.crystal_refine",
     "虚晶炼制": "recipe.void.crystal_refine",
+    "化神魂种": "recipe.fruit.soul_seed",
+    "魂种": "recipe.fruit.soul_seed",
 }
 RECIPE_ALIASES.update({key: key for key in ENDGAME_WORK_RECIPES})
 RECIPE_ALIASES.update(ENDGAME_WORK_RECIPE_ALIASES)
@@ -322,6 +346,9 @@ ITEM_LABELS = {
     "item.weapon.cloud_sword": "云纹剑",
     "item.food.cloud_tea": "云灵茶",
     "item.contract.beast_pact": "妖兽契约",
+    "item.ancestral_blood": "祖灵血",
+    "item.spirit_water": "灵泉水",
+    "item.soul_seed": "化神魂种",
     "item.tool.basic_furnace": "基础丹炉",
     "item.tool.basic_hammer": "基础炼器锤",
 }

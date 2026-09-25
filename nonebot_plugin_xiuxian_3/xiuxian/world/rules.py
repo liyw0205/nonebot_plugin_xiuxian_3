@@ -148,6 +148,13 @@ DESTINATIONS = {
         required_faction="beast", required_faction_reputation=200,
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
+    "beast.ancestral_lake": DestinationDefinition(
+        "beast.ancestral_lake", "妖界·祖灵湖", 10 * 60, 25, 0,
+        required_realm="soul_transformation", required_layer=1,
+        source_locations=("beast.ten_thousand_hills",),
+        required_faction="beast", required_faction_reputation=3000,
+        content_version="content-0.4", rule_version="world-0.4.0",
+    ),
     "beast.three_realms_trade_port": DestinationDefinition(
         "beast.three_realms_trade_port", "妖界·三界贸易口", 3 * 60, 8, 0,
         required_realm="nascent_soul", required_layer=1,
@@ -206,6 +213,8 @@ ALIASES = {
     "契约集市": "demon.abyss_market",
     "妖界万兽山": "beast.ten_thousand_hills",
     "万兽山": "beast.ten_thousand_hills",
+    "妖界祖灵湖": "beast.ancestral_lake",
+    "祖灵湖": "beast.ancestral_lake",
     "妖界三界贸易口": "beast.three_realms_trade_port",
     "三界贸易口": "beast.three_realms_trade_port",
     "三界互市": "beast.three_realms_trade_port",

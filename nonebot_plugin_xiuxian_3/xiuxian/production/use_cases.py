@@ -23,6 +23,7 @@ from ..repository import (
     PlayerSuspendedError,
     ProductionBusyError,
     ProductionDailyLimitError,
+    ProductionWeeklyLimitError,
     ProductionExpiredError,
     ProductionNotFoundError,
     ProductionNotReadyError,
@@ -161,6 +162,8 @@ class ProductionApplication:
             return CommandResult(False, "CONTRACT_SLOT_OCCUPIED", "已有有效妖兽契约，请待其到期后再制作。", context.request_id, operation_id)
         except ProductionDailyLimitError:
             return CommandResult(False, "RECIPE_DAILY_CAP", "该配方今日次数已用尽，明日再来。", context.request_id, operation_id)
+        except ProductionWeeklyLimitError:
+            return CommandResult(False, "SOUL_SEED_PLOT_COOLDOWN", "祖灵湖灵田七日冷却尚未结束。", context.request_id, operation_id)
         except FacilitySlotNotClaimedError:
             return CommandResult(False, "FACILITY_SLOT_REQUIRED", "请先认领对应的洞天设施槽位，再开始这条生产。", context.request_id, operation_id)
         except FacilityMaintenanceUnpaidError:

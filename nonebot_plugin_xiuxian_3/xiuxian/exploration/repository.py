@@ -316,6 +316,13 @@ class ExplorationRepositoryMixin:
             if definition.key == "explore.beast_hunt":
                 faction = self._json_object(row["faction_reputation_json"], {})
                 cross_realm_penalty_bp = 0 if str(row["path_key"] or "") == "beast" or int(faction.get("beast_alliance", 0)) > 0 else 1000
+            if definition.key == "explore.ancestral_lake":
+                faction = self._json_object(row["faction_reputation_json"], {})
+                if int(faction.get("beast", 0)) < 3000:
+                    raise LocationRequirementError("ancestral lake requires beast reputation")
+                if bloodline_stability_before < 50:
+                    raise LocationRequirementError("bloodline stability is too low for ancestral lake")
+                bloodline_stability_after = max(0, bloodline_stability_before - 5)
             if definition.key == "explore.spring_gather":
                 intro_state = self._json_object(row["intro_json"], {})
                 if "guide.gather_blood_grass" not in set(intro_state.get("flags", [])):
@@ -653,6 +660,8 @@ class ExplorationRepositoryMixin:
             total_cultivation = int(row["total_cultivation"])
             soul_power_loss = 0
             soul_fatigue_until = row["soul_fatigue_until"]
+            snapshot = self._json_object(session["snapshot_json"], {})
+            bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             for key, quantity in result.items():
                 if key == "spirit_stones":
                     stones += quantity
@@ -668,8 +677,8 @@ class ExplorationRepositoryMixin:
                 soul_power_loss = min(20, int(row["soul_power"]))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
             connection.execute(
-                "UPDATE players SET spirit_stones=?, cultivation=?, total_cultivation=?, inventory_json=?, faction_reputation_json=?, soul_power=?, soul_fatigue_until=?, updated_at=? WHERE id=?",
-                (stones, cultivation, total_cultivation, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True), max(0, int(row["soul_power"]) - soul_power_loss), soul_fatigue_until, now_text, row["id"]),
+                "UPDATE players SET spirit_stones=?, cultivation=?, total_cultivation=?, inventory_json=?, faction_reputation_json=?, soul_power=?, soul_fatigue_until=?, bloodline_stability=?, updated_at=? WHERE id=?",
+                (stones, cultivation, total_cultivation, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True), max(0, int(row["soul_power"]) - soul_power_loss), soul_fatigue_until, bloodline_stability_after, now_text, row["id"]),
             )
             result_json = {
                 "status": "settled",
@@ -682,7 +691,7 @@ class ExplorationRepositoryMixin:
                 "pollution_before": int(self._json_object(session["snapshot_json"], {}).get("pollution_before", 0)),
                 "pollution_after": int(self._json_object(session["snapshot_json"], {}).get("pollution_after", 0)),
                 "bloodline_stability_before": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_before", 0)),
-                "bloodline_stability_after": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_after", 0)),
+                "bloodline_stability_after": bloodline_stability_after,
                 "soul_power_loss": soul_power_loss,
                 "soul_fatigue_until": soul_fatigue_until,
                 "settled_at": now_text,
@@ -931,6 +940,7 @@ class ExplorationRepositoryMixin:
             stones = int(row["spirit_stones"])
             cultivation = int(row["cultivation"])
             total_cultivation = int(row["total_cultivation"])
+            bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             if status == "settled":
                 for key, quantity in result.items():
                     if key == "spirit_stones":
@@ -946,7 +956,7 @@ class ExplorationRepositoryMixin:
                 connection.execute(
                     """
                     UPDATE players
-                    SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, inventory_json = ?, faction_reputation_json = ?, updated_at = ?
+                    SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, inventory_json = ?, faction_reputation_json = ?, bloodline_stability = ?, updated_at = ?
                     WHERE id = ?
                     """,
                     (
@@ -955,6 +965,7 @@ class ExplorationRepositoryMixin:
                         total_cultivation,
                         json.dumps(inventory, ensure_ascii=False, sort_keys=True),
                         json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
+                        bloodline_stability_after,
                         now_text,
                         row["id"],
                     ),
@@ -972,7 +983,7 @@ class ExplorationRepositoryMixin:
                 "pollution_before": int(snapshot.get("pollution_before", 0)),
                 "pollution_after": int(snapshot.get("pollution_after", 0)),
                 "bloodline_stability_before": int(snapshot.get("bloodline_stability_before", 0)),
-                "bloodline_stability_after": int(snapshot.get("bloodline_stability_after", 0)),
+                "bloodline_stability_after": bloodline_stability_after,
                 "settled_at": now_text,
             }
             connection.execute(
