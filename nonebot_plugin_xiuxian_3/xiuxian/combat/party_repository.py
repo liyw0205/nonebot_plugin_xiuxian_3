@@ -24,6 +24,9 @@ from ..persistence.errors import (
     PartyBattleRequirementError,
     BoundaryRealmRequirementError,
     BoundaryRealmResourceError,
+    CrossRealmPartyRequirementError,
+    FactionReputationInsufficientError,
+    PollutionTooHighError,
     PartyNotFoundError,
     SoulExhaustionActiveError,
     SoulPowerInsufficientError,
@@ -40,10 +43,22 @@ from .party_rules import (
     BOUNDARY_REALM_STAMINA_COST,
     BOUNDARY_REALM_TICKET,
     BOUNDARY_REALM_TICKET_COST,
+    BEAST_REALM_LOCATION,
+    BEAST_REALM_REWARD,
+    BEAST_REALM_STAMINA_COST,
+    DEMON_REALM_LOCATION,
+    DEMON_REALM_REWARD,
+    DEMON_REALM_STAMINA_COST,
     party_enemy_for_location,
 )
 from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot
-from ..social.party_rules import party_definition_for, PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY
+from ..social.party_rules import (
+    party_definition_for,
+    PARTY_TYPE_BOUNDARY_REALM,
+    PARTY_TYPE_PARTY_BOUNDARY,
+    PARTY_TYPE_DEMON_REALM,
+    PARTY_TYPE_BEAST_REALM,
+)
 
 
 class PartyCombatRepositoryMixin:
@@ -181,7 +196,13 @@ class PartyCombatRepositoryMixin:
             if party is None:
                 raise PartyNotFoundError("party does not exist")
             party_type = str(party["party_type"])
-            if party_type not in {"exploration_pair", PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}:
+            if party_type not in {
+                "exploration_pair",
+                PARTY_TYPE_BOUNDARY_REALM,
+                PARTY_TYPE_PARTY_BOUNDARY,
+                PARTY_TYPE_DEMON_REALM,
+                PARTY_TYPE_BEAST_REALM,
+            }:
                 raise PartyBattleRequirementError("this party type cannot start party PVE")
             if str(party["status"]) != "ready":
                 raise PartyBattleRequirementError("party is not ready")
@@ -207,6 +228,8 @@ class PartyCombatRepositoryMixin:
                 raise PartyBattleRequirementError("party PVE is not available at this location") from exc
             snapshots: list[dict[str, Any]] = []
             boundary_party = party_type in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}
+            demon_party = party_type == PARTY_TYPE_DEMON_REALM
+            beast_party = party_type == PARTY_TYPE_BEAST_REALM
             leader_ticket_inventory: dict[str, int] | None = None
             for row in members:
                 if str(row["location_key"]) != str(party["location_key"]):
@@ -221,9 +244,19 @@ class PartyCombatRepositoryMixin:
                     raise PartyBattleRequirementError("a party member does not meet the encounter realm")
                 if boundary_party and not self._boundary_mainline_ready(connection, row):
                     raise BoundaryRealmRequirementError("three-realms mainline evidence is missing")
+                if demon_party and not self._intro_flag(row, "access.demon.fallen_ruins"):
+                    raise CrossRealmPartyRequirementError("demon fallen ruins access is missing")
+                if demon_party and int(row["pollution"]) >= 80:
+                    raise PollutionTooHighError("pollution is too high for the demon dungeon")
+                if beast_party and self._faction_reputation(row, "beast") < 200:
+                    raise FactionReputationInsufficientError("beast reputation is insufficient")
                 if boundary_party and int(row["stamina"]) < BOUNDARY_REALM_STAMINA_COST:
                     raise BoundaryRealmResourceError("a party member lacks boundary-realm stamina")
-                if boundary_party:
+                if demon_party and int(row["stamina"]) < DEMON_REALM_STAMINA_COST:
+                    raise CrossRealmPartyRequirementError("a party member lacks demon-dungeon stamina")
+                if beast_party and int(row["stamina"]) < BEAST_REALM_STAMINA_COST:
+                    raise CrossRealmPartyRequirementError("a party member lacks beast-dungeon stamina")
+                if boundary_party or demon_party or beast_party:
                     fatigue_until = row["soul_fatigue_until"]
                     if fatigue_until:
                         try:
@@ -304,6 +337,29 @@ class PartyCombatRepositoryMixin:
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
                     (json.dumps(leader_ticket_inventory, ensure_ascii=False, sort_keys=True), now_text, leader["id"]),
                 )
+            elif demon_party or beast_party:
+                expected_location = DEMON_REALM_LOCATION if demon_party else BEAST_REALM_LOCATION
+                if str(party["location_key"]) != expected_location:
+                    raise CrossRealmPartyRequirementError("cross-realm party location is invalid")
+                stamina_cost = DEMON_REALM_STAMINA_COST if demon_party else BEAST_REALM_STAMINA_COST
+                for row in members:
+                    connection.execute(
+                        "UPDATE players SET stamina = stamina - ?, updated_at = ? WHERE id = ? AND stamina >= ?",
+                        (stamina_cost, now_text, row["database_player_id"], stamina_cost),
+                    )
+                    if connection.execute("SELECT changes()").fetchone()[0] != 1:
+                        raise CrossRealmPartyRequirementError("party stamina changed during start")
+            dungeon_reward = (
+                DEMON_REALM_REWARD
+                if demon_party
+                else BEAST_REALM_REWARD
+                if beast_party
+                else BOUNDARY_REALM_REWARD
+                if boundary_party
+                else PARTY_BATTLE_REWARD
+            )
+            dungeon_content_version = "content-0.3" if (boundary_party or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
+            dungeon_rule_version = "combat-0.3.0" if (boundary_party or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
             battle_id = f"party-battle-{uuid4().hex}"
             snapshot = {
                 "battle_type": PARTY_BATTLE_TYPE,
@@ -322,20 +378,31 @@ class PartyCombatRepositoryMixin:
                 },
                 "random_pool": enemy.random_pool,
                 "random_seed": operation_id,
-                "reward": dict(BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD),
+                "reward": dict(dungeon_reward),
                 "party_type": party_type,
                 "resource_cost": {
-                    "stamina": BOUNDARY_REALM_STAMINA_COST if boundary_party else 0,
+                    "stamina": (
+                        BOUNDARY_REALM_STAMINA_COST
+                        if boundary_party
+                        else DEMON_REALM_STAMINA_COST
+                        if demon_party
+                        else BEAST_REALM_STAMINA_COST
+                        if beast_party
+                        else 0
+                    ),
                     "ticket": {BOUNDARY_REALM_TICKET: BOUNDARY_REALM_TICKET_COST} if boundary_party else {},
                 },
-                "content_version": "content-0.3" if boundary_party else PARTY_BATTLE_CONTENT_VERSION,
-                "rule_version": "combat-0.3.0" if boundary_party else PARTY_BATTLE_RULE_VERSION,
+                "content_version": dungeon_content_version,
+                "rule_version": dungeon_rule_version,
             }
             state = {
                 "round_no": 0,
                 "member_hp": {member["player_id"]: member["stats"]["max_hp"] for member in snapshots},
                 "member_status": {member["player_id"]: "active" for member in snapshots},
                 "member_soul_power": {member["player_id"]: int(member.get("soul_power", 0)) for member in snapshots},
+                "member_pollution": {
+                    member["player_id"]: int(member.get("pollution", 0)) for member in snapshots
+                },
                 "revive_count": {member["player_id"]: 0 for member in snapshots},
                 "contribution": {member["player_id"]: 1 for member in snapshots},
                 "enemy_hp": enemy.max_hp,
@@ -356,8 +423,8 @@ class PartyCombatRepositoryMixin:
                     deadline,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(state, ensure_ascii=False, sort_keys=True),
-                    "content-0.3" if boundary_party else PARTY_BATTLE_CONTENT_VERSION,
-                    "combat-0.3.0" if boundary_party else PARTY_BATTLE_RULE_VERSION,
+                    dungeon_content_version,
+                    dungeon_rule_version,
                     now_text,
                     now_text,
                 ),
@@ -465,6 +532,17 @@ class PartyCombatRepositoryMixin:
                     if str(member["player_id"]) not in member_soul_power
                 }
             )
+            member_pollution = {
+                str(key): int(value)
+                for key, value in dict(state.get("member_pollution", {})).items()
+            }
+            member_pollution.update(
+                {
+                    str(member["player_id"]): int(member.get("pollution", 0))
+                    for member in snapshot.get("members", [])
+                    if str(member["player_id"]) not in member_pollution
+                }
+            )
             revive_count = {
                 str(key): int(value)
                 for key, value in dict(state.get("revive_count", {})).items()
@@ -488,6 +566,7 @@ class PartyCombatRepositoryMixin:
                 }
             )
             enemy_hp = int(state.get("enemy_hp", enemy["max_hp"]))
+            summon_count = int(state.get("summon_count", 0))
             target_index = int(state.get("target_index", 0))
             actions: list[dict[str, Any]] = []
             sequence = int(session["action_sequence"])
@@ -495,6 +574,8 @@ class PartyCombatRepositoryMixin:
                 PARTY_TYPE_BOUNDARY_REALM,
                 PARTY_TYPE_PARTY_BOUNDARY,
             }
+            demon_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_DEMON_REALM
+            beast_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_BEAST_REALM
             members = sorted(
                 [member for member in snapshot.get("members", []) if member["player_id"] in member_hp],
                 key=lambda member: (-int(member["stats"]["initiative"]), str(member["player_id"]),),
@@ -518,6 +599,22 @@ class PartyCombatRepositoryMixin:
                             "target_key": f"member:{player_id}",
                             "hit_roll_bp": 0,
                             "damage": 0,
+                        }
+                    )
+                    continue
+                if beast_party and summon_count > 0:
+                    summon_count -= 1
+                    contribution[player_id] += 1
+                    actions.append(
+                        {
+                            "sequence_no": sequence,
+                            "actor_key": f"member:{player_id}",
+                            "strategy_key": "party.clear_summon",
+                            "skill_key": "skill.beast.ancestral_form",
+                            "target_key": "enemy.summon",
+                            "hit_roll_bp": 10_000,
+                            "damage": 0,
+                            "summon_remaining": summon_count,
                         }
                     )
                     continue
@@ -557,6 +654,8 @@ class PartyCombatRepositoryMixin:
                 roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:enemy")
                 hit_bp = hit_chance_bp(attacker_initiative=int(enemy["initiative"]), defender_agility=int(target["stats"]["agility"]))
                 damage = int(enemy["attack"]) if roll < hit_bp else 0
+                if beast_party and summon_count > 0:
+                    damage = damage * 12_000 // 10_000
                 if len(timeline_defenders) >= 2 and expected_round in {5, 10}:
                     damage = damage * 8_000 // 10_000
                 member_hp[target_id] = max(0, member_hp[target_id] - damage)
@@ -564,6 +663,42 @@ class PartyCombatRepositoryMixin:
                     member_status[target_id] = "downed"
                 actions.append({"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.auto", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage})
                 target_index += 1
+            if demon_party and expected_round % 3 == 0:
+                for member in members:
+                    player_id = str(member["player_id"])
+                    member_pollution[player_id] = min(100, member_pollution.get(player_id, 0) + 8)
+                    connection.execute(
+                        "UPDATE players SET pollution=MIN(100, pollution+8), updated_at=? WHERE id=?",
+                        (now_text, member["database_id"]),
+                    )
+                sequence += 1
+                actions.append(
+                    {
+                        "sequence_no": sequence,
+                        "actor_key": "enemy",
+                        "strategy_key": "enemy.abyss_pollution",
+                        "skill_key": "skill.demonic.abyss_communion",
+                        "target_key": "party",
+                        "hit_roll_bp": 0,
+                        "damage": 0,
+                        "pollution_gain": 8,
+                    }
+                )
+            if beast_party and expected_round % 4 == 0:
+                summon_count = 2
+                sequence += 1
+                actions.append(
+                    {
+                        "sequence_no": sequence,
+                        "actor_key": "enemy",
+                        "strategy_key": "enemy.ancestral_summon",
+                        "skill_key": "skill.beast.ancestral_form",
+                        "target_key": "enemy",
+                        "hit_roll_bp": 0,
+                        "damage": 0,
+                        "summon_count": 2,
+                    }
+                )
             if boundary_party and expected_round in {5, 10} and len(timeline_defenders) < 2:
                 for member in members:
                     player_id = str(member["player_id"])
@@ -587,7 +722,7 @@ class PartyCombatRepositoryMixin:
                 )
             # Revive deterministically after the enemy action; each downed
             # member can be restored once and the debit is guarded in SQL.
-            if boundary_party:
+            if boundary_party or demon_party or beast_party:
                 alive = [
                     member
                     for member in members
@@ -639,18 +774,19 @@ class PartyCombatRepositoryMixin:
                     "member_hp": member_hp,
                     "member_status": member_status,
                     "member_soul_power": member_soul_power,
+                    "member_pollution": member_pollution,
                     "revive_count": revive_count,
                     "contribution": contribution,
                     "enemy_hp": enemy_hp,
                 }
-                for metadata_key in ("soul_power_cost", "soul_power_loss"):
+                for metadata_key in ("soul_power_cost", "soul_power_loss", "pollution_gain", "summon_count"):
                     if metadata_key in action:
                         state_after[metadata_key] = int(action[metadata_key])
                 connection.execute(
                     "INSERT INTO party_battle_actions(action_id, battle_id, sequence_no, round_no, actor_key, strategy_key, skill_key, target_key, hit_roll_bp, damage, state_json, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (uuid4().hex, battle_id, action["sequence_no"], expected_round, action["actor_key"], action["strategy_key"], action["skill_key"], action["target_key"], action["hit_roll_bp"], action["damage"], json.dumps(state_after, ensure_ascii=False, sort_keys=True), f"{operation_id}:{action['sequence_no']}", now_text),
                 )
-            unresolved_downed = boundary_party and any(
+            unresolved_downed = (boundary_party or demon_party or beast_party) and any(
                 member_status.get(player_id) == "downed" for player_id in member_hp
             )
             outcome = "won" if enemy_hp <= 0 else ("lost" if unresolved_downed else (
@@ -670,9 +806,11 @@ class PartyCombatRepositoryMixin:
                     "member_hp": member_hp,
                     "member_status": member_status,
                     "member_soul_power": member_soul_power,
+                    "member_pollution": member_pollution,
                     "revive_count": revive_count,
                     "contribution": contribution,
                     "enemy_hp": enemy_hp,
+                    "summon_count": summon_count,
                     "target_index": target_index,
                 }
             )
@@ -716,6 +854,9 @@ class PartyCombatRepositoryMixin:
             reward_map: dict[str, dict[str, int]] = {}
             snapshot = self._json_object(session["snapshot_json"], {})
             boundary_party = str(snapshot.get("party_type", "")) in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}
+            demon_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_DEMON_REALM
+            beast_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_BEAST_REALM
+            cross_realm_party = boundary_party or demon_party or beast_party
             reward_template = {
                 str(key): int(value)
                 for key, value in dict(snapshot.get("reward", BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
@@ -766,7 +907,7 @@ class PartyCombatRepositoryMixin:
                             reward[key] = min(value, role_cap)
                 else:
                     reward = {}
-                if boundary_party and outcome in {"lost", "expired"} and score > 0:
+                if cross_realm_party and outcome in {"lost", "expired"} and score > 0:
                     reward = {"world_merit": min(10, max(1, score // 100))}
                 reward_map[str(battle_member["player_id"])] = reward
                 player = connection.execute("SELECT * FROM players WHERE id = ?", (battle_member["player_id"],)).fetchone()
@@ -778,14 +919,18 @@ class PartyCombatRepositoryMixin:
                     total_cultivation = int(player["total_cultivation"]) + int(reward.get("cultivation", 0))
                     spirit_stones = int(player["spirit_stones"]) + int(reward.get("spirit_stones", 0))
                     world_merit = int(player["world_merit"]) + int(reward.get("world_merit", 0))
+                    faction = self._json_object(player["faction_reputation_json"], {})
                     for item_key, quantity in reward.items():
                         if item_key.startswith("item."):
                             inventory[item_key] = int(inventory.get(item_key, 0)) + int(quantity)
+                        elif item_key.startswith("faction_reputation."):
+                            faction_key = item_key.removeprefix("faction_reputation.")
+                            faction[faction_key] = int(faction.get(faction_key, 0)) + int(quantity)
                     connection.execute(
-                        "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, world_merit=?, inventory_json=?, updated_at=? WHERE id=?",
-                        (cultivation, total_cultivation, spirit_stones, world_merit, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                        "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, world_merit=?, inventory_json=?, faction_reputation_json=?, updated_at=? WHERE id=?",
+                        (cultivation, total_cultivation, spirit_stones, world_merit, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
                     )
-                if boundary_party and outcome in {"lost", "expired"}:
+                if cross_realm_party and outcome in {"lost", "expired"}:
                     fatigue_until = serialize_datetime(self._now() + timedelta(hours=2))
                     connection.execute(
                         "UPDATE players SET soul_power=MAX(0, soul_power-2000), soul_fatigue_until=?, updated_at=? WHERE id=?",
@@ -865,6 +1010,25 @@ class PartyCombatRepositoryMixin:
             (row["database_player_id"], "story.mainline.three_realms"),
         ).fetchone()
         return progress is not None and str(progress["status"]) in {"completed", "claimed"}
+
+    @staticmethod
+    def _intro_flag(row: Any, flag: str) -> bool:
+        try:
+            intro = json.loads(str(row["intro_json"] or "{}"))
+        except (TypeError, json.JSONDecodeError):
+            intro = {}
+        if not isinstance(intro, dict):
+            return False
+        flags = intro.get("flags", [])
+        return flag in flags if isinstance(flags, list) else False
+
+    @staticmethod
+    def _faction_reputation(row: Any, faction: str) -> int:
+        try:
+            reputation = json.loads(str(row["faction_reputation_json"] or "{}"))
+        except (TypeError, json.JSONDecodeError):
+            reputation = {}
+        return int(reputation.get(faction, 0)) if isinstance(reputation, dict) else 0
 
     @staticmethod
     def _party_battle_record_operation(connection: sqlite3.Connection, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:

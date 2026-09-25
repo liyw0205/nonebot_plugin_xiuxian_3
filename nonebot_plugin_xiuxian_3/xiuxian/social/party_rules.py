@@ -8,6 +8,8 @@ from dataclasses import dataclass
 PARTY_TYPE_EXPLORATION_PAIR = "exploration_pair"
 PARTY_TYPE_ARENA_TRIO = "arena_trio"
 PARTY_TYPE_BOUNDARY_REALM = "boundary_realm"
+PARTY_TYPE_DEMON_REALM = "demon_realm"
+PARTY_TYPE_BEAST_REALM = "beast_realm"
 # Keep the implementation name used by early design notes as an input alias.
 PARTY_TYPE_PARTY_BOUNDARY = "party_boundary"
 PARTY_MAX_MEMBERS = 2
@@ -49,6 +51,24 @@ BOUNDARY_REALM_DEFINITION = PartyDefinition(
     content_version="content-0.3",
     rule_version="social-0.3.0",
 )
+DEMON_REALM_DEFINITION = PartyDefinition(
+    party_type=PARTY_TYPE_DEMON_REALM,
+    min_members=2,
+    max_members=5,
+    required_location="demon.fallen_ruins",
+    distribution_key="contribution",
+    content_version="content-0.3",
+    rule_version="social-0.3.1",
+)
+BEAST_REALM_DEFINITION = PartyDefinition(
+    party_type=PARTY_TYPE_BEAST_REALM,
+    min_members=2,
+    max_members=5,
+    required_location="beast.ten_thousand_hills",
+    distribution_key="contribution",
+    content_version="content-0.3",
+    rule_version="social-0.3.1",
+)
 
 
 def party_definition_for(party_type: str) -> PartyDefinition:
@@ -56,6 +76,10 @@ def party_definition_for(party_type: str) -> PartyDefinition:
         return ARENA_TRIO_DEFINITION
     if party_type in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}:
         return BOUNDARY_REALM_DEFINITION
+    if party_type == PARTY_TYPE_DEMON_REALM:
+        return DEMON_REALM_DEFINITION
+    if party_type == PARTY_TYPE_BEAST_REALM:
+        return BEAST_REALM_DEFINITION
     if party_type != PARTY_TYPE_EXPLORATION_PAIR:
         raise ValueError(f"unsupported party type: {party_type}")
     return PARTY_DEFINITION
@@ -64,6 +88,8 @@ def party_definition_for(party_type: str) -> PartyDefinition:
 __all__ = [
     "PARTY_CONFIRMATION_TTL_SECONDS",
     "BOUNDARY_REALM_DEFINITION",
+    "BEAST_REALM_DEFINITION",
+    "DEMON_REALM_DEFINITION",
     "BOUNDARY_REALM_MAX_MEMBERS",
     "BOUNDARY_REALM_MIN_MEMBERS",
     "PARTY_CONTENT_VERSION",
@@ -75,6 +101,8 @@ __all__ = [
     "PARTY_TYPE_EXPLORATION_PAIR",
     "PARTY_TYPE_ARENA_TRIO",
     "PARTY_TYPE_BOUNDARY_REALM",
+    "PARTY_TYPE_BEAST_REALM",
+    "PARTY_TYPE_DEMON_REALM",
     "PARTY_TYPE_PARTY_BOUNDARY",
     "PartyDefinition",
     "party_definition_for",

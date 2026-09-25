@@ -10,6 +10,8 @@
 
 魔渊额外事件池：魔核 45、声望 30、契约线索 15、心魔 10；万兽山：妖血 45、声望 30、血脉线索 15、祖灵事件 10。当前祖灵事件分支只保存为无资产结果，待独立事件切片接入。队伍副本奖励按角色贡献独立抽取，唯一物按贡献排序且保存排序；退出/掉线成员不获得未结算奖励。
 
+魔渊与万兽多人队伍副本已使用独立 `PartyBattleSession`；祖灵机制只记录可清除祖灵，不伪造独立事件资产。探索仅写贡献，不直接发事件大奖；达领奖条件后必须单独调用 `event.claim_reward`。
+
 世界探索事件由 events 域创建：`event.demon_invasion`、`event.beast_trade`、`event.boundary_rift`。探索仅写贡献，不直接发事件大奖；达领奖条件后必须单独调用 `event.claim_reward`。
 
 跨界探索 running 后不可取消；超时 24 小时恢复任务按原池结算为失败或成功，依据已保存战斗结果。错误：`CROSS_REALM_REQUIREMENT_MISSING`、`POLLUTION_TOO_HIGH`、`PARTY_SIZE_INVALID`、`PARTY_MEMBER_INVALID`、`SOUL_CRYSTAL_INSUFFICIENT`、`SOUL_EXHAUSTION_ACTIVE`。关闭后停止新会话，旧会话结算、玩家可返回安全区。验收：污染/神魂变化一次；队伍前置整体拒绝；副本奖励按贡献不复制唯一物；跨界池/盟约更新不改变旧会话。

@@ -800,6 +800,10 @@ class BoundaryRealmRequirementError(PartyBattleRequirementError):
     """A boundary-realm member is missing the cross-realm qualification."""
 
 
+class CrossRealmPartyRequirementError(PartyBattleRequirementError):
+    """A v0.3 cross-realm dungeon party requirement is not satisfied."""
+
+
 class BoundaryRealmResourceError(PartyBattleRequirementError):
     """A boundary-realm party lacks stamina or its team ticket."""
 

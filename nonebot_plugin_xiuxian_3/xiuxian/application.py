@@ -770,6 +770,12 @@ class XiuxianApplication:
     async def create_boundary_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_boundary_party(context), write_message="当前事件不允许创建界隙队伍。")
 
+    async def create_demon_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.create_demon_party(context), write_message="当前事件不允许创建魔渊队伍。")
+
+    async def create_beast_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.create_beast_party(context), write_message="当前事件不允许创建万兽队伍。")
+
     async def invite_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.invite_party(context), write_message="当前事件不允许邀请队伍成员。")
 

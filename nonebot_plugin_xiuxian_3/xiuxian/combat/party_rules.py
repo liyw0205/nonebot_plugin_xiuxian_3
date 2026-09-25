@@ -16,6 +16,20 @@ BOUNDARY_REALM_STAMINA_COST = 30
 BOUNDARY_REALM_TICKET = "item.soul_crystal"
 BOUNDARY_REALM_TICKET_COST = 1
 BOUNDARY_REALM_REWARD = {"item.soul_crystal": 1}
+DEMON_REALM_LOCATION = "demon.fallen_ruins"
+DEMON_REALM_STAMINA_COST = 20
+DEMON_REALM_REWARD = {
+    "item.demon_core": 1,
+    "world_merit": 20,
+    "faction_reputation.demon": 15,
+}
+BEAST_REALM_LOCATION = "beast.ten_thousand_hills"
+BEAST_REALM_STAMINA_COST = 20
+BEAST_REALM_REWARD = {
+    "item.beast_blood": 1,
+    "world_merit": 20,
+    "faction_reputation.beast": 15,
+}
 
 
 def party_enemy_for_location(location_key: str) -> EnemyDefinition:
@@ -27,6 +41,10 @@ def party_enemy_for_location(location_key: str) -> EnemyDefinition:
         return enemy_definition("enemy.mist_guardian")
     if location_key == BOUNDARY_REALM_LOCATION:
         return enemy_definition(BOUNDARY_REALM_ENEMY)
+    if location_key == DEMON_REALM_LOCATION:
+        return enemy_definition("enemy.demon_overlord")
+    if location_key == BEAST_REALM_LOCATION:
+        return enemy_definition("enemy.beast_ancestor")
     raise ValueError("party PVE is not available at this location")
 
 
@@ -42,5 +60,11 @@ __all__ = [
     "BOUNDARY_REALM_STAMINA_COST",
     "BOUNDARY_REALM_TICKET",
     "BOUNDARY_REALM_TICKET_COST",
+    "BEAST_REALM_LOCATION",
+    "BEAST_REALM_REWARD",
+    "BEAST_REALM_STAMINA_COST",
+    "DEMON_REALM_LOCATION",
+    "DEMON_REALM_REWARD",
+    "DEMON_REALM_STAMINA_COST",
     "party_enemy_for_location",
 ]

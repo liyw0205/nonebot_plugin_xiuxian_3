@@ -9,11 +9,13 @@ party_battle -> created -> running -> won/lost/expired -> settled
 service -> created -> accepted -> locked -> processing -> delivered -> settled
 ```
 
-当前运行时开放 `forming -> ready -> disbanded/expired` 的双人探索队伍、三人竞技队伍和界隙 2–5 人队伍状态机，
+当前运行时开放 `forming -> ready -> disbanded/expired` 的双人探索队伍、三人竞技队伍、界隙/魔渊/万兽 2–5 人队伍状态机，
 以及独立的 `party_battle` 自动 PVE 会话；队伍自身不伪装成单人战斗会话。邀请和全员确认窗口为 5 分钟，
 队伍创建时保存地点和分配规则。界隙队伍只能在 `cave.boundary_realm` 创建，开始前要求所有成员元婴 L1、三界主线证据、
 地点一致和资源充足；开始事务原子扣除每人 30 体力与队长 1 枚 `item.soul_crystal`，再锁定全员资产和跨界快照。
 队长退出时转移给活动成员，无活动成员则解散；超时会将邀请和活动成员标记为 `expired`。
+
+魔渊队伍和万兽队伍分别冻结 `demon.fallen_ruins`、`beast.ten_thousand_hills` 地点与 v0.3 资格；开始时每名成员原子扣除 20 体力，副本失败由结算事务统一写入神魂疲劳。
 
 宗门职位首版：成员、执事、长老、副宗主、宗主。公共仓库、成员管理、职位和解散均需要权限与审计。
 

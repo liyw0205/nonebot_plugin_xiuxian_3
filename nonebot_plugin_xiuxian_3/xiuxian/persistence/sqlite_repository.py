@@ -488,7 +488,7 @@ class SQLitePlayerRepository(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'parties'"
         ).fetchone()
         schema_sql = str(table[0]) if table and table[0] else ""
-        if "'boundary_realm'" in schema_sql and "'party_boundary'" in schema_sql:
+        if all(value in schema_sql for value in ("'boundary_realm'", "'party_boundary'", "'demon_realm'", "'beast_realm'")):
             return
         connection.execute("PRAGMA foreign_keys = OFF")
         connection.execute("DROP INDEX IF EXISTS idx_parties_leader")
@@ -498,7 +498,7 @@ class SQLitePlayerRepository(
             CREATE TABLE parties_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 party_id TEXT NOT NULL UNIQUE,
-                party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio', 'boundary_realm', 'party_boundary')),
+                party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio', 'boundary_realm', 'party_boundary', 'demon_realm', 'beast_realm')),
                 status TEXT NOT NULL CHECK (status IN ('forming', 'ready', 'disbanded', 'expired')),
                 leader_id INTEGER NOT NULL REFERENCES players(id),
                 location_key TEXT NOT NULL,

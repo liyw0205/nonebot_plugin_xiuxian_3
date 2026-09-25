@@ -154,6 +154,21 @@ BEAST_GUARDIAN = EnemyDefinition(
     reward={},
 )
 
+BEAST_ANCESTOR = EnemyDefinition(
+    key="enemy.beast_ancestor",
+    label="万兽始祖",
+    location_key="beast.ten_thousand_hills",
+    required_realm="nascent_soul",
+    required_layer=1,
+    max_hp=7500,
+    attack=480,
+    initiative=22,
+    agility=24,
+    skill_key="skill.beast.ancestral_form",
+    random_pool="combat.beast_ancestor.v0.3",
+    reward={},
+)
+
 DEMON_WAR_FRONT = EnemyDefinition(
     key="enemy.demon_war_front",
     label="魔界战场先锋",
@@ -223,6 +238,7 @@ ENEMIES = {
     MIST_ELITE.key: MIST_ELITE,
     DEMON_OVERLORD.key: DEMON_OVERLORD,
     BEAST_GUARDIAN.key: BEAST_GUARDIAN,
+    BEAST_ANCESTOR.key: BEAST_ANCESTOR,
     DEMON_WAR_FRONT.key: DEMON_WAR_FRONT,
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_WATCHER.key: BOUNDARY_WATCHER,
@@ -306,6 +322,7 @@ __all__ = [
     "CLOUD_BEAST",
     "DEMON_OVERLORD",
     "BEAST_GUARDIAN",
+    "BEAST_ANCESTOR",
     "DEMON_WAR_FRONT",
     "IRON_BOAR",
     "MIST_ELITE",
