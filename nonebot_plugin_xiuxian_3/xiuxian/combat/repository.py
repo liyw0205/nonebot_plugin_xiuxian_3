@@ -33,6 +33,7 @@ from .models import (
 )
 from .rules import (
     CONTENT_VERSION,
+    BEAST_GUARDIAN,
     DEMON_OVERLORD,
     DEMON_WAR_FRONT,
     DEFEAT_COOLDOWN_SECONDS,
@@ -199,7 +200,7 @@ class CombatRepositoryMixin:
         exploration_id: str | None = None,
     ) -> BattleStartRecord:
         enemy = enemy_definition(enemy_key)
-        v03_enemy_keys = {DEMON_OVERLORD.key, DEMON_WAR_FRONT.key}
+        v03_enemy_keys = {DEMON_OVERLORD.key, BEAST_GUARDIAN.key, DEMON_WAR_FRONT.key}
         battle_content_version = V03_CONTENT_VERSION if enemy.key in v03_enemy_keys else CONTENT_VERSION
         battle_rule_version = V03_RULE_VERSION if enemy.key in v03_enemy_keys else RULE_VERSION
         operation_name = "battle.start" if battle_type == "pve.training" else f"battle.start.{battle_type}"

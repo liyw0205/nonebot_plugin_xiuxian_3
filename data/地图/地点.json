@@ -186,27 +186,29 @@
     {
       "name": "万兽山入口",
       "world": "妖界",
-      "status": "locked",
+      "status": "open",
       "requirements": [
         {
           "type": "realm",
-          "realm_key": "foundation",
-          "min_layer": 6
+          "realm_key": "nascent_soul",
+          "min_layer": 1
         },
         {
-          "type": "quest_completed",
-          "quest_key": "quest.beast_intro"
+          "type": "faction_reputation",
+          "faction": "beast",
+          "min": 200
         }
       ],
       "travel": {
-        "duration_seconds": 120,
-        "stamina": 10
+        "duration_seconds": 300,
+        "stamina": 12
       },
       "environment": {
-        "display_only": true
+        "risk": "medium",
+        "non_beast_penalty_bp": -1000
       },
       "actions": [
-        "read_entry_requirements"
+        "explore.beast_hunt"
       ],
       "key": "beast.ten_thousand_hills"
     },

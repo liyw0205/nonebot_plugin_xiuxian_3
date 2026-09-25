@@ -41,6 +41,8 @@ class ExplorationStartRecord:
     pollution_before: int = 0
     pollution_after: int = 0
     cross_realm_penalty_bp: int = 0
+    bloodline_stability_before: int = 0
+    bloodline_stability_after: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,3 +69,5 @@ class ExplorationSettlementRecord:
     pollution_after: int = 0
     soul_power_loss: int = 0
     soul_fatigue_until: str | None = None
+    bloodline_stability_before: int = 0
+    bloodline_stability_after: int = 0

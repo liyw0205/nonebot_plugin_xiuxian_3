@@ -234,6 +234,30 @@
       "key": "item.clue.demon_contract"
     },
     {
+      "name": "妖界血脉线索",
+      "item_type": "clue",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "bloodline_clue",
+          "scope": "beast"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "status": "active",
+      "key": "item.clue.beast_bloodline"
+    },
+    {
       "name": "云铁",
       "item_type": "material",
       "quality": "rare",

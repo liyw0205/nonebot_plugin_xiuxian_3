@@ -38,9 +38,9 @@
       "reason": "companions v0.1 只声明生产来源，生产配方表尚未给出稳定 recipe_key"
     },
     {
-      "source": "demon.abyss_gate / beast.ten_thousand_hills",
+      "source": "demon.abyss_gate",
       "label": "未来版本任务",
-      "reason": "quest.demon_intro 与 quest.beast_intro 属于后续跨界内容，入口保持 locked"
+      "reason": "quest.demon_intro 属于后续跨界内容，魔界深渊入口保持 locked；妖界万兽山已由 v0.3 运行时切片接管"
     }
   ],
   "open_realms": [

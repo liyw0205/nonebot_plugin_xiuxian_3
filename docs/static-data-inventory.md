@@ -109,7 +109,7 @@ data/
 ### v0.3
 
 `item.pill.soul_condense`、`item.pill.soul_restore`、`item.soul_crystal`、
-`item.clue.demon_contract`、`item.demon_core`、`item.beast_blood`、
+`item.clue.demon_contract`、`item.clue.beast_bloodline`、`item.demon_core`、`item.beast_blood`、
 `item.weapon.boundary_spear`、
 `item.armor.soul_robe`、`item.token.rebuild_path`、
 `item.array.boundary_gate`、`item.contract.beast_pact`。

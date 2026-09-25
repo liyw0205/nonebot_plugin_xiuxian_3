@@ -297,6 +297,8 @@ class ExplorationRepositoryMixin:
                 raise LocationRequirementError("realm requirement is not met")
             pollution_before = int(row["pollution"])
             pollution_after = pollution_before
+            bloodline_stability_before = int(row["bloodline_stability"])
+            bloodline_stability_after = bloodline_stability_before
             cross_realm_penalty_bp = 0
             if definition.key == "explore.demon_abyss":
                 if pollution_before >= 80:
@@ -311,6 +313,9 @@ class ExplorationRepositoryMixin:
                 faction = self._json_object(row["faction_reputation_json"], {})
                 cross_realm_penalty_bp = 0 if str(row["path_key"] or "") == "demonic" or int(faction.get("demon_alliance", 0)) > 0 else 1000
                 pollution_after = min(100, pollution_before + 10)
+            if definition.key == "explore.beast_hunt":
+                faction = self._json_object(row["faction_reputation_json"], {})
+                cross_realm_penalty_bp = 0 if str(row["path_key"] or "") == "beast" or int(faction.get("beast_alliance", 0)) > 0 else 1000
             if definition.key == "explore.spring_gather":
                 intro_state = self._json_object(row["intro_json"], {})
                 if "guide.gather_blood_grass" not in set(intro_state.get("flags", [])):
@@ -393,6 +398,8 @@ class ExplorationRepositoryMixin:
                 "path_key": row["path_key"],
                 "pollution_before": pollution_before,
                 "pollution_after": pollution_after,
+                "bloodline_stability_before": bloodline_stability_before,
+                "bloodline_stability_after": bloodline_stability_after,
                 "cross_realm_penalty_bp": cross_realm_penalty_bp,
                 "rule_version": definition.rule_version,
                 "random_pool": definition.random_pool,
@@ -460,6 +467,8 @@ class ExplorationRepositoryMixin:
                 "risk_reduction_bp": barrier_risk_reduction_bp,
                 "pollution_before": pollution_before,
                 "pollution_after": pollution_after,
+                "bloodline_stability_before": bloodline_stability_before,
+                "bloodline_stability_after": bloodline_stability_after,
                 "cross_realm_penalty_bp": cross_realm_penalty_bp,
             }
             connection.execute(
@@ -492,6 +501,8 @@ class ExplorationRepositoryMixin:
             pollution_before=int(payload.get("pollution_before", 0)),
             pollution_after=int(payload.get("pollution_after", 0)),
             cross_realm_penalty_bp=int(payload.get("cross_realm_penalty_bp", 0)),
+            bloodline_stability_before=int(payload.get("bloodline_stability_before", 0)),
+            bloodline_stability_after=int(payload.get("bloodline_stability_after", 0)),
             already_completed=replay,
         )
 
@@ -670,6 +681,8 @@ class ExplorationRepositoryMixin:
                 "expired": False,
                 "pollution_before": int(self._json_object(session["snapshot_json"], {}).get("pollution_before", 0)),
                 "pollution_after": int(self._json_object(session["snapshot_json"], {}).get("pollution_after", 0)),
+                "bloodline_stability_before": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_before", 0)),
+                "bloodline_stability_after": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_after", 0)),
                 "soul_power_loss": soul_power_loss,
                 "soul_fatigue_until": soul_fatigue_until,
                 "settled_at": now_text,
@@ -703,6 +716,8 @@ class ExplorationRepositoryMixin:
                 "battle_outcome": battle_outcome,
                 "pollution_before": int(self._json_object(session["snapshot_json"], {}).get("pollution_before", 0)),
                 "pollution_after": int(self._json_object(session["snapshot_json"], {}).get("pollution_after", 0)),
+                "bloodline_stability_before": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_before", 0)),
+                "bloodline_stability_after": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_after", 0)),
                 "soul_power_loss": soul_power_loss,
                 "soul_fatigue_until": soul_fatigue_until,
             }
@@ -956,6 +971,8 @@ class ExplorationRepositoryMixin:
                 "content_version": snapshot.get("content_version", "content-0.1"),
                 "pollution_before": int(snapshot.get("pollution_before", 0)),
                 "pollution_after": int(snapshot.get("pollution_after", 0)),
+                "bloodline_stability_before": int(snapshot.get("bloodline_stability_before", 0)),
+                "bloodline_stability_after": int(snapshot.get("bloodline_stability_after", 0)),
                 "settled_at": now_text,
             }
             connection.execute(
@@ -992,6 +1009,8 @@ class ExplorationRepositoryMixin:
                 "storm_choice": result_json.get("storm_choice"),
                 "pollution_before": int(snapshot.get("pollution_before", 0)),
                 "pollution_after": int(snapshot.get("pollution_after", 0)),
+                "bloodline_stability_before": int(snapshot.get("bloodline_stability_before", 0)),
+                "bloodline_stability_after": int(snapshot.get("bloodline_stability_after", 0)),
                 "soul_power_loss": 0,
                 "soul_fatigue_until": None,
             }
@@ -1031,6 +1050,8 @@ class ExplorationRepositoryMixin:
             pollution_after=int(payload.get("pollution_after", 0)),
             soul_power_loss=int(payload.get("soul_power_loss", 0)),
             soul_fatigue_until=str(payload["soul_fatigue_until"]) if payload.get("soul_fatigue_until") else None,
+            bloodline_stability_before=int(payload.get("bloodline_stability_before", 0)),
+            bloodline_stability_after=int(payload.get("bloodline_stability_after", 0)),
             already_completed=replay,
         )
 

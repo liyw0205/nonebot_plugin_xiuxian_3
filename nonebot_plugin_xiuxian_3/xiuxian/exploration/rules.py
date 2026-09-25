@@ -35,6 +35,7 @@ BATTLE_ENEMY_BY_MODE = {
     "explore.cloud_mine": "enemy.cloud_beast",
     "explore.mist_grotto_2": "enemy.mist_elite",
     "explore.demon_abyss": "enemy.demon_overlord",
+    "explore.beast_hunt": "enemy.beast_guardian",
 }
 
 DEFINITIONS = {
@@ -147,6 +148,20 @@ DEFINITIONS = {
         rule_version=V03_RULE_VERSION,
         content_version=V03_CONTENT_VERSION,
     ),
+    "explore.beast_hunt": ExplorationDefinition(
+        key="explore.beast_hunt",
+        label="万兽山狩猎",
+        location_key="beast.ten_thousand_hills",
+        duration_seconds=15 * 60,
+        stamina_cost=20,
+        required_realm="nascent_soul",
+        required_layer=1,
+        daily_limit=2,
+        random_pool="loot.beast.hills.v0.3",
+        battle_chance_bp=10000,
+        rule_version=V03_RULE_VERSION,
+        content_version=V03_CONTENT_VERSION,
+    ),
 }
 
 ALIASES = {
@@ -164,6 +179,8 @@ ALIASES = {
     "云舟历练": "explore.cloud_boat_trial",
     "魔界堕落遗迹探索": "explore.demon_abyss",
     "堕落遗迹探索": "explore.demon_abyss",
+    "万兽山狩猎": "explore.beast_hunt",
+    "妖界万兽山探索": "explore.beast_hunt",
 }
 
 
@@ -294,6 +311,17 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
             return {"faction_reputation.demon": 15}
         if reward == 2:
             return {"item.clue.demon_contract": 1}
+        return {}
+    if mode_key == "explore.beast_hunt":
+        # The final branch is the documented ancestor event, which remains a
+        # later independent slice and therefore does not mint an asset here.
+        reward = weighted_value(seed + ":reward", (0, 1, 2, 3), (45, 30, 15, 10))
+        if reward == 0:
+            return {"item.beast_blood": 1}
+        if reward == 1:
+            return {"faction_reputation.beast": 15}
+        if reward == 2:
+            return {"item.clue.beast_bloodline": 1}
         return {}
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 

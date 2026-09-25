@@ -141,6 +141,13 @@ DESTINATIONS = {
         required_faction="demon", required_faction_reputation=200,
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
+    "beast.ten_thousand_hills": DestinationDefinition(
+        "beast.ten_thousand_hills", "妖界·万兽山", 5 * 60, 12, 0,
+        required_realm="nascent_soul", required_layer=1,
+        source_locations=("xuantian.floating_boat",),
+        required_faction="beast", required_faction_reputation=200,
+        content_version="content-0.3", rule_version="world-0.3.0",
+    ),
     "xuantian.war_front": DestinationDefinition(
         "xuantian.war_front", "玄天·魔界战场", 5 * 60, 15, 0,
         required_realm="nascent_soul", required_layer=1,
@@ -183,6 +190,8 @@ ALIASES = {
     "魔界魔渊集市": "demon.abyss_market",
     "魔渊集市": "demon.abyss_market",
     "契约集市": "demon.abyss_market",
+    "妖界万兽山": "beast.ten_thousand_hills",
+    "万兽山": "beast.ten_thousand_hills",
     "魔界战场": "xuantian.war_front",
     "玄天魔界战场": "xuantian.war_front",
 }

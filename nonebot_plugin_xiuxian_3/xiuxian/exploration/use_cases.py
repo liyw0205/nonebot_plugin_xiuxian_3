@@ -37,6 +37,7 @@ ITEM_LABELS = {
     "item.ticket.cloud_boat_fragment": "云舟票碎片",
     "item.demon_core": "魔核",
     "item.clue.demon_contract": "魔界契约线索",
+    "item.clue.beast_bloodline": "妖界血脉线索",
 }
 
 
@@ -80,7 +81,7 @@ class ExplorationApplication:
             return CommandResult(
                 False,
                 "INVALID_EXPLORATION_MODE",
-                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集`、`开始探索 洞天二层探索`、`开始探索 云舟试炼` 或 `开始探索 魔界堕落遗迹探索`。",
+                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集`、`开始探索 洞天二层探索`、`开始探索 云舟试炼`、`开始探索 魔界堕落遗迹探索` 或 `开始探索 万兽山狩猎`。",
                 context.request_id,
             )
         operation_id = self._operation_id(context, "exploration.start")
@@ -146,6 +147,8 @@ class ExplorationApplication:
                 "pollution_before": record.pollution_before,
                 "pollution_after": record.pollution_after,
                 "cross_realm_penalty_bp": record.cross_realm_penalty_bp,
+                "bloodline_stability_before": record.bloodline_stability_before,
+                "bloodline_stability_after": record.bloodline_stability_after,
                 "idempotent_replay": record.already_completed,
             },
         )
@@ -267,6 +270,7 @@ class ExplorationApplication:
                 + f"- **精力**：{record.player.energy}/{record.player.energy_max}\n"
                 + f"- **灵石**：{record.player.spirit_stones}\n"
                 + f"- **污染**：{record.pollution_after}\n"
+                + (f"- **血脉稳定**：{record.bloodline_stability_after}\n" if record.mode_key == "explore.beast_hunt" else "")
                 + (f"- **神魂损失**：{record.soul_power_loss}\n" if record.soul_power_loss else "")
                 + "\n> 结果按开始时的规则快照结算，重复结算不会重复发放。"
             ),
@@ -285,6 +289,8 @@ class ExplorationApplication:
                 "pollution_after": record.pollution_after,
                 "soul_power_loss": record.soul_power_loss,
                 "soul_fatigue_until": record.soul_fatigue_until,
+                "bloodline_stability_before": record.bloodline_stability_before,
+                "bloodline_stability_after": record.bloodline_stability_after,
                 "idempotent_replay": record.already_completed,
             },
         )

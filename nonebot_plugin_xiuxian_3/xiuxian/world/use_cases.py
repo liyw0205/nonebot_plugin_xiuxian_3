@@ -102,6 +102,10 @@ class WorldApplication:
             item.replace("qi_gathering", "聚气")
             .replace("qi_sensing", "感气")
             .replace("foundation", "筑基")
+            .replace("golden_core", "金丹")
+            .replace("nascent_soul", "元婴")
+            .replace("soul_transformation", "化神")
+            .replace("void_refining", "炼虚")
             .replace("dao_union", "合道")
             .replace("ascension_ready", "飞升候选")
             .replace("remained_in_world", "留界")
@@ -165,10 +169,11 @@ class WorldApplication:
         except EventNotActiveError:
             return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战场只在每周三 20:00 UTC 起的活动窗口开放。", context.request_id, operation_id)
         except FactionReputationInsufficientError:
+            faction_label = "妖界" if resolved == "beast.ten_thousand_hills" else "魔界"
             return CommandResult(
                 False,
                 "FACTION_REPUTATION_INSUFFICIENT",
-                "魔界声望不足，需要达到 200；本次未扣除体力或灵石。",
+                f"{faction_label}声望不足，需要达到 200；本次未扣除体力或灵石。",
                 context.request_id,
                 operation_id,
             )

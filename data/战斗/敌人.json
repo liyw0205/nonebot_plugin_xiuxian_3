@@ -129,6 +129,29 @@
       "status": "active"
     },
     {
+      "name": "万兽山守山兽",
+      "location_key": "beast.ten_thousand_hills",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 7500,
+        "attack": 480,
+        "initiative": 22,
+        "agility": 24
+      },
+      "skills": [
+        "skill.beast.guardian_roar"
+      ],
+      "reward_refs": [],
+      "key": "enemy.beast_guardian",
+      "status": "active"
+    },
+    {
       "name": "三劫天尊",
       "location_key": "tribulation.sky_terrace",
       "requirements": [
