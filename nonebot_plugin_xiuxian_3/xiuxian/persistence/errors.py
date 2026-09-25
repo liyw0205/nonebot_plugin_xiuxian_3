@@ -1016,6 +1016,10 @@ class ArenaMatchRequirementError(RuntimeError):
     """The requested arena challenge does not satisfy mode requirements."""
 
 
+class ThreeRealmsArenaRequirementError(ArenaMatchRequirementError):
+    """The player lacks the three-realms arena realm or permit gate."""
+
+
 class ArenaMatchNotFoundError(RuntimeError):
     """The requested arena match does not exist or is not visible to the player."""
 

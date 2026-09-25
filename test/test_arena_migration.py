@@ -99,6 +99,10 @@ def test_arena_mode_migration_upgrades_spar_only_tables_and_keeps_foreign_keys()
         "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, content_version, rule_version, created_at, updated_at) "
         "VALUES ('s3', 2, 'revoked', 'arena.rank', 1000, '2026-01-01', '2026-01-08', 'c', 'r', '2026-01-01', '2026-01-01')"
     )
+    connection.execute(
+        "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, content_version, rule_version, created_at, updated_at) "
+        "VALUES ('s4', 2, 'revoked', 'arena.three_realms', 1000, '2026-01-01', '2026-01-08', 'c', 'r', '2026-01-01', '2026-01-01')"
+    )
     assert connection.execute("SELECT COUNT(*) FROM arena_matches").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM arena_actions WHERE match_id = 'm1'").fetchone()[0] == 1
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []

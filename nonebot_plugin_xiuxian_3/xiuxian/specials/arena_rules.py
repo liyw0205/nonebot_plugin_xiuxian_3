@@ -6,6 +6,8 @@ import hashlib
 from datetime import timedelta
 from typing import Mapping
 
+from .three_realms_arena_rules import THREE_REALMS_ARENA_MODE_KEY
+
 CONTENT_VERSION = "content-0.6"
 RULE_VERSION = "arena-0.1.0"
 ARENA_MODE_KEY = "arena.spar"
@@ -84,7 +86,11 @@ def _stats(player: Mapping[str, object]) -> dict[str, int]:
 
 
 def simulate_match(
-    challenger: Mapping[str, object], defender: Mapping[str, object], *, seed: str
+    challenger: Mapping[str, object],
+    defender: Mapping[str, object],
+    *,
+    seed: str,
+    environment: Mapping[str, object] | None = None,
 ) -> tuple[str, int, list[dict[str, object]]]:
     """Resolve both immutable snapshots without accepting client actions."""
 
@@ -107,7 +113,21 @@ def simulate_match(
             sequence += 1
             actor_stats = stats[actor]
             target_stats = stats[target]
-            hit_bp = max(2_000, min(9_800, 8_500 + actor_stats["initiative"] * 20 - target_stats["agility"] * 20))
+            environment_bonus = 0
+            if environment:
+                relation = str(environment.get("relation", ""))
+                environment_bonus = 150 if relation == "same_faction" else -150
+                if actor == "challenger":
+                    environment_bonus += max(0, int(environment.get("challenger_bloodline_stability", 0))) // 20
+                else:
+                    environment_bonus += max(0, int(environment.get("defender_bloodline_stability", 0))) // 20
+            hit_bp = max(
+                2_000,
+                min(
+                    9_800,
+                    8_500 + actor_stats["initiative"] * 20 - target_stats["agility"] * 20 + environment_bonus,
+                ),
+            )
             hit_roll = battle_roll_bp(f"{seed}:round:{round_no}:action:{sequence}:hit")
             hit = hit_roll < hit_bp
             damage = 0
@@ -126,6 +146,7 @@ def simulate_match(
                 "hit_bp": hit_bp,
                 "damage": damage,
                 "state": {"challenger_hp": hp["challenger"], "defender_hp": hp["defender"]},
+                "environment": dict(environment or {}),
             }
             actions.append(action)
             if hp[target] <= 0:
@@ -156,6 +177,7 @@ __all__ = [
     "ARENA_MODE_KEY",
     "ARENA_PRACTICE_MODE_KEY",
     "ARENA_RANK_MODE_KEY",
+    "THREE_REALMS_ARENA_MODE_KEY",
     "CONTENT_VERSION",
     "DAILY_CHALLENGE_LIMIT",
     "DAILY_COUNTED_OPPONENT_LIMIT",

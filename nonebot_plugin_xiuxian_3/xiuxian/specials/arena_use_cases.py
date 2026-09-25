@@ -14,6 +14,7 @@ from ..persistence.errors import (
     ArenaSnapshotExpiredError,
     ArenaSnapshotNotFoundError,
     ArenaSnapshotRequirementError,
+    ThreeRealmsArenaRequirementError,
     OperationConflictError,
     PlayerNotFoundError,
     PlayerSuspendedError,
@@ -22,6 +23,7 @@ from ..persistence.errors import (
 from .arena_models import ArenaMatchRecord, ArenaSnapshotRecord
 from .arena_repository import ArenaRepositoryMixin
 from .arena_rules import ARENA_MODE_KEY, ARENA_PRACTICE_MODE_KEY, ARENA_RANK_MODE_KEY
+from .three_realms_arena_rules import THREE_REALMS_ARENA_MODE_KEY
 
 
 class ArenaApplication:
@@ -54,6 +56,7 @@ class ArenaApplication:
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能进行竞技场操作。"),
             ArenaSnapshotRequirementError: ("ARENA_REQUIREMENT_MISSING", "竞技场需要已入道的 active 修行者。"),
+            ThreeRealmsArenaRequirementError: ("THREE_REALMS_ARENA_REQUIREMENT_MISSING", "三界竞技场需要元婴 L1 与三界竞技许可。"),
             ArenaPlayerBusyError: ("ARENA_PLAYER_BUSY", "当前角色有未结束的战斗或修行会话，请先结算。"),
             ArenaSnapshotNotFoundError: ("ARENA_SNAPSHOT_NOT_FOUND", "没有找到可用的竞技场快照。"),
             ArenaSnapshotExpiredError: ("ARENA_SNAPSHOT_EXPIRED", "该竞技场快照已经过期或被撤销。"),
@@ -90,6 +93,7 @@ class ArenaApplication:
         return {
             "snapshot_id": record.snapshot_id,
             "status": record.status,
+            "mode_key": record.mode_key,
             "public_summary": dict(record.public_summary),
             "rating": record.rating,
             "matchable_at": record.matchable_at,
@@ -114,19 +118,28 @@ class ArenaApplication:
         }
 
     async def publish_snapshot(self, context: CommandContext) -> CommandResult:
+        return await self._publish_snapshot(context, mode_key=ARENA_MODE_KEY, label="竞技场")
+
+    async def publish_three_realms_snapshot(self, context: CommandContext) -> CommandResult:
+        return await self._publish_snapshot(context, mode_key=THREE_REALMS_ARENA_MODE_KEY, label="三界竞技场")
+
+    async def _publish_snapshot(self, context: CommandContext, *, mode_key: str, label: str) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_ARENA_COMMAND", "发布竞技场快照无需附加参数。", context.request_id)
-        operation_id = self._operation_id(context, "arena.publish")
+        operation_id = self._operation_id(context, f"{mode_key}.publish")
         try:
             record = await self.repository.publish_arena_snapshot(
-                platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+                mode_key=mode_key,
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
         return CommandResult(
             True,
             "ARENA_SNAPSHOT_PUBLISHED",
-            f"## 竞技场防守快照已发布\n\n快照 `{record.snapshot_id}` 将在 30 分钟后进入匹配池，有效 7 天。",
+            f"## {label}防守快照已发布\n\n快照 `{record.snapshot_id}` 将在 30 分钟后进入匹配池，有效 7 天。",
             context.request_id,
             operation_id,
             data=self._snapshot_data(record),
@@ -155,16 +168,22 @@ class ArenaApplication:
         )
 
     async def list_snapshots(self, context: CommandContext) -> CommandResult:
+        return await self._list_snapshots(context, mode_key=ARENA_MODE_KEY, title="竞技场匹配池")
+
+    async def list_three_realms_snapshots(self, context: CommandContext) -> CommandResult:
+        return await self._list_snapshots(context, mode_key=THREE_REALMS_ARENA_MODE_KEY, title="三界竞技场匹配池")
+
+    async def _list_snapshots(self, context: CommandContext, *, mode_key: str, title: str) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_ARENA_COMMAND", "竞技场快照列表无需附加参数。", context.request_id)
         try:
             records = await self.repository.list_arena_snapshots(
-                platform=context.adapter, platform_user_id=context.user_id
+                platform=context.adapter, platform_user_id=context.user_id, mode_key=mode_key
             )
         except Exception as exc:
             return self._error(context, "", exc)
         data = {"snapshots": [self._snapshot_data(record) for record in records]}
-        lines = ["## 竞技场匹配池", ""]
+        lines = [f"## {title}", ""]
         if not records:
             lines.append("当前没有相邻积分段的公开快照。")
         else:
@@ -199,7 +218,12 @@ class ArenaApplication:
             "draw": "平局",
         }.get(record.outcome, record.outcome)
         count_text = "计入积分" if record.score_counted else "本次仅作练习，不计入积分（同一快照今日已达 2 场）"
-        mode_label = {ARENA_MODE_KEY: "切磋", ARENA_RANK_MODE_KEY: "排位", ARENA_PRACTICE_MODE_KEY: "练习"}.get(mode_key, mode_key)
+        mode_label = {
+            ARENA_MODE_KEY: "切磋",
+            ARENA_RANK_MODE_KEY: "排位",
+            ARENA_PRACTICE_MODE_KEY: "练习",
+            THREE_REALMS_ARENA_MODE_KEY: "三界",
+        }.get(mode_key, mode_key)
         return CommandResult(
             True,
             "ARENA_MATCH_SETTLED",
@@ -208,6 +232,9 @@ class ArenaApplication:
             operation_id,
             data=self._match_data(record),
         )
+
+    async def challenge_three_realms(self, context: CommandContext) -> CommandResult:
+        return await self.challenge(context, mode_key=THREE_REALMS_ARENA_MODE_KEY)
 
     async def grant_practice_consent(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 2:

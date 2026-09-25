@@ -14,6 +14,7 @@
 | `arena.rank` | 每周 20 次；同段匹配 | 赛季积分、展示称号、服务资格 |
 | `arena.practice` | 每日 3 次；可选好友同意快照 | 无积分，仅战术记录/图鉴 |
 | `arena.team` | 2v2/3v3/2v3；每日 3 次；复用已确认双人或三人竞技队伍 | 双方成员积分更新、展示；无玩家资产转移 |
+| `arena.three_realms` | 元婴 L1、三界竞技许可；每日 5 次；同阵营/跨阵营均可匹配 | 只影响冻结的战术环境；不转移阵营声望、物品或其他玩家资产 |
 
 ## 2. 结算与反刷
 
@@ -31,12 +32,13 @@
 
 ## 4. 当前运行时切片
 
-当前开放 `arena.spar`、`arena.practice`、`arena.rank` 和 2v2/3v3/2v3 `arena.team`，入口统一经过 application：
+当前开放 `arena.spar`、`arena.practice`、`arena.rank`、`arena.three_realms` 和 2v2/3v3/2v3 `arena.team`，入口统一经过 application：
 
 - `发布竞技场快照` / `撤销竞技场快照 [snapshot_id]`
 - `竞技场列表` / `挑战竞技场 [snapshot_id]`
 - `竞技场练习 [snapshot_id]` / `允许竞技场练习 <snapshot_id> <对手用户标识>`
 - `竞技场排位 [snapshot_id]`
+- `发布三界竞技场快照` / `三界竞技场列表` / `挑战三界竞技场 [snapshot_id]`
 - `发布组队竞技场快照` / `组队竞技场列表` / `挑战组队竞技场 [snapshot_id]`
 - `竞技场回放 [match_id]` / `领取竞技场结果 [match_id]`
 - `组队竞技场回放 [match_id]`
@@ -50,7 +52,10 @@
 `arena_reward_claims`；不会创建单人 `battle_sessions`。跨服前置另外保存平台身份路由、结算审计和
 只读赛季冻结快照（`arena_identity_routes`、`arena_audit_events`、`arena_season_snapshots`），
 这些表不执行跨服匹配、不合并 QQ/OneBot 身份。QQ 官方和 OneBot V11 均覆盖发布、延迟、挑战、
-练习授权、回放、确认、反刷和模式配额。三人以上 PvP 与跨服仍关闭。
+练习授权、回放、确认、反刷和模式配额。`arena.three_realms` 发布和挑战时要求元婴 L1 与
+`item.permit.three_realms_arena`（或等价许可旗标），快照冻结阵营、盟约、污染、血脉稳定和许可状态；
+同阵营与跨阵营只改变服务端自动战的战术环境，匹配不修改阵营声望、背包、灵石、修为或装备。
+三人以上个人 PvP 与跨服匹配仍关闭。
 
 `arena.team` 只接受已确认的 `party.exploration_pair` 或 `party.arena_trio` 队伍；双方队伍人数可以相同，也可以组成 2v3，队长发布快照并发起挑战，成员属性和装备在快照中固定。
 战斗由服务端自动选择行动，结果写入独立的 `arena_team_matches` / `arena_team_actions`，不复用单人

@@ -418,7 +418,7 @@ class SQLitePlayerRepository(
             for name in ("arena_snapshots", "arena_matches")
         }
         if all(
-            table and "'arena.rank'" in str(table[0]) and "'arena.practice'" in str(table[0])
+            table and "'arena.rank'" in str(table[0]) and "'arena.practice'" in str(table[0]) and "'arena.three_realms'" in str(table[0])
             for table in tables.values()
         ):
             return
@@ -435,7 +435,7 @@ class SQLitePlayerRepository(
                 snapshot_id TEXT NOT NULL UNIQUE,
                 player_id INTEGER NOT NULL REFERENCES players(id),
                 status TEXT NOT NULL CHECK (status IN ('published', 'revoked', 'expired')),
-                arena_mode_key TEXT NOT NULL CHECK (arena_mode_key IN ('arena.spar', 'arena.rank', 'arena.practice')),
+                arena_mode_key TEXT NOT NULL CHECK (arena_mode_key IN ('arena.spar', 'arena.rank', 'arena.practice', 'arena.three_realms')),
                 rating INTEGER NOT NULL CHECK (rating >= 0),
                 matchable_at TEXT NOT NULL,
                 expires_at TEXT NOT NULL,
@@ -470,7 +470,7 @@ class SQLitePlayerRepository(
                 defender_id INTEGER NOT NULL REFERENCES players(id),
                 challenger_snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
                 defender_snapshot_id TEXT NOT NULL REFERENCES arena_snapshots(snapshot_id),
-                arena_mode_key TEXT NOT NULL CHECK (arena_mode_key IN ('arena.spar', 'arena.rank', 'arena.practice')),
+                arena_mode_key TEXT NOT NULL CHECK (arena_mode_key IN ('arena.spar', 'arena.rank', 'arena.practice', 'arena.three_realms')),
                 status TEXT NOT NULL CHECK (status IN ('settled')),
                 outcome TEXT NOT NULL CHECK (outcome IN ('challenger_won', 'defender_won', 'draw')),
                 rounds INTEGER NOT NULL CHECK (rounds BETWEEN 1 AND 15),

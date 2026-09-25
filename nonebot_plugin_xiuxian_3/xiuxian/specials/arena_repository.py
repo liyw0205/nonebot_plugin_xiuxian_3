@@ -25,6 +25,7 @@ from ..persistence.errors import (
     ArenaSnapshotExpiredError,
     ArenaSnapshotNotFoundError,
     ArenaSnapshotRequirementError,
+    ThreeRealmsArenaRequirementError,
     OperationConflictError,
     PlayerNotFoundError,
 )
@@ -51,6 +52,15 @@ from .arena_rules import (
     rating_band,
     rating_delta,
     simulate_match,
+    THREE_REALMS_ARENA_MODE_KEY,
+)
+from .three_realms_arena_rules import (
+    THREE_REALMS_ARENA_CONTENT_VERSION,
+    THREE_REALMS_ARENA_RULE_VERSION,
+    has_three_realms_permit,
+    meets_three_realms_gate,
+    player_faction,
+    tactical_environment,
 )
 
 
@@ -58,7 +68,12 @@ class ArenaRepositoryMixin:
     """Own immutable defense snapshots, matches, actions and claims."""
 
     async def publish_arena_snapshot(
-        self, *, platform: str, platform_user_id: str, operation_id: str
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        mode_key: str = ARENA_MODE_KEY,
     ) -> ArenaSnapshotRecord:
         await self.initialize()
         async with self._inflight:
@@ -68,6 +83,7 @@ class ArenaRepositoryMixin:
                 platform,
                 platform_user_id,
                 operation_id,
+                mode_key,
             )
 
     async def revoke_arena_snapshot(
@@ -90,12 +106,12 @@ class ArenaRepositoryMixin:
             )
 
     async def list_arena_snapshots(
-        self, *, platform: str, platform_user_id: str
+        self, *, platform: str, platform_user_id: str, mode_key: str = ARENA_MODE_KEY
     ) -> tuple[ArenaSnapshotRecord, ...]:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._list_arena_snapshots_once, platform, platform_user_id
+                self._list_arena_snapshots_once, platform, platform_user_id, mode_key
             )
 
     async def challenge_arena(
@@ -222,15 +238,17 @@ class ArenaRepositoryMixin:
             )
 
     def _publish_arena_snapshot_once(
-        self, platform: str, platform_user_id: str, operation_id: str
+        self, platform: str, platform_user_id: str, operation_id: str, mode_key: str
     ) -> ArenaSnapshotRecord:
+        if mode_key not in {ARENA_MODE_KEY, THREE_REALMS_ARENA_MODE_KEY}:
+            raise ArenaMatchRequirementError("unsupported arena snapshot mode")
         operation_name = "specials.publish_arena_snapshot"
         request_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
-            "arena_mode_key": ARENA_MODE_KEY,
-            "content_version": CONTENT_VERSION,
-            "rule_version": RULE_VERSION,
+            "arena_mode_key": mode_key,
+            "content_version": THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
+            "rule_version": THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
@@ -241,6 +259,8 @@ class ArenaRepositoryMixin:
             if replay is not None:
                 return self._snapshot_from_payload(replay, already_completed=True)
             player = self._arena_require_player(connection, platform, platform_user_id)
+            if mode_key == THREE_REALMS_ARENA_MODE_KEY and not meets_three_realms_gate(player):
+                raise ThreeRealmsArenaRequirementError("three-realms arena permit is missing")
             self._arena_require_free(connection, int(player["id"]))
             old = connection.execute(
                 "SELECT snapshot_id FROM arena_snapshots WHERE player_id = ? AND status = 'published'",
@@ -269,14 +289,14 @@ class ArenaRepositoryMixin:
                 (
                     snapshot_id,
                     player["id"],
-                    ARENA_MODE_KEY,
+                    mode_key,
                     player["arena_rating"],
                     serialize_datetime(matchable_at),
                     serialize_datetime(expires_at),
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(summary, ensure_ascii=False, sort_keys=True),
-                    CONTENT_VERSION,
-                    RULE_VERSION,
+                    THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
+                    THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
                     now_text,
                     now_text,
                 ),
@@ -284,6 +304,7 @@ class ArenaRepositoryMixin:
             payload = {
                 "snapshot_id": snapshot_id,
                 "status": "published",
+                "mode_key": mode_key,
                 "public_summary": summary,
                 "rating": int(player["arena_rating"]),
                 "matchable_at": serialize_datetime(matchable_at),
@@ -335,7 +356,7 @@ class ArenaRepositoryMixin:
             return self._snapshot_from_payload(payload)
 
     def _list_arena_snapshots_once(
-        self, platform: str, platform_user_id: str
+        self, platform: str, platform_user_id: str, mode_key: str
     ) -> tuple[ArenaSnapshotRecord, ...]:
         now = self._now()
         now_text = serialize_datetime(now)
@@ -346,10 +367,12 @@ class ArenaRepositoryMixin:
                 "WHERE status = 'published' AND expires_at <= ?",
                 (now_text, now_text),
             )
+            if mode_key not in {ARENA_MODE_KEY, THREE_REALMS_ARENA_MODE_KEY}:
+                raise ArenaMatchRequirementError("unsupported arena snapshot mode")
             rows = connection.execute(
-                "SELECT * FROM arena_snapshots WHERE status = 'published' AND player_id <> ? "
+                "SELECT * FROM arena_snapshots WHERE status = 'published' AND arena_mode_key = ? AND player_id <> ? "
                 "ORDER BY ABS(rating - ?), created_at, id LIMIT 50",
-                (player["id"], player["arena_rating"]),
+                (mode_key, player["id"], player["arena_rating"]),
             ).fetchall()
             return tuple(self._snapshot_from_row(row) for row in rows)
 
@@ -362,7 +385,12 @@ class ArenaRepositoryMixin:
         mode_key: str,
         request_id: str = "",
     ) -> ArenaMatchRecord:
-        if mode_key not in {ARENA_MODE_KEY, ARENA_RANK_MODE_KEY, ARENA_PRACTICE_MODE_KEY}:
+        if mode_key not in {
+            ARENA_MODE_KEY,
+            ARENA_RANK_MODE_KEY,
+            ARENA_PRACTICE_MODE_KEY,
+            THREE_REALMS_ARENA_MODE_KEY,
+        }:
             raise ArenaMatchRequirementError("unsupported arena mode")
         operation_name = "specials.challenge_arena"
         request_payload = {
@@ -370,8 +398,8 @@ class ArenaRepositoryMixin:
             "platform_user_id": platform_user_id,
             "snapshot_id": requested_snapshot_id,
             "arena_mode_key": mode_key,
-            "content_version": CONTENT_VERSION,
-            "rule_version": RULE_VERSION,
+            "content_version": THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
+            "rule_version": THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
@@ -384,6 +412,8 @@ class ArenaRepositoryMixin:
                 return self._match_from_payload(replay, already_completed=True)
             challenger = self._arena_require_player(connection, platform, platform_user_id)
             challenger_id = int(challenger["id"])
+            if mode_key == THREE_REALMS_ARENA_MODE_KEY and not meets_three_realms_gate(challenger):
+                raise ThreeRealmsArenaRequirementError("three-realms arena permit is missing")
             self._arena_require_free(connection, challenger_id)
             attempts = connection.execute(
                 "SELECT COUNT(*) AS total FROM arena_matches WHERE challenger_id = ? AND arena_mode_key = ? AND created_at LIKE ?",
@@ -408,14 +438,24 @@ class ArenaRepositoryMixin:
             ).fetchone()
             if defender is None or str(defender["stage"]) != "cultivator":
                 raise ArenaOpponentUnavailableError("opponent is no longer eligible")
+            if mode_key == THREE_REALMS_ARENA_MODE_KEY:
+                defender_snapshot_data = self._json_map(defender_snapshot["snapshot_json"])
+                if not bool(defender_snapshot_data.get("three_realms_permit", False)):
+                    raise ArenaOpponentUnavailableError("opponent lacks the three-realms arena permit")
             match_id = f"arena.match:{uuid4().hex}"
             challenger_snapshot_id = f"arena.match_snapshot:{uuid4().hex}"
             challenger_snapshot = self._arena_player_snapshot(connection, challenger, challenger_snapshot_id)
             defender_snapshot_data = self._json_map(defender_snapshot["snapshot_json"])
+            environment = (
+                tactical_environment(challenger_snapshot, defender_snapshot_data)
+                if mode_key == THREE_REALMS_ARENA_MODE_KEY
+                else {}
+            )
             outcome, rounds, actions = simulate_match(
                 challenger_snapshot,
                 defender_snapshot_data,
                 seed=operation_id,
+                environment=environment,
             )
             counted_row = connection.execute(
                 "SELECT COUNT(*) AS total FROM arena_matches WHERE challenger_id = ? AND defender_snapshot_id = ? "
@@ -457,8 +497,9 @@ class ArenaRepositoryMixin:
                 "challenger": challenger_snapshot,
                 "defender": defender_snapshot_data,
                 "arena_mode_key": mode_key,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
+                "content_version": THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
+                "rule_version": THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
+                "tactical_environment": environment,
             }
             result = {
                 "outcome": outcome,
@@ -472,8 +513,9 @@ class ArenaRepositoryMixin:
                 "opponent_summary": self._json_map(defender_snapshot["public_json"]),
                 "request_id": request_id,
                 "operation_id": operation_id,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
+                "content_version": THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
+                "rule_version": THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
+                "tactical_environment": environment,
             }
             connection.execute(
                 "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, snapshot_json, public_json, content_version, rule_version, created_at, updated_at) "
@@ -481,14 +523,14 @@ class ArenaRepositoryMixin:
                 (
                     challenger_snapshot_id,
                     challenger_id,
-                    ARENA_MODE_KEY,
+                    mode_key,
                     challenger["arena_rating"],
                     now_text,
                     now_text,
                     json.dumps(challenger_snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(public_summary(challenger_snapshot, snapshot_id=challenger_snapshot_id, rating=int(challenger["arena_rating"]), created_at=now_text), ensure_ascii=False, sort_keys=True),
-                    CONTENT_VERSION,
-                    RULE_VERSION,
+                    THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
+                    THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
                     now_text,
                     now_text,
                 ),
@@ -670,10 +712,16 @@ class ArenaRepositoryMixin:
         mode_key: str,
     ) -> sqlite3.Row:
         if requested_snapshot_id:
-            row = connection.execute(
-                "SELECT * FROM arena_snapshots WHERE snapshot_id = ? AND player_id <> ?",
-                (requested_snapshot_id, challenger_id),
-            ).fetchone()
+            if mode_key == THREE_REALMS_ARENA_MODE_KEY:
+                row = connection.execute(
+                    "SELECT * FROM arena_snapshots WHERE snapshot_id = ? AND arena_mode_key = ? AND player_id <> ?",
+                    (requested_snapshot_id, mode_key, challenger_id),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    "SELECT * FROM arena_snapshots WHERE snapshot_id = ? AND player_id <> ?",
+                    (requested_snapshot_id, challenger_id),
+                ).fetchone()
             if row is None:
                 raise ArenaSnapshotNotFoundError("arena snapshot does not exist")
             if str(row["status"]) != "published" or str(row["expires_at"]) <= now_text:
@@ -696,12 +744,20 @@ class ArenaRepositoryMixin:
                 ).fetchone()
                 if consent is None:
                     raise ArenaMatchRequirementError("practice requires the snapshot owner's consent")
+            if mode_key == THREE_REALMS_ARENA_MODE_KEY:
+                frozen = self._json_map(row["snapshot_json"])
+                if not bool(frozen.get("three_realms_permit", False)):
+                    raise ArenaOpponentUnavailableError("opponent lacks the three-realms arena permit")
             return row
+        mode_filter = " AND s.arena_mode_key = ?" if mode_key == THREE_REALMS_ARENA_MODE_KEY else ""
+        params: tuple[object, ...] = (
+            (mode_key,) if mode_key == THREE_REALMS_ARENA_MODE_KEY else ()
+        ) + (challenger_id, now_text, now_text, challenger_rating)
         rows = connection.execute(
             "SELECT s.* FROM arena_snapshots s JOIN players p ON p.id = s.player_id "
-            "WHERE s.status = 'published' AND s.player_id <> ? AND s.matchable_at <= ? AND s.expires_at > ? "
+            "WHERE s.status = 'published'" + mode_filter + " AND s.player_id <> ? AND s.matchable_at <= ? AND s.expires_at > ? "
             "AND p.status = 'active' AND p.stage = 'cultivator' ORDER BY ABS(s.rating - ?), s.created_at, s.id",
-            (challenger_id, now_text, now_text, challenger_rating),
+            params,
         ).fetchall()
         for row in rows:
             if mode_key == ARENA_PRACTICE_MODE_KEY:
@@ -711,6 +767,8 @@ class ArenaRepositoryMixin:
                 ).fetchone()
                 if consent is None:
                     continue
+            if mode_key == THREE_REALMS_ARENA_MODE_KEY and not bool(self._json_map(row["snapshot_json"]).get("three_realms_permit", False)):
+                continue
             if (
                 (mode_key == ARENA_RANK_MODE_KEY and rating_band(challenger_rating) == rating_band(int(row["rating"])))
                 or (mode_key != ARENA_RANK_MODE_KEY and compatible_rating(challenger_rating, int(row["rating"])))
@@ -802,10 +860,23 @@ class ArenaRepositoryMixin:
                 "SELECT skill_key FROM skill_masteries WHERE player_id = ? ORDER BY skill_key", (player["id"],)
             ).fetchall()
         )
+        def row_value(key: str, default: object = None) -> object:
+            try:
+                return player[key]
+            except (KeyError, IndexError):
+                return default
+
+        qualification_snapshot: dict[str, object] = {}
+        for key, value in qualification.items():
+            try:
+                qualification_snapshot[str(key)] = int(value)
+            except (TypeError, ValueError):
+                qualification_snapshot[str(key)] = str(value)
+
         return {
             "snapshot_id": snapshot_id,
             "dao_name": str(player["dao_name"] or ""),
-            "qualification": {str(key): int(value) for key, value in qualification.items()},
+            "qualification": qualification_snapshot,
             "max_hp": int(player["max_hp"]),
             "initiative": int(player["initiative"]),
             "attack_bonus": attack_bonus,
@@ -814,6 +885,11 @@ class ArenaRepositoryMixin:
             "realm_layer": int(player["realm_layer"]),
             "skills": list(skills),
             "equipment": equipment,
+            "faction_key": player_faction(player),
+            "alliance_key": player_faction(player),
+            "pollution": int(row_value("pollution", 0)),
+            "bloodline_stability": int(row_value("bloodline_stability", 0)),
+            "three_realms_permit": has_three_realms_permit(player),
         }
 
     @staticmethod
@@ -859,6 +935,7 @@ class ArenaRepositoryMixin:
         return {
             "snapshot_id": str(row["snapshot_id"]),
             "status": str(row["status"]),
+            "mode_key": str(row["arena_mode_key"]),
             "public_summary": ArenaRepositoryMixin._json_map(row["public_json"]),
             "rating": int(row["rating"]),
             "matchable_at": str(row["matchable_at"]),
@@ -870,6 +947,7 @@ class ArenaRepositoryMixin:
         return ArenaSnapshotRecord(
             snapshot_id=str(payload["snapshot_id"]),
             status=str(payload["status"]),
+            mode_key=str(payload.get("mode_key", ARENA_MODE_KEY)),
             public_summary=ArenaRepositoryMixin._json_map(payload.get("public_summary", {})),
             rating=int(payload.get("rating", 0)),
             matchable_at=str(payload.get("matchable_at", "")),
@@ -882,6 +960,7 @@ class ArenaRepositoryMixin:
         return ArenaSnapshotRecord(
             snapshot_id=str(row["snapshot_id"]),
             status=str(row["status"]),
+            mode_key=str(row["arena_mode_key"]),
             public_summary=ArenaRepositoryMixin._json_map(row["public_json"]),
             rating=int(row["rating"]),
             matchable_at=str(row["matchable_at"]),

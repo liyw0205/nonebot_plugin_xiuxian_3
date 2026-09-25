@@ -1195,6 +1195,13 @@ class XiuxianApplication:
             write_message="当前事件不允许发布竞技场防守快照。",
         )
 
+    async def publish_three_realms_arena_snapshot(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.publish_three_realms_snapshot(context),
+            write_message="当前事件不允许发布三界竞技场防守快照。",
+        )
+
     async def revoke_arena_snapshot(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,
@@ -1205,11 +1212,21 @@ class XiuxianApplication:
     async def list_arena_snapshots(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.arena.list_snapshots(context), require_write=False)
 
+    async def list_three_realms_arena_snapshots(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.arena.list_three_realms_snapshots(context), require_write=False)
+
     async def challenge_arena(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,
             lambda: self.arena.challenge(context),
             write_message="当前事件不允许发起竞技场挑战。",
+        )
+
+    async def challenge_three_realms_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.challenge_three_realms(context),
+            write_message="当前事件不允许发起三界竞技场挑战。",
         )
 
     async def rank_arena(self, context: CommandContext) -> CommandResult:

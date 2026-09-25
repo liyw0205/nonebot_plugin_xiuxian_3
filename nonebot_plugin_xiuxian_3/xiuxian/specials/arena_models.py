@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 class ArenaSnapshotRecord:
     snapshot_id: str
     status: str
+    mode_key: str
     public_summary: dict[str, object]
     rating: int
     matchable_at: str
