@@ -233,7 +233,10 @@ ARCHIVE_KEEPER = EnemyDefinition(
     key="enemy.archive_keeper",
     label="档案守卫",
     location_key="void.archive_ruins",
-    required_realm="void_refining",
+    # The archive is the source of the void-refining permit.  A soul-
+    # transformation character may enter after completing the three wall
+    # trials; existing void-refining characters remain eligible as well.
+    required_realm="soul_transformation",
     required_layer=1,
     # Keep the encounter within the existing twenty-round automatic battle contract.
     max_hp=120,

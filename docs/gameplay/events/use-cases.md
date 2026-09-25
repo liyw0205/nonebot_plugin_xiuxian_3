@@ -13,7 +13,8 @@
 客户端不能提交分数或伪造来源 operation。
 
 v0.5 虚空档案用例为 `档案状态`、`探索档案遗迹`、`领取档案碎片 alpha|beta|gamma`。
-档案探索必须先有已结算的 `void.archive_ruins` 航道，守卫战由服务端自动回合并绑定战斗快照；
+化神角色须先完成三次界壁试炼，随后进入并结算 `void.archive_ruins` 航道；炼虚角色可直接使用该航道。
+档案探索必须先有已结算的航道，守卫战由服务端自动回合并绑定战斗快照；
 alpha 从第一航道结算次数投影，beta 从 `enemy.archive_keeper` 胜利投影，gamma 从
 `recipe.void.crystal_refine` 已完成订单投影。每项任务每 UTC 周唯一领取，奖励为对应档案碎片与
 20 虚空功勋，三项完成后激活 7 日 `event.archive_unlock` 并追加 50 虚空功勋。

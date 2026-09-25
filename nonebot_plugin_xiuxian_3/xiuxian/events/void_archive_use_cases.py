@@ -134,35 +134,6 @@ class VoidArchiveApplication:
                 outcome=resolved.outcome,
                 operation_id=operation_id,
             )
-        except VoidArchiveRouteEvidenceError:
-            # Preserve the pre-v0.5炼虚许可 command for soul-transformation
-            # saves; new void-refining characters must use the real route.
-            try:
-                legacy = await self.repository.acquire_void_archive(
-                    platform=context.adapter,
-                    platform_user_id=context.user_id,
-                    operation_id=operation_id,
-                )
-            except Exception as exc:
-                if isinstance(exc, QuestRequirementError):
-                    return self._error(context, operation_id, VoidArchiveRouteEvidenceError("a settled archive route is required"))
-                return self._error(context, operation_id, exc)
-            return CommandResult(
-                True,
-                "QUEST_ACTION_RECORDED",
-                "## 档案遗迹探索已记录\n\n已兼容旧版炼虚许可链；新档案航道请先结算虚空档案遗迹。",
-                context.request_id,
-                operation_id,
-                data={
-                    "quest_key": legacy.quest_key,
-                    "component_key": legacy.component_key,
-                    "status": legacy.status,
-                    "progress": legacy.progress,
-                    "reward": legacy.reward,
-                    "idempotent_replay": legacy.already_completed,
-                    "legacy": True,
-                },
-            )
         except Exception as exc:
             return self._error(context, operation_id, exc)
         outcome = "胜利" if record.outcome == "won" else "失败"

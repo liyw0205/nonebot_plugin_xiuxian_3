@@ -14,11 +14,11 @@
 
 | `quest_or_task_key` | 目标 | 奖励/状态 | 上限 |
 |:--|:--|:--|:--|
-| `quest.break_void` | 完成界壁试炼 3 次、交付 `item.void_archive` 1 | 炼虚突破许可 | 每角色一次；失败试炼只计参与、不产档案 |
+| `quest.break_void` | 完成界壁试炼 3 次、从档案航道结算并击败档案守卫、交付 `item.void_archive` 1 | 炼虚突破许可 | 每角色一次；失败试炼只计参与、不产档案 |
 | `task.archive_fragment.alpha` | 第一航道成功探索 2 次 | 档案碎片 alpha、虚空功勋 20 | 每周一次 |
 | `task.archive_fragment.beta` | 击败 `enemy.archive_keeper` 1 次 | 档案碎片 beta、虚空功勋 20 | 每周一次 |
 | `task.archive_fragment.gamma` | 完成虚空加工订单 1 次 | 档案碎片 gamma、虚空功勋 20 | 每周一次 |
 
-三种碎片任务完成后，由 `event.archive_unlock` 按角色/周唯一开放新航道资格。`quest.break_void` 只在三次界壁试炼与档案交付都完成后可领取；许可不自动消耗锚或创建突破。所有任务以来源 operation 去重，赛季关闭后已完成许可可保留。
+三种碎片任务完成后，由 `event.archive_unlock` 按角色/周唯一开放新航道资格。化神角色完成三次界壁试炼后，可以进入档案航道并由服务端自动结算档案守卫；炼虚角色也可以使用该航道。`探索档案遗迹` 不再兼容旧版直接发放档案物品的入口，只接受已结算航道和守卫战 operation。`quest.break_void` 只在三次界壁试炼、档案守卫胜利和档案交付都完成后可领取；许可不自动消耗锚或创建突破。所有任务以来源 operation 去重，赛季关闭后已完成许可可保留。
 
 风暴状态在会话创建时固定：事件中创建的会话继续用风暴池，即使事件结束；事件外会话不被追溯修改。错误：`VOID_EVENT_NOT_ACTIVE`、`TIME_GARDEN_ORDER_CAP`、`ARCHIVE_TASK_NOT_COMPLETE`。验收：风暴不重抽；生产加速不叠加；赛季队列权不绕市场限额；周任务上限；季末箱可恢复。

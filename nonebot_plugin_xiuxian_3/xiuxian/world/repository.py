@@ -84,7 +84,16 @@ class WorldRepositoryMixin:
                     already_completed=True,
                 )
             row = self._require_player(connection, platform, platform_user_id)
-            if str(row["realm_key"]) != "void_refining" or int(row["realm_layer"]) < 1:
+            realm_key = str(row["realm_key"])
+            realm_layer = int(row["realm_layer"])
+            if realm_key == "soul_transformation" and route_key == "void.archive_ruins":
+                trial_count = connection.execute(
+                    "SELECT COUNT(*) AS count FROM quest_events WHERE player_id = ? AND quest_key = 'quest.break_void' AND component_key = 'void_wall_trial'",
+                    (row["id"],),
+                ).fetchone()
+                if int(trial_count["count"]) < 3:
+                    raise VoidRouteLockedError("archive route requires three wall trials")
+            elif realm_key != "void_refining" or realm_layer < 1:
                 raise VoidRouteLockedError("void route requires void refining")
             instability_until = row["void_instability_until"]
             unstable = False

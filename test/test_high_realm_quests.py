@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
@@ -43,12 +44,21 @@ async def _high_realm_player(
                         "item.domain_core": 1,
                         "item.ancient_fruit": 3,
                         "item.soul_crystal": 3,
+                        "item.void_anchor": 8,
                     }
                 ),
                 json.dumps({"xuantian": 2500}),
                 adapter,
                 user,
             ),
+        )
+
+
+def _expire_void_route(runtime) -> None:
+    with sqlite3.connect(runtime.settings.database_path) as db:
+        db.execute(
+            "UPDATE void_route_sessions SET ends_at = ? WHERE status = 'running'",
+            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),),
         )
 
 
@@ -118,31 +128,63 @@ def test_void_permit_counts_failed_trials_and_requires_archive_delivery() -> Non
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
-            user = "quest-void"
-            await _high_realm_player(
-                runtime, "onebot.v11", user, realm="soul_transformation", location_key="void.portal"
-            )
-            for index in range(3):
-                result = await runtime.dispatch(
-                    _context("onebot.v11", user, f"trial-{index}", f"trial-{index}"), "开始界壁试炼"
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"quest-void-{adapter}"
+                await _high_realm_player(
+                    runtime, adapter, user, realm="soul_transformation", location_key="void.portal"
                 )
-                assert result.code == "VOID_WALL_TRIAL_RECORDED"
-                assert result.data["progress"]["void_wall_trial"] == index + 1
-            archive = await runtime.dispatch(
-                _context("onebot.v11", user, "archive", "archive-source"), "探索档案遗迹"
-            )
-            assert archive.code == "QUEST_ACTION_RECORDED"
-            delivered = await runtime.dispatch(
-                _context("onebot.v11", user, "deliver", "archive-delivery"), "交付虚空档案"
-            )
-            assert delivered.code == "QUEST_ACTION_RECORDED"
-            permit = await runtime.dispatch(
-                _context("onebot.v11", user, "permit", "void-permit"), "领取炼虚许可"
-            )
-            assert permit.code == "QUEST_PERMIT_GRANTED"
-            status = await runtime.dispatch(_context("onebot.v11", user, "status"), "高阶任务")
-            assert status.code == "QUEST_STATUS"
-            assert status.data["quests"]["quest.break_void"]["status"] == "completed"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    before = db.execute(
+                        "SELECT stamina, inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                blocked_route = await runtime.dispatch(
+                    _context(adapter, user, f"archive-route-blocked-{adapter}"), "进入虚空航道 档案遗迹"
+                )
+                assert blocked_route.code == "VOID_ROUTE_LOCKED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    after = db.execute(
+                        "SELECT stamina, inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                assert after == before
+                legacy_blocked = await runtime.dispatch(
+                    _context(adapter, user, f"archive-without-route-{adapter}"), "探索档案遗迹"
+                )
+                assert legacy_blocked.code == "ARCHIVE_ROUTE_REQUIRED"
+                for index in range(3):
+                    result = await runtime.dispatch(
+                        _context(adapter, user, f"trial-{adapter}-{index}", f"trial-{adapter}-{index}"),
+                        "开始界壁试炼",
+                    )
+                    assert result.code == "VOID_WALL_TRIAL_RECORDED"
+                    assert result.data["progress"]["void_wall_trial"] == index + 1
+                started = await runtime.dispatch(
+                    _context(adapter, user, f"archive-route-{adapter}"), "进入虚空航道 档案遗迹"
+                )
+                assert started.code == "VOID_ROUTE_STARTED"
+                _expire_void_route(runtime)
+                settled = await runtime.dispatch(
+                    _context(adapter, user, f"archive-settle-{adapter}"), "结算虚空航道"
+                )
+                assert settled.code == "VOID_ROUTE_SETTLED"
+                assert settled.data["route_key"] == "void.archive_ruins"
+                archive = await runtime.dispatch(
+                    _context(adapter, user, f"archive-{adapter}"), "探索档案遗迹"
+                )
+                assert archive.code == "ARCHIVE_RUN_SETTLED"
+                assert archive.data["outcome"] == "won"
+                delivered = await runtime.dispatch(
+                    _context(adapter, user, f"deliver-{adapter}"), "交付虚空档案"
+                )
+                assert delivered.code == "QUEST_ACTION_RECORDED"
+                permit = await runtime.dispatch(
+                    _context(adapter, user, f"permit-{adapter}"), "领取炼虚许可"
+                )
+                assert permit.code == "QUEST_PERMIT_GRANTED"
+                status = await runtime.dispatch(_context(adapter, user, f"status-{adapter}"), "高阶任务")
+                assert status.code == "QUEST_STATUS"
+                assert status.data["quests"]["quest.break_void"]["status"] == "completed"
             await runtime.close()
 
     asyncio.run(run())
