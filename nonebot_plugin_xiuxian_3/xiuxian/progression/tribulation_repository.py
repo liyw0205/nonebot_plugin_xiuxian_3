@@ -385,6 +385,8 @@ class TribulationTrialRepositoryMixin:
             ).fetchone()
             if session is None:
                 raise TribulationTrialNotFoundError("no preparing tribulation trial")
+            if now < datetime.fromisoformat(str(session["ends_at"])):
+                raise TribulationTrialNotReadyError("tribulation trial is not ready")
             snapshot = self._json_object(session["snapshot_json"], {})
             battle_id = snapshot.get("battle_id")
             roll_bp: int | None = None
@@ -405,8 +407,6 @@ class TribulationTrialRepositoryMixin:
                 success = battle_outcome == "won"
             else:
                 # Complete active sessions from the previous deterministic trial version.
-                if now < datetime.fromisoformat(str(session["ends_at"])):
-                    raise TribulationTrialNotReadyError("tribulation trial is not ready")
                 roll_bp = trial_roll_bp(str(snapshot.get("random_seed", session["operation_id"])))
                 success = trial_success(str(session["trial_key"]), roll_bp)
 

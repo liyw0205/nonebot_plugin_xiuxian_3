@@ -86,7 +86,7 @@ class WorldRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             realm_key = str(row["realm_key"])
             realm_layer = int(row["realm_layer"])
-            if realm_key == "soul_transformation" and route_key == "void.archive_ruins":
+            if realm_key == "soul_transformation" and realm_layer >= 1 and route_key == "void.archive_ruins":
                 trial_count = connection.execute(
                     "SELECT COUNT(*) AS count FROM quest_events WHERE player_id = ? AND quest_key = 'quest.break_void' AND component_key = 'void_wall_trial'",
                     (row["id"],),
