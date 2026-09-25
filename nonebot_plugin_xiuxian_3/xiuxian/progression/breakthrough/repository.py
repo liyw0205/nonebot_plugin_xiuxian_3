@@ -320,6 +320,9 @@ class BreakthroughRepositoryMixin:
             definition = breakthrough_definition(target_realm)
         except ValueError as exc:
             raise BreakthroughRequirementError("target breakthrough is not open") from exc
+        if target_realm == "nascent_soul":
+            # A retry after the 24-hour window must settle the personal event first.
+            self._expire_heart_demon_for_player(platform, platform_user_id)
         operation_name = definition.key
         operation_payload = {
             "platform": platform,
@@ -328,7 +331,7 @@ class BreakthroughRepositoryMixin:
             "protection": protection,
         }
         request_hash = self._request_hash(operation_name, operation_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -914,7 +917,7 @@ class BreakthroughRepositoryMixin:
         operation_name = "progression.settle_breakthrough"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -1156,6 +1159,7 @@ class BreakthroughRepositoryMixin:
                 demon_session_id = uuid4().hex
                 demon_snapshot = {
                     "breakthrough_session_id": session["id"],
+                    "breakthrough_operation_id": operation_id,
                     "target_realm": "nascent_soul",
                     "expires_at": serialize_datetime(now + timedelta(hours=24)),
                     "content_version": result["content_version"],
@@ -1175,6 +1179,17 @@ class BreakthroughRepositoryMixin:
                         now_text,
                         now_text,
                     ),
+                )
+                self._project_heart_demon_created(
+                    connection,
+                    event_id=demon_session_id,
+                    player_id=int(row["id"]),
+                    breakthrough_session_id=str(session["session_id"]),
+                    breakthrough_operation_id=operation_id,
+                    starts_at=now_text,
+                    expires_at=demon_snapshot["expires_at"],
+                    snapshot=demon_snapshot,
+                    created_at=now_text,
                 )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
@@ -1217,7 +1232,7 @@ class BreakthroughRepositoryMixin:
         operation_name = "event.resolve_heart_demon"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id, "choice_key": choice_key}
         request_hash = self._request_hash(operation_name, request_payload)
-        now = datetime.now(timezone.utc)
+        now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -1235,6 +1250,12 @@ class BreakthroughRepositoryMixin:
                 (row["id"],),
             ).fetchone()
             if session is None:
+                resolved = connection.execute(
+                    "SELECT 1 FROM heart_demon_sessions WHERE player_id = ? AND status = 'resolved' ORDER BY id DESC LIMIT 1",
+                    (row["id"],),
+                ).fetchone()
+                if resolved is not None:
+                    raise HeartDemonAlreadyResolvedError("heart demon has already been resolved")
                 raise HeartDemonPendingError("no pending heart demon")
             try:
                 expired = now >= datetime.fromisoformat(str(session["expires_at"]))
@@ -1290,6 +1311,13 @@ class BreakthroughRepositoryMixin:
             connection.execute(
                 "UPDATE heart_demon_sessions SET status = 'resolved', choice_key = ?, result_json = ?, updated_at = ? WHERE id = ?",
                 (effective_choice, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
+            self._project_heart_demon_resolved(
+                connection,
+                event_id=str(session["session_id"]),
+                choice_key=effective_choice,
+                result=result,
+                resolved_at=now_text,
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:

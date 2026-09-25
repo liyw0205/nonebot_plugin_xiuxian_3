@@ -5,6 +5,7 @@
 `PlayerTask`：玩家、任务键/版本、窗口键、进度、状态、领取状态和 operation ID。
 
 `EventRound`：事件键、轮次、时间、阶段、参与条件、贡献规则、奖励池、结算状态和版本。
+`HeartDemonEventProjection`：个人事件键、突破会话/结算 operation、状态、选择、截止时间、失败快照和结算结果；不参与公共排行。
 
 `FinalHeavenSeason`：赛季 ID、UTC 起止时间、规则版本、收集/冻结状态、匿名快照与领奖截止时间。
 `FinalHeavenRanking`：赛季、榜单键、内部玩家外键、名次、积分、达成时间、匿名别名和展示奖励状态。

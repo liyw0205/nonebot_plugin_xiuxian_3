@@ -4,6 +4,8 @@ from .models import SpiritSpringEventRecord
 from .demon_models import DemonInvasionEventRecord
 from .demon_repository import DemonInvasionRepositoryMixin
 from .repository import EventsRepositoryMixin
+from .heart_demon_models import HeartDemonEventRecord
+from .heart_demon_repository import HEART_DEMON_EVENT_KEY, HeartDemonEventRepositoryMixin
 from .season_models import FinalHeavenClaimRecord, FinalHeavenSeasonRecord, FinalHeavenStanding
 from .season_repository import FinalHeavenSeasonRepositoryMixin
 from .season_use_cases import FinalHeavenSeasonApplication
@@ -24,6 +26,9 @@ __all__ = [
     "EVENT_TARGET",
     "EventsApplication",
     "EventsRepositoryMixin",
+    "HEART_DEMON_EVENT_KEY",
+    "HeartDemonEventRecord",
+    "HeartDemonEventRepositoryMixin",
     "DemonInvasionEventRecord",
     "DemonInvasionRepositoryMixin",
     "FinalHeavenClaimRecord",

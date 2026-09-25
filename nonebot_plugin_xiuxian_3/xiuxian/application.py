@@ -1032,6 +1032,9 @@ class XiuxianApplication:
     async def get_spirit_spring_event(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.events.get_spirit_spring_event(context), require_write=False)
 
+    async def get_heart_demon_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.get_heart_demon_event(context), require_write=False)
+
     async def claim_spirit_spring_event(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

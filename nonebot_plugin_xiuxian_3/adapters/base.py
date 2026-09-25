@@ -292,6 +292,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("清理生产委托", application.expire_production_commission)
     router.register("恢复生产委托", application.recover_production_commission)
     router.register("灵泉事件", application.get_spirit_spring_event)
+    router.register("心魔事件", application.get_heart_demon_event, aliases=("心魔状态",))
     router.register("领取灵泉事件奖励", application.claim_spirit_spring_event)
     router.register("魔界入侵", application.get_demon_invasion_event, aliases=("魔界战场",))
     router.register("贡献魔界战场", application.contribute_demon_invasion)

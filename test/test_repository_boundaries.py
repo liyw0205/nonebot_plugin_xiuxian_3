@@ -78,6 +78,8 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "get_demon_invasion_event": "nonebot_plugin_xiuxian_3.xiuxian.events.demon_repository",
         "record_demon_invasion_contribution": "nonebot_plugin_xiuxian_3.xiuxian.events.demon_repository",
         "claim_demon_invasion_event": "nonebot_plugin_xiuxian_3.xiuxian.events.demon_repository",
+        "get_heart_demon_event": "nonebot_plugin_xiuxian_3.xiuxian.events.heart_demon_repository",
+        "expire_heart_demon_events": "nonebot_plugin_xiuxian_3.xiuxian.events.heart_demon_repository",
         "get_advanced_quests": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
         "complete_domain_material_commission": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",
         "complete_ancient_domain_line": "nonebot_plugin_xiuxian_3.xiuxian.quests.repository",

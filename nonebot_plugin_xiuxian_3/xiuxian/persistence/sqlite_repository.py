@@ -37,6 +37,7 @@ from ..social.sect_repository import SectRepositoryMixin
 from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
+from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
 from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
 from ..specials.arena_repository import ArenaRepositoryMixin
@@ -77,6 +78,7 @@ class SQLitePlayerRepository(
     PartyRepositoryMixin,
     MentorRepositoryMixin,
     EventsRepositoryMixin,
+    HeartDemonEventRepositoryMixin,
     DemonInvasionRepositoryMixin,
     FinalHeavenSeasonRepositoryMixin,
     ArenaRepositoryMixin,
@@ -188,6 +190,7 @@ class SQLitePlayerRepository(
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
             self._migrate_facility_schema(connection)
+            self._migrate_heart_demon_event_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
@@ -212,6 +215,10 @@ class SQLitePlayerRepository(
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("production.contract.v0.3", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("events.heart_demon.v0.3", serialize_datetime(self._now())),
             )
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
@@ -251,6 +258,51 @@ class SQLitePlayerRepository(
                     "UPDATE redemption_codes SET status = 'revoked', updated_at = ? WHERE code_key = ?",
                     (now_text, definition.code_key),
                 )
+
+    @staticmethod
+    def _migrate_heart_demon_event_schema(connection: sqlite3.Connection) -> None:
+        """Backfill the event read model for sessions created before v0.3."""
+
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO heart_demon_event_projections(
+                event_id, event_key, player_id, breakthrough_session_id,
+                breakthrough_operation_id, status, choice_key, starts_at,
+                expires_at, resolved_at, snapshot_json, result_json,
+                created_at, updated_at
+            )
+            SELECT
+                h.session_id,
+                'event.heart_demon_trial',
+                h.player_id,
+                CAST(h.breakthrough_session_id AS TEXT),
+                COALESCE(json_extract(h.snapshot_json, '$.breakthrough_operation_id'), h.operation_id),
+                h.status,
+                h.choice_key,
+                h.created_at,
+                h.expires_at,
+                CASE WHEN h.status = 'resolved' THEN h.updated_at ELSE NULL END,
+                h.snapshot_json,
+                h.result_json,
+                h.created_at,
+                h.updated_at
+            FROM heart_demon_sessions h
+            """
+        )
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO activity_events(
+                player_id, event_key, source_operation_id, occurred_at, payload_json
+            )
+            SELECT
+                h.player_id,
+                'event.heart_demon_trial',
+                COALESCE(json_extract(h.snapshot_json, '$.breakthrough_operation_id'), h.operation_id),
+                h.created_at,
+                json_object('event_id', h.session_id, 'expires_at', h.expires_at)
+            FROM heart_demon_sessions h
+            """
+        )
 
     @staticmethod
     def _migrate_facility_schema(connection: sqlite3.Connection) -> None:

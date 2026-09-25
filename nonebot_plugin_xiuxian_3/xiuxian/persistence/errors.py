@@ -724,6 +724,10 @@ class HeartDemonPendingError(RuntimeError):
     """The player has an unresolved heart-demon session."""
 
 
+class HeartDemonAlreadyResolvedError(RuntimeError):
+    """A new choice was submitted after the personal event was resolved."""
+
+
 class SoulFatigueActiveError(RuntimeError):
     """The player's soul fatigue window is still active."""
 

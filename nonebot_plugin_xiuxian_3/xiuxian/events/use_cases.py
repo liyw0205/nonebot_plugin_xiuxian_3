@@ -125,6 +125,54 @@ class EventsApplication:
             data=self._data(record),
         )
 
+    async def get_heart_demon_event(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) > 1:
+            return CommandResult(False, "INVALID_EVENT_COMMAND", "请使用 `心魔事件 [事件编号]`。", context.request_id)
+        event_id = context.command_args[0] if context.command_args else None
+        try:
+            record = await self.repository.get_heart_demon_event(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                event_id=event_id,
+            )
+        except EventNotActiveError:
+            return CommandResult(False, "HEART_DEMON_NOT_FOUND", "当前没有心魔事件记录。", context.request_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看心魔事件。", context.request_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        state = "待处理" if record.status == "pending" else "已结算"
+        choice = record.choice_key or "待选择"
+        return CommandResult(
+            True,
+            "HEART_DEMON_EVENT_STATUS",
+            (
+                "## 心魔试炼\n\n"
+                f"**事件**：`{record.event_id}`\n"
+                f"**状态**：{state}\n"
+                f"**突破来源**：`{record.breakthrough_operation_id}`\n"
+                f"**有效期**：{record.starts_at} 至 {record.expires_at}\n"
+                f"**处理方式**：{choice}\n\n"
+                "> 逾期未选择将自动按 `heart_demon.face` 结算；该事件不进入公共排行。"
+            ),
+            context.request_id,
+            data={
+                "event_id": record.event_id,
+                "event_key": record.event_key,
+                "status": record.status,
+                "breakthrough_session_id": record.breakthrough_session_id,
+                "breakthrough_operation_id": record.breakthrough_operation_id,
+                "starts_at": record.starts_at,
+                "expires_at": record.expires_at,
+                "choice_key": record.choice_key,
+                "resolved_at": record.resolved_at,
+                "snapshot": record.snapshot,
+                "result": record.result,
+            },
+        )
+
     async def claim_spirit_spring_event(self, context: CommandContext) -> CommandResult:
         round_id = self._round_id(context.command_args)
         if round_id == "":

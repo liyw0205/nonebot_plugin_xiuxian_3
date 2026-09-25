@@ -2,7 +2,7 @@
 
 ## 用例
 
-`activate_task`、`record_task_event`、`claim_task_reward`、`open_event_round`、`record_contribution`、`settle_event_round`、`freeze_ranking`、`claim_ranking_reward`、`get_final_heaven_season`、`claim_final_heaven_rewards`。
+`activate_task`、`record_task_event`、`claim_task_reward`、`open_event_round`、`record_contribution`、`settle_event_round`、`freeze_ranking`、`claim_ranking_reward`、`get_final_heaven_season`、`claim_final_heaven_rewards`、`get_heart_demon_event`。
 
 v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战场 战斗|运输|维修 [来源operation]`
 和 `领取魔界入侵奖励 [轮次]`。贡献只能引用服务端已结算来源；省略来源 operation 时，服务端
@@ -14,10 +14,11 @@ v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战�
 
 魔界入侵补充错误码：`EVENT_CONTRIBUTION_SOURCE_INVALID`、`EVENT_CONTRIBUTION_INSUFFICIENT`、
 `EVENT_REWARD_ALREADY_CLAIMED`、`EVENT_REWARD_EXPIRED` 和 `OPERATION_CONFLICT`。
+心魔事件入口为 `心魔事件 [事件编号]`；超时按 `heart_demon.face` 自动结算且不进入公共排行。补充错误码：`HEART_DEMON_ALREADY_RESOLVED`、`HEART_DEMON_NOT_FOUND`。
 
 ## 验收
 
-重复事件只推进一次；活动关闭后不能新增进度；奖励重试不重复发放；排行按冻结快照结算；时区和日切由服务端 Clock 决定。
+重复事件只推进一次；活动关闭后不能新增进度；奖励重试不重复发放；排行按冻结快照结算；时区和日切由服务端 Clock 决定。心魔事件投影与突破失败同事务写入，已结算事件不能再次选择。
 
 终局赛季读取 `endgame_endings` 和已结算 `final_battle_sessions/members`，不接受命令参数提交积分。
 只有飞升或留界的不可逆结局可以进入对应结局榜；协作榜只累计至少两人且成功结算的终局战，

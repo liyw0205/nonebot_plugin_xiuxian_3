@@ -862,6 +862,28 @@ CREATE TABLE IF NOT EXISTS heart_demon_sessions (
 CREATE INDEX IF NOT EXISTS idx_heart_demon_sessions_player
     ON heart_demon_sessions(player_id, status);
 
+CREATE TABLE IF NOT EXISTS heart_demon_event_projections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    event_key TEXT NOT NULL CHECK (event_key = 'event.heart_demon_trial'),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    breakthrough_session_id TEXT NOT NULL,
+    breakthrough_operation_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'resolved')),
+    choice_key TEXT,
+    starts_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    resolved_at TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, breakthrough_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_heart_demon_event_projections_player
+    ON heart_demon_event_projections(player_id, status, created_at);
+
 CREATE TABLE IF NOT EXISTS domain_selection_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL UNIQUE,

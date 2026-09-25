@@ -11,6 +11,7 @@ from ...repository import (
     BreakthroughNotReadyError,
     BreakthroughRequirementError,
     HeartDemonPendingError,
+    HeartDemonAlreadyResolvedError,
     QuestRequirementError,
     SoulFatigueActiveError,
     CurrencyInsufficientError,
@@ -466,6 +467,8 @@ class BreakthroughApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except HeartDemonPendingError:
             return CommandResult(False, "HEART_DEMON_NOT_FOUND", "当前没有待处理的心魔。", context.request_id, operation_id)
+        except HeartDemonAlreadyResolvedError:
+            return CommandResult(False, "HEART_DEMON_ALREADY_RESOLVED", "这场心魔事件已经结算，不能重复选择。", context.request_id, operation_id)
         except MaterialInsufficientError:
             return CommandResult(False, "MATERIAL_INSUFFICIENT", "净化心魔需要魂元丹 ×1，未扣除资源。", context.request_id, operation_id)
         except BreakthroughRequirementError:
