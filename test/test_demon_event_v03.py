@@ -284,3 +284,72 @@ def test_demon_invasion_rejects_invalid_sources_and_enforces_claim_boundaries() 
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_personal_facility_maintenance_is_player_scoped_and_idempotent_on_qq_and_onebot() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(
+                    data_dir=Path(data_dir) / adapter,
+                    clock=lambda: datetime(2026, 9, 23, 20, 5, tzinfo=timezone.utc),
+                )
+                user = f"facility-maintenance-{adapter}"
+                created = await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")
+                assert created.ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='golden_core', realm_layer=1, location_key='cave.mist_grotto_2', spirit_stones=250 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+
+                claimed = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "claim", "facility-claim"),
+                    "认领设施槽位 炼丹房",
+                )
+                assert claimed.code == "FACILITY_SLOT_CLAIMED"
+                maintained = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "maintain", "facility-maintain"),
+                    "维护设施",
+                )
+                assert maintained.code == "FACILITY_MAINTENANCE_SETTLED"
+                assert maintained.data["paid_count"] == 1
+                source_id = maintained.data["records"][0]["maintenance_operation_id"]
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "maintain-replay", "facility-maintain"),
+                    "维护设施",
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    stones = connection.execute(
+                        "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                    ).fetchone()[0]
+                assert stones == 150
+
+                runtime.repository._clock = lambda: datetime(2026, 9, 24, 20, 5, tzinfo=timezone.utc)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET spirit_stones=0 WHERE platform=? AND platform_user_id=?", (adapter, user)
+                    )
+                unpaid = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "maintain-unpaid", "facility-maintain-next"),
+                    "维护设施",
+                )
+                assert unpaid.code == "FACILITY_MAINTENANCE_SETTLED"
+                assert unpaid.data["inactive_count"] == 1
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    status = connection.execute(
+                        "SELECT status FROM production_facility_maintenance WHERE operation_id=?", (source_id,)
+                    ).fetchone()[0]
+                    slot_status = connection.execute(
+                        "SELECT status FROM production_facility_slots WHERE slot_key='facility.alchemy_room.1'"
+                    ).fetchone()[0]
+                assert status == "active"
+                assert slot_status == "inactive"
+                await runtime.close()
+
+    asyncio.run(run())

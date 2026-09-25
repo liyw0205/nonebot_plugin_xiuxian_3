@@ -380,6 +380,9 @@ class XiuxianApplication:
     async def claim_facility_slot(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.facilities.claim_facility_slot(context))
 
+    async def maintain_player_facilities(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.facilities.maintain_player_facilities(context))
+
     async def preview_travel(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.world.preview_travel(context), require_write=False)
 

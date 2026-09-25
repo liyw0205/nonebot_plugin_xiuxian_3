@@ -121,6 +121,103 @@ class FacilityRepositoryMixin:
         async with self._inflight:
             return await asyncio.to_thread(self._maintain_facilities_once, business_date)
 
+    async def maintain_player_facilities(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> tuple[FacilityMaintenanceRecord, ...]:
+        """Maintain only the current player's personal facility slots.
+
+        The business date comes from the repository clock.  A player cannot
+        select a date or cause maintenance to run for another owner.
+        """
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._maintain_player_facilities_once,
+                platform,
+                platform_user_id,
+                operation_id,
+            )
+
+    def _maintain_player_facilities_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> tuple[FacilityMaintenanceRecord, ...]:
+        from ..persistence.errors import PlayerNotFoundError
+
+        operation_name = "production.maintain_player_facilities"
+        request_hash = self._request_hash(
+            operation_name,
+            {"platform": platform, "platform_user_id": platform_user_id},
+        )
+        day = str(self.business_today())
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return tuple(self._maintenance_record_from_payload(item, replay=True) for item in payload["records"])
+
+            player = self._require_player(connection, platform, platform_user_id)
+            slots = connection.execute(
+                "SELECT * FROM production_facility_slots WHERE owner_type = 'personal' AND owner_id = ? AND status IN ('active', 'inactive') ORDER BY id",
+                (str(player["id"]),),
+            ).fetchall()
+            records: list[FacilityMaintenanceRecord] = []
+            for slot in slots:
+                existing_maintenance = connection.execute(
+                    "SELECT m.*, s.slot_key FROM production_facility_maintenance m JOIN production_facility_slots s ON s.id = m.slot_id WHERE m.slot_id = ? AND m.business_date = ?",
+                    (slot["id"], day),
+                ).fetchone()
+                if existing_maintenance is not None:
+                    records.append(self._maintenance_record(existing_maintenance, replay=True))
+                    continue
+                paid = int(player["spirit_stones"]) >= FACILITY_MAINTENANCE_FEE
+                if paid:
+                    connection.execute(
+                        "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
+                        (FACILITY_MAINTENANCE_FEE, now_text, player["id"]),
+                    )
+                    player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+                status = "active" if paid else "inactive"
+                maintenance_operation_id = f"production.facility.maintenance:{slot['slot_key']}:{day}"
+                connection.execute(
+                    "INSERT INTO production_facility_maintenance(slot_id, business_date, owner_type, owner_id, fee, paid, status, operation_id, created_at) VALUES (?, ?, 'personal', ?, ?, ?, ?, ?, ?)",
+                    (slot["id"], day, str(player["id"]), FACILITY_MAINTENANCE_FEE, int(paid), status, maintenance_operation_id, now_text),
+                )
+                connection.execute(
+                    "UPDATE production_facility_slots SET status = ?, last_maintenance_date = ?, updated_at = ? WHERE id = ?",
+                    (status, day, now_text, slot["id"]),
+                )
+                created = connection.execute(
+                    "SELECT m.*, s.slot_key FROM production_facility_maintenance m JOIN production_facility_slots s ON s.id = m.slot_id WHERE m.operation_id = ?",
+                    (maintenance_operation_id,),
+                ).fetchone()
+                records.append(self._maintenance_record(created, replay=False))
+            payload = {"business_date": day, "records": [self._maintenance_payload(record) for record in records]}
+            self._record_facility_operation(
+                connection,
+                operation_id,
+                operation_name,
+                int(player["id"]),
+                request_hash,
+                payload,
+                now_text,
+            )
+            return tuple(records)
+
     def _maintain_facilities_once(self, business_date: str | date | None) -> tuple[FacilityMaintenanceRecord, ...]:
         day = str(business_date or self.business_today())
         now_text = serialize_datetime(self._now())
@@ -261,6 +358,31 @@ class FacilityRepositoryMixin:
             fee=int(slot["fee"]),
             paid=bool(slot["paid"]),
             status=str(slot["status"]),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _maintenance_payload(record: FacilityMaintenanceRecord) -> dict[str, Any]:
+        return {
+            "slot_key": record.slot_key,
+            "owner_type": record.owner_type,
+            "owner_id": record.owner_id,
+            "business_date": record.business_date,
+            "fee": record.fee,
+            "paid": record.paid,
+            "status": record.status,
+        }
+
+    @staticmethod
+    def _maintenance_record_from_payload(payload: dict[str, Any], *, replay: bool) -> FacilityMaintenanceRecord:
+        return FacilityMaintenanceRecord(
+            slot_key=str(payload["slot_key"]),
+            owner_type=str(payload["owner_type"]),
+            owner_id=str(payload["owner_id"]),
+            business_date=str(payload["business_date"]),
+            fee=int(payload["fee"]),
+            paid=bool(payload["paid"]),
+            status=str(payload["status"]),
             already_completed=replay,
         )
 

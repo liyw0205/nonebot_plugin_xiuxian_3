@@ -84,5 +84,56 @@ class FacilityApplication:
             },
         )
 
+    async def maintain_player_facilities(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_FACILITY_COMMAND", "维护设施无需附加日期或所有者参数。", context.request_id)
+        operation_id = context.operation_id or f"production.maintain_player_facilities:{context.adapter}:{context.user_id}:{context.message_id or context.request_id}"
+        try:
+            records = await self.repository.maintain_player_facilities(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他维护操作，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if not records:
+            return CommandResult(False, "FACILITY_NOT_CLAIMED", "你还没有认领可维护的个人设施槽位。", context.request_id, operation_id)
+        paid = sum(1 for record in records if record.paid)
+        inactive = len(records) - paid
+        status_text = f"已缴费 {paid} 个"
+        if inactive:
+            status_text += f"，欠费停用 {inactive} 个"
+        return CommandResult(
+            True,
+            "FACILITY_MAINTENANCE_SETTLED",
+            f"## 设施维护完成\n\n本业务日{status_text}。每个槽位维护费 100 灵石；欠费槽位已停用。",
+            context.request_id,
+            operation_id,
+            data={
+                "business_date": records[0].business_date,
+                "records": [
+                    {
+                        "slot_key": record.slot_key,
+                        "business_date": record.business_date,
+                        "fee": record.fee,
+                        "paid": record.paid,
+                        "status": record.status,
+                        "maintenance_operation_id": f"production.facility.maintenance:{record.slot_key}:{record.business_date}",
+                        "idempotent_replay": record.already_completed,
+                    }
+                    for record in records
+                ],
+                "paid_count": paid,
+                "inactive_count": inactive,
+                "idempotent_replay": all(record.already_completed for record in records),
+            },
+        )
+
 
 __all__ = ["FacilityApplication"]
