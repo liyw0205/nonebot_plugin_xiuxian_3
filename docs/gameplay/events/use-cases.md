@@ -4,6 +4,14 @@
 
 `activate_task`、`record_task_event`、`claim_task_reward`、`open_event_round`、`record_contribution`、`settle_event_round`、`freeze_ranking`、`claim_ranking_reward`、`get_final_heaven_season`、`claim_final_heaven_rewards`、`get_three_realms_season`、`claim_three_realms_rewards`、`get_heart_demon_event`。
 
+领域前线用例为 `get_domain_front`、`join_domain_front`、`start_domain_front_battle`、
+`create_domain_front_point`、`record_domain_front_contribution`、`claim_domain_front_reward`、
+`get_domain_war_season`、`claim_domain_war_reward` 和 `redeem_domain_core`。活动参与、来源投影、个人门槛、轮次恢复、
+赛季冻结与奖励都由独立 repository 事务完成。
+
+赛季分数由冻结前实时投影：领域前线贡献按贡献量计分，宗门建设贡献按 `quantity * 2`，化神配方成品每件 `+5`；
+客户端不能提交分数或伪造来源 operation。
+
 v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战场 战斗|运输|维修 [来源operation]`
 和 `领取魔界入侵奖励 [轮次]`。贡献只能引用服务端已结算来源；省略来源 operation 时，服务端
 选择本轮最新未消费的同类来源。运输、个人设施维修和 `开始魔界战` 的已结算战斗是当前玩家可达来源。
@@ -25,6 +33,9 @@ v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战�
 
 三界赛季补充错误码：`THREE_REALMS_RANKING_NOT_FINALIZED`、`THREE_REALMS_REWARD_NOT_ELIGIBLE`、
 `THREE_REALMS_REWARD_ALREADY_CLAIMED`、`THREE_REALMS_REWARD_EXPIRED` 和 `OPERATION_CONFLICT`。
+
+领域前线补充错误码：`DOMAIN_CORE_REDEEM_NOT_AVAILABLE`、`DOMAIN_CORE_REDEEM_ALREADY_USED`、
+`DOMAIN_CORE_FRAGMENT_INSUFFICIENT` 和 `INVALID_DOMAIN_SEASON_COMMAND`。
 
 ## 验收
 

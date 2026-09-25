@@ -724,6 +724,62 @@ class DomainConflictError(RuntimeError):
     """The requested domain conflicts with the current party state."""
 
 
+class DomainEventRequirementError(RuntimeError):
+    """The player does not meet the domain-front participation gates."""
+
+
+class DomainEventParticipantCapError(RuntimeError):
+    """A sect reached the domain-front roster cap for the round."""
+
+
+class DomainEventAlreadyJoinedError(RuntimeError):
+    """The player already joined the selected domain-front round."""
+
+
+class DomainEventRoundNotActiveError(RuntimeError):
+    """The selected domain-front round no longer accepts actions."""
+
+
+class DomainEventSourceInvalidError(RuntimeError):
+    """A domain-front contribution source is absent or not owned by the actor."""
+
+
+class DomainEventRewardAlreadyClaimedError(RuntimeError):
+    """The player already claimed the domain-front round reward."""
+
+
+class DomainEventRewardNotEligibleError(RuntimeError):
+    """The player has not reached the domain-front reward threshold."""
+
+
+class DomainSeasonRankingNotFinalizedError(RuntimeError):
+    """The domain-war season has not reached its freeze point."""
+
+
+class DomainSeasonRewardNotEligibleError(RuntimeError):
+    """The player has no ranking reward in the domain-war season."""
+
+
+class DomainSeasonRewardAlreadyClaimedError(RuntimeError):
+    """The player already claimed the domain-war season reward."""
+
+
+class DomainSeasonRewardExpiredError(RuntimeError):
+    """The domain-war season reward window has closed."""
+
+
+class DomainCoreRedeemAlreadyUsedError(RuntimeError):
+    """The player already redeemed a domain core for this season."""
+
+
+class DomainCoreRedeemRequirementError(RuntimeError):
+    """The season is not eligible for domain-core redemption."""
+
+
+class DomainCoreFragmentInsufficientError(ResourceInsufficientError):
+    """The player lacks the fragments required for domain-core redemption."""
+
+
 class SoulPowerInsufficientError(RuntimeError):
     """The player lacks the soul power required for soul transformation."""
 

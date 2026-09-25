@@ -46,6 +46,7 @@ from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
 from .events.season_use_cases import FinalHeavenSeasonApplication
 from .events.three_realms_use_cases import ThreeRealmsSeasonApplication
+from .events.domain_front_use_cases import DomainFrontApplication
 from .specials.arena_use_cases import ArenaApplication
 from .specials.team_arena_use_cases import TeamArenaApplication
 from .quests.use_cases import QuestApplication
@@ -98,6 +99,7 @@ class XiuxianApplication:
         self.events = EventsApplication(repository)
         self.seasons = FinalHeavenSeasonApplication(repository)
         self.three_realms_seasons = ThreeRealmsSeasonApplication(repository)
+        self.domain_front = DomainFrontApplication(repository)
         self.arena = ArenaApplication(repository)
         self.team_arena = TeamArenaApplication(repository)
         self.quests = QuestApplication(repository)
@@ -1255,6 +1257,33 @@ class XiuxianApplication:
             lambda: self.three_realms_seasons.claim_three_realms_rewards(context),
             write_message="当前事件不允许领取三界赛季奖励。",
         )
+
+    async def get_domain_front(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.get_domain_front(context), require_write=False)
+
+    async def join_domain_front(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.join_domain_front(context), write_message="当前事件不允许加入领域前线。")
+
+    async def start_domain_front_battle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.start_domain_front_battle(context), write_message="当前事件不允许开始领域战。")
+
+    async def create_domain_front_point(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.create_domain_front_point(context), write_message="当前事件不允许占领领域据点。")
+
+    async def contribute_domain_front(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.contribute_domain_front(context), write_message="当前事件不允许贡献领域前线。")
+
+    async def claim_domain_front_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.claim_domain_front_reward(context), write_message="当前事件不允许领取领域前线奖励。")
+
+    async def get_domain_war_season(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.get_domain_war_season(context), require_write=False)
+
+    async def claim_domain_war_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.claim_domain_war_reward(context), write_message="当前事件不允许领取领域战赛季奖励。")
+
+    async def redeem_domain_core(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.domain_front.redeem_domain_core(context), write_message="当前事件不允许兑换领域核心。")
 
     async def publish_arena_snapshot(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
