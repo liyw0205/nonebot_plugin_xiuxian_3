@@ -211,6 +211,37 @@
       "key": "beast.ten_thousand_hills"
     },
     {
+      "name": "魔渊集市",
+      "world": "魔界",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        },
+        {
+          "type": "faction_reputation",
+          "faction": "demon",
+          "min": 200
+        }
+      ],
+      "travel": {
+        "duration_seconds": 300,
+        "stamina": 12,
+        "spirit_stone": 500
+      },
+      "environment": {
+        "risk": "high",
+        "non_demon_penalty_bp": -1000
+      },
+      "actions": [
+        "economy.trade.xuantian_to_demon",
+        "production.demon_contract"
+      ],
+      "key": "demon.abyss_market"
+    },
+    {
       "name": "玄天界·云城",
       "world": "玄天界",
       "status": "locked",

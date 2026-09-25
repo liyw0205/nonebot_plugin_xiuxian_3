@@ -237,6 +237,15 @@ class TravelRepositoryMixin:
         if not meets_realm(player.realm_key, player.realm_layer, definition.required_realm, definition.required_layer):
             required = f"{definition.required_realm} L{definition.required_layer}"
             missing.append(f"境界要求（{required}）")
+        if definition.required_faction and definition.required_faction_reputation:
+            current_reputation = int(player.faction_reputation.get(definition.required_faction, 0))
+            if current_reputation < definition.required_faction_reputation:
+                faction_label = {"demon": "魔界", "beast": "妖界"}.get(
+                    definition.required_faction, definition.required_faction
+                )
+                missing.append(
+                    f"{faction_label}声望（需要 {definition.required_faction_reputation}，当前 {current_reputation}）"
+                )
         if destination == "xuantian.war_front":
             from ..events.demon_rules import demon_event_times, demon_scheduled_start
 
@@ -389,6 +398,10 @@ class TravelRepositoryMixin:
                     raise LocationRequirementError("destination quest permission is missing")
             if not meets_realm(str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer):
                 raise LocationRequirementError("realm requirement is not met")
+            reputation = self._json_object(row["faction_reputation_json"], {})
+            current_reputation = int(reputation.get(definition.required_faction or "", 0))
+            if definition.required_faction and current_reputation < definition.required_faction_reputation:
+                raise FactionReputationInsufficientError("destination faction reputation is insufficient")
             if int(row["dao_fruit_progress"]) < definition.required_dao_fruit_progress:
                 raise LocationRequirementError("dao fruit progress is insufficient")
 
@@ -472,6 +485,9 @@ class TravelRepositoryMixin:
                 "required_endgame_status": definition.required_endgame_status,
                 "required_intro_flag": definition.required_intro_flag,
                 "consume_pass_on_arrival": definition.consume_pass_on_arrival,
+                "required_faction": definition.required_faction,
+                "required_faction_reputation": definition.required_faction_reputation,
+                "faction_reputation": current_reputation,
             }
             connection.execute(
                 """

@@ -33,6 +33,7 @@ from ..repository import (
     DemonIntroAlreadyCompletedError,
     DemonIntroRequirementError,
     EventNotActiveError,
+    FactionReputationInsufficientError,
 )
 from .rules import CAVE_LOCATION, destination_definition, resolve_destination
 from .cloud_rules import cloud_route_definition, resolve_cloud_route
@@ -134,6 +135,8 @@ class WorldApplication:
             "required_endgame_status": definition.required_endgame_status,
             "required_intro_flag": definition.required_intro_flag,
             "consume_pass_on_arrival": definition.consume_pass_on_arrival,
+            "required_faction": definition.required_faction,
+            "required_faction_reputation": definition.required_faction_reputation,
         })
 
     async def start_travel(self, context: CommandContext, destination: str | None = None) -> CommandResult:
@@ -161,6 +164,14 @@ class WorldApplication:
             return CommandResult(False, "PLAYER_OCCUPIED", "当前处于突破虚弱，暂时不能移动，请先恢复状态。", context.request_id, operation_id)
         except EventNotActiveError:
             return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战场只在每周三 20:00 UTC 起的活动窗口开放。", context.request_id, operation_id)
+        except FactionReputationInsufficientError:
+            return CommandResult(
+                False,
+                "FACTION_REPUTATION_INSUFFICIENT",
+                "魔界声望不足，需要达到 200；本次未扣除体力或灵石。",
+                context.request_id,
+                operation_id,
+            )
         except LocationRequirementError:
             if resolved == "dao.origin_gate":
                 return CommandResult(

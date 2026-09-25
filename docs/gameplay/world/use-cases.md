@@ -6,6 +6,7 @@
 - `preview_travel(player_id, destination)` -> 条件、费用、时间，不写资产。
 - `start_travel(player_id, destination, operation_id)` -> 移动会话。
 - `settle_travel(player_id, operation_id)` -> 新位置和途中事件；服务端从该角色唯一的运行中会话读取路线快照。
+- `demon.abyss_market` -> 元婴 L1、魔界声望 `>=200`，5 分钟/12 体力/500 灵石；声望不足返回 `FACTION_REPUTATION_INSUFFICIENT`，成功会话冻结准入和 `content-0.3`/`world-0.3.0` 版本。
 - `board_cloud_boat(player_id, route_key, operation_id)` -> v0.2 云舟会话，冻结路线、费用和凭证。
 - `settle_cloud_boat(player_id, operation_id)` -> 按冻结快照抵达洞天二层、深渊门或返回云城。
 - `accept_demon_intro(player_id, operation_id)` -> 在深渊门确认风险，写入一次性入口资格和魔界声望，不发魔界资源。
@@ -19,6 +20,7 @@
 `ASCENSION_REQUIREMENT_MISSING`、`ENDING_STATE_REQUIRED`、`TRAVEL_BUSY`、
 `PLAYER_OCCUPIED`、`TRAVEL_RESOURCE_INSUFFICIENT`、`TRAVEL_PASS_INSUFFICIENT`、
 `TRAVEL_NOT_READY`、`TRAVEL_ROUTE_INVALID`、`OPERATION_CONFLICT`。
+跨界声望门槛另有 `FACTION_REPUTATION_INSUFFICIENT`。
 v0.2 另有 `CLOUD_ROUTE_LOCKED`、`CLOUD_FARE_INSUFFICIENT`、`ADVANCED_CAVE_PASS_MISSING`、
 `ARRAY_HALL_PERMISSION_DENIED`、`DEMON_INTRO_REQUIREMENT_MISSING`。
 

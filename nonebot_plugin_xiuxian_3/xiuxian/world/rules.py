@@ -27,6 +27,8 @@ class DestinationDefinition:
     required_endgame_status: str | None = None
     required_intro_flag: str | None = None
     consume_pass_on_arrival: bool = False
+    required_faction: str | None = None
+    required_faction_reputation: int = 0
     content_version: str = "content-0.1"
     rule_version: str = RULE_VERSION
 
@@ -132,6 +134,13 @@ DESTINATIONS = {
         required_intro_flag="access.demon.fallen_ruins",
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
+    "demon.abyss_market": DestinationDefinition(
+        "demon.abyss_market", "魔界·魔渊集市", 5 * 60, 12, 500,
+        required_realm="nascent_soul", required_layer=1,
+        source_locations=("demon.abyss_gate", "demon.fallen_ruins"),
+        required_faction="demon", required_faction_reputation=200,
+        content_version="content-0.3", rule_version="world-0.3.0",
+    ),
     "xuantian.war_front": DestinationDefinition(
         "xuantian.war_front", "玄天·魔界战场", 5 * 60, 15, 0,
         required_realm="nascent_soul", required_layer=1,
@@ -171,6 +180,9 @@ ALIASES = {
     "深渊门": "demon.abyss_gate",
     "魔界堕落遗迹": "demon.fallen_ruins",
     "堕落遗迹": "demon.fallen_ruins",
+    "魔界魔渊集市": "demon.abyss_market",
+    "魔渊集市": "demon.abyss_market",
+    "契约集市": "demon.abyss_market",
     "魔界战场": "xuantian.war_front",
     "玄天魔界战场": "xuantian.war_front",
 }
