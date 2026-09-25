@@ -804,6 +804,9 @@ class XiuxianApplication:
     async def create_beast_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_beast_party(context), write_message="当前事件不允许创建万兽队伍。")
 
+    async def create_standard_pve_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.create_standard_pve_party(context), write_message="当前事件不允许创建多人副本队伍。")
+
     async def invite_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.invite_party(context), write_message="当前事件不允许邀请队伍成员。")
 

@@ -16,10 +16,12 @@
 重复来源不加分。轮次结束胜方宗门增加 100 宗门功勋，个人贡献达到 20 的实际出战成员获得 30 点世界功勋。
 领奖 operation 可重放；新 operation 重复领奖拒绝；24 小时后合格未领奖记录自动发放，查询数据不得暴露平台用户 ID。
 
-当前开放的队伍为 `party.exploration_pair`、`party.arena_trio`、`party.boundary_realm`、`party.demon_realm` 和 `party.beast_realm`：探索队伍最多两人，竞技队伍最多三人，跨界副本队伍 2–5 人；创建时冻结地点，五分钟全员确认窗口，
+当前开放的队伍为 `party.exploration_pair`、`party.standard_pve`、`party.arena_trio`、`party.boundary_realm`、`party.demon_realm` 和 `party.beast_realm`：探索队伍最多两人，普通副本队伍 4–5 人，竞技队伍最多三人，跨界副本队伍 2–5 人；创建时冻结地点，五分钟全员确认窗口，
 队长退出时转移给仍在线的成员，否则队伍解散。确认后队长可在近郊或雾隐洞天发起独立队伍 PVE；
 服务端冻结全体成员属性/装备、锁定资产并自动推进回合，任一已确认成员可结算，奖励按成员唯一键发放。
 每次写操作均使用 operation ledger 幂等回放。
+
+普通多人副本命令为 `创建多人副本队伍`，别名为 `创建四人副本队伍`、`创建普通副本队伍`。队伍必须有 4–5 名同地点成员；3 人确认时保持 `forming`，第 6 名成员在邀请阶段被拒绝。当前普通敌人地点为 `xuantian.outskirts` 和 `cave.mist_grotto`，开始事务使用独立 `party_battle_sessions`，保存全员快照并在自动回合结算后逐成员发放唯一奖励。
 
 界隙队伍只能在 `cave.boundary_realm` 创建。开始前服务端校验所有成员元婴 L1、`story.mainline.three_realms` 证据、地点、30 体力和队长 1 枚 `item.soul_crystal`；任一失败整体拒绝且不扣资源。成功后保存阵营/盟约/污染/血脉/跨界惩罚、技能和版本快照，自动战斗使用 `enemy.boundary_watcher`。成员倒地进入 `downed`，存活队友可由服务端原子消耗 25 点神魂复起一次；5/10 回合时间轴要求至少两人防御，否则全队各扣 10 点神魂。失败会扣除既有疲劳成本，不掉永久装备；奖励按贡献、角色上限和固定排序独立写入且不可重复发放。
 
@@ -34,10 +36,10 @@
 
 ## 错误码
 
-`SECT_NOT_FOUND`、`SECT_FULL`、`ALREADY_MEMBER`、`APPLICATION_EXISTS`、`SECT_PERMISSION_DENIED`、`SECT_ASSET_LOCKED`、`ROLE_CHANGE_INVALID`、`SECT_WAR_REGISTRATION_CLOSED`、`SECT_WAR_PARTICIPANT_CAP`、`SECT_WAR_REQUIREMENT_MISSING`、`SECT_WAR_ROUND_NOT_ACTIVE`、`SECT_WAR_SOURCE_INVALID`、`SECT_WAR_REWARD_ALREADY_CLAIMED`、`SECT_WAR_REWARD_NOT_ELIGIBLE`、`SECT_WAR_REWARD_EXPIRED`、`MENTOR_REQUIREMENT_MISSING`、`APPRENTICE_RELATION_CONFLICT`、`MENTOR_INVITATION_NOT_FOUND`、`MENTOR_INVITATION_EXPIRED`、`MENTOR_GRADUATION_NOT_READY`、`MENTOR_STATE_CONFLICT`、`PARTY_NOT_FOUND`、`PARTY_ALREADY_MEMBER`、`PARTY_MEMBER_CAP`、`PARTY_PERMISSION_DENIED`、`PARTY_INVITATION_NOT_FOUND`、`PARTY_LOCATION_MISMATCH`、`PARTY_CONFIRMATION_EXPIRED`、`PARTY_STATE_CONFLICT`、`PARTY_BATTLE_BUSY`、`PARTY_BATTLE_PERMISSION_DENIED`、`PARTY_BATTLE_REQUIREMENT_MISSING`、`BATTLE_CROSS_REALM_REQUIREMENT_MISSING`、`POLLUTION_TOO_HIGH`、`SOUL_CRYSTAL_INSUFFICIENT`、`SOUL_EXHAUSTION_ACTIVE`、`BATTLE_SOUL_POWER_INSUFFICIENT`、`PARTY_BATTLE_NOT_READY`、`SERVICE_ORDER_CONFLICT`。
+`SECT_NOT_FOUND`、`SECT_FULL`、`ALREADY_MEMBER`、`APPLICATION_EXISTS`、`SECT_PERMISSION_DENIED`、`SECT_ASSET_LOCKED`、`ROLE_CHANGE_INVALID`、`SECT_WAR_REGISTRATION_CLOSED`、`SECT_WAR_PARTICIPANT_CAP`、`SECT_WAR_REQUIREMENT_MISSING`、`SECT_WAR_ROUND_NOT_ACTIVE`、`SECT_WAR_SOURCE_INVALID`、`SECT_WAR_REWARD_ALREADY_CLAIMED`、`SECT_WAR_REWARD_NOT_ELIGIBLE`、`SECT_WAR_REWARD_EXPIRED`、`MENTOR_REQUIREMENT_MISSING`、`APPRENTICE_RELATION_CONFLICT`、`MENTOR_INVITATION_NOT_FOUND`、`MENTOR_INVITATION_EXPIRED`、`MENTOR_GRADUATION_NOT_READY`、`MENTOR_STATE_CONFLICT`、`PARTY_NOT_FOUND`、`PARTY_ALREADY_MEMBER`、`PARTY_MEMBER_CAP`、`PARTY_PERMISSION_DENIED`、`PARTY_INVITATION_NOT_FOUND`、`PARTY_LOCATION_MISMATCH`、`PARTY_CONFIRMATION_EXPIRED`、`PARTY_STATE_CONFLICT`、`PARTY_BATTLE_BUSY`、`PARTY_BATTLE_PERMISSION_DENIED`、`PARTY_BATTLE_REQUIREMENT_MISSING`、`BATTLE_CROSS_REALM_REQUIREMENT_MISSING`、`POLLUTION_TOO_HIGH`、`SOUL_CRYSTAL_INSUFFICIENT`、`SOUL_EXHAUSTION_ACTIVE`、`BATTLE_SOUL_POWER_INSUFFICIENT`、`PARTY_BATTLE_NOT_READY`、`SERVICE_ORDER_CONFLICT`。普通副本人数不足或地点无对应敌人时统一返回 `PARTY_BATTLE_REQUIREMENT_MISSING`。
 
 ## 验收
 
-非管理职位不能改仓库；申请不能重复接受；队伍条件按全员检查，确认超时整体失效；战斗必须
+非管理职位不能改仓库；申请不能重复接受；队伍条件按全员检查，普通副本覆盖 4 人下限/5 人上限和第 6 人拒绝，确认超时整体失效；战斗必须
 保存所有成员开始快照、锁定资产并写行动回放，任一协助者结算只发每成员唯一奖励；战斗期间退出被拒绝；
 服务失败按约定退款/赔偿；宗门贡献重试只增加一次。

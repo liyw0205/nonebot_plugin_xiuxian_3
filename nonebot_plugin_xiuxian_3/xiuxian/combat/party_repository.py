@@ -58,6 +58,7 @@ from ..social.party_rules import (
     PARTY_TYPE_PARTY_BOUNDARY,
     PARTY_TYPE_DEMON_REALM,
     PARTY_TYPE_BEAST_REALM,
+    PARTY_TYPE_STANDARD_PVE,
 )
 
 
@@ -202,6 +203,7 @@ class PartyCombatRepositoryMixin:
                 PARTY_TYPE_PARTY_BOUNDARY,
                 PARTY_TYPE_DEMON_REALM,
                 PARTY_TYPE_BEAST_REALM,
+                PARTY_TYPE_STANDARD_PVE,
             }:
                 raise PartyBattleRequirementError("this party type cannot start party PVE")
             if str(party["status"]) != "ready":

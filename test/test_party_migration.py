@@ -52,7 +52,11 @@ def test_party_type_migration_preserves_existing_party_members() -> None:
     connection.execute(
         "INSERT INTO parties(party_id, party_type, status, leader_id, location_key, confirmation_deadline, content_version, rule_version, created_at, updated_at) VALUES ('party-trio', 'arena_trio', 'forming', 2, 'xuantian.new_town', '2026-01-01', 'c', 'r', '2026-01-01', '2026-01-01')"
     )
+    connection.execute(
+        "INSERT INTO parties(party_id, party_type, status, leader_id, location_key, confirmation_deadline, content_version, rule_version, created_at, updated_at) VALUES ('party-standard', 'standard_pve', 'forming', 2, 'xuantian.outskirts', '2026-01-01', 'content-0.3', 'social-0.3.2', '2026-01-01', '2026-01-01')"
+    )
     assert connection.execute("SELECT party_type FROM parties WHERE party_id = 'party-old'").fetchone()[0] == "exploration_pair"
+    assert connection.execute("SELECT party_type FROM parties WHERE party_id = 'party-standard'").fetchone()[0] == "standard_pve"
     assert connection.execute("SELECT party_id FROM party_members WHERE party_id = 'party-old'").fetchone()[0] == "party-old"
     assert connection.execute("SELECT party_id FROM party_battle_sessions WHERE battle_id = 'battle-old'").fetchone()[0] == "party-old"
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []

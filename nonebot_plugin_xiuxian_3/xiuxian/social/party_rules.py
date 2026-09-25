@@ -10,6 +10,7 @@ PARTY_TYPE_ARENA_TRIO = "arena_trio"
 PARTY_TYPE_BOUNDARY_REALM = "boundary_realm"
 PARTY_TYPE_DEMON_REALM = "demon_realm"
 PARTY_TYPE_BEAST_REALM = "beast_realm"
+PARTY_TYPE_STANDARD_PVE = "standard_pve"
 # Keep the implementation name used by early design notes as an input alias.
 PARTY_TYPE_PARTY_BOUNDARY = "party_boundary"
 PARTY_MAX_MEMBERS = 2
@@ -69,6 +70,15 @@ BEAST_REALM_DEFINITION = PartyDefinition(
     content_version="content-0.3",
     rule_version="social-0.3.1",
 )
+STANDARD_PVE_DEFINITION = PartyDefinition(
+    party_type=PARTY_TYPE_STANDARD_PVE,
+    min_members=4,
+    max_members=5,
+    required_location=None,
+    distribution_key="contribution",
+    content_version="content-0.3",
+    rule_version="social-0.3.2",
+)
 
 
 def party_definition_for(party_type: str) -> PartyDefinition:
@@ -80,6 +90,8 @@ def party_definition_for(party_type: str) -> PartyDefinition:
         return DEMON_REALM_DEFINITION
     if party_type == PARTY_TYPE_BEAST_REALM:
         return BEAST_REALM_DEFINITION
+    if party_type == PARTY_TYPE_STANDARD_PVE:
+        return STANDARD_PVE_DEFINITION
     if party_type != PARTY_TYPE_EXPLORATION_PAIR:
         raise ValueError(f"unsupported party type: {party_type}")
     return PARTY_DEFINITION
@@ -89,6 +101,7 @@ __all__ = [
     "PARTY_CONFIRMATION_TTL_SECONDS",
     "BOUNDARY_REALM_DEFINITION",
     "BEAST_REALM_DEFINITION",
+    "STANDARD_PVE_DEFINITION",
     "DEMON_REALM_DEFINITION",
     "BOUNDARY_REALM_MAX_MEMBERS",
     "BOUNDARY_REALM_MIN_MEMBERS",
@@ -102,6 +115,7 @@ __all__ = [
     "PARTY_TYPE_ARENA_TRIO",
     "PARTY_TYPE_BOUNDARY_REALM",
     "PARTY_TYPE_BEAST_REALM",
+    "PARTY_TYPE_STANDARD_PVE",
     "PARTY_TYPE_DEMON_REALM",
     "PARTY_TYPE_PARTY_BOUNDARY",
     "PartyDefinition",

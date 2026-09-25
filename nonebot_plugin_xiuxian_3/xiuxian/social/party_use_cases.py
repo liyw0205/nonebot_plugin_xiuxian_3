@@ -34,6 +34,7 @@ from .party_rules import (
     PARTY_TYPE_BEAST_REALM,
     PARTY_TYPE_DEMON_REALM,
     PARTY_TYPE_BOUNDARY_REALM,
+    PARTY_TYPE_STANDARD_PVE,
 )
 
 
@@ -99,6 +100,14 @@ class PartyApplication:
 
     async def create_beast_party(self, context: CommandContext) -> CommandResult:
         return await self._create_party(context, party_type=PARTY_TYPE_BEAST_REALM, title="万兽队伍", invite_hint="一至四名同在万兽山的元婴道友")
+
+    async def create_standard_pve_party(self, context: CommandContext) -> CommandResult:
+        return await self._create_party(
+            context,
+            party_type=PARTY_TYPE_STANDARD_PVE,
+            title="多人副本队伍",
+            invite_hint="三至四名同地点道友",
+        )
 
     async def _create_party(self, context: CommandContext, *, party_type: str, title: str, invite_hint: str) -> CommandResult:
         if context.command_args:
