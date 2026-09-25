@@ -121,7 +121,8 @@ class ExplorationApplication:
                 f"- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
                 f"- **精力**：{record.player.energy}/{record.player.energy_max}（消耗 {record.energy_cost}）\n"
                 f"- **今日上限**：{definition.daily_limit} 次\n\n"
-                "> 完成后发送 `结算探索`；准备期间不能移动、修炼、生产、突破或再次探索。"
+                + (f"- **迷雾屏障**：风险 -{record.risk_reduction_bp} bp\n\n" if record.risk_reduction_bp else "")
+                + "> 完成后发送 `结算探索`；准备期间不能移动、修炼、生产、突破或再次探索。"
             ),
             context.request_id,
             operation_id,
@@ -133,6 +134,7 @@ class ExplorationApplication:
                 "stamina_cost": record.stamina_cost,
                 "energy_cost": record.energy_cost,
                 "content_version": definition.content_version,
+                "risk_reduction_bp": record.risk_reduction_bp,
                 "idempotent_replay": record.already_completed,
             },
         )

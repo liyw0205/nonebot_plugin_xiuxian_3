@@ -17,6 +17,8 @@ class CultivationSessionRecord:
     ends_at: str
     stamina_cost: int
     energy_cost: int = 0
+    state_bp: int = 10000
+    cloud_tea_effect_bp: int = 0
     already_completed: bool = False
 
 

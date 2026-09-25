@@ -172,6 +172,8 @@ class ProgressionApplication:
                 "stamina_cost": record.stamina_cost,
                 "energy": player.energy,
                 "energy_cost": record.energy_cost,
+                "state_bp": record.state_bp,
+                "cloud_tea_effect_bp": record.cloud_tea_effect_bp,
                 "starts_at": record.starts_at,
                 "ends_at": record.ends_at,
                 "idempotent_replay": record.already_completed,

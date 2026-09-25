@@ -37,6 +37,7 @@ class ExplorationStartRecord:
     daily_limit: int
     already_completed: bool = False
     energy_cost: int = 0
+    risk_reduction_bp: int = 0
 
 
 @dataclass(frozen=True, slots=True)

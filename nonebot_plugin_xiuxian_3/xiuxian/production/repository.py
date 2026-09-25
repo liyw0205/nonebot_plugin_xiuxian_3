@@ -646,6 +646,27 @@ class ProductionRepositoryMixin:
                     durability["item.weapon.wood_sword"] = max(8000, min(10000, 8000 + quality // 5))
                 elif recipe.key == "recipe.weapon.cloud_sword":
                     durability["item.weapon.cloud_sword"] = max(8500, min(10000, 8500 + quality // 10))
+                    # New equipment is an instance, while the legacy durability
+                    # projection remains for old profile readers and migrations.
+                    sword_quantity = int(outputs.get("item.weapon.cloud_sword", 0))
+                    inventory.pop("item.weapon.cloud_sword", None)
+                    for _ in range(sword_quantity):
+                        connection.execute(
+                            """
+                            INSERT INTO equipment_instances(
+                                instance_id, player_id, item_key, label, slot, status,
+                                durability_bp, temper_level, max_temper_level, affixes_json,
+                                refinement_failure_streak, created_at, updated_at
+                            ) VALUES (?, ?, 'item.weapon.cloud_sword', '云纹剑', 'weapon', 'active', ?, 0, 3, '{}', 0, ?, ?)
+                            """,
+                            (
+                                uuid4().hex,
+                                row["id"],
+                                durability["item.weapon.cloud_sword"],
+                                now_text,
+                                now_text,
+                            ),
+                        )
             else:
                 for item_key, quantity in dict(
                     snapshot.get("failure_refunds", recipe.failure_refunds)

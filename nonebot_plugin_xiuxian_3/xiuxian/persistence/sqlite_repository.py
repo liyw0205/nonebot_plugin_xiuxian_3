@@ -28,6 +28,7 @@ from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
 from ..production.facility_repository import FacilityRepositoryMixin
+from ..items.repository import ItemRepositoryMixin
 from ..production.endgame_repository import EndgameProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
 from ..livelihood.repository import LivelihoodRepositoryMixin
@@ -64,6 +65,7 @@ class SQLitePlayerRepository(
     DaoEchoesRepositoryMixin,
     ProductionRepositoryMixin,
     FacilityRepositoryMixin,
+    ItemRepositoryMixin,
     EndgameProductionRepositoryMixin,
     LivelihoodRepositoryMixin,
     SectRepositoryMixin,
@@ -467,6 +469,7 @@ class SQLitePlayerRepository(
             ("energy_max", "INTEGER NOT NULL DEFAULT 0"),
             ("inventory_json", "TEXT NOT NULL DEFAULT '{}'"),
             ("durability_json", "TEXT NOT NULL DEFAULT '{}'"),
+            ("item_effects_json", "TEXT NOT NULL DEFAULT '{}'"),
             ("intro_json", "TEXT NOT NULL DEFAULT '{}'"),
             ("selected_service", "TEXT"),
             ("realm_key", "TEXT NOT NULL DEFAULT 'mortal'"),
@@ -664,3 +667,5 @@ _production_repository.SQLitePlayerRepository = SQLitePlayerRepository
 _advancement_repository.SQLitePlayerRepository = SQLitePlayerRepository
 _cultivation_repository.SQLitePlayerRepository = SQLitePlayerRepository
 _breakthrough_repository.SQLitePlayerRepository = SQLitePlayerRepository
+from ..items import repository as _items_repository
+_items_repository.SQLitePlayerRepository = SQLitePlayerRepository

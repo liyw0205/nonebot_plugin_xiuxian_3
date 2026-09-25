@@ -23,6 +23,11 @@ COMMISSION_FAILURE_REFUND_BP = 8000
 COMMISSION_TTL_SECONDS = 24 * 60 * 60
 COMMISSION_RECOVERY_GRACE_SECONDS = 24 * 60 * 60
 COMMISSION_RECIPES = frozenset({"recipe.pill.healing_low", "recipe.weapon.wood_sword"})
+NON_TRADEABLE_ITEMS = frozenset({
+    "item.pill.core_condense",
+    "item.pill.golden_core_guard",
+    "item.array.mist_barrier",
+})
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +67,7 @@ def resolve_market_item(value: str) -> MarketItem:
     key = _ALIASES.get(value.strip(), value.strip())
     if not key or not key.startswith("item."):
         raise ValueError("item is not tradeable")
-    if any(marker in key for marker in ("manual", "token", "certificate", "bound", "locked", "masterwork")):
+    if key in NON_TRADEABLE_ITEMS or any(marker in key for marker in ("manual", "token", "certificate", "bound", "locked", "masterwork")):
         raise ValueError("item is not tradeable")
     return MarketItem(key=key, label=_ITEMS.get(key, key))
 
@@ -106,6 +111,7 @@ __all__ = [
     "COMMISSION_MIN_REWARD",
     "COMMISSION_PLATFORM_FEE_BP",
     "COMMISSION_RECIPES",
+    "NON_TRADEABLE_ITEMS",
     "COMMISSION_RECOVERY_GRACE_SECONDS",
     "COMMISSION_TTL_SECONDS",
     "MarketItem",

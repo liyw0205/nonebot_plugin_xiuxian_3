@@ -8,6 +8,7 @@ from ..contracts import CommandContext, CommandResult, validate_command_identity
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
 from .production.facility_use_cases import FacilityApplication
+from .items.use_cases import ItemApplication
 from .progression.use_cases import ProgressionApplication
 from .progression.endgame_use_cases import EndgameApplication
 from .progression.final_battle_use_cases import FinalBattleApplication
@@ -53,6 +54,7 @@ class XiuxianApplication:
         self.breakthrough = BreakthroughApplication(repository)
         self.production = ProductionApplication(repository)
         self.facilities = FacilityApplication(repository)
+        self.items = ItemApplication(repository)
         self.world = WorldApplication(repository)
         self.exploration = ExplorationApplication(repository)
         self.combat = CombatApplication(repository)
@@ -366,6 +368,13 @@ class XiuxianApplication:
             context,
             lambda: self.production.recover_production(context),
             write_message="当前事件不允许恢复生产订单。",
+        )
+
+    async def use_item(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.items.use_item(context),
+            write_message="当前事件不允许使用物品。",
         )
 
     async def claim_facility_slot(self, context: CommandContext) -> CommandResult:

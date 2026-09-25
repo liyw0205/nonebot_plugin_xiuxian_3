@@ -436,6 +436,8 @@ class CultivationRepositoryMixin:
                     ends_at=str(payload["ends_at"]),
                     stamina_cost=int(payload["stamina_cost"]),
                     energy_cost=int(payload.get("energy_cost", 0)),
+                    state_bp=int(payload.get("state_bp", 10000)),
+                    cloud_tea_effect_bp=int(payload.get("cloud_tea_effect_bp", 0)),
                     already_completed=True,
                 )
 
@@ -537,6 +539,11 @@ class CultivationRepositoryMixin:
                     domain_crack_until = now
                 if domain_crack_until > now:
                     state_bp = min(state_bp, 8500)
+            item_effects = self._json_object(row["item_effects_json"], {})
+            cloud_tea_effect_bp = int(item_effects.get("cloud_tea_state_bp", 0))
+            if cloud_tea_effect_bp > 0:
+                state_bp += cloud_tea_effect_bp
+                item_effects = {}
             snapshot = {
                 "realm_key": row["realm_key"],
                 "realm_layer": int(row["realm_layer"]),
@@ -546,13 +553,14 @@ class CultivationRepositoryMixin:
                 "mode_key": mode.key,
                 "stamina_cost": mode.stamina_cost,
                 "energy_cost": mode.energy_cost,
+                "state_bp": state_bp,
+                "cloud_tea_effect_bp": cloud_tea_effect_bp,
                 "base_cultivation": mode.base_cultivation,
                 "environment_bp": mode.environment_bp,
-                "state_bp": state_bp,
             }
             connection.execute(
-                "UPDATE players SET stamina = stamina - ?, energy = energy - ?, updated_at = ? WHERE id = ?",
-                (mode.stamina_cost, mode.energy_cost, serialize_datetime(now), row["id"]),
+                "UPDATE players SET stamina = stamina - ?, energy = energy - ?, item_effects_json = ?, updated_at = ? WHERE id = ?",
+                (mode.stamina_cost, mode.energy_cost, json.dumps(item_effects, ensure_ascii=False, sort_keys=True), serialize_datetime(now), row["id"]),
             )
             connection.execute(
                 """
@@ -612,6 +620,8 @@ class CultivationRepositoryMixin:
                 ends_at=ends_at,
                 stamina_cost=mode.stamina_cost,
                 energy_cost=mode.energy_cost,
+                state_bp=state_bp,
+                cloud_tea_effect_bp=cloud_tea_effect_bp,
             )
 
     async def settle_cultivation(

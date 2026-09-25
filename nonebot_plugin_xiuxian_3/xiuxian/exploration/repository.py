@@ -132,6 +132,7 @@ from ..exploration.rules import (
     meets_realm as exploration_meets_realm,
     settlement_result,
 )
+from ..items.rules import MIST_BARRIER_RISK_REDUCTION_BP
 from ..adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from ..adventures.mainline_models import (
     MainlineClaimRecord,
@@ -351,6 +352,22 @@ class ExplorationRepositoryMixin:
             exploration_id = uuid4().hex
             starts_at = serialize_datetime(now)
             ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
+            connection.execute(
+                "UPDATE mist_barrier_instances SET status = 'expired', updated_at = ? WHERE player_id = ? AND status = 'active' AND expires_at <= ?",
+                (starts_at, player_id, starts_at),
+            )
+            active_barrier = connection.execute(
+                "SELECT barrier_id, expires_at, snapshot_json FROM mist_barrier_instances WHERE player_id = ? AND location_key = ? AND status = 'active' AND expires_at > ? ORDER BY id DESC LIMIT 1",
+                (player_id, definition.location_key, starts_at),
+            ).fetchone()
+            barrier_risk_reduction_bp = 0
+            if active_barrier is not None:
+                barrier_risk_reduction_bp = int(
+                    self._json_object(active_barrier["snapshot_json"], {}).get(
+                        "risk_reduction_bp", MIST_BARRIER_RISK_REDUCTION_BP
+                    )
+                )
+            battle_chance_bp = max(0, definition.battle_chance_bp - barrier_risk_reduction_bp)
             snapshot = {
                 "mode_key": definition.key,
                 "location_key": definition.location_key,
@@ -361,7 +378,10 @@ class ExplorationRepositoryMixin:
                 "rule_version": definition.rule_version,
                 "random_pool": definition.random_pool,
                 "random_seed": operation_id,
-                "battle_chance_bp": definition.battle_chance_bp,
+                "battle_chance_bp": battle_chance_bp,
+                "base_battle_chance_bp": definition.battle_chance_bp,
+                "barrier_risk_reduction_bp": barrier_risk_reduction_bp,
+                "barrier_id": active_barrier["barrier_id"] if active_barrier is not None else None,
                 "business_date": business_date,
                 "stamina_cost": definition.stamina_cost,
                 "energy_cost": definition.energy_cost,
@@ -418,6 +438,7 @@ class ExplorationRepositoryMixin:
                 "energy_cost": definition.energy_cost,
                 "content_version": definition.content_version,
                 "daily_limit": definition.daily_limit,
+                "risk_reduction_bp": barrier_risk_reduction_bp,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -445,6 +466,7 @@ class ExplorationRepositoryMixin:
             stamina_cost=int(payload["stamina_cost"]),
             daily_limit=int(payload["daily_limit"]),
             energy_cost=int(payload.get("energy_cost", 0)),
+            risk_reduction_bp=int(payload.get("risk_reduction_bp", 0)),
             already_completed=replay,
         )
 

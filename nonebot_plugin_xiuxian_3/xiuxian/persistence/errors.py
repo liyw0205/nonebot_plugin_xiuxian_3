@@ -1302,3 +1302,23 @@ class EndgameRecipeNotFoundError(RuntimeError):
 
 class EndgameRecipeNotReadyError(RuntimeError):
     """The endgame recipe order has not reached its settlement time."""
+
+
+class ItemNotUsableError(RuntimeError):
+    """The requested item has no active player-facing use effect."""
+
+
+class ItemInsufficientError(RuntimeError):
+    """The player does not own enough copies of the requested item."""
+
+
+class ItemLocationRequiredError(RuntimeError):
+    """The item effect requires a different binding location."""
+
+
+class ItemEffectAlreadyActiveError(RuntimeError):
+    """An item effect of the same non-stacking kind is already active."""
+
+
+class ItemEffectAlreadyPendingError(RuntimeError):
+    """A one-shot consumable effect is already waiting to be applied."""
