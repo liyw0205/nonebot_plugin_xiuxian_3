@@ -132,8 +132,110 @@ class ThreeRealmsSeasonRepositoryMixin:
         for season_id in season_ids:
             _, starts_at, ends_at = season_window_for_id(season_id)
             season = connection.execute("SELECT * FROM three_realms_seasons WHERE season_id=?", (season_id,)).fetchone()
-            if str(season["status"]) == "collecting" and now >= ends_at:
-                self._three_realms_freeze(connection, season, starts_at, ends_at, now_text)
+            if str(season["status"]) == "collecting":
+                self._three_realms_project_sources(connection, season_id, starts_at, ends_at, now_text)
+                if now >= ends_at:
+                    self._three_realms_freeze(connection, season, starts_at, ends_at, now_text)
+
+    @staticmethod
+    def _three_realms_project_sources(
+        connection: Any,
+        season_id: str,
+        starts_at: datetime,
+        ends_at: datetime,
+        now_text: str,
+    ) -> None:
+        """Project settled source operations into the live season read model."""
+
+        start_text, end_text = serialize_datetime(starts_at), serialize_datetime(ends_at)
+        faction_rows = connection.execute(
+            "SELECT e.player_id, e.source_operation_id, e.applied_quantity AS score, e.occurred_at "
+            "FROM world_event_contribution_events e JOIN world_event_rounds r ON r.round_id=e.round_id "
+            "WHERE r.event_key IN ('event.demon_invasion','event.beast_trade','event.boundary_rift') "
+            "AND e.occurred_at>=? AND e.occurred_at<? AND e.applied_quantity>0",
+            (start_text, end_text),
+        ).fetchall()
+        for row in faction_rows:
+            ThreeRealmsSeasonRepositoryMixin._insert_score_event(
+                connection,
+                season_id=season_id,
+                board_key="faction_merit",
+                player_id=int(row["player_id"]),
+                source_operation_id=str(row["source_operation_id"]),
+                score=int(row["score"]),
+                occurred_at=str(row["occurred_at"]),
+                now_text=now_text,
+            )
+
+        party_rows = connection.execute(
+            "SELECT battle_id, result_json, updated_at FROM party_battle_sessions "
+            "WHERE status='settled' AND updated_at>=? AND updated_at<?",
+            (start_text, end_text),
+        ).fetchall()
+        for row in party_rows:
+            try:
+                contribution = json.loads(str(row["result_json"] or "{}")).get("contribution", {})
+            except (TypeError, json.JSONDecodeError):
+                contribution = {}
+            for player_key, value in dict(contribution).items():
+                score = int(value or 0)
+                if score <= 0:
+                    continue
+                ThreeRealmsSeasonRepositoryMixin._insert_score_event(
+                    connection,
+                    season_id=season_id,
+                    board_key="party_contribution",
+                    player_id=int(player_key),
+                    source_operation_id=f"party_battle:{row['battle_id']}",
+                    score=score,
+                    occurred_at=str(row["updated_at"]),
+                    now_text=now_text,
+                )
+
+        sect_rows = connection.execute(
+            "SELECT player_id, source_operation_id, quantity AS score, occurred_at "
+            "FROM sect_contribution_events WHERE occurred_at>=? AND occurred_at<? AND quantity>0",
+            (start_text, end_text),
+        ).fetchall()
+        for row in sect_rows:
+            ThreeRealmsSeasonRepositoryMixin._insert_score_event(
+                connection,
+                season_id=season_id,
+                board_key="sect_contribution",
+                player_id=int(row["player_id"]),
+                source_operation_id=str(row["source_operation_id"]),
+                score=int(row["score"]),
+                occurred_at=str(row["occurred_at"]),
+                now_text=now_text,
+            )
+
+    @staticmethod
+    def _insert_score_event(
+        connection: Any,
+        *,
+        season_id: str,
+        board_key: str,
+        player_id: int,
+        source_operation_id: str,
+        score: int,
+        occurred_at: str,
+        now_text: str,
+    ) -> None:
+        connection.execute(
+            "INSERT OR IGNORE INTO three_realms_season_score_events "
+            "(season_id,board_key,player_id,source_operation_id,score,occurred_at,snapshot_json,created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                season_id,
+                board_key,
+                player_id,
+                source_operation_id,
+                score,
+                occurred_at,
+                json.dumps({"source_operation_id": source_operation_id, "score": score}, sort_keys=True),
+                now_text,
+            ),
+        )
 
     def _three_realms_freeze(self, connection: Any, season: Any, starts_at: datetime, ends_at: datetime, frozen_at: str) -> None:
         season_id = str(season["season_id"])
@@ -150,47 +252,17 @@ class ThreeRealmsSeasonRepositoryMixin:
 
     @staticmethod
     def _three_realms_candidates(connection: Any, season_id: str, board_key: str, starts_at: datetime, ends_at: datetime) -> list[dict[str, object]]:
-        start_text, end_text = serialize_datetime(starts_at), serialize_datetime(ends_at)
-        scores: dict[int, dict[str, object]] = {}
-        if board_key == "faction_merit":
-            rows = connection.execute(
-                "SELECT contribution_events.player_id, SUM(contribution_events.applied_quantity) AS score, "
-                "MAX(contribution_events.occurred_at) AS achieved_at "
-                "FROM world_event_contribution_events AS contribution_events "
-                "JOIN world_event_rounds AS rounds ON rounds.round_id=contribution_events.round_id "
-                "WHERE rounds.event_key IN ('event.demon_invasion','event.beast_trade','event.boundary_rift') "
-                "AND contribution_events.occurred_at>=? AND contribution_events.occurred_at<? "
-                "GROUP BY contribution_events.player_id",
-                (start_text, end_text),
-            ).fetchall()
-        elif board_key == "party_contribution":
-            rows = connection.execute(
-                "SELECT result_json, updated_at FROM party_battle_sessions "
-                "WHERE status='settled' AND updated_at>=? AND updated_at<?",
-                (start_text, end_text),
-            ).fetchall()
-            party_scores: dict[int, dict[str, object]] = {}
-            for row in rows:
-                result = json.loads(str(row["result_json"] or "{}"))
-                for player_key, value in dict(result.get("contribution", {})).items():
-                    player_id = int(player_key)
-                    score = int(value or 0)
-                    if score <= 0:
-                        continue
-                    current = party_scores.setdefault(player_id, {"score": 0, "achieved_at": str(row["updated_at"])})
-                    current["score"] = int(current["score"]) + score
-                    current["achieved_at"] = max(str(current["achieved_at"]), str(row["updated_at"]))
-            rows = [{"player_id": player_id, **value} for player_id, value in party_scores.items()]
-        else:
-            rows = connection.execute(
-                "SELECT player_id, SUM(quantity) AS score, MAX(occurred_at) AS achieved_at "
-                "FROM sect_contribution_events WHERE occurred_at>=? AND occurred_at<? GROUP BY player_id",
-                (start_text, end_text),
-            ).fetchall()
-        for row in rows:
-            score = int(row["score"] or 0)
-            if score > 0:
-                scores[int(row["player_id"])] = {"score": score, "achieved_at": str(row["achieved_at"])}
+        del starts_at, ends_at
+        rows = connection.execute(
+            "SELECT player_id, SUM(score) AS score, MAX(occurred_at) AS achieved_at "
+            "FROM three_realms_season_score_events WHERE season_id=? AND board_key=? GROUP BY player_id",
+            (season_id, board_key),
+        ).fetchall()
+        scores = {
+            int(row["player_id"]): {"score": int(row["score"]), "achieved_at": str(row["achieved_at"])}
+            for row in rows
+            if int(row["score"] or 0) > 0
+        }
         ordered = sorted(scores.items(), key=lambda item: (-int(item[1]["score"]), str(item[1]["achieved_at"]), tie_breaker(season_id, item[0])))
         return [{"player_id": player_id, **value} for player_id, value in ordered]
 

@@ -486,6 +486,45 @@ CREATE TABLE IF NOT EXISTS sect_war_claims (
 CREATE INDEX IF NOT EXISTS idx_sect_war_claims_player
     ON sect_war_claims(player_id, round_id);
 
+CREATE TABLE IF NOT EXISTS sect_war_federation_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id TEXT NOT NULL UNIQUE,
+    round_id TEXT NOT NULL,
+    shard_key TEXT NOT NULL,
+    sect_id TEXT NOT NULL,
+    roster_size INTEGER NOT NULL CHECK (roster_size BETWEEN 1 AND 15),
+    status TEXT NOT NULL CHECK (status IN ('frozen', 'revoked')),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    frozen_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (round_id, shard_key, sect_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_war_federation_snapshots_round
+    ON sect_war_federation_snapshots(round_id, shard_key, status, frozen_at);
+
+CREATE TABLE IF NOT EXISTS sect_war_federation_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    result_id TEXT NOT NULL UNIQUE,
+    round_id TEXT NOT NULL,
+    shard_key TEXT NOT NULL,
+    sect_id TEXT NOT NULL,
+    score INTEGER NOT NULL CHECK (score >= 0),
+    winner INTEGER NOT NULL CHECK (winner IN (0, 1)),
+    source_operation_id TEXT NOT NULL UNIQUE,
+    result_json TEXT NOT NULL DEFAULT '{}',
+    content_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    imported_at TEXT NOT NULL,
+    UNIQUE (round_id, shard_key, sect_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_war_federation_results_round
+    ON sect_war_federation_results(round_id, shard_key, score DESC, sect_id);
+
 CREATE TABLE IF NOT EXISTS sect_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sect_id TEXT NOT NULL REFERENCES sects(sect_id),
@@ -1992,6 +2031,22 @@ CREATE TABLE IF NOT EXISTS three_realms_rankings (
 
 CREATE INDEX IF NOT EXISTS idx_three_realms_rankings_player
     ON three_realms_rankings(player_id, season_id, board_key, rank);
+
+CREATE TABLE IF NOT EXISTS three_realms_season_score_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_id TEXT NOT NULL REFERENCES three_realms_seasons(season_id),
+    board_key TEXT NOT NULL CHECK (board_key IN ('faction_merit', 'party_contribution', 'sect_contribution')),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    source_operation_id TEXT NOT NULL,
+    score INTEGER NOT NULL CHECK (score > 0),
+    occurred_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (season_id, board_key, player_id, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_three_realms_score_events_window
+    ON three_realms_season_score_events(season_id, board_key, occurred_at, player_id);
 
 CREATE TABLE IF NOT EXISTS three_realms_claims (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

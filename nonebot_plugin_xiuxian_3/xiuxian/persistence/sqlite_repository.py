@@ -37,6 +37,7 @@ from ..social.sect_repository import SectRepositoryMixin
 from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
 from ..social.sect_war_repository import SectWarRepositoryMixin
+from ..social.sect_war_federation_repository import SectWarFederationRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
 from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
@@ -83,6 +84,7 @@ class SQLitePlayerRepository(
     PartyRepositoryMixin,
     MentorRepositoryMixin,
     SectWarRepositoryMixin,
+    SectWarFederationRepositoryMixin,
     EventsRepositoryMixin,
     HeartDemonEventRepositoryMixin,
     DemonInvasionRepositoryMixin,

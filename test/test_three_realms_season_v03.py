@@ -146,3 +146,62 @@ def test_three_realms_freeze_claim_and_binding_across_adapters() -> None:
     import asyncio
 
     asyncio.run(run())
+
+
+def test_three_realms_season_projects_new_sources_before_freeze_across_adapters() -> None:
+    async def run() -> None:
+        initial = datetime(2026, 9, 23, 20, 5, tzinfo=timezone.utc)
+        season_id, starts_at, ends_at = season_window(initial)
+        clock = MutableClock(starts_at + timedelta(days=2))
+        qq, onebot = _contexts()
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            qq_context = replace(qq, user_id="projection-qq", operation_id="projection-qq-create")
+            ob_context = replace(onebot, user_id="projection-ob", operation_id="projection-ob-create")
+            assert (await runtime.adapters.dispatch("qq.official", qq_context, "开始修仙")).code == "PLAYER_CREATED"
+            assert (await runtime.adapters.dispatch("onebot.v11", ob_context, "开始修仙")).code == "PLAYER_CREATED"
+            event_time = (starts_at + timedelta(days=1)).isoformat()
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_ids = dict(connection.execute("SELECT platform_user_id,id FROM players").fetchall())
+                for index, (user_id, score) in enumerate((("projection-qq", 7), ("projection-ob", 3)), start=1):
+                    connection.execute(
+                        "INSERT INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,rule_version,created_at,updated_at) VALUES (?, 'event.beast_trade', 'beast.three_realms_trade_port', 'settled', ?, ?, ?, 1, ?, '{}', 'events-0.3.1', ?, ?)",
+                        (f"projection-round-{index}", starts_at.isoformat(), ends_at.isoformat(), ends_at.isoformat(), score, event_time, event_time),
+                    )
+                    connection.execute(
+                        "INSERT INTO world_event_contribution_events(round_id,player_id,source_operation_id,quantity,applied_quantity,occurred_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (f"projection-round-{index}", player_ids[user_id], f"projection-source-{index}", score, score, event_time),
+                    )
+
+            first = await runtime.adapters.dispatch(
+                "qq.official", replace(qq_context, operation_id="projection-qq-first"), "三界赛季 阵营功勋"
+            )
+            assert first.code == "THREE_REALMS_SEASON_RANKING"
+            assert next(item["score"] for item in first.data["personal_standings"] if item["board_key"] == "faction_merit") == 7
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute("SELECT COUNT(*) FROM three_realms_season_score_events WHERE season_id=?", (season_id,)).fetchone()[0] == 2
+                player_id = player_ids["projection-qq"]
+                connection.execute(
+                    "INSERT INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,rule_version,created_at,updated_at) VALUES ('projection-round-3', 'event.beast_trade', 'beast.three_realms_trade_port', 'settled', ?, ?, ?, 1, 5, '{}', 'events-0.3.1', ?, ?)",
+                    (starts_at.isoformat(), ends_at.isoformat(), ends_at.isoformat(), event_time, event_time),
+                )
+                connection.execute(
+                    "INSERT INTO world_event_contribution_events(round_id,player_id,source_operation_id,quantity,applied_quantity,occurred_at) VALUES ('projection-round-3', ?, 'projection-source-3', 5, 5, ?)",
+                    (player_id, event_time),
+                )
+
+            second = await runtime.adapters.dispatch(
+                "onebot.v11", replace(ob_context, operation_id="projection-ob-second"), "三界赛季 阵营功勋"
+            )
+            assert second.code == "THREE_REALMS_SEASON_RANKING"
+            latest = await runtime.adapters.dispatch(
+                "qq.official", replace(qq_context, operation_id="projection-qq-latest"), "三界赛季 阵营功勋"
+            )
+            assert next(item["score"] for item in latest.data["personal_standings"] if item["board_key"] == "faction_merit") == 12
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute("SELECT COUNT(*) FROM three_realms_season_score_events WHERE season_id=?", (season_id,)).fetchone()[0] == 3
+            await runtime.close()
+
+    import asyncio
+
+    asyncio.run(run())

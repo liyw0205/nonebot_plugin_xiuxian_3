@@ -4,6 +4,7 @@ from .sect_models import SectApplicationRecord, SectRecord
 from .party_models import PartyInvitationRecord, PartyMemberRecord, PartyRecord
 from .mentor_models import MentorRelationRecord
 from .sect_war_models import SectWarClaimRecord, SectWarRecord, SectWarStanding
+from .sect_war_federation_models import SectWarFederationResultRecord, SectWarFederationSnapshotRecord
 from .sect_war_rules import (
     SECT_WAR_CLAIM_HOURS,
     SECT_WAR_CONTENT_VERSION,
@@ -52,6 +53,8 @@ __all__ = [
     "SectWarClaimRecord",
     "SectWarRecord",
     "SectWarStanding",
+    "SectWarFederationResultRecord",
+    "SectWarFederationSnapshotRecord",
     "SECT_WAR_CLAIM_HOURS",
     "SECT_WAR_CONTENT_VERSION",
     "SECT_WAR_DURATION_MINUTES",
