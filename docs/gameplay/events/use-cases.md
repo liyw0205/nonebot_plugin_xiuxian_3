@@ -8,12 +8,19 @@ v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战�
 和 `领取魔界入侵奖励 [轮次]`。贡献只能引用服务端已结算来源；省略来源 operation 时，服务端
 选择本轮最新未消费的同类来源。运输、个人设施维修和 `开始魔界战` 的已结算战斗是当前玩家可达来源。
 
+公共跨界事件入口为 `妖界贸易事件 [轮次]`、`贡献妖界贸易 贸易|妖血 [来源operation]`、
+`领取妖界贸易奖励 <轮次>`，以及 `界隙裂痕 [轮次]`、`贡献界隙裂痕 [来源operation]`、
+`领取界隙裂痕奖励 <轮次>`。妖界贸易来源为已结算固定贸易 operation 或绑定妖血消耗；
+界隙裂痕来源为角色参与的已结算界隙队伍胜利。所有来源按
+`round_id/player_id/source_operation_id` 去重，查询、贡献和领奖事务都会恢复已落库但未刷新的轮次。
+
 ## 错误码
 
 `TASK_NOT_FOUND`、`TASK_NOT_ACTIVE`、`TASK_PREREQUISITE_MISSING`、`TASK_WINDOW_CLOSED`、`TASK_ALREADY_CLAIMED`、`EVENT_DUPLICATE`、`EVENT_NOT_OPEN`、`ROUND_ALREADY_SETTLED`、`FINAL_RANKING_NOT_FINALIZED`、`FINAL_RANKING_NOT_ELIGIBLE`、`FINAL_RANKING_REWARD_CLAIMED`、`FINAL_RANKING_CLAIM_EXPIRED`。
 
 魔界入侵补充错误码：`EVENT_CONTRIBUTION_SOURCE_INVALID`、`EVENT_CONTRIBUTION_INSUFFICIENT`、
 `EVENT_REWARD_ALREADY_CLAIMED`、`EVENT_REWARD_EXPIRED` 和 `OPERATION_CONFLICT`。
+公共跨界事件复用上述来源、贡献和领奖错误码。
 心魔事件入口为 `心魔事件 [事件编号]`；超时按 `heart_demon.face` 自动结算且不进入公共排行。补充错误码：`HEART_DEMON_ALREADY_RESOLVED`、`HEART_DEMON_NOT_FOUND`。
 
 ## 验收

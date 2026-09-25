@@ -39,6 +39,7 @@ from ..social.mentor_repository import MentorRepositoryMixin
 from ..events.repository import EventsRepositoryMixin
 from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
+from ..events.cross_realm_repository import CrossRealmEventRepositoryMixin
 from ..events.season_repository import FinalHeavenSeasonRepositoryMixin
 from ..specials.arena_repository import ArenaRepositoryMixin
 from ..specials.team_arena_repository import TeamArenaRepositoryMixin
@@ -82,6 +83,7 @@ class SQLitePlayerRepository(
     EventsRepositoryMixin,
     HeartDemonEventRepositoryMixin,
     DemonInvasionRepositoryMixin,
+    CrossRealmEventRepositoryMixin,
     FinalHeavenSeasonRepositoryMixin,
     ArenaRepositoryMixin,
     TeamArenaRepositoryMixin,
@@ -223,6 +225,10 @@ class SQLitePlayerRepository(
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("events.heart_demon.v0.3", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("events.cross_realm.v0.3.1", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",

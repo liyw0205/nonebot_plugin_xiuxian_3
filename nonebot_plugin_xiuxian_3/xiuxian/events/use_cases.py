@@ -16,6 +16,7 @@ from ..persistence.errors import (
 )
 from .repository import EventsRepositoryMixin
 from .demon_rules import DEMON_ACTION_VALUES
+from .cross_realm_rules import BEAST_TRADE_EVENT_KEY, BOUNDARY_RIFT_EVENT_KEY
 
 
 class EventsApplication:
@@ -285,6 +286,138 @@ class EventsApplication:
             context.request_id,
             operation_id,
             data=self._data(record),
+        )
+
+    @staticmethod
+    def _cross_event_round_id(args: tuple[str, ...]) -> str | None:
+        if not args:
+            return None
+        return args[0] if len(args) == 1 else ""
+
+    async def _get_cross_realm_event(self, context: CommandContext, event_key: str, label: str, usage: str) -> CommandResult:
+        round_id = self._cross_event_round_id(context.command_args)
+        if round_id == "":
+            return CommandResult(False, "INVALID_EVENT_COMMAND", usage, context.request_id)
+        try:
+            record = await self.repository.get_cross_realm_event(
+                event_key=event_key,
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                round_id=round_id,
+            )
+        except Exception as exc:
+            return self._error(context, "", exc, event_label=label)
+        state = {"open": "进行中", "running": "进行中", "settled": "已结算", "failed": "已结束"}.get(record.status, record.status)
+        return CommandResult(
+            True,
+            "EVENT_STATUS",
+            (
+                f"## {label}\n\n"
+                f"**轮次**：`{record.round_id}`\n"
+                f"**状态**：{state}\n"
+                f"**全服贡献**：{record.total_contribution}/{record.target_quantity}\n"
+                f"**你的贡献**：{record.player_contribution}\n"
+                f"**时间**：{record.starts_at} 至 {record.ends_at}\n\n"
+                "> 贡献来源必须是服务器已结算的 operation；事件结束后 24 小时内可领奖。"
+            ),
+            context.request_id,
+            data=self._data(record),
+        )
+
+    async def get_beast_trade_event(self, context: CommandContext) -> CommandResult:
+        return await self._get_cross_realm_event(
+            context, BEAST_TRADE_EVENT_KEY, "妖界贸易", "请使用 `妖界贸易事件 [轮次]`。"
+        )
+
+    async def get_boundary_rift_event(self, context: CommandContext) -> CommandResult:
+        return await self._get_cross_realm_event(
+            context, BOUNDARY_RIFT_EVENT_KEY, "界隙裂痕", "请使用 `界隙裂痕 [轮次]`。"
+        )
+
+    async def _contribute_cross_realm_event(
+        self, context: CommandContext, event_key: str, label: str, action_values: dict[str, str], usage: str
+    ) -> CommandResult:
+        if len(context.command_args) > 2:
+            return CommandResult(False, "INVALID_EVENT_COMMAND", usage, context.request_id)
+        action = context.command_args[0] if context.command_args else next(iter(action_values))
+        action_key = action_values.get(action)
+        source_operation_id = context.command_args[1] if len(context.command_args) == 2 else None
+        if action_key is None and len(context.command_args) == 1 and event_key == BOUNDARY_RIFT_EVENT_KEY:
+            action_key = "complete"
+            source_operation_id = action
+        if action_key is None:
+            return CommandResult(False, "INVALID_EVENT_COMMAND", usage, context.request_id)
+        operation_id = self._operation_id(context, f"{event_key}.contribute")
+        try:
+            record = await self.repository.record_cross_realm_contribution(
+                event_key=event_key,
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                action_key=action_key,
+                source_operation_id=source_operation_id,
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc, event_label=label)
+        return CommandResult(
+            True,
+            "EVENT_CONTRIBUTION_RECORDED",
+            f"## {label}贡献已记录\n\n- **本轮贡献**：{record.player_contribution}\n- **全服贡献**：{record.total_contribution}/{record.target_quantity}",
+            context.request_id,
+            operation_id,
+            data=self._data(record),
+        )
+
+    async def contribute_beast_trade_event(self, context: CommandContext) -> CommandResult:
+        return await self._contribute_cross_realm_event(
+            context,
+            BEAST_TRADE_EVENT_KEY,
+            "妖界贸易",
+            {"贸易": "trade", "跨界贸易": "trade", "妖血": "blood", "提交妖血": "blood"},
+            "请使用 `贡献妖界贸易 贸易|妖血 [来源operation]`。",
+        )
+
+    async def contribute_boundary_rift_event(self, context: CommandContext) -> CommandResult:
+        return await self._contribute_cross_realm_event(
+            context,
+            BOUNDARY_RIFT_EVENT_KEY,
+            "界隙裂痕",
+            {"路线": "route", "首领": "boss", "完成": "complete"},
+            "请使用 `贡献界隙裂痕 [来源operation]`。",
+        )
+
+    async def _claim_cross_realm_event(self, context: CommandContext, event_key: str, label: str, usage: str) -> CommandResult:
+        round_id = self._cross_event_round_id(context.command_args)
+        if not round_id or round_id == "":
+            return CommandResult(False, "INVALID_EVENT_COMMAND", usage, context.request_id)
+        operation_id = self._operation_id(context, f"{event_key}.claim_reward")
+        try:
+            record = await self.repository.claim_cross_realm_event(
+                event_key=event_key,
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                round_id=round_id,
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc, event_label=label)
+        return CommandResult(
+            True,
+            "EVENT_REWARD_CLAIMED",
+            f"## {label}奖励已领取\n\n" + "\n".join(f"- {key} +{value}" for key, value in record.reward.items()),
+            context.request_id,
+            operation_id,
+            data=self._data(record),
+        )
+
+    async def claim_beast_trade_event(self, context: CommandContext) -> CommandResult:
+        return await self._claim_cross_realm_event(
+            context, BEAST_TRADE_EVENT_KEY, "妖界贸易", "请使用 `领取妖界贸易奖励 <轮次>`。"
+        )
+
+    async def claim_boundary_rift_event(self, context: CommandContext) -> CommandResult:
+        return await self._claim_cross_realm_event(
+            context, BOUNDARY_RIFT_EVENT_KEY, "界隙裂痕", "请使用 `领取界隙裂痕奖励 <轮次>`。"
         )
 
 

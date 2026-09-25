@@ -9,8 +9,8 @@ operation ledger 保护。
 
 化神/炼虚许可任务已开放最小玩家闭环：`完成领域委托`、`完成远古洞天任务`、`开始跨界战`、
 `开始界壁试炼`、`探索档案遗迹`、`交付虚空档案` 和对应许可领取命令均进入统一 application，
-任务组件由 `quest_progress` / `quest_events` 审计。v0.3 `quest.demon_main_1` 已接入服务端探索证据核验：魔界声望达到 200 且有两次已结算的 `explore.demon_abyss` 胜利后，`领取魔界主线` 原子写入任务事件、版本快照和 `access.demon.fallen_ruins`。`event.demon_invasion` 通过 `魔界入侵` 查看轮次，`贡献魔界战场 战斗|运输|维修` 只投影已结算的服务端 operation，个人贡献达到 50 后以 `领取魔界入侵奖励` 领取世界功勋 50 和魔界声望 20；操作和领奖均幂等。`维护设施` 由玩家按服务端业务日维护个人槽位，真实维护 operation 可作为维修贡献来源；`开始魔界战` 在活动窗口内创建固定敌人自动战，结算后可投影战斗来源。运输/维修/战斗来源与领奖是当前最小玩家路径。领域前线、完整虚空档案副本、复杂世界事件和
-多人战斗仍按[当前开发状态](../../current-status.md)逐步开放。终局赛季三榜由独立 season repository
+任务组件由 `quest_progress` / `quest_events` 审计。v0.3 `quest.demon_main_1` 已接入服务端探索证据核验：魔界声望达到 200 且有两次已结算的 `explore.demon_abyss` 胜利后，`领取魔界主线` 原子写入任务事件、版本快照和 `access.demon.fallen_ruins`。`event.demon_invasion` 通过 `魔界入侵` 查看轮次，`贡献魔界战场 战斗|运输|维修` 只投影已结算的服务端 operation，个人贡献达到 50 后以 `领取魔界入侵奖励` 领取世界功勋 50 和魔界声望 20；操作和领奖均幂等。`维护设施` 由玩家按服务端业务日维护个人槽位，真实维护 operation 可作为维修贡献来源；`开始魔界战` 在活动窗口内创建固定敌人自动战，结算后可投影战斗来源。运输/维修/战斗来源与领奖是当前最小玩家路径。`event.beast_trade` 和 `event.boundary_rift` 已补齐固定轮次、来源 operation 投影、恢复和双适配器领奖；领域前线、完整虚空档案副本、其他复杂世界事件和
+其他多人战斗仍按[当前开发状态](../../current-status.md)逐步开放。终局赛季三榜由独立 season repository
 接入：结局榜读取正式结局，协作榜仅读取成功多人终局战；到期按需冻结匿名快照，称号领取幂等，
 逾期补发展示称号但不自动确认篇章资格。`event.heart_demon_trial` 由元婴突破失败在同一事务写入独立 `heart_demon_event_projections`，记录事件、突破结算 operation、版本快照和 24 小时截止时间；`心魔事件` 只读查询会先处理到期事件，按 `heart_demon.face` 自动结算。`化解心魔` 回写事件投影；已结算事件再次选择返回 `HEART_DEMON_ALREADY_RESOLVED`，不进入公共排行。`content-v*.md` 是规则合同，不代表所有后续入口已接入。
 

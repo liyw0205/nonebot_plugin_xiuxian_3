@@ -3,6 +3,8 @@
 from .models import SpiritSpringEventRecord
 from .demon_models import DemonInvasionEventRecord
 from .demon_repository import DemonInvasionRepositoryMixin
+from .cross_realm_models import CrossRealmEventRecord
+from .cross_realm_repository import CrossRealmEventRepositoryMixin
 from .repository import EventsRepositoryMixin
 from .heart_demon_models import HeartDemonEventRecord
 from .heart_demon_repository import HEART_DEMON_EVENT_KEY, HeartDemonEventRepositoryMixin
@@ -31,6 +33,8 @@ __all__ = [
     "HeartDemonEventRepositoryMixin",
     "DemonInvasionEventRecord",
     "DemonInvasionRepositoryMixin",
+    "CrossRealmEventRecord",
+    "CrossRealmEventRepositoryMixin",
     "FinalHeavenClaimRecord",
     "FinalHeavenSeasonApplication",
     "FinalHeavenSeasonRecord",

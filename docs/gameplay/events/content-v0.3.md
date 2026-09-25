@@ -1,6 +1,6 @@
 # v0.3 活动内容基线：三界事件、心魔与赛季
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.3`，`rule_version=events-0.3.0`。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.3`，`rule_version=events-0.3.1`。
 
 ## 1. 三界事件
 
@@ -13,7 +13,7 @@
 
 贡献按 `round_id/player_id/source_operation_id` 唯一；公共事件结束 24h 可领奖。心魔事件没有公共时间窗，超时 24h 按 `heart_demon.face` 自动结算。
 
-当前运行时开放事件轮次、运输/个人设施维护/战斗来源投影和领奖；`xuantian.war_front` 在活动窗口内允许元婴 L1 玩家移动并通过 `开始魔界战` 创建固定自动战，战斗结算不发额外奖励，贡献按服务端战斗行动伤害核验。
+当前运行时开放三类公共事件轮次、来源 operation 投影、重复来源拒绝、过期轮次恢复和双适配器领奖；`xuantian.war_front` 在活动窗口内允许元婴 L1 玩家移动并通过 `开始魔界战` 创建固定自动战，战斗结算不发额外奖励，贡献按服务端战斗行动伤害核验。妖界贸易按 UTC 周一滚动 7 日，界隙裂痕按 UTC 两小时窗口；事件查询或领奖会在同一事务内刷新轮次状态。
 
 ## 2. `season.three_realms`
 

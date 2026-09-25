@@ -1111,6 +1111,24 @@ class XiuxianApplication:
             write_message="当前事件不允许领取魔界入侵奖励。",
         )
 
+    async def get_beast_trade_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.get_beast_trade_event(context), require_write=False)
+
+    async def contribute_beast_trade_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.contribute_beast_trade_event(context), write_message="当前事件不允许贡献妖界贸易。")
+
+    async def claim_beast_trade_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.claim_beast_trade_event(context), write_message="当前事件不允许领取妖界贸易奖励。")
+
+    async def get_boundary_rift_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.get_boundary_rift_event(context), require_write=False)
+
+    async def contribute_boundary_rift_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.contribute_boundary_rift_event(context), write_message="当前事件不允许贡献界隙裂痕。")
+
+    async def claim_boundary_rift_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.claim_boundary_rift_event(context), write_message="当前事件不允许领取界隙裂痕奖励。")
+
     async def get_final_heaven_season(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,
