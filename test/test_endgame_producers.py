@@ -10,6 +10,7 @@ from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import ENDGAME_RECIPES, recipe_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
     DAO_ORIGIN_REWARDS,
     DAO_ORIGIN_TASKS,
@@ -24,6 +25,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import (
     TRIBULATION_PROGRESS_REWARD,
     trial_roll_bp,
 )
+from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
 
 
 class MutableClock:
@@ -218,6 +220,232 @@ def test_dao_origin_resource_closure_and_qq_onebot_task_producers() -> None:
                 }
                 assert status.data["quests"]["task.dao_origin.guard"]["season_id"] == season_id
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
+    """Use public commands to create every Dao-origin evidence source.
+
+    The high-realm row is only a bounded starting fixture.  Evidence must come
+    from the production, project, mentor and battle application paths.
+    """
+
+    async def run() -> None:
+        clock = MutableClock()
+        with TemporaryDirectory() as data_dir:
+            for adapter, user in (("qq.official", "qq-real-producers"), ("onebot.v11", "ob-real-producers")):
+                # Public projects are global per database week; use an isolated
+                # runtime so each adapter exercises the same full-world flow.
+                runtime = create_runtime(data_dir=f"{data_dir}/{adapter.replace('.', '_')}", clock=clock)
+                clock.value = datetime(2026, 10, 12, tzinfo=timezone.utc)
+                apprentices = tuple(f"{user}-apprentice-{index}" for index in range(3))
+                await _create(runtime, adapter, user)
+                for apprentice in apprentices:
+                    await _create(runtime, adapter, apprentice)
+                    for index, command in enumerate(
+                        (
+                            "寻仙问道",
+                            "完成引导 阅读",
+                            "前往近郊",
+                            "完成引导 采集",
+                            "完成引导 炼丹",
+                            "选择道途 辅修 炼丹",
+                        )
+                    ):
+                        result = await runtime.dispatch(
+                            _ctx(adapter, apprentice, f"{apprentice}-onboard-{index}"), command
+                        )
+                        assert result.ok, (apprentice, command, result.code)
+                    _set_player(
+                        runtime,
+                        adapter,
+                        apprentice,
+                        stage="cultivator",
+                        realm_key="qi_gathering",
+                        realm_layer=3,
+                        energy=100,
+                        energy_max=100,
+                        inventory_json=json.dumps(
+                            {
+                                "item.herb.blood_grass": 2,
+                                "item.food.coarse_spirit_rice": 1,
+                                "item.tool.basic_furnace": 1,
+                            }
+                        ),
+                    )
+
+                # Mentoring starts from its documented foundation L4 gate.
+                _set_player(runtime, adapter, user, stage="cultivator", realm_key="foundation", realm_layer=4)
+                for apprentice in apprentices:
+                    production_operation = next(
+                        f"{adapter}-{apprentice}-production-{index}"
+                        for index in range(1_000)
+                        if random_quality_bp(f"{adapter}-{apprentice}-production-{index}") >= 500
+                    )
+                    started = await runtime.dispatch(
+                        _ctx(adapter, apprentice, production_operation),
+                        "开始生产 recipe.pill.healing_low",
+                    )
+                    assert started.code == "PRODUCTION_STARTED"
+                    clock.advance(minutes=1)
+                    completed = await runtime.dispatch(
+                        _ctx(adapter, apprentice, f"{apprentice}-production-settle"), "领取生产"
+                    )
+                    assert completed.code == "PRODUCTION_COMPLETED"
+                    assert completed.data["success"] is True
+
+                    invitation = await runtime.dispatch(
+                        _ctx(adapter, user, f"{user}-invite-{apprentice}"),
+                        f"邀请拜师 {adapter}:{apprentice}",
+                    )
+                    assert invitation.code == "MENTOR_INVITED"
+                    accepted = await runtime.dispatch(
+                        _ctx(adapter, apprentice, f"{apprentice}-accept"),
+                        f"接受拜师 {invitation.data['relation_id']}",
+                    )
+                    assert accepted.code == "MENTOR_ACCEPTED"
+                    graduated = await runtime.dispatch(
+                        _ctx(adapter, user, f"{user}-graduate-{apprentice}"),
+                        f"师徒毕业 {invitation.data['relation_id']}",
+                    )
+                    assert graduated.code == "MENTOR_GRADUATED"
+
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    realm_key="void_refining",
+                    realm_layer=10,
+                    total_cultivation=2_998_960,
+                    location_key="cave.boundary_realm",
+                    path_key="body",
+                    max_hp=500_000,
+                    initiative=1_000,
+                    qualification_json=json.dumps({"body": 100_000}),
+                    energy=100,
+                    energy_max=100,
+                    spirit_stones=303_000,
+                    world_merit=3_000,
+                    inventory_json=json.dumps(
+                        {
+                            "item.material.cloud_iron": 100,
+                            "item.domain_core": 2,
+                            "item.mat.wood": 100,
+                            "item.dao_fruit_fragment": 30,
+                        }
+                    ),
+                )
+
+                for lane in ("建设者", "见证者", "远行者"):
+                    for stage in range(1, 11):
+                        started = await runtime.dispatch(
+                            _ctx(adapter, user, f"{user}-echo-start-{lane}-{stage}"),
+                            f"开始道源主线 {lane} {stage}",
+                        )
+                        claimed = await runtime.dispatch(
+                            _ctx(adapter, user, f"{user}-echo-claim-{lane}-{stage}"),
+                            f"领取道源主线奖励 {lane} {stage}",
+                        )
+                        assert started.code == "DAO_ECHOES_STAGE_STARTED"
+                        assert claimed.code == "DAO_ECHOES_STAGE_CLAIMED"
+
+                for index in range(3):
+                    challenge = await runtime.dispatch(
+                        _ctx(adapter, user, f"{user}-dao-challenge-{index}"), "开始合道挑战"
+                    )
+                    assert challenge.code == "DAO_UNION_CHALLENGE_SETTLED"
+                    assert challenge.data["outcome"] == "won"
+
+                work_operation = next(
+                    f"{user}-masterwork-{index}"
+                    for index in range(1_000)
+                    if random_quality_bp(f"{user}-masterwork-{index}") >= 500
+                )
+                started_work = await runtime.dispatch(
+                    _ctx(adapter, user, work_operation), "开始生产 recipe.masterwork.body"
+                )
+                assert started_work.code == "PRODUCTION_STARTED"
+                clock.advance(hours=3)
+                completed_work = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-masterwork-settle"), "领取生产"
+                )
+                assert completed_work.code == "PRODUCTION_COMPLETED"
+                assert completed_work.data["success"] is True
+                delivered = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-masterwork-deliver"), "交付合道作品"
+                )
+                assert delivered.code == "QUEST_ACTION_RECORDED"
+
+                # Three public-project rewards are generated in one final-heaven season.
+                for week, project_key, contributions in (
+                    ("week-1", "project.town_well", (("木材", 100),)),
+                    ("week-2", "project.town_well", (("木材", 100),)),
+                    ("week-3", "project.market_road", (("云铁", 60), ("灵石", 60))),
+                ):
+                    inventory = {
+                        "item.mat.wood": 100 if any(resource == "木材" for resource, _ in contributions) else 0,
+                        "item.material.cloud_iron": 60
+                        if any(resource == "云铁" for resource, _ in contributions)
+                        else 0,
+                        "item.dao_fruit_fragment": 30,
+                    }
+                    _set_player(
+                        runtime,
+                        adapter,
+                        user,
+                        # Keep the documented 300,000-stone 合道 cost after the
+                        # 3,000-stone market-road contribution.
+                        spirit_stones=303_000,
+                        inventory_json=json.dumps(inventory),
+                    )
+                    operation_index = 0
+                    for resource, amount in contributions:
+                        for index in range(0, amount, 30):
+                            contribution = min(30, amount - index)
+                            result = await runtime.dispatch(
+                                _ctx(adapter, user, f"{user}-{week}-{operation_index}"),
+                                f"贡献公共项目 {project_key} {resource} {contribution}",
+                            )
+                            assert result.code == "PROJECT_CONTRIBUTED", (
+                                week,
+                                resource,
+                                contribution,
+                                operation_index,
+                                result.code,
+                                result.message,
+                            )
+                            operation_index += 1
+                    settled = await runtime.dispatch(
+                        _ctx(adapter, user, f"{user}-{week}-settle"), "结算公共项目"
+                    )
+                    assert settled.code == "PROJECT_SETTLED", (week, settled.code, settled.message)
+                    if week != "week-3":
+                        clock.advance(days=7)
+
+                recorded = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-record-mainline"), "记录合道主线"
+                )
+                assert recorded.code == "QUEST_ACTION_RECORDED"
+                permit = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-dao-permit"), "领取合道许可"
+                )
+                assert permit.code == "QUEST_PERMIT_GRANTED"
+                union = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-begin-union"), "开始合道"
+                )
+                assert union.code == "DAO_UNION_STARTED"
+
+                for label in ("守界", "建设", "传承"):
+                    for index in range(3):
+                        result = await runtime.dispatch(
+                            _ctx(adapter, user, f"{user}-origin-{label}-{index}"),
+                            f"完成道源任务 {label}",
+                        )
+                        assert result.code == "DAO_ORIGIN_TASK_RECORDED", (label, result.code, result.message)
+                        assert result.data["progress"]["completed"] == index + 1
+
+                await runtime.close()
 
     asyncio.run(run())
 
@@ -600,6 +828,112 @@ def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
                     _ctx(adapter, user, f"preview-next-day-{adapter}"), "移动预览 道源门"
                 )
                 assert next_day.data["ready"] is True
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_qq_and_onebot_reach_dao_origin_from_a_settled_archive_route() -> None:
+    """The high-tier gate must be reachable through real void-route state."""
+
+    async def run() -> None:
+        clock = MutableClock()
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            for adapter, user in (("qq.official", "qq-route-gate"), ("onebot.v11", "ob-route-gate")):
+                await _create(runtime, adapter, user)
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="void_refining",
+                    realm_layer=1,
+                    location_key="void.portal",
+                    stamina=200,
+                    stamina_max=200,
+                    inventory_json=json.dumps({"item.void_anchor": 100}),
+                )
+
+                def route_operation(prefix: str) -> str:
+                    return next(
+                        f"{prefix}-{index}"
+                        for index in range(1_000)
+                        if void_route_roll_bp(f"{prefix}-{index}") >= 1_500
+                    )
+
+                first_operation = route_operation(f"first-{adapter}")
+                first = await runtime.dispatch(
+                    _ctx(adapter, user, first_operation), "进入虚空航道 第一航道"
+                )
+                assert first.code == "VOID_ROUTE_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE void_route_sessions SET ends_at=? WHERE session_id=?",
+                        ((clock() - timedelta(seconds=1)).isoformat(), first.data["session_id"]),
+                    )
+                settled_first = await runtime.dispatch(
+                    _ctx(adapter, user, f"{first_operation}-settle"), "结算虚空航道"
+                )
+                assert settled_first.code == "VOID_ROUTE_SETTLED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    location = connection.execute(
+                        "SELECT location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert location == "void.first_route"
+
+                archive_operation = route_operation(f"archive-{adapter}")
+                archive = await runtime.dispatch(
+                    _ctx(adapter, user, archive_operation), "进入虚空航道 档案遗迹"
+                )
+                assert archive.code == "VOID_ROUTE_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE void_route_sessions SET ends_at=? WHERE session_id=?",
+                        ((clock() - timedelta(seconds=1)).isoformat(), archive.data["session_id"]),
+                    )
+                settled_archive = await runtime.dispatch(
+                    _ctx(adapter, user, f"{archive_operation}-settle"), "结算虚空航道"
+                )
+                assert settled_archive.code == "VOID_ROUTE_SETTLED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    location = connection.execute(
+                        "SELECT location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert location == "void.archive_ruins"
+
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    realm_key="dao_union",
+                    realm_layer=6,
+                    dao_fruit_progress=500,
+                    stamina=20,
+                    stamina_max=20,
+                    inventory_json=json.dumps({"item.dao_fruit_fragment": 2}),
+                )
+                gate = await runtime.dispatch(
+                    _ctx(adapter, user, f"gate-{adapter}"), "前往 道源门"
+                )
+                assert gate.code == "TRAVEL_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
+                        ((clock() - timedelta(seconds=1)).isoformat(), gate.data["session_id"]),
+                    )
+                arrived = await runtime.dispatch(
+                    _ctx(adapter, user, f"gate-settle-{adapter}"), "结算移动"
+                )
+                assert arrived.code == "TRAVEL_COMPLETED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    location = connection.execute(
+                        "SELECT location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert location == "dao.origin_gate"
             await runtime.close()
 
     asyncio.run(run())

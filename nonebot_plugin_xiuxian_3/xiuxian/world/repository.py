@@ -230,9 +230,19 @@ class WorldRepositoryMixin:
                 if storm
                 else row["void_instability_until"]
             )
+            # A settled route is also a location transition.  Keep the route
+            # key as the arrival location so downstream gates can require a
+            # real archive arrival instead of a manually forged player state.
+            arrival_location = str(session["route_key"])
             connection.execute(
-                "UPDATE players SET inventory_json = ?, void_route_count = void_route_count + 1, void_instability_until = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), instability_until, now_text, row["id"]),
+                "UPDATE players SET location_key = ?, inventory_json = ?, void_route_count = void_route_count + 1, void_instability_until = ?, updated_at = ? WHERE id = ?",
+                (
+                    arrival_location,
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    instability_until,
+                    now_text,
+                    row["id"],
+                ),
             )
             result = {
                 "reward": reward,
@@ -240,6 +250,7 @@ class WorldRepositoryMixin:
                 "extra_anchor_lost": extra_anchor_lost,
                 "status": "settled",
                 "route_key": session["route_key"],
+                "location_key": arrival_location,
             }
             connection.execute(
                 "UPDATE void_route_sessions SET status = 'settled', result_json = ?, updated_at = ? WHERE id = ?",
