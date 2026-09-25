@@ -239,7 +239,11 @@ class CombatRepositoryMixin:
                     raise EventNotActiveError("demon invasion war front is closed")
 
             player = self._require_player(connection, platform, platform_user_id)
-            if str(player["location_key"]) != enemy.location_key and exploration_id is None:
+            if (
+                str(player["location_key"]) != enemy.location_key
+                and exploration_id is None
+                and battle_type != "pve.archive_keeper"
+            ):
                 raise BattleRequirementError("battle requires a specific location")
             cooldown = player["battle_defeat_until"]
             if battle_type == "pve.training" and cooldown and now < datetime.fromisoformat(str(cooldown)):

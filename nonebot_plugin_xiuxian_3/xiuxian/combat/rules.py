@@ -229,6 +229,22 @@ BOUNDARY_TRIAL_GUARDIAN = EnemyDefinition(
     reward={},
 )
 
+ARCHIVE_KEEPER = EnemyDefinition(
+    key="enemy.archive_keeper",
+    label="档案守卫",
+    location_key="void.archive_ruins",
+    required_realm="void_refining",
+    required_layer=1,
+    # Keep the encounter within the existing twenty-round automatic battle contract.
+    max_hp=120,
+    attack=2,
+    initiative=1,
+    agility=1,
+    skill_key="enemy_skill.archive_rule_rewrite",
+    random_pool="combat.enemy.archive_keeper.v0.5",
+    reward={},
+)
+
 ENEMIES = {
     TRAINING_DUMMY.key: TRAINING_DUMMY,
     WOOD_RAT.key: WOOD_RAT,
@@ -243,6 +259,7 @@ ENEMIES = {
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_WATCHER.key: BOUNDARY_WATCHER,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
+    ARCHIVE_KEEPER.key: ARCHIVE_KEEPER,
 }
 
 
@@ -328,6 +345,7 @@ __all__ = [
     "MIST_ELITE",
     "MIST_GUARDIAN",
     "WOOD_RAT",
+    "ARCHIVE_KEEPER",
     "battle_roll_bp",
     "clamp",
     "enemy_definition",

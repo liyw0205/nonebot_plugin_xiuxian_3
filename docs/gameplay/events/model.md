@@ -23,5 +23,10 @@
 匿名冻结榜和 7 日领奖窗口。
 `DomainCoreRedemption`：赛季、角色、兑换 operation 和兑换时间；每角色每赛季唯一，消耗 20 个绑定领域核心碎片并发放 1 个领域核心。
 
+`VoidArchiveRun`：角色、UTC 周次、已结算档案航道、`enemy.archive_keeper` 战斗、结果、奖励快照和 operation；
+同一航道只能结算一次，周内首个胜利发放 `item.void_archive`，后续胜利转换为 `item.void_crystal` ×3。
+`VoidArchiveTask`：角色、周次、`task.archive_fragment.alpha|beta|gamma`、服务端证据进度、奖励和领取 operation；
+三项均领取后写入唯一 `event.archive_unlock` 窗口，任务不接受客户端提交进度。
+
 排行使用冻结快照；活动结束后的奖励进入待领取、自动补发或过期状态。终局赛季和三界赛季均有独立的
 season repository，不与灵泉轮次仓储混放。

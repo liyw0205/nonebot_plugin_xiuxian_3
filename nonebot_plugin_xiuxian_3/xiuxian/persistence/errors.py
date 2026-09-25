@@ -76,6 +76,26 @@ class VoidRouteNotReadyError(RuntimeError):
     """The route has not reached its arrival time."""
 
 
+class VoidArchiveRouteEvidenceError(RuntimeError):
+    """A settled archive-ruins route is required before the guard can be fought."""
+
+
+class VoidArchiveGuardAlreadySettledError(RuntimeError):
+    """The same settled archive route cannot create a second guard result."""
+
+
+class VoidArchiveTaskNotCompleteError(RuntimeError):
+    """A weekly archive-fragment task has insufficient server evidence."""
+
+
+class VoidArchiveTaskAlreadyClaimedError(RuntimeError):
+    """A weekly archive-fragment task was already claimed."""
+
+
+class VoidArchiveTaskInvalidError(RuntimeError):
+    """The requested archive-fragment task key is not part of the content."""
+
+
 class CloudRouteLockedError(RuntimeError):
     """The v0.2 cloud route is unavailable for the current player."""
 

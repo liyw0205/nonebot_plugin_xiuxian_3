@@ -184,6 +184,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("开始跨界战", application.start_cross_realm_battle, aliases=("跨界战", "挑战跨界守门人"))
     router.register("开始界壁试炼", application.start_void_wall_trial, aliases=("界壁试炼", "开始虚空试炼"))
     router.register("探索档案遗迹", application.acquire_void_archive, aliases=("获取虚空档案", "探索虚空档案", "完成档案遗迹探索"))
+    router.register("档案状态", application.get_void_archive_status, aliases=("虚空档案", "档案任务"))
+    router.register("领取档案碎片", application.claim_void_archive_task)
     router.register("交付虚空档案", application.deliver_void_archive, aliases=("上交虚空档案", "交付档案"))
     router.register("领取化神许可", application.claim_soul_transformation_quest, aliases=("完成化神任务", "领取化神任务"))
     router.register("领取炼虚许可", application.claim_void_refining_quest, aliases=("完成炼虚任务", "领取炼虚任务"))

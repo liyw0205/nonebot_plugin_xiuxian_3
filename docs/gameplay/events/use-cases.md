@@ -12,6 +12,12 @@
 赛季分数由冻结前实时投影：领域前线贡献按贡献量计分，宗门建设贡献按 `quantity * 2`，化神配方成品每件 `+5`；
 客户端不能提交分数或伪造来源 operation。
 
+v0.5 虚空档案用例为 `档案状态`、`探索档案遗迹`、`领取档案碎片 alpha|beta|gamma`。
+档案探索必须先有已结算的 `void.archive_ruins` 航道，守卫战由服务端自动回合并绑定战斗快照；
+alpha 从第一航道结算次数投影，beta 从 `enemy.archive_keeper` 胜利投影，gamma 从
+`recipe.void.crystal_refine` 已完成订单投影。每项任务每 UTC 周唯一领取，奖励为对应档案碎片与
+20 虚空功勋，三项完成后激活 7 日 `event.archive_unlock` 并追加 50 虚空功勋。
+
 v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战场 战斗|运输|维修 [来源operation]`
 和 `领取魔界入侵奖励 [轮次]`。贡献只能引用服务端已结算来源；省略来源 operation 时，服务端
 选择本轮最新未消费的同类来源。运输、个人设施维修和 `开始魔界战` 的已结算战斗是当前玩家可达来源。
@@ -36,6 +42,9 @@ v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战�
 
 领域前线补充错误码：`DOMAIN_CORE_REDEEM_NOT_AVAILABLE`、`DOMAIN_CORE_REDEEM_ALREADY_USED`、
 `DOMAIN_CORE_FRAGMENT_INSUFFICIENT` 和 `INVALID_DOMAIN_SEASON_COMMAND`。
+
+虚空档案补充错误码：`ARCHIVE_ROUTE_REQUIRED`、`ARCHIVE_GUARD_ALREADY_SETTLED`、
+`ARCHIVE_TASK_NOT_COMPLETE`、`ARCHIVE_TASK_ALREADY_CLAIMED`、`INVALID_ARCHIVE_TASK`。
 
 ## 验收
 

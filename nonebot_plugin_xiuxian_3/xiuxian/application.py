@@ -47,6 +47,7 @@ from .events.use_cases import EventsApplication
 from .events.season_use_cases import FinalHeavenSeasonApplication
 from .events.three_realms_use_cases import ThreeRealmsSeasonApplication
 from .events.domain_front_use_cases import DomainFrontApplication
+from .events.void_archive_use_cases import VoidArchiveApplication
 from .specials.arena_use_cases import ArenaApplication
 from .specials.team_arena_use_cases import TeamArenaApplication
 from .quests.use_cases import QuestApplication
@@ -100,6 +101,7 @@ class XiuxianApplication:
         self.seasons = FinalHeavenSeasonApplication(repository)
         self.three_realms_seasons = ThreeRealmsSeasonApplication(repository)
         self.domain_front = DomainFrontApplication(repository)
+        self.void_archive = VoidArchiveApplication(repository)
         self.arena = ArenaApplication(repository)
         self.team_arena = TeamArenaApplication(repository)
         self.quests = QuestApplication(repository)
@@ -541,7 +543,13 @@ class XiuxianApplication:
         return await self._invoke(context, lambda: self.quests.start_void_wall_trial(context), write_message="当前事件不允许开始界壁试炼。")
 
     async def acquire_void_archive(self, context: CommandContext) -> CommandResult:
-        return await self._invoke(context, lambda: self.quests.acquire_void_archive(context), write_message="当前事件不允许探索档案遗迹。")
+        return await self._invoke(context, lambda: self.void_archive.run_archive(context), write_message="当前事件不允许探索档案遗迹。")
+
+    async def get_void_archive_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.void_archive.get_status(context), require_write=False)
+
+    async def claim_void_archive_task(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.void_archive.claim_task(context), write_message="当前事件不允许领取档案碎片任务。")
 
     async def deliver_void_archive(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.deliver_void_archive(context), write_message="当前事件不允许交付虚空档案。")

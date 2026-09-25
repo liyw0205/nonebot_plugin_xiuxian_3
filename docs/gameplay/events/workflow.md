@@ -21,3 +21,14 @@ season: collecting -> frozen (claim window is derived from claim_expires_at)
 窗口结束后的首次查询或领奖事务冻结前 50 名匿名榜，冻结后不读取变化中的轮次贡献。
 冻结后且仍在 7 日领奖窗口内，角色可用 `兑换领域核心 <赛季编号>` 消耗 20 个绑定碎片兑换 1 个领域核心；
 兑换按角色/赛季唯一，重复 operation 只回放原结果。
+
+虚空档案流程为：
+
+```text
+void.archive_ruins running -> settled -> archive_guard running -> won/lost
+weekly task active -> complete -> claimed
+three claimed -> event.archive_unlock active (7 days)
+```
+
+`探索档案遗迹` 只读取已结算航道和服务端战斗结果；失败不计 beta，重复航道或重复 operation 不重复发奖。
+任务领取时在同一事务内投影来源 operation、写入周次唯一 claim、发放碎片/功勋并按三项状态激活解锁事件。

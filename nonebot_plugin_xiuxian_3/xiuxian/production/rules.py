@@ -244,6 +244,27 @@ RECIPES: dict[str, RecipeDefinition] = {
         binding_slot_limit=1,
         cross_realm_faction="beast",
     ),
+    "recipe.void.crystal_refine": RecipeDefinition(
+        key="recipe.void.crystal_refine",
+        name="虚空晶炼制",
+        profession=None,
+        inputs={"item.void_crystal": 3, "item.void_anchor": 1},
+        energy_cost=8,
+        duration_seconds=60,
+        daily_limit=4,
+        tool_key=None,
+        tool_cost_bp=0,
+        currency_cost=0,
+        outputs={"item.void_power_crystal": 2},
+        high_quality_bonus={},
+        failure_refunds={"item.void_crystal": 2, "item.void_anchor": 1},
+        min_realm_layer=1,
+        required_realm="void_refining",
+        content_version="content-0.5",
+        rule_version="production-0.5.0",
+        success_threshold_bp=1,
+        high_quality_threshold_bp=10001,
+    ),
 }
 RECIPES.update(ENDGAME_WORK_RECIPES)
 
@@ -272,6 +293,8 @@ RECIPE_ALIASES = {
     "beast_pact": "recipe.contract.beast_pact",
     "妖兽契约": "recipe.contract.beast_pact",
     "兽契": "recipe.contract.beast_pact",
+    "虚空晶炼制": "recipe.void.crystal_refine",
+    "虚晶炼制": "recipe.void.crystal_refine",
 }
 RECIPE_ALIASES.update({key: key for key in ENDGAME_WORK_RECIPES})
 RECIPE_ALIASES.update(ENDGAME_WORK_RECIPE_ALIASES)
@@ -288,6 +311,12 @@ ITEM_LABELS = {
     "item.array.gathering_basic": "基础聚灵阵",
     "item.array.mist_barrier": "迷雾屏障阵",
     "item.material.cloud_iron": "云铁",
+    "item.void_crystal": "虚空晶",
+    "item.void_anchor": "虚空锚",
+    "item.void_power_crystal": "虚空能量晶",
+    "item.archive_fragment.alpha": "档案碎片 alpha",
+    "item.archive_fragment.beta": "档案碎片 beta",
+    "item.archive_fragment.gamma": "档案碎片 gamma",
     "item.pill.golden_core_guard": "金丹护脉丹",
     "item.pill.core_condense": "凝核丹",
     "item.weapon.cloud_sword": "云纹剑",
