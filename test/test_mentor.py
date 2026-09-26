@@ -95,6 +95,47 @@ def test_mentor_invite_accept_reject_and_expiry() -> None:
     asyncio.run(run())
 
 
+def test_higher_realm_player_can_invite_apprentice() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            await _create_player(runtime, "master")
+            await _create_player(runtime, "apprentice")
+            _set_realm(runtime, "master", "dao_union", 10)
+
+            invited = await runtime.dispatch(
+                _context("master", "high-realm-mentor-invite"), "邀请拜师 apprentice"
+            )
+            assert invited.code == "MENTOR_INVITED"
+            accepted = await runtime.dispatch(
+                _context("apprentice", "high-realm-mentor-accept"),
+                f"接受拜师 {invited.data['relation_id']}",
+            )
+            assert accepted.code == "MENTOR_ACCEPTED"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    ("realm", "layer", "expected"),
+    (
+        ("foundation", 3, False),
+        ("foundation", 4, True),
+        ("golden_core", 1, True),
+        ("dao_union", 10, True),
+        ("unknown", 10, False),
+        ("dao_union", 0, False),
+    ),
+)
+def test_master_eligibility_uses_foundation_l4_as_minimum(
+    realm: str, layer: int, expected: bool
+) -> None:
+    from nonebot_plugin_xiuxian_3.xiuxian.social.mentor_rules import is_master_eligible
+
+    assert is_master_eligible(realm, layer) is expected
+
+
 def test_mentor_graduation_requires_progress_and_rewards_once() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:

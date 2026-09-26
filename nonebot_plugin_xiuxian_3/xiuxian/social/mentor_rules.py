@@ -16,10 +16,23 @@ MENTOR_GRADUATION_MIN_LAYER = 3
 MENTOR_APPRENTICE_LOCAL_REPUTATION = 10
 MENTOR_CONTRIBUTION = 20
 MENTOR_SERVICE_REPUTATION = 2
+_MASTER_REALM_RANKS = {
+    "foundation": 3,
+    "golden_core": 4,
+    "nascent_soul": 5,
+    "soul_transformation": 6,
+    "void_refining": 7,
+    "dao_union": 8,
+    "tribulation": 9,
+}
 
 
 def is_master_eligible(realm_key: str, realm_layer: int) -> bool:
-    return realm_key == MENTOR_MASTER_REALM and int(realm_layer) >= MENTOR_MASTER_MIN_LAYER
+    rank = _MASTER_REALM_RANKS.get(realm_key, -1)
+    layer = int(realm_layer)
+    if rank < _MASTER_REALM_RANKS[MENTOR_MASTER_REALM] or layer < 1:
+        return False
+    return rank > _MASTER_REALM_RANKS[MENTOR_MASTER_REALM] or layer >= MENTOR_MASTER_MIN_LAYER
 
 
 def is_apprentice_eligible(stage: str, realm_key: str, realm_layer: int) -> bool:

@@ -13,9 +13,11 @@ from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
     cloud_boat_storm_roll_bp,
     settlement_result,
 )
+from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import next_layer_threshold
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
+from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_TASKS
 from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
 
 
@@ -1622,6 +1624,347 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         dao_union_l10_reached = True
                         break
                 assert dao_union_l10_reached, dao_union_state
+
+                # Generate all three seasonal evidence sources on this same
+                # character before entering tribulation. The collaborators
+                # provide market stock and apprentice services only.
+                season_id, season_start, season_end = final_heaven_season_window(clock())
+                if season_end - clock() < timedelta(days=21):
+                    clock.advance(seconds=int((season_end - clock()).total_seconds()))
+                    season_id, season_start, season_end = final_heaven_season_window(clock())
+                assert clock() >= season_start
+                assert clock() + timedelta(days=14) < season_end
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_row = connection.execute(
+                        "SELECT id, location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                if player_row[1] != "cave.boundary_realm":
+                    boundary_preview = await _dispatch(
+                        runtime, adapter, user, 81000, "移动预览 界隙秘境"
+                    )
+                    assert boundary_preview.data["ready"] is True
+                    started_boundary = await _dispatch(
+                        runtime, adapter, user, 81001, "前往 界隙秘境"
+                    )
+                    assert started_boundary.code == "TRAVEL_STARTED"
+                    clock.advance(minutes=10)
+                    arrived_boundary = await _dispatch(
+                        runtime, adapter, user, 81002, "结算移动"
+                    )
+                    assert arrived_boundary.data["destination"] == "cave.boundary_realm"
+
+                for index in range(3):
+                    challenge = await _dispatch(
+                        runtime, adapter, user, 81010 + index, "开始合道挑战"
+                    )
+                    assert challenge.code == "DAO_UNION_CHALLENGE_SETTLED"
+                    assert challenge.data["outcome"] == "won"
+                    guard = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        81020 + index,
+                        "完成道源任务 守界",
+                    )
+                    assert guard.code == "DAO_ORIGIN_TASK_RECORDED"
+                    assert guard.data["progress"]["completed"] == index + 1
+                    assert guard.data["reward"].get("item.tribulation_token", 0) == (
+                        1 if index == 2 else 0
+                    )
+
+                helper_adapter = "onebot.v11" if adapter == "qq.official" else "qq.official"
+                apprentices = [f"dao-origin-apprentice-{index}-{adapter}" for index in range(3)]
+                for index, apprentice in enumerate(apprentices):
+                    await _dispatch(runtime, helper_adapter, apprentice, 82000 + index * 10, "开始修仙")
+                    await _dispatch(runtime, helper_adapter, apprentice, 82001 + index * 10, "寻仙问道")
+                    for offset, command in enumerate(
+                        (
+                            "完成引导 阅读",
+                            "前往近郊",
+                            "完成引导 采集",
+                            "完成引导 炼丹",
+                            "选择道途 辅修 炼丹",
+                        )
+                    ):
+                        await _dispatch(
+                            runtime,
+                            helper_adapter,
+                            apprentice,
+                            82002 + index * 10 + offset,
+                            command,
+                        )
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        apprentice_row = connection.execute(
+                            "SELECT id, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (helper_adapter, apprentice),
+                        ).fetchone()
+                        apprentice_inventory = json.loads(apprentice_row[1] or "{}")
+                        apprentice_inventory.update(
+                            {
+                                "item.herb.blood_grass": 2,
+                                "item.food.coarse_spirit_rice": 1,
+                                "item.tool.basic_furnace": 1,
+                            }
+                        )
+                        connection.execute(
+                            "UPDATE players SET stage='cultivator', realm_key='qi_gathering', "
+                            "realm_layer=3, energy=100, energy_max=100, inventory_json=? WHERE id=?",
+                            (json.dumps(apprentice_inventory, ensure_ascii=False, sort_keys=True), apprentice_row[0]),
+                        )
+
+                    production_operation = next(
+                        f"{apprentice}-mentor-production-{candidate}"
+                        for candidate in range(1000)
+                        if random_quality_bp(f"{apprentice}-mentor-production-{candidate}") >= 500
+                    )
+                    started_production = await runtime.adapters.dispatch(
+                        helper_adapter,
+                        _context(helper_adapter, apprentice, f"{apprentice}-produce", production_operation),
+                        "开始生产 recipe.pill.healing_low",
+                    )
+                    assert started_production.code == "PRODUCTION_STARTED", started_production.message
+                    clock.advance(minutes=1)
+                    completed_production = await _dispatch(
+                        runtime,
+                        helper_adapter,
+                        apprentice,
+                        82007 + index * 10,
+                        "领取生产",
+                    )
+                    assert completed_production.code == "PRODUCTION_COMPLETED"
+                    assert completed_production.data["success"] is True
+
+                    invitation = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        82100 + index * 3,
+                        f"邀请拜师 {helper_adapter}:{apprentice}",
+                    )
+                    assert invitation.code == "MENTOR_INVITED"
+                    accepted = await _dispatch(
+                        runtime,
+                        helper_adapter,
+                        apprentice,
+                        82101 + index * 3,
+                        f"接受拜师 {invitation.data['relation_id']}",
+                    )
+                    assert accepted.code == "MENTOR_ACCEPTED"
+                    graduated = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        82102 + index * 3,
+                        f"师徒毕业 {invitation.data['relation_id']}",
+                    )
+                    assert graduated.code == "MENTOR_GRADUATED"
+                    teach = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        82200 + index,
+                        "完成道源任务 传承",
+                    )
+                    assert teach.code == "DAO_ORIGIN_TASK_RECORDED"
+                    assert teach.data["progress"]["completed"] == index + 1
+                    assert teach.data["reward"].get("item.tribulation_token", 0) == (
+                        1 if index == 2 else 0
+                    )
+
+                async def free_project_purchase_capacity(
+                    amount: int, protected_item: str, operation_index: int
+                ) -> None:
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        main_row = connection.execute(
+                            "SELECT carry_capacity, inventory_json FROM players "
+                            "WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                    capacity = int(main_row[0] or 0)
+                    if capacity <= 0:
+                        return
+                    inventory = json.loads(main_row[1] or "{}")
+                    space_needed = max(0, sum(int(value) for value in inventory.values()) + amount - capacity)
+                    preserve = {
+                        "item.dao_fruit_fragment",
+                        "item.recipe.void_refinery",
+                        "item.void_anchor",
+                        "item.tribulation_token",
+                        "item.mat.wood",
+                        "item.herb.spirit_leaf",
+                        "item.ascension_certificate",
+                        protected_item,
+                    }
+                    for candidate_index, (surplus_key, surplus_count) in enumerate(
+                        sorted(inventory.items(), key=lambda entry: int(entry[1]), reverse=True)
+                    ):
+                        if space_needed <= 0:
+                            break
+                        if (
+                            not surplus_key.startswith("item.")
+                            or surplus_key in preserve
+                            or any(
+                                marker in surplus_key
+                                for marker in ("manual", "token", "certificate", "bound", "locked", "masterwork")
+                            )
+                        ):
+                            continue
+                        quantity = min(99, int(surplus_count), space_needed)
+                        if quantity <= 0:
+                            continue
+                        listed = await runtime.adapters.dispatch(
+                            adapter,
+                            _context(
+                                adapter,
+                                user,
+                                f"{adapter}-dao-origin-clear-list-{operation_index}-{candidate_index}",
+                            ),
+                            f"发布摆摊 {surplus_key} {quantity} 1",
+                        )
+                        if not listed.ok:
+                            continue
+                        bought = await _dispatch(
+                            runtime,
+                            helper_adapter,
+                            helper,
+                            82900 + operation_index * 200 + candidate_index,
+                            f"购买摆摊 {listed.data['order_id']} {quantity}",
+                        )
+                        assert bought.code == "MARKET_ORDER_PURCHASED"
+                        space_needed -= quantity
+                    assert space_needed == 0, (capacity, inventory, amount)
+
+                async def ensure_project_stock(item_key: str, amount: int, index: int) -> None:
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        main_inventory = json.loads(
+                            connection.execute(
+                                "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                                (adapter, user),
+                            ).fetchone()[0]
+                            or "{}"
+                        )
+                    remaining = max(0, amount - int(main_inventory.get(item_key, 0)))
+                    batch = 0
+                    while remaining:
+                        quantity = min(30, remaining)
+                        await free_project_purchase_capacity(
+                            quantity, item_key, index * 10 + batch
+                        )
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            helper_row = connection.execute(
+                                "SELECT id, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                                (helper_adapter, helper),
+                            ).fetchone()
+                            helper_inventory = json.loads(helper_row[1] or "{}")
+                            helper_inventory[item_key] = max(
+                                quantity, int(helper_inventory.get(item_key, 0))
+                            )
+                            connection.execute(
+                                "UPDATE players SET inventory_json=? WHERE id=?",
+                                (json.dumps(helper_inventory, ensure_ascii=False, sort_keys=True), helper_row[0]),
+                            )
+                        listing = await _dispatch(
+                            runtime,
+                            helper_adapter,
+                            helper,
+                            82300 + index * 100 + batch * 2,
+                            f"发布摆摊 {item_key} {quantity} 100",
+                        )
+                        purchased = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            82301 + index * 100 + batch * 2,
+                            f"购买摆摊 {listing.data['order_id']} {quantity}",
+                        )
+                        assert purchased.code == "MARKET_ORDER_PURCHASED"
+                        remaining -= quantity
+                        batch += 1
+
+                for week_index in range(3):
+                    projects = await _dispatch(
+                        runtime, adapter, user, 84000 + week_index * 200, "公共项目"
+                    )
+                    project = projects.data["projects"][0]
+                    project_key = str(project["project_key"])
+                    for resource_key, required in project["requirements"].items():
+                        if resource_key == "currency.spirit_stone":
+                            points_left = int(required) // 50
+                            while points_left:
+                                points = min(30, points_left)
+                                contribution = await _dispatch(
+                                    runtime,
+                                    adapter,
+                                    user,
+                                    84100 + week_index * 200 + points_left,
+                                    f"贡献公共项目 {project_key} 灵石 {points}",
+                                )
+                                assert contribution.code == "PROJECT_CONTRIBUTED"
+                                points_left -= points
+                        else:
+                            await ensure_project_stock(resource_key, int(required), week_index)
+                            resource_left = int(required)
+                            while resource_left:
+                                amount = min(30, resource_left)
+                                contribution = await _dispatch(
+                                    runtime,
+                                    adapter,
+                                    user,
+                                    84400 + week_index * 200 + resource_left,
+                                    f"贡献公共项目 {project_key} {resource_key} {amount}",
+                                )
+                                assert contribution.code == "PROJECT_CONTRIBUTED"
+                                resource_left -= amount
+                    project_reward = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        84600 + week_index * 200,
+                        "结算公共项目",
+                    )
+                    assert project_reward.code == "PROJECT_SETTLED"
+                    assert project_reward.data["rewarded"] is True
+                    build = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        84800 + week_index,
+                        "完成道源任务 建设",
+                    )
+                    assert build.code == "DAO_ORIGIN_TASK_RECORDED"
+                    assert build.data["progress"]["completed"] == week_index + 1
+                    assert build.data["reward"].get("item.tribulation_token", 0) == (
+                        1 if week_index == 2 else 0
+                    )
+                    if week_index < 2:
+                        clock.advance(days=7)
+
+                task_rows = []
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    for task_key in DAO_ORIGIN_TASKS:
+                        rows = connection.execute(
+                            "SELECT payload_json FROM quest_events WHERE player_id=? "
+                            "AND quest_key=? AND component_key='completed' AND outcome='success'",
+                            (player_row[0], task_key),
+                        ).fetchall()
+                        assert len(rows) == 3, task_key
+                        task_rows.extend(json.loads(row[0]) for row in rows)
+                    terminal_inventory = connection.execute(
+                        "SELECT realm_key, realm_layer, total_cultivation, inventory_json "
+                        "FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert all(row["season_id"] == season_id for row in task_rows)
+                assert terminal_inventory[0:2] == ("dao_union", 10)
+                assert int(terminal_inventory[2]) >= 8_998_960
+                assert json.loads(terminal_inventory[3]).get("item.tribulation_token") == 4
+
+                tribulation = await _dispatch(runtime, adapter, user, 84900, "开始渡劫")
+                assert tribulation.code == "TRIBULATION_STARTED"
+                assert tribulation.data["realm_key"] == "tribulation"
+                assert tribulation.data["realm_layer"] == 1
                 await runtime.close()
 
     asyncio.run(run())
