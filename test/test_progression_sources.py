@@ -809,15 +809,15 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                     assert confirmed.ok, confirmed
 
                 # Each win contributes +15 beast reputation and +20 world
-                # merit.  This closes both breakthrough resource gates from
-                # server-settled party evidence rather than a state fixture.
-                for battle_index in range(67):
+                # merit.  Server-settled party evidence closes both gates
+                # without patching the primary player's progression state.
+                # Recovery advances time beyond the party confirmation TTL,
+                # so each battle uses a newly confirmed party.
+                for battle_index in range(98):
                     if battle_index:
-                        await _dispatch(runtime, helper_adapter, helper, 2662 + battle_index * 3, "退出队伍")
-                        await _dispatch(runtime, adapter, user, 2663 + battle_index * 3, "退出队伍")
                         clock.advance(hours=10)
-                        await _dispatch(runtime, adapter, user, 2670 + battle_index * 3, "恢复状态")
-                        await _dispatch(runtime, helper_adapter, helper, 2671 + battle_index * 3, "恢复状态")
+                        await _dispatch(runtime, adapter, user, 10000 + battle_index * 5, "恢复状态")
+                        await _dispatch(runtime, helper_adapter, helper, 10001 + battle_index * 5, "恢复状态")
                         helper_party = await runtime.adapters.dispatch(
                             helper_adapter,
                             _context(helper_adapter, helper, f"beast-party-create-{battle_index}"),
@@ -829,16 +829,25 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                             runtime,
                             helper_adapter,
                             helper,
-                            2672 + battle_index * 3,
+                            11000 + battle_index * 5,
                             f"邀请入队 {adapter}:{user}",
                         )
-                        await _dispatch(runtime, adapter, user, 2673 + battle_index * 3, f"接受入队 {party_id}")
-                        for member_adapter, member in ((helper_adapter, helper), (adapter, user)):
+                        await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            11001 + battle_index * 5,
+                            f"接受入队 {party_id}",
+                        )
+                        for member_adapter, member, offset in (
+                            (helper_adapter, helper, 2),
+                            (adapter, user, 3),
+                        ):
                             confirmed = await _dispatch(
                                 runtime,
                                 member_adapter,
                                 member,
-                                2674 + battle_index * 3 if member_adapter == helper_adapter else 2675 + battle_index * 3,
+                                11000 + battle_index * 5 + offset,
                                 f"确认入队 {party_id}",
                             )
                             assert confirmed.ok
@@ -1200,7 +1209,7 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                         (adapter, user),
                     ).fetchone()
                 assert final_state[:4] == ("void_refining", 1, 200, 200)
-                assert final_state[4] >= 500
+                assert final_state[4] >= 2_000, final_state
                 assert final_state[5] == 50
                 await runtime.close()
 
