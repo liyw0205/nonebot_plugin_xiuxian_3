@@ -151,7 +151,7 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
     asyncio.run(run())
 
 
-def test_qq_and_onebot_can_produce_foundation_draft_from_player_path() -> None:
+def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
@@ -364,6 +364,88 @@ def test_qq_and_onebot_can_produce_foundation_draft_from_player_path() -> None:
                     "发布摆摊 筑基丹 1 1",
                 )
                 assert forbidden_market.code == "MARKET_ITEM_FORBIDDEN"
+
+                clock.advance(days=1)
+                await _dispatch(runtime, adapter, user, 299, "恢复状态")
+                for index in range(3):
+                    operation = next(
+                        f"{adapter}-foundation-sand-{index}-{candidate}"
+                        for candidate in range(1000)
+                        if settlement_result(
+                            "explore.spring_gather", f"{adapter}-foundation-sand-{index}-{candidate}"
+                        )["item.mat.array_sand"] == 1
+                    )
+                    await _dispatch(runtime, adapter, user, 300 + index, "开始探索 灵泉采集", operation_id=operation)
+                    clock.advance(seconds=90)
+                    await _dispatch(runtime, adapter, user, 310 + index, "结算探索")
+
+                await _dispatch(runtime, adapter, user, 320, "前往 青石镇")
+                clock.advance(seconds=30)
+                await _dispatch(runtime, adapter, user, 321, "结算移动")
+                await _dispatch(runtime, adapter, user, 322, "前往 近郊")
+                clock.advance(seconds=30)
+                await _dispatch(runtime, adapter, user, 323, "结算移动")
+                for index in range(2):
+                    operation = next(
+                        f"{adapter}-foundation-iron-{index}-{candidate}"
+                        for candidate in range(1000)
+                        if settlement_result(
+                            "explore.gather_outskirts", f"{adapter}-foundation-iron-{index}-{candidate}"
+                        )["item.ore.ironstone"] == 2
+                        and battle_roll_bp(f"{adapter}-foundation-iron-{index}-{candidate}:battle") >= 1000
+                    )
+                    await _dispatch(runtime, adapter, user, 330 + index, "开始探索 近郊采集", operation_id=operation)
+                    clock.advance(seconds=30)
+                    await _dispatch(runtime, adapter, user, 340 + index, "结算探索")
+
+                for index in range(15):
+                    if index in (0, 6, 12):
+                        clock.advance(days=1)
+                        await _dispatch(runtime, adapter, user, 350 + index, "恢复状态")
+                    operation = next(
+                        f"{adapter}-foundation-stones-{index}-{candidate}"
+                        for candidate in range(1000)
+                        if settlement_result(
+                            "explore.trial_outskirts", f"{adapter}-foundation-stones-{index}-{candidate}"
+                        )["spirit_stones"] == 30
+                        and battle_roll_bp(f"{adapter}-foundation-stones-{index}-{candidate}:battle") >= 2000
+                    )
+                    await _dispatch(runtime, adapter, user, 360 + index, "开始探索 短历练", operation_id=operation)
+                    clock.advance(seconds=60)
+                    await _dispatch(runtime, adapter, user, 380 + index, "结算探索")
+
+                for cycle in range(90):
+                    clock.advance(hours=1)
+                    await _dispatch(runtime, adapter, user, 400 + cycle, "恢复状态")
+                    await _dispatch(runtime, adapter, user, 500 + cycle, "开始修炼")
+                    clock.advance(minutes=10)
+                    cultivated = await _dispatch(runtime, adapter, user, 600 + cycle, "结算修炼")
+                    assert cultivated.data["realm_key"] == "qi_gathering"
+                    threshold = next_layer_threshold("qi_gathering", cultivated.data["realm_layer"])
+                    if threshold is not None and cultivated.data["cultivation"] >= threshold:
+                        advanced = await _dispatch(runtime, adapter, user, 700 + cycle, "晋升境界")
+                        layer = advanced.data["realm_layer"]
+                    else:
+                        layer = cultivated.data["realm_layer"]
+                    if layer == 10 and cultivated.data["total_cultivation"] >= 4260:
+                        break
+                else:
+                    raise AssertionError("new player did not reach qi-gathering L10")
+
+                breakthrough_operation = next(
+                    f"{adapter}-foundation-break-{candidate}"
+                    for candidate in range(1000)
+                    if breakthrough_roll_bp(f"{adapter}-foundation-break-{candidate}") < 7500
+                )
+                started_foundation = await runtime.dispatch(
+                    _context(adapter, user, "foundation-break-start", breakthrough_operation),
+                    "开始突破 筑基",
+                )
+                assert started_foundation.code == "BREAKTHROUGH_STARTED", started_foundation.message
+                clock.advance(minutes=5)
+                founded = await _dispatch(runtime, adapter, user, 800, "结算突破")
+                assert founded.code == "BREAKTHROUGH_SUCCEEDED"
+                assert founded.data["target_realm"] == "foundation"
                 await runtime.close()
 
     asyncio.run(run())
