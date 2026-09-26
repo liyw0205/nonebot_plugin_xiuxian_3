@@ -115,8 +115,8 @@ class WorldApplication:
             for item in record.missing
         )
         missing = "、".join(missing_labels) if missing_labels else "无"
-        pass_label = ITEM_LABELS.get(definition.pass_key or "", "通行物品")
-        pass_summary = f"{pass_label} ×{definition.pass_quantity}" if definition.pass_key else "无"
+        pass_label = ITEM_LABELS.get(record.pass_key or "", "通行物品")
+        pass_summary = f"{pass_label} ×{record.pass_quantity}" if record.pass_key else "无"
         message = (
             f"## {definition.label} · 移动预览\n\n"
             f"**{self._display_name(record.player)}**可以查看这条路线。\n\n"
@@ -134,8 +134,8 @@ class WorldApplication:
             "duration_seconds": definition.duration_seconds,
             "stamina_cost": definition.stamina_cost,
             "currency_cost": definition.currency_cost,
-            "pass_key": definition.pass_key,
-            "pass_quantity": definition.pass_quantity,
+            "pass_key": record.pass_key,
+            "pass_quantity": record.pass_quantity,
             "required_dao_fruit_progress": definition.required_dao_fruit_progress,
             "daily_start_limit": definition.daily_start_limit,
             "required_endgame_status": definition.required_endgame_status,

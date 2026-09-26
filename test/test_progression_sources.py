@@ -1266,6 +1266,81 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                         break
                 assert void_l10_reached, void_state
                 assert int(void_state[4]) >= 2_000, void_state
+
+                boundary_preview = await _dispatch(
+                    runtime, adapter, user, 60001, "移动预览 界隙秘境"
+                )
+                assert boundary_preview.data["ready"] is True
+                return_to_boundary = await _dispatch(
+                    runtime, adapter, user, 60002, "前往 界隙秘境"
+                )
+                assert return_to_boundary.code == "TRAVEL_STARTED"
+                clock.advance(minutes=10)
+                boundary_arrival = await _dispatch(
+                    runtime, adapter, user, 60003, "结算移动"
+                )
+                assert boundary_arrival.data["destination"] == "cave.boundary_realm"
+                dao_challenge = await _dispatch(
+                    runtime, adapter, user, 60004, "开始合道挑战"
+                )
+                assert dao_challenge.code == "DAO_UNION_CHALLENGE_SETTLED"
+                assert dao_challenge.data["outcome"] == "won"
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_archive_return_enables_qq_and_onebot_dao_union_challenge() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                clock = MutableClock()
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                user = f"dao-return-{adapter}"
+                await _dispatch(runtime, adapter, user, 0, "开始修仙")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        """
+                        UPDATE players
+                        SET stage='cultivator', realm_key='void_refining', realm_layer=10,
+                            cultivation=2150000, total_cultivation=2998960,
+                            location_key='void.archive_ruins', stamina=100, stamina_max=100,
+                            max_hp=100000, initiative=100000, world_merit=2000,
+                            qualification_json=?, intro_json=?, inventory_json='{}'
+                        WHERE platform=? AND platform_user_id=?
+                        """,
+                        (
+                            json.dumps({"body": 100000}),
+                            json.dumps({"flags": ["story.mainline.three_realms"]}),
+                            adapter,
+                            user,
+                        ),
+                    )
+
+                preview = await _dispatch(runtime, adapter, user, 4, "移动预览 界隙秘境")
+                assert preview.data["ready"] is True
+                assert preview.data["pass_key"] is None
+                started = await _dispatch(runtime, adapter, user, 1, "前往 界隙秘境")
+                assert started.code == "TRAVEL_STARTED", started.message
+                clock.advance(minutes=10)
+                arrived = await _dispatch(runtime, adapter, user, 2, "结算移动")
+                assert arrived.data["destination"] == "cave.boundary_realm"
+
+                challenge = await _dispatch(runtime, adapter, user, 3, "开始合道挑战")
+                assert challenge.code == "DAO_UNION_CHALLENGE_SETTLED"
+                assert challenge.data["outcome"] == "won"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player = connection.execute(
+                        "SELECT location_key, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    evidence = connection.execute(
+                        "SELECT COUNT(*) FROM quest_events WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND quest_key='quest.dao_union' AND component_key='cross_server_challenge'",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert player[0] == "cave.boundary_realm"
+                assert "item.cave_pass_basic" not in json.loads(player[1])
+                assert evidence == 1
                 await runtime.close()
 
     asyncio.run(run())

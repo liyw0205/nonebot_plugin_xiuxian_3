@@ -35,6 +35,7 @@ class DestinationDefinition:
     required_faction_reputation: int = 0
     content_version: str = "content-0.1"
     rule_version: str = RULE_VERSION
+    pass_exempt_source_locations: tuple[str, ...] = ()
 
 
 DESTINATIONS = {
@@ -175,8 +176,9 @@ DESTINATIONS = {
     "cave.boundary_realm": DestinationDefinition(
         "cave.boundary_realm", "界隙秘境", 10 * 60, 30, 0,
         required_realm="nascent_soul", required_layer=1,
-        source_locations=("cave.mist_grotto_2", "demon.fallen_ruins", "beast.ten_thousand_hills", "xuantian.war_front"),
+        source_locations=("cave.mist_grotto_2", "demon.fallen_ruins", "beast.ten_thousand_hills", "xuantian.war_front", "void.archive_ruins"),
         required_intro_flag="story.mainline.three_realms",
+        pass_exempt_source_locations=("void.archive_ruins",),
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
     "void.portal": DestinationDefinition(

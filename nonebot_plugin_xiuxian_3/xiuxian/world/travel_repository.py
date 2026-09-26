@@ -265,7 +265,12 @@ class TravelRepositoryMixin:
             missing.append("体力")
         if player.spirit_stones < definition.currency_cost:
             missing.append("灵石")
-        if definition.pass_key and player.inventory.get(definition.pass_key, 0) < definition.pass_quantity:
+        pass_key = definition.pass_key
+        pass_quantity = definition.pass_quantity
+        if player.location_key in definition.pass_exempt_source_locations:
+            pass_key = None
+            pass_quantity = 0
+        if pass_key and player.inventory.get(pass_key, 0) < pass_quantity:
             missing.append("通行物品")
         endgame_status = player.endgame_status or "none"
         if definition.required_endgame_status:
@@ -291,8 +296,8 @@ class TravelRepositoryMixin:
             duration_seconds=definition.duration_seconds,
             stamina_cost=definition.stamina_cost,
             currency_cost=definition.currency_cost,
-            pass_key=definition.pass_key,
-            pass_quantity=definition.pass_quantity,
+            pass_key=pass_key,
+            pass_quantity=pass_quantity,
             ready=ready,
             missing=tuple(missing),
         )
@@ -467,23 +472,28 @@ class TravelRepositoryMixin:
             stamina = int(row["stamina"])
             stones = int(row["spirit_stones"])
             inventory = self._json_object(row["inventory_json"], {})
+            pass_key = definition.pass_key
+            pass_quantity = definition.pass_quantity
+            if current in definition.pass_exempt_source_locations:
+                pass_key = None
+                pass_quantity = 0
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             if stones < definition.currency_cost:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
-            if definition.pass_key and inventory.get(definition.pass_key, 0) < definition.pass_quantity:
+            if pass_key and inventory.get(pass_key, 0) < pass_quantity:
                 raise LocationRequirementError("travel pass is missing")
             if definition.daily_start_limit and self._count_destination_starts_today_in(
                 connection, player_id=player_id, destination=destination, now=now
             ) >= definition.daily_start_limit:
                 raise LocationRequirementError("destination daily visit limit is reached")
 
-            if definition.pass_key and not definition.consume_pass_on_arrival:
-                remaining = inventory.get(definition.pass_key, 0) - definition.pass_quantity
+            if pass_key and not definition.consume_pass_on_arrival:
+                remaining = inventory.get(pass_key, 0) - pass_quantity
                 if remaining:
-                    inventory[definition.pass_key] = remaining
+                    inventory[pass_key] = remaining
                 else:
-                    inventory.pop(definition.pass_key, None)
+                    inventory.pop(pass_key, None)
             session_id = uuid4().hex
             ends_at = now + timedelta(seconds=definition.duration_seconds)
             snapshot = {
@@ -493,8 +503,8 @@ class TravelRepositoryMixin:
                 "destination": destination,
                 "stamina_cost": definition.stamina_cost,
                 "currency_cost": definition.currency_cost,
-                "pass_key": definition.pass_key,
-                "pass_quantity": definition.pass_quantity,
+                "pass_key": pass_key,
+                "pass_quantity": pass_quantity,
                 "required_dao_fruit_progress": definition.required_dao_fruit_progress,
                 "daily_start_limit": definition.daily_start_limit,
                 "required_endgame_status": definition.required_endgame_status,
@@ -529,7 +539,7 @@ class TravelRepositoryMixin:
                 """,
                 (session_id, player_id, operation_id, current, destination, serialize_datetime(now),
                  serialize_datetime(ends_at), definition.stamina_cost, definition.currency_cost,
-                 definition.pass_key, definition.pass_quantity, json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                 pass_key, pass_quantity, json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                  serialize_datetime(now), serialize_datetime(now)),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
@@ -539,7 +549,7 @@ class TravelRepositoryMixin:
                 "source": current, "destination": destination, "status": "running",
                 "starts_at": serialize_datetime(now), "ends_at": serialize_datetime(ends_at),
                 "stamina_cost": definition.stamina_cost, "currency_cost": definition.currency_cost,
-                "pass_key": definition.pass_key, "pass_quantity": definition.pass_quantity,
+                "pass_key": pass_key, "pass_quantity": pass_quantity,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
