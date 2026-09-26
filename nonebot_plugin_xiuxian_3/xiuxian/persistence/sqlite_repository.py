@@ -26,6 +26,7 @@ from ..combat.repository import CombatRepositoryMixin
 from ..combat.party_repository import PartyCombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
+from ..adventures.three_realms_repository import ThreeRealmsRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
 from ..production.contract_repository import ContractProductionRepositoryMixin
 from ..production.facility_repository import FacilityRepositoryMixin
@@ -87,6 +88,7 @@ class SQLitePlayerRepository(
     PartyCombatRepositoryMixin,
     AdventuresRepositoryMixin,
     DaoEchoesRepositoryMixin,
+    ThreeRealmsRepositoryMixin,
     ContractProductionRepositoryMixin,
     ProductionRepositoryMixin,
     FacilityRepositoryMixin,

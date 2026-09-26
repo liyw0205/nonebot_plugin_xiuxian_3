@@ -19,6 +19,7 @@ from .combat.use_cases import CombatApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .adventures.dao_echoes_use_cases import DaoEchoesApplication
+from .adventures.three_realms_use_cases import ThreeRealmsApplication
 from .advancement.use_cases import AdvancementApplication
 from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
@@ -73,6 +74,7 @@ class XiuxianApplication:
         self.adventures = AdventuresApplication(repository)
         self.mainline = AdventuresMainlineApplication(repository)
         self.dao_echoes = DaoEchoesApplication(repository)
+        self.three_realms = ThreeRealmsApplication(repository)
         self.advancement = AdvancementApplication(repository)
         self.constitution = ConstitutionApplication(repository)
         self.talent = TalentApplication(repository)
@@ -656,6 +658,23 @@ class XiuxianApplication:
             context,
             lambda: self.dao_echoes.claim_reward(context),
             write_message="当前事件不允许领取道源主线奖励。",
+        )
+
+    async def get_three_realms_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.three_realms.get_status(context), require_write=False)
+
+    async def start_three_realms_stage(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.three_realms.start_stage(context),
+            write_message="当前事件不允许开始三界主线。",
+        )
+
+    async def claim_three_realms_stage(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.three_realms.claim_reward(context),
+            write_message="当前事件不允许领取三界主线奖励。",
         )
 
     async def preview_retreat(self, context: CommandContext) -> CommandResult:

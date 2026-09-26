@@ -24,10 +24,10 @@ open_realms_added: [nascent_soul]
 | event/season | `event.demon_invasion`、`event.beast_trade`、`event.boundary_rift`、`event.heart_demon_trial`、`season.three_realms` | events v0.3 |
 | social/economy | `sect.choose_alliance`、`sect_war.*`、`market.trade`、`auction.weekly.*` | social/economy v0.3 |
 | livelihood | `permit.demon_trade`、`permit.beast_trade`、`permit.boundary_caravan`、`facility.coop_workshop` | livelihood v0.3 |
-| routine/adventures | `ritual.spirit_tree.realm`、`gacha.fate.three_realms`、`story.three_realms.oath`、`bounty.demon_relief`、`instance.secret_realm.boundary_rift` | routine/adventures v0.3 |
+| routine/adventures | `ritual.spirit_tree.realm`、`gacha.fate.three_realms`、`story.three_realms.oath`、`story.mainline.three_realms`、`bounty.demon_relief`、`instance.secret_realm.boundary_rift` | routine/adventures v0.3 |
 | advancement/companions | `progression.retreat.nascent`、`talent.tree.*.tier3`、`item.tempering.realm`、`beast.evolution.realm`、`mount.evolution.realm` | advancement/companions v0.3 |
 
-`quest.rebuild_path`：元婴 L9、三界声望各 1000、完成任意跨界主线 1 条；奖励 `item.token.rebuild_path` 1、开放一次 `paths.rebuild`。`quest.demon_main_1`：魔界声望 200、堕落遗迹引导完成；`quest.break_void_intro`：元婴 L9 圆满前置、完成界隙副本 1 次。
+`story.mainline.three_realms`：元婴 L1；调停、契约、共生三线只能选择一线，每线 5 关且按序完成；第五关写入该路线的三界声望 1000、`item.token.rebuild_path` 和主线许可旗标。`quest.rebuild_path`：元婴 L9、三界声望各 1000、完成任意跨界主线 1 条；奖励 `item.token.rebuild_path` 1、开放一次 `paths.rebuild`。`quest.demon_main_1`：魔界声望 200、堕落遗迹引导完成；`quest.break_void_intro`：元婴 L9 圆满前置、完成界隙副本 1 次。
 
 ## 2. 发布/回滚检查
 
