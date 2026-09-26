@@ -1211,6 +1211,61 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                 assert final_state[:4] == ("void_refining", 1, 200, 200)
                 assert final_state[4] >= 2_000, final_state
                 assert final_state[5] == 50
+
+                # Continue the new character through void-refining L10 using
+                # the public daily refinement and advancement commands.
+                void_l10_reached = False
+                for day in range(260):
+                    operation_base = 20000 + day * 10
+                    clock.advance(days=1)
+                    await _dispatch(runtime, adapter, user, operation_base, "恢复状态")
+                    await _dispatch(runtime, adapter, user, operation_base + 1, "道历问安")
+                    for slot in range(2):
+                        started_refinement = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            operation_base + 2 + slot * 2,
+                            "开始修炼 神魂淬炼",
+                        )
+                        assert started_refinement.code == "CULTIVATION_STARTED", started_refinement.message
+                        clock.advance(minutes=30)
+                        settled_refinement = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            operation_base + 3 + slot * 2,
+                            "结算修炼",
+                        )
+                        assert settled_refinement.data["cultivation_gain"] >= 5_000
+                    realm = str(settled_refinement.data["realm_key"])
+                    layer = int(settled_refinement.data["realm_layer"])
+                    threshold = next_layer_threshold(realm, layer)
+                    if threshold is not None and int(settled_refinement.data["cultivation"]) >= threshold:
+                        advanced = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            operation_base + 6,
+                            "晋升境界",
+                        )
+                        assert advanced.code == "REALM_LAYER_ADVANCED"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        void_state = connection.execute(
+                            "SELECT realm_key, realm_layer, cultivation, total_cultivation, world_merit, spirit_stones "
+                            "FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                    if (
+                        void_state[0] == "void_refining"
+                        and int(void_state[1]) == 10
+                        and int(void_state[2]) >= 2_150_000
+                        and int(void_state[3]) >= 2_998_960
+                    ):
+                        void_l10_reached = True
+                        break
+                assert void_l10_reached, void_state
+                assert int(void_state[4]) >= 2_000, void_state
                 await runtime.close()
 
     asyncio.run(run())
