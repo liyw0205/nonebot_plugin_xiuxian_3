@@ -131,7 +131,7 @@ DESTINATIONS = {
         "demon.fallen_ruins", "魔界·堕落遗迹", 8 * 60, 20, 0,
         required_realm="nascent_soul", required_layer=1,
         source_locations=("demon.abyss_gate",),
-        required_intro_flag="access.demon.fallen_ruins",
+        required_intro_flag="access.demon_abyss_gate",
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
     "demon.abyss_market": DestinationDefinition(

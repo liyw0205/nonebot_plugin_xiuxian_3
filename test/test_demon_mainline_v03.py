@@ -26,13 +26,13 @@ async def _player(runtime, adapter: str, user: str, *, flag: bool = True) -> Non
         adapter, _context(adapter, user, f"create-{user}"), "开始修仙"
     )
     assert created.ok
-    flags = ["access.demon.fallen_ruins"] if flag else []
+    flags = ["access.demon_abyss_gate"] if flag else []
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             """
             UPDATE players
             SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
-                location_key='demon.fallen_ruins', stamina=100, stamina_max=100,
+                location_key='demon.abyss_gate', stamina=100, stamina_max=100,
                 energy=100, energy_max=100, max_hp=100000, initiative=100000,
                 qualification_json=?, faction_reputation_json=?, intro_json=?
             WHERE platform=? AND platform_user_id=?
@@ -52,6 +52,14 @@ def _expire(runtime, exploration_id: str) -> None:
         connection.execute(
             "UPDATE exploration_sessions SET ends_at=? WHERE exploration_id=?",
             ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), exploration_id),
+        )
+
+
+def _expire_travel(runtime, session_id: str) -> None:
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        connection.execute(
+            "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
+            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), session_id),
         )
 
 
@@ -80,6 +88,26 @@ def test_demon_mainline_requires_server_evidence_and_unlocks_both_adapters() -> 
                         "UPDATE players SET faction_reputation_json=? WHERE platform=? AND platform_user_id=?",
                         (json.dumps({"demon": 200}), adapter, user),
                     )
+
+                travel = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "travel-to-ruins", "demon-outer-ruins-travel"),
+                    "前往 魔界堕落遗迹",
+                )
+                assert travel.code == "TRAVEL_STARTED", travel.message
+                _expire_travel(runtime, travel.data["session_id"])
+                arrived = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "arrive-ruins"), "结算移动"
+                )
+                assert arrived.code == "TRAVEL_COMPLETED", arrived.message
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    intro_text = connection.execute(
+                        "SELECT intro_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                initial_flags = set(json.loads(intro_text)["flags"])
+                assert "access.demon_abyss_gate" in initial_flags
+                assert "access.demon.fallen_ruins" not in initial_flags
 
                 for index in range(2):
                     started = await runtime.adapters.dispatch(
@@ -140,7 +168,7 @@ def test_demon_mainline_requires_server_evidence_and_unlocks_both_adapters() -> 
     asyncio.run(run())
 
 
-def test_demon_fallen_ruins_movement_requires_unlock_flag_without_spending_stamina() -> None:
+def test_demon_fallen_ruins_movement_requires_intro_flag_without_spending_stamina() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=Path(data_dir))

@@ -31,7 +31,7 @@
 
 | `quest_key` | 前置/目标 | 产出 | 限制 |
 |:--|:--|:--|:--|
-| `quest.demon_main_1` | 元婴、魔界声望 200、完成 `explore.demon_abyss` 2 次 | 开放 `demon.fallen_ruins`、魔界主线标记 | 每角色一次 |
+| `quest.demon_main_1` | 元婴、魔界声望 200、完成 `explore.demon_abyss` 2 次 | 开放 `access.demon.fallen_ruins` 遗迹副本权限、魔界主线标记 | 风险引导后可抵达外层遗迹并生产证据；权限仅在主线完成后授予；每角色一次 |
 | `quest.rebuild_path` | 元婴、三界声望各 1000、完成任一跨界主线 | `item.token.rebuild_path` 1、一次 `paths.rebuild` 资格 | token 永久绑定；资格不可重复领 |
 | `quest.break_void_intro` | 元婴 perfect、完成 `explore.boundary_realm` 1 次 | 开放 `void.portal` 界壁试炼 | 不开放炼虚突破；炼虚许可在 v0.5 |
 
