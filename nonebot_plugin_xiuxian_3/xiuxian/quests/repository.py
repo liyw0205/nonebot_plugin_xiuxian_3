@@ -221,6 +221,10 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         battle_id: str,
         outcome: str,
     ) -> QuestActionRecord:
+        # Successful wall trials are the public virtual-node source available
+        # to a newly transformed character.  The battle result is checked by
+        # _record_component_sync, so failed participation never mints stock.
+        reward = {"item.void_anchor": 2, "item.void_crystal": 2} if outcome == "won" else {}
         return self._record_component_sync(
             platform,
             platform_user_id,
@@ -230,6 +234,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             required_realm="soul_transformation",
             target=VOID_TRIAL_TARGET,
             outcome=outcome if outcome in {"won", "lost"} else "lost",
+            reward_per_event=reward,
             payload_extra={"battle_id": battle_id},
             evidence_battle_id=battle_id,
             evidence_battle_type="pve.void_wall_trial",
@@ -564,6 +569,8 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             permit_rewards = (
                 {"item.soul_seed": 1, "item.domain_core": 1}
                 if quest_key == SOUL_QUEST
+                else {"item.recipe.void_refinery": 1}
+                if quest_key == VOID_QUEST
                 else {}
             )
             flags_state = self._json_object(player["intro_json"], {})
@@ -606,7 +613,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 "quest_key": quest_key,
                 "status": "completed",
                 "progress": progress,
-                "snapshot": {"rewards": permit_rewards, "source": "quest.soul_transformation"} if permit_rewards else {},
+                "snapshot": {"rewards": permit_rewards, "source": quest_key} if permit_rewards else {},
             }
             self._insert_operation(
                 connection,

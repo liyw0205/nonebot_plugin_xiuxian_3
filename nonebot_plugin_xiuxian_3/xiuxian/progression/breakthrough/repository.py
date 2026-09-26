@@ -424,7 +424,12 @@ class BreakthroughRepositoryMixin:
                 if max((int(value) for value in faction.values()), default=0) < 2000:
                     raise FactionReputationInsufficientError("faction reputation is insufficient")
             if is_void_refining:
-                if str(row["location_key"]) not in {"void.first_route", "cave.time_garden"}:
+                # A newly transformed player reaches the archive ruins through
+                # the public permit route. Keep the first route/time garden
+                # locations for established void characters, while accepting
+                # the archive arrival as the documented pre-breakthrough
+                # staging point.
+                if str(row["location_key"]) not in {"void.first_route", "void.archive_ruins", "cave.time_garden"}:
                     raise VoidLocationRequiredError("void refining requires an approved void location")
                 flags = {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])}
                 if "quest.break_void" not in flags:
@@ -1000,7 +1005,7 @@ class BreakthroughRepositoryMixin:
                     )
                 elif is_soul_transformation:
                     connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_key = NULL, domain_power = 100, domain_charge = 150, domain_charge_max = 150, domain_charge_reset_date = ?, realm_resistance_bp = 1000, domain_crack_until = NULL, max_hp = max_hp + 1000, max_mp = max_mp + 800, initiative = initiative + 20, updated_at = ? WHERE id = ?",
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, stamina_max = stamina_max + 20, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_key = NULL, domain_power = 100, domain_charge = 150, domain_charge_max = 150, domain_charge_reset_date = ?, realm_resistance_bp = 1000, domain_crack_until = NULL, max_hp = max_hp + 1000, max_mp = max_mp + 800, initiative = initiative + 20, updated_at = ? WHERE id = ?",
                         (
                             definition.target_realm,
                             definition.reward_currency,

@@ -28,14 +28,14 @@
 |:--|--:|
 | 必需材料 | `item.void_crystal` 5、`item.void_anchor` 2、`item.recipe.void_refinery` 已学习 |
 | 必需资源 | 世界功勋 500、灵石 80,000、领域能量 100 |
-| 会话锁 | 15 分钟，`preparing`；地点必须为 `void.first_route` 或 `cave.time_garden` |
+| 会话锁 | 15 分钟，`preparing`；地点必须为 `void.first_route`、已结算的 `void.archive_ruins` 或 `cave.time_garden` |
 | 基础成功率 | 7,500 bp |
 | 航道发现加成 | 每条 +200 bp，最多 600 bp |
 | 领域稳定加成 | `domain_power // 10` bp，最多 500 bp |
 | 失败保底 | 每次 +250 bp，最多 750 bp |
 | 最终夹断 | 7,500–9,200 bp |
 
-`success_bp = clamp(7500 + route_count*200 + min(domain_power//10,500) + pity_count*250, 7500, 9200)`；`random_pool=breakthrough.void_refining.v0.5`。突破开始时冻结路线发现数、领域、地点、装备、道途、材料、资源和随机池。
+`success_bp = clamp(7500 + route_count*200 + min(domain_power//10,500) + pity_count*250, 7500, 9200)`；`random_pool=breakthrough.void_refining.v0.5`。突破开始时冻结路线发现数、领域、地点、装备、道途、材料、资源和随机池。化神角色通过公开界壁试炼和档案航道后会正式抵达 `void.archive_ruins`，该地点是取得炼虚许可后的临时突破落点；炼虚角色仍可在第一航道或时序福地突破。
 
 成功：进入 `void_refining` L1、`realm_cultivation=0`，获得 `void_power=200/200`、`space_resistance=1500 bp`、虚空锚持有上限 20；发放 `progression.reward.void_refining_entry`：`item.void_anchor` 3（绑定 24 小时）、世界功勋 500。炼虚 L1–L10 门槛见 `layers.md`。
 

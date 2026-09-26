@@ -41,7 +41,7 @@ v0.3 或更低版本读取这些内容时状态为 `locked`，只能展示前置
 
 `success_bp = clamp(6500 + soul_prepare_bp + reputation_prepare_bp + quest_bp + pity_count*300, 6500, 9000)`。随机保存 `roll_bp`，仅 `roll_bp < success_bp` 成功。
 
-成功：消耗全部材料与资源；进入 `soul_transformation` L1、`realm_cultivation=0`，保留历史修为、失败保底归零；建立空领域槽，`domain_power=100`、`domain_charge_max=150`、`realm_resistance=1000 bp`，并发放 `progression.reward.soul_transformation_entry`：世界功勋 300、`item.domain_core` 1（绑定 24 小时）。
+成功：消耗全部材料与资源；进入 `soul_transformation` L1、`realm_cultivation=0`，保留历史修为、失败保底归零；建立空领域槽，`domain_power=100`、`domain_charge_max=150`、`realm_resistance=1000 bp`，并将体力上限提高 20（用于承接化神后的虚空门户/档案航道行动）；同时发放 `progression.reward.soul_transformation_entry`：世界功勋 300、`item.domain_core` 1（绑定 24 小时）。
 
 失败：必需材料、功勋、灵石、神魂均消耗；元婴境内修为保留 70%（层数保持 L10）；进入 `domain_crack` 24 小时，领域/跨界深层行动禁用，`pity_count +1`。使用保护丹时修为保留 85%、裂痕缩短为 8 小时。失败不降低境界，不删除元婴技能、道途或声望。
 

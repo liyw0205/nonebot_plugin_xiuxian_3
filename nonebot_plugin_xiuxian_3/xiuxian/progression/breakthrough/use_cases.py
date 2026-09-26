@@ -315,7 +315,7 @@ class BreakthroughApplication:
         except VoidQuestMissingError:
             return CommandResult(False, "VOID_QUEST_MISSING", "尚未完成界壁试炼并取得炼虚许可，未扣除任何资源。", context.request_id, operation_id)
         except VoidLocationRequiredError:
-            return CommandResult(False, "VOID_LOCATION_REQUIRED", "炼虚突破必须在虚空第一航道或时序福地进行，未扣除任何资源。", context.request_id, operation_id)
+            return CommandResult(False, "VOID_LOCATION_REQUIRED", "炼虚突破必须在虚空第一航道、档案遗迹或时序福地进行，未扣除任何资源。", context.request_id, operation_id)
         except VoidResourceInsufficientError:
             return CommandResult(False, "VOID_RESOURCE_INSUFFICIENT", "炼虚需要世界功勋 500 和领域能量 100，未扣除任何资源。", context.request_id, operation_id)
         except QuestRequirementError:

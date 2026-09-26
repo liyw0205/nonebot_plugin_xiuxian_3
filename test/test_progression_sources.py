@@ -16,6 +16,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import next_layer_threshold
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
+from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
 
 
 class MutableClock:
@@ -763,6 +764,7 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                             total_cultivation=248960, max_hp=100000, initiative=100000,
                             stamina=100, stamina_max=100, energy=100, energy_max=100,
                             soul_power=300, soul_power_max=300,
+                            carry_capacity=1000, spirit_stones=100000,
                             qualification_json=?, faction_reputation_json=?, intro_json=?, inventory_json=?
                         WHERE platform=? AND platform_user_id=?
                         """,
@@ -1029,6 +1031,177 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                 transformed = await _dispatch(runtime, adapter, user, 4300, "结算突破")
                 assert transformed.code == "BREAKTHROUGH_SUCCEEDED", transformed.message
                 assert transformed.data["target_realm"] == "soul_transformation"
+
+                # Continue the same public player path through the炼虚 gate.
+                # Soul refinement is available at higher realms as well; the
+                # daily limit and injected clock keep this long resource path
+                # deterministic without changing the player's row directly.
+                void_ready = False
+                for day in range(120):
+                    clock.advance(days=1)
+                    await _dispatch(runtime, adapter, user, 4400 + day, "恢复状态")
+                    for slot in range(2):
+                        started_refinement = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            4600 + day * 2 + slot,
+                            "开始修炼 神魂淬炼",
+                        )
+                        assert started_refinement.code == "CULTIVATION_STARTED", started_refinement.message
+                        clock.advance(minutes=30)
+                        settled_refinement = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            4700 + day * 2 + slot,
+                            "结算修炼",
+                        )
+                        assert settled_refinement.data["cultivation_gain"] >= 5000
+                        if slot == 0:
+                            clock.advance(hours=8)
+                            await _dispatch(runtime, adapter, user, 4800 + day, "恢复状态")
+                        current_realm = settled_refinement.data["realm_key"]
+                        current_layer = int(settled_refinement.data["realm_layer"])
+                        threshold = next_layer_threshold(current_realm, current_layer)
+                        if threshold is not None and int(settled_refinement.data["cultivation"]) >= threshold:
+                            advanced = await _dispatch(
+                                runtime,
+                                adapter,
+                                user,
+                                4900 + day * 2 + slot,
+                                "晋升境界",
+                            )
+                            current_layer = int(advanced.data["realm_layer"])
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        realm, layer, cultivation, total_cultivation, spirit_stones = connection.execute(
+                            "SELECT realm_key, realm_layer, cultivation, total_cultivation, spirit_stones "
+                            "FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                    if (
+                        realm == "soul_transformation"
+                        and int(layer) == 10
+                        and int(cultivation) >= 600000
+                        and int(total_cultivation) >= 848960
+                    ):
+                        void_ready = True
+                        break
+                assert void_ready
+
+                # Earn the 80,000-stone fee through the public market path.
+                # The collaborator wallet is seeded, while the main player
+                # sells an item already obtained through public exploration.
+                clock.advance(days=1)
+                await _dispatch(runtime, adapter, user, 5998, "恢复状态")
+                await _dispatch(runtime, adapter, user, 5999, "道历问安")
+                listed = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    6000,
+                    "发布摆摊 灵叶 1 90000",
+                )
+                assert listed.code == "MARKET_ORDER_CREATED", listed.message
+                order_id = str(listed.data["order_id"])
+                purchased = await _dispatch(
+                    runtime,
+                    helper_adapter,
+                    helper,
+                    6001,
+                    f"购买摆摊 {order_id}",
+                )
+                assert purchased.code == "MARKET_ORDER_PURCHASED", purchased.message
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    spirit_stones = connection.execute(
+                        "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert int(spirit_stones) >= 80000
+
+                # Reach the published portal, complete all three server-settled
+                # wall trials, and use their rewards to pay for the archive
+                # route.  The route roll is selected only to avoid the
+                # documented storm loss; no inventory or location is patched.
+                clock.advance(hours=8)
+                await _dispatch(runtime, adapter, user, 5099, "恢复状态")
+                await _dispatch(runtime, adapter, user, 5100, "前往 虚空门户")
+                clock.advance(minutes=5)
+                await _dispatch(runtime, adapter, user, 5101, "结算移动")
+                wall_battles: list[str] = []
+                for index in range(3):
+                    trial = await _dispatch(runtime, adapter, user, 5110 + index, "开始界壁试炼")
+                    assert trial.data["outcome"] == "won"
+                    wall_battles.append(str(trial.data["battle_id"]))
+                    assert trial.data["progress"]["void_wall_trial"] == index + 1
+
+                archive_operation = next(
+                    f"{adapter}-new-archive-{candidate}"
+                    for candidate in range(1000)
+                    if void_route_roll_bp(f"{adapter}-new-archive-{candidate}") >= 1500
+                )
+                started_archive = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    5120,
+                    "进入虚空航道 档案遗迹",
+                    operation_id=archive_operation,
+                )
+                assert started_archive.code == "VOID_ROUTE_STARTED"
+                assert started_archive.data["anchor_cost"] == 4
+                clock.advance(minutes=45)
+                settled_archive = await _dispatch(runtime, adapter, user, 5121, "结算虚空航道")
+                assert settled_archive.code == "VOID_ROUTE_SETTLED"
+                assert settled_archive.data["route_key"] == "void.archive_ruins"
+                archive_guard = await _dispatch(runtime, adapter, user, 5122, "探索档案遗迹")
+                assert archive_guard.code == "ARCHIVE_RUN_SETTLED"
+                assert archive_guard.data["outcome"] == "won"
+                delivered_archive = await _dispatch(runtime, adapter, user, 5123, "交付虚空档案")
+                assert delivered_archive.code == "QUEST_ACTION_RECORDED"
+                void_permit = await _dispatch(runtime, adapter, user, 5124, "领取炼虚许可")
+                assert void_permit.code == "QUEST_PERMIT_GRANTED"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    inventory = json.loads(
+                        connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                    )
+                    location = connection.execute(
+                        "SELECT location_key FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert location == "void.archive_ruins"
+                assert inventory.get("item.recipe.void_refinery") == 1
+                assert inventory.get("item.void_anchor") == 2
+                assert inventory.get("item.void_crystal") == 7
+
+                void_breakthrough_operation = next(
+                    f"{adapter}-new-void-break-{candidate}"
+                    for candidate in range(1000)
+                    if breakthrough_roll_bp(f"{adapter}-new-void-break-{candidate}") < 7710
+                )
+                started_void = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "new-void-breakthrough-start", void_breakthrough_operation),
+                    "开始突破 炼虚",
+                )
+                assert started_void.code == "BREAKTHROUGH_STARTED", started_void.message
+                clock.advance(minutes=15)
+                settled_void = await _dispatch(runtime, adapter, user, 5125, "结算突破")
+                assert settled_void.code == "BREAKTHROUGH_SUCCEEDED", settled_void.message
+                assert settled_void.data["target_realm"] == "void_refining"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    final_state = connection.execute(
+                        "SELECT realm_key, realm_layer, void_power, void_power_max, world_merit, domain_charge "
+                        "FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert final_state[:4] == ("void_refining", 1, 200, 200)
+                assert final_state[4] >= 500
+                assert final_state[5] == 50
                 await runtime.close()
 
     asyncio.run(run())

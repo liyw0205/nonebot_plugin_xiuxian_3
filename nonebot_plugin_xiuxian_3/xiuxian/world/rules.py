@@ -179,6 +179,12 @@ DESTINATIONS = {
         required_intro_flag="story.mainline.three_realms",
         content_version="content-0.3", rule_version="world-0.3.0",
     ),
+    "void.portal": DestinationDefinition(
+        "void.portal", "虚空门户", 5 * 60, 10, 0,
+        required_realm="soul_transformation", required_layer=1,
+        source_locations=("cave.boundary_realm",),
+        content_version="content-0.5", rule_version="world-0.5.0",
+    ),
 }
 
 ALIASES = {
@@ -228,6 +234,8 @@ ALIASES = {
     "界隙秘境": "cave.boundary_realm",
     "界隙": "cave.boundary_realm",
     "边界秘境": "cave.boundary_realm",
+    "虚空门户": "void.portal",
+    "虚空门": "void.portal",
 }
 
 
