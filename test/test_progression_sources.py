@@ -1285,6 +1285,274 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                 )
                 assert dao_challenge.code == "DAO_UNION_CHALLENGE_SETTLED"
                 assert dao_challenge.data["outcome"] == "won"
+
+                work_materials = {
+                    "item.herb.blood_grass": 20,
+                    "item.soul_crystal": 3,
+                    "item.domain_core": 3,
+                    "item.material.cloud_iron": 15,
+                    "item.void_crystal": 10,
+                }
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    helper_row = connection.execute(
+                        "SELECT id, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (helper_adapter, helper),
+                    ).fetchone()
+                    helper_inventory = json.loads(helper_row[1] or "{}")
+                    for item_key, amount in work_materials.items():
+                        helper_inventory[item_key] = max(
+                            int(helper_inventory.get(item_key, 0)), amount
+                        )
+                    connection.execute(
+                        "UPDATE players SET spirit_stones=1000000, inventory_json=? WHERE id=?",
+                        (json.dumps(helper_inventory, ensure_ascii=False, sort_keys=True), helper_row[0]),
+                    )
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    main_row = connection.execute(
+                        "SELECT id, carry_capacity, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                main_inventory = json.loads(main_row[2] or "{}")
+                material_missing = {
+                    item_key: max(0, amount - int(main_inventory.get(item_key, 0)))
+                    for item_key, amount in work_materials.items()
+                }
+                carry_capacity = int(main_row[1] or 0)
+                carried = sum(int(amount) for amount in main_inventory.values())
+                capacity_to_free = (
+                    max(0, carried + sum(material_missing.values()) - carry_capacity)
+                    if carry_capacity > 0
+                    else 0
+                )
+                preserve_items = {
+                    *work_materials,
+                    "item.dao_fruit_fragment",
+                    "item.recipe.void_refinery",
+                    "item.void_anchor",
+                    "item.tribulation_token",
+                }
+                clearance_items = tuple(
+                    item_key
+                    for item_key, _ in sorted(
+                        main_inventory.items(),
+                        key=lambda entry: int(entry[1]),
+                        reverse=True,
+                    )
+                    if item_key.startswith("item.")
+                    and item_key not in preserve_items
+                    and not any(
+                        marker in item_key
+                        for marker in ("manual", "token", "certificate", "bound", "locked", "masterwork")
+                    )
+                )
+                for clearance_index, item_key in enumerate(clearance_items):
+                    if capacity_to_free <= 0:
+                        break
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        current = connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                    current_inventory = json.loads(current[0] or "{}")
+                    reserve = int(work_materials.get(item_key, 0))
+                    available = max(0, int(current_inventory.get(item_key, 0)) - reserve)
+                    quantity = min(99, available, capacity_to_free)
+                    if quantity <= 0:
+                        continue
+                    listed_surplus = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(
+                            adapter,
+                            user,
+                            f"{adapter}-new-clearance-list-{clearance_index}",
+                            f"{adapter}-new-clearance-list-{clearance_index}",
+                        ),
+                        f"发布摆摊 {item_key} {quantity} 100",
+                    )
+                    if not listed_surplus.ok:
+                        assert listed_surplus.code in {
+                            "ITEM_BINDING_ACTIVE",
+                            "MARKET_ITEM_FORBIDDEN",
+                            "MARKET_ITEM_LOCKED",
+                        }, (item_key, listed_surplus.code, listed_surplus.message)
+                        continue
+                    cleared = await _dispatch(
+                        runtime,
+                        helper_adapter,
+                        helper,
+                        61500 + clearance_index,
+                        f"购买摆摊 {listed_surplus.data['order_id']}",
+                    )
+                    assert cleared.code == "MARKET_ORDER_PURCHASED"
+                    capacity_to_free -= quantity
+                assert capacity_to_free == 0, (carry_capacity, carried, material_missing)
+
+                sale_keys = (
+                    "item.herb.spirit_leaf",
+                    "item.herb.blood_grass",
+                    "item.mat.wood",
+                    "item.ore.ironstone",
+                    "item.mat.array_sand",
+                    "item.material.cloud_iron",
+                    "item.soul_crystal",
+                    "item.void_crystal",
+                    "item.domain_core",
+                    "item.demon_core",
+                    "item.beast_blood",
+                    "item.ancestral_blood",
+                    "item.spirit_water",
+                )
+                for sale_index, item_key in enumerate(sale_keys):
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        main_row = connection.execute(
+                            "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                    balance = int(main_row[0])
+                    if balance >= 320_000:
+                        break
+                    inventory = json.loads(main_row[1] or "{}")
+                    available = int(inventory.get(item_key, 0))
+                    if available <= 0:
+                        continue
+                    quantity = min(99, available, max(1, (320_000 - balance + 94_999) // 95_000))
+                    listed = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        61000 + sale_index * 2,
+                        f"发布摆摊 {item_key} {quantity} 100000",
+                    )
+                    purchased = await _dispatch(
+                        runtime,
+                        helper_adapter,
+                        helper,
+                        61001 + sale_index * 2,
+                        f"购买摆摊 {listed.data['order_id']}",
+                    )
+                    assert purchased.code == "MARKET_ORDER_PURCHASED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    balance = int(connection.execute(
+                        "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0])
+                assert balance >= 320_000, balance
+
+                for material_index, (item_key, amount) in enumerate(work_materials.items()):
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        inventory = json.loads(connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0])
+                    missing = max(0, amount - int(inventory.get(item_key, 0)))
+                    if not missing:
+                        continue
+                    listing = await _dispatch(
+                        runtime,
+                        helper_adapter,
+                        helper,
+                        62000 + material_index * 2,
+                        f"发布摆摊 {item_key} {missing} 100",
+                    )
+                    material_purchase = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        62001 + material_index * 2,
+                        f"购买摆摊 {listing.data['order_id']} {missing}",
+                    )
+                    assert material_purchase.code == "MARKET_ORDER_PURCHASED"
+
+                for lane_index, lane in enumerate(("建设者", "见证者", "远行者")):
+                    for stage in range(1, 11):
+                        stage_index = lane_index * 10 + stage - 1
+                        started_echo = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            63000 + stage_index * 2,
+                            f"开始道源主线 {lane} {stage}",
+                        )
+                        claimed_echo = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            63001 + stage_index * 2,
+                            f"领取道源主线奖励 {lane} {stage}",
+                        )
+                        assert started_echo.code == "DAO_ECHOES_STAGE_STARTED"
+                        assert claimed_echo.code == "DAO_ECHOES_STAGE_CLAIMED"
+
+                clock.advance(days=1)
+                await _dispatch(runtime, adapter, user, 64000, "恢复状态")
+                for work_index, (recipe, duration_minutes) in enumerate(
+                    (
+                        ("recipe.masterwork.alchemy", 90),
+                        ("recipe.masterwork.artifice", 90),
+                        ("recipe.masterwork.formation", 90),
+                        ("recipe.masterwork.support", 30),
+                    )
+                ):
+                    if work_index:
+                        clock.advance(days=1)
+                        await _dispatch(
+                            runtime, adapter, user, 64001 + work_index, "恢复状态"
+                        )
+                    work_operation = next(
+                        f"{adapter}-new-masterwork-{work_index}-{candidate}"
+                        for candidate in range(1000)
+                        if random_quality_bp(
+                            f"{adapter}-new-masterwork-{work_index}-{candidate}"
+                        ) >= 500
+                    )
+                    started_work = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        64100 + work_index * 2,
+                        f"开始生产 {recipe}",
+                        operation_id=work_operation,
+                    )
+                    assert started_work.code == "PRODUCTION_STARTED"
+                    clock.advance(minutes=duration_minutes)
+                    completed_work = await _dispatch(
+                        runtime, adapter, user, 64101 + work_index * 2, "领取生产"
+                    )
+                    assert completed_work.code == "PRODUCTION_COMPLETED"
+                    assert completed_work.data["success"] is True
+
+                delivered_work = await _dispatch(
+                    runtime, adapter, user, 64200, "交付合道作品"
+                )
+                assert delivered_work.code == "QUEST_ACTION_RECORDED"
+                recorded_mainline = await _dispatch(
+                    runtime, adapter, user, 64201, "记录合道主线"
+                )
+                assert recorded_mainline.code == "QUEST_ACTION_RECORDED"
+                permit = await _dispatch(
+                    runtime, adapter, user, 64202, "领取合道许可"
+                )
+                assert permit.code == "QUEST_PERMIT_GRANTED"
+                assert permit.data["reward"] == {"item.dao_fruit_fragment": 12}
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    merit_before_union = int(connection.execute(
+                        "SELECT world_merit FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0])
+                assert merit_before_union >= 2_000
+                union = await _dispatch(runtime, adapter, user, 64203, "开始合道")
+                assert union.code == "DAO_UNION_STARTED", union.message
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    final_state = connection.execute(
+                        "SELECT realm_key, realm_layer, spirit_stones, world_merit, inventory_json "
+                        "FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert final_state[0:2] == ("dao_union", 1)
+                assert int(final_state[2]) >= 0
+                assert int(final_state[3]) == merit_before_union - 2_000
+                assert json.loads(final_state[4]).get("item.dao_fruit_fragment") == 2
                 await runtime.close()
 
     asyncio.run(run())
