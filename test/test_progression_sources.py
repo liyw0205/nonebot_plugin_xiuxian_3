@@ -15,6 +15,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
 )
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import trial_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import next_layer_threshold
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_TASKS
@@ -1965,6 +1966,168 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                 assert tribulation.code == "TRIBULATION_STARTED"
                 assert tribulation.data["realm_key"] == "tribulation"
                 assert tribulation.data["realm_layer"] == 1
+
+                # Continue the same character into the first unlocked trial.
+                reached_trial = False
+                for day in range(30):
+                    clock.advance(days=1)
+                    await _dispatch(runtime, adapter, user, 900000 + day * 20, "恢复状态")
+                    for slot in range(2):
+                        operation_base = 901000 + day * 20 + slot * 5
+                        started_refinement = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            operation_base,
+                            "开始修炼 神魂淬炼",
+                        )
+                        assert started_refinement.code == "CULTIVATION_STARTED"
+                        clock.advance(minutes=30)
+                        cultivated = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            operation_base + 1,
+                            "结算修炼",
+                        )
+                        assert cultivated.data["realm_key"] == "tribulation"
+                        assert cultivated.data["cultivation_gain"] >= 5_000
+                        threshold = next_layer_threshold(
+                            "tribulation", cultivated.data["realm_layer"]
+                        )
+                        while threshold is not None and cultivated.data["cultivation"] >= threshold:
+                            advanced = await _dispatch(
+                                runtime,
+                                adapter,
+                                user,
+                                operation_base + 2 + int(cultivated.data["realm_layer"]),
+                                "晋升境界",
+                            )
+                            assert advanced.code == "REALM_LAYER_ADVANCED"
+                            threshold = next_layer_threshold(
+                                "tribulation", advanced.data["realm_layer"]
+                            )
+                            if advanced.data["realm_layer"] == 3:
+                                reached_trial = True
+                                break
+                        if slot == 0:
+                            clock.advance(hours=8)
+                            await _dispatch(
+                                runtime,
+                                adapter,
+                                user,
+                                operation_base + 4,
+                                "恢复状态",
+                            )
+                        if reached_trial:
+                            break
+                    if reached_trial:
+                        break
+                assert reached_trial, "new character did not reach tribulation L3"
+
+                clock.advance(hours=13)
+                await _dispatch(runtime, adapter, user, 907700, "恢复状态")
+                await _dispatch(runtime, adapter, user, 907701, "前往 虚空门户")
+                clock.advance(minutes=5)
+                await _dispatch(runtime, adapter, user, 907702, "结算移动")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    main_inventory = json.loads(
+                        connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                        or "{}"
+                    )
+                missing_anchors = max(0, 4 - int(main_inventory.get("item.void_anchor", 0)))
+                if missing_anchors:
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        helper_row = connection.execute(
+                            "SELECT id, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (helper_adapter, helper),
+                        ).fetchone()
+                        helper_inventory = json.loads(helper_row[1] or "{}")
+                        helper_inventory["item.void_anchor"] = (
+                            int(helper_inventory.get("item.void_anchor", 0)) + missing_anchors
+                        )
+                        connection.execute(
+                            "UPDATE players SET inventory_json=? WHERE id=?",
+                            (json.dumps(helper_inventory, ensure_ascii=False, sort_keys=True), helper_row[0]),
+                        )
+                    anchor_listing = await _dispatch(
+                        runtime,
+                        helper_adapter,
+                        helper,
+                        908000,
+                        f"发布摆摊 item.void_anchor {missing_anchors} 1",
+                    )
+                    anchor_purchase = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        908001,
+                        f"购买摆摊 {anchor_listing.data['order_id']} {missing_anchors}",
+                    )
+                    assert anchor_purchase.code == "MARKET_ORDER_PURCHASED"
+                archive_operation = next(
+                    f"{adapter}-tribulation-archive-{candidate}"
+                    for candidate in range(1000)
+                    if void_route_roll_bp(f"{adapter}-tribulation-archive-{candidate}") >= 1500
+                )
+                archive = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    907703,
+                    "进入虚空航道 档案遗迹",
+                    operation_id=archive_operation,
+                )
+                assert archive.code == "VOID_ROUTE_STARTED"
+                clock.advance(minutes=45)
+                arrived_archive = await _dispatch(runtime, adapter, user, 907704, "结算虚空航道")
+                assert arrived_archive.data["route_key"] == "void.archive_ruins"
+                clock.advance(hours=13)
+                await _dispatch(runtime, adapter, user, 908010, "恢复状态")
+                await _dispatch(runtime, adapter, user, 907705, "前往 道源门")
+                clock.advance(hours=1)
+                arrived_gate = await _dispatch(runtime, adapter, user, 907706, "结算移动")
+                assert arrived_gate.data["destination"] == "dao.origin_gate"
+                await _dispatch(runtime, adapter, user, 907707, "前往 天劫台")
+                clock.advance(minutes=30)
+                arrived_terrace = await _dispatch(runtime, adapter, user, 907708, "结算移动")
+                assert arrived_terrace.data["destination"] == "tribulation.sky_terrace"
+
+                trial_operation = next(
+                    f"{adapter}-new-player-body-trial-{candidate}"
+                    for candidate in range(1000)
+                    if trial_roll_bp(f"{adapter}-new-player-body-trial-{candidate}") < 7000
+                )
+                trial = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    907709,
+                    "开始天劫试炼 身心劫",
+                    operation_id=trial_operation,
+                )
+                assert trial.code == "TRIAL_STARTED"
+                assert trial.data["battle_outcome"] == "won"
+                clock.advance(minutes=31)
+                settled_trial = await _dispatch(runtime, adapter, user, 907710, "结算天劫试炼")
+                assert settled_trial.code == "TRIAL_SUCCEEDED"
+                next_layer = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, f"{adapter}-907711"),
+                    "晋升境界",
+                )
+                assert next_layer.code == "REALM_CULTIVATION_INSUFFICIENT"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    tribulation_state = connection.execute(
+                        "SELECT realm_key, realm_layer, cultivation FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert tribulation_state[0:2] == ("tribulation", 3)
+                assert int(tribulation_state[2]) >= 220_000
                 await runtime.close()
 
     asyncio.run(run())

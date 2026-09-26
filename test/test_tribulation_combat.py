@@ -79,6 +79,17 @@ def test_tribulation_phase_boundaries_and_derived_stats_are_versioned_inputs() -
         "initiative": 21_360,
         "agility": 20_550,
     }
+    natural_stats = stat_snapshot(
+        {"body": 10, "agility": 15},
+        realm_layer=3,
+        equipment=(),
+    )
+    assert natural_stats == {
+        "max_hp": 135_000,
+        "attack": 23_333,
+        "initiative": 21_300,
+        "agility": 20_550,
+    }
 
 
 def test_tribulation_actions_replay_after_restart_and_settlement_is_idempotent() -> None:

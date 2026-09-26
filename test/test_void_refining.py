@@ -134,6 +134,53 @@ def test_void_route_resistance_floor_and_adapter_simulation() -> None:
     asyncio.run(run())
 
 
+def test_higher_realms_can_reenter_archive_route_on_both_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "qq-high-route"), ("onebot.v11", "ob-high-route")):
+                seller = f"{user}-anchor-seller"
+                await runtime.dispatch(_ctx(adapter, user, f"create-{user}"), "开始修仙")
+                await runtime.dispatch(_ctx(adapter, seller, f"create-{seller}"), "开始修仙")
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=3, "
+                        "location_key='void.portal', stamina=100, space_resistance_bp=0, "
+                        "spirit_stones=10, inventory_json='{}' WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                    db.execute(
+                        "UPDATE players SET location_key='void.portal', spirit_stones=1000, inventory_json=? "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.void_anchor": 4}), adapter, seller),
+                    )
+                listing = await runtime.dispatch(
+                    _ctx(adapter, seller, f"{seller}-list"),
+                    "发布摆摊 item.void_anchor 4 1",
+                )
+                assert listing.code == "MARKET_ORDER_CREATED", (adapter, listing.code, listing.message)
+                purchase = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-buy"),
+                    f"购买摆摊 {listing.data['order_id']} 4",
+                )
+                assert purchase.code == "MARKET_ORDER_PURCHASED"
+                operation = f"{user}-archive-route"
+                started = await runtime.dispatch(
+                    _ctx(adapter, user, operation), "进入虚空航道 档案遗迹"
+                )
+                assert started.code == "VOID_ROUTE_STARTED", (adapter, started.code, started.message)
+                assert started.data["anchor_cost"] == 4
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    snapshot_json = db.execute(
+                        "SELECT snapshot_json FROM void_route_sessions WHERE session_id=?",
+                        (started.data["session_id"],),
+                    ).fetchone()[0]
+                assert json.loads(snapshot_json)["rule_version"] == "world-0.5.1"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_void_power_recovers_once_per_business_day() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:

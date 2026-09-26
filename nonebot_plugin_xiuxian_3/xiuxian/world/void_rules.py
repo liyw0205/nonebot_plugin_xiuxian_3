@@ -7,7 +7,7 @@ from hashlib import blake2b
 
 from .void_models import VoidRouteDefinition
 
-RULE_VERSION = "world-0.5.0"
+RULE_VERSION = "world-0.5.1"
 CONTENT_VERSION = "content-0.5"
 VOID_ROUTE_DURATION_SECONDS = 30 * 60
 VOID_ROUTE_STORM_CHANCE_BP = 1500

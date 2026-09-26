@@ -2,7 +2,7 @@
 
 本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=combat-0.6.0`。
 这是 v0.6 的历史发布快照，不裁决当前运行时状态。当前已验收的天劫三阶段自动回合
-是独立的 `combat-0.6.1` 规则切片，终局战是独立的 `combat-final-0.1.0` 规则切片；细节见
+是独立的 `combat-0.6.2` 规则切片，天劫试炼将合法资质 5–15 映射至高阶战斗尺度；终局战是独立的 `combat-final-0.1.0` 规则切片；细节见
 [战斗模型](model.md)、[行动流程](workflow.md)和[用例验收](use-cases.md)。玩家不提交战斗行动，服务端
 按快照和策略自动推进。
 

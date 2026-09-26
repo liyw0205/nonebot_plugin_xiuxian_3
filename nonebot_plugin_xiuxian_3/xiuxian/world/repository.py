@@ -15,12 +15,15 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
+    CONTENT_VERSION,
+    RULE_VERSION,
     VOID_INSTABILITY_SECONDS,
     VOID_ROUTE_STORM_CHANCE_BP,
     navigation_anchor_cost,
     void_route_definition,
     void_route_roll_bp,
 )
+from .rules import meets_realm
 
 
 class WorldRepositoryMixin:
@@ -86,14 +89,17 @@ class WorldRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             realm_key = str(row["realm_key"])
             realm_layer = int(row["realm_layer"])
-            if realm_key == "soul_transformation" and realm_layer >= 1 and route_key == "void.archive_ruins":
-                trial_count = connection.execute(
-                    "SELECT COUNT(*) AS count FROM quest_events WHERE player_id = ? AND quest_key = 'quest.break_void' AND component_key = 'void_wall_trial'",
-                    (row["id"],),
-                ).fetchone()
-                if int(trial_count["count"]) < 3:
-                    raise VoidRouteLockedError("archive route requires three wall trials")
-            elif realm_key != "void_refining" or realm_layer < 1:
+            if realm_key == "soul_transformation" and realm_layer >= 1:
+                if route_key == "void.archive_ruins":
+                    trial_count = connection.execute(
+                        "SELECT COUNT(*) AS count FROM quest_events WHERE player_id = ? AND quest_key = 'quest.break_void' AND component_key = 'void_wall_trial'",
+                        (row["id"],),
+                    ).fetchone()
+                    if int(trial_count["count"]) < 3:
+                        raise VoidRouteLockedError("archive route requires three wall trials")
+                else:
+                    raise VoidRouteLockedError("void route requires void refining")
+            elif not meets_realm(realm_key, realm_layer, "void_refining", 1):
                 raise VoidRouteLockedError("void route requires void refining")
             instability_until = row["void_instability_until"]
             unstable = False
@@ -136,8 +142,8 @@ class WorldRepositoryMixin:
                 "anchor_cost": anchor_cost,
                 "beacon_discount": beacon_discount,
                 "stamina_cost": definition.stamina_cost,
-                "content_version": "content-0.5",
-                "rule_version": "world-0.5.0",
+                "content_version": CONTENT_VERSION,
+                "rule_version": RULE_VERSION,
             }
             connection.execute(
                 "UPDATE players SET inventory_json = ?, stamina = stamina - ?, updated_at = ? WHERE id = ?",

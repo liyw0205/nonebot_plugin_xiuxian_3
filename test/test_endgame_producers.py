@@ -775,7 +775,7 @@ def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
                     realm_key="dao_union",
                     realm_layer=6,
                     location_key="void.archive_ruins",
-                    dao_fruit_progress=499,
+                    dao_fruit_progress=469,
                     stamina=30,
                     stamina_max=30,
                     inventory_json=json.dumps({"item.dao_fruit_fragment": 2}),
@@ -796,7 +796,7 @@ def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
                     ).fetchone()
                 assert unchanged == (30, json.dumps({"item.dao_fruit_fragment": 2}))
 
-                _set_player(runtime, adapter, user, dao_fruit_progress=500)
+                _set_player(runtime, adapter, user, dao_fruit_progress=470)
                 ready = await runtime.dispatch(
                     _ctx(adapter, user, f"preview-ready-{adapter}"), "移动预览 道源门"
                 )
@@ -830,9 +830,9 @@ def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
                     )
                 assert row == (10, "{}", "void.archive_ruins")
                 snapshot = json.loads(snapshot_json)
-                assert snapshot["rule_version"] == "world-0.6.0"
+                assert snapshot["rule_version"] == "world-0.6.1"
                 assert snapshot["content_version"] == "content-0.6"
-                assert snapshot["required_dao_fruit_progress"] == 500
+                assert snapshot["required_dao_fruit_progress"] == 470
                 assert snapshot["daily_start_limit"] == 1
                 arrived = await runtime.dispatch(
                     _ctx(adapter, user, f"gate-settle-{adapter}"), "结算移动"

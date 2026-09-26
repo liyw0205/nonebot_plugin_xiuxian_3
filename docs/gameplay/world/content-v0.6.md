@@ -1,10 +1,10 @@
 # v0.6 世界地点内容基线：天劫与终局地点
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=world-0.6.0`。终局地点不允许普通撤销；每个会话由试炼/终局状态机权威结算。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，基线规则为 `world-0.6.0`；道源门准入增量为 `world-0.6.1`。终局地点不允许普通撤销；每个会话由试炼/终局状态机权威结算。
 
 | `location_key` | 准入 | 会话成本/时长 | 内容与限制 |
 |:--|:--|:--|:--|
-| `dao.origin_gate` | 从 `void.archive_ruins` 出发；合道 L6、道果进度 >=500 | 60 分钟 / 20 体力、`item.dao_fruit_fragment` 2 | 合道试炼、道果线索；每个 UTC 日最多创建 1 次行程 |
+| `dao.origin_gate` | 从 `void.archive_ruins` 出发；合道 L6、道果进度 >=470（恰为三项道源任务奖励总量） | 60 分钟 / 20 体力、`item.dao_fruit_fragment` 2 | 合道试炼、道果线索；每个 UTC 日最多创建 1 次行程 |
 | `tribulation.sky_terrace` | 从 `dao.origin_gate` 出发；渡劫 L3 | 30 分钟 / `item.tribulation_token` 1（移动通行凭证） | 三次天劫试炼；顺序固定。每次试炼另按 progression 合同消耗 1 张凭证 |
 | `ascension.heaven_path` | 终局战胜利后进入 `ascension_ready` | 终局战不移动、不重扣凭证 | 个人飞升/留界结局入口；最终战在天劫台启动 |
 | `ascension.left_world_hall` | `remained_in_world`，从飞升路出发 | 30 分钟 / 10 体力 | 道统建设、留界结局确认 |

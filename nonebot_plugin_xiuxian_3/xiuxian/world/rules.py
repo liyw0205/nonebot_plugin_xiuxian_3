@@ -68,10 +68,10 @@ DESTINATIONS = {
         required_realm="dao_union", required_layer=6,
         pass_key="item.dao_fruit_fragment", pass_quantity=2,
         source_locations=("void.archive_ruins",),
-        required_dao_fruit_progress=500,
+        required_dao_fruit_progress=470,
         daily_start_limit=1,
         content_version="content-0.6",
-        rule_version="world-0.6.0",
+        rule_version="world-0.6.1",
     ),
     "tribulation.sky_terrace": DestinationDefinition(
         "tribulation.sky_terrace", "天劫台", 30 * 60, 0, 0,

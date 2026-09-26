@@ -27,7 +27,6 @@ from .endgame_rules import (
     CONTENT_VERSION,
     FRUIT_KEYS,
     RULE_VERSION,
-    THREE_REALM_KEYS,
     TRIAL_ORDER,
     TRIBULATION_TRIAL_DURATION_SECONDS,
     TRIBULATION_WORLD_MERIT_REWARD,
@@ -68,7 +67,6 @@ class TribulationTrialRepositoryMixin:
             LocationRequirementError,
             OperationConflictError,
             PlayerSuspendedError,
-            ThreeRealmReputationInsufficientError,
             TribulationCooldownError,
             TribulationDebtBlockedError,
             TribulationTokenInsufficientError,
@@ -166,18 +164,6 @@ class TribulationTrialRepositoryMixin:
                     raise DaoFruitChoiceError("dao fruit does not match the primary path")
                 if row["dao_fruit_key"]:
                     raise DaoFruitChoiceError("dao fruit is already locked")
-            if trial_key == "trial.three_realms":
-                reputation = self._json_object(row["faction_reputation_json"], {})
-                reputation_row = connection.execute(
-                    "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
-                ).fetchone()
-                if reputation_row is not None:
-                    for key, value in self._json_object(reputation_row["local_json"], {}).items():
-                        if str(key).startswith("faction."):
-                            reputation[str(key).split(".", 1)[1]] = int(value)
-                if any(int(reputation.get(key, 0)) < 2_000 for key in THREE_REALM_KEYS):
-                    raise ThreeRealmReputationInsufficientError("three realm reputation is insufficient")
-
             inventory = self._json_object(row["inventory_json"], {})
             if int(inventory.get("item.tribulation_token", 0)) < definition.token_cost:
                 raise TribulationTokenInsufficientError("tribulation token is insufficient")

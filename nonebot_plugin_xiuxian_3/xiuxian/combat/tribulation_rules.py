@@ -7,7 +7,7 @@ from typing import Mapping
 
 
 CONTENT_VERSION = "content-0.6"
-RULE_VERSION = "combat-0.6.1"
+RULE_VERSION = "combat-0.6.2"
 PROFILE_KEY = "battle_profile.tribulation_trial.v1"
 ENEMY_KEY = "enemy.tribulation_heaven"
 ENEMY_MAX_HP = 150_000
@@ -47,8 +47,10 @@ def stat_snapshot(
     """Project current build inputs into the high-tier trial battle scale."""
 
     layer = max(1, int(realm_layer))
-    body = min(2_000, max(0, int(qualification.get("body", 0))))
-    agility = min(2_000, max(0, int(qualification.get("agility", 0))))
+    body = min(15, max(0, int(qualification.get("body", 0))))
+    agility = min(15, max(0, int(qualification.get("agility", 0))))
+    body_scale = body * 4_000 // 3
+    agility_scale = agility * 4_000 // 3
     hp_affix = damage_affix = initiative_affix = temper = 0
     for item in equipment:
         affixes = item.get("affixes", {})
@@ -60,10 +62,10 @@ def stat_snapshot(
             temper += max(0, int(item.get("temper_level", 0)))
 
     return {
-        "max_hp": 80_000 + (layer - 1) * 7_500 + body * 30 + hp_affix * 100,
-        "attack": 8_000 + (layer - 1) * 1_000 + body * 10 + damage_affix * 100 + temper * 500,
-        "initiative": 1_000 + layer * 100 + agility * 10 + initiative_affix * 20,
-        "agility": 400 + layer * 50 + agility * 10,
+        "max_hp": 80_000 + (layer - 1) * 7_500 + body * 4_000 + hp_affix * 100,
+        "attack": 8_000 + (layer - 1) * 1_000 + body_scale + damage_affix * 100 + temper * 500,
+        "initiative": 1_000 + layer * 100 + agility_scale + initiative_affix * 20,
+        "agility": 400 + layer * 50 + agility_scale,
     }
 
 

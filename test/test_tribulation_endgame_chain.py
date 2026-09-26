@@ -43,7 +43,7 @@ async def _create_trial_player(runtime, adapter: str, user: str, *, strong: bool
             WHERE platform=? AND platform_user_id=?
             """,
             (
-                json.dumps({"xuantian": 2_000, "demon": 2_000, "beast": 2_000}),
+                json.dumps({}),
                 json.dumps({"item.tribulation_token": 3}),
                 json.dumps(qualification),
                 adapter,
@@ -109,6 +109,44 @@ def test_qq_and_onebot_three_trials_isolated_and_replayable() -> None:
                     ("trial.three_realms", "succeeded", 1),
                     ("trial.dao_choice", "succeeded", 1),
                 }
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_natural_qualification_wins_first_tribulation_trial_on_both_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            for adapter, user in (
+                ("qq.official", "foundation-source-qq.official"),
+                ("onebot.v11", "foundation-source-onebot.v11"),
+            ):
+                await runtime.dispatch(_ctx(adapter, user, f"create-{user}"), "开始修仙")
+                await runtime.dispatch(_ctx(adapter, user, f"seek-{user}"), "寻仙问道")
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=3, "
+                        "endgame_status='tribulation', location_key='tribulation.sky_terrace', "
+                        "inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.tribulation_token": 1}), adapter, user),
+                    )
+                operation = next(
+                    f"{user}-body-trial-{candidate}"
+                    for candidate in range(1000)
+                    if trial_roll_bp(f"{user}-body-trial-{candidate}") < 7_000
+                )
+                started = await runtime.dispatch(
+                    _ctx(adapter, user, operation), "开始天劫试炼 身心劫"
+                )
+                assert started.code == "TRIAL_STARTED"
+                assert started.data["battle_outcome"] == "won", (adapter, started.data)
+                clock.advance(minutes=31)
+                settled = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-body-trial-settle"), "结算天劫试炼"
+                )
+                assert settled.code == "TRIAL_SUCCEEDED"
             await runtime.close()
 
     asyncio.run(run())

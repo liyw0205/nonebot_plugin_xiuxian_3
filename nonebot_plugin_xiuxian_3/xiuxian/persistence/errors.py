@@ -1364,10 +1364,6 @@ class TribulationTokenInsufficientError(RuntimeError):
     """The player lacks the token required by a tribulation trial."""
 
 
-class ThreeRealmReputationInsufficientError(RuntimeError):
-    """The player lacks the three realm reputation needed by trial two."""
-
-
 class DaoFruitChoiceError(RuntimeError):
     """The chosen dao fruit is invalid or already locked."""
 

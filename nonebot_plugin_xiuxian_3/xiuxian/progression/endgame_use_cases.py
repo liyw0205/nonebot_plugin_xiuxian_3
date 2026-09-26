@@ -16,7 +16,6 @@ from ..repository import (
     PlayerNotFoundError,
     PlayerSuspendedError,
     RepositoryBusyError,
-    ThreeRealmReputationInsufficientError,
     TribulationCooldownError,
     TribulationDebtBlockedError,
     TribulationEntryRequirementError,
@@ -248,8 +247,6 @@ class EndgameApplication:
             return self._failure(context, operation_id, "TRIBULATION_TRIAL_BUSY", "已有天劫试炼或终局配方会话进行中，请先结算。")
         except TribulationTokenInsufficientError:
             return self._failure(context, operation_id, "TRIBULATION_TOKEN_INSUFFICIENT", "缺少天劫凭证，试炼未开始。")
-        except ThreeRealmReputationInsufficientError:
-            return self._failure(context, operation_id, "THREE_REALM_REPUTATION_INSUFFICIENT", "三界声望需各达到 2,000。")
         except DaoFruitChoiceError:
             return self._failure(context, operation_id, "DAO_FRUIT_PATH_MISMATCH", "道果必须与当前主道途匹配，且只能锁定一次。")
         except OperationConflictError:
