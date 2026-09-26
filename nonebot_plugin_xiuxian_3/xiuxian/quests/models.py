@@ -43,6 +43,7 @@ class DaoUnionQualificationRecord:
     status: str
     progress: dict[str, int]
     snapshot: dict[str, object]
+    reward: dict[str, int] = field(default_factory=dict)
     already_completed: bool = False
 
 

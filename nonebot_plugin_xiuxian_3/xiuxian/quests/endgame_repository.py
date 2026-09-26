@@ -27,6 +27,7 @@ from .rules import (
     DAO_ORIGIN_WORLD_MERIT,
     DAO_UNION_CHALLENGE,
     DAO_UNION_CONTENT_VERSION,
+    DAO_UNION_FRAGMENT_REWARD,
     DAO_UNION_MAINLINE,
     DAO_UNION_MAINLINE_CONTENT_VERSION,
     DAO_UNION_MAINLINE_LANES,
@@ -318,16 +319,26 @@ class EndgameQuestRepositoryMixin:
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": int(player["realm_layer"]),
                 "components": progress,
+                "reward": {"item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD},
                 "content_version": DAO_UNION_CONTENT_VERSION,
                 "rule_version": DAO_UNION_RULE_VERSION,
             }
+            inventory = self._json_object(player["inventory_json"], {})
+            inventory["item.dao_fruit_fragment"] = (
+                int(inventory.get("item.dao_fruit_fragment", 0)) + DAO_UNION_FRAGMENT_REWARD
+            )
             flags_state = self._json_object(player["intro_json"], {})
             flags = set(str(item) for item in flags_state.get("flags", []))
             flags.add(DAO_UNION_QUEST)
             flags_state["flags"] = sorted(flags)
             connection.execute(
-                "UPDATE players SET intro_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(flags_state, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                "UPDATE players SET inventory_json = ?, intro_json = ?, updated_at = ? WHERE id = ?",
+                (
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    player["id"],
+                ),
             )
             self._upsert_progress(
                 connection,
@@ -348,6 +359,7 @@ class EndgameQuestRepositoryMixin:
                 "status": "completed",
                 "progress": progress,
                 "snapshot": snapshot,
+                "reward": {"item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD},
             }
             self._insert_operation(
                 connection,
@@ -556,6 +568,7 @@ class EndgameQuestRepositoryMixin:
             status=str(payload["status"]),
             progress={str(key): int(value) for key, value in dict(payload.get("progress", {})).items()},
             snapshot=dict(payload.get("snapshot", {})),
+            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             already_completed=replay,
         )
 

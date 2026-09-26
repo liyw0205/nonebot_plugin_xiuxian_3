@@ -332,7 +332,6 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
                             "item.material.cloud_iron": 100,
                             "item.domain_core": 2,
                             "item.mat.wood": 100,
-                            "item.dao_fruit_fragment": 30,
                         }
                     ),
                 )
@@ -388,7 +387,6 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
                         "item.material.cloud_iron": 60
                         if any(resource == "云铁" for resource, _ in contributions)
                         else 0,
-                        "item.dao_fruit_fragment": 30,
                     }
                     _set_player(
                         runtime,
@@ -431,10 +429,22 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
                     _ctx(adapter, user, f"{user}-dao-permit"), "领取合道许可"
                 )
                 assert permit.code == "QUEST_PERMIT_GRANTED"
+                assert permit.data["reward"] == {"item.dao_fruit_fragment": 12}
+                permit_replay = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-dao-permit"), "领取合道许可"
+                )
+                assert permit_replay.data["idempotent_replay"] is True
+                assert permit_replay.data["reward"] == {"item.dao_fruit_fragment": 12}
                 union = await runtime.dispatch(
                     _ctx(adapter, user, f"{user}-begin-union"), "开始合道"
                 )
                 assert union.code == "DAO_UNION_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    fragments = connection.execute(
+                        "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert json.loads(fragments).get("item.dao_fruit_fragment") == 2
 
                 for label in ("守界", "建设", "传承"):
                     for index in range(3):
@@ -489,6 +499,19 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                         "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
                         (adapter, user),
                     ).fetchone()[0]
+
+                incomplete = await runtime.dispatch(
+                    _ctx(adapter, user, f"permit-incomplete-{adapter}"), "领取合道许可"
+                )
+                assert incomplete.code == "QUEST_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    incomplete_inventory = connection.execute(
+                        "SELECT inventory_json FROM players WHERE id=?",
+                        (player_id,),
+                    ).fetchone()[0]
+                assert json.loads(incomplete_inventory).get("item.dao_fruit_fragment") is None
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
                     for stage in range(1, 4):
                         connection.execute(
                             "INSERT INTO mainline_runs(player_id, story_key, chapter, stage, stage_key, status, first_clear_key, content_version, rule_version, created_at, updated_at) "
@@ -562,6 +585,7 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                     _ctx(adapter, user, f"permit-{adapter}"), "领取合道许可"
                 )
                 assert permit.code == "QUEST_PERMIT_GRANTED"
+                assert permit.data["reward"] == {"item.dao_fruit_fragment": 12}
                 assert permit.data["snapshot"]["path_key"] == "body"
                 assert permit.data["snapshot"]["components"] == {
                     "three_realm_mainline": 1,
@@ -572,6 +596,7 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                     _ctx(adapter, user, f"permit-{adapter}"), "领取合道许可"
                 )
                 assert replay.data["idempotent_replay"] is True
+                assert replay.data["reward"] == {"item.dao_fruit_fragment": 12}
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     state = connection.execute(
                         "SELECT intro_json, inventory_json FROM players WHERE id = ?", (player_id,)
@@ -587,9 +612,10 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                         (player_id,),
                     ).fetchone()
                 assert "quest.dao_union" in json.loads(state[0])["flags"]
+                assert json.loads(state[1]).get("item.dao_fruit_fragment") == 12
                 assert json.loads(state[1]).get("item.masterwork.body", 0) == 0
-                assert {tuple(row) for row in event_versions} == {("content-0.6", "quests-0.6.0")}
-                assert tuple(progress_version) == ("content-0.6", "quests-0.6.0")
+                assert {tuple(row) for row in event_versions} == {("content-0.6", "quests-0.6.1")}
+                assert tuple(progress_version) == ("content-0.6", "quests-0.6.1")
             await runtime.close()
 
     asyncio.run(run())

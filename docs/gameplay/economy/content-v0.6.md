@@ -4,7 +4,7 @@
 
 | `market_key` | 可交易 | 禁止交易 | 参数 |
 |:--|:--|:--|:--|
-| `market.dao_fragment` | `item.dao_fruit_fragment`、非终局消耗品 | 飞升凭证、道果、终局法器、结局称号、进度/功勋 | 1–5 碎片，2h，手续费 1000 bp，每赛季完成 10 次 |
+| `market.dao_fragment` | 暂无（v0.6 未开放） | `item.dao_fruit_fragment`、飞升凭证、道果、终局法器、结局称号、进度/功勋 | 道果碎片绑定不可交易；该市场切片仍关闭 |
 | `dao.settlement_construction` | 道统建设材料/服务 | 核心权限、投票、成员席位 | 使用世界功勋，不可灵石购买 |
 | `season.final_reward` | 无普通交易 | 所有结局奖励 | 只发称号、展示物、新篇章资格 |
 
