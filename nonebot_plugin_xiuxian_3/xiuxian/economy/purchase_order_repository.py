@@ -31,6 +31,7 @@ from ..persistence.errors import (
     PurchaseSelfMatchError,
 )
 from .purchase_order_models import PurchaseOrderRecord
+from .bindings import active_binding_totals
 from .purchase_order_rules import (
     CONTENT_VERSION,
     PURCHASE_ORDER_TTL_SECONDS,
@@ -285,17 +286,11 @@ class PurchaseOrderRepositoryMixin:
             available = int(inventory.get(item_key, 0)) - int(locked_market) - int(locked_auction) - int(locked_purchase)
             if available < quantity:
                 raise PurchaseItemLockedError("seller inventory is unavailable")
-            bound = connection.execute(
-                "SELECT COALESCE(SUM(quantity),0) AS quantity, MIN(bound_until) AS first_bound_until FROM ("
-                "SELECT quantity, bound_until FROM item_bindings WHERE player_id=? AND item_key=? AND bound_until>? "
-                "UNION ALL SELECT quantity, bound_until FROM season_item_bindings WHERE player_id=? AND item_key=? AND bound_until>?)",
-                (seller["id"], item_key, now_text, seller["id"], item_key, now_text),
-            ).fetchone()
-            if available - int(bound["quantity"] or 0) < quantity:
+            bound_quantity, first_binding = active_binding_totals(connection, int(seller["id"]), item_key, now_text)
+            if available - bound_quantity < quantity:
                 raise ItemBindingActiveError("item binding is still active")
             seller_faction = faction_for_location(str(seller["location_key"]))
             item_region = order_region(str(seller["location_key"]))
-            first_binding = str(bound["first_bound_until"]) if bound["first_bound_until"] else None
             connection.execute(
                 """
                 INSERT INTO purchase_item_locks(order_id, seller_player_id, item_key, quantity, created_at, updated_at)

@@ -27,6 +27,7 @@ from ..persistence.errors import (
     PlayerSuspendedError,
 )
 from .models import MarketOrderRecord
+from .bindings import active_binding_totals
 from .commission_models import ProductionCommissionRecord
 from .rules import (
     COMMISSION_MAX_REWARD,
@@ -303,21 +304,9 @@ class EconomyRepositoryMixin:
                 raise MarketOrderLimitError("listing limit reached")
             inventory = self._json_object(player["inventory_json"], {})
             market_locked = self._market_locked_quantity(connection, int(player["id"]), item.key)
-            bound_quantity = connection.execute(
-                """
-                SELECT COALESCE(SUM(quantity), 0) AS quantity
-                FROM (
-                    SELECT quantity, bound_until FROM item_bindings
-                    WHERE player_id = ? AND item_key = ? AND bound_until > ?
-                    UNION ALL
-                    SELECT quantity, bound_until FROM season_item_bindings
-                    WHERE player_id = ? AND item_key = ? AND bound_until > ?
-                )
-                """,
-                (player["id"], item.key, now_text, player["id"], item.key, now_text),
-            ).fetchone()
+            bound_quantity, _ = active_binding_totals(connection, int(player["id"]), item.key, now_text)
             unbound_inventory = int(inventory.get(item.key, 0)) - market_locked
-            available = unbound_inventory - int(bound_quantity["quantity"] if bound_quantity else 0)
+            available = unbound_inventory - bound_quantity
             if unbound_inventory < quantity:
                 raise MarketItemLockedError("not enough unlocked inventory")
             if available < quantity:

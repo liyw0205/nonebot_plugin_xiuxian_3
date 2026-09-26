@@ -1,9 +1,10 @@
 # v0.3 生产内容基线：跨界配方与契约制作
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.3`，`rule_version=production-0.3.0`。跨界生产要求元婴、对应地点/盟约或主线；失败返还 60% 可返材料，工具额外 -1000 bp 耐久，成功产出绑定 24 小时。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.3`，跨界生产默认 `rule_version=production-0.3.0`；金丹前置凝魂丹使用 `production-0.3.1`。跨界生产要求元婴、对应地点/盟约或主线；失败返还 60% 可返材料，工具额外 -1000 bp 耐久，成功产出绑定 24 小时。
 
 | `recipe_key` | 前置/地点 | 输入 | 精力/时长 | 成功产出 | 特殊规则 |
 |:--|:--|:--|--:|--:|:--|
+| `recipe.pill.soul_condense` | `alchemy`、金丹 | 神魂晶 1、灵叶 3、阵砂 2 | 12 / 5 分钟 | `item.pill.soul_condense` 1 | 每日 2；绑定；基础丹炉耐久 -250 bp，质量阈值 6000；失败返灵叶 1、阵砂 1 |
 | `recipe.pill.soul_restore` | `alchemy` 5、元婴、跨界炼丹房 | `item.soul_crystal` 2、`item.beast_blood` 1 | 15 / 5 分钟 | `item.pill.soul_restore` 1 | 每日 3；只用于心魔净化 |
 | `recipe.weapon.boundary_spear` | `artifice` 5、元婴、界隙工坊 | `item.demon_core` 3、云铁 5、神魂晶 1 | 20 / 8 分钟 | `item.weapon.boundary_spear` 1 | 每周 1；永久绑定 |
 | `recipe.array.boundary_gate` | `formation` 5、元婴、界隙地点 | 神魂晶 5、阵砂 10、灵石 1000 | 25 / 10 分钟 | `item.array.boundary_gate` 1 | 队伍跨界门 3 次，7 天过期 |

@@ -2494,6 +2494,19 @@ CREATE TABLE IF NOT EXISTS item_bindings (
 CREATE INDEX IF NOT EXISTS idx_item_bindings_active
     ON item_bindings(player_id, item_key, bound_until);
 
+CREATE TABLE IF NOT EXISTS exploration_item_bindings (
+    source_operation_id TEXT NOT NULL REFERENCES operations(operation_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    bound_until TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (source_operation_id, item_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exploration_item_bindings_active
+    ON exploration_item_bindings(player_id, item_key, bound_until);
+
 CREATE TABLE IF NOT EXISTS season_item_bindings (
     binding_id TEXT PRIMARY KEY,
     player_id INTEGER NOT NULL REFERENCES players(id),

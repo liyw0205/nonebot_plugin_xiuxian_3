@@ -28,6 +28,7 @@ NON_TRADEABLE_ITEMS = frozenset({
     "item.pill.foundation_draft",
     "item.pill.foundation_guard",
     "item.pill.core_condense",
+    "item.pill.soul_condense",
     "item.pill.golden_core_guard",
     "item.array.mist_barrier",
     "item.contract.beast_pact",

@@ -119,6 +119,7 @@ from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
 from ..world.rules import destination_definition, meets_realm, RULE_VERSION
+from ..world.cloud_rules import DEMON_INTRO_FLAG
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     CLOUD_BOAT_STORM_CHANCE_BP,
@@ -330,6 +331,8 @@ class ExplorationRepositoryMixin:
 
             inventory = self._json_object(row["inventory_json"], {})
             intro_state = self._json_object(row["intro_json"], {})
+            if definition.key == "explore.demon_threshold" and DEMON_INTRO_FLAG not in intro_state.get("flags", []):
+                raise LocationRequirementError("demon gate risk briefing is required")
             if definition.key == "explore.cloud_mine":
                 has_access = has_cloud_mine_access(
                     subprofession_key=row["subprofession_key"],
@@ -607,7 +610,8 @@ class ExplorationRepositoryMixin:
                 "battle_id": battle_id,
             },
         )
-        now_text = serialize_datetime(self._now())
+        now = self._now()
+        now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
@@ -741,6 +745,7 @@ class ExplorationRepositoryMixin:
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
             )
+            self._bind_exploration_rewards(connection, int(row["id"]), operation_id, result, now)
             return self._exploration_settlement_from_payload(payload)
 
     def _settle_exploration_sync(self, platform: str, platform_user_id: str, operation_id: str) -> ExplorationSettlementRecord:
@@ -1043,7 +1048,25 @@ class ExplorationRepositoryMixin:
                     now_text,
                 ),
             )
+            if status == "settled":
+                self._bind_exploration_rewards(connection, int(row["id"]), operation_id, result, now)
             return self._exploration_settlement_from_payload(payload)
+
+    @staticmethod
+    def _bind_exploration_rewards(
+        connection: sqlite3.Connection, player_id: int, operation_id: str,
+        result: dict[str, int], now: datetime,
+    ) -> None:
+        now_text = serialize_datetime(now)
+        bound_until = serialize_datetime(now + timedelta(hours=24))
+        for item_key in ("item.demon_core", "item.beast_blood"):
+            quantity = int(result.get(item_key, 0))
+            if quantity > 0:
+                connection.execute(
+                    "INSERT INTO exploration_item_bindings(source_operation_id,player_id,item_key,quantity,bound_until,created_at) VALUES (?,?,?,?,?,?)",
+                    (operation_id, player_id, item_key, quantity, bound_until, now_text),
+                )
+
     @staticmethod
     def _exploration_settlement_from_payload(payload: dict[str, Any], replay: bool = False) -> ExplorationSettlementRecord:
         return ExplorationSettlementRecord(

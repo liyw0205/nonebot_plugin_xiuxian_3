@@ -21,6 +21,7 @@ from ..persistence.errors import (
     PlayerNotFoundError,
 )
 from .auction_models import AuctionRecord
+from .bindings import active_binding_totals
 from .auction_rules import (
     AUCTION_DURATION,
     AUCTION_SETTLEMENT_GRACE,
@@ -113,12 +114,7 @@ class AuctionRepositoryMixin:
                 "SELECT COALESCE(SUM(quantity), 0) FROM auction_item_locks WHERE seller_player_id=? AND item_key=?",
                 (seller["id"], item.key),
             ).fetchone()[0]
-            bound = connection.execute(
-                "SELECT COALESCE(SUM(quantity), 0) FROM ("
-                "SELECT quantity FROM item_bindings WHERE player_id=? AND item_key=? AND bound_until > ? "
-                "UNION ALL SELECT quantity FROM season_item_bindings WHERE player_id=? AND item_key=? AND bound_until > ?)",
-                (seller["id"], item.key, now_text, seller["id"], item.key, now_text),
-            ).fetchone()[0]
+            bound, _ = active_binding_totals(connection, int(seller["id"]), item.key, now_text)
             available = int(inventory.get(item.key, 0)) - int(locked_market) - int(locked_auction)
             if available < int(quantity):
                 raise AuctionItemLockedError("auction item is not available")

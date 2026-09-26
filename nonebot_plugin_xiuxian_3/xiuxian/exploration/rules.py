@@ -137,6 +137,21 @@ DEFINITIONS = {
         rule_version=V02_RULE_VERSION,
         content_version=V02_CONTENT_VERSION,
     ),
+    "explore.demon_threshold": ExplorationDefinition(
+        key="explore.demon_threshold",
+        label="深渊门备材",
+        location_key="demon.abyss_gate",
+        duration_seconds=4 * 60,
+        stamina_cost=8,
+        required_realm="golden_core",
+        required_layer=9,
+        daily_limit=6,
+        random_pool="gather.demon_threshold.v0.3",
+        battle_chance_bp=0,
+        energy_cost=2,
+        rule_version="exploration-0.3.1",
+        content_version=V03_CONTENT_VERSION,
+    ),
     "explore.demon_abyss": ExplorationDefinition(
         key="explore.demon_abyss",
         label="魔界堕落遗迹探索",
@@ -194,6 +209,8 @@ ALIASES = {
     "洞天二层探索": "explore.mist_grotto_2",
     "云舟试炼": "explore.cloud_boat_trial",
     "云舟历练": "explore.cloud_boat_trial",
+    "深渊门备材": "explore.demon_threshold",
+    "深渊门采集": "explore.demon_threshold",
     "魔界堕落遗迹探索": "explore.demon_abyss",
     "堕落遗迹探索": "explore.demon_abyss",
     "万兽山狩猎": "explore.beast_hunt",
@@ -320,6 +337,8 @@ def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
             "cultivation": weighted_value(seed + ":cultivation", (600, 750, 900), (30, 40, 30)),
             "item.ticket.cloud_boat_fragment": weighted_value(seed + ":ticket", (1, 2), (60, 40)),
         }
+    if mode_key == "explore.demon_threshold":
+        return {"item.soul_crystal": 1, "item.demon_core": 1}
     if mode_key == "explore.demon_abyss":
         # Keep the pool stable in the session snapshot: the final 10% is the
         # documented heart-demon encounter, whose separate event flow remains
