@@ -4,7 +4,7 @@
 
 | `item_key` | 类型/堆叠 | 绑定/交易 | 效果、成本与限制 | 来源 |
 |:--|:--|:--|:--|:--|
-| `item.pill.core_condense` | 突破丹，9 | 绑定 | 金丹突破必需；仅在开始会话时锁定，失败/成功均消耗 | 金丹炼丹、宗门商店 |
+| `item.pill.core_condense` | 突破丹，9 | 绑定 | 金丹突破必需；仅在开始会话时锁定，失败/成功均消耗 | 筑基起炼丹辅修个人生产（`recipe.pill.core_condense`） |
 | `item.pill.golden_core_guard` | 保护丹，9 | 绑定 | 金丹失败保留 70% 修为、震荡 4 小时；成功不消耗 | 金丹炼丹、宗门商店 |
 | `item.pill.golden_core_restore` | 恢复丹，9 | 绑定 | 提前解除 `foundation_shock`；额外灵石 200；每震荡一次 | 金丹配方 |
 | `item.material.cloud_iron` | 矿材，99 | 可交易 | 金丹突破/炼器材料 | 云铁矿区、委托 |

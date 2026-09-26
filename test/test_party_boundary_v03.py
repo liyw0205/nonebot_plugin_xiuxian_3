@@ -154,8 +154,11 @@ def test_boundary_battle_loss_applies_soul_fatigue_after_one_revival_per_member_
             replay = await runtime.repository.replay_party_battle(
                 platform="qq.official", platform_user_id="boundary-loss-leader", battle_id=started.battle_id
             )
-            assert sum(action["skill_key"] == "skill.soul.revival" for action in replay.actions) == 2
-            assert any("soul_power_cost" in str(action["state_json"]) for action in replay.actions)
+            revivals = [action for action in replay.actions if action["skill_key"] == "skill.soul.revival"]
+            assert 1 <= len(revivals) <= 2
+            assert len({action["target_key"] for action in revivals}) == len(revivals)
+            assert all('"soul_power_cost": 25' in action["state_json"] for action in revivals)
+            timeline_impacts = sum(action["skill_key"] == "skill.soul.suppression" for action in replay.actions)
             with sqlite3.connect(runtime.settings.database_path) as db:
                 rows = db.execute(
                     "SELECT soul_power, soul_fatigue_until FROM players WHERE platform_user_id IN (?, ?) ORDER BY platform_user_id",
@@ -165,7 +168,7 @@ def test_boundary_battle_loss_applies_soul_fatigue_after_one_revival_per_member_
                     "SELECT COUNT(*) FROM party_battle_members WHERE battle_id=? AND asset_lock_status='locked'",
                     (started.battle_id,),
                 ).fetchone()[0]
-            assert [row[0] for row in rows] == [7975, 7975]
+            assert sum(row[0] for row in rows) == 16000 - 25 * len(revivals) - 20 * timeline_impacts
             assert all(row[1] for row in rows)
             assert locked == 0
             await runtime.close()

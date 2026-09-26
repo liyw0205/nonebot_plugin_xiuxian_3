@@ -803,7 +803,7 @@ class ProductionRepositoryMixin:
                 or str(row["realm_key"]) == "qi_gathering"
             )
         else:
-            realm_ok = str(row["realm_key"]) == recipe.required_realm and int(row["realm_layer"]) >= recipe.min_realm_layer
+            realm_ok = str(row["realm_key"]) in (recipe.required_realm, *recipe.additional_realms) and int(row["realm_layer"]) >= recipe.min_realm_layer
         if not realm_ok:
             if cross_realm:
                 raise CrossRealmRecipeLockedError("当前境界不满足这条跨界配方")
