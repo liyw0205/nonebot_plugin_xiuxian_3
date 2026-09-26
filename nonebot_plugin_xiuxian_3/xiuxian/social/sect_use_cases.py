@@ -21,8 +21,17 @@ from ..repository import (
     SectNotFoundError,
     SectPermissionDeniedError,
     SectRequirementError,
+    SectContributionInsufficientError,
+    SectExchangeDailyCapError,
+    SectExchangeInvalidOfferError,
+    SectStockInsufficientError,
+    SectDailyBuildAlreadyCompletedError,
+    SectDailyBuildNotReadyError,
+    SectWarehouseFullError,
+    SectSupplyItemInvalidError,
     SQLitePlayerRepository,
 )
+from .sect_exchange_rules import SECT_DONATION_ALIASES, SECT_EXCHANGE_OFFERS, SECT_SUPPLY_RECIPES, resolve_sect_exchange_offer
 from .sect_rules import role_label
 
 
@@ -277,6 +286,125 @@ class SectApplication:
             context.request_id,
             data={"sect_id": record.sect_id, "name": record.name, "motto": record.motto, "role": record.role, "member_count": record.member_count, "max_members": record.max_members, "construction": record.construction},
         )
+
+    async def exchange_shop(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_SECT_EXCHANGE", "请使用 `宗门商店兑换 筑基护脉丹|金丹护脉丹|云铁|阵砂`。", context.request_id)
+        offer = resolve_sect_exchange_offer(context.command_args[0])
+        if offer is None:
+            return CommandResult(False, "INVALID_SECT_EXCHANGE", "没有这项宗门兑换物。", context.request_id)
+        operation_id = self._operation_id(context, "social.sect_exchange")
+        try:
+            record = await self.repository.exchange_sect_item(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                offer_key=offer.key,
+                operation_id=operation_id,
+            )
+        except SectExchangeDailyCapError:
+            return CommandResult(False, "SECT_EXCHANGE_DAILY_CAP", "今日宗门兑换次数已用尽。", context.request_id, operation_id)
+        except SectStockInsufficientError:
+            return CommandResult(False, "SECT_STOCK_INSUFFICIENT", "宗门仓库库存不足，未扣除贡献。", context.request_id, operation_id)
+        except SectContributionInsufficientError:
+            return CommandResult(False, "SECT_CONTRIBUTION_INSUFFICIENT", "个人宗门贡献不足，未扣除库存。", context.request_id, operation_id)
+        except SectExchangeInvalidOfferError:
+            return CommandResult(False, "INVALID_SECT_EXCHANGE", "没有这项宗门兑换物。", context.request_id, operation_id)
+        except SectNotFoundError:
+            return CommandResult(False, "SECT_NOT_FOUND", "你当前不在有效宗门中。", context.request_id, operation_id)
+        except (PlayerNotFoundError, PlayerSuspendedError):
+            return CommandResult(False, "PLAYER_NOT_FOUND", "当前角色不存在或暂时不可用。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他宗门兑换。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        replay = "（重复请求已回放）" if record.already_completed else ""
+        return CommandResult(
+            True,
+            "SECT_EXCHANGE_COMPLETED",
+            f"## 宗门兑换成功{replay}\n\n- **物品**：{record.label} ×{record.quantity}\n- **消耗贡献**：{record.contribution_spent}\n- **剩余贡献**：{record.member_contribution}",
+            context.request_id,
+            operation_id,
+            data={
+                "offer_key": record.offer_key,
+                "item_key": record.item_key,
+                "quantity": record.quantity,
+                "contribution_spent": record.contribution_spent,
+                "member_contribution": record.member_contribution,
+                "warehouse_quantity": record.warehouse_quantity,
+                "inventory_quantity": record.inventory_quantity,
+                "content_version": record.content_version,
+                "rule_version": record.rule_version,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def shop(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_SECT_EXCHANGE", "请使用 `宗门商店兑换 筑基护脉丹|金丹护脉丹|云铁|阵砂`。", context.request_id)
+        lines = ["## 宗门商店", "", "每位成员每日最多兑换 5 次；兑换会同时扣除个人宗门贡献和宗门仓库库存。", ""]
+        offers = []
+        for offer in SECT_EXCHANGE_OFFERS.values():
+            lines.append(f"- **{offer.label}**：贡献 {offer.contribution_cost} → ×{offer.quantity}")
+            offers.append({"offer_key": offer.key, "label": offer.label, "contribution_cost": offer.contribution_cost, "item_key": offer.item_key, "quantity": offer.quantity})
+        return CommandResult(True, "SECT_SHOP", "\n".join(lines), context.request_id, data={"offers": offers, "daily_cap": 5})
+
+    async def daily_build(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_SECT_SUPPLY", "请使用 `宗门每日建设`。", context.request_id)
+        return await self._supply_command(context, "social.sect_daily_build", self.repository.build_sect_daily, {}, "SECT_DAILY_BUILT")
+
+    async def donate(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 2:
+            return CommandResult(False, "INVALID_SECT_SUPPLY", "请使用 `宗门捐献 灵石|灵叶|止血草|阵砂|云铁 数量`。", context.request_id)
+        item_key = SECT_DONATION_ALIASES.get(context.command_args[0], context.command_args[0])
+        if context.command_args[0] == "灵石":
+            item_key = "spirit_stones"
+        try:
+            quantity = int(context.command_args[1])
+        except ValueError:
+            return CommandResult(False, "INVALID_SECT_SUPPLY", "捐献数量必须为整数。", context.request_id)
+        return await self._supply_command(context, "social.sect_donate", self.repository.donate_sect_asset, {"item_key": item_key, "quantity": quantity}, "SECT_DONATED")
+
+    async def procure(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_SECT_SUPPLY", "请使用 `宗门补给 筑基护脉丹|金丹护脉丹`。", context.request_id)
+        offer = resolve_sect_exchange_offer(context.command_args[0])
+        if offer is None or offer.key not in SECT_SUPPLY_RECIPES:
+            return CommandResult(False, "INVALID_SECT_SUPPLY", "没有这项宗门补给。", context.request_id)
+        return await self._supply_command(context, "social.sect_procure", self.repository.procure_sect_stock, {"offer_key": offer.key}, "SECT_STOCK_PROCURED")
+
+    async def _supply_command(self, context: CommandContext, name: str, method, params: dict, code: str) -> CommandResult:
+        operation_id = self._operation_id(context, name)
+        try:
+            record = await method(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id, **params)
+        except SectDailyBuildNotReadyError:
+            return CommandResult(False, "SECT_BUILD_NOT_READY", "今日需要先完成 3 次不同的探索或生产。", context.request_id, operation_id)
+        except SectDailyBuildAlreadyCompletedError:
+            return CommandResult(False, "SECT_BUILD_ALREADY_COMPLETED", "今日宗门建设已完成。", context.request_id, operation_id)
+        except SectPermissionDeniedError:
+            return CommandResult(False, "SECT_PERMISSION_DENIED", "只有宗主或副宗主可以补给仓库。", context.request_id, operation_id)
+        except SectWarehouseFullError:
+            return CommandResult(False, "SECT_WAREHOUSE_FULL", "宗门仓库格位已满。", context.request_id, operation_id)
+        except SectStockInsufficientError:
+            return CommandResult(False, "SECT_STOCK_INSUFFICIENT", "宗门仓库原料不足。", context.request_id, operation_id)
+        except ResourceInsufficientError:
+            return CommandResult(False, "RESOURCE_INSUFFICIENT", "原料或灵石不足。", context.request_id, operation_id)
+        except (SectSupplyItemInvalidError, SectExchangeInvalidOfferError):
+            return CommandResult(False, "INVALID_SECT_SUPPLY", "捐献或补给物品、数量不符合规则。", context.request_id, operation_id)
+        except SectNotFoundError:
+            return CommandResult(False, "SECT_NOT_FOUND", "你当前不在有效宗门中。", context.request_id, operation_id)
+        except (PlayerNotFoundError, PlayerSuspendedError):
+            return CommandResult(False, "PLAYER_NOT_FOUND", "当前角色不存在或暂时不可用。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他操作。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        label = {"SECT_DAILY_BUILT": "宗门建设完成", "SECT_DONATED": "宗门捐献完成", "SECT_STOCK_PROCURED": "宗门补给完成"}[code]
+        return CommandResult(True, code, f"## {label}", context.request_id, operation_id, data=record)
 
 
 __all__ = ["SectApplication"]

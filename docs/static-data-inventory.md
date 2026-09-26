@@ -170,7 +170,8 @@ data/
 
 ## 5. 已裁决的兼容问题
 
-1. `item.pill.foundation_guard` 只表示 v0.1 筑基失败保护丹；v0.2 金丹保护丹统一
+1. `item.pill.foundation_guard` 只表示 v0.1 筑基失败保护丹；v0.2 宗门商店固定兑换使用
+   `sect.exchange.foundation_guard`，正式库存由宗门原料和灵石补给产生，不接收绑定丹药捐献；金丹保护丹统一
    改为 `item.pill.golden_core_guard`，突破、配方、奖励、兑换和发布清单均使用新键。
 2. 示例装备统一使用正式键 `item.armor.cotton_robe`，不再使用 `item.basic_robe`。
 3. 战斗/探索中的“洞天材料 1–3”统一映射为灵叶/阵砂/铁石加权池，运行时配置位于

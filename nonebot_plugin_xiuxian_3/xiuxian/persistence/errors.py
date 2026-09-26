@@ -20,6 +20,38 @@ class PlayerSuspendedError(RuntimeError):
     """A suspended or deleted player cannot perform a write operation."""
 
 
+class SectExchangeInvalidOfferError(RuntimeError):
+    """The requested sect exchange offer is not registered in the content."""
+
+
+class SectExchangeDailyCapError(RuntimeError):
+    """The player has reached the daily sect exchange limit."""
+
+
+class SectStockInsufficientError(RuntimeError):
+    """The sect warehouse lacks the requested exchange item."""
+
+
+class SectContributionInsufficientError(RuntimeError):
+    """The member lacks enough personal sect contribution."""
+
+
+class SectDailyBuildNotReadyError(RuntimeError):
+    """Three settled actions today are required for sect construction."""
+
+
+class SectDailyBuildAlreadyCompletedError(RuntimeError):
+    """The member already completed construction today."""
+
+
+class SectWarehouseFullError(RuntimeError):
+    """A new item type would exceed the sect warehouse slot capacity."""
+
+
+class SectSupplyItemInvalidError(RuntimeError):
+    """This bound or unregistered item cannot be donated to a sect."""
+
+
 class DaoNameTakenError(RuntimeError):
     """The requested dao name is already used by another player."""
 

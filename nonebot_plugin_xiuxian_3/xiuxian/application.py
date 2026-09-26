@@ -794,6 +794,21 @@ class XiuxianApplication:
     async def get_sect_profile(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.social.get_profile(context), require_write=False)
 
+    async def get_sect_shop(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.social.shop(context), require_write=False)
+
+    async def exchange_sect_item(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.social.exchange_shop(context), write_message="当前事件不允许执行宗门兑换。")
+
+    async def build_sect_daily(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.social.daily_build(context), write_message="当前事件不允许宗门建设。")
+
+    async def donate_sect_asset(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.social.donate(context), write_message="当前事件不允许宗门捐献。")
+
+    async def procure_sect_stock(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.social.procure(context), write_message="当前事件不允许宗门补给。")
+
     async def get_sect_war(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.sect_war.get(context), require_write=False)
 

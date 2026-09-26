@@ -34,6 +34,8 @@ from ..production.endgame_repository import EndgameProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
 from ..livelihood.repository import LivelihoodRepositoryMixin
 from ..social.sect_repository import SectRepositoryMixin
+from ..social.sect_exchange_repository import SectExchangeRepositoryMixin
+from ..social.sect_supply_repository import SectSupplyRepositoryMixin
 from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
 from ..social.sect_war_repository import SectWarRepositoryMixin
@@ -92,6 +94,8 @@ class SQLitePlayerRepository(
     EndgameProductionRepositoryMixin,
     LivelihoodRepositoryMixin,
     SectRepositoryMixin,
+    SectExchangeRepositoryMixin,
+    SectSupplyRepositoryMixin,
     PartyRepositoryMixin,
     MentorRepositoryMixin,
     SectWarRepositoryMixin,

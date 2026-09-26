@@ -777,6 +777,18 @@ CREATE TABLE IF NOT EXISTS sect_contribution_events (
 CREATE INDEX IF NOT EXISTS idx_sect_contribution_events_window
     ON sect_contribution_events(player_id, occurred_at);
 
+CREATE TABLE IF NOT EXISTS sect_warehouse_supply_events (
+    operation_id TEXT PRIMARY KEY REFERENCES operations(operation_id),
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    action_key TEXT NOT NULL CHECK (action_key IN ('donate_item', 'donate_stones', 'procure')),
+    snapshot_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sect_supply_events_sect
+    ON sect_warehouse_supply_events(sect_id, created_at);
+
 CREATE TABLE IF NOT EXISTS sect_applications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     application_id TEXT NOT NULL UNIQUE,
