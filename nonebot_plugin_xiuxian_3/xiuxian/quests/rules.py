@@ -20,6 +20,7 @@ VOID_TRIAL_TARGET = 3
 
 DAO_UNION_QUEST = "quest.dao_union"
 DAO_UNION_FRAGMENT_REWARD = 12
+DAO_UNION_TRIBULATION_TOKEN_REWARD = 1
 DAO_UNION_CONTENT_VERSION = "content-0.6"
 DAO_UNION_RULE_VERSION = "quests-0.6.1"
 DAO_UNION_MAINLINE = "three_realm_mainline"
@@ -42,9 +43,9 @@ DAO_ORIGIN_TASKS = (DAO_ORIGIN_GUARD, DAO_ORIGIN_BUILD, DAO_ORIGIN_TEACH)
 DAO_ORIGIN_TARGET = 3
 # These values close the documented 1,000/1,000 endgame resource path.
 DAO_ORIGIN_REWARDS = {
-    DAO_ORIGIN_GUARD: {"dao_fruit_progress": 150, "ascension_merit": 150},
-    DAO_ORIGIN_BUILD: {"dao_fruit_progress": 160, "ascension_merit": 150},
-    DAO_ORIGIN_TEACH: {"dao_fruit_progress": 160, "ascension_merit": 150},
+    DAO_ORIGIN_GUARD: {"dao_fruit_progress": 150, "ascension_merit": 150, "item.tribulation_token": 1},
+    DAO_ORIGIN_BUILD: {"dao_fruit_progress": 160, "ascension_merit": 150, "item.tribulation_token": 1},
+    DAO_ORIGIN_TEACH: {"dao_fruit_progress": 160, "ascension_merit": 150, "item.tribulation_token": 1},
 }
 DAO_ORIGIN_WORLD_MERIT = {
     DAO_ORIGIN_GUARD: 300,
@@ -104,6 +105,7 @@ __all__ = [
     "DAO_UNION_MAINLINE_STAGE_KEYS",
     "DAO_UNION_MAINLINE_STORY_KEY",
     "DAO_UNION_QUEST",
+    "DAO_UNION_TRIBULATION_TOKEN_REWARD",
     "DAO_UNION_RULE_VERSION",
     "DAO_UNION_WORK",
     "meets_realm",

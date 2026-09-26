@@ -1534,7 +1534,10 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                     runtime, adapter, user, 64202, "领取合道许可"
                 )
                 assert permit.code == "QUEST_PERMIT_GRANTED"
-                assert permit.data["reward"] == {"item.dao_fruit_fragment": 12}
+                assert permit.data["reward"] == {
+                    "item.dao_fruit_fragment": 12,
+                    "item.tribulation_token": 1,
+                }
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     merit_before_union = int(connection.execute(
                         "SELECT world_merit FROM players WHERE platform=? AND platform_user_id=?",
@@ -1552,7 +1555,9 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                 assert final_state[0:2] == ("dao_union", 1)
                 assert int(final_state[2]) >= 0
                 assert int(final_state[3]) == merit_before_union - 2_000
-                assert json.loads(final_state[4]).get("item.dao_fruit_fragment") == 2
+                final_inventory = json.loads(final_state[4])
+                assert final_inventory.get("item.dao_fruit_fragment") == 2
+                assert final_inventory.get("item.tribulation_token") == 1
                 await runtime.close()
 
     asyncio.run(run())

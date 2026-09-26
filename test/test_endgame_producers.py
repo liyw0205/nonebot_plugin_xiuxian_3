@@ -166,6 +166,7 @@ def test_dao_origin_resource_closure_and_qq_onebot_task_producers() -> None:
                         else:
                             assert completed.data["reward"]["dao_fruit_progress"] == DAO_ORIGIN_REWARDS[task_key]["dao_fruit_progress"]
                             assert completed.data["reward"]["ascension_merit"] == DAO_ORIGIN_REWARDS[task_key]["ascension_merit"]
+                            assert completed.data["reward"]["item.tribulation_token"] == 1
                             assert completed.data["reward"]["world_merit"] > 0
                         replay = await runtime.dispatch(
                             _ctx(adapter, user, operation), f"完成道源任务 {label}"
@@ -178,7 +179,7 @@ def test_dao_origin_resource_closure_and_qq_onebot_task_producers() -> None:
 
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     resources = connection.execute(
-                        "SELECT dao_fruit_progress, ascension_merit, world_merit FROM players WHERE platform = ? AND platform_user_id = ?",
+                        "SELECT dao_fruit_progress, ascension_merit, world_merit, inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
                         (adapter, user),
                     ).fetchone()
                     event_count = connection.execute(
@@ -200,7 +201,8 @@ def test_dao_origin_resource_closure_and_qq_onebot_task_producers() -> None:
                         "AND quest_key IN ('task.dao_origin.guard', 'task.dao_origin.build', 'task.dao_origin.teach')",
                         (adapter, user),
                     ).fetchall()
-                assert resources == (470, 450, 1_000)
+                assert resources[:3] == (470, 450, 1_000)
+                assert json.loads(resources[3]).get("item.tribulation_token") == 3
                 assert event_count == 9
                 assert {tuple(row) for row in event_versions} == {("content-0.6", "events-0.6.0")}
                 assert {tuple(row) for row in progress_versions} == {("content-0.6", "events-0.6.0")}
@@ -429,12 +431,18 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
                     _ctx(adapter, user, f"{user}-dao-permit"), "领取合道许可"
                 )
                 assert permit.code == "QUEST_PERMIT_GRANTED"
-                assert permit.data["reward"] == {"item.dao_fruit_fragment": 12}
+                assert permit.data["reward"] == {
+                    "item.dao_fruit_fragment": 12,
+                    "item.tribulation_token": 1,
+                }
                 permit_replay = await runtime.dispatch(
                     _ctx(adapter, user, f"{user}-dao-permit"), "领取合道许可"
                 )
                 assert permit_replay.data["idempotent_replay"] is True
-                assert permit_replay.data["reward"] == {"item.dao_fruit_fragment": 12}
+                assert permit_replay.data["reward"] == {
+                    "item.dao_fruit_fragment": 12,
+                    "item.tribulation_token": 1,
+                }
                 union = await runtime.dispatch(
                     _ctx(adapter, user, f"{user}-begin-union"), "开始合道"
                 )
@@ -585,7 +593,10 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                     _ctx(adapter, user, f"permit-{adapter}"), "领取合道许可"
                 )
                 assert permit.code == "QUEST_PERMIT_GRANTED"
-                assert permit.data["reward"] == {"item.dao_fruit_fragment": 12}
+                assert permit.data["reward"] == {
+                    "item.dao_fruit_fragment": 12,
+                    "item.tribulation_token": 1,
+                }
                 assert permit.data["snapshot"]["path_key"] == "body"
                 assert permit.data["snapshot"]["components"] == {
                     "three_realm_mainline": 1,
@@ -596,7 +607,15 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                     _ctx(adapter, user, f"permit-{adapter}"), "领取合道许可"
                 )
                 assert replay.data["idempotent_replay"] is True
-                assert replay.data["reward"] == {"item.dao_fruit_fragment": 12}
+                assert replay.data["reward"] == {
+                    "item.dao_fruit_fragment": 12,
+                    "item.tribulation_token": 1,
+                }
+                token_listing = await runtime.dispatch(
+                    _ctx(adapter, user, f"token-market-{adapter}"),
+                    "发布摆摊 item.tribulation_token 1 1",
+                )
+                assert token_listing.code == "MARKET_ITEM_FORBIDDEN"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     state = connection.execute(
                         "SELECT intro_json, inventory_json FROM players WHERE id = ?", (player_id,)
@@ -613,6 +632,7 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                     ).fetchone()
                 assert "quest.dao_union" in json.loads(state[0])["flags"]
                 assert json.loads(state[1]).get("item.dao_fruit_fragment") == 12
+                assert json.loads(state[1]).get("item.tribulation_token") == 1
                 assert json.loads(state[1]).get("item.masterwork.body", 0) == 0
                 assert {tuple(row) for row in event_versions} == {("content-0.6", "quests-0.6.1")}
                 assert tuple(progress_version) == ("content-0.6", "quests-0.6.1")

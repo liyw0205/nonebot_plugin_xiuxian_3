@@ -36,6 +36,7 @@ from .rules import (
     DAO_UNION_MAINLINE_STORY_KEY,
     DAO_UNION_QUEST,
     DAO_UNION_RULE_VERSION,
+    DAO_UNION_TRIBULATION_TOKEN_REWARD,
     DAO_UNION_WORK,
     meets_realm,
 )
@@ -313,19 +314,27 @@ class EndgameQuestRepositoryMixin:
             ).fetchone()
             if existing is not None and str(existing["status"]) in {"completed", "claimed"}:
                 raise QuestAlreadyCompletedError("dao union qualification is already claimed")
+            qualification_reward = {
+                "item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD,
+                "item.tribulation_token": DAO_UNION_TRIBULATION_TOKEN_REWARD,
+            }
             snapshot = {
                 "path_key": player["path_key"],
                 "subprofession_key": player["subprofession_key"],
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": int(player["realm_layer"]),
                 "components": progress,
-                "reward": {"item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD},
+                "reward": qualification_reward,
                 "content_version": DAO_UNION_CONTENT_VERSION,
                 "rule_version": DAO_UNION_RULE_VERSION,
             }
             inventory = self._json_object(player["inventory_json"], {})
             inventory["item.dao_fruit_fragment"] = (
                 int(inventory.get("item.dao_fruit_fragment", 0)) + DAO_UNION_FRAGMENT_REWARD
+            )
+            inventory["item.tribulation_token"] = (
+                int(inventory.get("item.tribulation_token", 0))
+                + DAO_UNION_TRIBULATION_TOKEN_REWARD
             )
             flags_state = self._json_object(player["intro_json"], {})
             flags = set(str(item) for item in flags_state.get("flags", []))
@@ -359,7 +368,7 @@ class EndgameQuestRepositoryMixin:
                 "status": "completed",
                 "progress": progress,
                 "snapshot": snapshot,
-                "reward": {"item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD},
+                "reward": qualification_reward,
             }
             self._insert_operation(
                 connection,
@@ -405,9 +414,22 @@ class EndgameQuestRepositoryMixin:
             count += 1
             reward = dict(DAO_ORIGIN_REWARDS[task_key]) if count == DAO_ORIGIN_TARGET else {}
             world_merit_reward = DAO_ORIGIN_WORLD_MERIT[task_key] if count == DAO_ORIGIN_TARGET else 0
+            inventory = self._json_object(player["inventory_json"], {})
+            token_reward = int(reward.get("item.tribulation_token", 0))
+            if token_reward:
+                inventory["item.tribulation_token"] = (
+                    int(inventory.get("item.tribulation_token", 0)) + token_reward
+                )
             connection.execute(
-                "UPDATE players SET dao_fruit_progress = dao_fruit_progress + ?, ascension_merit = ascension_merit + ?, world_merit = world_merit + ?, updated_at = ? WHERE id = ?",
-                (int(reward.get("dao_fruit_progress", 0)), int(reward.get("ascension_merit", 0)), world_merit_reward, now_text, player["id"]),
+                "UPDATE players SET dao_fruit_progress = dao_fruit_progress + ?, ascension_merit = ascension_merit + ?, world_merit = world_merit + ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (
+                    int(reward.get("dao_fruit_progress", 0)),
+                    int(reward.get("ascension_merit", 0)),
+                    world_merit_reward,
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                    player["id"],
+                ),
             )
             if world_merit_reward:
                 reward["world_merit"] = world_merit_reward

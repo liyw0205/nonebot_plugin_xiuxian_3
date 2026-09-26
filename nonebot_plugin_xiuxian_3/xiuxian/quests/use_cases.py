@@ -232,7 +232,7 @@ class QuestApplication:
         return CommandResult(
             True,
             "QUEST_PERMIT_GRANTED",
-            "## 合道许可已获得\n\n资格快照已冻结，并获得 12 枚道果碎片，可用于合道与道源门行程。",
+            "## 合道许可已获得\n\n资格快照已冻结，并获得 12 枚道果碎片与 1 张天劫凭证。",
             context.request_id,
             operation_id,
             data={
