@@ -35,6 +35,7 @@ from .rules import (
     CONTENT_VERSION,
     BEAST_GUARDIAN,
     DEMON_OVERLORD,
+    DEMON_RUINS_SCOUT,
     DEMON_WAR_FRONT,
     DEFEAT_COOLDOWN_SECONDS,
     MAX_TURNS,
@@ -42,6 +43,7 @@ from .rules import (
     TURN_TIMEOUT_SECONDS,
     V03_CONTENT_VERSION,
     V03_RULE_VERSION,
+    V031_RULE_VERSION,
     battle_roll_bp,
     enemy_definition,
     hit_chance_bp,
@@ -201,9 +203,19 @@ class CombatRepositoryMixin:
         exploration_id: str | None = None,
     ) -> BattleStartRecord:
         enemy = enemy_definition(enemy_key)
-        v03_enemy_keys = {DEMON_OVERLORD.key, BEAST_GUARDIAN.key, DEMON_WAR_FRONT.key}
+        v03_enemy_keys = {
+            DEMON_OVERLORD.key,
+            DEMON_RUINS_SCOUT.key,
+            BEAST_GUARDIAN.key,
+            DEMON_WAR_FRONT.key,
+        }
         battle_content_version = V03_CONTENT_VERSION if enemy.key in v03_enemy_keys else CONTENT_VERSION
-        battle_rule_version = V03_RULE_VERSION if enemy.key in v03_enemy_keys else RULE_VERSION
+        if enemy.key == DEMON_RUINS_SCOUT.key:
+            battle_rule_version = V031_RULE_VERSION
+        elif enemy.key in v03_enemy_keys:
+            battle_rule_version = V03_RULE_VERSION
+        else:
+            battle_rule_version = RULE_VERSION
         operation_name = "battle.start" if battle_type == "pve.training" else f"battle.start.{battle_type}"
         request_hash = self._request_hash(
             operation_name,

@@ -36,7 +36,7 @@ BATTLE_ENEMY_BY_MODE = {
     "explore.mist_grotto": "enemy.mist_guardian",
     "explore.cloud_mine": "enemy.cloud_beast",
     "explore.mist_grotto_2": "enemy.mist_elite",
-    "explore.demon_abyss": "enemy.demon_overlord",
+    "explore.demon_abyss": "enemy.demon_ruins_scout",
     "explore.beast_hunt": "enemy.beast_guardian",
     "explore.ancestral_lake": "enemy.ancestral_spirit",
 }

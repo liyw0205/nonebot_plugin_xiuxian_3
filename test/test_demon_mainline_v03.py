@@ -26,6 +26,10 @@ async def _player(runtime, adapter: str, user: str, *, flag: bool = True) -> Non
         adapter, _context(adapter, user, f"create-{user}"), "开始修仙"
     )
     assert created.ok
+    sought = await runtime.adapters.dispatch(
+        adapter, _context(adapter, user, f"seek-{user}"), "寻仙问道"
+    )
+    assert sought.ok
     flags = ["access.demon_abyss_gate"] if flag else []
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
@@ -33,12 +37,11 @@ async def _player(runtime, adapter: str, user: str, *, flag: bool = True) -> Non
             UPDATE players
             SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
                 location_key='demon.abyss_gate', stamina=100, stamina_max=100,
-                energy=100, energy_max=100, max_hp=100000, initiative=100000,
-                qualification_json=?, faction_reputation_json=?, intro_json=?
+                energy=100, energy_max=100, max_hp=600,
+                faction_reputation_json=?, intro_json=?
             WHERE platform=? AND platform_user_id=?
             """,
             (
-                json.dumps({"body": 100000, "agility": 100000}),
                 json.dumps({"demon": 200}),
                 json.dumps({"flags": flags}),
                 adapter,
@@ -124,6 +127,22 @@ def test_demon_mainline_requires_server_evidence_and_unlocks_both_adapters() -> 
                     )
                     assert settled.code == "EXPLORATION_SETTLED"
                     assert settled.data["battle_outcome"] == "won"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        enemy_key, rule_version, snapshot_text = connection.execute(
+                            "SELECT enemy_key, rule_version, snapshot_json FROM battle_sessions WHERE battle_id=?",
+                            (settled.data["battle_id"],),
+                        ).fetchone()
+                        qualification_text = connection.execute(
+                            "SELECT qualification_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                    battle_snapshot = json.loads(snapshot_text)
+                    qualification = json.loads(qualification_text)
+                    assert enemy_key == "enemy.demon_ruins_scout"
+                    assert rule_version == "combat-0.3.1"
+                    assert battle_snapshot["player"]["stats"]["max_hp"] == 600
+                    assert battle_snapshot["player"]["stats"]["attack"] == 10 + qualification["body"] // 2
+                    assert battle_snapshot["player"]["cross_realm_penalty_bp"] == 1000
 
                 claim = await runtime.adapters.dispatch(
                     adapter,

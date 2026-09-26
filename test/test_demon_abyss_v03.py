@@ -249,7 +249,7 @@ def test_demon_abyss_reputation_reward_is_snapshotted_and_projected() -> None:
             assert json.loads(faction_text)["demon"] == 15
             assert battle_id == settled.data["battle_id"]
             assert content_version == "content-0.3"
-            assert rule_version == "combat-0.3.0"
+            assert rule_version == "combat-0.3.1"
             assert json.loads(snapshot_text)["player"]["cross_realm_penalty_bp"] == 1000
 
             replay = await runtime.adapters.dispatch(

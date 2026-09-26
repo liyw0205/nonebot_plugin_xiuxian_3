@@ -11,6 +11,7 @@ CONTENT_VERSION = "content-0.1"
 RULE_VERSION = "combat-0.1.0"
 V03_CONTENT_VERSION = "content-0.3"
 V03_RULE_VERSION = "combat-0.3.0"
+V031_RULE_VERSION = "combat-0.3.1"
 MAX_TURNS = 20
 TURN_TIMEOUT_SECONDS = 60
 DEFEAT_COOLDOWN_SECONDS = 15 * 60
@@ -136,6 +137,21 @@ DEMON_OVERLORD = EnemyDefinition(
     agility=24,
     skill_key="skill.demonic.abyss_communion",
     random_pool="combat.demon_overlord.v0.3",
+    reward={},
+)
+
+DEMON_RUINS_SCOUT = EnemyDefinition(
+    key="enemy.demon_ruins_scout",
+    label="堕落遗迹巡守魔傀",
+    location_key="demon.fallen_ruins",
+    required_realm="nascent_soul",
+    required_layer=1,
+    max_hp=120,
+    attack=20,
+    initiative=8,
+    agility=8,
+    skill_key="enemy_skill.scratch",
+    random_pool="combat.demon_ruins_scout.v0.3.1",
     reward={},
 )
 
@@ -271,6 +287,7 @@ ENEMIES = {
     CLOUD_BEAST.key: CLOUD_BEAST,
     MIST_ELITE.key: MIST_ELITE,
     DEMON_OVERLORD.key: DEMON_OVERLORD,
+    DEMON_RUINS_SCOUT.key: DEMON_RUINS_SCOUT,
     BEAST_GUARDIAN.key: BEAST_GUARDIAN,
     BEAST_ANCESTOR.key: BEAST_ANCESTOR,
     ANCESTRAL_SPIRIT.key: ANCESTRAL_SPIRIT,
@@ -350,6 +367,7 @@ __all__ = [
     "DEFEAT_COOLDOWN_SECONDS",
     "V03_CONTENT_VERSION",
     "V03_RULE_VERSION",
+    "V031_RULE_VERSION",
     "ENEMIES",
     "MAX_TURNS",
     "RULE_VERSION",
@@ -357,6 +375,7 @@ __all__ = [
     "EnemyDefinition",
     "CLOUD_BEAST",
     "DEMON_OVERLORD",
+    "DEMON_RUINS_SCOUT",
     "BEAST_GUARDIAN",
     "BEAST_ANCESTOR",
     "ANCESTRAL_SPIRIT",

@@ -16,6 +16,11 @@
 `member_status`、神魂、复起次数和贡献；倒地成员最多复起一次，复起由服务端原子扣除队友 25 点神魂并写入回放。
 境界、地点或已有行动锁任一前置不满足时，不创建会话，也不能生成任务资格证据。
 
+魔界堕落遗迹外层的单人探索使用 `enemy.demon_ruins_scout`，内容快照为 `content-0.3`、
+战斗规则为 `combat-0.3.1`；它是为元婴单人探索/主线证据设置的巡守遭遇。`enemy.demon_overlord`
+保留 `8000` 气血、`520` 攻击和 `combat-0.3.0`，只由有权限的 2–5 人魔渊副本启动，
+不作为单人主线证据战。
+
 ## 错误码
 
 `BATTLE_NOT_FOUND`、`BATTLE_BUSY`、`BATTLE_REQUIREMENT_MISSING`、`SKILL_NOT_AVAILABLE`、`TARGET_INVALID`、`RESOURCE_INSUFFICIENT`、`BATTLE_EXPIRED`、`BATTLE_ALREADY_SETTLED`。
