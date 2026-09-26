@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
@@ -156,7 +157,7 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
     asyncio.run(run())
 
 
-def test_qq_and_onebot_can_reach_nascent_soul_from_new_player() -> None:
+def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
@@ -706,6 +707,328 @@ def test_qq_and_onebot_can_reach_nascent_soul_from_new_player() -> None:
                 soul_break = await _dispatch(runtime, adapter, user, 2536, "结算突破")
                 assert soul_break.code == "BREAKTHROUGH_SUCCEEDED", soul_break.message
                 assert soul_break.data["target_realm"] == "nascent_soul"
+
+                # The post-nascent path is intentionally driven by public
+                # commands.  Only the second adapter's helper is a controlled
+                # combat collaborator; the primary player's progression is
+                # never patched in SQL.
+                for stage in range(1, 6):
+                    started_mainline = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        2600 + stage * 2,
+                        f"开始三界主线 共生 {stage}",
+                    )
+                    assert started_mainline.code == "THREE_REALMS_STAGE_STARTED"
+                    claimed_mainline = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        2601 + stage * 2,
+                        f"领取三界主线奖励 共生 {stage}",
+                    )
+                    assert claimed_mainline.code == "THREE_REALMS_STAGE_CLAIMED"
+                assert claimed_mainline.data["reward"].get("faction_reputation.beast") == 1000
+
+                for commission in range(3):
+                    completed_commission = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        2620 + commission,
+                        "完成领域委托",
+                    )
+                    assert completed_commission.data["progress"]["completed"] == commission + 1
+
+                # Travel to the beast realm before creating the helper party.
+                clock.advance(hours=10)
+                await _dispatch(runtime, adapter, user, 2639, "恢复状态")
+                await _dispatch(runtime, adapter, user, 2640, "前往 云舟渡口")
+                clock.advance(minutes=1)
+                await _dispatch(runtime, adapter, user, 2641, "结算移动")
+                await _dispatch(runtime, adapter, user, 2642, "前往 万兽山")
+                clock.advance(minutes=5)
+                await _dispatch(runtime, adapter, user, 2643, "结算移动")
+
+                helper_adapter = "onebot.v11" if adapter == "qq.official" else "qq.official"
+                helper = f"combat-helper-{adapter}"
+                await _dispatch(runtime, helper_adapter, helper, 2650, "开始修仙")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        """
+                        UPDATE players
+                        SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
+                            location_key='beast.ten_thousand_hills', cultivation=190000,
+                            total_cultivation=248960, max_hp=100000, initiative=100000,
+                            stamina=100, stamina_max=100, energy=100, energy_max=100,
+                            soul_power=300, soul_power_max=300,
+                            qualification_json=?, faction_reputation_json=?, intro_json=?, inventory_json=?
+                        WHERE platform=? AND platform_user_id=?
+                        """,
+                        (
+                            json.dumps({"body": 20000, "agility": 20000, "spirit": 30, "root": 30, "insight": 30, "fortune": 10}),
+                            json.dumps({"beast": 200}),
+                            json.dumps({"flags": ["story.mainline.three_realms"]}),
+                            json.dumps({"item.soul_crystal": 100}),
+                            helper_adapter,
+                            helper,
+                        ),
+                    )
+
+                clock.advance(hours=10)
+                await _dispatch(runtime, adapter, user, 2660, "恢复状态")
+                await _dispatch(runtime, helper_adapter, helper, 2661, "恢复状态")
+                helper_party = await runtime.adapters.dispatch(
+                    helper_adapter,
+                    _context(helper_adapter, helper, "beast-party-create"),
+                    "创建万兽队伍",
+                )
+                assert helper_party.code == "PARTY_CREATED"
+                party_id = str(helper_party.data["party_id"])
+                invited = await runtime.adapters.dispatch(
+                    helper_adapter,
+                    _context(helper_adapter, helper, "beast-party-invite"),
+                    f"邀请入队 {adapter}:{user}",
+                )
+                assert invited.code == "PARTY_INVITED"
+                joined = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "beast-party-accept"),
+                    f"接受入队 {party_id}",
+                )
+                assert joined.code == "PARTY_JOINED"
+                for member_adapter, member in ((helper_adapter, helper), (adapter, user)):
+                    confirmed = await runtime.adapters.dispatch(
+                        member_adapter,
+                        _context(member_adapter, member, f"beast-party-confirm-{member_adapter}"),
+                        f"确认入队 {party_id}",
+                    )
+                    assert confirmed.ok, confirmed
+
+                # Each win contributes +15 beast reputation and +20 world
+                # merit.  This closes both breakthrough resource gates from
+                # server-settled party evidence rather than a state fixture.
+                for battle_index in range(67):
+                    if battle_index:
+                        await _dispatch(runtime, helper_adapter, helper, 2662 + battle_index * 3, "退出队伍")
+                        await _dispatch(runtime, adapter, user, 2663 + battle_index * 3, "退出队伍")
+                        clock.advance(hours=10)
+                        await _dispatch(runtime, adapter, user, 2670 + battle_index * 3, "恢复状态")
+                        await _dispatch(runtime, helper_adapter, helper, 2671 + battle_index * 3, "恢复状态")
+                        helper_party = await runtime.adapters.dispatch(
+                            helper_adapter,
+                            _context(helper_adapter, helper, f"beast-party-create-{battle_index}"),
+                            "创建万兽队伍",
+                        )
+                        assert helper_party.code == "PARTY_CREATED"
+                        party_id = str(helper_party.data["party_id"])
+                        await _dispatch(
+                            runtime,
+                            helper_adapter,
+                            helper,
+                            2672 + battle_index * 3,
+                            f"邀请入队 {adapter}:{user}",
+                        )
+                        await _dispatch(runtime, adapter, user, 2673 + battle_index * 3, f"接受入队 {party_id}")
+                        for member_adapter, member in ((helper_adapter, helper), (adapter, user)):
+                            confirmed = await _dispatch(
+                                runtime,
+                                member_adapter,
+                                member,
+                                2674 + battle_index * 3 if member_adapter == helper_adapter else 2675 + battle_index * 3,
+                                f"确认入队 {party_id}",
+                            )
+                            assert confirmed.ok
+                    battle = await runtime.adapters.dispatch(
+                        helper_adapter,
+                        _context(helper_adapter, helper, f"beast-battle-{battle_index}"),
+                        f"开始队伍战斗 {party_id}",
+                    )
+                    assert battle.code == "PARTY_BATTLE_SETTLED", (battle_index, battle.code, battle.message)
+                    assert battle.data["outcome"] == "won"
+
+                await _dispatch(runtime, helper_adapter, helper, 2880, "退出队伍")
+                await _dispatch(runtime, adapter, user, 2881, "退出队伍")
+
+                # Put both players in the boundary realm for the three
+                # personally participated victories used by the ancient-line
+                # quest.  The normal movement command is used for the real
+                # player; the helper uses the same public route as well.
+                clock.advance(hours=10)
+                await _dispatch(runtime, adapter, user, 2890, "恢复状态")
+                await _dispatch(runtime, helper_adapter, helper, 2891, "恢复状态")
+                for move_adapter, move_user, offset in (
+                    (adapter, user, 2892),
+                    (helper_adapter, helper, 2894),
+                ):
+                    await _dispatch(runtime, move_adapter, move_user, offset, "前往 界隙秘境")
+                    clock.advance(minutes=10)
+                    await _dispatch(runtime, move_adapter, move_user, offset + 1, "结算移动")
+                clock.advance(hours=15)
+                await _dispatch(runtime, adapter, user, 2896, "恢复状态")
+                await _dispatch(runtime, helper_adapter, helper, 2897, "恢复状态")
+
+                boundary_party = await runtime.adapters.dispatch(
+                    helper_adapter,
+                    _context(helper_adapter, helper, "boundary-party-create"),
+                    "创建界隙队伍",
+                )
+                assert boundary_party.code == "PARTY_CREATED"
+                boundary_id = str(boundary_party.data["party_id"])
+                await _dispatch(
+                    runtime,
+                    helper_adapter,
+                    helper,
+                    2900,
+                    f"邀请入队 {adapter}:{user}",
+                )
+                await _dispatch(runtime, adapter, user, 2901, f"接受入队 {boundary_id}")
+                for member_adapter, member in ((helper_adapter, helper), (adapter, user)):
+                    confirmed = await _dispatch(
+                        runtime,
+                        member_adapter,
+                        member,
+                        2902 if member_adapter == helper_adapter else 2903,
+                        f"确认入队 {boundary_id}",
+                    )
+                    assert confirmed.ok
+                assert confirmed.data["ready"] is True or confirmed.data["status"] == "ready"
+
+                boundary_battles: list[str] = []
+                for battle_index in range(3):
+                    if battle_index:
+                        await _dispatch(runtime, helper_adapter, helper, 2905 + battle_index * 8, "退出队伍")
+                        await _dispatch(runtime, adapter, user, 2906 + battle_index * 8, "退出队伍")
+                        clock.advance(hours=15)
+                        await _dispatch(runtime, adapter, user, 2910 + battle_index * 2, "恢复状态")
+                        await _dispatch(runtime, helper_adapter, helper, 2911 + battle_index * 2, "恢复状态")
+                        boundary_party = await runtime.adapters.dispatch(
+                            helper_adapter,
+                            _context(helper_adapter, helper, f"boundary-party-create-{battle_index}"),
+                            "创建界隙队伍",
+                        )
+                        assert boundary_party.code == "PARTY_CREATED"
+                        boundary_id = str(boundary_party.data["party_id"])
+                        await _dispatch(
+                            runtime,
+                            helper_adapter,
+                            helper,
+                            2912 + battle_index * 8,
+                            f"邀请入队 {adapter}:{user}",
+                        )
+                        await _dispatch(runtime, adapter, user, 2913 + battle_index * 8, f"接受入队 {boundary_id}")
+                        for member_adapter, member in ((helper_adapter, helper), (adapter, user)):
+                            confirmed = await _dispatch(
+                                runtime,
+                                member_adapter,
+                                member,
+                                2914 + battle_index * 8 if member_adapter == helper_adapter else 2915 + battle_index * 8,
+                                f"确认入队 {boundary_id}",
+                            )
+                            assert confirmed.ok
+                    battle = await runtime.adapters.dispatch(
+                        helper_adapter,
+                        _context(helper_adapter, helper, f"boundary-battle-{battle_index}"),
+                        f"开始队伍战斗 {boundary_id}",
+                    )
+                    assert battle.code == "PARTY_BATTLE_SETTLED", battle.message
+                    assert battle.data["outcome"] == "won"
+                    boundary_battles.append(str(battle.data["battle_id"]))
+                    evidence = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        2920 + battle_index,
+                        f"完成远古洞天任务 {boundary_battles[-1]}",
+                    )
+                    assert evidence.data["progress"]["success"] == battle_index + 1
+
+                await _dispatch(runtime, helper_adapter, helper, 2928, "退出队伍")
+                await _dispatch(runtime, adapter, user, 2929, "退出队伍")
+                cross_realm = await _dispatch(runtime, adapter, user, 2930, "开始跨界战")
+                assert cross_realm.data["outcome"] == "won"
+                permit = await _dispatch(runtime, adapter, user, 2931, "领取化神许可")
+                assert permit.code == "QUEST_PERMIT_GRANTED"
+
+                # Soul refinement is limited to two sessions per UTC day and
+                # supplies +5,000 cultivation per session for this character.
+                # Advance the injected clock between days and recover through
+                # the same public command used by players.
+                soul_ready = False
+                for day in range(60):
+                    if day:
+                        clock.advance(days=1)
+                    clock.advance(hours=10)
+                    await _dispatch(runtime, adapter, user, 2940 + day, "恢复状态")
+                    for slot in range(2):
+                        started_refinement = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            3000 + day * 2 + slot,
+                            "开始修炼 神魂淬炼",
+                        )
+                        assert started_refinement.code == "CULTIVATION_STARTED"
+                        clock.advance(minutes=30)
+                        settled_refinement = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            3100 + day * 2 + slot,
+                            "结算修炼",
+                        )
+                        assert settled_refinement.data["soul_power_gain"] == 50
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        realm, layer, cultivation, total_cultivation = connection.execute(
+                            "SELECT realm_key, realm_layer, cultivation, total_cultivation FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                    threshold = next_layer_threshold(realm, layer)
+                    if threshold is not None and cultivation >= threshold:
+                        await _dispatch(runtime, adapter, user, 5000 + day * 2, "晋升境界")
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            realm, layer, cultivation, total_cultivation = connection.execute(
+                                "SELECT realm_key, realm_layer, cultivation, total_cultivation FROM players WHERE platform=? AND platform_user_id=?",
+                                (adapter, user),
+                            ).fetchone()
+                    if realm == "nascent_soul" and layer == 10 and cultivation >= 190000 and total_cultivation >= 248960:
+                        soul_ready = True
+                        break
+                assert soul_ready
+
+                # The breakthrough also requires 20,000 spirit stones.  Daily
+                # check-in is a real player-facing source; the clock makes the
+                # long-running accumulation deterministic without wall time.
+                stones_ready = False
+                for day in range(1000):
+                    clock.advance(days=1)
+                    await _dispatch(runtime, adapter, user, 3200 + day, "道历问安")
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        spirit_stones = connection.execute(
+                            "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                    if spirit_stones >= 20000:
+                        stones_ready = True
+                        break
+                assert stones_ready
+
+                soul_break_operation = next(
+                    f"{adapter}-soul-break-{candidate}"
+                    for candidate in range(1000)
+                    if breakthrough_roll_bp(f"{adapter}-soul-break-{candidate}") < 6500
+                )
+                started_soul_transformation = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "soul-transformation-start", soul_break_operation),
+                    "开始突破 化神",
+                )
+                assert started_soul_transformation.code == "BREAKTHROUGH_STARTED", started_soul_transformation.message
+                clock.advance(minutes=10)
+                transformed = await _dispatch(runtime, adapter, user, 4300, "结算突破")
+                assert transformed.code == "BREAKTHROUGH_SUCCEEDED", transformed.message
+                assert transformed.data["target_realm"] == "soul_transformation"
                 await runtime.close()
 
     asyncio.run(run())
