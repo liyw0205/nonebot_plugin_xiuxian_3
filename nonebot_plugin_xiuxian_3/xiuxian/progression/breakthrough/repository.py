@@ -589,6 +589,7 @@ class BreakthroughRepositoryMixin:
                 "base_success_bp": definition.base_success_bp,
                 "required_foundation_quality": definition.required_foundation_quality,
                 "foundation_quality": foundation_quality,
+                "foundation_quality_on_success": max(foundation_quality, 5500) if target_realm == "foundation" else None,
                 "quality_bonus_bp": quality_bonus_bp,
                 "technique_bonus_bp": technique_bonus_bp,
                 "formation_bonus_bp": formation_bonus_bp,
@@ -1037,6 +1038,11 @@ class BreakthroughRepositoryMixin:
                             now_text,
                             row["id"],
                         ),
+                    )
+                if definition.target_realm == "foundation":
+                    connection.execute(
+                        "UPDATE players SET foundation_quality = MAX(foundation_quality, ?) WHERE id = ?",
+                        (int(snapshot.get("foundation_quality_on_success") or 5500), row["id"]),
                     )
                 if definition.reward_local_reputation:
                     reputation = connection.execute(

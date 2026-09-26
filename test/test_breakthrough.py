@@ -220,13 +220,13 @@ def test_foundation_breakthrough_failure_consumes_foundation_guard() -> None:
             assert settled.data["protection_consumed"] is True
             assert settled.data["cultivation_after"] == 2465
             with sqlite3.connect(runtime.settings.database_path) as connection:
-                inventory = json.loads(
-                    connection.execute(
-                        "SELECT inventory_json FROM players WHERE platform_user_id = ?",
-                        (user,),
-                    ).fetchone()[0]
-                )
+                inventory_json, quality = connection.execute(
+                    "SELECT inventory_json, foundation_quality FROM players WHERE platform_user_id = ?",
+                    (user,),
+                ).fetchone()
+                inventory = json.loads(inventory_json)
             assert inventory["item.pill.foundation_guard"] == 0
+            assert quality == 0
             await runtime.close()
 
     asyncio.run(run())
@@ -259,6 +259,13 @@ def test_foundation_breakthrough_uses_quality_snapshot_and_grants_cave_pass() ->
             started = await runtime.dispatch(_context(user, "start", operation_id="foundation-start-0"), "开始突破 筑基")
             assert started.code == "BREAKTHROUGH_STARTED"
             assert started.data["success_bp"] == 8_600
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                snapshot = json.loads(connection.execute(
+                    "SELECT snapshot_json FROM breakthrough_sessions WHERE session_id=?",
+                    (started.data["session_id"],),
+                ).fetchone()[0])
+            assert snapshot["rule_version"] == "progression-0.1.6"
+            assert snapshot["foundation_quality_on_success"] == 5500
             _finish_breakthrough(runtime, started.data["session_id"])
             settled = await runtime.dispatch(_context(user, "settle", operation_id="foundation-settle"), "结算突破")
             assert settled.code == "BREAKTHROUGH_SUCCEEDED"
@@ -267,13 +274,57 @@ def test_foundation_breakthrough_uses_quality_snapshot_and_grants_cave_pass() ->
             assert settled.data["reward_items"] == {"item.cave_pass_basic": 1}
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 row = connection.execute(
-                    "SELECT realm_key, realm_layer, cultivation, world_merit, inventory_json, spirit_stones FROM players WHERE platform_user_id = ?",
+                    "SELECT realm_key, realm_layer, cultivation, world_merit, inventory_json, spirit_stones, foundation_quality FROM players WHERE platform_user_id = ?",
                     (user,),
                 ).fetchone()
                 assert row[0:4] == ("foundation", 1, 0, 50)
                 assert '"item.cave_pass_basic": 1' in row[4]
                 assert row[5] == 500
+                assert row[6] == 5500
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_legacy_foundation_quality_backfill_runs_once() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for user in ("old-foundation", "strong-foundation", "still-qi"):
+                await _cultivator(runtime, user)
+            await runtime.close()
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "DELETE FROM schema_migrations WHERE migration_key='progression.foundation_quality.v0.1.6'"
+                )
+                connection.execute(
+                    "UPDATE players SET realm_key='foundation' WHERE platform_user_id='old-foundation'"
+                )
+                connection.execute(
+                    "UPDATE players SET realm_key='foundation', foundation_quality=7000 "
+                    "WHERE platform_user_id='strong-foundation'"
+                )
+
+            recovered = create_runtime(data_dir=data_dir)
+            await recovered.repository.initialize()
+            with sqlite3.connect(recovered.settings.database_path) as connection:
+                qualities = dict(connection.execute(
+                    "SELECT platform_user_id, foundation_quality FROM players"
+                ).fetchall())
+            assert qualities == {"old-foundation": 5500, "strong-foundation": 7000, "still-qi": 0}
+            await recovered.close()
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET foundation_quality=0 WHERE platform_user_id='old-foundation'"
+                )
+            recovered = create_runtime(data_dir=data_dir)
+            await recovered.repository.initialize()
+            with sqlite3.connect(recovered.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT foundation_quality FROM players WHERE platform_user_id='old-foundation'"
+                ).fetchone()[0] == 0
+            await recovered.close()
 
     asyncio.run(run())
 

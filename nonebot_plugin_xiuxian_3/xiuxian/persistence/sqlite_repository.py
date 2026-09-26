@@ -235,6 +235,17 @@ class SQLitePlayerRepository(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
             )
+            if connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE migration_key=?",
+                ("progression.foundation_quality.v0.1.6",),
+            ).fetchone() is None:
+                connection.execute(
+                    "UPDATE players SET foundation_quality=5500 WHERE realm_key='foundation' AND foundation_quality=0"
+                )
+                connection.execute(
+                    "INSERT INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                    ("progression.foundation_quality.v0.1.6", serialize_datetime(self._now())),
+                )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("routine.v0.1", serialize_datetime(self._now())),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
@@ -446,6 +447,13 @@ def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
                 founded = await _dispatch(runtime, adapter, user, 800, "结算突破")
                 assert founded.code == "BREAKTHROUGH_SUCCEEDED"
                 assert founded.data["target_realm"] == "foundation"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT foundation_quality FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0] == 5500
+                replay = await _dispatch(runtime, adapter, user, 800, "结算突破")
+                assert replay.data["idempotent_replay"] is True
                 await runtime.close()
 
     asyncio.run(run())
