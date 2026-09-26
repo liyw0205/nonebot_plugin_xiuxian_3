@@ -42,8 +42,8 @@ async def _dispatch(
     *,
     operation_id: str = "",
 ):
-    result = await runtime.dispatch(
-        _context(adapter, user, f"{adapter}-{index}", operation_id), command
+    result = await runtime.adapters.dispatch(
+        adapter, _context(adapter, user, f"{adapter}-{index}", operation_id), command
     )
     assert result.ok, (command, result.code, result.message)
     return result
@@ -124,8 +124,8 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
                     for index in range(100)
                     if random_quality_bp(f"{adapter}-focus-{index}") >= 500
                 )
-                started = await runtime.dispatch(
-                    _context(adapter, user, "focus-start", operation),
+                started = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "focus-start", operation),
                     "开始生产 焦点丹",
                 )
                 assert started.code == "PRODUCTION_STARTED"
@@ -139,8 +139,8 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
                     for index in range(1000)
                     if random_quality_bp(f"{adapter}-qi-guard-{index}") >= 500
                 )
-                started_guard = await runtime.dispatch(
-                    _context(adapter, user, "qi-guard-start", extra_guard_operation),
+                started_guard = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "qi-guard-start", extra_guard_operation),
                     "开始生产 聚气护脉丹",
                 )
                 assert started_guard.code == "PRODUCTION_STARTED"
@@ -152,7 +152,7 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
     asyncio.run(run())
 
 
-def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
+def test_qq_and_onebot_can_reach_golden_core_from_new_player() -> None:
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
@@ -220,8 +220,8 @@ def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
                     for index in range(1000)
                     if random_quality_bp(f"{adapter}-focus-{index}") >= 500
                 )
-                started_focus = await runtime.dispatch(
-                    _context(adapter, user, "foundation-focus-start", focus_operation),
+                started_focus = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "foundation-focus-start", focus_operation),
                     "开始生产 焦点丹",
                 )
                 assert started_focus.code == "PRODUCTION_STARTED"
@@ -269,8 +269,8 @@ def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
                     for index in range(1000)
                     if breakthrough_roll_bp(f"{adapter}-qi-breakthrough-{index}") < 8000
                 )
-                started_breakthrough = await runtime.dispatch(
-                    _context(adapter, user, "qi-breakthrough-start", breakthrough_operation),
+                started_breakthrough = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "qi-breakthrough-start", breakthrough_operation),
                     "开始突破 聚气",
                 )
                 assert started_breakthrough.code == "BREAKTHROUGH_STARTED"
@@ -340,8 +340,8 @@ def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
                     clock.advance(seconds=90)
                     await _dispatch(runtime, adapter, user, 90 + index, "结算探索")
 
-                started_draft = await runtime.dispatch(
-                    _context(adapter, user, "foundation-draft-start", f"{adapter}-foundation-draft"),
+                started_draft = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "foundation-draft-start", f"{adapter}-foundation-draft"),
                     "开始生产 筑基丹",
                 )
                 assert started_draft.code == "PRODUCTION_STARTED", started_draft.message
@@ -350,8 +350,8 @@ def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
                 assert completed_draft.code == "PRODUCTION_COMPLETED"
                 assert completed_draft.data["success"] is True
                 assert completed_draft.data["outputs"] == {"item.pill.foundation_draft": 1}
-                started_guard = await runtime.dispatch(
-                    _context(adapter, user, "foundation-guard-start", f"{adapter}-foundation-guard"),
+                started_guard = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "foundation-guard-start", f"{adapter}-foundation-guard"),
                     "开始生产 筑基护脉丹",
                 )
                 assert started_guard.code == "PRODUCTION_STARTED", started_guard.message
@@ -360,8 +360,8 @@ def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
                 assert completed_guard.code == "PRODUCTION_COMPLETED"
                 assert completed_guard.data["success"] is True
                 assert completed_guard.data["outputs"] == {"item.pill.foundation_guard": 1}
-                forbidden_market = await runtime.dispatch(
-                    _context(adapter, user, "foundation-draft-market"),
+                forbidden_market = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "foundation-draft-market"),
                     "发布摆摊 筑基丹 1 1",
                 )
                 assert forbidden_market.code == "MARKET_ITEM_FORBIDDEN"
@@ -438,8 +438,8 @@ def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
                     for candidate in range(1000)
                     if breakthrough_roll_bp(f"{adapter}-foundation-break-{candidate}") < 7500
                 )
-                started_foundation = await runtime.dispatch(
-                    _context(adapter, user, "foundation-break-start", breakthrough_operation),
+                started_foundation = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "foundation-break-start", breakthrough_operation),
                     "开始突破 筑基",
                 )
                 assert started_foundation.code == "BREAKTHROUGH_STARTED", started_foundation.message
@@ -454,6 +454,107 @@ def test_qq_and_onebot_can_reach_foundation_from_new_player() -> None:
                     ).fetchone()[0] == 5500
                 replay = await _dispatch(runtime, adapter, user, 800, "结算突破")
                 assert replay.data["idempotent_replay"] is True
+
+                for index in range(15):
+                    if index in (0, 6, 12):
+                        clock.advance(days=1)
+                        await _dispatch(runtime, adapter, user, 801 + index, "恢复状态")
+                    operation = next(
+                        f"{adapter}-core-stones-{index}-{candidate}"
+                        for candidate in range(1000)
+                        if settlement_result(
+                            "explore.trial_outskirts", f"{adapter}-core-stones-{index}-{candidate}"
+                        )["spirit_stones"] == 30
+                        and battle_roll_bp(f"{adapter}-core-stones-{index}-{candidate}:battle") >= 2000
+                    )
+                    await _dispatch(runtime, adapter, user, 830 + index, "开始探索 短历练", operation_id=operation)
+                    clock.advance(seconds=60)
+                    await _dispatch(runtime, adapter, user, 850 + index, "结算探索")
+
+                for cycle in range(70):
+                    if cycle % 2 == 0:
+                        clock.advance(days=1)
+                        await _dispatch(runtime, adapter, user, 900 + cycle, "恢复状态")
+                        await _dispatch(runtime, adapter, user, 1000 + cycle, "道历问安")
+                    await _dispatch(runtime, adapter, user, 1100 + cycle, "开始修炼 静修")
+                    clock.advance(minutes=30)
+                    cultivated = await _dispatch(runtime, adapter, user, 1200 + cycle, "结算修炼")
+                    assert cultivated.data["realm_key"] == "foundation"
+                    threshold = next_layer_threshold("foundation", cultivated.data["realm_layer"])
+                    if threshold is not None and cultivated.data["cultivation"] >= threshold:
+                        advanced = await _dispatch(runtime, adapter, user, 1300 + cycle, "晋升境界")
+                        layer = advanced.data["realm_layer"]
+                    else:
+                        layer = cultivated.data["realm_layer"]
+                    if layer == 10 and cultivated.data["total_cultivation"] >= 11960:
+                        break
+                else:
+                    raise AssertionError("new player did not reach foundation L10")
+
+                clock.advance(days=1)
+                await _dispatch(runtime, adapter, user, 1399, "恢复状态")
+                await _dispatch(runtime, adapter, user, 1400, "前往 灵泉谷")
+                clock.advance(seconds=90)
+                await _dispatch(runtime, adapter, user, 1401, "结算移动")
+                for index in range(3):
+                    operation = next(
+                        f"{adapter}-core-spring-{index}-{candidate}"
+                        for candidate in range(1000)
+                        if settlement_result(
+                            "explore.spring_gather", f"{adapter}-core-spring-{index}-{candidate}"
+                        )["item.herb.spirit_leaf"] == 2
+                        and settlement_result(
+                            "explore.spring_gather", f"{adapter}-core-spring-{index}-{candidate}"
+                        )["item.mat.array_sand"] == 1
+                    )
+                    await _dispatch(runtime, adapter, user, 1410 + index, "开始探索 灵泉采集", operation_id=operation)
+                    clock.advance(seconds=90)
+                    await _dispatch(runtime, adapter, user, 1420 + index, "结算探索")
+
+                await _dispatch(runtime, adapter, user, 1430, "前往 青石镇")
+                clock.advance(seconds=30)
+                await _dispatch(runtime, adapter, user, 1431, "结算移动")
+                clock.advance(days=1)
+                await _dispatch(runtime, adapter, user, 1435, "恢复状态")
+                await _dispatch(runtime, adapter, user, 1432, "前往 云铁矿区")
+                clock.advance(seconds=120)
+                await _dispatch(runtime, adapter, user, 1433, "结算移动")
+                await _dispatch(runtime, adapter, user, 1434, "接取悬赏 云铁矿区悬赏")
+                for index in range(2):
+                    operation = next(
+                        f"{adapter}-core-mine-{index}-{candidate}"
+                        for candidate in range(1000)
+                        if battle_roll_bp(f"{adapter}-core-mine-{index}-{candidate}:battle") >= 3000
+                        and settlement_result(
+                            "explore.cloud_mine", f"{adapter}-core-mine-{index}-{candidate}"
+                        )["item.material.cloud_iron"] >= 3
+                    )
+                    await _dispatch(runtime, adapter, user, 1440 + index, "开始探索 云铁采集", operation_id=operation)
+                    clock.advance(seconds=120)
+                    await _dispatch(runtime, adapter, user, 1450 + index, "结算探索")
+                await _dispatch(runtime, adapter, user, 1460, "领取悬赏")
+                await _dispatch(runtime, adapter, user, 1461, "前往 青石镇")
+                clock.advance(seconds=30)
+                await _dispatch(runtime, adapter, user, 1462, "结算移动")
+                production_operation = next(
+                    f"{adapter}-core-pill-{candidate}"
+                    for candidate in range(1000)
+                    if random_quality_bp(f"{adapter}-core-pill-{candidate}") >= 1000
+                )
+                await _dispatch(runtime, adapter, user, 1463, "开始生产 凝核丹", operation_id=production_operation)
+                clock.advance(seconds=180)
+                produced = await _dispatch(runtime, adapter, user, 1464, "领取生产")
+                assert produced.data["outputs"] == {"item.pill.core_condense": 1}
+                core_operation = next(
+                    f"{adapter}-core-break-{candidate}"
+                    for candidate in range(1000)
+                    if breakthrough_roll_bp(f"{adapter}-core-break-{candidate}") < 4800
+                )
+                await _dispatch(runtime, adapter, user, 1465, "开始突破 金丹", operation_id=core_operation)
+                clock.advance(minutes=5)
+                golden = await _dispatch(runtime, adapter, user, 1466, "结算突破")
+                assert golden.code == "BREAKTHROUGH_SUCCEEDED"
+                assert golden.data["target_realm"] == "golden_core"
                 await runtime.close()
 
     asyncio.run(run())
