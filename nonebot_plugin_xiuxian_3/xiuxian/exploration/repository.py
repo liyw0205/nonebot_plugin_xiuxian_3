@@ -330,12 +330,19 @@ class ExplorationRepositoryMixin:
 
             inventory = self._json_object(row["inventory_json"], {})
             intro_state = self._json_object(row["intro_json"], {})
-            if definition.key == "explore.cloud_mine" and not has_cloud_mine_access(
-                subprofession_key=row["subprofession_key"],
-                inventory=inventory,
-                intro_flags={str(flag) for flag in intro_state.get("flags", [])},
-            ):
-                raise LocationRequirementError("cloud mine access is missing")
+            if definition.key == "explore.cloud_mine":
+                has_access = has_cloud_mine_access(
+                    subprofession_key=row["subprofession_key"],
+                    inventory=inventory,
+                    intro_flags={str(flag) for flag in intro_state.get("flags", [])},
+                )
+                if not has_access:
+                    has_access = connection.execute(
+                        "SELECT 1 FROM bounty_offers WHERE player_id=? AND bounty_key='bounty.cloud_mine' AND status='accepted' AND expires_at>? LIMIT 1",
+                        (row["id"], serialize_datetime(now)),
+                    ).fetchone() is not None
+                if not has_access:
+                    raise LocationRequirementError("cloud mine access is missing")
 
             player_id = int(row["id"])
             active = connection.execute(

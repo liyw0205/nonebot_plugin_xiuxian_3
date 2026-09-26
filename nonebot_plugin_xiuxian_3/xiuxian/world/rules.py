@@ -36,7 +36,7 @@ class DestinationDefinition:
 DESTINATIONS = {
     "xuantian.new_town": DestinationDefinition(
         "xuantian.new_town", "青石镇", 30, 1, 0,
-        source_locations=("xuantian.outskirts", "xuantian.sect_gate", "xuantian.spirit_field"),
+        source_locations=("xuantian.outskirts", "xuantian.sect_gate", "xuantian.spirit_field", "xuantian.cloud_mine"),
     ),
     "xuantian.outskirts": DestinationDefinition(
         "xuantian.outskirts", "玄天近郊", 30, 2, 0,
@@ -99,8 +99,8 @@ DESTINATIONS = {
     "xuantian.cloud_mine": DestinationDefinition(
         "xuantian.cloud_mine", "云铁矿区", 2 * 60, 6, 0,
         required_realm="foundation", required_layer=1,
-        source_locations=("xuantian.cloud_city",),
-        content_version="content-0.2", rule_version="world-0.2.0",
+        source_locations=("xuantian.cloud_city", "xuantian.new_town"),
+        content_version="content-0.2", rule_version="world-0.2.1",
     ),
     "xuantian.floating_boat": DestinationDefinition(
         "xuantian.floating_boat", "云舟渡口", 60, 0, 500,

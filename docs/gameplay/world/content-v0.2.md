@@ -3,13 +3,13 @@
 本文件遵守 [版本内容开发合同](../../content-development-contract.md)。
 
 - `content_version`：`content-0.2`
-- `rule_version`：`world-0.2.0`
+- `rule_version`：`world-0.2.0`（筑基矿区路线修订为 `world-0.2.1`）
 - 新用例：`world.board_cloud_boat`、`world.accept_demon_intro`、`world.use_array_hall`。
 
 | `location_key` | 准入 | 耗时/成本 | 环境与动作 | 关闭/失败 |
 |:--|:--|:--|:--|:--|
 | `xuantian.cloud_city` | 金丹 | 3 分钟 / 8 体力 | 高阶市场、炼器区、阵师会馆；`training_bp=11000` | 无云舟/移动状态拒绝 |
-| `xuantian.cloud_mine` | 筑基、采矿子类等级 2 或矿区委托 | 2 分钟 / 6 体力 | 云铁采集、矿兽战；`risk=medium` | 工具/精力不足不能开始采集 |
+| `xuantian.cloud_mine` | 筑基可抵达；采集需采矿子类等级 2、许可或有效期内已接取的矿区委托 | 2 分钟 / 6 体力 | 青石镇或云城进入；可返回青石镇；云铁采集、矿兽战；`risk=medium` | 工具/精力不足不能开始采集 |
 | `xuantian.floating_boat` | 筑基、灵石 `>=500` | 1 分钟 / 500 灵石 | 云舟调度、洞天二层/魔界引导航线 | 金丹以下不能购买中层航线 |
 | `cave.mist_grotto_2` | 金丹、`item.cave_pass_advanced` | 3 分钟 / 15 体力、凭证 1 | 金丹材料、精英战、灵田二层；`risk=high` | 凭证只在会话创建后消耗 |
 | `xuantian.array_hall` | 聚气、宗门成员或阵法教学邀请 | 1 分钟 / 3 体力 | 布阵学习、阵材委托、领域前置 | 无权限只显示申请路径 |
@@ -34,7 +34,7 @@
 ## 当前运行时边界
 
 本阶段开放云城/阵堂移动、三条云舟航线、抵达深渊门后的风险确认、阵堂权限检查，以及
-`explore.cloud_mine`/`explore.cloud_boat_trial`/`explore.mist_grotto_2` 探索入口。矿区入口仍要求采矿标记或矿区许可，
+`explore.cloud_mine`/`explore.cloud_boat_trial`/`explore.mist_grotto_2` 探索入口。矿区采集要求采矿标记/许可或有效期内已接取的云铁矿区悬赏，
 云舟试炼要求位于云舟渡口且达到金丹 L1；洞天二层入口要求已经抵达该地点；v0.2 五条个人配方已开放预览、生产和结算，阵堂地点仍会再次校验宗门成员/教学邀请；魔界核心区和魔界资源仍
 返回关闭或未满足前置；已创建云舟按会话快照结算。`world.accept_demon_intro` 只写入入口资格和
 `faction_reputation.demon=20`，不发魔核或妖血。
