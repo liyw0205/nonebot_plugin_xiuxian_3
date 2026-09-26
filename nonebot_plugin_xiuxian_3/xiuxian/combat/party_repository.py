@@ -40,6 +40,7 @@ from .party_rules import (
     PARTY_BATTLE_TYPE,
     BOUNDARY_REALM_LOCATION,
     BOUNDARY_REALM_REWARD,
+    BOUNDARY_REALM_SOUL_POWER_MAX,
     BOUNDARY_REALM_STAMINA_COST,
     BOUNDARY_REALM_TICKET,
     BOUNDARY_REALM_TICKET_COST,
@@ -921,6 +922,15 @@ class PartyCombatRepositoryMixin:
                     total_cultivation = int(player["total_cultivation"]) + int(reward.get("cultivation", 0))
                     spirit_stones = int(player["spirit_stones"]) + int(reward.get("spirit_stones", 0))
                     world_merit = int(player["world_merit"]) + int(reward.get("world_merit", 0))
+                    soul_power_max = max(
+                        int(player["soul_power_max"]),
+                        int(player["soul_power"]),
+                        BOUNDARY_REALM_SOUL_POWER_MAX if boundary_party and reward.get("soul_power") else 0,
+                    )
+                    soul_power = min(
+                        soul_power_max,
+                        int(player["soul_power"]) + int(reward.get("soul_power", 0)),
+                    )
                     faction = self._json_object(player["faction_reputation_json"], {})
                     for item_key, quantity in reward.items():
                         if item_key.startswith("item."):
@@ -929,8 +939,8 @@ class PartyCombatRepositoryMixin:
                             faction_key = item_key.removeprefix("faction_reputation.")
                             faction[faction_key] = int(faction.get(faction_key, 0)) + int(quantity)
                     connection.execute(
-                        "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, world_merit=?, inventory_json=?, faction_reputation_json=?, updated_at=? WHERE id=?",
-                        (cultivation, total_cultivation, spirit_stones, world_merit, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                        "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, world_merit=?, soul_power=?, soul_power_max=?, inventory_json=?, faction_reputation_json=?, updated_at=? WHERE id=?",
+                        (cultivation, total_cultivation, spirit_stones, world_merit, soul_power, soul_power_max, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
                     )
                 if cross_realm_party and outcome in {"lost", "expired"}:
                     fatigue_until = serialize_datetime(self._now() + timedelta(hours=2))

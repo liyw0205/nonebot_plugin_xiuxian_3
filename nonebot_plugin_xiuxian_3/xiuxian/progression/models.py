@@ -39,6 +39,7 @@ class CultivationMode:
     required_realm: str | None = None
     required_layer: int = 0
     requires_solitude: bool = False
+    soul_power_gain: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +48,7 @@ class CultivationSettlementRecord:
     session_id: str
     cultivation_gain: int
     mode_key: str = ""
+    soul_power_gain: int = 0
     already_completed: bool = False
 
 
@@ -58,6 +60,7 @@ class CultivationRecoveryRecord:
     session_id: str
     cultivation_gain: int
     mode_key: str = ""
+    soul_power_gain: int = 0
     already_completed: bool = False
 
 

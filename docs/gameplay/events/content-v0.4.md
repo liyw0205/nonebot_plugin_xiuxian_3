@@ -21,10 +21,10 @@
 
 | `quest_key` | 目标 | 许可/奖励 | 限制 |
 |:--|:--|:--|:--|
-| `quest.domain_material_commission` | 完成领域材料委托 3 次 | 化神准备度 +300 bp、`item.ancient_fruit` 1 | 每角色一次；失败订单不计 |
-| `quest.ancient_domain_line` | `explore.boundary_realm` 成功 3 次、交付神魂晶 3 | 远古洞天主线标记、准备度 +300 bp | 元婴可完成；不能要求已化神 |
-| `quest.soul_transformation` | 上述两任务完成 + 跨界战胜利 1 次 | 化神突破许可、准备度 +600 bp | 只提供许可/准备度，不发化神境界 |
+| `quest.domain_material_commission` | 逐次交付魔核 1，共 3 次 | 每次发 `item.ancient_fruit` 1；目标完成后准备度 +300 bp | 每角色一次；资源不足不记进度；三次正好满足突破 3 果 |
+| `quest.ancient_domain_line` | 提交 3 场本人参与且已结算胜利的 `cave.boundary_realm` 队伍战斗编号；第三次交付神魂晶 3 | 远古洞天主线标记、准备度 +300 bp | 每场战斗编号只能计一次；元婴可完成；不能要求已化神 |
+| `quest.soul_transformation` | 上述两任务完成 + 跨界战胜利 1 次 | 化神突破许可、绑定魂种 1、领域核心 1、准备度 +600 bp | 奖励提供突破前材料，不发化神境界 |
 
-`event.redeem.domain_core` 输入 `item.domain_core_fragment` 20，输出 `item.domain_core` 1；成功后碎片消耗，重复 operation 回放同一核心实例。
+`event.redeem.domain_core` 输入 `item.domain_core_fragment` 20，输出 `item.domain_core` 1；成功后碎片消耗，重复 operation 回放同一核心实例。化神许可另提供首枚突破用领域核心，化神突破成功发放的领域核心用于后续选择领域。
 
 所有事件开始时冻结领域版本、参与资格、敌人/地点和贡献公式；领域裂痕角色不能参加领域前线但可参与远古洞天非领域内容。错误：`DOMAIN_EVENT_REQUIREMENT_MISSING`、`DOMAIN_CRACK_ACTIVE`、`DOMAIN_CORE_REDEEM_ALREADY_USED`。关闭时不新计分，已创建奖励按轮次领取。验收：领域战贡献不因重放双加；碎片合成唯一；全服成功/个人门槛分离；赛季排名冻结。

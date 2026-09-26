@@ -49,6 +49,86 @@ async def _prepare_soul_player(runtime, adapter: str, user: str, location: str) 
         )
 
 
+async def _prepare_nascent_player(runtime, adapter: str, user: str) -> None:
+    created = await runtime.adapters.dispatch(
+        adapter, _context(adapter, user, f"create-{adapter}"), "开始修仙"
+    )
+    assert created.ok
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        connection.execute(
+            """
+            UPDATE players
+            SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
+                cultivation=0, total_cultivation=58960, soul_power=100,
+                soul_power_max=100, stamina=100, stamina_max=100, energy=100,
+                energy_max=100, qualification_json=?
+            WHERE platform=? AND platform_user_id=?
+            """,
+            (json.dumps({"insight": 30}), adapter, user),
+        )
+
+
+def test_soul_refinement_grows_nascent_cultivation_and_soul_once_per_day() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=Path(data_dir) / adapter)
+                user = f"nascent-refinement-{adapter}"
+                await _prepare_nascent_player(runtime, adapter, user)
+
+                started = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "refine-start", "refine-start"),
+                    "开始修炼 神魂淬炼",
+                )
+                assert started.code == "CULTIVATION_STARTED"
+                _expire(runtime, "cultivation_sessions", "session_id", started.data["session_id"])
+                settled = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "refine-settle", "refine-settle"),
+                    "结算修炼",
+                )
+                assert settled.code == "CULTIVATION_SETTLED"
+                assert settled.data["cultivation_gain"] == 5750
+                assert settled.data["soul_power_gain"] == 50
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "refine-replay", "refine-settle"),
+                    "结算修炼",
+                )
+                assert replay.data["idempotent_replay"] is True
+
+                second = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "refine-second", "refine-second"),
+                    "开始修炼 神魂淬炼",
+                )
+                assert second.code == "CULTIVATION_STARTED"
+                _expire(runtime, "cultivation_sessions", "session_id", second.data["session_id"])
+                second_settled = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "refine-second-settle", "refine-second-settle"),
+                    "结算修炼",
+                )
+                assert second_settled.data["soul_power_gain"] == 50
+                limited = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "refine-limited", "refine-limited"),
+                    "开始修炼 神魂淬炼",
+                )
+                assert limited.code == "CULTIVATION_DAILY_LIMIT"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player = connection.execute(
+                        "SELECT cultivation,total_cultivation,soul_power,soul_power_max FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert player == (11500, 70460, 200, 300)
+                await runtime.close()
+
+    asyncio.run(run())
+
+
 async def _run_exploration(runtime, adapter: str, user: str, operation: str, command: str) -> dict[str, int]:
     started = await runtime.adapters.dispatch(
         adapter, _context(adapter, user, f"{operation}-start", operation), command

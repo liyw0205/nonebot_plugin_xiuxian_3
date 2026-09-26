@@ -29,6 +29,7 @@ from ..repository import (
 from .rules import (
     MODE_BREATHING,
     MODE_SECLUSION,
+    MODE_SOUL_REFINEMENT,
     MODE_SPIRIT_SPRING,
     can_advance_layer,
     cultivation_mode,
@@ -53,6 +54,8 @@ class ProgressionApplication:
             return MODE_SPIRIT_SPRING
         if len(args) == 1 and args[0] in {"静修", "静修修炼"}:
             return MODE_SECLUSION
+        if len(args) == 1 and args[0] in {"神魂淬炼", "淬炼神魂", "凝魂"}:
+            return MODE_SOUL_REFINEMENT
         return None
 
     @staticmethod
@@ -84,7 +87,7 @@ class ProgressionApplication:
             return CommandResult(
                 False,
                 "INVALID_CULTIVATION_MODE",
-                "目前支持 `开始修炼`（调息）、`开始修炼 灵泉` 或 `开始修炼 静修`。",
+                "目前支持 `开始修炼`（调息）、`开始修炼 灵泉`、`开始修炼 静修` 或元婴后的 `开始修炼 神魂淬炼`。",
                 context.request_id,
             )
         operation_id = self._operation_id(context, "progression.start_cultivation")
@@ -217,12 +220,18 @@ class ProgressionApplication:
         threshold = next_layer_threshold(player.realm_key, player.realm_layer)
         next_step = "发送 `晋升境界`，尝试进入下一层。" if threshold is not None and player.cultivation >= threshold else "继续发送 `开始修炼`，积累境内修为。"
         mode_label = cultivation_mode_label(record.mode_key)
+        soul_line = (
+            f"- **神魂**：{player.soul_power}/{player.soul_power_max}（+{record.soul_power_gain}）\n"
+            if record.soul_power_gain
+            else ""
+        )
         message = (
             "## 修炼结算完成\n\n"
             f"**{self._display_name(player)}**完成{mode_label}，获得 **修为 ×{record.cultivation_gain}**。\n\n"
             f"- **境界**：{self._realm_text(player)}\n"
             f"- **境内修为**：{player.cultivation}/{threshold or '混元'}\n"
             f"- **总修为**：{player.total_cultivation}\n"
+            f"{soul_line}"
             f"- **体力**：{player.stamina}/{player.stamina_max}\n\n"
             f"> 下一步：{next_step}"
         )
@@ -236,6 +245,7 @@ class ProgressionApplication:
                 "dao_name": player.dao_name,
                 "session_id": record.session_id,
                 "cultivation_gain": record.cultivation_gain,
+                "soul_power_gain": record.soul_power_gain,
                 "mode_key": record.mode_key,
                 "cultivation": player.cultivation,
                 "total_cultivation": player.total_cultivation,

@@ -986,7 +986,7 @@ class BreakthroughRepositoryMixin:
                     inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
                 if is_nascent:
                     connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, soul_power = 100, soul_power_max = 100, domain_charge = 100, domain_charge_max = 100, cross_realm_penalty_bp = ?, max_hp = max_hp + 600, max_mp = max_mp + 480, carry_capacity = carry_capacity + 50, exploration_efficiency_bp = exploration_efficiency_bp + 1500, heart_demon_bonus_bp = 0, soul_fatigue_until = NULL, updated_at = ? WHERE id = ?",
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, soul_power = 100, soul_power_max = 300, domain_charge = 100, domain_charge_max = 100, cross_realm_penalty_bp = ?, max_hp = max_hp + 600, max_mp = max_mp + 480, carry_capacity = carry_capacity + 50, exploration_efficiency_bp = exploration_efficiency_bp + 1500, heart_demon_bonus_bp = 0, soul_fatigue_until = NULL, updated_at = ? WHERE id = ?",
                         (
                             definition.target_realm,
                             definition.reward_currency,

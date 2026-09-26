@@ -99,11 +99,30 @@ class QuestApplication:
         )
 
     async def complete_ancient_domain_line(self, context: CommandContext) -> CommandResult:
-        return await self._simple_action(
-            context,
-            "quest.ancient_domain_line",
-            self.repository.complete_ancient_domain_line,
-            "远古洞天探索",
+        if len(context.command_args) != 1:
+            return CommandResult(
+                False,
+                "INVALID_QUEST_COMMAND",
+                "请提供已结算的界隙秘境战斗编号：`完成远古洞天任务 战斗编号`。",
+                context.request_id,
+            )
+        operation_id = self._operation_id(context, "quest.ancient_domain_line")
+        try:
+            record = await self.repository.complete_ancient_domain_line(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+                battle_id=context.command_args[0],
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(
+            True,
+            "QUEST_ACTION_RECORDED",
+            f"## 远古洞天任务已核验\n\n- **进度**：{record.progress}\n- **奖励**：已登记界隙秘境胜利证据",
+            context.request_id,
+            operation_id,
+            data=self._data(record),
         )
 
     async def acquire_void_archive(self, context: CommandContext) -> CommandResult:

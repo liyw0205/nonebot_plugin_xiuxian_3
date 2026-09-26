@@ -19,9 +19,11 @@ REALM_TRIBULATION = "tribulation"
 MODE_BREATHING = "cultivate.breathing"
 MODE_SPIRIT_SPRING = "cultivate.spirit_spring"
 MODE_SECLUSION = "cultivate.seclusion"
+MODE_SOUL_REFINEMENT = "cultivate.soul_refinement"
 RULE_VERSION = "progression-0.1.1"
 SPIRIT_SPRING_RULE_VERSION = "progression-0.1.2"
 SECLUSION_RULE_VERSION = "progression-0.1.5"
+SOUL_REFINEMENT_RULE_VERSION = "progression-0.4.1"
 
 # Index zero represents the L1 entry point. Values are the minimum realm
 # cultivation required for each layer in the content-0.1 snapshot.
@@ -59,6 +61,13 @@ SECLUSION_ENERGY_COST = 2
 SECLUSION_DURATION_SECONDS = 30 * 60
 SECLUSION_BASE_CULTIVATION = 170
 SECLUSION_DAILY_LIMIT = 2
+SOUL_REFINEMENT_STAMINA_COST = 8
+SOUL_REFINEMENT_ENERGY_COST = 5
+SOUL_REFINEMENT_DURATION_SECONDS = 30 * 60
+SOUL_REFINEMENT_BASE_CULTIVATION = 5000
+SOUL_REFINEMENT_SOUL_POWER_GAIN = 50
+SOUL_REFINEMENT_SOUL_POWER_MAX = 300
+SOUL_REFINEMENT_DAILY_LIMIT = 2
 RECOVERY_PERIOD_SECONDS = 30 * 60
 CULTIVATION_SETTLEMENT_GRACE_SECONDS = 24 * 60 * 60
 
@@ -67,6 +76,7 @@ CULTIVATION_MODE_LABELS = {
     MODE_BREATHING: "调息修炼",
     MODE_SPIRIT_SPRING: "灵泉修炼",
     MODE_SECLUSION: "静修",
+    MODE_SOUL_REFINEMENT: "神魂淬炼",
 }
 
 # These are deliberately previews/qualifications, not direct access to future
@@ -175,6 +185,22 @@ def cultivation_mode(mode_key: str) -> CultivationMode:
             required_realm=REALM_QI_GATHERING,
             required_layer=1,
             requires_solitude=True,
+        )
+    if mode_key == MODE_SOUL_REFINEMENT:
+        return CultivationMode(
+            key=MODE_SOUL_REFINEMENT,
+            label=CULTIVATION_MODE_LABELS[MODE_SOUL_REFINEMENT],
+            stamina_cost=SOUL_REFINEMENT_STAMINA_COST,
+            energy_cost=SOUL_REFINEMENT_ENERGY_COST,
+            duration_seconds=SOUL_REFINEMENT_DURATION_SECONDS,
+            base_cultivation=SOUL_REFINEMENT_BASE_CULTIVATION,
+            environment_bp=10000,
+            daily_limit=SOUL_REFINEMENT_DAILY_LIMIT,
+            rule_version=SOUL_REFINEMENT_RULE_VERSION,
+            required_realm=REALM_NASCENT_SOUL,
+            required_layer=1,
+            requires_solitude=True,
+            soul_power_gain=SOUL_REFINEMENT_SOUL_POWER_GAIN,
         )
     raise ValueError(f"unsupported cultivation mode: {mode_key}")
 

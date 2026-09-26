@@ -405,7 +405,11 @@ class CultivationRepositoryMixin:
         mode_key: str,
         operation_id: str,
     ) -> CultivationSessionRecord:
-        from ..progression.rules import FORMAL_REALMS, cultivation_mode
+        from ..progression.rules import (
+            FORMAL_REALMS,
+            SOUL_REFINEMENT_SOUL_POWER_MAX,
+            cultivation_mode,
+        )
 
         operation_payload = {
             "platform": platform,
@@ -557,10 +561,22 @@ class CultivationRepositoryMixin:
                 "cloud_tea_effect_bp": cloud_tea_effect_bp,
                 "base_cultivation": mode.base_cultivation,
                 "environment_bp": mode.environment_bp,
+                "soul_power_gain": mode.soul_power_gain,
             }
             connection.execute(
-                "UPDATE players SET stamina = stamina - ?, energy = energy - ?, item_effects_json = ?, updated_at = ? WHERE id = ?",
-                (mode.stamina_cost, mode.energy_cost, json.dumps(item_effects, ensure_ascii=False, sort_keys=True), serialize_datetime(now), row["id"]),
+                "UPDATE players SET stamina = stamina - ?, energy = energy - ?, soul_power_max = ?, item_effects_json = ?, updated_at = ? WHERE id = ?",
+                (
+                    mode.stamina_cost,
+                    mode.energy_cost,
+                    max(
+                        int(row["soul_power_max"]),
+                        int(row["soul_power"]),
+                        SOUL_REFINEMENT_SOUL_POWER_MAX if mode.soul_power_gain else 0,
+                    ),
+                    json.dumps(item_effects, ensure_ascii=False, sort_keys=True),
+                    serialize_datetime(now),
+                    row["id"],
+                ),
             )
             connection.execute(
                 """
@@ -679,6 +695,7 @@ class CultivationRepositoryMixin:
                     session_id=str(payload["session_id"]),
                     cultivation_gain=int(payload["cultivation_gain"]),
                     mode_key=str(payload.get("mode_key", "cultivate.breathing")),
+                    soul_power_gain=int(payload.get("soul_power_gain", 0)),
                     already_completed=True,
                 )
 
@@ -733,13 +750,18 @@ class CultivationRepositoryMixin:
                 environment_bp=int(snapshot.get("environment_bp", 10000)),
                 state_bp=int(snapshot.get("state_bp", 10000)),
             )
+            soul_power_gain = int(snapshot.get("soul_power_gain", 0))
             connection.execute(
-                "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, updated_at = ? WHERE id = ?",
-                (gain, gain, now_text, row["id"]),
+                "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, soul_power = MIN(soul_power_max, soul_power + ?), updated_at = ? WHERE id = ?",
+                (gain, gain, soul_power_gain, now_text, row["id"]),
             )
+            settlement_result = {
+                "cultivation_gain": gain,
+                "soul_power_gain": soul_power_gain,
+            }
             connection.execute(
                 "UPDATE cultivation_sessions SET status = 'settled', result_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps({"cultivation_gain": gain}, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+                (json.dumps(settlement_result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
@@ -749,6 +771,7 @@ class CultivationRepositoryMixin:
                 "player": self._player_payload(player),
                 "session_id": session["session_id"],
                 "cultivation_gain": gain,
+                "soul_power_gain": soul_power_gain,
                 "mode_key": str(snapshot.get("mode_key", session["mode_key"])),
             }
             connection.execute(
@@ -767,6 +790,7 @@ class CultivationRepositoryMixin:
                 session_id=session["session_id"],
                 cultivation_gain=gain,
                 mode_key=str(snapshot.get("mode_key", session["mode_key"])),
+                soul_power_gain=soul_power_gain,
             )
 
     async def recover_cultivation(
@@ -836,6 +860,7 @@ class CultivationRepositoryMixin:
                     session_id=str(payload["session_id"]),
                     cultivation_gain=int(payload["cultivation_gain"]),
                     mode_key=str(payload.get("mode_key", "cultivate.breathing")),
+                    soul_power_gain=int(payload.get("soul_power_gain", 0)),
                     already_completed=True,
                 )
 
@@ -862,15 +887,20 @@ class CultivationRepositoryMixin:
                 environment_bp=int(snapshot.get("environment_bp", 10000)),
                 state_bp=int(snapshot.get("state_bp", 10000)),
             )
+            soul_power_gain = int(snapshot.get("soul_power_gain", 0))
             connection.execute(
-                "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, updated_at = ? WHERE id = ?",
-                (gain, gain, now_text, row["id"]),
+                "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, soul_power = MIN(soul_power_max, soul_power + ?), updated_at = ? WHERE id = ?",
+                (gain, gain, soul_power_gain, now_text, row["id"]),
             )
             connection.execute(
                 "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
                 (
                     json.dumps(
-                        {"cultivation_gain": gain, "recovered_after_expiry": True},
+                        {
+                            "cultivation_gain": gain,
+                            "soul_power_gain": soul_power_gain,
+                            "recovered_after_expiry": True,
+                        },
                         ensure_ascii=False,
                         sort_keys=True,
                     ),
@@ -886,6 +916,7 @@ class CultivationRepositoryMixin:
                 "player": self._player_payload(player),
                 "session_id": session["session_id"],
                 "cultivation_gain": gain,
+                "soul_power_gain": soul_power_gain,
                 "mode_key": str(snapshot.get("mode_key", session["mode_key"])),
             }
             connection.execute(
@@ -904,6 +935,7 @@ class CultivationRepositoryMixin:
                 session_id=session["session_id"],
                 cultivation_gain=gain,
                 mode_key=str(snapshot.get("mode_key", session["mode_key"])),
+                soul_power_gain=soul_power_gain,
             )
 
     async def cancel_cultivation(

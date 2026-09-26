@@ -61,7 +61,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             )
 
     async def complete_ancient_domain_line(
-        self, *, platform: str, platform_user_id: str, operation_id: str
+        self, *, platform: str, platform_user_id: str, operation_id: str, battle_id: str
     ) -> QuestActionRecord:
         await self.initialize()
         async with self._inflight:
@@ -70,6 +70,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 platform,
                 platform_user_id,
                 operation_id,
+                battle_id,
             )
 
     async def record_cross_realm_victory(
@@ -173,11 +174,12 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             required_realm="nascent_soul",
             target=DOMAIN_COMMISSION_TARGET,
             outcome="success",
-            reward_on_target={"item.ancient_fruit": 1},
+            material_cost_per_event={"item.demon_core": 1},
+            reward_per_event={"item.ancient_fruit": 1},
         )
 
     def _complete_ancient_domain_line_sync(
-        self, platform: str, platform_user_id: str, operation_id: str
+        self, platform: str, platform_user_id: str, operation_id: str, battle_id: str
     ) -> QuestActionRecord:
         return self._record_component_sync(
             platform,
@@ -188,6 +190,8 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             required_realm="nascent_soul",
             target=ANCIENT_DOMAIN_TARGET,
             outcome="success",
+            payload_extra={"battle_id": battle_id},
+            evidence_party_battle_id=battle_id,
             final_material_cost={"item.soul_crystal": 3},
         )
 
@@ -378,11 +382,14 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         target: int,
         outcome: str,
         reward_on_target: dict[str, int] | None = None,
+        reward_per_event: dict[str, int] | None = None,
+        material_cost_per_event: dict[str, int] | None = None,
         final_material_cost: dict[str, int] | None = None,
         payload_extra: dict[str, object] | None = None,
         evidence_battle_id: str | None = None,
         evidence_battle_type: str | None = None,
         evidence_outcome: str | None = None,
+        evidence_party_battle_id: str | None = None,
     ) -> QuestActionRecord:
         operation_name = quest_key if quest_key.startswith("quest.") else f"quest.{quest_key}"
         request_payload = {
@@ -418,26 +425,61 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                     raise QuestRequirementError("battle evidence outcome is not eligible")
                 if quest_key == VOID_QUEST:
                     outcome = actual_outcome
+            event_source_operation_id = operation_id
+            if evidence_party_battle_id is not None:
+                battle = connection.execute(
+                    """
+                    SELECT s.start_operation_id, s.location_key, s.status, s.result_json,
+                           p.party_type
+                    FROM party_battle_sessions s
+                    JOIN parties p ON p.party_id = s.party_id
+                    JOIN party_battle_members m ON m.battle_id = s.battle_id
+                    WHERE s.battle_id = ? AND m.player_id = ?
+                    """,
+                    (evidence_party_battle_id, player["id"]),
+                ).fetchone()
+                if (
+                    battle is None
+                    or str(battle["party_type"]) not in {"boundary_realm", "party_boundary"}
+                    or str(battle["location_key"]) != "cave.boundary_realm"
+                    or str(battle["status"]) != "settled"
+                    or str(self._json_object(battle["result_json"], {}).get("outcome", "")) != "won"
+                ):
+                    raise QuestRequirementError("successful boundary-realm battle evidence is required")
+                event_source_operation_id = str(battle["start_operation_id"])
+                duplicate_source = connection.execute(
+                    "SELECT 1 FROM quest_events WHERE player_id = ? AND quest_key = ? AND component_key = ? AND source_operation_id = ?",
+                    (player["id"], quest_key, component_key, event_source_operation_id),
+                ).fetchone()
+                if duplicate_source is not None:
+                    raise QuestAlreadyCompletedError("boundary-realm battle evidence was already used")
             count = self._event_count(connection, int(player["id"]), quest_key, component_key)
             if count >= target:
                 raise QuestAlreadyCompletedError("quest component reached its target")
             final_cost_due = final_material_cost and count + 1 >= target
+            material_cost = dict(material_cost_per_event or {})
             if final_cost_due:
+                for key, amount in final_material_cost.items():
+                    material_cost[key] = int(material_cost.get(key, 0)) + int(amount)
+            if material_cost:
                 inventory = self._json_object(player["inventory_json"], {})
-                missing = [key for key, amount in final_material_cost.items() if int(inventory.get(key, 0)) < amount]
+                missing = [key for key, amount in material_cost.items() if int(inventory.get(key, 0)) < amount]
                 if missing:
                     raise QuestResourceInsufficientError("quest material is missing")
-                for key, amount in final_material_cost.items():
+                for key, amount in material_cost.items():
                     inventory[key] = int(inventory[key]) - amount
                     if not inventory[key]:
                         inventory.pop(key)
             else:
                 inventory = self._json_object(player["inventory_json"], {})
             count += 1
-            reward = dict(reward_on_target or {}) if count >= target else {}
+            reward = dict(reward_per_event or {})
+            if count >= target:
+                for key, amount in dict(reward_on_target or {}).items():
+                    reward[key] = int(reward.get(key, 0)) + int(amount)
             for key, amount in reward.items():
                 inventory[key] = int(inventory.get(key, 0)) + int(amount)
-            if final_cost_due or reward:
+            if material_cost or reward:
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
                     (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
@@ -447,9 +489,9 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 player_id=int(player["id"]),
                 quest_key=quest_key,
                 component_key=component_key,
-                source_operation_id=operation_id,
+                source_operation_id=event_source_operation_id,
                 outcome=outcome,
-                payload={"count": count, **(payload_extra or {})},
+                payload={"count": count, "material_cost": material_cost, **(payload_extra or {})},
                 now_text=now_text,
             )
             progress = {component_key: count}
@@ -519,7 +561,11 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             }
             if existing_progress is not None and str(existing_progress["status"]) in {"completed", "claimed"}:
                 raise QuestAlreadyCompletedError("quest permit is already claimed")
-            permit_rewards = {"item.soul_seed": 1} if quest_key == SOUL_QUEST else {}
+            permit_rewards = (
+                {"item.soul_seed": 1, "item.domain_core": 1}
+                if quest_key == SOUL_QUEST
+                else {}
+            )
             flags_state = self._json_object(player["intro_json"], {})
             flags = [str(item) for item in flags_state.get("flags", [])]
             if quest_key not in flags:
