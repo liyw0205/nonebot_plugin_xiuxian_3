@@ -158,7 +158,7 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
     asyncio.run(run())
 
 
-def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
+def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
@@ -1558,6 +1558,70 @@ def test_qq_and_onebot_can_reach_soul_transformation_from_new_player() -> None:
                 final_inventory = json.loads(final_state[4])
                 assert final_inventory.get("item.dao_fruit_fragment") == 2
                 assert final_inventory.get("item.tribulation_token") == 1
+
+                # Fast-forward business days, but earn all cultivation through player commands.
+                dao_union_l10_reached = False
+                for day in range(650):
+                    operation_base = 70000 + day * 32
+                    clock.advance(days=1)
+                    await _dispatch(
+                        runtime, adapter, user, operation_base, "恢复状态"
+                    )
+                    for slot in range(2):
+                        slot_base = operation_base + 1 + slot * 10
+                        started_refinement = await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            slot_base,
+                            "开始修炼 神魂淬炼",
+                        )
+                        assert started_refinement.code == "CULTIVATION_STARTED"
+                        clock.advance(minutes=30)
+                        settled_refinement = await _dispatch(
+                            runtime, adapter, user, slot_base + 1, "结算修炼"
+                        )
+                        assert settled_refinement.data["cultivation_gain"] >= 5_000
+                        current_realm = str(settled_refinement.data["realm_key"])
+                        current_layer = int(settled_refinement.data["realm_layer"])
+                        current_cultivation = int(settled_refinement.data["cultivation"])
+                        threshold = next_layer_threshold(current_realm, current_layer)
+                        while threshold is not None and current_cultivation >= threshold:
+                            advanced = await _dispatch(
+                                runtime,
+                                adapter,
+                                user,
+                                slot_base + 2 + current_layer,
+                                "晋升境界",
+                            )
+                            assert advanced.code == "REALM_LAYER_ADVANCED"
+                            current_layer = int(advanced.data["realm_layer"])
+                            threshold = next_layer_threshold(current_realm, current_layer)
+                        if slot == 0:
+                            clock.advance(hours=8)
+                            await _dispatch(
+                                runtime,
+                                adapter,
+                                user,
+                                operation_base + 30,
+                                "恢复状态",
+                            )
+
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        dao_union_state = connection.execute(
+                            "SELECT realm_key, realm_layer, cultivation, total_cultivation "
+                            "FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                    if (
+                        dao_union_state[0] == "dao_union"
+                        and int(dao_union_state[1]) == 10
+                        and int(dao_union_state[2]) >= 6_000_000
+                        and int(dao_union_state[3]) >= 8_998_960
+                    ):
+                        dao_union_l10_reached = True
+                        break
+                assert dao_union_l10_reached, dao_union_state
                 await runtime.close()
 
     asyncio.run(run())
