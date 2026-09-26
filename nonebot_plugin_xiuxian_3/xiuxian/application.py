@@ -460,6 +460,20 @@ class XiuxianApplication:
             write_message="当前事件不允许确认魔界引导。",
         )
 
+    async def read_beast_history(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.world.read_beast_history(context),
+            write_message="当前事件不允许记录妖界史阅读。",
+        )
+
+    async def complete_beast_intro(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.world.complete_beast_intro(context),
+            write_message="当前事件不允许完成妖界引导。",
+        )
+
     async def use_array_hall(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

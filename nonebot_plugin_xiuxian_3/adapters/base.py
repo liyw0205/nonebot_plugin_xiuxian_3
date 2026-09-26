@@ -167,6 +167,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("结算云舟", application.settle_cloud_boat)
     router.register("恢复云舟", application.recover_cloud_boat)
     router.register("接受魔界引导", application.accept_demon_intro, aliases=("魔界引导", "确认魔界风险"))
+    router.register("阅读妖界史", application.read_beast_history)
+    router.register("完成妖界引导", application.complete_beast_intro)
     router.register("使用阵堂", application.use_array_hall, aliases=("进入阵堂", "阵堂权限"))
     router.register("进入虚空航道", application.enter_void_route, aliases=("前往虚空航道", "虚空航行"))
     router.register("结算虚空航道", application.settle_void_route)

@@ -184,6 +184,14 @@ class DemonIntroAlreadyCompletedError(RuntimeError):
     """The one-time demon introduction was already completed."""
 
 
+class BeastIntroRequirementError(RuntimeError):
+    """The beast-realm introduction prerequisites are incomplete."""
+
+
+class BeastIntroAlreadyCompletedError(RuntimeError):
+    """The one-time beast-realm introduction was already completed."""
+
+
 class ResourceInsufficientError(RuntimeError):
     """A player does not have enough of a spendable resource."""
 

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+
+from .cloud_rules import BEAST_INTRO_FLAG
 
 
 RULE_VERSION = "world-0.1.0"
 CAVE_LOCATION = "cave.mist_grotto"
 CAVE_PASS = "item.cave_pass_basic"
+BEAST_HILLS_REQUIRED_REPUTATION = 200
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,3 +264,7 @@ def meets_realm(realm_key: str, layer: int, required_realm: str | None, required
     if required_realm is None:
         return True
     return (realm_rank(realm_key), int(layer)) >= (realm_rank(required_realm), required_layer)
+
+
+def beast_hills_entry_allowed(faction_reputation: int, intro_flags: Iterable[str]) -> bool:
+    return int(faction_reputation) >= BEAST_HILLS_REQUIRED_REPUTATION or BEAST_INTRO_FLAG in set(intro_flags)

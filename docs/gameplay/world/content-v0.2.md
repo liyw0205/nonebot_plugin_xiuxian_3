@@ -4,7 +4,7 @@
 
 - `content_version`：`content-0.2`
 - `rule_version`：`world-0.2.0`（筑基矿区路线修订为 `world-0.2.1`）
-- 新用例：`world.board_cloud_boat`、`world.accept_demon_intro`、`world.use_array_hall`。
+- 新用例：`world.board_cloud_boat`、`world.accept_demon_intro`、`world.read_beast_history`、`world.complete_beast_intro`、`world.use_array_hall`。
 
 | `location_key` | 准入 | 耗时/成本 | 环境与动作 | 关闭/失败 |
 |:--|:--|:--|:--|:--|
@@ -38,3 +38,5 @@
 云舟试炼要求位于云舟渡口且达到金丹 L1；洞天二层入口要求已经抵达该地点；v0.2 五条个人配方已开放预览、生产和结算，阵堂地点仍会再次校验宗门成员/教学邀请；魔界核心区和魔界资源仍
 返回关闭或未满足前置；已创建云舟按会话快照结算。`world.accept_demon_intro` 只写入入口资格和
 `faction_reputation.demon=20`，不发魔核或妖血。
+
+妖界引导由 `阅读妖界史` 和 `完成妖界引导` 提供：后者要求筑基、本人阅读事件、本人已结算的近郊采集或短历练，以及 100 灵石；一次事务内扣费并发放 `access.beast_ten_thousand_hills` 与 20 妖界声望。每角色限一次，失败不扣费。

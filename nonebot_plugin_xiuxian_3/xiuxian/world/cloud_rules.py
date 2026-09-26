@@ -9,6 +9,8 @@ CONTENT_VERSION = "content-0.2"
 RULE_VERSION = "world-0.2.0"
 DEMON_INTRO_QUEST = "quest.demon_intro"
 DEMON_INTRO_FLAG = "access.demon_abyss_gate"
+BEAST_INTRO_QUEST = "quest.beast_intro"
+BEAST_INTRO_FLAG = "access.beast_ten_thousand_hills"
 ARRAY_HALL_INVITE_FLAG = "array_hall.invite"
 ADVANCED_CAVE_PASS = "item.cave_pass_advanced"
 
@@ -75,6 +77,8 @@ def cloud_route_definition(route_key: str) -> CloudRouteDefinition:
 
 __all__ = [
     "ADVANCED_CAVE_PASS",
+    "BEAST_INTRO_FLAG",
+    "BEAST_INTRO_QUEST",
     "ARRAY_HALL_INVITE_FLAG",
     "CLOUD_ROUTES",
     "CONTENT_VERSION",

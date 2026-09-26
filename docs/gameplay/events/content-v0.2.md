@@ -30,6 +30,8 @@
 | `quest.demon_intro` | 筑基；完成 `route.cloud_to_abyss_intro`、确认魔界风险说明、提交灵石 100 | `access.demon_abyss_gate`、`faction_reputation.demon` 20 | 不发魔核、不开放魔界核心区；每角色一次 |
 | `quest.beast_intro` | 筑基；完成妖界史阅读、近郊妖兽观察 1 次、提交灵石 100 | `access.beast_ten_thousand_hills`、`faction_reputation.beast` 20 | 不发妖血、不开放妖界核心区；每角色一次 |
 
-两项任务的确认/提交/奖励均通过 `quest.complete` 单一 operation 结算；重复返回原资格。入口资格只用于 v0.2 锁定入口说明，核心地点仍在 v0.3 才开放。
+`quest.beast_intro` 通过 `阅读妖界史` 记录阅读 operation，通过 `完成妖界引导` 原子核验筑基、阅读事件、本人已结算的近郊采集/短历练和 100 灵石，再写任务进度、权限与声望。完成 operation 可重放，每角色只能领取一次。入口资格在 v0.3 万兽山开放后可替代 200 妖界声望准入，但不替代元婴境界要求；不发妖血、不开放妖界核心区。
+
+`quest.demon_intro` 的现有风险确认仍由 `接受魔界引导` 单一 operation 结算；重复返回原资格。
 
 错误：`SEASON_NOT_ACTIVE`、`SEASON_REWARD_ALREADY_CLAIMED`、`EVENT_RANKING_NOT_FINALIZED`。关闭时冻结积分写入，先生成排名快照再开放领奖。验收：排名 tie-break 稳定；同一精英战不双加分；活动与赛季奖各自唯一；赛后实时变更不影响榜单。

@@ -11,6 +11,8 @@
 - `board_cloud_boat(player_id, route_key, operation_id)` -> v0.2 云舟会话，冻结路线、费用和凭证。
 - `settle_cloud_boat(player_id, operation_id)` -> 按冻结快照抵达洞天二层、深渊门或返回云城。
 - `accept_demon_intro(player_id, operation_id)` -> 在深渊门确认风险，写入一次性入口资格和魔界声望，不发魔界资源。
+- `read_beast_history(player_id, operation_id)` -> 写入 `quest.beast_intro` 的妖界史阅读事件。
+- `complete_beast_intro(player_id, operation_id)` -> 原子核验筑基、史料事件、本人已结算的近郊探索和灵石，发放万兽山入口资格及 20 妖界声望。
 - `use_array_hall(player_id, operation_id)` -> 再次校验宗门/教学邀请，只确认阵堂权限，不自动创建生产订单；生产域的阵堂配方在预览和开始时复用同一校验。
 - `leave_closed_location(player_id, operation_id)` -> 撤离结果。
 
@@ -24,6 +26,8 @@
 跨界声望门槛另有 `FACTION_REPUTATION_INSUFFICIENT`。
 v0.2 另有 `CLOUD_ROUTE_LOCKED`、`CLOUD_FARE_INSUFFICIENT`、`ADVANCED_CAVE_PASS_MISSING`、
 `ARRAY_HALL_PERMISSION_DENIED`、`DEMON_INTRO_REQUIREMENT_MISSING`。
+妖界任务另有 `BEAST_INTRO_REQUIREMENT_MISSING`、`BEAST_INTRO_ALREADY_COMPLETED` 和
+`BEAST_INTRO_STONES_INSUFFICIENT`。
 
 ## 验收
 

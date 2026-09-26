@@ -112,7 +112,7 @@ from ..world.void_rules import (
 )
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
-from ..world.rules import destination_definition, meets_realm
+from ..world.rules import beast_hills_entry_allowed, destination_definition, meets_realm
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     battle_roll_bp,
@@ -239,7 +239,10 @@ class TravelRepositoryMixin:
             missing.append(f"境界要求（{required}）")
         if definition.required_faction and definition.required_faction_reputation:
             current_reputation = int(player.faction_reputation.get(definition.required_faction, 0))
-            if current_reputation < definition.required_faction_reputation:
+            has_beast_hills_access = destination == "beast.ten_thousand_hills" and beast_hills_entry_allowed(
+                current_reputation, player.intro_flags
+            )
+            if current_reputation < definition.required_faction_reputation and not has_beast_hills_access:
                 faction_label = {"demon": "魔界", "beast": "妖界"}.get(
                     definition.required_faction, definition.required_faction
                 )
@@ -408,7 +411,12 @@ class TravelRepositoryMixin:
             reputation = self._json_object(row["faction_reputation_json"], {})
             current_reputation = int(reputation.get(definition.required_faction or "", 0))
             if definition.required_faction and current_reputation < definition.required_faction_reputation:
-                raise FactionReputationInsufficientError("destination faction reputation is insufficient")
+                intro = self._json_object(row["intro_json"], {})
+                has_beast_hills_access = destination == "beast.ten_thousand_hills" and beast_hills_entry_allowed(
+                    current_reputation, intro.get("flags", [])
+                )
+                if not has_beast_hills_access:
+                    raise FactionReputationInsufficientError("destination faction reputation is insufficient")
             if int(row["dao_fruit_progress"]) < definition.required_dao_fruit_progress:
                 raise LocationRequirementError("dao fruit progress is insufficient")
 
@@ -496,6 +504,12 @@ class TravelRepositoryMixin:
                 "required_faction_reputation": definition.required_faction_reputation,
                 "faction_reputation": current_reputation,
             }
+            if destination == "beast.ten_thousand_hills":
+                snapshot["beast_hills_permission"] = (
+                    "reputation"
+                    if current_reputation >= definition.required_faction_reputation
+                    else "intro_flag"
+                )
             connection.execute(
                 """
                 UPDATE players

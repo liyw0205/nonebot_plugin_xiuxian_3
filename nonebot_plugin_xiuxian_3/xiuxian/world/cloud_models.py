@@ -50,6 +50,22 @@ class DemonIntroRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class BeastHistoryRecord:
+    quest_key: str
+    component_key: str
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class BeastIntroRecord:
+    player: PlayerView
+    quest_key: str
+    status: str
+    reward: dict[str, int] = field(default_factory=dict)
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class ArrayHallRecord:
     player: PlayerView
     status: str
@@ -60,6 +76,8 @@ class ArrayHallRecord:
 
 __all__ = [
     "ArrayHallRecord",
+    "BeastHistoryRecord",
+    "BeastIntroRecord",
     "CloudBoatSettlementRecord",
     "CloudBoatStartRecord",
     "DemonIntroRecord",

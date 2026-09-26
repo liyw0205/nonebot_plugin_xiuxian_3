@@ -13,8 +13,17 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from .cloud_models import ArrayHallRecord, CloudBoatSettlementRecord, CloudBoatStartRecord, DemonIntroRecord
+from .cloud_models import (
+    ArrayHallRecord,
+    BeastHistoryRecord,
+    BeastIntroRecord,
+    CloudBoatSettlementRecord,
+    CloudBoatStartRecord,
+    DemonIntroRecord,
+)
 from .cloud_rules import (
+    BEAST_INTRO_FLAG,
+    BEAST_INTRO_QUEST,
     CLOUD_ROUTES,
     CONTENT_VERSION,
     DEMON_INTRO_FLAG,
@@ -390,6 +399,234 @@ class CloudRepositoryMixin:
             self._cloud_insert_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
             return self._demon_intro_from_payload(payload)
 
+    async def read_beast_history(
+        self, *, platform: str, platform_user_id: str, operation_id: str
+    ) -> BeastHistoryRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._read_beast_history_once, platform, platform_user_id, operation_id
+            )
+
+    def _read_beast_history_once(
+        self, platform: str, platform_user_id: str, operation_id: str
+    ) -> BeastHistoryRecord:
+        from ..repository import OperationConflictError
+
+        operation_name = "world.read_beast_history"
+        request_hash = self._request_hash(
+            operation_name, {"platform": platform, "platform_user_id": platform_user_id}
+        )
+        now_text = serialize_datetime(self._now())
+        component_key = "beast_history_read"
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                payload = json.loads(existing["result_json"])
+                return BeastHistoryRecord(
+                    quest_key=str(payload["quest_key"]),
+                    component_key=str(payload["component_key"]),
+                    already_completed=True,
+                )
+
+            player = self._require_player(connection, platform, platform_user_id)
+            player_id = int(player["id"])
+            self._insert_quest_event(
+                connection,
+                player_id=player_id,
+                quest_key=BEAST_INTRO_QUEST,
+                component_key=component_key,
+                source_operation_id=operation_id,
+                outcome="read",
+                payload={"source": "beast_history"},
+                now_text=now_text,
+                content_version=CONTENT_VERSION,
+                rule_version=RULE_VERSION,
+            )
+            progress = connection.execute(
+                "SELECT status FROM quest_progress WHERE player_id = ? AND quest_key = ?",
+                (player_id, BEAST_INTRO_QUEST),
+            ).fetchone()
+            if progress is None or str(progress["status"]) not in {"completed", "claimed"}:
+                self._upsert_progress(
+                    connection,
+                    player_id,
+                    BEAST_INTRO_QUEST,
+                    "active",
+                    {component_key: 1},
+                    {"quest_key": BEAST_INTRO_QUEST, "content_version": CONTENT_VERSION, "rule_version": RULE_VERSION},
+                    operation_id,
+                    now_text,
+                    content_version=CONTENT_VERSION,
+                    rule_version=RULE_VERSION,
+                )
+            payload = {"quest_key": BEAST_INTRO_QUEST, "component_key": component_key}
+            self._cloud_insert_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
+            return BeastHistoryRecord(quest_key=BEAST_INTRO_QUEST, component_key=component_key)
+
+    async def complete_beast_intro(
+        self, *, platform: str, platform_user_id: str, operation_id: str
+    ) -> BeastIntroRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._complete_beast_intro_once, platform, platform_user_id, operation_id
+            )
+
+    def _complete_beast_intro_once(
+        self, platform: str, platform_user_id: str, operation_id: str
+    ) -> BeastIntroRecord:
+        from ..repository import (
+            BeastIntroAlreadyCompletedError,
+            BeastIntroRequirementError,
+            OperationConflictError,
+            ResourceInsufficientError,
+        )
+
+        operation_name = "world.complete_beast_intro"
+        request_hash = self._request_hash(
+            operation_name, {"platform": platform, "platform_user_id": platform_user_id}
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._beast_intro_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            player = self._require_player(connection, platform, platform_user_id)
+            player_id = int(player["id"])
+            progress = connection.execute(
+                "SELECT status FROM quest_progress WHERE player_id = ? AND quest_key = ?",
+                (player_id, BEAST_INTRO_QUEST),
+            ).fetchone()
+            if progress is not None and str(progress["status"]) in {"completed", "claimed"}:
+                raise BeastIntroAlreadyCompletedError("beast introduction already completed")
+            if not self._cloud_meets_realm(
+                str(player["realm_key"]), int(player["realm_layer"]), "foundation", 1
+            ):
+                raise BeastIntroRequirementError("beast introduction requires foundation")
+            history = connection.execute(
+                "SELECT 1 FROM quest_events WHERE player_id = ? AND quest_key = ? "
+                "AND component_key = 'beast_history_read' AND outcome = 'read' LIMIT 1",
+                (player_id, BEAST_INTRO_QUEST),
+            ).fetchone()
+            if history is None:
+                raise BeastIntroRequirementError("beast history has not been read")
+            observation = self._valid_beast_observation(connection, player_id)
+            if observation is None:
+                raise BeastIntroRequirementError("outskirts beast observation is incomplete")
+            if int(player["spirit_stones"]) < 100:
+                raise ResourceInsufficientError("beast introduction requires 100 spirit stones")
+
+            faction = self._json_object(player["faction_reputation_json"], {})
+            faction["beast"] = int(faction.get("beast", 0)) + 20
+            intro = self._json_object(player["intro_json"], {})
+            flags = {str(item) for item in intro.get("flags", [])}
+            flags.update({BEAST_INTRO_QUEST, BEAST_INTRO_FLAG})
+            intro["flags"] = sorted(flags)
+            connection.execute(
+                "UPDATE players SET spirit_stones = spirit_stones - 100, faction_reputation_json = ?, "
+                "intro_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(faction, ensure_ascii=False, sort_keys=True), json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, player_id),
+            )
+            self._insert_quest_event(
+                connection,
+                player_id=player_id,
+                quest_key=BEAST_INTRO_QUEST,
+                component_key="outskirts_beast_observation",
+                source_operation_id=str(observation["settlement_operation_id"]),
+                outcome="success",
+                payload={"exploration_id": str(observation["exploration_id"]), "mode_key": str(observation["mode_key"])},
+                now_text=now_text,
+                content_version=CONTENT_VERSION,
+                rule_version=RULE_VERSION,
+            )
+            self._insert_quest_event(
+                connection,
+                player_id=player_id,
+                quest_key=BEAST_INTRO_QUEST,
+                component_key="submission",
+                source_operation_id=operation_id,
+                outcome="success",
+                payload={"submitted_stones": 100, "reputation": 20},
+                now_text=now_text,
+                content_version=CONTENT_VERSION,
+                rule_version=RULE_VERSION,
+            )
+            quest_snapshot = {
+                "quest_key": BEAST_INTRO_QUEST,
+                "content_version": CONTENT_VERSION,
+                "rule_version": RULE_VERSION,
+                "access_flag": BEAST_INTRO_FLAG,
+                "exploration_id": str(observation["exploration_id"]),
+                "exploration_operation_id": str(observation["settlement_operation_id"]),
+                "exploration_start_operation_id": str(observation["start_operation_id"]),
+                "exploration_mode": str(observation["mode_key"]),
+            }
+            self._upsert_progress(
+                connection,
+                player_id,
+                BEAST_INTRO_QUEST,
+                "completed",
+                {"beast_history_read": 1, "outskirts_beast_observation": 1, "submission": 1},
+                quest_snapshot,
+                operation_id,
+                now_text,
+                content_version=CONTENT_VERSION,
+                rule_version=RULE_VERSION,
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "quest_key": BEAST_INTRO_QUEST,
+                "status": "completed",
+                "reward": {"faction_reputation.beast": 20},
+            }
+            self._cloud_insert_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
+            return self._beast_intro_from_payload(payload)
+
+    @staticmethod
+    def _valid_beast_observation(connection: Any, player_id: int) -> Any | None:
+        return connection.execute(
+            """
+            SELECT e.exploration_id, e.operation_id AS start_operation_id, e.mode_key,
+                (
+                    SELECT o.operation_id FROM operations AS o
+                    WHERE o.player_id = e.player_id
+                        AND o.operation_name IN ('exploration.settle', 'exploration.settle_combat')
+                        AND json_extract(o.result_json, '$.exploration_id') = e.exploration_id
+                        AND json_extract(o.result_json, '$.status') = 'settled'
+                    ORDER BY o.created_at ASC LIMIT 1
+                ) AS settlement_operation_id
+            FROM exploration_sessions AS e
+            WHERE e.player_id = ? AND e.location_key = 'xuantian.outskirts'
+                AND e.mode_key IN ('explore.gather_outskirts', 'explore.trial_outskirts')
+                AND e.status = 'settled'
+                AND EXISTS (
+                    SELECT 1 FROM operations AS o
+                    WHERE o.player_id = e.player_id
+                        AND o.operation_name IN ('exploration.settle', 'exploration.settle_combat')
+                        AND json_extract(o.result_json, '$.exploration_id') = e.exploration_id
+                        AND json_extract(o.result_json, '$.status') = 'settled'
+                )
+            ORDER BY e.id ASC
+            LIMIT 1
+            """,
+            (player_id,),
+        ).fetchone()
+
     async def use_array_hall(
         self, *, platform: str, platform_user_id: str, operation_id: str
     ) -> ArrayHallRecord:
@@ -512,6 +749,18 @@ class CloudRepositoryMixin:
         return DemonIntroRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]), quest_key=str(payload["quest_key"]),
             status=str(payload["status"]), reward={str(k): int(v) for k, v in payload.get("reward", {}).items()},
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _beast_intro_from_payload(payload: dict[str, Any], *, replay: bool = False) -> BeastIntroRecord:
+        from ..repository import SQLitePlayerRepository
+
+        return BeastIntroRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            quest_key=str(payload["quest_key"]),
+            status=str(payload["status"]),
+            reward={str(k): int(v) for k, v in payload.get("reward", {}).items()},
             already_completed=replay,
         )
 
