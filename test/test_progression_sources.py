@@ -7,7 +7,11 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp, settlement_result
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
+    battle_roll_bp,
+    cloud_boat_storm_roll_bp,
+    settlement_result,
+)
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import next_layer_threshold
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
@@ -152,7 +156,7 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
     asyncio.run(run())
 
 
-def test_qq_and_onebot_can_reach_golden_core_from_new_player() -> None:
+def test_qq_and_onebot_can_reach_nascent_soul_from_new_player() -> None:
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
@@ -555,6 +559,153 @@ def test_qq_and_onebot_can_reach_golden_core_from_new_player() -> None:
                 golden = await _dispatch(runtime, adapter, user, 1466, "结算突破")
                 assert golden.code == "BREAKTHROUGH_SUCCEEDED"
                 assert golden.data["target_realm"] == "golden_core"
+
+                await _dispatch(runtime, adapter, user, 1500, "前往 近郊")
+                clock.advance(seconds=30)
+                await _dispatch(runtime, adapter, user, 1501, "结算移动")
+                for day in range(28):
+                    clock.advance(days=1)
+                    await _dispatch(runtime, adapter, user, 1510 + day, "恢复状态")
+                    await _dispatch(runtime, adapter, user, 1540 + day, "道历问安")
+                    for index in range(8):
+                        if index == 6:
+                            clock.advance(hours=3)
+                            await _dispatch(runtime, adapter, user, 1900 + day, "恢复状态")
+                        elif index == 7:
+                            clock.advance(hours=3)
+                            await _dispatch(runtime, adapter, user, 1950 + day, "恢复状态")
+                        operation = next(
+                            f"{adapter}-nascent-money-{day}-{index}-{candidate}"
+                            for candidate in range(1000)
+                            if settlement_result(
+                                "explore.trial_outskirts",
+                                f"{adapter}-nascent-money-{day}-{index}-{candidate}",
+                            )["spirit_stones"] == 30
+                            and battle_roll_bp(
+                                f"{adapter}-nascent-money-{day}-{index}-{candidate}:battle"
+                            ) >= 2000
+                        )
+                        await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            1580 + day * 8 + index,
+                            "开始探索 短历练",
+                            operation_id=operation,
+                        )
+                        clock.advance(seconds=60)
+                        await _dispatch(runtime, adapter, user, 1810 + day * 8 + index, "结算探索")
+
+                await _dispatch(runtime, adapter, user, 2100, "前往 青石镇")
+                clock.advance(seconds=30)
+                await _dispatch(runtime, adapter, user, 2101, "结算移动")
+                clock.advance(hours=4)
+                await _dispatch(runtime, adapter, user, 2106, "恢复状态")
+                await _dispatch(runtime, adapter, user, 2102, "前往 云城")
+                clock.advance(minutes=3)
+                await _dispatch(runtime, adapter, user, 2103, "结算移动")
+                await _dispatch(runtime, adapter, user, 2104, "前往 云舟渡口")
+                clock.advance(minutes=1)
+                await _dispatch(runtime, adapter, user, 2105, "结算移动")
+                clock.advance(hours=6)
+                await _dispatch(runtime, adapter, user, 2107, "恢复状态")
+
+                nascent_ready = False
+                for day in range(35):
+                    if day:
+                        clock.advance(days=1)
+                        await _dispatch(runtime, adapter, user, 2110 + day, "恢复状态")
+                        await _dispatch(runtime, adapter, user, 2150 + day, "道历问安")
+                    for index in range(3):
+                        if index:
+                            clock.advance(hours=6)
+                            await _dispatch(runtime, adapter, user, 2180 + day * 3 + index, "恢复状态")
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            realm, layer, cultivation, total = connection.execute(
+                                "SELECT realm_key, realm_layer, cultivation, total_cultivation FROM players "
+                                "WHERE platform=? AND platform_user_id=?",
+                                (adapter, user),
+                            ).fetchone()
+                        if realm == "golden_core" and layer == 10 and total >= 58960:
+                            nascent_ready = True
+                            break
+                        operation = next(
+                            f"{adapter}-gold-trial-{day}-{index}-{candidate}"
+                            for candidate in range(1000)
+                            if cloud_boat_storm_roll_bp(
+                                f"{adapter}-gold-trial-{day}-{index}-{candidate}"
+                            ) >= 2500
+                        )
+                        await _dispatch(
+                            runtime,
+                            adapter,
+                            user,
+                            2200 + day * 3 + index,
+                            "开始探索 云舟试炼",
+                            operation_id=operation,
+                        )
+                        clock.advance(minutes=5)
+                        settled_trial = await _dispatch(runtime, adapter, user, 2300 + day * 3 + index, "结算探索")
+                        assert settled_trial.data["result"]["cultivation"] > 0
+                        threshold = next_layer_threshold("golden_core", int(layer))
+                        if threshold is not None and int(cultivation) + int(settled_trial.data["result"]["cultivation"]) >= threshold:
+                            advanced = await _dispatch(runtime, adapter, user, 2400 + day * 3 + index, "晋升境界")
+                            layer = int(advanced.data["realm_layer"])
+                    if nascent_ready:
+                        break
+                else:
+                    raise AssertionError("new player did not reach golden-core L10 from cloud-boat trials")
+
+                clock.advance(days=1)
+                await _dispatch(runtime, adapter, user, 2499, "恢复状态")
+                await _dispatch(runtime, adapter, user, 2500, "乘坐云舟 魔界引导")
+                clock.advance(minutes=5)
+                await _dispatch(runtime, adapter, user, 2501, "结算云舟")
+                assert (await _dispatch(runtime, adapter, user, 2502, "接受魔界引导")).code == "DEMON_INTRO_ACCEPTED"
+                await _dispatch(runtime, adapter, user, 2503, "恢复状态")
+                for index in range(6):
+                    if index == 3:
+                        clock.advance(days=1)
+                        await _dispatch(runtime, adapter, user, 2504, "恢复状态")
+                    elif index == 2:
+                        clock.advance(hours=2)
+                        await _dispatch(runtime, adapter, user, 2505, "恢复状态")
+                    started = await _dispatch(runtime, adapter, user, 2510 + index, "开始探索 深渊门备材")
+                    assert started.code == "EXPLORATION_STARTED"
+                    clock.advance(minutes=4)
+                    settled = await _dispatch(runtime, adapter, user, 2520 + index, "结算探索")
+                    assert settled.data["result"] == {"item.soul_crystal": 1, "item.demon_core": 1}
+
+                await _dispatch(runtime, adapter, user, 2530, "乘坐云舟 返回云城")
+                clock.advance(minutes=3)
+                await _dispatch(runtime, adapter, user, 2531, "结算云舟")
+                soul_pill_operation = next(
+                    f"{adapter}-final-soul-pill-{candidate}"
+                    for candidate in range(1000)
+                    if random_quality_bp(f"{adapter}-final-soul-pill-{candidate}") >= 1000
+                )
+                pill = await _dispatch(
+                    runtime, adapter, user, 2532, "开始生产 凝魂丹", operation_id=soul_pill_operation
+                )
+                assert pill.code == "PRODUCTION_STARTED", pill.message
+                clock.advance(minutes=5)
+                soul_pill = await _dispatch(runtime, adapter, user, 2533, "领取生产")
+                assert soul_pill.data["outputs"] == {"item.pill.soul_condense": 1}
+                prepared = await _dispatch(runtime, adapter, user, 2534, "准备元婴")
+                assert prepared.code == "NASCENT_SOUL_PREPARED", prepared.message
+                soul_break_operation = next(
+                    f"{adapter}-final-nascent-break-{candidate}"
+                    for candidate in range(1000)
+                    if breakthrough_roll_bp(f"{adapter}-final-nascent-break-{candidate}") < 5500
+                )
+                started_soul = await _dispatch(
+                    runtime, adapter, user, 2535, "开始突破 元婴", operation_id=soul_break_operation
+                )
+                assert started_soul.code == "BREAKTHROUGH_STARTED", started_soul.message
+                clock.advance(minutes=30)
+                soul_break = await _dispatch(runtime, adapter, user, 2536, "结算突破")
+                assert soul_break.code == "BREAKTHROUGH_SUCCEEDED", soul_break.message
+                assert soul_break.data["target_realm"] == "nascent_soul"
                 await runtime.close()
 
     asyncio.run(run())
