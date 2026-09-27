@@ -12,6 +12,8 @@ RULE_VERSION = "combat-0.1.0"
 V03_CONTENT_VERSION = "content-0.3"
 V03_RULE_VERSION = "combat-0.3.0"
 V031_RULE_VERSION = "combat-0.3.1"
+V02_CONTENT_VERSION = "content-0.2"
+V02_RULE_VERSION = "combat-0.2.0"
 MAX_TURNS = 20
 TURN_TIMEOUT_SECONDS = 60
 DEFEAT_COOLDOWN_SECONDS = 15 * 60
@@ -137,6 +139,21 @@ MIST_ELITE = EnemyDefinition(
     agility=18,
     skill_key="enemy_skill.mist_exposed",
     random_pool="battle.enemy.mist_elite.v0.2",
+    reward={},
+)
+
+CLOUD_BOAT_GUARDIAN = EnemyDefinition(
+    key="enemy.cloud_boat_guardian",
+    label="云舟守灵",
+    location_key="xuantian.floating_boat",
+    required_realm="golden_core",
+    required_layer=1,
+    max_hp=900,
+    attack=120,
+    initiative=16,
+    agility=16,
+    skill_key="enemy_skill.cloud_armor",
+    random_pool="combat.enemy.cloud_boat_guardian.v0.2",
     reward={},
 )
 
@@ -302,6 +319,7 @@ ENEMIES = {
     SPRING_WISP.key: SPRING_WISP,
     CLOUD_BEAST.key: CLOUD_BEAST,
     MIST_ELITE.key: MIST_ELITE,
+    CLOUD_BOAT_GUARDIAN.key: CLOUD_BOAT_GUARDIAN,
     DEMON_OVERLORD.key: DEMON_OVERLORD,
     DEMON_RUINS_SCOUT.key: DEMON_RUINS_SCOUT,
     BEAST_GUARDIAN.key: BEAST_GUARDIAN,
@@ -380,6 +398,8 @@ def player_goes_first(*, player_initiative: int, enemy_initiative: int, seed: st
 
 __all__ = [
     "CONTENT_VERSION",
+    "V02_CONTENT_VERSION",
+    "V02_RULE_VERSION",
     "DEFEAT_COOLDOWN_SECONDS",
     "V03_CONTENT_VERSION",
     "V03_RULE_VERSION",
@@ -390,6 +410,7 @@ __all__ = [
     "TURN_TIMEOUT_SECONDS",
     "EnemyDefinition",
     "CLOUD_BEAST",
+    "CLOUD_BOAT_GUARDIAN",
     "DEMON_OVERLORD",
     "DEMON_RUINS_SCOUT",
     "BEAST_GUARDIAN",

@@ -27,6 +27,10 @@ ITEM_LABELS = {
     "item.material.mist_core": "洞天材料",
     "item.herb.spirit_leaf": "灵叶",
     "codex.instance.mist_grotto": "图鉴记录",
+    "codex.instance.cloud_boat": "云舟图鉴",
+    "item.material.cloud_iron": "云铁",
+    "item.weapon.cloud_sword": "云纹剑",
+    "item.ticket.cloud_boat_fragment": "云舟票碎片",
     "local_reputation": "地方名望",
 }
 
@@ -80,12 +84,12 @@ class SecretRealmApplication:
         if record.active_run_id:
             lines.append(f"> 当前已有进行中的秘境：`{record.active_run_id}`。")
         else:
-            lines.append("> 发送 `进入秘境 雾隐秘境` 或 `进入秘境 灵泉小径` 开始。")
+            lines.append("> 发送 `进入秘境 雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境` 或 `云舟秘境` 开始。")
         return CommandResult(True, "SECRET_REALM_PREVIEW", "\n".join(lines), context.request_id, data={"realms": data, "active_run_id": record.active_run_id})
 
     async def enter(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1 or not (instance_key := resolve_secret_realm(context.command_args[0])):
-            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `进入秘境 雾隐秘境` 或 `进入秘境 灵泉小径`。", context.request_id)
+            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `进入秘境 雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境` 或 `云舟秘境`。", context.request_id)
         operation_id = self._operation_id(context, "secret_realm.enter")
         try:
             record = await self.repository.enter_secret_realm(platform=context.adapter, platform_user_id=context.user_id, instance_key=instance_key, operation_id=operation_id)

@@ -185,7 +185,9 @@ class SecretRealmRepositoryMixin:
             )
         if record.status != "combat_pending":
             return record
-        battle_operation = f"secret_realm.battle.start:{record.run_id}"
+        # The node index differentiates repeated encounter nodes while still
+        # making retries of the same node replay the original battle.
+        battle_operation = f"secret_realm.battle.start:{record.run_id}:{record.node_index}"
         try:
             battle = await self.start_quest_battle(
                 platform=platform,
@@ -235,13 +237,15 @@ class SecretRealmRepositoryMixin:
             elif node_key == "encounter":
                 if not snapshot.get("resource_selected"):
                     raise SecretRealmNodeError("resource node must be completed first")
+                if node_index > 1 and snapshot.get("node_history", [])[-1:] != ["choice"]:
+                    raise SecretRealmNodeError("encounter node must follow a completed choice")
                 status = "combat_pending"
                 next_index = node_index
                 battle_id = None
             else:
                 if not snapshot.get("encounter_won"):
                     raise SecretRealmNodeError("encounter must be cleared first")
-                status = "cleared"
+                status = "cleared" if node_index + 1 >= len(nodes) else "routing"
                 next_index = node_index + 1
                 battle_id = None
             snapshot["node_history"] = [*snapshot.get("node_history", []), node_key]
@@ -492,7 +496,13 @@ class SecretRealmRepositoryMixin:
         quantity = int(run_id[-1], 16) % 2
         if instance_key.endswith("mist_grotto"):
             return {"item.material.mist_core": quantity}
-        return {"item.herb.spirit_leaf": quantity}
+        if instance_key.endswith("spring_path"):
+            return {"item.herb.spirit_leaf": quantity}
+        if instance_key.endswith("mist_depth_2"):
+            return {"item.material.cloud_iron": quantity}
+        if instance_key.endswith("cloud_boat"):
+            return {"item.ticket.cloud_boat_fragment": quantity}
+        raise ValueError(f"unsupported secret-realm resource roll: {instance_key}")
 
     @staticmethod
     def _is_first_clear(connection: sqlite3.Connection, player_id: int, instance_key: str) -> bool:
@@ -526,6 +536,30 @@ class SecretRealmRepositoryMixin:
                 local = SecretRealmRepositoryMixin._json_object(rep["local_json"], {}) if rep else {}
                 local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + int(value)
                 connection.execute("INSERT INTO player_reputations(player_id, local_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json, updated_at=excluded.updated_at", (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), now_text))
+            elif key.startswith("item.weapon.") or key.startswith("item.armor."):
+                from ..advancement.equipment_rules import equipment_definition
+
+                definition = equipment_definition(key)
+                for _ in range(int(value)):
+                    connection.execute(
+                        """
+                        INSERT INTO equipment_instances(
+                            instance_id, player_id, item_key, label, slot, status,
+                            durability_bp, temper_level, max_temper_level, affixes_json,
+                            refinement_failure_streak, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, 'active', 10000, 0, ?, '{}', 0, ?, ?)
+                        """,
+                        (
+                            uuid4().hex,
+                            player["id"],
+                            definition.key,
+                            definition.label,
+                            definition.slot,
+                            definition.max_temper_level,
+                            now_text,
+                            now_text,
+                        ),
+                    )
             else:
                 inventory[key] = int(inventory.get(key, 0)) + int(value)
         connection.execute("UPDATE players SET spirit_stones=?, inventory_json=?, updated_at=? WHERE id=?", (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]))

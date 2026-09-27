@@ -45,6 +45,10 @@ from .rules import (
     V03_CONTENT_VERSION,
     V03_RULE_VERSION,
     V031_RULE_VERSION,
+    V02_CONTENT_VERSION,
+    V02_RULE_VERSION,
+    MIST_ELITE,
+    CLOUD_BOAT_GUARDIAN,
     battle_roll_bp,
     enemy_definition,
     hit_chance_bp,
@@ -210,11 +214,20 @@ class CombatRepositoryMixin:
             BEAST_GUARDIAN.key,
             DEMON_WAR_FRONT.key,
         }
-        battle_content_version = V03_CONTENT_VERSION if enemy.key in v03_enemy_keys else CONTENT_VERSION
+        v02_enemy_keys = {MIST_ELITE.key, CLOUD_BOAT_GUARDIAN.key}
+        battle_content_version = (
+            V03_CONTENT_VERSION
+            if enemy.key in v03_enemy_keys
+            else V02_CONTENT_VERSION
+            if enemy.key in v02_enemy_keys
+            else CONTENT_VERSION
+        )
         if enemy.key == DEMON_RUINS_SCOUT.key:
             battle_rule_version = V031_RULE_VERSION
         elif enemy.key in v03_enemy_keys:
             battle_rule_version = V03_RULE_VERSION
+        elif enemy.key in v02_enemy_keys:
+            battle_rule_version = V02_RULE_VERSION
         else:
             battle_rule_version = RULE_VERSION
         operation_name = "battle.start" if battle_type == "pve.training" else f"battle.start.{battle_type}"

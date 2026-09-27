@@ -6,6 +6,8 @@ from .secret_realm_models import SecretRealmDefinition
 
 RULE_VERSION = "adventures-0.1.1"
 CONTENT_VERSION = "content-0.1"
+V02_RULE_VERSION = "adventures-0.2.0"
+V02_CONTENT_VERSION = "content-0.2"
 
 MIST_GROTTO = SecretRealmDefinition(
     key="instance.secret_realm.mist_grotto",
@@ -45,13 +47,54 @@ SPRING_PATH = SecretRealmDefinition(
     content_version=CONTENT_VERSION,
 )
 
-DEFINITIONS = {item.key: item for item in (MIST_GROTTO, SPRING_PATH)}
+MIST_DEPTH_2 = SecretRealmDefinition(
+    key="instance.secret_realm.mist_depth_2",
+    label="雾隐洞天二层秘境",
+    required_realm="golden_core",
+    required_layer=1,
+    location_key="cave.mist_grotto_2",
+    stamina_cost=15,
+    ticket_key="item.cave_pass_advanced",
+    ticket_quantity=1,
+    node_keys=("resource", "encounter", "choice", "encounter", "choice"),
+    enemy_key="enemy.mist_elite",
+    first_reward={"item.weapon.cloud_sword": 1},
+    repeat_reward={"item.material.cloud_iron": 1},
+    quota_period="week",
+    quota_limit=1,
+    rule_version=V02_RULE_VERSION,
+    content_version=V02_CONTENT_VERSION,
+)
+
+CLOUD_BOAT = SecretRealmDefinition(
+    key="instance.secret_realm.cloud_boat",
+    label="云舟秘境",
+    required_realm="golden_core",
+    required_layer=1,
+    location_key="xuantian.floating_boat",
+    stamina_cost=12,
+    ticket_key="item.ticket.cloud_boat_fragment",
+    ticket_quantity=1,
+    node_keys=("resource", "encounter", "choice"),
+    enemy_key="enemy.cloud_boat_guardian",
+    first_reward={"codex.instance.cloud_boat": 1, "local_reputation": 12},
+    repeat_reward={"item.ticket.cloud_boat_fragment": 1},
+    quota_period="week",
+    quota_limit=2,
+    rule_version=V02_RULE_VERSION,
+    content_version=V02_CONTENT_VERSION,
+)
+
+DEFINITIONS = {item.key: item for item in (MIST_GROTTO, SPRING_PATH, MIST_DEPTH_2, CLOUD_BOAT)}
 ALIASES = {
     **{key: key for key in DEFINITIONS},
     "雾隐秘境": MIST_GROTTO.key,
     "雾隐洞天秘境": MIST_GROTTO.key,
     "灵泉小径": SPRING_PATH.key,
     "灵泉秘境": SPRING_PATH.key,
+    "雾隐洞天二层秘境": MIST_DEPTH_2.key,
+    "洞天二层秘境": MIST_DEPTH_2.key,
+    "云舟秘境": CLOUD_BOAT.key,
 }
 
 NODE_ALIASES = {
@@ -101,6 +144,8 @@ __all__ = [
     "DEFINITIONS",
     "NODE_ALIASES",
     "RULE_VERSION",
+    "V02_CONTENT_VERSION",
+    "V02_RULE_VERSION",
     "realm_at_least",
     "resolve_node",
     "resolve_secret_realm",

@@ -49,6 +49,8 @@ def test_qq_and_onebot_secret_realm_preview_are_isolated() -> None:
             assert {item["instance_key"] for item in qq.data["realms"]} == {
                 "instance.secret_realm.mist_grotto",
                 "instance.secret_realm.spring_path",
+                "instance.secret_realm.mist_depth_2",
+                "instance.secret_realm.cloud_boat",
             }
             await runtime.close()
 
