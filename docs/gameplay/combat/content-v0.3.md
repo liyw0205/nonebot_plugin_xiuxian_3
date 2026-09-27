@@ -4,12 +4,16 @@
 
 | `enemy_key` | 场景 | 气血/攻击 | 核心机制 | 奖励 |
 |:--|:--|:--|:--|:--|
+| `enemy.demon_abyss_echo_guardian` | 魔界深渊秘境 | 700 / 85 | 无额外机制，服务端普通自动回合 | 无；由秘境统一结算 |
+| `enemy.demon_abyss_heart` | 魔界深渊秘境 | 1000 / 120 | 无额外机制，服务端普通自动回合 | 无；由秘境统一结算 |
 | `enemy.demon_overlord` | 魔渊副本 | 8000 / 520 | 每 3 回合全队污染 +8；气血 60/30% 阶段护盾 1000 | 魔核、功勋、魔界声望 |
 | `enemy.demon_war_front` | `xuantian.war_front` 战场 | 600 / 35 | 固定单人自动战；战斗行动写入回放，伤害由事件域按每 100 点核验 | 无额外战斗奖励，贡献投影到 `event.demon_invasion` |
 | `enemy.beast_ancestor` | 万兽副本 | 7500 / 480 | 血脉召唤 2 小怪；小怪存活时首领狂暴 +2000 bp | 妖血、功勋、妖界声望 |
 | `enemy.boundary_watcher` | 界隙秘境 | 10000 / 600 | 回合 5/10 时间轴冲击，需至少 2 人防御否则全队神魂 -10 | 神魂晶、元婴材料 |
 
 副本会话最多 5 人，至少 2 人；全员资格、体力、门票、跨界状态锁定后才创建。界隙、魔渊和万兽均使用独立队伍会话；魔渊队伍每名成员扣 20 体力并冻结污染，万兽队伍每名成员扣 20 体力并冻结血脉。死亡角色进入 `downed`，服务端按稳定成员顺序寻找存活队友，原子消耗 25 点神魂复起；每名被复起成员最多一次，神魂不足或无存活队友时不复起并结束战斗。复起、神魂扣除、贡献、污染和祖灵行动均写入队伍回放状态。首领奖励按贡献/每角色上限独立结算；唯一物排序和 roll 固定在 `BattleResult`，重复结算只读取已保存结果。
+
+魔界深渊秘境专用敌人使用 `content-0.3` / `combat-0.3.2`。两者均固定在 `demon.abyss_gate`、筑基 L1 门槛，使用 `enemy_skill.scratch` 且没有专属效果；`enemy.demon_abyss_echo_guardian` 的 initiative/agility 为 14/14，随机池为 `combat.enemy.demon_abyss_echo_guardian.v0.3.2`；`enemy.demon_abyss_heart` 的 initiative/agility 为 18/20，随机池为 `combat.enemy.demon_abyss_heart.v0.3.2`。不接入 `enemy.demon_ruins_scout` 或 `enemy.demon_overlord`。两战 `reward={}`，不能从战斗领奖入口重复产生秘境奖励。
 
 | `skill_key` | 效果 | 成本/限制 |
 |:--|:--|:--|

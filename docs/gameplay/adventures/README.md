@@ -3,7 +3,7 @@
 本域把已有的悬赏、秘境与战斗日志正规化，并新增主线关卡。它复用探索/战斗域的快照与结算，不复制第二套战斗引擎。
 
 当前开放草药补给、训练傀儡、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境，以及已接入的主线关卡；
-斗法记录分享和其他 v0.3 以后的 `instance.secret_realm.*` 内容仍保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
+`instance.secret_realm.demon_abyss` 的规则合同已闭合但运行时仍锁定；斗法记录分享和其他 v0.3 以后的 `instance.secret_realm.*` 内容也保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，以及 v0.3 的
 `bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，

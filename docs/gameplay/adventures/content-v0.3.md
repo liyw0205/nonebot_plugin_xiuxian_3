@@ -1,13 +1,13 @@
 # v0.3 冒险内容基线：三界悬赏、界隙秘境与主线分歧
 
-本文件遵守[版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.3`，`rule_version=adventures-0.3.0`。跨界冒险保存阵营/盟约/污染/血脉快照；失败不静默抹除状态。
+本文件遵守[版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.3`，基础 `rule_version=adventures-0.3.0`。跨界冒险保存阵营/盟约/污染/血脉快照；失败不静默抹除状态。各独立切片可使用本文件登记的后续规则版本。
 
 | 类型 | 稳定键/准入 | 参数与奖励 |
 |:--|:--|:--|
 | 悬赏 | `bounty.demon_relief`：`access.demon_abyss_gate`；接取后获得并交付 `item.food.coarse_spirit_rice` 3 | 4h；每日 1 条；魔界声望 +10、灵石 240；领取时扣除 3 份补给，过期不扣 |
 | 悬赏 | `bounty.beast_habitat`：有效 `permit.beast_trade`；接取后完成 `dispatch.beast_relocation` success 2 次 | 48h；每日 1 条；妖界声望 +10、`codex.story.beast_habitat`；只计接取后新结算的唯一来源 operation |
 | 秘境 | `instance.secret_realm.boundary_rift`：`cave.boundary_realm`、元婴 L1、`story.mainline.three_realms`、2–5 人确认 | 固定 6 节点、每人 30 体力、队长 1 枚 `item.soul_crystal`；每名成员每 UTC 周尝试 1 次 |
-| 秘境 | `instance.secret_realm.demon_abyss`：魔界声望 200 | 4 节点、20 体力；污染风险 +50 bp；首通名望/故事线索 |
+| 秘境 | `instance.secret_realm.demon_abyss`：筑基 L1、`demon.abyss_gate`、`access.demon_abyss_gate`、魔界声望 >=200 | 固定 4 节点、20 体力；污染渗流节点 +50 bp；每 UTC 周 1 次；首通魔界声望 +20 和专属线索，重复给魔核 1 |
 | 主线 | `story.mainline.three_realms` | 元婴 L1；调停、契约、共生三线，选择一线后按序完成 5 关；结局写故事、对应三界声望 1000、`item.token.rebuild_path` 和 `story.mainline.three_realms` 许可旗标 |
 | 斗法留影 | `combat.replay.v0.3` | 保留 90 天/1000 场；公开战报脱敏；跨界战日志只显示区域和队伍编号 |
 
@@ -25,16 +25,19 @@
 `dispatch.demon_relief` / `dispatch.beast_relocation` 与贸易许可的稳定键、成本、时长、风险、返还及奖励
 均以 [v0.3 特色玩法内容基线](../specials/content-v0.3.md) 和 [v0.3 常驻经营内容基线](../livelihood/content-v0.3.md) 为准。
 
-## `instance.secret_realm.demon_abyss` 合同缺口
+## `instance.secret_realm.demon_abyss` 合同
 
-该稳定键已登记但尚不能开放。当前表格只定义了声望门槛、节点数、体力和首通奖励类别；实现前必须补齐以下内容，不得从魔渊探索或 `demon.fallen_ruins` 队伍副本推导：
+该秘境使用 `content-0.3` / `adventures-0.3.2`，是单人秘境，不复用魔界探索会话或 `demon.fallen_ruins` 队伍副本会话、敌人、掉落和权限。角色必须位于 `demon.abyss_gate`、达到筑基 L1、持有 `access.demon_abyss_gate` 且当前 `faction_reputation.demon >= 200`；四项均在入场事务重新核验。魔界声望不是唯一准入条件，不接受客户端传入旗标或快照。
 
-- 秘境地点、境界和正式准入旗标；魔界声望 `>=200` 是否为唯一准入条件。
-- 四个节点的稳定顺序及各节点行为；每周额度与过期、战败时体力/门票的处理。
-- “污染风险 +50 bp”的单位、触发时点、概率/效果和快照字段；不得把它当作污染点数或战斗惩罚直接套用。
-- 首通名望对应的声望域、数值和奖励稳定键；故事线索的稳定键、数量；重复通关奖励及其随机/冻结规则。
+路线固定为 `abyss_threshold -> pollution_seep -> echo_guardian -> abyss_heart`。每个节点只能按序由本人确认：`abyss_threshold` 记录进入深渊；`pollution_seep` 执行一次污染风险判定；`echo_guardian` 使用秘境专用自动战 `enemy.demon_abyss_echo_guardian`；`abyss_heart` 使用秘境专用自动战 `enemy.demon_abyss_heart`。自动战使用战斗域服务端规则，客户端不能提交行动、伤害或结果；两个敌人不发战斗域物品奖励，只有秘境结算发放本合同奖励。
 
-上述字段闭合并补充双适配器验收前，保持 `locked`，不创建新运行时入口。
+入场原子扣除 20 体力并预占该角色当期 UTC 周唯一尝试额度，无门票。节点二的“污染风险 +50 bp”表示一次附加概率：基础风险为 0 bp，最终概率为 50 bp（0.5%）；服务端从入场冻结的随机种子派生节点随机流，生成 `[0, 10000)` 的 `risk_roll_bp`，仅当 roll `< 50` 时污染 +1，污染上限为 100。该判定不是污染点数、战斗惩罚或失败率。入场快照至少保存境界/层数、地点、门禁旗标、魔界声望、入场污染、风险基础值/修正值、随机种子及 `content_version` / `rule_version`；节点提交保存风险 roll、结果和污染前后值。恢复只续跑未提交节点，不重抽已提交判定。
+
+额度按 UTC 周历周计算，每名角色每周最多成功创建一个入场记录；失败和正常过期均消耗本周次数。会话 60 分钟过期。战败或过期不退 20 体力、不返额度、不发秘境奖励；战斗本身的自动结算仍按战斗域通用失败规则处理。自动战启动遇到可重试的系统故障时保持当前节点和资源锁，服务恢复后用相同的 `run_id + node_index` 战斗 operation 续跑，不能重复扣体力或风险判定；若运维将未完成会话标记为 `system_aborted`，同一事务退还 20 体力并释放本周预占额度，且只回滚该会话已记录的污染增量，不覆盖角色其余污染变化。会话期间禁止其他污染修改操作。资格校验失败和入场事务失败均不扣资源、不占额度。角色在活动会话期间不能进入另一秘境或开始冲突的长行动。
+
+首次成功结算按角色独立唯一：发放 `faction_reputation.demon +20` 与绑定线索 `item.clue.demon_abyss_echo` ×1，并写入 `story.demon_abyss_echo`。之后成功结算固定发放 `item.demon_core` ×1，不再增加首通声望或线索。没有随机奖励池；奖励键、数量、准入快照、规则版本和首通资格在入场快照冻结，首通标记与奖励在成功结算事务内原子写入。首通唯一键为 `secret_realm.first_clear:instance.secret_realm.demon_abyss:<player_id>`；所有进入、节点和结算 operation 均由调用方稳定 operation ID 幂等重放。
+
+命令为 `进入秘境 魔界深渊`、`选择秘境节点 深渊门|污染渗流|残响守卫|深渊之心` 和 `结算秘境`。QQ 官方及 OneBot V11 验收必须覆盖两种适配器各自主流程、混合适配器前后续跑、地点/境界/门禁/声望逐项拒绝且不扣费、路线跳步拒绝、两场服务端自动战、风险 roll 边界和重放、首通/重复奖励、周额度、战败/过期成本、system-aborted 补偿、重启恢复、资产锁与 operation 重放。该合同闭合后可以实现，但在上述验收完成前状态仍为 `locked`。
 
 ## `instance.secret_realm.boundary_rift` 合同
 
