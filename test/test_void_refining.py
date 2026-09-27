@@ -299,8 +299,10 @@ def test_void_refining_materials_can_be_replenished_after_failure_on_both_adapte
                     )
                 ).code == "VOID_ROUTE_SETTLED"
 
-                # The wallet reset is a controlled depleted-resource precondition;
-                # all permit and battle evidence above came from public commands.
+                # Keep the controlled reset limited to the depleted material
+                # precondition. Qualification, route and battle evidence above
+                # still came from public commands; the material itself is the
+                # documented one-time test fixture for the failed attempt.
                 with sqlite3.connect(runtime.settings.database_path) as db:
                     db.execute(
                         "UPDATE players SET inventory_json=? WHERE platform=? AND platform_user_id=?",
@@ -334,12 +336,6 @@ def test_void_refining_materials_can_be_replenished_after_failure_on_both_adapte
                     )
                 assert inventory["item.void_crystal"] == 0
                 assert inventory["item.void_anchor"] == 8
-                with sqlite3.connect(runtime.settings.database_path) as db:
-                    db.execute(
-                        "UPDATE players SET spirit_stones=100000, world_merit=1000 "
-                        "WHERE platform=? AND platform_user_id=?",
-                        (adapter, user),
-                    )
 
                 current[0] += timedelta(days=7)
                 refreshed = await runtime.adapters.dispatch(
@@ -405,6 +401,61 @@ def test_void_refining_materials_can_be_replenished_after_failure_on_both_adapte
                     )
                 assert inventory["item.void_crystal"] == 7
                 assert inventory["item.void_anchor"] == 10
+
+                # Replenish the breakthrough fee through the public market
+                # path. The collaborator balance is a controlled seller-side
+                # precondition; the main player's wallet and merit are never
+                # written back after the failed operation.
+                helper_adapter = "onebot.v11" if adapter == "qq.official" else "qq.official"
+                helper = f"void-replenish-helper-{adapter}"
+                helper_created = await runtime.adapters.dispatch(
+                    helper_adapter,
+                    _ctx(helper_adapter, helper, f"{user}-helper-create"),
+                    "开始修仙",
+                )
+                assert helper_created.code == "PLAYER_CREATED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET spirit_stones=100000 WHERE platform=? AND platform_user_id=?",
+                        (helper_adapter, helper),
+                    )
+                    failed_wallet = db.execute(
+                        "SELECT spirit_stones, world_merit FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    helper_wallet_before = db.execute(
+                        "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                        (helper_adapter, helper),
+                    ).fetchone()[0]
+                assert failed_wallet == (20_000, 500)
+
+                listed = await runtime.adapters.dispatch(
+                    adapter,
+                    _ctx(adapter, user, f"{user}-replenish-list"),
+                    "发布摆摊 item.void_crystal 1 90000",
+                )
+                assert listed.code == "MARKET_ORDER_CREATED"
+                purchased = await runtime.adapters.dispatch(
+                    helper_adapter,
+                    _ctx(helper_adapter, helper, f"{user}-replenish-buy"),
+                    f"购买摆摊 {listed.data['order_id']}",
+                )
+                assert purchased.code == "MARKET_ORDER_PURCHASED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    replenished_wallet = db.execute(
+                        "SELECT spirit_stones, world_merit, inventory_json FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    helper_wallet_after = db.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (helper_adapter, helper),
+                    ).fetchone()
+                assert replenished_wallet[0] >= 80_000
+                assert replenished_wallet[1] == failed_wallet[1]
+                assert json.loads(replenished_wallet[2]).get("item.void_crystal", 0) == 6
+                assert helper_wallet_after[0] < helper_wallet_before
+                assert json.loads(helper_wallet_after[1]).get("item.void_crystal", 0) == 1
 
                 current[0] += timedelta(hours=12)
                 refreshed_again = await runtime.adapters.dispatch(
