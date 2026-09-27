@@ -21,7 +21,7 @@ open_realms_added: [soul_transformation]
 | recipe/item | 领域恢复丹、领域刃、领域阵、神魂种子及对应物品 | production/items v0.4 |
 | quest | `quest.soul_transformation`、`quest.domain_material_commission`、`quest.ancient_domain_line` | events/quests v0.4 |
 | event/season | `event.domain_front`、`event.ancient_domain_open`、`event.abyss_depths`、`season.domain_war` | events v0.4 |
-| social/market | 领域建筑、`market.domain_material`、领域兑换周 | social/economy v0.4 |
+| social/market | 领域建筑、`party.secret_realm_ancient`、`market.domain_material`、领域兑换周 | social/economy v0.4 |
 | livelihood | `project.domain_refuge`、`project.abyss_purification`、`project.ancestral_habitat`、`facility.domain_*` | livelihood v0.4 |
 | routine/adventures | `ritual.spirit_tree.domain`、`gacha.fate.domain`、`story.domain_rebuild`、`bounty.domain_crack`、`instance.secret_realm.ancient_domain` | routine/adventures v0.4 |
 | advancement/companions | `progression.retreat.soul_transformation`、`talent.tree.*.tier4`、`item.tempering.domain`、`beast.evolution.domain`、`mount.evolution.domain` | advancement/companions v0.4 |

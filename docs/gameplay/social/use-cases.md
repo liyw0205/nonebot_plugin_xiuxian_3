@@ -27,6 +27,8 @@
 
 界隙裂隙秘境使用 `secret_realm_boundary` 专用队伍类型和独立 `instance.secret_realm.boundary_rift` 会话；它不创建或结算普通 `party_battle` 奖励。入口命令为 `创建界隙裂隙秘境队伍`，秘境命令为 `进入秘境 界隙裂隙`、`选择秘境节点 ...`、`结算界隙裂隙秘境`。2–5 名已确认成员逐一满足元婴 L1 和 `story.mainline.three_realms`，每人每 UTC 周一次，入场扣 30 体力、队长扣 1 枚神魂晶；六节点、两场自动战、首通/重复奖励、过期与启动失败补偿按[冒险域合同](../adventures/content-v0.3.md#instancesecret_realmboundary_rift-合同)执行。
 
+`party.secret_realm_ancient` 是 `instance.secret_realm.ancient_domain` 的恰好 3 人专用队伍，不能复用最少 4 人的 `party.standard_pve`。命令为 `创建远古洞天秘境队伍`；运行时接入前保持 locked。队伍准入、队长单独支付 40 体力、逐成员周额度、八节点、领域快照及独立自动战结算按[v0.4 冒险合同](../adventures/content-v0.4.md#instancesecret_realmancient_domain-合同)执行。
+
 魔渊队伍只能在 `demon.fallen_ruins` 创建，所有成员需元婴 L1、持有 `access.demon.fallen_ruins`、污染低于 80 且有 20 体力；万兽队伍只能在 `beast.ten_thousand_hills` 创建，所有成员需元婴 L1、妖界声望至少 200 且有 20 体力。两类副本均使用独立队伍战斗会话，原子扣除体力并冻结污染/血脉/技能快照；`enemy.demon_overlord` 每 3 回合使全队污染 +8，`enemy.beast_ancestor` 每 4 回合召唤两只可被队员清除的祖灵。胜利奖励分别为魔核/魔界声望/世界功勋和妖血/妖界声望/世界功勋，失败进入神魂疲劳；复起、奖励唯一性和回放规则与界隙副本一致。
 
 已确认双人或三人竞技队伍还可以由队长发布 `arena.team` 防守快照并发起 2v2/3v3/2v3 异步挑战；组队竞技场使用独立快照、
