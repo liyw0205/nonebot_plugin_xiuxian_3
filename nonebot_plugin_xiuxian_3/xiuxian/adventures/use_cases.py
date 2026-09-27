@@ -141,7 +141,7 @@ class AdventuresApplication:
                     "expires_at": offer.expires_at,
                 }
             )
-        lines.append("> 每日最多接取一条悬赏；发送 `接取悬赏 草药补给`、`接取悬赏 生产订单`、`接取悬赏 云铁矿区悬赏` 或 `接取悬赏 洞天精英悬赏` 开始。")
+        lines.append("> 每日最多接取一条悬赏；发送 `接取悬赏 草药补给`、`接取悬赏 训练傀儡`、`接取悬赏 生产订单`、`接取悬赏 云铁矿区悬赏` 或 `接取悬赏 洞天精英悬赏` 开始。")
         return CommandResult(
             True,
             "BOUNTY_BOARD",
@@ -153,7 +153,7 @@ class AdventuresApplication:
     async def accept_bounty(self, context: CommandContext) -> CommandResult:
         bounty_key = self._bounty_args(context.command_args)
         if bounty_key is None:
-            return CommandResult(False, "INVALID_BOUNTY_COMMAND", "请使用 `接取悬赏 草药补给`、`接取悬赏 生产订单`、`接取悬赏 云铁矿区悬赏` 或 `接取悬赏 洞天精英悬赏`。", context.request_id)
+            return CommandResult(False, "INVALID_BOUNTY_COMMAND", "请使用 `接取悬赏 草药补给`、`接取悬赏 训练傀儡`、`接取悬赏 生产订单`、`接取悬赏 云铁矿区悬赏` 或 `接取悬赏 洞天精英悬赏`。", context.request_id)
         operation_id = self._operation_id(context, "bounty.accept")
         try:
             record = await self.repository.accept_bounty(

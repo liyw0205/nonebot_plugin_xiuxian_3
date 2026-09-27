@@ -74,7 +74,7 @@ def test_bounty_board_herb_claim_replay_and_reputation() -> None:
             assert board.code == "BOUNTY_BOARD"
             assert "草药补给" in board.message
             assert "训练傀儡" in board.message
-            assert "战斗功能未开放" in board.message
+            assert "前置不足" in board.message
             assert board.data["offers"][0]["status"] == "available"
 
             accepted = await runtime.dispatch(
@@ -153,7 +153,52 @@ def test_bounty_progress_guards_expiry_and_operation_conflict() -> None:
     asyncio.run(run())
 
 
-def test_production_bounty_tracks_completed_order_and_battle_bounty_stays_locked() -> None:
+def test_training_bounty_tracks_real_wins_for_qq_and_onebot() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, adapters=("qq.official", "onebot.v11"))
+            for adapter, user in (("qq.official", "bounty-qq-training"), ("onebot.v11", "bounty-ob-training")):
+                context = lambda request, operation_id="": CommandContext(
+                    adapter=adapter, user_id=user, request_id=request, operation_id=operation_id
+                )
+                assert (await runtime.dispatch(context("create"), "开始修仙")).ok
+                assert (await runtime.dispatch(context("seek"), "寻仙问道")).ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=1, "
+                        "location_key='xuantian.new_town', max_hp=5000, initiative=100, qualification_json=? "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"body": 1000, "agility": 100}), adapter, user),
+                    )
+                accepted = await runtime.dispatch(
+                    context("accept", f"{adapter}-training-accept"), "接取悬赏 训练傀儡"
+                )
+                assert accepted.code == "BOUNTY_ACCEPTED"
+                for index in range(2):
+                    battle = await runtime.dispatch(
+                        context(f"battle-{index}", f"{adapter}-training-battle-{index}"), "开始训练战"
+                    )
+                    assert battle.code == "BATTLE_SETTLED"
+                    assert battle.data["outcome"] == "won"
+                board = await runtime.dispatch(context("board"), "悬赏榜")
+                training = next(item for item in board.data["offers"] if item["bounty_key"] == "bounty.training_dummy")
+                assert training["status"] == "completed"
+                assert training["progress"] == 2
+                claimed = await runtime.dispatch(
+                    context("claim", f"{adapter}-training-claim"), "领取悬赏"
+                )
+                assert claimed.code == "BOUNTY_CLAIMED"
+                assert claimed.data["rewards"] == {"cultivation": 120, "item.pill.focus_low": 1}
+                replay = await runtime.dispatch(
+                    context("claim-replay", f"{adapter}-training-claim"), "领取悬赏"
+                )
+                assert replay.data["idempotent_replay"] is True
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_production_bounty_tracks_completed_order() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
@@ -189,8 +234,6 @@ def test_production_bounty_tracks_completed_order_and_battle_bounty_stays_locked
             assert energy == 16
             assert reputation == 2
 
-            locked = await runtime.dispatch(_context(user, "locked"), "接取悬赏 训练傀儡")
-            assert locked.code == "CONTENT_CLOSED"
             await runtime.close()
 
     asyncio.run(run())

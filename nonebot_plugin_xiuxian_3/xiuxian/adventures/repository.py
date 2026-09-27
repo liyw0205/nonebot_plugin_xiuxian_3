@@ -335,6 +335,21 @@ class AdventuresRepositoryMixin:
             ).fetchone()
             baseline = int(snapshot.get("baseline_exploration_battle_wins", 0))
             return max(0, min(definition.target_amount, int(current["count"]) - baseline))
+        if definition.target_kind == "training_dummy_wins":
+            current = connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM battle_sessions
+                WHERE player_id = ?
+                  AND battle_type = 'pve.training'
+                  AND enemy_key = ?
+                  AND status = 'settled'
+                  AND json_extract(result_json, '$.outcome') = 'won'
+                """,
+                (row["id"], definition.target_key),
+            ).fetchone()
+            baseline = int(snapshot.get("baseline_training_battle_wins", 0))
+            return max(0, min(definition.target_amount, int(current["count"]) - baseline))
         result = SQLitePlayerRepository._json_object(offer["result_json"], {})
         return max(0, min(definition.target_amount, int(result.get("progress", 0))))
 
@@ -401,18 +416,19 @@ class AdventuresRepositoryMixin:
                 "SELECT COUNT(*) AS count FROM production_orders WHERE player_id = ? AND status = 'completed'",
                 (row["id"],),
             ).fetchone()
-            if definition.target_kind == "exploration_battle_wins":
+            if definition.target_kind in {"exploration_battle_wins", "training_dummy_wins"}:
+                battle_type = "pve.exploration" if definition.target_kind == "exploration_battle_wins" else "pve.training"
                 battle_wins = connection.execute(
                     """
                     SELECT COUNT(*) AS count
                     FROM battle_sessions
                     WHERE player_id = ?
-                      AND battle_type = 'pve.exploration'
+                      AND battle_type = ?
                       AND enemy_key = ?
                       AND status = 'settled'
                       AND json_extract(result_json, '$.outcome') = 'won'
                     """,
-                    (row["id"], definition.target_key),
+                    (row["id"], battle_type, definition.target_key),
                 ).fetchone()
             else:
                 battle_wins = {"count": 0}
@@ -427,6 +443,7 @@ class AdventuresRepositoryMixin:
                 "baseline_quantity": int(inventory.get(str(definition.target_key), 0)) if definition.target_key else 0,
                 "baseline_completed_orders": int(completed_orders["count"]),
                 "baseline_exploration_battle_wins": int(battle_wins["count"]),
+                "baseline_training_battle_wins": int(battle_wins["count"]),
             }
             offer_id = uuid4().hex
             connection.execute(

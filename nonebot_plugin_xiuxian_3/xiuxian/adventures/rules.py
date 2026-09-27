@@ -54,7 +54,6 @@ DEFINITIONS: dict[str, BountyDefinition] = {
         target_key="enemy.training_dummy",
         target_amount=2,
         reward=(("cultivation", 120), ("item.pill.focus_low", 1)),
-        runtime_status="locked",
     ),
     "bounty.craft_order": BountyDefinition(
         key="bounty.craft_order",
