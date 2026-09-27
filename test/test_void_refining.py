@@ -494,6 +494,166 @@ def test_void_refining_materials_can_be_replenished_after_failure_on_both_adapte
     asyncio.run(run())
 
 
+def test_void_refining_world_merit_can_be_replenished_by_public_events_before_retry() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            current = [datetime(2026, 9, 21, 12, tzinfo=timezone.utc)]
+            runtime = None
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir, clock=lambda: current[0])
+                user = f"void-merit-{adapter}"
+                await _prepare_void_player(runtime, user, adapter=adapter)
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    # Start at the exact fee so the failed breakthrough exhausts
+                    # world merit; this is a controlled test precondition.
+                    db.execute(
+                        "UPDATE players SET world_merit=500, spirit_stones=160000, inventory_json=?, max_hp=10000, initiative=100, stamina=100, stamina_max=100, domain_charge_max=150, qualification_json=? WHERE platform=? AND platform_user_id=?",
+                        (
+                            json.dumps({"item.void_crystal": 5, "item.void_anchor": 8}),
+                            json.dumps({"body": 10000, "spirit": 10000, "insight": 10000, "root": 10000, "agility": 10000}),
+                            adapter,
+                            user,
+                        ),
+                    )
+
+                failed_operation = next(
+                    f"{user}-failed-{index}"
+                    for index in range(1000)
+                    if breakthrough_roll_bp(f"{user}-failed-{index}") >= 7_550
+                )
+                started = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, failed_operation), "开始突破 炼虚"
+                )
+                assert started.code == "BREAKTHROUGH_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE breakthrough_sessions SET ends_at=? WHERE session_id=?",
+                        ((current[0] - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    )
+                failed = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-failed-settle"), "结算突破"
+                )
+                assert failed.code == "BREAKTHROUGH_FAILED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    failed_state = db.execute(
+                        "SELECT world_merit, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert failed_state[0] == 0
+                assert json.loads(failed_state[1])["item.void_crystal"] == 0
+
+                # Domain-front rounds are public event sources. The sect and
+                # staging location are controlled access prerequisites only.
+                current[0] += timedelta(days=7)
+                status = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-recover"), "恢复状态"
+                )
+                assert status.ok
+                profile = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-daily-reset"), "我的状态"
+                )
+                assert profile.ok and profile.data["domain_charge"] >= 100, profile.data
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    player_id = db.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    now = current[0].isoformat()
+                    db.execute(
+                        "UPDATE players SET domain_key='domain.fire', location_key='xuantian.domain_front' WHERE id=?",
+                        (player_id,),
+                    )
+                    db.execute(
+                        "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?, 'content-0.4', 'social-0.4.0')",
+                        (f"void-merit-sect-{adapter}", "功勋补给宗", f"void-merit-sect-{adapter}", player_id, now, now),
+                    )
+                    db.execute(
+                        "INSERT INTO sect_members(sect_id,player_id,role,status,contribution,joined_at,last_action_at,created_at,updated_at) VALUES (?, ?, 'leader', 'active', 0, ?, ?, ?, ?)",
+                        (f"void-merit-sect-{adapter}", player_id, now, now, now, now),
+                    )
+
+                for round_index in range(5):
+                    event = await runtime.adapters.dispatch(
+                        adapter, _ctx(adapter, user, f"{user}-event-status-{round_index}"), "领域前线"
+                    )
+                    assert event.code == "DOMAIN_EVENT_STATUS"
+                    round_id = event.data["round_id"]
+                    joined = await runtime.adapters.dispatch(
+                        adapter, _ctx(adapter, user, f"{user}-event-join-{round_index}"), "加入领域前线"
+                    )
+                    assert joined.code == "DOMAIN_EVENT_JOINED"
+                    battle = await runtime.adapters.dispatch(
+                        adapter, _ctx(adapter, user, f"{user}-event-battle-{round_index}"), "开始领域战"
+                    )
+                    assert battle.code == "DOMAIN_BATTLE_SETTLED"
+                    contribution = await runtime.adapters.dispatch(
+                        adapter,
+                        _ctx(adapter, user, f"{user}-event-contribute-{round_index}"),
+                        "贡献领域前线 战斗",
+                    )
+                    assert contribution.code == "DOMAIN_EVENT_CONTRIBUTION_RECORDED"
+                    current[0] += timedelta(minutes=31)
+                    settled = await runtime.adapters.dispatch(
+                        adapter,
+                        _ctx(adapter, user, f"{user}-event-settle-{round_index}"),
+                        f"领域前线 {round_id}",
+                    )
+                    assert settled.data["status"] == "settled"
+                    claimed = await runtime.adapters.dispatch(
+                        adapter,
+                        _ctx(adapter, user, f"{user}-event-claim-{round_index}"),
+                        f"领取领域前线奖励 {round_id}",
+                    )
+                    assert claimed.code == "DOMAIN_EVENT_REWARD_CLAIMED"
+                    assert claimed.data["reward"]["world_merit"] == 100
+                    if round_index < 4:
+                        current[0] += timedelta(hours=3, minutes=29)
+
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    merit, inventory = db.execute(
+                        "SELECT world_merit, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert merit == 500
+                assert json.loads(inventory)["item.domain_core_fragment"] == 25
+
+                # Material replenishment is isolated to this retry precondition;
+                # world merit above came only from public event claims.
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET location_key='void.first_route', inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.void_crystal": 5, "item.void_anchor": 8}), adapter, user),
+                    )
+                retry_operation = next(
+                    f"{user}-retry-{index}"
+                    for index in range(1000)
+                    if breakthrough_roll_bp(f"{user}-retry-{index}") < 7_800
+                )
+                retry = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, retry_operation), "开始突破 炼虚"
+                )
+                assert retry.code == "BREAKTHROUGH_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE breakthrough_sessions SET ends_at=? WHERE session_id=?",
+                        ((current[0] - timedelta(seconds=1)).isoformat(), retry.data["session_id"]),
+                    )
+                settled_retry = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-retry-settle"), "结算突破"
+                )
+                assert settled_retry.code == "BREAKTHROUGH_SUCCEEDED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    realm, final_merit = db.execute(
+                        "SELECT realm_key, world_merit FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert realm == "void_refining"
+                assert final_merit == 500
+                await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_void_route_resistance_floor_and_adapter_simulation() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
