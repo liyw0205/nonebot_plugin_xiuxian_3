@@ -44,6 +44,7 @@ _ENTRY_LABELS = {
     "codex.dispatch.herb_search": ("dispatch", "药材搜寻"),
     "codex.instance.mist_grotto": ("challenge", "雾隐洞天"),
     "codex.instance.cloud_boat": ("challenge", "云舟秘境"),
+    "codex.domain.ancient_domain": ("challenge", "远古洞天秘境"),
     "codex.challenge.mist_trial.floor_5": ("challenge", "雾隐试炼塔五层"),
     "codex.challenge.mist_trial.floor_10": ("challenge", "雾隐试炼塔十层"),
     "codex.story.dispatch_demon_relief": ("story", "魔界救援线索"),
@@ -108,6 +109,8 @@ def category_for_entry(entry_key: str) -> str | None:
     if definition is not None:
         return definition.category
     if entry_key.startswith("codex.challenge."):
+        return "challenge"
+    if entry_key.startswith("codex.domain."):
         return "challenge"
     if entry_key.startswith("codex.story."):
         return "story"

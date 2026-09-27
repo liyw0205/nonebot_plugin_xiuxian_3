@@ -995,6 +995,9 @@ class XiuxianApplication:
     async def create_boundary_rift_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_boundary_rift_party(context), write_message="当前事件不允许创建界隙裂隙秘境队伍。")
 
+    async def create_ancient_domain_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.create_ancient_domain_party(context), write_message="当前事件不允许创建远古洞天秘境队伍。")
+
     async def create_demon_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_demon_party(context), write_message="当前事件不允许创建魔渊队伍。")
 

@@ -22,6 +22,15 @@ from ..persistence.errors import (
 from .secret_realm_rules import resolve_node, resolve_secret_realm
 from .boundary_rift_rules import BOUNDARY_RIFT_KEY, resolve_boundary_rift_node
 from .boundary_rift_use_cases import BoundaryRiftApplication
+from .ancient_domain_use_cases import AncientDomainApplication
+from .ancient_domain_rules import (
+    ANCIENT_DOMAIN_FIRST_REWARD,
+    ANCIENT_DOMAIN_KEY,
+    ANCIENT_DOMAIN_NODES,
+    ANCIENT_DOMAIN_REPEAT_REWARD,
+    ANCIENT_DOMAIN_STAMINA_COST,
+    resolve_ancient_domain_node,
+)
 from .demon_abyss_rules import (
     DEMON_ABYSS_KEY,
     DEMON_ABYSS_FIRST_REWARD,
@@ -58,6 +67,7 @@ class SecretRealmApplication:
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
         self.boundary_rift = BoundaryRiftApplication(repository)
+        self.ancient_domain = AncientDomainApplication(repository)
         self.demon_abyss = DemonAbyssApplication(repository)
 
     @staticmethod
@@ -112,6 +122,17 @@ class SecretRealmApplication:
             "quota_period": "week",
             "quota_limit": DEMON_ABYSS_QUOTA_LIMIT,
         })
+        data.append({
+            "instance_key": ANCIENT_DOMAIN_KEY,
+            "label": "远古洞天秘境",
+            "nodes": ANCIENT_DOMAIN_NODES,
+            "stamina_cost": ANCIENT_DOMAIN_STAMINA_COST,
+            "first_reward": ANCIENT_DOMAIN_FIRST_REWARD,
+            "repeat_reward": ANCIENT_DOMAIN_REPEAT_REWARD,
+            "quota_period": "week",
+            "quota_limit": 1,
+            "party_size": 3,
+        })
         lines.extend(
             [
                 "### 魔界深渊秘境",
@@ -125,15 +146,23 @@ class SecretRealmApplication:
                 "- **路线**：裂隙入口 → 破碎岔路 → 跨界哨卫 → 神魂潮汐 → 界隙守望者 → 裂隙封印。",
                 "- **消耗**：每人 30 体力、队长 1 枚神魂晶；每人每 UTC 周 1 次。",
                 "",
+                "### 远古洞天秘境",
+                "- **前置**：创建专用三人队伍；队员均需化神 L1、位于 `cave.ancient_domain` 且没有有效领域裂痕。",
+                "- **路线**：洞天入口 → 裂痕回廊 → 封印古藏 → 太初灵园 → 洞天灵泉 → 远古洞天之主 → 风化天阶 → 本源封印。",
+                "- **消耗**：队长支付全队 40 体力；每名队员每 UTC 周 1 次。",
+                "- **首通/重复**：每名首通队员发现 `codex.domain.ancient_domain` 并获得古果 ×2；重复通关获得古果 ×1。",
+                "",
             ]
         )
         if record.active_run_id:
             lines.append(f"> 当前已有进行中的秘境：`{record.active_run_id}`。")
         else:
-            lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙` 开始；组队秘境先创建专用队伍。")
+            lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境`、`界隙裂隙` 或 `远古洞天` 开始；组队秘境先创建专用队伍。")
         return CommandResult(True, "SECRET_REALM_PREVIEW", "\n".join(lines), context.request_id, data={"realms": data, "active_run_id": record.active_run_id})
 
     async def enter(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == ANCIENT_DOMAIN_KEY:
+            return await self.ancient_domain.enter(context)
         if len(context.command_args) == 1 and resolve_demon_abyss(context.command_args[0]) == DEMON_ABYSS_KEY:
             return await self.demon_abyss.enter(context)
         if len(context.command_args) != 1 or not (instance_key := resolve_secret_realm(context.command_args[0])):
@@ -164,6 +193,15 @@ class SecretRealmApplication:
         return CommandResult(True, "SECRET_REALM_ENTERED", f"## {record.label}已进入\n\n已锁定体力 {record.stamina_locked} 点和秘境凭证。\n\n- **下一节点**：{record.current_node}\n- **状态**：路线进行中\n\n> 发送 `选择秘境节点 资源` 按服务端顺序推进。", context.request_id, operation_id, data=self._data(record))
 
     async def choose_node(self, context: CommandContext) -> CommandResult:
+        if context.command_args and resolve_ancient_domain_node(context.command_args[0]):
+            return await self.ancient_domain.choose_node(context)
+        try:
+            if context.command_args and await self.repository.has_active_ancient_domain(
+                platform=context.adapter, platform_user_id=context.user_id
+            ):
+                return await self.ancient_domain.choose_node(context)
+        except PlayerNotFoundError:
+            pass
         if context.command_args and resolve_boundary_rift_node(context.command_args[0]):
             return await self.boundary_rift.choose_node(context)
         if context.command_args and (
@@ -195,6 +233,15 @@ class SecretRealmApplication:
     async def settle(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "结算秘境无需附加参数。", context.request_id)
+        ancient_operation_id = self._operation_id(context, "ancient_domain.settle")
+        try:
+            if (
+                await self.repository.has_active_ancient_domain(platform=context.adapter, platform_user_id=context.user_id)
+                or await self.repository.has_ancient_domain_settlement_operation(ancient_operation_id)
+            ):
+                return await self.ancient_domain.settle(context)
+        except PlayerNotFoundError:
+            pass
         operation_id = self._operation_id(context, "demon_abyss.settle")
         try:
             active_demon = await self.demon_abyss.has_active(context)
@@ -203,6 +250,11 @@ class SecretRealmApplication:
             active_demon = replay_demon = False
         if active_demon or replay_demon:
             return await self.demon_abyss.settle(context)
+        try:
+            if await self.repository.has_latest_ancient_domain_run(platform=context.adapter, platform_user_id=context.user_id):
+                return await self.ancient_domain.settle(context)
+        except PlayerNotFoundError:
+            pass
         operation_id = self._operation_id(context, "secret_realm.settle")
         try:
             record = await self.repository.settle_secret_realm(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id)

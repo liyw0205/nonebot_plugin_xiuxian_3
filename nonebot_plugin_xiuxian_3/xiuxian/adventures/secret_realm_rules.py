@@ -89,8 +89,11 @@ DEFINITIONS = {item.key: item for item in (MIST_GROTTO, SPRING_PATH, MIST_DEPTH_
 ALIASES = {
     **{key: key for key in DEFINITIONS},
     "instance.secret_realm.boundary_rift": "instance.secret_realm.boundary_rift",
+    "instance.secret_realm.ancient_domain": "instance.secret_realm.ancient_domain",
     "界隙裂隙": "instance.secret_realm.boundary_rift",
     "界隙裂隙秘境": "instance.secret_realm.boundary_rift",
+    "远古洞天": "instance.secret_realm.ancient_domain",
+    "远古洞天秘境": "instance.secret_realm.ancient_domain",
     "雾隐秘境": MIST_GROTTO.key,
     "雾隐洞天秘境": MIST_GROTTO.key,
     "灵泉小径": SPRING_PATH.key,

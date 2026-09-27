@@ -308,6 +308,21 @@ BOUNDARY_WATCHER = EnemyDefinition(
     reward={},
 )
 
+ANCIENT_DOMAIN_LORD = EnemyDefinition(
+    key="enemy.ancient_domain_lord",
+    label="远古洞天之主",
+    location_key="cave.ancient_domain",
+    required_realm="soul_transformation",
+    required_layer=1,
+    max_hp=18_000,
+    attack=900,
+    initiative=30,
+    agility=30,
+    skill_key="enemy_skill.domain_suppress",
+    random_pool="none",
+    reward={},
+)
+
 BOUNDARY_TRIAL_GUARDIAN = EnemyDefinition(
     key="enemy.boundary_trial_guardian",
     label="界壁试炼守卫",
@@ -451,6 +466,7 @@ ENEMIES = {
     DEMON_WAR_FRONT.key: DEMON_WAR_FRONT,
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_WATCHER.key: BOUNDARY_WATCHER,
+    ANCIENT_DOMAIN_LORD.key: ANCIENT_DOMAIN_LORD,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
     ARCHIVE_KEEPER.key: ARCHIVE_KEEPER,
     MIST_TRIAL_SENSING.key: MIST_TRIAL_SENSING,

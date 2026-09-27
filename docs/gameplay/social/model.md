@@ -26,7 +26,7 @@
 `party.exploration_pair`（最多 2 人）、`party.arena_trio`（最多 3 人）、`party.standard_pve`（4–5 人普通副本）、
 `party.boundary_realm`、`party.demon_realm`、`party.beast_realm`（2–5 人跨界副本队伍）及 `party.secret_realm_boundary`
 （2–5 人界隙裂隙秘境专用队伍；它与 `party.boundary_realm` 分开建模、分开结算）。`party.secret_realm_ancient`
-为 v0.4 预留的恰好 3 人远古洞天秘境队伍；与 `party.standard_pve`、普通队伍战斗和界隙裂隙秘境会话分离，运行时验收前保持 locked。
+恰好 3 人远古洞天秘境专用队伍；与 `party.standard_pve`、普通队伍战斗和界隙裂隙秘境会话分离，使用独立 run/成员额度及领域首领自动战结算。
 
 `PartyBattleSession`：独立于单人 `BattleSession` 的队伍战斗 ID、队伍快照、敌人/地点/规则版本、
 行动序号、状态和结果。`PartyBattleMember` 在战斗开始时保存每名成员属性/装备快照并锁定资产；

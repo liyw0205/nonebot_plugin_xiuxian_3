@@ -392,6 +392,11 @@ class PartyRepositoryMixin:
                 (party_id,),
             ).fetchone():
                 raise PartyStateConflictError("party is committed to an active boundary-rift run")
+            if connection.execute(
+                "SELECT 1 FROM ancient_domain_runs WHERE party_id=? AND status IN ('routing','combat_pending','cleared') LIMIT 1",
+                (party_id,),
+            ).fetchone():
+                raise PartyStateConflictError("party is committed to an active ancient-domain run")
             connection.execute(
                 "UPDATE party_members SET status = 'left', left_at = ?, updated_at = ? WHERE id = ? AND status = 'active'",
                 (now_text, now_text, member["id"]),
@@ -447,6 +452,8 @@ class PartyRepositoryMixin:
         rows = connection.execute(
             "SELECT party_id FROM parties WHERE status IN ('forming', 'ready') AND confirmation_deadline <= ? "
             "AND NOT EXISTS (SELECT 1 FROM boundary_rift_runs r WHERE r.party_id=parties.party_id "
+            "AND r.status IN ('routing','combat_pending','cleared')) "
+            "AND NOT EXISTS (SELECT 1 FROM ancient_domain_runs r WHERE r.party_id=parties.party_id "
             "AND r.status IN ('routing','combat_pending','cleared'))",
             (now_text,),
         ).fetchall()

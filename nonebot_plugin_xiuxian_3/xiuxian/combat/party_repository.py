@@ -62,8 +62,14 @@ from ..social.party_rules import (
     PARTY_TYPE_BEAST_REALM,
     PARTY_TYPE_STANDARD_PVE,
     PARTY_TYPE_SECRET_REALM_BOUNDARY,
+    PARTY_TYPE_SECRET_REALM_ANCIENT,
 )
 from ..adventures.boundary_rift_rules import BOUNDARY_RIFT_ENEMIES, BOUNDARY_RIFT_LOCATION
+from ..adventures.ancient_domain_rules import (
+    ANCIENT_DOMAIN_ENEMY,
+    ANCIENT_DOMAIN_ENERGY_SUPPRESSION,
+    ANCIENT_DOMAIN_LOCATION,
+)
 
 
 class PartyCombatRepositoryMixin:
@@ -77,6 +83,7 @@ class PartyCombatRepositoryMixin:
         party_id: str | None,
         operation_id: str,
         boundary_rift_run_id: str | None = None,
+        ancient_domain_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         await self.initialize()
         async with self._inflight:
@@ -88,6 +95,7 @@ class PartyCombatRepositoryMixin:
                 party_id,
                 operation_id,
                 boundary_rift_run_id,
+                ancient_domain_run_id,
             )
 
     async def settle_party_battle(
@@ -177,11 +185,14 @@ class PartyCombatRepositoryMixin:
         party_id: str | None,
         operation_id: str,
         boundary_rift_run_id: str | None = None,
+        ancient_domain_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         operation_name = "battle.party.start"
         request = {"platform": platform, "platform_user_id": platform_user_id, "party_id": party_id}
         if boundary_rift_run_id is not None:
             request["boundary_rift_run_id"] = boundary_rift_run_id
+        if ancient_domain_run_id is not None:
+            request["ancient_domain_run_id"] = ancient_domain_run_id
         request_hash = self._request_hash(
             operation_name,
             request,
@@ -215,6 +226,7 @@ class PartyCombatRepositoryMixin:
                 PARTY_TYPE_BEAST_REALM,
                 PARTY_TYPE_STANDARD_PVE,
                 PARTY_TYPE_SECRET_REALM_BOUNDARY,
+                PARTY_TYPE_SECRET_REALM_ANCIENT,
             }:
                 raise PartyBattleRequirementError("this party type cannot start party PVE")
             if str(party["status"]) != "ready":
@@ -227,7 +239,8 @@ class PartyCombatRepositoryMixin:
                 "p.platform_user_id, p.path_key, p.qualification_json, p.max_hp, p.initiative, "
                 "p.realm_key, p.realm_layer, p.location_key, p.status AS player_status, p.endgame_status, "
                 "p.stamina, p.inventory_json, p.pollution, p.bloodline_stability, p.cross_realm_penalty_bp, "
-                "p.faction_reputation_json, p.intro_json, p.soul_power, p.soul_power_max, p.soul_fatigue_until "
+                "p.faction_reputation_json, p.intro_json, p.soul_power, p.soul_power_max, p.soul_fatigue_until, "
+                "p.domain_key, p.domain_charge, p.domain_charge_max, p.domain_power "
                 "FROM party_members m JOIN players p ON p.id = m.player_id "
                 "WHERE m.party_id = ? AND m.status = 'active' ORDER BY m.id",
                 (resolved_party_id,),
@@ -238,6 +251,9 @@ class PartyCombatRepositoryMixin:
             secret_rift_party = party_type == PARTY_TYPE_SECRET_REALM_BOUNDARY
             if secret_rift_party != (boundary_rift_run_id is not None):
                 raise PartyBattleRequirementError("boundary-rift battles must be started by the active instance")
+            ancient_domain_party = party_type == PARTY_TYPE_SECRET_REALM_ANCIENT
+            if ancient_domain_party != (ancient_domain_run_id is not None) or (secret_rift_party and ancient_domain_party):
+                raise PartyBattleRequirementError("ancient-domain battles must be started by the active instance")
             rift_run = None
             if secret_rift_party:
                 rift_run = connection.execute(
@@ -252,24 +268,48 @@ class PartyCombatRepositoryMixin:
                 if enemy_key is None or str(party["location_key"]) != BOUNDARY_RIFT_LOCATION:
                     raise PartyBattleRequirementError("boundary-rift node has no registered enemy")
                 enemy = enemy_definition(enemy_key)
+            ancient_run = None
+            ancient_run_snapshot = {}
+            if ancient_domain_party:
+                ancient_run = connection.execute(
+                    "SELECT * FROM ancient_domain_runs WHERE run_id=? AND party_id=? AND status='combat_pending' AND battle_id IS NULL",
+                    (ancient_domain_run_id, resolved_party_id),
+                ).fetchone()
+                if ancient_run is None or str(ancient_run["expires_at"]) <= now_text:
+                    raise PartyBattleRequirementError("ancient-domain node is not ready for battle")
+                ancient_run_snapshot = self._json_object(ancient_run["snapshot_json"], {})
+                if (
+                    ancient_run_snapshot.get("current_node") != "ancient_domain_lord"
+                    or str(party["location_key"]) != ANCIENT_DOMAIN_LOCATION
+                ):
+                    raise PartyBattleRequirementError("ancient-domain node has no registered enemy")
+                enemy = enemy_definition(ANCIENT_DOMAIN_ENEMY)
             try:
-                if not secret_rift_party:
+                if not secret_rift_party and not ancient_domain_party:
                     enemy = party_enemy_for_location(str(party["location_key"]))
             except ValueError as exc:
                 raise PartyBattleRequirementError("party PVE is not available at this location") from exc
             snapshots: list[dict[str, Any]] = []
             boundary_party = party_type in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}
             boundary_rift_combat = boundary_party or secret_rift_party
+            ancient_member_snapshots = {
+                int(member["database_id"]): member
+                for member in ancient_run_snapshot.get("member_combat_snapshots", [])
+            }
             demon_party = party_type == PARTY_TYPE_DEMON_REALM
             beast_party = party_type == PARTY_TYPE_BEAST_REALM
             leader_ticket_inventory: dict[str, int] | None = None
             for row in members:
-                if str(row["location_key"]) != str(party["location_key"]):
+                entry_snapshot = ancient_member_snapshots.get(int(row["database_player_id"]))
+                member_location = str(entry_snapshot.get("location_key", row["location_key"]) if entry_snapshot else row["location_key"])
+                member_realm = str(entry_snapshot.get("realm_key", row["realm_key"]) if entry_snapshot else row["realm_key"])
+                member_realm_layer = int(entry_snapshot.get("realm_layer", row["realm_layer"]) if entry_snapshot else row["realm_layer"])
+                if member_location != str(party["location_key"]):
                     if boundary_rift_combat:
                         raise BoundaryRealmRequirementError("party members must share the frozen location")
                     raise PartyBattleRequirementError("party members must share the frozen location")
                 if not self._meets_realm_values(
-                    str(row["realm_key"]), int(row["realm_layer"]), enemy.required_realm, enemy.required_layer
+                    member_realm, member_realm_layer, enemy.required_realm, enemy.required_layer
                 ):
                     if boundary_rift_combat:
                         raise BoundaryRealmRequirementError("a party member does not meet the encounter realm")
@@ -282,6 +322,8 @@ class PartyCombatRepositoryMixin:
                     raise PollutionTooHighError("pollution is too high for the demon dungeon")
                 if beast_party and self._faction_reputation(row, "beast") < 200:
                     raise FactionReputationInsufficientError("beast reputation is insufficient")
+                if ancient_domain_party and str(party["location_key"]) != ANCIENT_DOMAIN_LOCATION:
+                    raise PartyBattleRequirementError("ancient-domain party is at the wrong location")
                 if boundary_party and int(row["stamina"]) < BOUNDARY_REALM_STAMINA_COST:
                     raise BoundaryRealmResourceError("a party member lacks boundary-realm stamina")
                 if demon_party and int(row["stamina"]) < DEMON_REALM_STAMINA_COST:
@@ -302,6 +344,7 @@ class PartyCombatRepositoryMixin:
                     connection,
                     int(row["database_player_id"]),
                     ignore_boundary_rift_run_id=boundary_rift_run_id,
+                    ignore_ancient_domain_run_id=ancient_domain_run_id,
                 ):
                     raise PartyBattleBusyError("a party member has another active action")
                 locked = connection.execute(
@@ -310,28 +353,26 @@ class PartyCombatRepositoryMixin:
                 ).fetchone()
                 if locked is not None:
                     raise PartyBattleBusyError("a party member has locked battle assets")
-                equipment = self._battle_equipment_snapshot(connection, int(row["database_player_id"]))
-                skills = self._battle_skill_snapshot(
-                    connection,
-                    int(row["database_player_id"]),
-                    str(row["path_key"] or ""),
+                equipment = tuple(entry_snapshot["equipment"]) if entry_snapshot else self._battle_equipment_snapshot(connection, int(row["database_player_id"]))
+                skills = list(entry_snapshot["skills"]) if entry_snapshot else self._battle_skill_snapshot(
+                    connection, int(row["database_player_id"]), str(row["path_key"] or "")
                 )
-                qualification = self._json_object(row["qualification_json"], {})
+                qualification = dict(entry_snapshot["qualification"]) if entry_snapshot else self._json_object(row["qualification_json"], {})
                 inventory = self._json_object(row["inventory_json"], {})
                 if boundary_party and row["database_player_id"] == leader["id"]:
                     leader_ticket_inventory = inventory
-                stats = player_stat_snapshot(
+                stats = dict(entry_snapshot["stats"]) if entry_snapshot else player_stat_snapshot(
                     qualification,
                     max_hp=int(row["max_hp"]),
                     initiative=int(row["initiative"]),
                     equipment=equipment,
                 )
                 cross_realm_snapshot = {
-                    "pollution": int(row["pollution"]),
-                    "bloodline_stability": int(row["bloodline_stability"]),
-                    "cross_realm_penalty_bp": int(row["cross_realm_penalty_bp"]),
-                    "faction_reputation": self._json_object(row["faction_reputation_json"], {}),
-                    "alliance_key": self._alliance_key_from_row(row),
+                    "pollution": int(entry_snapshot.get("pollution", row["pollution"]) if entry_snapshot else row["pollution"]),
+                    "bloodline_stability": int(entry_snapshot.get("bloodline_stability", row["bloodline_stability"]) if entry_snapshot else row["bloodline_stability"]),
+                    "cross_realm_penalty_bp": int(entry_snapshot.get("cross_realm_penalty_bp", row["cross_realm_penalty_bp"]) if entry_snapshot else row["cross_realm_penalty_bp"]),
+                    "faction_reputation": dict(entry_snapshot.get("faction_reputation", {}) if entry_snapshot else self._json_object(row["faction_reputation_json"], {})),
+                    "alliance_key": entry_snapshot.get("alliance_key") if entry_snapshot else self._alliance_key_from_row(row),
                     "content_version": str(party["content_version"]),
                     "rule_version": str(party["rule_version"]),
                 }
@@ -340,14 +381,18 @@ class PartyCombatRepositoryMixin:
                         "player_id": str(row["stable_player_id"]),
                         "database_id": int(row["database_player_id"]),
                         "role": str(row["member_role"]),
-                        "realm_key": str(row["realm_key"]),
-                        "realm_layer": int(row["realm_layer"]),
-                        "path_key": row["path_key"],
+                        "realm_key": member_realm,
+                        "realm_layer": member_realm_layer,
+                        "path_key": entry_snapshot.get("path_key", row["path_key"]) if entry_snapshot else row["path_key"],
                         "qualification": qualification,
                         "stats": stats,
                         "equipment": list(equipment),
                         "skills": skills,
-                        "soul_power": int(row["soul_power"]),
+                        "soul_power": int(entry_snapshot.get("soul_power", row["soul_power"]) if entry_snapshot else row["soul_power"]),
+                        "domain_key": (entry_snapshot.get("domain_key") if entry_snapshot else row["domain_key"]),
+                        "domain_charge": int(entry_snapshot.get("domain_charge", row["domain_charge"]) if entry_snapshot else row["domain_charge"]),
+                        "domain_charge_max": int(entry_snapshot.get("domain_charge_max", row["domain_charge_max"]) if entry_snapshot else row["domain_charge_max"]),
+                        "domain_power": int(entry_snapshot.get("domain_power", row["domain_power"]) if entry_snapshot else row["domain_power"]),
                         "cross_realm": cross_realm_snapshot,
                         "pollution": cross_realm_snapshot["pollution"],
                         "bloodline_stability": cross_realm_snapshot["bloodline_stability"],
@@ -391,13 +436,13 @@ class PartyCombatRepositoryMixin:
                 else BEAST_REALM_REWARD
                 if beast_party
                 else {}
-                if secret_rift_party
+                if secret_rift_party or ancient_domain_party
                 else BOUNDARY_REALM_REWARD
                 if boundary_party
                 else PARTY_BATTLE_REWARD
             )
-            dungeon_content_version = "content-0.3" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
-            dungeon_rule_version = "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
+            dungeon_content_version = "content-0.4" if ancient_domain_party else "content-0.3" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
+            dungeon_rule_version = "combat-0.4.0" if ancient_domain_party else "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
             battle_id = f"party-battle-{uuid4().hex}"
             snapshot = {
                 "battle_type": PARTY_BATTLE_TYPE,
@@ -418,6 +463,7 @@ class PartyCombatRepositoryMixin:
                 "random_seed": operation_id,
                 "reward": dict(dungeon_reward),
                 "party_type": party_type,
+                "ancient_domain_run_id": ancient_domain_run_id,
                 "resource_cost": {
                     "stamina": (
                         BOUNDARY_REALM_STAMINA_COST
@@ -438,6 +484,11 @@ class PartyCombatRepositoryMixin:
                 "member_hp": {member["player_id"]: member["stats"]["max_hp"] for member in snapshots},
                 "member_status": {member["player_id"]: "active" for member in snapshots},
                 "member_soul_power": {member["player_id"]: int(member.get("soul_power", 0)) for member in snapshots},
+                "member_domain_energy": {member["player_id"]: int(member.get("domain_charge", 0)) for member in snapshots},
+                "member_domain_active": {
+                    member["player_id"]: bool(member.get("domain_key")) and int(member.get("domain_charge", 0)) > 0
+                    for member in snapshots
+                },
                 "member_pollution": {
                     member["player_id"]: int(member.get("pollution", 0)) for member in snapshots
                 },
@@ -480,6 +531,11 @@ class PartyCombatRepositoryMixin:
                 connection.execute(
                     "UPDATE boundary_rift_runs SET battle_id=?, updated_at=? WHERE run_id=? AND status='combat_pending' AND battle_id IS NULL",
                     (battle_id, now_text, boundary_rift_run_id),
+                )
+            if ancient_domain_party:
+                connection.execute(
+                    "UPDATE ancient_domain_runs SET battle_id=?, updated_at=? WHERE run_id=? AND status='combat_pending' AND battle_id IS NULL",
+                    (battle_id, now_text, ancient_domain_run_id),
                 )
             payload = {
                 "battle_id": battle_id,
@@ -573,6 +629,28 @@ class PartyCombatRepositoryMixin:
                     str(member["player_id"]): int(member.get("soul_power", 0))
                     for member in snapshot.get("members", [])
                     if str(member["player_id"]) not in member_soul_power
+                }
+            )
+            member_domain_energy = {
+                str(key): int(value)
+                for key, value in dict(state.get("member_domain_energy", {})).items()
+            }
+            member_domain_energy.update(
+                {
+                    str(member["player_id"]): int(member.get("domain_charge", 0))
+                    for member in snapshot.get("members", [])
+                    if str(member["player_id"]) not in member_domain_energy
+                }
+            )
+            member_domain_active = {
+                str(key): bool(value)
+                for key, value in dict(state.get("member_domain_active", {})).items()
+            }
+            member_domain_active.update(
+                {
+                    str(member["player_id"]): bool(member.get("domain_key")) and member_domain_energy.get(str(member["player_id"]), 0) > 0
+                    for member in snapshot.get("members", [])
+                    if str(member["player_id"]) not in member_domain_active
                 }
             )
             member_pollution = {
@@ -743,6 +821,56 @@ class PartyCombatRepositoryMixin:
                         "summon_count": 2,
                     }
                 )
+            if str(enemy.get("key", "")) == ANCIENT_DOMAIN_ENEMY:
+                run_id = str(snapshot.get("ancient_domain_run_id", ""))
+                member_rows = {
+                    str(member["player_id"]): member
+                    for member in snapshot.get("members", [])
+                }
+                for player_id, active in tuple(member_domain_active.items()):
+                    if not active or member_domain_energy.get(player_id, 0) <= 0:
+                        member_domain_active[player_id] = False
+                        continue
+                    member_snapshot = member_rows[player_id]
+                    player_id_db = int(member_snapshot["database_id"])
+                    current_energy = connection.execute(
+                        "SELECT domain_charge FROM players WHERE id=?", (player_id_db,)
+                    ).fetchone()
+                    amount = min(
+                        ANCIENT_DOMAIN_ENERGY_SUPPRESSION,
+                        member_domain_energy[player_id],
+                        int(current_energy["domain_charge"]) if current_energy else 0,
+                    )
+                    if amount <= 0:
+                        member_domain_energy[player_id] = 0
+                        member_domain_active[player_id] = False
+                        continue
+                    member_domain_energy[player_id] -= amount
+                    if member_domain_energy[player_id] <= 0:
+                        member_domain_active[player_id] = False
+                    connection.execute(
+                        "UPDATE players SET domain_charge=MAX(0, domain_charge-?), updated_at=? WHERE id=?",
+                        (amount, now_text, player_id_db),
+                    )
+                    connection.execute(
+                        "INSERT OR IGNORE INTO ancient_domain_energy_events(run_id, battle_id, player_id, round_no, amount, created_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        (run_id, battle_id, player_id_db, expected_round, amount, now_text),
+                    )
+                    sequence += 1
+                    actions.append(
+                        {
+                            "sequence_no": sequence,
+                            "actor_key": "enemy",
+                            "strategy_key": "enemy.domain_suppress",
+                            "skill_key": "enemy_skill.domain_suppress",
+                            "target_key": f"member:{player_id}",
+                            "hit_roll_bp": 0,
+                            "damage": 0,
+                            "domain_energy_loss": amount,
+                            "domain_active_after": member_domain_active[player_id],
+                        }
+                    )
             if boundary_party and expected_round in {5, 10} and len(timeline_defenders) < 2:
                 for member in members:
                     player_id = str(member["player_id"])
@@ -818,12 +946,14 @@ class PartyCombatRepositoryMixin:
                     "member_hp": member_hp,
                     "member_status": member_status,
                     "member_soul_power": member_soul_power,
+                    "member_domain_energy": member_domain_energy,
+                    "member_domain_active": member_domain_active,
                     "member_pollution": member_pollution,
                     "revive_count": revive_count,
                     "contribution": contribution,
                     "enemy_hp": enemy_hp,
                 }
-                for metadata_key in ("soul_power_cost", "soul_power_loss", "pollution_gain", "summon_count"):
+                for metadata_key in ("soul_power_cost", "soul_power_loss", "pollution_gain", "summon_count", "domain_energy_loss"):
                     if metadata_key in action:
                         state_after[metadata_key] = int(action[metadata_key])
                 connection.execute(
@@ -850,6 +980,8 @@ class PartyCombatRepositoryMixin:
                     "member_hp": member_hp,
                     "member_status": member_status,
                     "member_soul_power": member_soul_power,
+                    "member_domain_energy": member_domain_energy,
+                    "member_domain_active": member_domain_active,
                     "member_pollution": member_pollution,
                     "revive_count": revive_count,
                     "contribution": contribution,
@@ -902,10 +1034,11 @@ class PartyCombatRepositoryMixin:
             demon_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_DEMON_REALM
             beast_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_BEAST_REALM
             cross_realm_party = boundary_party or demon_party or beast_party
+            ancient_domain_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_SECRET_REALM_ANCIENT
             fatigue_party = cross_realm_party or secret_rift_party
             reward_template = {
                 str(key): int(value)
-                for key, value in dict(snapshot.get("reward", {} if secret_rift_party else BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
+                for key, value in dict(snapshot.get("reward", {} if secret_rift_party or ancient_domain_party else BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
             }
             battle_members = connection.execute("SELECT * FROM party_battle_members WHERE battle_id = ? ORDER BY id", (battle_id,)).fetchall()
             state = self._json_object(session["state_json"], {})

@@ -184,6 +184,30 @@ class BoundaryRiftNotReadyError(RuntimeError):
     """The boundary-rift run is not ready for the requested transition."""
 
 
+class AncientDomainRequirementError(RuntimeError):
+    """The party does not meet the ancient-domain entry requirements."""
+
+
+class AncientDomainBusyError(RuntimeError):
+    """A party member or party already has a conflicting active session."""
+
+
+class AncientDomainQuotaError(RuntimeError):
+    """A party member already used this UTC week's ancient-domain attempt."""
+
+
+class AncientDomainNotFoundError(RuntimeError):
+    """No ancient-domain run is available to the actor."""
+
+
+class AncientDomainNodeError(RuntimeError):
+    """The selected node is not the next server-authorized route step."""
+
+
+class AncientDomainNotReadyError(RuntimeError):
+    """The ancient-domain run is not ready for the requested transition."""
+
+
 class DemonAbyssRequirementError(RuntimeError):
     """The player lacks demon-abyss location, realm, access, or reputation."""
 
