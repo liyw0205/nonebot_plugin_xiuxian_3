@@ -537,6 +537,33 @@
       "status": "active"
     },
     {
+      "name": "炼制魂元丹",
+      "profession": "alchemy",
+      "requirements": [
+        {"type": "profession_level", "value": 5},
+        {"type": "realm", "realm_key": "nascent_soul", "min_layer": 1},
+        {"type": "facility", "facility_kind": "alchemy"},
+        {"type": "location_any", "values": ["cave.mist_grotto_2"]}
+      ],
+      "inputs": [
+        {"item_key": "item.soul_crystal", "quantity": 2},
+        {"item_key": "item.beast_blood", "quantity": 1}
+      ],
+      "energy_cost": 15,
+      "duration_seconds": 300,
+      "outputs": [{"item_key": "item.pill.soul_restore", "quantity": 1}],
+      "daily_limit": 3,
+      "failure": {
+        "input_refund": [{"item_key": "item.soul_crystal", "quantity": 1}],
+        "currency_refund_bp": 0,
+        "produces_output": false
+      },
+      "content_version": "content-0.3",
+      "rule_version": "production-0.3.0",
+      "key": "recipe.pill.soul_restore",
+      "status": "active"
+    },
+    {
       "name": "缔结妖兽契约",
       "profession": null,
       "requirements": [

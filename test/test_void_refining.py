@@ -10,6 +10,7 @@ from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.persistence.sqlite_repository import SQLitePlayerRepository
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
 
 
 def _ctx(adapter: str, user: str, operation: str) -> CommandContext:
@@ -142,6 +143,10 @@ def test_void_refining_failure_replays_and_recovers_after_instability_expires() 
                 await _prepare_void_player(runtime, user, adapter=adapter)
                 with sqlite3.connect(runtime.settings.database_path) as db:
                     db.execute(
+                        "UPDATE players SET intro_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"flags": ["quest.break_void", "story.mainline.three_realms"]}), adapter, user),
+                    )
+                    db.execute(
                         "UPDATE players SET inventory_json=? WHERE platform=? AND platform_user_id=?",
                         (json.dumps({"item.void_crystal": 5, "item.void_anchor": 7}), adapter, user),
                     )
@@ -229,6 +234,211 @@ def test_void_refining_failure_replays_and_recovers_after_instability_expires() 
                 assert json.loads(player_state[1])["item.void_anchor"] == 1
                 assert player_state[2] == 60
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_refining_materials_can_be_replenished_after_failure_on_both_adapters() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            current = [datetime(2026, 9, 21, 12, tzinfo=timezone.utc)]
+            clock = lambda: current[0]
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                user = f"void-replenish-{adapter}"
+                await _prepare_void_player(runtime, user, adapter=adapter)
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET intro_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"flags": ["quest.break_void", "story.mainline.three_realms"]}), adapter, user),
+                    )
+                    db.execute(
+                        "UPDATE players SET inventory_json=?, qualification_json=?, max_hp=10000, initiative=100, "
+                        "stamina=100, domain_charge_max=150, location_key='cave.boundary_realm' "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (
+                            json.dumps({"item.void_anchor": 10}),
+                            json.dumps({"body": 10000, "spirit": 10000, "insight": 10000, "root": 10000, "agility": 10000}),
+                            adapter,
+                            user,
+                        ),
+                    )
+
+                to_portal = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-portal-start"), "前往 虚空门户"
+                )
+                assert to_portal.code == "TRAVEL_STARTED"
+                current[0] += timedelta(minutes=5)
+                assert (
+                    await runtime.adapters.dispatch(
+                        adapter, _ctx(adapter, user, f"{user}-portal-settle"), "结算移动"
+                    )
+                ).code == "TRAVEL_COMPLETED"
+                for index in range(3):
+                    trial = await runtime.adapters.dispatch(
+                        adapter,
+                        _ctx(adapter, user, f"{user}-initial-trial-{index}"),
+                        "开始界壁试炼",
+                    )
+                    assert trial.code == "VOID_WALL_TRIAL_RECORDED"
+                    assert trial.data["outcome"] == "won"
+
+                archive_operation = next(
+                    f"{user}-initial-archive-{index}"
+                    for index in range(1000)
+                    if void_route_roll_bp(f"{user}-initial-archive-{index}") >= 1_500
+                )
+                archive = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, archive_operation), "进入虚空航道 档案遗迹"
+                )
+                assert archive.code == "VOID_ROUTE_STARTED"
+                current[0] += timedelta(minutes=45)
+                assert (
+                    await runtime.adapters.dispatch(
+                        adapter, _ctx(adapter, user, f"{user}-initial-archive-settle"), "结算虚空航道"
+                    )
+                ).code == "VOID_ROUTE_SETTLED"
+
+                # The wallet reset is a controlled depleted-resource precondition;
+                # all permit and battle evidence above came from public commands.
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.void_crystal": 5, "item.void_anchor": 10}), adapter, user),
+                    )
+
+                failed_operation = next(
+                    f"{user}-failed-{index}"
+                    for index in range(1000)
+                    if breakthrough_roll_bp(f"{user}-failed-{index}") >= 7_550
+                )
+                started = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, failed_operation), "开始突破 炼虚"
+                )
+                assert started.code == "BREAKTHROUGH_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE breakthrough_sessions SET ends_at=? WHERE session_id=?",
+                        ((current[0] - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    )
+                failed = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-failed-settle"), "结算突破"
+                )
+                assert failed.code == "BREAKTHROUGH_FAILED"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    inventory = json.loads(
+                        db.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                    )
+                assert inventory["item.void_crystal"] == 0
+                assert inventory["item.void_anchor"] == 8
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET spirit_stones=100000, world_merit=1000 "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+
+                current[0] += timedelta(days=7)
+                refreshed = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-resource-recovery"), "恢复状态"
+                )
+                assert refreshed.ok and refreshed.data["stamina"] >= 70, refreshed.data
+                profile = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-daily-domain-reset"), "我的状态"
+                )
+                assert profile.ok
+                archive_operation = next(
+                    f"{user}-archive-{index}"
+                    for index in range(1000)
+                    if void_route_roll_bp(f"{user}-archive-{index}") >= 1_500
+                )
+                archive = await runtime.adapters.dispatch(
+                    adapter,
+                    _ctx(adapter, user, archive_operation),
+                    "进入虚空航道 档案遗迹",
+                )
+                assert archive.code == "VOID_ROUTE_STARTED"
+                current[0] += timedelta(minutes=45)
+                settled_archive = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-archive-settle"), "结算虚空航道"
+                )
+                assert settled_archive.code == "VOID_ROUTE_SETTLED"
+
+                to_boundary = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-boundary-start"), "前往 界隙秘境"
+                )
+                assert to_boundary.code == "TRAVEL_STARTED"
+                current[0] += timedelta(minutes=10)
+                assert (
+                    await runtime.adapters.dispatch(
+                        adapter, _ctx(adapter, user, f"{user}-boundary-settle"), "结算移动"
+                    )
+                    ).code == "TRAVEL_COMPLETED"
+                to_portal = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-portal-retry-start"), "前往 虚空门户"
+                )
+                assert to_portal.code == "TRAVEL_STARTED"
+                current[0] += timedelta(minutes=5)
+                assert (
+                    await runtime.adapters.dispatch(
+                        adapter, _ctx(adapter, user, f"{user}-portal-retry-settle"), "结算移动"
+                    )
+                ).code == "TRAVEL_COMPLETED"
+                for index in range(3):
+                    trial = await runtime.adapters.dispatch(
+                        adapter,
+                        _ctx(adapter, user, f"{user}-trial-{index}"),
+                        "开始界壁试炼",
+                    )
+                    assert trial.code == "VOID_WALL_TRIAL_RECORDED"
+                    assert trial.data["outcome"] == "won"
+
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    inventory = json.loads(
+                        db.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                    )
+                assert inventory["item.void_crystal"] == 7
+                assert inventory["item.void_anchor"] == 10
+
+                current[0] += timedelta(hours=12)
+                refreshed_again = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"{user}-resource-recovery-again"), "恢复状态"
+                )
+                assert refreshed_again.ok and refreshed_again.data["stamina"] >= 40, refreshed_again.data
+                second_archive = next(
+                    f"{user}-archive-retry-{index}"
+                    for index in range(1000)
+                    if void_route_roll_bp(f"{user}-archive-retry-{index}") >= 1_500
+                )
+                retry_route = await runtime.adapters.dispatch(
+                    adapter,
+                    _ctx(adapter, user, second_archive),
+                    "进入虚空航道 档案遗迹",
+                )
+                assert retry_route.code == "VOID_ROUTE_STARTED"
+                current[0] += timedelta(minutes=45)
+                assert (
+                    await runtime.adapters.dispatch(
+                        adapter, _ctx(adapter, user, f"{user}-retry-route-settle"), "结算虚空航道"
+                    )
+                ).code == "VOID_ROUTE_SETTLED"
+
+                retry_operation = next(
+                    f"{user}-retry-breakthrough-{index}"
+                    for index in range(1000)
+                    if breakthrough_roll_bp(f"{user}-retry-breakthrough-{index}") < 7_550
+                )
+                retry = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, retry_operation), "开始突破 炼虚"
+                )
+                assert retry.code == "BREAKTHROUGH_STARTED"
+                await runtime.close()
 
     asyncio.run(run())
 

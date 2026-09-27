@@ -28,6 +28,7 @@ from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..adventures.three_realms_repository import ThreeRealmsRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
+from ..production.pollution_repository import PollutionRepositoryMixin
 from ..production.contract_repository import ContractProductionRepositoryMixin
 from ..production.facility_repository import FacilityRepositoryMixin
 from ..items.repository import ItemRepositoryMixin
@@ -91,6 +92,7 @@ class SQLitePlayerRepository(
     ThreeRealmsRepositoryMixin,
     ContractProductionRepositoryMixin,
     ProductionRepositoryMixin,
+    PollutionRepositoryMixin,
     FacilityRepositoryMixin,
     ItemRepositoryMixin,
     EndgameProductionRepositoryMixin,

@@ -908,6 +908,10 @@ class PollutionTooHighError(RuntimeError):
     """Cross-realm exploration is blocked by excessive pollution."""
 
 
+class PollutionAlreadyClearError(RuntimeError):
+    """Pollution purification has no work to perform."""
+
+
 class SoulExhaustionActiveError(RuntimeError):
     """A failed cross-realm action left the player temporarily exhausted."""
 

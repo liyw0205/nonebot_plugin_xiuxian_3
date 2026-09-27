@@ -397,6 +397,13 @@ class XiuxianApplication:
             write_message="当前事件不允许恢复生产订单。",
         )
 
+    async def purify_pollution(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.production.purify_pollution(context),
+            write_message="当前事件不允许净化污染。",
+        )
+
     async def use_item(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

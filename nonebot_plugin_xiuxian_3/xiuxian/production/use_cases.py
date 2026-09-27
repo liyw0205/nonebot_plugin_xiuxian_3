@@ -16,6 +16,7 @@ from ..repository import (
     FacilityMaintenanceUnpaidError,
     FacilitySlotNotClaimedError,
     FacilitySlotOccupiedError,
+    HeartDemonPendingError,
     MaterialInsufficientError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -24,6 +25,7 @@ from ..repository import (
     ProductionBusyError,
     ProductionDailyLimitError,
     ProductionWeeklyLimitError,
+    PollutionAlreadyClearError,
     ProductionExpiredError,
     ProductionNotFoundError,
     ProductionNotReadyError,
@@ -257,6 +259,55 @@ class ProductionApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         return self._settlement_result(context, operation_id, record, recovered=True)
+
+    async def purify_pollution(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_POLLUTION_COMMAND", "净化污染无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "production.purify_pollution")
+        try:
+            record = await self.repository.purify_pollution(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except MaterialInsufficientError:
+            return CommandResult(False, "MATERIAL_INSUFFICIENT", "缺少魂元丹，未修改污染或背包。", context.request_id, operation_id)
+        except PollutionAlreadyClearError:
+            return CommandResult(False, "POLLUTION_ALREADY_CLEAR", "当前没有需要净化的污染，未修改背包。", context.request_id, operation_id)
+        except HeartDemonPendingError:
+            return CommandResult(False, "HEART_DEMON_PENDING", "请先处理待决心魔事件，再进行污染净化。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能净化污染。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他净化操作，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "POLLUTION_PURIFIED",
+            (
+                f"## 污染净化完成\n\n"
+                f"**{self._display_name(record.player)}**消耗 1 枚魂元丹，污染降低 "
+                f"**{record.pollution_reduced}**。\n\n"
+                f"- **污染**：{record.pollution_before} → {record.pollution_after}\n"
+                f"- **魂元丹**：{record.item_quantity}\n"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "item_key": record.item_key,
+                "pollution_before": record.pollution_before,
+                "pollution_after": record.pollution_after,
+                "pollution_reduced": record.pollution_reduced,
+                "item_quantity": record.item_quantity,
+                "inventory": record.player.inventory,
+                "idempotent_replay": record.already_completed,
+            },
+        )
 
     async def start_endgame_recipe(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:

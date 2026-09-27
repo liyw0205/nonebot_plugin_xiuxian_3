@@ -53,8 +53,20 @@ class ProductionSettlementRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class PollutionPurificationRecord:
+    player: PlayerView
+    item_key: str
+    pollution_before: int
+    pollution_after: int
+    pollution_reduced: int
+    item_quantity: int
+    already_completed: bool = False
+
+
 __all__ = [
     "ProductionOrderRecord",
     "ProductionPreviewRecord",
     "ProductionSettlementRecord",
+    "PollutionPurificationRecord",
 ]

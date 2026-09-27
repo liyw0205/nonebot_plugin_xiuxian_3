@@ -154,6 +154,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("开始生产", application.start_production)
     router.register("领取生产", application.complete_production)
     router.register("恢复生产", application.recover_production)
+    router.register("净化污染", application.purify_pollution)
     router.register("使用", application.use_item, aliases=("使用道具", "使用物品", "使用成品", "布置阵法"))
     router.register("认领设施槽位", application.claim_facility_slot)
     router.register("维护设施", application.maintain_player_facilities)

@@ -2,13 +2,15 @@
 
 ## 用例
 
-`preview_recipe`、`start_production`、`complete_production`、`deliver_production`、`cancel_production`、`collect_farm`、`production.claim_facility_slot`。
+`preview_recipe`、`start_production`、`complete_production`、`deliver_production`、`cancel_production`、`collect_farm`、`production.claim_facility_slot`、`production.purify_pollution`。
 
 洞天二层的 `认领设施槽位 <灵田1|炼丹房|炼器台|阵基> [个人|宗门]` 将槽位绑定到所有者；每个槽位同时最多一个 `processing` 订单。维护 job 以 `slot_id + business_date` 幂等收取 100 灵石，余额不足只将设施设为 `inactive`，不取消已经 processing 的订单；订单完成、失败或过期恢复后释放槽位。
 
+`净化污染` 每次消耗 1 枚 `item.pill.soul_restore`，最多降低 20 点污染且不低于 0。污染为 0、魂元丹不足或存在待处理 `heart_demon` 会原子拒绝，不写入背包/污染；operation 重放只返回原结果。
+
 ## 错误码
 
-`RECIPE_NOT_FOUND`、`REQUIREMENT_MISSING`、`MATERIAL_INSUFFICIENT`、`ENERGY_INSUFFICIENT`、`TOOL_BUSY`、`PRODUCTION_BUSY`、`ORDER_EXPIRED`、`DELIVERY_INVALID`、`FACILITY_SLOT_OCCUPIED`、`FACILITY_SLOT_REQUIRED`、`FACILITY_MAINTENANCE_UNPAID`、`FACILITY_OWNER_INVALID`。
+`RECIPE_NOT_FOUND`、`REQUIREMENT_MISSING`、`MATERIAL_INSUFFICIENT`、`ENERGY_INSUFFICIENT`、`TOOL_BUSY`、`PRODUCTION_BUSY`、`ORDER_EXPIRED`、`DELIVERY_INVALID`、`FACILITY_SLOT_OCCUPIED`、`FACILITY_SLOT_REQUIRED`、`FACILITY_MAINTENANCE_UNPAID`、`FACILITY_OWNER_INVALID`、`POLLUTION_ALREADY_CLEAR`、`HEART_DEMON_PENDING`。
 
 ## 验收
 
