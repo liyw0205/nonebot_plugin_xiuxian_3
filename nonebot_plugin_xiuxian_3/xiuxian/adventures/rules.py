@@ -1,4 +1,4 @@
-"""Pure, versioned v0.1 bounty rules."""
+"""Pure, versioned bounty rules."""
 
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ class BountyDefinition:
     runtime_status: str = "open"
     rule_version: str = RULE_VERSION
     content_version: str = CONTENT_VERSION
+    required_intro_flag: str | None = None
+    consume_target: bool = False
 
 
 DEFINITIONS: dict[str, BountyDefinition] = {
@@ -100,6 +102,23 @@ DEFINITIONS: dict[str, BountyDefinition] = {
         rule_version="adventures-0.2.0",
         content_version="content-0.2",
     ),
+    "bounty.demon_relief": BountyDefinition(
+        key="bounty.demon_relief",
+        label="魔界救援",
+        description="获得并交付粗糙灵米 3 份",
+        required_realm=None,
+        required_layer=0,
+        duration_seconds=4 * 60 * 60,
+        daily_limit=1,
+        target_kind="inventory_gain",
+        target_key="item.food.coarse_spirit_rice",
+        target_amount=3,
+        reward=(("faction_reputation.demon", 10), ("spirit_stones", 240)),
+        rule_version="adventures-0.3.0",
+        content_version="content-0.3",
+        required_intro_flag="access.demon_abyss_gate",
+        consume_target=True,
+    ),
 }
 
 
@@ -114,6 +133,8 @@ ALIASES = {
     "云铁悬赏": "bounty.cloud_mine",
     "洞天精英悬赏": "bounty.elite_hunt",
     "精英悬赏": "bounty.elite_hunt",
+    "魔界救援": "bounty.demon_relief",
+    "魔界救援悬赏": "bounty.demon_relief",
 }
 
 

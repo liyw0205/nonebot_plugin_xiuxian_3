@@ -4,14 +4,19 @@
 
 | 类型 | 稳定键/准入 | 参数与奖励 |
 |:--|:--|:--|
-| 悬赏 | `bounty.demon_relief`：魔界许可 | 交付补给 3；4h；魔界名望 +10、灵石 240 |
-| 悬赏 | `bounty.beast_habitat`：妖界许可 | 保护/迁移目标 2；4h；妖界名望 +10、图鉴线索 |
+| 悬赏 | `bounty.demon_relief`：`access.demon_abyss_gate`；接取后获得并交付 `item.food.coarse_spirit_rice` 3 | 4h；每日 1 条；魔界声望 +10、灵石 240；领取时扣除 3 份补给，过期不扣 |
+| 悬赏 | `bounty.beast_habitat`：妖界许可；完成 `dispatch.beast_relocation` 2 次 | 4h；每日 1 条；妖界声望 +10、图鉴线索；保护/迁移来源事件和图鉴奖励稳定键尚未闭合，保持锁定 |
 | 秘境 | `instance.secret_realm.boundary_rift`：元婴 L1、2–5 人确认 | 6 节点、30 体力/队；首通图鉴、普通神魂材料、主线旗标；每周 1 |
 | 秘境 | `instance.secret_realm.demon_abyss`：魔界声望 200 | 4 节点、20 体力；污染风险 +50 bp；首通名望/故事线索 |
 | 主线 | `story.mainline.three_realms` | 元婴 L1；调停、契约、共生三线，选择一线后按序完成 5 关；结局写故事、对应三界声望 1000、`item.token.rebuild_path` 和 `story.mainline.three_realms` 许可旗标 |
 | 斗法留影 | `combat.replay.v0.3` | 保留 90 天/1000 场；公开战报脱敏；跨界战日志只显示区域和队伍编号 |
 
 跨界秘境需要队伍成员逐一确认，任一成员不满足则不扣费；战斗中途掉线由队长/恢复任务结算。悬赏和主线可发正常修为，但必须经 progression/reward service，禁止直接写字段。
+
+`bounty.demon_relief` 使用 `content-0.3` / `adventures-0.3.0`：角色须已通过魔界风险确认并持有
+`access.demon_abyss_gate`，不另加境界或地点门槛。进度以接取时 `item.food.coarse_spirit_rice` 数量为基线，
+只计接取后新增量；领取事务再核验并扣除 3 份，失败/过期不扣货、不发奖。奖励写入 `faction_reputation.demon`
+与灵石，重复 operation 回放原结果。当前实现与适配器验收见[冒险域](README.md)和[当前开发状态](../../current-status.md)。
 
 ## `instance.secret_realm.demon_abyss` 合同缺口
 

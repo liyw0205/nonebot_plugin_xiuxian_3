@@ -287,6 +287,12 @@ class AdventuresRepositoryMixin:
             return False
         realm_key = str(row["realm_key"] if isinstance(row, sqlite3.Row) else row.get("realm_key", "mortal"))
         layer = int(row["realm_layer"] if isinstance(row, sqlite3.Row) else row.get("realm_layer", 0))
+        if definition.required_intro_flag:
+            intro_raw = row["intro_json"] if isinstance(row, sqlite3.Row) else row.get("intro_json", {})
+            intro = SQLitePlayerRepository._json_object(intro_raw, {})
+            flags = {str(flag) for flag in intro.get("flags", [])}
+            if definition.required_intro_flag not in flags:
+                return False
         if bounty_meets_realm(realm_key, layer, definition.required_realm, definition.required_layer):
             return True
         if definition.key == "bounty.cloud_mine":
@@ -440,6 +446,8 @@ class AdventuresRepositoryMixin:
                 "target_key": definition.target_key,
                 "target_amount": definition.target_amount,
                 "reputation_key": definition.reputation_key,
+                "required_intro_flag": definition.required_intro_flag,
+                "consume_target": definition.consume_target,
                 "baseline_quantity": int(inventory.get(str(definition.target_key), 0)) if definition.target_key else 0,
                 "baseline_completed_orders": int(completed_orders["count"]),
                 "baseline_exploration_battle_wins": int(battle_wins["count"]),
@@ -566,6 +574,15 @@ class AdventuresRepositoryMixin:
                 raise BountyIncompleteError("bounty target is incomplete")
 
             inventory = self._json_object(row["inventory_json"], {})
+            if definition.consume_target and definition.target_key:
+                quantity = int(inventory.get(definition.target_key, 0))
+                if quantity < definition.target_amount:
+                    raise BountyIncompleteError("delivery inventory is insufficient")
+                remaining = quantity - definition.target_amount
+                if remaining:
+                    inventory[definition.target_key] = remaining
+                else:
+                    inventory.pop(definition.target_key, None)
             stones = int(row["spirit_stones"])
             cultivation = int(row["cultivation"])
             total_cultivation = int(row["total_cultivation"])
@@ -574,6 +591,7 @@ class AdventuresRepositoryMixin:
             actual_rewards: dict[str, int] = {}
             local_reputation = 0
             service_reputation = 0
+            faction_reputation = self._json_object(row["faction_reputation_json"], {})
             for key, quantity in rewards.items():
                 quantity = int(quantity)
                 if key == "spirit_stones":
@@ -592,6 +610,10 @@ class AdventuresRepositoryMixin:
                     actual_rewards[key] = quantity
                 elif key == "service_reputation":
                     service_reputation += quantity
+                    actual_rewards[key] = quantity
+                elif key.startswith("faction_reputation."):
+                    faction_key = key.removeprefix("faction_reputation.")
+                    faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + quantity
                     actual_rewards[key] = quantity
                 else:
                     inventory[key] = int(inventory.get(key, 0)) + quantity
@@ -620,7 +642,7 @@ class AdventuresRepositoryMixin:
                 """
                 UPDATE players
                 SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, energy = ?,
-                    inventory_json = ?, updated_at = ?
+                    inventory_json = ?, faction_reputation_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -629,6 +651,7 @@ class AdventuresRepositoryMixin:
                     total_cultivation,
                     energy,
                     json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
                     now_text,
                     row["id"],
                 ),
