@@ -23,6 +23,7 @@ from ..player.models import (
     TravelRecord,
 )
 from ..player.rules import STAGE_MORTAL, STAGE_NEW_USER, qualification_for
+from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
 from ..progression.models import (
     CultivationCancelRecord,
     CultivationRecoveryRecord,
@@ -511,6 +512,22 @@ class PlayerRepositoryMixin:
                     serialize_datetime(now),
                 ),
             )
+            record_codex_discovery(
+                connection,
+                player_id=int(row["id"]),
+                entry_key="codex.place.new_town",
+                operation_id=operation_id,
+                occurred_at=now,
+                snapshot={"source": "player.start_seeking", "location_key": "xuantian.new_town"},
+            )
+            record_material_discoveries(
+                connection,
+                player_id=int(row["id"]),
+                operation_id=operation_id,
+                occurred_at=now,
+                reward={"item.herb.blood_grass": 3},
+                snapshot={"source": "player.start_seeking"},
+            )
             return SeekingRecord(player=player, created=created, already_completed=False)
 
     async def complete_intro(
@@ -683,6 +700,15 @@ class PlayerRepositoryMixin:
                     serialize_datetime(now),
                 ),
             )
+            if changed and guide_key == "guide.gather_blood_grass":
+                record_material_discoveries(
+                    connection,
+                    player_id=int(row["id"]),
+                    operation_id=operation_id,
+                    occurred_at=now,
+                    reward={"item.herb.blood_grass": item_quantity},
+                    snapshot={"source": "player.complete_intro", "guide_key": guide_key},
+                )
             return IntroRecord(
                 player=player,
                 guide_key=guide_key,
@@ -849,6 +875,15 @@ class PlayerRepositoryMixin:
                     serialize_datetime(now),
                 ),
             )
+            if changed:
+                record_codex_discovery(
+                    connection,
+                    player_id=int(row["id"]),
+                    entry_key=f"codex.place.{destination.rsplit('.', 1)[-1]}",
+                    operation_id=operation_id,
+                    occurred_at=now,
+                    snapshot={"source": "world.travel_intro", "destination": destination},
+                )
             return TravelRecord(player=player, destination=destination, changed=changed, stamina_cost=cost)
 
 

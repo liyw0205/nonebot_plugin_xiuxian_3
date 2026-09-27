@@ -29,6 +29,9 @@
 | `town_commission.herb_supply` | `item.herb.blood_grass` 3 | 灵石 18 | `local.xuantian.new_town +3`、服务信誉 +1 | 全服 200 单；12h |
 | `town_commission.repair_tools` | `item.mat.wood` 2、`item.ore.ironstone` 1 | 灵石 25 | 名望 +4、信誉 +1 | 全服 120 单；12h |
 | `town_commission.meal_service` | `item.food.spirit_rice` 2 | 灵石 20 | 名望 +3、信誉 +1 | 全服 150 单；12h |
+| `town_commission.spirit_leaf` | `item.herb.spirit_leaf` 1；领取 `codex.xuantian.place_3` 后展示 | 灵石 30 | 名望 +4、信誉 +2 | 全服 80 单；12h |
+
+`town_commission.spirit_leaf` 是 v0.1 图鉴地点里程碑的额外委托；未领取里程碑时对该角色隐藏且不可接取，不改变基础三项委托。
 
 接受时仅锁定委托名额，不锁物品；交付时检查物品、原子扣库存/物品并发放报酬。库存耗尽、过期、暂停或重复交付均不扣物。`local.xuantian.new_town` 上限 1000；服务信誉上限 100。达到名望 40 开 `residence.courtyard`，名望 100 开城市委托第二槽，信誉 10 开普通服务订单承接资格；不得影响战斗、修炼或突破。
 

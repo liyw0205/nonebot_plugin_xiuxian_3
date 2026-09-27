@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -14,6 +16,9 @@ from .xiuxian.content import ContentBundle
 from .xiuxian.config import XiuxianSettings
 from .xiuxian.repository import SQLitePlayerRepository
 
+_LOGGER = logging.getLogger(__name__)
+_DISPATCH_RECOVERY_INTERVAL_SECONDS = 60
+
 
 @dataclass(slots=True)
 class XiuxianRuntime:
@@ -24,11 +29,26 @@ class XiuxianRuntime:
     router: CommandRouter
     adapters: AdapterRegistry
     _closed: bool = False
+    _dispatch_recovery_task: asyncio.Task[None] | None = None
 
     async def initialize(self) -> None:
         if self._closed:
             raise RuntimeError("runtime is closed")
         await self.repository.initialize()
+        if self._dispatch_recovery_task is None:
+            self._dispatch_recovery_task = asyncio.create_task(
+                self._dispatch_recovery_loop(), name="xiuxian3-dispatch-recovery"
+            )
+
+    async def _dispatch_recovery_loop(self) -> None:
+        while not self._closed:
+            try:
+                await self.repository.recover_expired_dispatches()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                _LOGGER.exception("dispatch recovery pass failed")
+            await asyncio.sleep(_DISPATCH_RECOVERY_INTERVAL_SECONDS)
 
     async def dispatch(self, context: CommandContext, text: str) -> CommandResult:
         if self._closed:
@@ -37,6 +57,14 @@ class XiuxianRuntime:
 
     async def close(self) -> None:
         self._closed = True
+        task = self._dispatch_recovery_task
+        self._dispatch_recovery_task = None
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 def create_runtime(

@@ -39,6 +39,7 @@ from .dispatch_rules import (
     resolve_dispatch,
     reward_for,
 )
+from .codex_projection import record_codex_discovery, record_material_discoveries
 
 
 class DispatchRepositoryMixin:
@@ -266,6 +267,43 @@ class DispatchRepositoryMixin:
                 self._settle_dispatch_once, platform, platform_user_id, assignment_id, operation_id
             )
 
+    async def recover_expired_dispatches(self, *, batch_size: int = 100) -> int:
+        if batch_size < 1:
+            raise ValueError("dispatch recovery batch size must be positive")
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._recover_expired_dispatches_once, batch_size)
+
+    def _recover_expired_dispatches_once(self, batch_size: int) -> int:
+        cutoff = serialize_datetime(self._now() - timedelta(hours=24))
+        with self._connect() as connection:
+            assignments = connection.execute(
+                """
+                SELECT a.assignment_id, p.platform, p.platform_user_id
+                FROM dispatch_assignments a
+                JOIN players p ON p.id = a.player_id
+                WHERE a.status IN ('accepted', 'running') AND a.ends_at <= ?
+                ORDER BY a.ends_at, a.id
+                LIMIT ?
+                """,
+                (cutoff, batch_size),
+            ).fetchall()
+
+        recovered = 0
+        for assignment in assignments:
+            assignment_id = str(assignment["assignment_id"])
+            try:
+                self._settle_dispatch_once(
+                    str(assignment["platform"]),
+                    str(assignment["platform_user_id"]),
+                    assignment_id,
+                    f"specials.dispatch.recovery:{assignment_id}",
+                )
+            except (DispatchAlreadySettledError, DispatchNotReadyError):
+                continue
+            recovered += 1
+        return recovered
+
     def _settle_dispatch_once(
         self, platform: str, platform_user_id: str, assignment_id: str | None, operation_id: str
     ) -> DispatchSettlementRecord:
@@ -322,11 +360,24 @@ class DispatchRepositoryMixin:
                     local_map[key] = min(1000, max(0, int(local_map.get(key, 0)) + amount))
                     local_updates[key] = amount
                 elif key.startswith("codex."):
-                    self._record_dispatch_codex(
-                        connection, int(player["id"]), key, operation_id, now_text, snapshot
+                    record_codex_discovery(
+                        connection,
+                        player_id=int(player["id"]),
+                        entry_key=key,
+                        operation_id=operation_id,
+                        occurred_at=now,
+                        snapshot=snapshot,
                     )
                 else:
                     raise RuntimeError(f"unsupported dispatch reward asset: {key}")
+            record_material_discoveries(
+                connection,
+                player_id=int(player["id"]),
+                operation_id=operation_id,
+                occurred_at=now,
+                reward=reward,
+                snapshot=snapshot,
+            )
             for key, amount in refunded.items():
                 if key.startswith("item."):
                     inventory[key] = int(inventory.get(key, 0)) + amount
@@ -383,6 +434,29 @@ class DispatchRepositoryMixin:
                     now_text,
                     now_text,
                     assignment["id"],
+                ),
+            )
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO activity_events(
+                    player_id, event_key, source_operation_id, occurred_at, payload_json
+                ) VALUES (?, 'specials.dispatch.settled', ?, ?, ?)
+                """,
+                (
+                    player["id"],
+                    operation_id,
+                    now_text,
+                    json.dumps(
+                        {
+                            "assignment_id": str(assignment["assignment_id"]),
+                            "dispatch_key": str(assignment["dispatch_key"]),
+                            "outcome": outcome,
+                            "content_version": CONTENT_VERSION,
+                            "rule_version": RULE_VERSION,
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
                 ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
@@ -540,35 +614,6 @@ class DispatchRepositoryMixin:
             "SELECT local_json FROM player_reputations WHERE player_id = ?", (player_id,)
         ).fetchone()
         return self._json_object(row["local_json"], {}) if row is not None else {}
-
-    @staticmethod
-    def _record_dispatch_codex(
-        connection: sqlite3.Connection,
-        player_id: int,
-        entry_key: str,
-        operation_id: str,
-        now_text: str,
-        snapshot: dict[str, Any],
-    ) -> None:
-        connection.execute(
-            """
-            INSERT INTO codex_entries(
-                player_id, entry_key, category, first_seen_operation_id, first_seen_at,
-                payload_json, content_version, rule_version, last_seen_at
-            ) VALUES (?, ?, 'dispatch', ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(player_id, entry_key) DO UPDATE SET last_seen_at = excluded.last_seen_at
-            """,
-            (
-                player_id,
-                entry_key,
-                operation_id,
-                now_text,
-                json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                CONTENT_VERSION,
-                RULE_VERSION,
-                now_text,
-            ),
-        )
 
     @staticmethod
     def _dispatch_assignment_from_payload(

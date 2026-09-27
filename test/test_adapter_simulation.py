@@ -738,3 +738,193 @@ def test_normalized_event_identity_is_deduplicated_before_dispatch() -> None:
     assert dedup.accept(onebot_key) is True
     assert dedup.accept(onebot_key) is False
     assert dedup.accept(qq_key) is True
+
+
+def _seed_story_evidence(
+    database_path,
+    adapter: str,
+    user: str,
+    branch: str,
+    *,
+    first_index: int = 1,
+    count: int | None = None,
+    via_harvest: bool = False,
+) -> list[str]:
+    source_count = count or (3 if branch == "merchant" else 2)
+    operation_ids = [
+        f"evidence-{adapter}-{user}-{index}"
+        for index in range(first_index, first_index + source_count)
+    ]
+    with sqlite3.connect(database_path) as connection:
+        player_id = connection.execute(
+            "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+        ).fetchone()[0]
+        now = "2026-01-01T00:00:00+00:00"
+        if branch == "merchant":
+            for index, operation_id in zip(range(first_index, first_index + source_count), operation_ids):
+                commission_id = f"story-test-commission-{adapter}-{user}-{index}"
+                connection.execute(
+                    "INSERT INTO town_commissions(commission_id,commission_key,business_date,status,"
+                    "stock_total,stock_remaining,starts_at,expires_at,created_at,updated_at) "
+                    "VALUES(?,?,?,'published',1,1,?,?,?,?)",
+                    (commission_id, f"story.test.{adapter}.{user}.{index}", now[:10], now, now, now, now),
+                )
+                connection.execute(
+                    "INSERT INTO town_commission_claims(claim_id,commission_id,player_id,business_date,"
+                    "status,accept_operation_id,deliver_operation_id,accepted_at,delivered_at,created_at,updated_at) "
+                    "VALUES(?,?,?,?,'delivered',?,?,?,?,?,?)",
+                    (
+                        f"story-test-claim-{adapter}-{user}-{index}", commission_id, player_id,
+                        now[:10], f"accept-{operation_id}", operation_id, now, now, now, now,
+                    ),
+                )
+        elif branch == "warden":
+            for index, operation_id in zip(range(first_index, first_index + source_count), operation_ids):
+                connection.execute(
+                    "INSERT INTO battle_sessions(battle_id,player_id,start_operation_id,resolved_operation_id,"
+                    "battle_type,enemy_key,location_key,status,reward_status,starts_at,turn_deadline,result_json,"
+                    "content_version,rule_version,created_at,updated_at) "
+                    "VALUES(?,?,?,?,'pve','enemy.story.test','xuantian.new_town','settled','none',?,?,?,?,?,?,?)",
+                    (
+                        f"story-test-battle-{adapter}-{user}-{index}", player_id,
+                        f"battle-start-{operation_id}", operation_id, now, now,
+                        json.dumps({"outcome": "won"}), "combat-0.1", "combat-0.1", now, now,
+                    ),
+                )
+        elif via_harvest:
+            for index, operation_id in zip(range(first_index, first_index + source_count), operation_ids):
+                connection.execute(
+                    "INSERT INTO operations(operation_id,operation_name,player_id,request_hash,result_json,created_at) "
+                    "VALUES(?,'livelihood.harvest',?,'story-test',?,?)",
+                    (
+                        operation_id,
+                        player_id,
+                        json.dumps({"plot_id": f"plot-{index}", "status": "harvested"}),
+                        now,
+                    ),
+                )
+        else:
+            for index, operation_id in zip(range(first_index, first_index + source_count), operation_ids):
+                connection.execute(
+                    "INSERT INTO dispatch_assignments(assignment_id,player_id,operation_id,dispatch_key,status,"
+                    "outcome,business_date,accepted_at,running_at,ends_at,cancel_until,result_json,"
+                    "settle_operation_id,settled_at,created_at,updated_at) "
+                    "VALUES(?,?,?,'dispatch.herb_search','settled','success',?,?,?,?,?,?,?, ?,?,?)",
+                    (
+                        f"story-test-dispatch-{adapter}-{user}-{index}", player_id,
+                        f"dispatch-accept-{operation_id}", now[:10], now, now, now, now,
+                        json.dumps({"outcome": "success"}), operation_id, now, now, now,
+                    ),
+                )
+    return operation_ids
+
+
+def test_story_endings_run_through_qq_and_onebot_v11_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            normalized_events = (
+                ("qq.official", normalize_qq_event(_qq_group_event("剧情线", message_id="qq-story"))),
+                ("onebot.v11", normalize_event(_onebot_group_event("剧情线", message_id=3099))),
+            )
+            for adapter, normalized in normalized_events:
+                for branch, command_label in (("merchant", "商路"), ("warden", "守望"), ("gardener", "药圃")):
+                    user = f"{normalized.context.user_id}-story-{branch}"
+                    prefix = f"story-{adapter}-{branch}"
+                    base = replace(normalized.context, user_id=user)
+
+                    async def dispatch(suffix: str, command: str):
+                        context = replace(base, operation_id=f"{prefix}-{suffix}")
+                        return await runtime.adapters.dispatch(adapter, context, command)
+
+                    created = await dispatch("create", "开始修仙")
+                    premature = await dispatch("start-before-seek", "开始剧情")
+                    sought = await dispatch("seek", "寻仙问道")
+                    assert created.code == "PLAYER_CREATED"
+                    assert premature.code == "STORY_REQUIREMENT_MISSING"
+                    assert sought.code == "SEEKING_STARTED"
+                    assert (await dispatch("status-before", "剧情线")).data["status"] == "available"
+                    start = await dispatch("start", "开始剧情")
+                    assert start.code == "STORY_STARTED"
+                    assert (await dispatch("start", "开始剧情")).data["idempotent_replay"] is True
+
+                    blocked = await dispatch("blocked-choice", f"选择剧情 {command_label}")
+                    assert blocked.code == "STORY_CHOICE_NOT_READY"
+                    evidence_ids = _seed_story_evidence(
+                        runtime.settings.database_path,
+                        adapter,
+                        user,
+                        branch,
+                        via_harvest=(adapter == "qq.official" and branch == "gardener"),
+                    )
+                    chosen = await dispatch("choose", f"选择剧情 {command_label}")
+                    assert chosen.code == "STORY_ROUTE_LOCKED"
+                    assert chosen.data["source_operation_ids"] == list(reversed(evidence_ids))
+                    assert (await dispatch("choose", f"选择剧情 {command_label}")).data["idempotent_replay"] is True
+                    locked = await dispatch("wrong-choice", "选择剧情 药圃" if branch != "gardener" else "选择剧情 守望")
+                    assert locked.code == "STORY_CHOICE_LOCKED"
+                    later_evidence = _seed_story_evidence(
+                        runtime.settings.database_path,
+                        adapter,
+                        user,
+                        branch,
+                        first_index=4 if branch == "merchant" else 3,
+                        count=1,
+                        via_harvest=(adapter == "qq.official" and branch == "gardener"),
+                    )
+                    if adapter == "onebot.v11" and branch == "warden":
+                        await runtime.close()
+                        runtime = create_runtime(data_dir=data_dir)
+                        resumed = await dispatch("status-resumed", "剧情线")
+                        assert resumed.data["status"] == "ending_pending"
+                        assert resumed.data["selected_route"] == branch
+
+                    claimed = await dispatch("claim", "领取剧情结局")
+                    assert claimed.code == "STORY_ENDING_CLAIMED"
+                    assert claimed.data["reward"] == {"local_reputation": 10}
+                    assert claimed.data["idempotent_replay"] is False
+                    replay = await dispatch("claim", "领取剧情结局")
+                    assert replay.code == "STORY_ENDING_CLAIMED"
+                    assert replay.data["idempotent_replay"] is True
+                    status = await dispatch("status-ended", "剧情线")
+                    assert status.data["status"] == "ended"
+                    assert status.data["selected_route"] == branch
+                    assert (await dispatch("claim-again", "领取剧情结局")).code == "STORY_ENDING_ALREADY_CLAIMED"
+
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        local_json, intro_json, cultivation, endgame_status = connection.execute(
+                            "SELECT r.local_json,p.intro_json,p.cultivation,p.endgame_status "
+                            "FROM players p LEFT JOIN player_reputations r ON r.player_id=p.id "
+                            "WHERE p.platform=? AND p.platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                        assert json.loads(local_json)["local.xuantian.new_town"] >= 10
+                        flags = json.loads(intro_json)["flags"]
+                        assert f"flag.road.{branch}" in flags
+                        assert f"appearance.home.{branch}" in flags
+                        assert cultivation == 0 and endgame_status == "none"
+                        assert connection.execute(
+                            "SELECT COUNT(*) FROM story_ending_claims c JOIN players p ON p.id=c.player_id "
+                            "WHERE p.platform=? AND p.platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0] == 1
+                        snapshot_json, reward_json, content_version, rule_version = connection.execute(
+                            "SELECT c.snapshot_json,c.reward_json,c.content_version,c.rule_version "
+                            "FROM story_ending_claims c JOIN players p ON p.id=c.player_id "
+                            "WHERE p.platform=? AND p.platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                        ending_snapshot = json.loads(snapshot_json)
+                        assert ending_snapshot["choice"]["source_operation_ids"] == list(reversed(evidence_ids))
+                        assert later_evidence[0] not in ending_snapshot["choice"]["source_operation_ids"]
+                        assert json.loads(reward_json) == {"local_reputation": 10}
+                        assert content_version == "content-0.1"
+                        assert rule_version == "specials-0.1.3"
+                        assert connection.execute(
+                            "SELECT COUNT(*) FROM codex_entries c JOIN players p ON p.id=c.player_id "
+                            "WHERE p.platform=? AND p.platform_user_id=? AND c.entry_key=?",
+                            (adapter, user, f"codex.story.xuantian.road.{branch}"),
+                        ).fetchone()[0] == 1
+            await runtime.close()
+
+    asyncio.run(run())

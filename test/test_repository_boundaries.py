@@ -15,6 +15,16 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "accept_dispatch": "nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_repository",
         "settle_dispatch": "nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_repository",
         "cancel_dispatch": "nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_repository",
+        "recover_expired_dispatches": "nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_repository",
+        "get_codex": "nonebot_plugin_xiuxian_3.xiuxian.specials.codex_repository",
+        "claim_codex_milestone": "nonebot_plugin_xiuxian_3.xiuxian.specials.codex_repository",
+        "preview_tower": "nonebot_plugin_xiuxian_3.xiuxian.specials.tower_repository",
+        "start_tower_run": "nonebot_plugin_xiuxian_3.xiuxian.specials.tower_repository",
+        "claim_tower_reward": "nonebot_plugin_xiuxian_3.xiuxian.specials.tower_repository",
+        "get_story_status": "nonebot_plugin_xiuxian_3.xiuxian.specials.story_repository",
+        "start_story": "nonebot_plugin_xiuxian_3.xiuxian.specials.story_repository",
+        "choose_story_route": "nonebot_plugin_xiuxian_3.xiuxian.specials.story_repository",
+        "claim_story_ending": "nonebot_plugin_xiuxian_3.xiuxian.specials.story_repository",
         "recover_cloud_boat": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
         "accept_demon_intro": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
         "use_array_hall": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
@@ -110,3 +120,12 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
 
 def test_repository_facade_preserves_error_identity() -> None:
     assert CompatibilityBusyError is RepositoryBusyError
+
+
+def test_codex_payload_parser_does_not_shadow_quest_claim_parser() -> None:
+    assert SQLitePlayerRepository._claim_from_payload.__module__ == (
+        "nonebot_plugin_xiuxian_3.xiuxian.quests.repository"
+    )
+    assert SQLitePlayerRepository._codex_milestone_claim_from_payload.__module__ == (
+        "nonebot_plugin_xiuxian_3.xiuxian.specials.codex_repository"
+    )

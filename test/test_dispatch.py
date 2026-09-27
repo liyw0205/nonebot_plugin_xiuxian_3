@@ -401,3 +401,83 @@ def test_dispatch_confirmation_expiry_disables_cancellation() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_expired_dispatch_recovery_projects_routine_and_honor_sources_on_both_adapters() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 27, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            for adapter in ("qq.official", "onebot.v11"):
+                runtime = create_runtime(data_dir=f"{data_dir}/{adapter}", clock=clock)
+                user = f"dispatch-recovery-{adapter}"
+                prefix = adapter.replace(".", "-")
+                await _mortal(runtime, adapter, user, prefix)
+                campaign = await _send(runtime, adapter, user, f"{prefix}-campaign", "七日入道")
+                assert campaign.code == "SEVEN_DAY_STATUS"
+                success_seed = _forced_dispatch_seed(TOWN_DELIVERY, "success")
+                with _force_uuid(success_seed, f"{prefix}-assignment"):
+                    accepted = await _send(
+                        runtime,
+                        adapter,
+                        user,
+                        f"{prefix}-accept",
+                        "接受派遣 dispatch.town_delivery",
+                    )
+                assert accepted.code == "DISPATCH_ACCEPTED"
+
+                clock.advance(hours=24)
+                assert await runtime.repository.recover_expired_dispatches() == 0
+                clock.advance(days=5, minutes=31)
+                await runtime.initialize()
+                for _ in range(100):
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        status = connection.execute(
+                            "SELECT status FROM dispatch_assignments WHERE assignment_id=?",
+                            (accepted.data["assignment_id"],),
+                        ).fetchone()[0]
+                    if status == "settled":
+                        break
+                    await asyncio.sleep(0.01)
+                assert status == "settled"
+                assert await runtime.repository.recover_expired_dispatches() == 0
+
+                honors = await _send(runtime, adapter, user, f"{prefix}-honors", "功业录")
+                assert honors.code == "HONOR_STATUS"
+                dispatch_achievement = honors.data["achievements"][2]
+                assert dispatch_achievement["achievement_key"] == "achievement.first_dispatch"
+                assert dispatch_achievement["state"] == "claimable"
+                assert honors.data["titles"][3]["title_key"] == "title.dispatch_helper"
+                assert honors.data["titles"][3]["acquired"] is True
+
+                seven_day = await _send(runtime, adapter, user, f"{prefix}-seven-day", "七日入道")
+                dispatch_goal = seven_day.data["goals"][5]
+                assert dispatch_goal["day"] == 6
+                assert dispatch_goal["state"] == "claimable"
+                goal_claim = await _send(
+                    runtime, adapter, user, f"{prefix}-claim-goal", "领取七日目标 6"
+                )
+                assert goal_claim.code == "SEVEN_DAY_GOAL_CLAIMED"
+
+                claim_context = _context(adapter, user, f"{prefix}-claim-achievement")
+                achievement = await runtime.adapters.dispatch(adapter, claim_context, "领取功业 3")
+                replay = await runtime.adapters.dispatch(adapter, claim_context, "领取功业 3")
+                assert achievement.code == "ACHIEVEMENT_CLAIMED"
+                assert achievement.data["achievement_key"] == "achievement.first_dispatch"
+                assert replay.data["idempotent_replay"] is True
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    source_count = connection.execute(
+                        "SELECT COUNT(*) FROM activity_events WHERE player_id=("
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?"
+                        ") AND event_key='specials.dispatch.settled'",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    recovery_operations = connection.execute(
+                        "SELECT COUNT(*) FROM operations WHERE operation_id=?",
+                        (f"specials.dispatch.recovery:{accepted.data['assignment_id']}",),
+                    ).fetchone()[0]
+                assert source_count == 1
+                assert recovery_operations == 1
+                await runtime.close()
+
+    asyncio.run(run())

@@ -13,6 +13,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from .arena_federation import ensure_identity_route, record_settlement_audit
+from .codex_projection import record_codex_discovery
 
 
 CONTENT_VERSION = "content-0.6"
@@ -44,7 +45,13 @@ def project_arena_result(
     if outcome not in {"challenger_won", "defender_won", "draw"}:
         raise ValueError("invalid arena outcome")
     normalized = [
-        {"player_id": int(item["player_id"]), "side": str(item["side"])}
+        {
+            "player_id": int(item["player_id"]),
+            "side": str(item["side"]),
+            "observed_path_keys": tuple(
+                dict.fromkeys(str(key) for key in item.get("observed_path_keys", ()) if key)
+            ),
+        }
         for item in participants
     ]
     if not normalized or len({item["player_id"] for item in normalized}) != len(normalized):
@@ -102,25 +109,31 @@ def project_arena_result(
             continue
 
         for entry_key in entry_keys:
-            connection.execute(
-                """
-                INSERT INTO codex_entries(
-                    player_id, entry_key, category, first_seen_operation_id,
-                    first_seen_at, payload_json, content_version, rule_version,
-                    last_seen_at
-                ) VALUES (?, ?, 'challenge', ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(player_id, entry_key) DO UPDATE SET last_seen_at = excluded.last_seen_at
-                """,
-                (
-                    player_id,
-                    entry_key,
-                    operation_id,
-                    settled_at,
-                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
-                    CONTENT_VERSION,
-                    RULE_VERSION,
-                    settled_at,
-                ),
+            record_codex_discovery(
+                connection,
+                player_id=player_id,
+                entry_key=entry_key,
+                operation_id=operation_id,
+                occurred_at=settled_at,
+                snapshot=payload,
+                content_version=CONTENT_VERSION,
+                rule_version=RULE_VERSION,
+            )
+        for path_key in participant["observed_path_keys"]:
+            record_codex_discovery(
+                connection,
+                player_id=player_id,
+                entry_key=f"codex.path.{path_key}",
+                operation_id=operation_id,
+                occurred_at=settled_at,
+                snapshot={
+                    "source": "arena.public_snapshot",
+                    "match_id": match_id,
+                    "mode_key": mode_key,
+                    "path_key": path_key,
+                },
+                content_version=CONTENT_VERSION,
+                rule_version=RULE_VERSION,
             )
         for event_key in (
             "arena.participation",

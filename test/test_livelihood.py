@@ -151,7 +151,12 @@ def test_spirit_leaf_requires_courtyard_and_freezes_array_sand_roll() -> None:
             harvested = await runtime.dispatch(_context(user, "spirit-harvest"), "灵田收获")
             assert harvested.code == "FIELD_PLOT_HARVESTED"
             assert harvested.data["harvest"]["item.herb.spirit_leaf"] == 3
-            assert harvested.data["harvest"].get("item.mat.array_sand", 0) in {0, 1}
+            assert harvested.data["harvest"]["item.mat.array_sand"] == 1
+            codex = await runtime.dispatch(_context(user, "spirit-codex"), "我的图鉴 材料")
+            assert any(
+                item["entry_key"] == "codex.material.array_sand"
+                for item in codex.data["entries"]
+            )
             replay = await runtime.dispatch(_context(user, "spirit-harvest"), "灵田收获")
             assert replay.data["harvest"] == harvested.data["harvest"]
             assert replay.data["idempotent_replay"] is True

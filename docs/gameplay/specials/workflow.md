@@ -10,7 +10,9 @@ dispatch: preview -> accepted -> running -> succeeded/failed -> settled
 
 codex: hidden -> discovered -> completed (集合里程碑)
 
-tower: preview -> battle_running -> won/lost/expired -> reward_pending -> claimed
+tower: preview -> battle_running -> reward_pending -> claimed
+                         -> lost
+                         -> aborted (战斗启动失败并退还入场体力)
 
 arena_snapshot: draft -> published -> expired/revoked
 arena_match: queued -> running -> won/lost/drawn -> settled

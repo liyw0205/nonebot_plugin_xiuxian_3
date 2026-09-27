@@ -48,6 +48,78 @@ class DispatchCancellationExpiredError(RuntimeError):
     """The dispatch confirmation window has expired."""
 
 
+class CodexMilestoneNotFoundError(RuntimeError):
+    """The requested codex milestone is not part of the active content."""
+
+
+class CodexMilestoneNotReadyError(RuntimeError):
+    """The requested codex milestone has not been completed."""
+
+
+class CodexMilestoneAlreadyClaimedError(RuntimeError):
+    """The requested codex milestone was already claimed."""
+
+
+class TowerRequirementError(RuntimeError):
+    """The player lacks the realm, resources, or eligibility required by a tower floor."""
+
+
+class TowerBusyError(RuntimeError):
+    """The player already has an active tower run or another long action."""
+
+
+class TowerFloorLockedError(RuntimeError):
+    """The previous tower floor has not been cleared and claimed."""
+
+
+class TowerQuotaError(RuntimeError):
+    """The daily attempt or weekly practice quota is exhausted."""
+
+
+class TowerNotFoundError(RuntimeError):
+    """The requested tower run does not exist."""
+
+
+class TowerNotReadyError(RuntimeError):
+    """The tower battle has not reached a terminal result."""
+
+
+class TowerStartFailedError(RuntimeError):
+    """The tower battle could not start and its entry cost was refunded."""
+
+
+class TowerRewardNotAvailableError(RuntimeError):
+    """There is no pending tower reward to claim."""
+
+
+class TowerAlreadyClaimedError(RuntimeError):
+    """A tower reward was already claimed and no reward is pending."""
+
+
+class StoryRequirementError(RuntimeError):
+    """The player has not completed the onboarding requirement for the story."""
+
+
+class StoryNotStartedError(RuntimeError):
+    """The player has no active run for the requested story."""
+
+
+class StoryChoiceRequirementError(RuntimeError):
+    """The requested story branch is unavailable or lacks verified evidence."""
+
+
+class StoryChoiceConflictError(RuntimeError):
+    """The player already locked a different story branch."""
+
+
+class StoryEndingNotAvailableError(RuntimeError):
+    """The story ending is not ready to claim."""
+
+
+class StoryEndingAlreadyClaimedError(RuntimeError):
+    """The story ending reward has already been claimed."""
+
+
 class SecretRealmRequirementError(RuntimeError):
     """The player lacks the realm, location, or ticket required by a realm."""
 

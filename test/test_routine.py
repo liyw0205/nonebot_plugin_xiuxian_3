@@ -319,8 +319,8 @@ def test_seven_day_campaign_uses_first_seeking_clock_and_claims_one_goal_once() 
             clock.advance(days=4)
             closed = await runtime.dispatch(_context(user, "closed"), "七日入道")
             assert closed.data["current_day"] == 6
-            assert closed.data["goals"][4]["state"] == "content_closed"
-            assert closed.data["goals"][5]["state"] == "content_closed"
+            assert closed.data["goals"][4]["state"] == "pending"
+            assert closed.data["goals"][5]["state"] == "pending"
             blocked = await runtime.dispatch(
                 _context(user, "tower", operation_id="seven-tower"), "领取七日目标 5"
             )
@@ -412,9 +412,9 @@ def test_honor_titles_and_achievements_are_audited_and_idempotent() -> None:
 
             closed = await runtime.dispatch(
                 _context(user, "closed-achievement", operation_id="closed-achievement"),
-                "领取功业 3",
+                "领取功业 5",
             )
-            assert closed.code == "CONTENT_CLOSED"
+            assert closed.code == "ACHIEVEMENT_NOT_COMPLETED"
             await runtime.close()
 
     asyncio.run(run())

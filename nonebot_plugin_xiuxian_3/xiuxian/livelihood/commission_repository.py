@@ -21,7 +21,12 @@ from ..persistence.errors import (
     OperationConflictError,
 )
 from .models import TownCommissionRecord, TownCommissionView
-from .rules import TownCommissionDefinition, commission_definition, TOWN_COMMISSION_DEFINITIONS
+from .rules import (
+    COMMISSION_SPIRIT_LEAF,
+    TownCommissionDefinition,
+    commission_definition,
+    TOWN_COMMISSION_DEFINITIONS,
+)
 
 
 class CommissionRepositoryMixin:
@@ -52,7 +57,14 @@ class CommissionRepositoryMixin:
                 """,
                 (player["id"], business_date),
             ).fetchall()
-            return tuple(self._commission_view(row) for row in rows)
+            has_codex_unlock = self._has_codex_unlock(
+                connection, int(player["id"]), "commission.town.extra_offer"
+            )
+            return tuple(
+                self._commission_view(row)
+                for row in rows
+                if str(row["commission_key"]) != COMMISSION_SPIRIT_LEAF or has_codex_unlock
+            )
 
     async def accept_commission(
         self,
@@ -102,6 +114,10 @@ class CommissionRepositoryMixin:
             if existing is not None:
                 return self._record_from_payload(existing, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
+            if definition.key == COMMISSION_SPIRIT_LEAF and not self._has_codex_unlock(
+                connection, int(player["id"]), "commission.town.extra_offer"
+            ):
+                raise CommissionNotFoundError("codex milestone has not unlocked this commission")
             self._ensure_commissions(connection, business_date, now)
             self._expire_commissions(connection, business_date, now, now_text)
             offer = connection.execute(
@@ -395,6 +411,21 @@ class CommissionRepositoryMixin:
             "UPDATE town_commissions SET status = 'expired', updated_at = ? WHERE business_date = ? AND status = 'published' AND expires_at <= ?",
             (now_text, business_date, now_text),
         )
+
+    @staticmethod
+    def _has_codex_unlock(connection: Any, player_id: int, unlock_key: str) -> bool:
+        rows = connection.execute(
+            "SELECT unlocks_json FROM codex_milestone_claims WHERE player_id = ?",
+            (player_id,),
+        ).fetchall()
+        for row in rows:
+            try:
+                unlocks = json.loads(str(row["unlocks_json"]))
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(unlocks, list) and unlock_key in unlocks:
+                return True
+        return False
 
     @staticmethod
     def _snapshot(definition: TownCommissionDefinition, offer: Any, now_text: str) -> dict[str, Any]:

@@ -69,7 +69,6 @@ SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
         "完成试炼塔一层",
         (("item.mat.array_sand", 2),),
         "specials.tower.floor.1",
-        closed=True,
     ),
     SevenDayGoalDefinition(
         6,
@@ -77,7 +76,6 @@ SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
         "完成一次派遣",
         (("spirit_stones", 50),),
         "specials.dispatch.settled",
-        closed=True,
     ),
     SevenDayGoalDefinition(
         7,
@@ -161,8 +159,8 @@ HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
         "雾中守门人",
         "story.mainline.xuantian:chapter.1.stage.3",
     ),
-    HonorTitleDefinition("title.dispatch_helper", "派遣行者", "specials.dispatch.settled", closed=True),
-    HonorTitleDefinition("title.first_tower_clear", "试炼先行", "specials.tower.floor.10", closed=True),
+    HonorTitleDefinition("title.dispatch_helper", "派遣行者", "specials.dispatch.settled"),
+    HonorTitleDefinition("title.first_tower_clear", "试炼先行", "specials.tower.floor.10"),
     HonorTitleDefinition(
         "title.season.final_heaven.ascension",
         "凌霄先登",
@@ -228,21 +226,18 @@ ACHIEVEMENTS: tuple[AchievementDefinition, ...] = (
         "首次完成派遣",
         "specials.dispatch.settled",
         (("title_key", "title.dispatch_helper"),),
-        closed=True,
     ),
     AchievementDefinition(
         "achievement.codex_5",
         "收录五条图鉴",
         "specials.codex.count.5",
         (("local_reputation", 5),),
-        closed=True,
     ),
     AchievementDefinition(
         "achievement.tower_10",
         "试炼塔十层",
         "specials.tower.floor.10",
         (("title_key", "title.first_tower_clear"),),
-        closed=True,
     ),
 )
 

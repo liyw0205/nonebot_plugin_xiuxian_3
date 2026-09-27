@@ -153,6 +153,7 @@ def spirit_leaf_array_sand_roll(operation_id: str) -> int:
 COMMISSION_HERB_SUPPLY = "town_commission.herb_supply"
 COMMISSION_REPAIR_TOOLS = "town_commission.repair_tools"
 COMMISSION_MEAL_SERVICE = "town_commission.meal_service"
+COMMISSION_SPIRIT_LEAF = "town_commission.spirit_leaf"
 
 TOWN_COMMISSION_DEFINITIONS = {
     COMMISSION_HERB_SUPPLY: TownCommissionDefinition(
@@ -182,6 +183,15 @@ TOWN_COMMISSION_DEFINITIONS = {
         service_reputation=1,
         stock=150,
     ),
+    COMMISSION_SPIRIT_LEAF: TownCommissionDefinition(
+        key=COMMISSION_SPIRIT_LEAF,
+        label="灵泉谷灵叶收集",
+        inputs={"item.herb.spirit_leaf": 1},
+        reward_stones=30,
+        local_reputation=4,
+        service_reputation=2,
+        stock=80,
+    ),
 }
 
 COMMISSION_ALIASES = {
@@ -190,6 +200,7 @@ COMMISSION_ALIASES = {
     "工具修缮": COMMISSION_REPAIR_TOOLS,
     "灵米饭供应": COMMISSION_MEAL_SERVICE,
     "灵米饭": COMMISSION_MEAL_SERVICE,
+    "灵泉谷灵叶收集": COMMISSION_SPIRIT_LEAF,
 }
 
 

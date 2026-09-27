@@ -186,8 +186,26 @@ class TeamArenaRepositoryMixin:
                 settled_at=now_text,
                 request_id=request_id,
                 participants=(
-                    *({"player_id": int(member["database_id"]), "side": "challenger"} for member in challenger_snapshot["members"]),
-                    *({"player_id": int(member["database_id"]), "side": "defender"} for member in defender_members),
+                    *(
+                        {
+                            "player_id": int(member["database_id"]),
+                            "side": "challenger",
+                            "observed_path_keys": tuple(
+                                opponent.get("path_key") for opponent in defender_members
+                            ),
+                        }
+                        for member in challenger_snapshot["members"]
+                    ),
+                    *(
+                        {
+                            "player_id": int(member["database_id"]),
+                            "side": "defender",
+                            "observed_path_keys": tuple(
+                                opponent.get("path_key") for opponent in challenger_snapshot["members"]
+                            ),
+                        }
+                        for member in defender_members
+                    ),
                 ),
             )
             payload = {"match_id": match_id, "outcome": outcome, "rounds": rounds, "challenger_rating": challenger_rating + challenger_delta, "defender_rating": defender_rating + defender_delta, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta, "opponent_summary": self._json_map(defender["public_json"]), "projection": projection}

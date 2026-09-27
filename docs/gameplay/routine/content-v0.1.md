@@ -1,6 +1,6 @@
 # v0.1 道历与运营循环内容基线
 
-本文件遵守[版本内容开发合同](../../content-development-contract.md)与[道历与运营循环域](README.md)。`content_version=content-0.1`，`rule_version=routine-0.1.0`。
+本文件遵守[版本内容开发合同](../../content-development-contract.md)与[道历与运营循环域](README.md)。`content_version=content-0.1`，`rule_version=routine-0.1.0`。本文件是版本内容快照；当前实现状态以[当前开发状态](../../current-status.md)为准。
 
 ## 1. 道历问安、补录道历与灵木聚财
 
@@ -53,14 +53,13 @@
 | D2 | `quest.seven_day.day2_gather` | 止血草 ×2 | 已开放 |
 | D3 | `quest.seven_day.day3_production_preview` | 灵石 ×30 | 已开放；以生产预览或已开始订单作为可审计来源 |
 | D4 | `quest.seven_day.day4_bounty` | 地方名望 +2 | 已开放；以接取悬赏作为可审计来源 |
-| D5 | `quest.seven_day.day5_tower` | 阵砂 ×2 | 未开放；等待试炼塔/战斗运行时 |
-| D6 | `quest.seven_day.day6_dispatch` | 灵石 ×50 | 派遣已开放；routine 尚未接入已结算派遣来源 |
+| D5 | `quest.seven_day.day5_tower` | 阵砂 ×2 | 运行时已开放；须在目标日期或之后胜利完成试炼塔第一层 |
+| D6 | `quest.seven_day.day6_dispatch` | 灵石 ×50 | 已开放；以已结算派遣来源 operation 为凭据 |
 | D7 | `quest.seven_day.day7_path` | 地方名望 +5、机缘签 ×2 | 已开放；以选择道途作为可审计来源 |
 
 用户发送 `七日入道` 查看状态，发送 `领取七日目标 <1-7>` 领取已完成目标。目标起点、
 目标日期、来源 operation、奖励和版本均持久化；同一日数或同一 operation 重试只回放原结果，
-不同 operation 不能重复占用同一来源事件。D5 等待试炼塔运行时；D6 在 routine 派遣来源投影
-接入前返回未完成。七日目标查询/领奖不会自行创建战斗或派遣会话。
+不同 operation 不能重复占用同一来源事件。D5 来源为 `specials.tower.floor.1`，D6 来源为派遣结算事件。七日目标查询/领奖不会自行创建战斗或派遣会话。
 
 称号与功业录当前开放以下来源：
 
@@ -70,7 +69,9 @@
 | `title.town_helper` | 累计三次道历问安 | 自动获得，可佩戴 |
 | `achievement.first_checkin` | 首次道历问安 | 地方名望 +3，可领取一次 |
 | `achievement.first_craft` | 首次完成生产订单 | 服务信誉 +2，可领取一次 |
-| `achievement.first_dispatch`、`achievement.codex_5`、`achievement.tower_10` | 派遣/图鉴/试炼塔 | 派遣已开放但功业来源事件尚未接入；图鉴收集和试炼塔内容仍未开放 |
+| `achievement.codex_5` | 五条不同图鉴首见记录 | 已开放；青石镇名望 +5，来源 operation 为第五条首见 |
+| `achievement.first_dispatch` | 首次结算派遣 | 已开放；领取后获得称号 `title.dispatch_helper` |
+| `achievement.tower_10` | 试炼塔十层 | 运行时来源已接入；十层胜利后可领取并获得 `title.first_tower_clear` |
 
 发送 `功业录` 查看功业与称号，发送 `领取功业 序号` 领取奖励，发送 `佩戴称号 序号`
 更换展示称号。称号是展示记录，不提供永久战斗属性；来源 operation、奖励版本和领取

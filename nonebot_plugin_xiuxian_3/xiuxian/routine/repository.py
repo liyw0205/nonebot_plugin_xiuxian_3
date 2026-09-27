@@ -1284,6 +1284,15 @@ class RoutineRepositoryMixin:
                 """,
                 (player_id,),
             ).fetchone()
+        elif source_event == "specials.codex.count.5":
+            row = connection.execute(
+                """
+                SELECT first_seen_operation_id FROM codex_entries
+                WHERE player_id = ?
+                ORDER BY first_seen_at ASC, id ASC LIMIT 1 OFFSET 4
+                """,
+                (player_id,),
+            ).fetchone()
         else:
             row = connection.execute(
                 """
@@ -1295,8 +1304,10 @@ class RoutineRepositoryMixin:
             ).fetchone()
         if row is None:
             return None
-        key = "operation_id" if "operation_id" in row.keys() else "source_operation_id"
-        return str(row[key])
+        for key in ("operation_id", "source_operation_id", "first_seen_operation_id"):
+            if key in row.keys():
+                return str(row[key])
+        raise RuntimeError(f"honor source query returned no operation identifier: {source_event}")
 
     @staticmethod
     def _materialize_honor_titles(

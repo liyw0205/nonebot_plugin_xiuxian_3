@@ -587,8 +587,20 @@ class ArenaRepositoryMixin:
                 settled_at=now_text,
                 request_id=request_id,
                 participants=(
-                    {"player_id": challenger_id, "side": "challenger"},
-                    {"player_id": int(defender["id"]), "side": "defender"},
+                    {
+                        "player_id": challenger_id,
+                        "side": "challenger",
+                        "observed_path_keys": tuple(
+                            key for key in (defender_snapshot_data.get("path_key"),) if key
+                        ),
+                    },
+                    {
+                        "player_id": int(defender["id"]),
+                        "side": "defender",
+                        "observed_path_keys": tuple(
+                            key for key in (challenger_snapshot.get("path_key"),) if key
+                        ),
+                    },
                 ),
             )
             result["projection"] = projection

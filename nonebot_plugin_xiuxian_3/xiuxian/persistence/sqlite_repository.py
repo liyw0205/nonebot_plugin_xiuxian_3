@@ -68,6 +68,12 @@ from ..specials.idle_repository import IdleRepositoryMixin
 from ..specials.idle_migration import ensure_idle_schema
 from ..specials.dispatch_repository import DispatchRepositoryMixin
 from ..specials.dispatch_migration import ensure_dispatch_schema
+from ..specials.codex_repository import CodexRepositoryMixin
+from ..specials.codex_migration import ensure_codex_schema
+from ..specials.tower_repository import TowerRepositoryMixin
+from ..specials.tower_migration import ensure_tower_schema
+from ..specials.story_repository import StoryRepositoryMixin
+from ..specials.story_migration import ensure_story_schema
 from ..quests.repository import QuestRepositoryMixin
 from ..quests.cross_realm_repository import DemonQuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
@@ -129,6 +135,9 @@ class SQLitePlayerRepository(
     ArenaRecoveryRepositoryMixin,
     IdleRepositoryMixin,
     DispatchRepositoryMixin,
+    CodexRepositoryMixin,
+    TowerRepositoryMixin,
+    StoryRepositoryMixin,
     DemonQuestRepositoryMixin,
     QuestRepositoryMixin,
     EconomyRepositoryMixin,
@@ -247,6 +256,9 @@ class SQLitePlayerRepository(
             ensure_secret_realm_schema(connection)
             ensure_idle_schema(connection)
             ensure_dispatch_schema(connection)
+            ensure_codex_schema(connection)
+            ensure_tower_schema(connection)
+            ensure_story_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"

@@ -36,6 +36,7 @@ from .idle_rules import (
     reward_for,
     resolve_route,
 )
+from .codex_projection import record_codex_discovery, record_material_discoveries
 
 
 class IdleRepositoryMixin:
@@ -338,10 +339,22 @@ class IdleRepositoryMixin:
                 (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(durability, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
             )
             if "codex.route.town_road" in reward:
-                self._record_idle_codex(connection, int(player["id"]), "codex.route.town_road", operation_id, now_text, snapshot)
-            for key in reward:
-                if key.startswith("item."):
-                    self._record_idle_codex(connection, int(player["id"]), f"codex.material.{key.split('.', 2)[-1]}", operation_id, now_text, snapshot)
+                record_codex_discovery(
+                    connection,
+                    player_id=int(player["id"]),
+                    entry_key="codex.route.town_road",
+                    operation_id=operation_id,
+                    occurred_at=now,
+                    snapshot=snapshot,
+                )
+            record_material_discoveries(
+                connection,
+                player_id=int(player["id"]),
+                operation_id=operation_id,
+                occurred_at=now,
+                reward=reward,
+                snapshot=snapshot,
+            )
             result = {
                 **reward,
                 "fallback": fallback,
@@ -551,18 +564,6 @@ class IdleRepositoryMixin:
         connection.execute(
             "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
-
-    @staticmethod
-    def _record_idle_codex(connection: sqlite3.Connection, player_id: int, entry_key: str, operation_id: str, now_text: str, snapshot: dict[str, Any]) -> None:
-        category = "route" if entry_key.startswith("codex.route.") else "material"
-        connection.execute(
-            """
-            INSERT INTO codex_entries(player_id, entry_key, category, first_seen_operation_id, first_seen_at, payload_json, content_version, rule_version, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(player_id, entry_key) DO UPDATE SET last_seen_at = excluded.last_seen_at
-            """,
-            (player_id, entry_key, category, operation_id, now_text, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), CONTENT_VERSION, RULE_VERSION, now_text),
         )
 
     @staticmethod

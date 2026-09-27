@@ -19,6 +19,7 @@ from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
 from ..config import XiuxianSettings
+from ..specials.codex_projection import record_material_discoveries
 from ..player.models import (
     CultivationRecord,
     IntroRecord,
@@ -1057,6 +1058,19 @@ class ExplorationRepositoryMixin:
             )
             if status == "settled":
                 self._bind_exploration_rewards(connection, int(row["id"]), operation_id, result, now)
+                record_material_discoveries(
+                    connection,
+                    player_id=int(row["id"]),
+                    operation_id=operation_id,
+                    occurred_at=now,
+                    reward=result,
+                    snapshot={
+                        "source": operation_name,
+                        "mode_key": str(session["mode_key"]),
+                        "location_key": str(session["location_key"]),
+                        "content_version": snapshot.get("content_version", "content-0.1"),
+                    },
+                )
             return self._exploration_settlement_from_payload(payload)
 
     @staticmethod

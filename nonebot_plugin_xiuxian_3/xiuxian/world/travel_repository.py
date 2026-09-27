@@ -113,6 +113,7 @@ from ..world.void_rules import (
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.rules import beast_hills_entry_allowed, destination_definition, meets_realm
+from ..specials.codex_projection import record_codex_discovery
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     battle_roll_bp,
@@ -663,6 +664,14 @@ class TravelRepositoryMixin:
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), serialize_datetime(now)),
+            )
+            record_codex_discovery(
+                connection,
+                player_id=int(row["id"]),
+                entry_key=f"codex.place.{str(session['destination']).rsplit('.', 1)[-1]}",
+                operation_id=operation_id,
+                occurred_at=now,
+                snapshot={"source": operation_name, "destination": str(session["destination"])},
             )
             return self._travel_settlement_from_payload(payload)
 

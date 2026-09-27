@@ -27,6 +27,8 @@ runtime = create_runtime()  # 默认使用 data/xiuxian3.sqlite3
 await runtime.initialize()
 ```
 
+`runtime.initialize()` 同时启动派遣过期恢复循环；NoneBot 插件在 driver startup/shutdown 中自动初始化和关闭 runtime。独立 CLI/Web 宿主必须在事件循环启动时调用 `initialize()`，并在退出时 `close()`。
+
 可通过 `XIUXIAN3_DATA_DIR` 指定运行数据目录，`XIUXIAN3_MAX_INFLIGHT` 控制
 异步请求上限，`XIUXIAN3_DB_BUSY_TIMEOUT_MS` 控制 SQLite 锁等待时间。SQLite
 使用 WAL 和短事务；`data/` 下的领域 JSON 是只读代码配置，数据库、日志和备份
@@ -253,11 +255,18 @@ Clock。
 
 七日入道以首次 `寻仙问道` 的业务日为 D1，发送 `七日入道` 查看七日目标状态，发送
 `领取七日目标 <1-7>` 领取已完成目标。目标允许补做但不会重置起点；D5 试炼塔、D6 派遣
-在依赖系统开放前显示为未开放，不会启动战斗或生成虚假奖励。
+来源分别是试炼塔首层胜利事件 `specials.tower.floor.1` 和派遣结算事务投影
+`specials.dispatch.settled`；
+目标查询/领奖不会启动战斗或派遣。
 
 `功业录`、`领取功业 <序号>` 和 `佩戴称号 <序号>` 使用同一 routine application 入口；
-首次寻仙、三次问安会投影称号，首次问安和首次完成生产可领取一次功业奖励。试炼塔、派遣、
-图鉴功业仍保持关闭，称号只用于展示。
+首次寻仙、三次问安及首次派遣会投影称号；首次问安、首次完成生产、收录五条图鉴和首次
+结算派遣可领取一次功业奖励；试炼塔十层胜利投影 `title.first_tower_clear` 和
+`achievement.tower_10` 来源。称号只用于展示。
+
+雾隐试炼塔 v0.1 已开放：`试炼塔` 查询，`挑战试炼塔 <1-30>` 按层自动战，胜利后
+`领取试炼塔奖励` 独立领取。首通楼层顺序、层段每日配额、每层每周练习额度、体力扣除、
+待领奖互斥和 operation 回放由特色玩法域持久化；塔战斗不通过战斗域发放修为或普通战利品。
 
 普通结算窗口为修炼结束后的 24 小时。超过窗口的会话标记为 `expired`，`结算修炼`
 返回 `CULTIVATION_EXPIRED`；发送 `恢复修炼` 会使用开始时快照完成唯一一次迟到结算，

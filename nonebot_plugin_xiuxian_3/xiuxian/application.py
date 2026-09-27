@@ -55,6 +55,9 @@ from .specials.arena_use_cases import ArenaApplication
 from .specials.team_arena_use_cases import TeamArenaApplication
 from .specials.idle_use_cases import IdleApplication
 from .specials.dispatch_use_cases import DispatchApplication
+from .specials.codex_use_cases import CodexApplication
+from .specials.tower_use_cases import TowerApplication
+from .specials.story_use_cases import StoryApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
 
@@ -114,6 +117,9 @@ class XiuxianApplication:
         self.team_arena = TeamArenaApplication(repository)
         self.idle = IdleApplication(repository)
         self.dispatch = DispatchApplication(repository)
+        self.codex = CodexApplication(repository)
+        self.tower = TowerApplication(repository)
+        self.story = StoryApplication(repository)
         self.quests = QuestApplication(repository)
 
     async def _invoke(
@@ -1484,6 +1490,37 @@ class XiuxianApplication:
 
     async def cancel_dispatch(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.dispatch.cancel(context), write_message="当前事件不允许取消派遣。")
+
+    async def get_codex(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.codex.get_codex(context), require_write=False)
+
+    async def claim_codex_milestone(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.codex.claim_milestone(context),
+            write_message="当前事件不允许领取图鉴里程碑。",
+        )
+
+    async def preview_tower(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.tower.preview(context), require_write=False)
+
+    async def challenge_tower(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.tower.challenge(context), write_message="当前事件不允许挑战试炼塔。")
+
+    async def claim_tower_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.tower.claim_reward(context), write_message="当前事件不允许领取试炼塔奖励。")
+
+    async def get_story_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.story.status(context), require_write=False)
+
+    async def start_story(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.story.start(context), write_message="当前事件不允许开始剧情。")
+
+    async def choose_story_route(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.story.choose(context), write_message="当前事件不允许选择剧情路线。")
+
+    async def claim_story_ending(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.story.claim(context), write_message="当前事件不允许领取剧情结局。")
 
     async def publish_team_arena_snapshot(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

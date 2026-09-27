@@ -22,6 +22,7 @@ from ..persistence.errors import (
     ResidenceRequiredError,
     ResourceInsufficientError,
 )
+from ..specials.codex_projection import record_material_discoveries
 from .models import FieldPlotRecord
 from .rules import crop_definition, residence_definition, spirit_leaf_array_sand_roll
 
@@ -347,6 +348,18 @@ class FieldPlotRepositoryMixin:
                     required_maintenance=int(snapshot.get("required_maintenance", 1)),
                     harvest=harvest,
                     local_reputation_delta=reputation_delta,
+                )
+                record_material_discoveries(
+                    connection,
+                    player_id=int(row["id"]),
+                    operation_id=operation_id,
+                    occurred_at=now,
+                    reward=harvest,
+                    snapshot={
+                        "source": "livelihood.harvest",
+                        "crop_key": str(plot["crop_key"]),
+                        "maintained": maintained,
+                    },
                 )
             self._record_operation(connection, operation_id, operation_name, row["id"], request_hash, payload, now_text)
             return self._field_from_payload(payload)

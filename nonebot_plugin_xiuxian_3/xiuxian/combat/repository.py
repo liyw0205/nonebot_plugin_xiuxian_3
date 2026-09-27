@@ -57,6 +57,7 @@ from .rules import (
 )
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
+from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
 
 
 class CombatRepositoryMixin:
@@ -86,6 +87,7 @@ class CombatRepositoryMixin:
         battle_type: str,
         operation_id: str,
         ignore_secret_realm_run_id: str | None = None,
+        ignore_tower_run_id: str | None = None,
     ) -> BattleStartRecord:
         """Create a named quest encounter using the same replayable battle core."""
 
@@ -101,6 +103,7 @@ class CombatRepositoryMixin:
                 battle_type,
                 None,
                 ignore_secret_realm_run_id,
+                ignore_tower_run_id,
             )
 
     async def start_demon_war_front_battle(
@@ -210,6 +213,7 @@ class CombatRepositoryMixin:
         battle_type: str = "pve.training",
         exploration_id: str | None = None,
         ignore_secret_realm_run_id: str | None = None,
+        ignore_tower_run_id: str | None = None,
     ) -> BattleStartRecord:
         enemy = enemy_definition(enemy_key)
         v03_enemy_keys = {
@@ -297,7 +301,7 @@ class CombatRepositoryMixin:
             if (
                 str(player["location_key"]) != enemy.location_key
                 and exploration_id is None
-                and battle_type != "pve.archive_keeper"
+                and battle_type not in {"pve.archive_keeper", "pve.tower"}
             ):
                 raise BattleRequirementError("battle requires a specific location")
             cooldown = player["battle_defeat_until"]
@@ -308,6 +312,7 @@ class CombatRepositoryMixin:
                 int(player["id"]),
                 ignore_exploration_id=exploration_id,
                 ignore_secret_realm_run_id=ignore_secret_realm_run_id,
+                ignore_tower_run_id=ignore_tower_run_id,
             ):
                 raise BattleBusyError("another long action is active")
             exploration = None
@@ -333,6 +338,8 @@ class CombatRepositoryMixin:
                 raise BattleRequirementError("realm requirement is not met")
             if exploration is not None:
                 location_key = str(exploration_snapshot.get("location_key", enemy.location_key))
+            elif battle_type == "pve.tower":
+                location_key = str(player["location_key"])
             else:
                 location_key = enemy.location_key
             active = connection.execute(
@@ -734,7 +741,7 @@ class CombatRepositoryMixin:
             } if outcome == "won" else {}
             reward_status = "pending" if outcome == "won" and reward else "none"
             durability_loss = 0
-            if outcome == "won" and str(session["battle_type"]) != "pve.tribulation_trial":
+            if outcome == "won" and str(session["battle_type"]) not in {"pve.tribulation_trial", "pve.tower"}:
                 durable_ids = [
                     str(item["instance_id"])
                     for item in list(snapshot.get("player", {}).get("equipment", []))
@@ -772,6 +779,25 @@ class CombatRepositoryMixin:
                     "settled_at": now_text,
                 }
             )
+            creature_entries = {
+                "enemy.wood_rat": "codex.creature.wood_rat",
+                "enemy.iron_boar": "codex.creature.iron_boar",
+                "enemy.mist_guardian": "codex.creature.mist_guardian",
+            }
+            if outcome == "won" and str(session["enemy_key"]) in creature_entries:
+                record_codex_discovery(
+                    connection,
+                    player_id=int(player["id"]),
+                    entry_key=creature_entries[str(session["enemy_key"])],
+                    operation_id=operation_id,
+                    occurred_at=now,
+                    snapshot={
+                        "battle_id": battle_id,
+                        "enemy_key": str(session["enemy_key"]),
+                        "battle_type": str(session["battle_type"]),
+                        "rule_version": snapshot.get("rule_version", RULE_VERSION),
+                    },
+                )
             connection.execute(
                 """
                 UPDATE battle_sessions
@@ -863,6 +889,14 @@ class CombatRepositoryMixin:
                     total_cultivation += quantity
                 else:
                     inventory[key] = int(inventory.get(key, 0)) + quantity
+            record_material_discoveries(
+                connection,
+                player_id=int(player["id"]),
+                operation_id=operation_id,
+                occurred_at=self._now(),
+                reward=reward,
+                snapshot={"source": "battle.claim_reward", "battle_id": str(session["battle_id"])},
+            )
             connection.execute(
                 """
                 UPDATE players

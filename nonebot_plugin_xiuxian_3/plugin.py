@@ -14,8 +14,13 @@ runtime = create_runtime()
 
 try:
     matchers = install(runtime)
+    from nonebot import get_driver
+
+    driver = get_driver()
+    driver.on_startup(runtime.initialize)
+    driver.on_shutdown(runtime.close)
     matcher = matchers[0] if matchers else None
-except (RuntimeError, ValueError):
+except (ImportError, RuntimeError, ValueError):
     matchers = ()
     matcher = None
 

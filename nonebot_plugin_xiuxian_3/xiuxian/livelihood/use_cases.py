@@ -334,7 +334,7 @@ class LivelihoodApplication:
     async def accept_commission(self, context: CommandContext) -> CommandResult:
         key = self._resolve_commission(context.command_args)
         if key is None:
-            return CommandResult(False, "INVALID_COMMISSION", "可用 `接取委托 止血草供应`、`接取委托 工具修缮` 或 `接取委托 灵米饭供应`。", context.request_id)
+            return CommandResult(False, "INVALID_COMMISSION", "可用 `接取委托 止血草供应`、`接取委托 工具修缮`、`接取委托 灵米饭供应` 或已解锁的 `接取委托 灵泉谷灵叶收集`。", context.request_id)
         operation_id = self._operation_id(context, "livelihood.accept_commission")
         try:
             record = await self.repository.accept_commission(

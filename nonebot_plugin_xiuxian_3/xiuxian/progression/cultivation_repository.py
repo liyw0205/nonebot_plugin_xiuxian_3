@@ -23,6 +23,7 @@ from ..player.models import (
     TravelRecord,
 )
 from ..player.rules import STAGE_MORTAL, STAGE_NEW_USER, qualification_for
+from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
 from ..progression.models import (
     CultivationCancelRecord,
     CultivationRecoveryRecord,
@@ -352,6 +353,22 @@ class CultivationRepositoryMixin:
                     json.dumps(payload, ensure_ascii=False, sort_keys=True),
                     serialize_datetime(now),
                 ),
+            )
+            record_codex_discovery(
+                connection,
+                player_id=int(row["id"]),
+                entry_key=f"codex.path.{path_key}",
+                operation_id=operation_id,
+                occurred_at=now,
+                snapshot={"source": "player.enter_cultivation", "path_key": path_key},
+            )
+            record_material_discoveries(
+                connection,
+                player_id=int(row["id"]),
+                operation_id=operation_id,
+                occurred_at=now,
+                reward={key: quantity for key, quantity in reward_items(path_key, subprofession_key)},
+                snapshot={"source": "player.enter_cultivation", "path_key": path_key},
             )
             return CultivationRecord(
                 player=player,
@@ -1094,6 +1111,7 @@ class CultivationRepositoryMixin:
         *,
         ignore_exploration_id: str | None = None,
         ignore_secret_realm_run_id: str | None = None,
+        ignore_tower_run_id: str | None = None,
     ) -> bool:
         """Return whether a player has any session that locks another action."""
 
@@ -1111,6 +1129,7 @@ class CultivationRepositoryMixin:
             ("void_route_sessions", "status = 'running'"),
             ("idle_assignments", "status IN ('assigned', 'running')"),
             ("dispatch_assignments", "status IN ('accepted', 'running')"),
+            ("tower_runs", "status IN ('battle_running', 'reward_pending')"),
             ("livelihood_trade_routes", "status = 'in_transit'"),
             ("secret_realm_runs", "status IN ('entered', 'routing', 'combat_pending', 'cleared', 'failed')"),
         )
@@ -1124,6 +1143,11 @@ class CultivationRepositoryMixin:
                 active = connection.execute(
                     "SELECT 1 FROM secret_realm_runs WHERE player_id = ? AND status IN ('entered', 'routing', 'combat_pending', 'cleared', 'failed') AND run_id != ? LIMIT 1",
                     (player_id, ignore_secret_realm_run_id),
+                ).fetchone()
+            elif table == "tower_runs" and ignore_tower_run_id is not None:
+                active = connection.execute(
+                    "SELECT 1 FROM tower_runs WHERE player_id=? AND status IN ('battle_running','reward_pending') AND run_id<>? LIMIT 1",
+                    (player_id, ignore_tower_run_id),
                 ).fetchone()
             else:
                 active = connection.execute(
