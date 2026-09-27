@@ -751,6 +751,13 @@ class XiuxianApplication:
             write_message="当前事件不允许租住居所。",
         )
 
+    async def issue_trade_permit(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.issue_trade_permit(context),
+            write_message="当前事件不允许申请贸易许可。",
+        )
+
     async def get_residence(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.livelihood.get_profile(context), require_write=False)
 

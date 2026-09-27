@@ -71,4 +71,16 @@ class TownCommissionRecord:
     already_completed: bool = False
 
 
-__all__ = ["FieldPlotRecord", "ResidenceRecord", "TownCommissionRecord", "TownCommissionView"]
+@dataclass(frozen=True, slots=True)
+class TradePermitRecord:
+    player: PlayerView
+    permit_id: str
+    permit_key: str
+    issued_at: str
+    expires_at: str
+    cost: int
+    already_active: bool = False
+    already_completed: bool = False
+
+
+__all__ = ["FieldPlotRecord", "ResidenceRecord", "TownCommissionRecord", "TownCommissionView", "TradePermitRecord"]

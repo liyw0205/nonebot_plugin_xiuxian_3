@@ -20,6 +20,14 @@ class PlayerSuspendedError(RuntimeError):
     """A suspended or deleted player cannot perform a write operation."""
 
 
+class TradePermitRequirementError(RuntimeError):
+    """The player lacks a trade permit's quest, faction reputation, or currency."""
+
+
+class TradePermitContentClosedError(RuntimeError):
+    """The requested trade permit is not part of active content."""
+
+
 class DispatchRequirementError(RuntimeError):
     """The player lacks dispatch eligibility or required resources."""
 

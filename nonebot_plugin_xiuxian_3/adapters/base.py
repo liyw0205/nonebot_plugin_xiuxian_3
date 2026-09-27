@@ -219,6 +219,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("结算闭关", application.settle_retreat)
     router.register("恢复闭关", application.recover_retreat)
     router.register("租住居所", application.lease_residence, aliases=("租房",))
+    router.register("申请贸易许可", application.issue_trade_permit)
     router.register("我的居所", application.get_residence, aliases=("居所状态",))
     router.register("灵田播种", application.plant_field, aliases=("播种",))
     router.register("灵田维护", application.maintain_field, aliases=("维护灵田",))

@@ -6,7 +6,7 @@
 斗法记录分享及 v0.3 以后的 `instance.secret_realm.*` 内容仍保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，以及 v0.3 的
-`bounty.demon_relief`：悬赏榜为只读查询，
+`bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
 接取时冻结目标、奖励和背包/生产基线，领取时按服务端进度在一个事务中发奖。每个业务日每名
 角色最多接取一条悬赏，重复 operation 只回放原结果。训练傀儡悬赏使用已结算的 `pve.training`
 胜场作为服务端进度来源，接取时冻结胜场基线，完成 2 次后
@@ -19,8 +19,10 @@
 operation ledger 幂等。
 
 可用命令：`悬赏榜`、`接取悬赏 草药补给`、`接取悬赏 生产订单`、`接取悬赏 云铁矿区悬赏`、
-`接取悬赏 魔界救援`、`领取悬赏`。魔界救援要求 `access.demon_abyss_gate`，以接取后新增的粗糙灵米计进度，
+`接取悬赏 魔界救援`、`接取悬赏 妖界栖地保护`、`领取悬赏`。魔界救援要求 `access.demon_abyss_gate`，以接取后新增的粗糙灵米计进度，
 领取时扣除三份并原子增加魔界声望与灵石；过期不扣货。QQ 官方与 OneBot V11 共用同一 application，
+妖界栖地保护要求有效 `permit.beast_trade`，只计接取后成功结算的 `dispatch.beast_relocation` 来源事件，
+领奖增加妖界声望并首次发现 `codex.story.beast_habitat`。
 权限、资产扣除和声望写入都在事务中完成。悬赏奖励中的
 地方名望和服务信誉写入独立声誉表，不直接改境界、道途或战斗属性。
 

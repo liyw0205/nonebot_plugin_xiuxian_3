@@ -28,6 +28,7 @@ class BountyDefinition:
     content_version: str = CONTENT_VERSION
     required_intro_flag: str | None = None
     consume_target: bool = False
+    required_permit: str | None = None
 
 
 DEFINITIONS: dict[str, BountyDefinition] = {
@@ -119,6 +120,22 @@ DEFINITIONS: dict[str, BountyDefinition] = {
         required_intro_flag="access.demon_abyss_gate",
         consume_target=True,
     ),
+    "bounty.beast_habitat": BountyDefinition(
+        key="bounty.beast_habitat",
+        label="妖界栖地保护",
+        description="接取后成功完成妖界迁徙派遣 2 次",
+        required_realm=None,
+        required_layer=0,
+        duration_seconds=48 * 60 * 60,
+        daily_limit=1,
+        target_kind="dispatch_successes",
+        target_key="dispatch.beast_relocation",
+        target_amount=2,
+        reward=(("faction_reputation.beast", 10), ("codex.story.beast_habitat", 1)),
+        rule_version="adventures-0.3.0",
+        content_version="content-0.3",
+        required_permit="permit.beast_trade",
+    ),
 }
 
 
@@ -135,6 +152,8 @@ ALIASES = {
     "精英悬赏": "bounty.elite_hunt",
     "魔界救援": "bounty.demon_relief",
     "魔界救援悬赏": "bounty.demon_relief",
+    "妖界栖地保护": "bounty.beast_habitat",
+    "万兽栖地": "bounty.beast_habitat",
 }
 
 

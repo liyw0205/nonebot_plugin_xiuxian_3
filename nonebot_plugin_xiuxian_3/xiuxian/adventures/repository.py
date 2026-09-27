@@ -145,6 +145,7 @@ from ..adventures.mainline import (
     resolve_mainline,
 )
 from ..adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
+from ..specials.codex_projection import record_codex_discovery
 from ..routine.models import (
     AchievementClaimRecord,
     AchievementView,
@@ -239,6 +240,15 @@ class AdventuresRepositoryMixin:
                 "SELECT * FROM bounty_offers WHERE player_id = ? AND business_date = ?",
                 (row["id"], business_date),
             ).fetchone()
+            if accepted is None:
+                accepted = connection.execute(
+                    """
+                    SELECT * FROM bounty_offers
+                    WHERE player_id = ? AND status IN ('accepted', 'completed') AND expires_at > ?
+                    ORDER BY accepted_at DESC, id DESC LIMIT 1
+                    """,
+                    (row["id"], serialize_datetime(now)),
+                ).fetchone()
             offers: list[BountyOfferView] = []
             for definition in BOUNTY_DEFINITIONS.values():
                 progress = 0
@@ -258,7 +268,7 @@ class AdventuresRepositoryMixin:
                     status = "daily_limit"
                 elif definition.runtime_status != "open":
                     status = "locked"
-                elif not self._bounty_player_eligible(row, definition):
+                elif not self._bounty_player_eligible(connection, row, definition, now):
                     status = "requirement"
                 else:
                     status = "available"
@@ -281,7 +291,9 @@ class AdventuresRepositoryMixin:
             )
 
     @staticmethod
-    def _bounty_player_eligible(row: sqlite3.Row | dict[str, Any], definition) -> bool:
+    def _bounty_player_eligible(
+        connection: sqlite3.Connection, row: sqlite3.Row | dict[str, Any], definition, now: datetime
+    ) -> bool:
         stage = str(row["stage"] if isinstance(row, sqlite3.Row) else row.get("stage", ""))
         if stage not in {STAGE_MORTAL, "seeker", "cultivator"}:
             return False
@@ -292,6 +304,13 @@ class AdventuresRepositoryMixin:
             intro = SQLitePlayerRepository._json_object(intro_raw, {})
             flags = {str(flag) for flag in intro.get("flags", [])}
             if definition.required_intro_flag not in flags:
+                return False
+        if definition.required_permit:
+            player_id = int(row["id"] if isinstance(row, sqlite3.Row) else row.get("id", 0))
+            if not connection.execute(
+                "SELECT 1 FROM trade_permits WHERE player_id=? AND permit_key=? AND expires_at>? LIMIT 1",
+                (player_id, definition.required_permit, serialize_datetime(now)),
+            ).fetchone():
                 return False
         if bounty_meets_realm(realm_key, layer, definition.required_realm, definition.required_layer):
             return True
@@ -356,6 +375,20 @@ class AdventuresRepositoryMixin:
             ).fetchone()
             baseline = int(snapshot.get("baseline_training_battle_wins", 0))
             return max(0, min(definition.target_amount, int(current["count"]) - baseline))
+        if definition.target_kind == "dispatch_successes":
+            rows = connection.execute(
+                """
+                SELECT d.assignment_id
+                FROM activity_events e
+                JOIN dispatch_assignments d ON d.settle_operation_id = e.source_operation_id
+                WHERE e.player_id = ? AND e.event_key = 'specials.dispatch.settled'
+                  AND e.occurred_at > ? AND d.dispatch_key = ? AND d.status = 'settled'
+                  AND json_extract(e.payload_json, '$.outcome') = 'success'
+                """,
+                (row["id"], str(offer["accepted_at"]), str(definition.target_key)),
+            ).fetchall()
+            baseline = {str(item) for item in snapshot.get("baseline_dispatch_assignment_ids", [])}
+            return max(0, min(definition.target_amount, sum(str(item["assignment_id"]) not in baseline for item in rows)))
         result = SQLitePlayerRepository._json_object(offer["result_json"], {})
         return max(0, min(definition.target_amount, int(result.get("progress", 0))))
 
@@ -409,8 +442,18 @@ class AdventuresRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if definition.runtime_status != "open":
                 raise BountyContentClosedError("bounty runtime is closed")
-            if not self._bounty_player_eligible(row, definition):
+            if not self._bounty_player_eligible(connection, row, definition, now):
                 raise BountyRequirementError("bounty requirements are not met")
+            active = connection.execute(
+                """
+                SELECT 1 FROM bounty_offers
+                WHERE player_id = ? AND status IN ('accepted', 'completed') AND expires_at > ?
+                LIMIT 1
+                """,
+                (row["id"], starts_at),
+            ).fetchone()
+            if active is not None:
+                raise BountyDailyLimitError("player already has an active bounty")
             accepted = connection.execute(
                 "SELECT 1 FROM bounty_offers WHERE player_id = ? AND business_date = ? LIMIT 1",
                 (row["id"], business_date),
@@ -438,6 +481,15 @@ class AdventuresRepositoryMixin:
                 ).fetchone()
             else:
                 battle_wins = {"count": 0}
+            baseline_dispatch_ids: list[str] = []
+            if definition.target_kind == "dispatch_successes":
+                baseline_dispatch_ids = [
+                    str(item["assignment_id"])
+                    for item in connection.execute(
+                        "SELECT assignment_id FROM dispatch_assignments WHERE player_id=? AND dispatch_key=? AND status IN ('accepted', 'running')",
+                        (row["id"], definition.target_key),
+                    ).fetchall()
+                ]
             snapshot = {
                 "bounty_key": definition.key,
                 "content_version": definition.content_version,
@@ -452,6 +504,7 @@ class AdventuresRepositoryMixin:
                 "baseline_completed_orders": int(completed_orders["count"]),
                 "baseline_exploration_battle_wins": int(battle_wins["count"]),
                 "baseline_training_battle_wins": int(battle_wins["count"]),
+                "baseline_dispatch_assignment_ids": baseline_dispatch_ids,
             }
             offer_id = uuid4().hex
             connection.execute(
@@ -614,6 +667,18 @@ class AdventuresRepositoryMixin:
                 elif key.startswith("faction_reputation."):
                     faction_key = key.removeprefix("faction_reputation.")
                     faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + quantity
+                    actual_rewards[key] = quantity
+                elif key.startswith("codex."):
+                    record_codex_discovery(
+                        connection,
+                        player_id=int(row["id"]),
+                        entry_key=key,
+                        operation_id=operation_id,
+                        occurred_at=now,
+                        snapshot=self._json_object(offer["snapshot_json"], {}),
+                        content_version=definition.content_version,
+                        rule_version=definition.rule_version,
+                    )
                     actual_rewards[key] = quantity
                 else:
                     inventory[key] = int(inventory.get(key, 0)) + quantity

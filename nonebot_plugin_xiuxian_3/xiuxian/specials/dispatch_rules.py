@@ -21,11 +21,17 @@ class DispatchDefinition:
     risk_pool: str
     risk_weights: tuple[tuple[str, int], ...]
     requirement: str
+    required_permit: str | None = None
+    failure_refunds: tuple[tuple[str, int], ...] = ()
+    content_version: str = CONTENT_VERSION
+    rule_version: str = RULE_VERSION
 
 
 TOWN_DELIVERY = "dispatch.town_delivery"
 HERB_SEARCH = "dispatch.herb_search"
 WORKSHOP_HELP = "dispatch.workshop_help"
+DEMON_RELIEF = "dispatch.demon_relief"
+BEAST_RELOCATION = "dispatch.beast_relocation"
 
 DISPATCHES: dict[str, DispatchDefinition] = {
     TOWN_DELIVERY: DispatchDefinition(
@@ -58,12 +64,42 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         risk_weights=(("success", 6500), ("delayed", 2000), ("failed", 1500)),
         requirement="guide.choose_service",
     ),
+    DEMON_RELIEF: DispatchDefinition(
+        key=DEMON_RELIEF,
+        label="魔界救援",
+        duration_seconds=4 * 60 * 60,
+        daily_limit=3,
+        costs=(("item.herb.blood_grass", 2), ("item.food.coarse_spirit_rice", 2)),
+        risk_pool="dispatch.demon_relief.v0.3",
+        risk_weights=(("success", 7000), ("partial", 2000), ("failed", 1000)),
+        requirement="permit.demon_trade",
+        required_permit="permit.demon_trade",
+        failure_refunds=(("item.herb.blood_grass", 1), ("item.food.coarse_spirit_rice", 1)),
+        content_version="content-0.3",
+        rule_version="specials-0.3.0",
+    ),
+    BEAST_RELOCATION: DispatchDefinition(
+        key=BEAST_RELOCATION,
+        label="妖界迁徙",
+        duration_seconds=4 * 60 * 60,
+        daily_limit=3,
+        costs=(("item.herb.spirit_leaf", 2), ("item.food.coarse_spirit_rice", 2)),
+        risk_pool="dispatch.beast_relocation.v0.3",
+        risk_weights=(("success", 7000), ("partial", 2000), ("failed", 1000)),
+        requirement="permit.beast_trade",
+        required_permit="permit.beast_trade",
+        failure_refunds=(("item.herb.spirit_leaf", 1), ("item.food.coarse_spirit_rice", 1)),
+        content_version="content-0.3",
+        rule_version="specials-0.3.0",
+    ),
 }
 
 ALIASES = {
     "城镇送货": TOWN_DELIVERY,
     "药材搜寻": HERB_SEARCH,
     "作坊帮工": WORKSHOP_HELP,
+    "魔界救援": DEMON_RELIEF,
+    "妖界迁徙": BEAST_RELOCATION,
 }
 
 
@@ -122,14 +158,22 @@ def reward_for(definition: DispatchDefinition, seed: str, outcome: str) -> dict[
             "service_reputation": 2,
             "item.mat.array_sand": roll_range(seed, "array_sand", 1, 2),
         }
+    if definition.key in {DEMON_RELIEF, BEAST_RELOCATION}:
+        local_key = "local.demon.trade_post" if definition.key == DEMON_RELIEF else "local.beast.trade_post"
+        if outcome == "partial":
+            return {local_key: 3}
+        clue_key = "codex.story.dispatch_demon_relief" if definition.key == DEMON_RELIEF else "codex.story.dispatch_beast_relocation"
+        return {local_key: 6, clue_key: 1}
     raise ValueError(f"unsupported dispatch reward: {definition.key}")
 
 
 __all__ = [
     "ALIASES",
+    "BEAST_RELOCATION",
     "CANCEL_WINDOW_SECONDS",
     "CONTENT_VERSION",
     "DISPATCHES",
+    "DEMON_RELIEF",
     "HERB_SEARCH",
     "RULE_VERSION",
     "TOWN_DELIVERY",

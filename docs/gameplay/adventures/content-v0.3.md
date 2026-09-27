@@ -5,7 +5,7 @@
 | 类型 | 稳定键/准入 | 参数与奖励 |
 |:--|:--|:--|
 | 悬赏 | `bounty.demon_relief`：`access.demon_abyss_gate`；接取后获得并交付 `item.food.coarse_spirit_rice` 3 | 4h；每日 1 条；魔界声望 +10、灵石 240；领取时扣除 3 份补给，过期不扣 |
-| 悬赏 | `bounty.beast_habitat`：妖界许可；完成 `dispatch.beast_relocation` 2 次 | 4h；每日 1 条；妖界声望 +10、图鉴线索；保护/迁移来源事件和图鉴奖励稳定键尚未闭合，保持锁定 |
+| 悬赏 | `bounty.beast_habitat`：有效 `permit.beast_trade`；接取后完成 `dispatch.beast_relocation` success 2 次 | 48h；每日 1 条；妖界声望 +10、`codex.story.beast_habitat`；只计接取后新结算的唯一来源 operation |
 | 秘境 | `instance.secret_realm.boundary_rift`：元婴 L1、2–5 人确认 | 6 节点、30 体力/队；首通图鉴、普通神魂材料、主线旗标；每周 1 |
 | 秘境 | `instance.secret_realm.demon_abyss`：魔界声望 200 | 4 节点、20 体力；污染风险 +50 bp；首通名望/故事线索 |
 | 主线 | `story.mainline.three_realms` | 元婴 L1；调停、契约、共生三线，选择一线后按序完成 5 关；结局写故事、对应三界声望 1000、`item.token.rebuild_path` 和 `story.mainline.three_realms` 许可旗标 |
@@ -17,6 +17,13 @@
 `access.demon_abyss_gate`，不另加境界或地点门槛。进度以接取时 `item.food.coarse_spirit_rice` 数量为基线，
 只计接取后新增量；领取事务再核验并扣除 3 份，失败/过期不扣货、不发奖。奖励写入 `faction_reputation.demon`
 与灵石，重复 operation 回放原结果。当前实现与适配器验收见[冒险域](README.md)和[当前开发状态](../../current-status.md)。
+
+`bounty.beast_habitat` 使用 `content-0.3` / `adventures-0.3.0`：角色申请时须持有效 `permit.beast_trade`。
+进度按接取时间之后已结算的 `specials.dispatch.settled` 事件计算，只接受 `dispatch.beast_relocation`
+且 `outcome=success` 的唯一来源 operation；接取时在途的派遣编号写入基线，已结算来源也因结算时间早于接取时间而不计入。领取事务
+写入 `faction_reputation.beast` +10 并首次发现 `codex.story.beast_habitat`；不足两次或过期均不发奖励。
+`dispatch.demon_relief` / `dispatch.beast_relocation` 与贸易许可的稳定键、成本、时长、风险、返还及奖励
+均以 [v0.3 特色玩法内容基线](../specials/content-v0.3.md) 和 [v0.3 常驻经营内容基线](../livelihood/content-v0.3.md) 为准。
 
 ## `instance.secret_realm.demon_abyss` 合同缺口
 

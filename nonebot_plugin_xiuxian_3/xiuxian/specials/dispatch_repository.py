@@ -84,6 +84,10 @@ class DispatchRepositoryMixin:
             flags = {str(value) for value in intro.get("flags", [])}
             if "guide.choose_service" not in flags:
                 missing.append("需要完成任一教学服务")
+        if definition.required_permit and self._active_dispatch_permit(
+            connection, int(player["id"]), definition.required_permit, now
+        ) is None:
+            missing.append(f"需要有效 {definition.required_permit}")
         costs = dict(definition.costs)
         if int(player["stamina"]) < costs.get("stamina", 0):
             missing.append("体力不足")
@@ -112,6 +116,24 @@ class DispatchRepositoryMixin:
             ready=not missing,
             missing=tuple(missing),
         )
+
+    @staticmethod
+    def _active_dispatch_permit(
+        connection: sqlite3.Connection, player_id: int, permit_key: str | None, now: datetime
+    ) -> dict[str, str] | None:
+        if permit_key is None:
+            return None
+        row = connection.execute(
+            """
+            SELECT permit_id, expires_at FROM trade_permits
+            WHERE player_id = ? AND permit_key = ? AND expires_at > ?
+            ORDER BY expires_at DESC, id DESC LIMIT 1
+            """,
+            (player_id, permit_key, serialize_datetime(now)),
+        ).fetchone()
+        if row is None:
+            return None
+        return {"permit_id": str(row["permit_id"]), "expires_at": str(row["expires_at"])}
 
     async def accept_dispatch(
         self,
@@ -164,6 +186,9 @@ class DispatchRepositoryMixin:
             seed = uuid4().hex
             outcome = choose_outcome(definition, seed)
             reward = reward_for(definition, seed, outcome)
+            permit_snapshot = self._active_dispatch_permit(
+                connection, int(player["id"]), definition.required_permit, now
+            )
             duration = definition.duration_seconds
             if outcome == "delayed":
                 duration = duration * 3 // 2
@@ -173,6 +198,8 @@ class DispatchRepositoryMixin:
                 "dispatch_key": definition.key,
                 "label": definition.label,
                 "requirement": definition.requirement,
+                "required_permit": definition.required_permit,
+                "permit": permit_snapshot,
                 "stage": str(player["stage"]),
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": int(player["realm_layer"]),
@@ -182,13 +209,14 @@ class DispatchRepositoryMixin:
                 "costs": costs,
                 "risk_pool": definition.risk_pool,
                 "risk_weights": dict(definition.risk_weights),
+                "failure_refunds": dict(definition.failure_refunds),
                 "outcome": outcome,
                 "reward": reward,
                 "random_seed": seed,
                 "duration_seconds": definition.duration_seconds,
                 "ends_at": serialize_datetime(ends_at),
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
             }
             inventory = self._json_object(player["inventory_json"], {})
             for key, amount in costs.items():
@@ -338,7 +366,11 @@ class DispatchRepositoryMixin:
             refunded: dict[str, int] = {}
             costs = self._json_object(assignment["costs_json"], {})
             if outcome == "failed":
-                if str(assignment["dispatch_key"]) == HERB_SEARCH:
+                if snapshot.get("failure_refunds"):
+                    refunded.update(
+                        {str(key): int(value) for key, value in dict(snapshot["failure_refunds"]).items()}
+                    )
+                elif str(assignment["dispatch_key"]) == HERB_SEARCH:
                     refunded["stamina"] = 2
                 elif str(assignment["dispatch_key"]) == WORKSHOP_HELP:
                     refunded["item.mat.wood"] = 1
@@ -367,6 +399,8 @@ class DispatchRepositoryMixin:
                         operation_id=operation_id,
                         occurred_at=now,
                         snapshot=snapshot,
+                        content_version=str(snapshot.get("content_version", CONTENT_VERSION)),
+                        rule_version=str(snapshot.get("rule_version", RULE_VERSION)),
                     )
                 else:
                     raise RuntimeError(f"unsupported dispatch reward asset: {key}")
@@ -423,8 +457,8 @@ class DispatchRepositoryMixin:
                 "reward": reward,
                 "refunded": refunded,
                 "settled_at": now_text,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
+                "content_version": str(snapshot.get("content_version", CONTENT_VERSION)),
+                "rule_version": str(snapshot.get("rule_version", RULE_VERSION)),
             }
             connection.execute(
                 "UPDATE dispatch_assignments SET status = 'settled', settle_operation_id = ?, result_json = ?, settled_at = ?, updated_at = ? WHERE id = ? AND status IN ('accepted', 'running')",
@@ -451,8 +485,8 @@ class DispatchRepositoryMixin:
                             "assignment_id": str(assignment["assignment_id"]),
                             "dispatch_key": str(assignment["dispatch_key"]),
                             "outcome": outcome,
-                            "content_version": CONTENT_VERSION,
-                            "rule_version": RULE_VERSION,
+                            "content_version": str(snapshot.get("content_version", CONTENT_VERSION)),
+                            "rule_version": str(snapshot.get("rule_version", RULE_VERSION)),
                         },
                         ensure_ascii=False,
                         sort_keys=True,

@@ -12,6 +12,12 @@
 
 许可只提供订单/路线准入，不加阵营伤害、突破成功率或修为。过期只拒绝新单，已在途路线按开始快照结算。
 
+### 1.1 贸易许可运行合同
+
+`permit.demon_trade` 与 `permit.beast_trade` 由 `申请贸易许可 魔界|妖界` 领取。申请事务校验对应的已完成引导旗标 `quest.demon_intro` / `quest.beast_intro`、阵营声望至少 80 和灵石至少 500；成功扣除 500 灵石并写入独立许可记录，有效期为服务端时间起 7 天。重复 operation 返回原结果；同类许可仍有效时不重复扣费，过期后可重新申请。许可记录冻结内容/规则版本、成本、引导来源和声望快照；过期记录保留供审计。
+
+`permit.demon_trade` 只解锁 `dispatch.demon_relief`，`permit.beast_trade` 只解锁 `dispatch.beast_relocation` 及 `bounty.beast_habitat`。这些许可不等同于魔界深层准入或妖界祖地许可。
+
 ## 2. 三界常驻订单
 
 | `commission_key` | 许可/交付 | 报酬 | 地区名望 | 库存/窗口 |

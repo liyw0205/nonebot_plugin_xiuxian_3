@@ -346,6 +346,8 @@ def test_dispatch_rule_tables_are_closed_and_partial_outputs_round_down() -> Non
         TOWN_DELIVERY: 10000,
         HERB_SEARCH: 10000,
         WORKSHOP_HELP: 10000,
+        "dispatch.demon_relief": 10000,
+        "dispatch.beast_relocation": 10000,
     }
     from nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_rules import reward_for
 

@@ -33,8 +33,11 @@ from ..repository import (
     ResidenceRequiredError,
     SQLitePlayerRepository,
     ResourceInsufficientError,
+    TradePermitContentClosedError,
+    TradePermitRequirementError,
 )
 from .rules import commission_definition, crop_definition, residence_definition
+from .trade_permit_rules import resolve_trade_permit
 
 
 class LivelihoodApplication:
@@ -131,6 +134,53 @@ class LivelihoodApplication:
             context.request_id,
             operation_id,
             data={"residence_id": record.residence_id, "residence_key": record.residence_key, "status": record.status, "ends_at": record.ends_at, "rent_cost": record.rent_cost, "idempotent_replay": record.already_completed},
+        )
+
+    async def issue_trade_permit(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_TRADE_PERMIT", "请使用 `申请贸易许可 魔界|妖界`。", context.request_id)
+        try:
+            definition = resolve_trade_permit(context.command_args[0])
+        except ValueError:
+            return CommandResult(False, "TRADE_PERMIT_NOT_FOUND", "仅可申请魔界或妖界贸易许可。", context.request_id)
+        operation_id = self._operation_id(context, "livelihood.issue_trade_permit")
+        try:
+            record = await self.repository.issue_trade_permit(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                permit_key=definition.key,
+                operation_id=operation_id,
+            )
+        except TradePermitContentClosedError:
+            return CommandResult(False, "TRADE_PERMIT_CONTENT_CLOSED", "该贸易许可暂未开放。", context.request_id, operation_id)
+        except TradePermitRequirementError:
+            return CommandResult(False, "TRADE_PERMIT_REQUIREMENT_MISSING", "请先完成对应三界引导并达到阵营声望 80。", context.request_id, operation_id)
+        except CurrencyInsufficientError:
+            return CommandResult(False, "CURRENCY_INSUFFICIENT", "申请贸易许可需要灵石 500。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能申请贸易许可。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他许可操作。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "许可记录暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        state = "已有有效许可，本次未重复扣费" if record.already_active else f"已扣除灵石 {record.cost}"
+        return CommandResult(
+            True,
+            "TRADE_PERMIT_ISSUED" if not record.already_active else "TRADE_PERMIT_ACTIVE",
+            f"{definition.label}{'仍然有效' if record.already_active else '已签发'}。{state}；有效至 {record.expires_at}。",
+            context.request_id,
+            operation_id,
+            data={
+                "permit_id": record.permit_id,
+                "permit_key": record.permit_key,
+                "issued_at": record.issued_at,
+                "expires_at": record.expires_at,
+                "cost": record.cost,
+                "already_active": record.already_active,
+                "idempotent_replay": record.already_completed,
+            },
         )
 
     async def get_profile(self, context: CommandContext) -> CommandResult:

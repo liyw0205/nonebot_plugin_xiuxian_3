@@ -45,6 +45,9 @@ _ENTRY_LABELS = {
     "codex.instance.cloud_boat": ("challenge", "云舟秘境"),
     "codex.challenge.mist_trial.floor_5": ("challenge", "雾隐试炼塔五层"),
     "codex.challenge.mist_trial.floor_10": ("challenge", "雾隐试炼塔十层"),
+    "codex.story.dispatch_demon_relief": ("story", "魔界救援线索"),
+    "codex.story.dispatch_beast_relocation": ("story", "妖界迁徙线索"),
+    "codex.story.beast_habitat": ("story", "万兽栖地保护记录"),
 }
 for _floor_no in range(1, 31):
     _ENTRY_LABELS.setdefault(
