@@ -25,6 +25,7 @@ from ..exploration.repository import ExplorationRepositoryMixin
 from ..combat.repository import CombatRepositoryMixin
 from ..combat.party_repository import PartyCombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
+from ..adventures.secret_realm_repository import SecretRealmRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..adventures.three_realms_repository import ThreeRealmsRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
@@ -72,6 +73,7 @@ from ..economy.purchase_order_repository import PurchaseOrderRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
 from .errors import *  # noqa: F401,F403
 from .schema import SCHEMA
+from ..adventures.secret_realm_migration import ensure_secret_realm_schema
 
 
 class SQLitePlayerRepository(
@@ -88,6 +90,7 @@ class SQLitePlayerRepository(
     CombatRepositoryMixin,
     PartyCombatRepositoryMixin,
     AdventuresRepositoryMixin,
+    SecretRealmRepositoryMixin,
     DaoEchoesRepositoryMixin,
     ThreeRealmsRepositoryMixin,
     ContractProductionRepositoryMixin,
@@ -235,6 +238,7 @@ class SQLitePlayerRepository(
             ensure_void_archive_schema(connection)
             ensure_void_frontier_schema(connection)
             self._migrate_heart_demon_event_schema(connection)
+            ensure_secret_realm_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"

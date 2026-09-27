@@ -93,6 +93,21 @@ MIST_GUARDIAN = EnemyDefinition(
     reward={},
 )
 
+SPRING_WISP = EnemyDefinition(
+    key="enemy.spring_wisp",
+    label="灵泉水灵",
+    location_key="xuantian.spirit_field",
+    required_realm="qi_sensing",
+    required_layer=3,
+    max_hp=110,
+    attack=18,
+    initiative=11,
+    agility=10,
+    skill_key="enemy_skill.scratch",
+    random_pool="battle.enemy.spring_wisp.v0.1",
+    reward={},
+)
+
 CLOUD_BEAST = EnemyDefinition(
     key="enemy.cloud_beast",
     label="云铁矿兽",
@@ -284,6 +299,7 @@ ENEMIES = {
     WOOD_RAT.key: WOOD_RAT,
     IRON_BOAR.key: IRON_BOAR,
     MIST_GUARDIAN.key: MIST_GUARDIAN,
+    SPRING_WISP.key: SPRING_WISP,
     CLOUD_BEAST.key: CLOUD_BEAST,
     MIST_ELITE.key: MIST_ELITE,
     DEMON_OVERLORD.key: DEMON_OVERLORD,
@@ -383,6 +399,7 @@ __all__ = [
     "IRON_BOAR",
     "MIST_ELITE",
     "MIST_GUARDIAN",
+    "SPRING_WISP",
     "WOOD_RAT",
     "ARCHIVE_KEEPER",
     "battle_roll_bp",

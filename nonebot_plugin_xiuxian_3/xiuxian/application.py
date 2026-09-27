@@ -20,6 +20,7 @@ from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .adventures.dao_echoes_use_cases import DaoEchoesApplication
 from .adventures.three_realms_use_cases import ThreeRealmsApplication
+from .adventures.secret_realm_use_cases import SecretRealmApplication
 from .advancement.use_cases import AdvancementApplication
 from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
@@ -75,6 +76,7 @@ class XiuxianApplication:
         self.mainline = AdventuresMainlineApplication(repository)
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
+        self.secret_realms = SecretRealmApplication(repository)
         self.advancement = AdvancementApplication(repository)
         self.constitution = ConstitutionApplication(repository)
         self.talent = TalentApplication(repository)
@@ -648,6 +650,30 @@ class XiuxianApplication:
             context,
             lambda: self.mainline.claim_reward(context),
             write_message="当前事件不允许领取主线奖励。",
+        )
+
+    async def preview_secret_realms(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.secret_realms.preview(context), require_write=False)
+
+    async def enter_secret_realm(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.secret_realms.enter(context),
+            write_message="当前事件不允许进入秘境。",
+        )
+
+    async def choose_secret_realm_node(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.secret_realms.choose_node(context),
+            write_message="当前事件不允许选择秘境节点。",
+        )
+
+    async def settle_secret_realm(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.secret_realms.settle(context),
+            write_message="当前事件不允许结算秘境。",
         )
 
     async def get_dao_echoes_status(self, context: CommandContext) -> CommandResult:

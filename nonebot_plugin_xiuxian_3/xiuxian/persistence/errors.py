@@ -20,6 +20,38 @@ class PlayerSuspendedError(RuntimeError):
     """A suspended or deleted player cannot perform a write operation."""
 
 
+class SecretRealmRequirementError(RuntimeError):
+    """The player lacks the realm, location, or ticket required by a realm."""
+
+
+class SecretRealmBusyError(RuntimeError):
+    """The player already has an active secret-realm run or long action."""
+
+
+class SecretRealmQuotaError(RuntimeError):
+    """The instance quota for the current business period is exhausted."""
+
+
+class SecretRealmNotFoundError(RuntimeError):
+    """The player has no matching secret-realm run."""
+
+
+class SecretRealmNodeError(RuntimeError):
+    """The requested node is not the server-authorized next node."""
+
+
+class SecretRealmCombatPendingError(RuntimeError):
+    """The encounter has not reached a terminal automatic battle result."""
+
+
+class SecretRealmNotReadyError(RuntimeError):
+    """The run cannot be settled in its current state."""
+
+
+class SecretRealmAlreadySettledError(RuntimeError):
+    """The run was already settled and can only be replayed."""
+
+
 class SectExchangeInvalidOfferError(RuntimeError):
     """The requested sect exchange offer is not registered in the content."""
 

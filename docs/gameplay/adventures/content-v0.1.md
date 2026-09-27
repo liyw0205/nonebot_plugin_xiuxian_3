@@ -1,6 +1,6 @@
 # v0.1 冒险内容基线：悬赏榜、秘境试炼、主线道途与斗法留影
 
-本文件遵守[版本内容开发合同](../../content-development-contract.md)与[冒险域](README.md)。`content_version=content-0.1`，`rule_version=adventures-0.1.0`。
+本文件遵守[版本内容开发合同](../../content-development-contract.md)与[冒险域](README.md)。`content_version=content-0.1`，`rule_version=adventures-0.1.1`。
 
 ## 1. 悬赏榜
 
@@ -25,6 +25,11 @@
 | `instance.secret_realm.spring_path` | 感气 L3、灵泉谷到达 | 2 节点、6 体力 | 灵叶 2、地方名望 +5 | 每日 1 次，灵叶 0–1 |
 
 节点由服务端保存：`resource -> encounter -> choice`。玩家只能选择当前允许节点；战斗失败不重抽资源。实例状态 `entered -> routing -> combat_pending -> cleared/failed -> settled`；入场票/体力在创建时锁定，失败按定义消耗体力但不消费未使用材料。
+
+当前运行时已开放上述两个合同。命令为 `秘境预览`、`进入秘境 雾隐秘境|灵泉小径`、`选择秘境节点 资源|遭遇|选择`
+和 `结算秘境`；节点顺序、战斗编号、版本快照和 operation 均由服务端保存。`mist_grotto` 的遭遇复用
+`enemy.mist_guardian` 自动战，`spring_path` 使用 `enemy.spring_wisp`；战斗失败不改变已保存的资源节点，失败退还
+门票但保留体力消耗，过期释放门票和体力。首次成功结算只发一次首通奖励，重复 operation 只回放原结果。
 
 ## 3. 主线道途：`story.mainline.xuantian`
 
