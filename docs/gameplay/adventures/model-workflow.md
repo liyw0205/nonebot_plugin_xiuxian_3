@@ -15,6 +15,7 @@ replay: recorded -> indexed -> private/shared -> archived
 - `secret_realm.preview`、`secret_realm.enter`、`secret_realm.choose_node`、`secret_realm.settle`
 - `secret_realm.demon_abyss.enter`、`secret_realm.demon_abyss.choose_node`、`secret_realm.demon_abyss.settle`
 - `secret_realm.boundary_rift.enter`、`secret_realm.boundary_rift.choose_node`、`secret_realm.boundary_rift.settle`
+- `secret_realm.ancestral_hall.enter`、`secret_realm.ancestral_hall.choose_node`、`secret_realm.ancestral_hall.settle`
 - `mainline.list_chapters`、`mainline.start_stage`、`mainline.claim_first_clear`
 - `combat.replay.list`、`combat.replay.read`、`combat.replay.share`、`combat.replay.revoke_share`
 
