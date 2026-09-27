@@ -1,12 +1,12 @@
 # v0.1 探索内容基线：采集、短历练、雾隐洞天与悬赏
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.1`，`rule_version=exploration-0.1.0`。写用例：`exploration.start`、`exploration.settle`、`exploration.cancel`、`bounty.accept`、`bounty.claim`。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.1`，当前规则修订为 `rule_version=exploration-0.1.1`（保留 `0.1.0` 已开始会话的原奖励）。写用例：`exploration.start`、`exploration.settle`、`exploration.cancel`、`bounty.accept`、`bounty.claim`。
 
 ## 1. 探索模式
 
 | `mode_key` | 地点/前置 | 时长/成本 | `random_pool` | 保底产出与风险 | 日上限 |
 |:--|:--|:--|:--|:--|--:|
-| `explore.gather_outskirts` | `xuantian.outskirts`、凡人以上 | 30 秒 / 3 体力 | `gather.outskirts.v0.1` | 止血草 1；额外止血草 0–2、铁石 0–2；10% 训练战 | 12 |
+| `explore.gather_outskirts` | `xuantian.outskirts`、凡人以上 | 30 秒 / 3 体力 | `gather.outskirts.v0.1.1` | 止血草 1；额外止血草 0–2、铁石 0–2；木材 0–1（权重 90/10）；10% 训练战 | 12 |
 | `explore.trial_outskirts` | 近郊、感气 L2 | 60 秒 / 5 体力 | `trial.outskirts.v0.1` | 修为 40–80、灵石 10–30；20% 遭遇战 | 8 |
 | `explore.spring_gather` | 灵泉谷、感气 L2、完成采集引导 | 90 秒 / 6 体力 | `gather.spirit_field.v0.1` | 灵叶 1；额外灵叶 0–1、阵砂 0–1；15% 资源事件 | 6 |
 | `explore.mist_grotto` | 雾隐洞天、聚气 L4、会话已进入 | 5 分钟 / 10 体力 | `cave.mist_grotto.v0.1` | 修为 300–500、洞天材料 1–3；25% 精英战 | 2 |
@@ -21,7 +21,7 @@
 `enemy.mist_guardian`；`explore.spring_gather` 当前无战斗遭遇。敌人地点、境界前置、规则版本、
 属性与装备均以探索开始快照为准。
 
-各池为离散权重：近郊额外草 0/1/2 权重 35/45/20，铁石 0/1/2 权重 50/35/15；短历练修为 40/60/80 权重 30/45/25，灵石 10/20/30 权重 40/40/20；灵泉额外资源按 0/1 权重 60/40；洞天材料使用 `item.herb.spirit_leaf`/`item.mat.array_sand`/`item.ore.ironstone` 权重 45/30/25。气运只允许按属性文档调整非保底项权重，不能改保底产出或遭遇概率。
+各池为离散权重：近郊额外草 0/1/2 权重 35/45/20，铁石 0/1/2 权重 50/35/15，木材 0/1 权重 90/10；短历练修为 40/60/80 权重 30/45/25，灵石 10/20/30 权重 40/40/20；灵泉额外资源按 0/1 权重 60/40；洞天材料使用 `item.herb.spirit_leaf`/`item.mat.array_sand`/`item.ore.ironstone` 权重 45/30/25。气运只允许按属性文档调整非保底项权重，不能改保底产出或遭遇概率。
 
 ## 2. 悬赏轮次
 

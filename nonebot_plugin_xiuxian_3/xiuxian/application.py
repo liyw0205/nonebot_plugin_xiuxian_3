@@ -54,6 +54,7 @@ from .events.void_frontier_use_cases import VoidFrontierApplication
 from .specials.arena_use_cases import ArenaApplication
 from .specials.team_arena_use_cases import TeamArenaApplication
 from .specials.idle_use_cases import IdleApplication
+from .specials.dispatch_use_cases import DispatchApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
 
@@ -112,6 +113,7 @@ class XiuxianApplication:
         self.arena = ArenaApplication(repository)
         self.team_arena = TeamArenaApplication(repository)
         self.idle = IdleApplication(repository)
+        self.dispatch = DispatchApplication(repository)
         self.quests = QuestApplication(repository)
 
     async def _invoke(
@@ -1470,6 +1472,18 @@ class XiuxianApplication:
 
     async def cancel_idle(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.idle.cancel(context), write_message="当前事件不允许取消挂机。")
+
+    async def preview_dispatch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dispatch.preview(context), require_write=False)
+
+    async def accept_dispatch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dispatch.accept(context), write_message="当前事件不允许接受派遣。")
+
+    async def settle_dispatch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dispatch.settle(context), write_message="当前事件不允许结算派遣。")
+
+    async def cancel_dispatch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dispatch.cancel(context), write_message="当前事件不允许取消派遣。")
 
     async def publish_team_arena_snapshot(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

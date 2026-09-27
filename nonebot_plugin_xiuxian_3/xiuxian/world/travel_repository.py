@@ -456,6 +456,16 @@ class TravelRepositoryMixin:
                     ).fetchone()
                 if busy is not None:
                     raise TravelBusyError("another action is already running")
+            for table, status_clause in (
+                ("idle_assignments", "status IN ('assigned', 'running')"),
+                ("dispatch_assignments", "status IN ('accepted', 'running')"),
+            ):
+                busy = connection.execute(
+                    f"SELECT 1 FROM {table} WHERE player_id = ? AND {status_clause} LIMIT 1",
+                    (player_id,),
+                ).fetchone()
+                if busy is not None:
+                    raise TravelBusyError("another long action is already running")
             exploration = connection.execute(
                 "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') LIMIT 1",
                 (player_id,),

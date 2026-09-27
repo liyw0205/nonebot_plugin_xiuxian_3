@@ -95,10 +95,10 @@
 在修改玩法、内容或本目录入口后，至少执行：
 
 ```bash
-/data/user/0/com.termux/files/home/myenv/bin/python -m pytest -q
-/data/user/0/com.termux/files/home/myenv/bin/python -m pytest -q test/test_documentation.py
-/data/user/0/com.termux/files/home/myenv/bin/python -m compileall -q nonebot_plugin_xiuxian_3
-find data -name '*.json' -print0 | xargs -0 -n1 /data/user/0/com.termux/files/home/myenv/bin/python -m json.tool >/dev/null
+$HOME/myenv/bin/python -m pytest -q
+$HOME/myenv/bin/python -m pytest -q test/test_documentation.py
+$HOME/myenv/bin/python -m compileall -q nonebot_plugin_xiuxian_3
+find data -name '*.json' -print0 | xargs -0 -n1 $HOME/myenv/bin/python -m json.tool >/dev/null
 git diff --check
 ```
 

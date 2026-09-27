@@ -28,7 +28,7 @@
 魔渊队伍只能在 `demon.fallen_ruins` 创建，所有成员需元婴 L1、持有 `access.demon.fallen_ruins`、污染低于 80 且有 20 体力；万兽队伍只能在 `beast.ten_thousand_hills` 创建，所有成员需元婴 L1、妖界声望至少 200 且有 20 体力。两类副本均使用独立队伍战斗会话，原子扣除体力并冻结污染/血脉/技能快照；`enemy.demon_overlord` 每 3 回合使全队污染 +8，`enemy.beast_ancestor` 每 4 回合召唤两只可被队员清除的祖灵。胜利奖励分别为魔核/魔界声望/世界功勋和妖血/妖界声望/世界功勋，失败进入神魂疲劳；复起、奖励唯一性和回放规则与界隙副本一致。
 
 已确认双人或三人竞技队伍还可以由队长发布 `arena.team` 防守快照并发起 2v2/3v3/2v3 异步挑战；组队竞技场使用独立快照、
-匹配和回放表，不复用队伍 PVE 会话，也不转移任何玩家资产。三人以上队伍 PvP 和跨服匹配仍关闭。
+匹配和回放表，不复用队伍 PVE 会话，也不转移任何玩家资产。其他多人队伍 PvP 形态和跨服匹配仍关闭。
 
 个人三界竞技场用例为 `publish_three_realms_arena_snapshot`、`list_three_realms_arena_snapshots` 和
 `challenge_three_realms_arena`，对应命令 `发布三界竞技场快照`、`三界竞技场列表`、`挑战三界竞技场 [snapshot_id]`。

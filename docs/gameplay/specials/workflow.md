@@ -6,7 +6,7 @@ idle: preview -> assigned -> claimable -> claimed
                     -> cancelled (仅 assigned 前的确认窗口)
 
 dispatch: preview -> accepted -> running -> succeeded/failed -> settled
-                              -> cancelled (仅 accepted)
+                   -> cancelled (仅接受后 60 秒内；仍计当日配额)
 
 codex: hidden -> discovered -> completed (集合里程碑)
 

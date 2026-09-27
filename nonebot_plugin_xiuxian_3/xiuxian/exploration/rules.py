@@ -7,7 +7,7 @@ import hashlib
 from .models import ExplorationDefinition
 
 
-RULE_VERSION = "exploration-0.1.0"
+RULE_VERSION = "exploration-0.1.1"
 V02_RULE_VERSION = "exploration-0.2.0"
 V02_CONTENT_VERSION = "content-0.2"
 V03_RULE_VERSION = "exploration-0.3.0"
@@ -51,7 +51,7 @@ DEFINITIONS = {
         required_realm="mortal",
         required_layer=0,
         daily_limit=12,
-        random_pool="gather.outskirts.v0.1",
+        random_pool="gather.outskirts.v0.1.1",
         battle_chance_bp=1000,
         rule_version=RULE_VERSION,
     ),
@@ -293,12 +293,15 @@ def cloud_boat_storm_roll_bp(seed: str) -> int:
     return battle_roll_bp(seed + ":storm")
 
 
-def settlement_result(mode_key: str, seed: str) -> dict[str, int]:
+def settlement_result(mode_key: str, seed: str, *, rule_version: str = RULE_VERSION) -> dict[str, int]:
     if mode_key == "explore.gather_outskirts":
-        return {
+        result = {
             "item.herb.blood_grass": 1 + weighted_value(seed + ":blood", (0, 1, 2), (35, 45, 20)),
             "item.ore.ironstone": weighted_value(seed + ":iron", (0, 1, 2), (50, 35, 15)),
         }
+        if rule_version == "exploration-0.1.1":
+            result["item.mat.wood"] = weighted_value(seed + ":wood", (0, 1), (90, 10))
+        return result
     if mode_key == "explore.trial_outskirts":
         return {
             "cultivation": weighted_value(seed + ":cultivation", (40, 60, 80), (30, 45, 25)),

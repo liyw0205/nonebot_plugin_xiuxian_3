@@ -477,6 +477,13 @@ class BreakthroughRepositoryMixin:
             ).fetchone()
             if retreat is not None:
                 raise BreakthroughBusyError("retreat is active")
+            idle_or_dispatch = connection.execute(
+                "SELECT 1 FROM idle_assignments WHERE player_id = ? AND status IN ('assigned', 'running') "
+                "UNION ALL SELECT 1 FROM dispatch_assignments WHERE player_id = ? AND status IN ('accepted', 'running') LIMIT 1",
+                (row["id"], row["id"]),
+            ).fetchone()
+            if idle_or_dispatch is not None:
+                raise BreakthroughBusyError("another long action is active")
 
             inventory = self._json_object(row["inventory_json"], {})
             for item_key, quantity in definition.materials.items():

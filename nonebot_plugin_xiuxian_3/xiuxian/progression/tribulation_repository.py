@@ -106,6 +106,8 @@ class TribulationTrialRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if str(row["status"]) != "active":
                 raise PlayerSuspendedError("player is not active")
+            if self._has_active_long_action(connection, int(row["id"])):
+                raise TribulationTrialBusyError("another long action is active")
             if str(row["realm_key"]) != "tribulation" or int(row["realm_layer"]) < definition.required_layer:
                 raise TrialSequenceError("tribulation layer is insufficient")
             if int(row["tribulation_debt"]) >= 100:

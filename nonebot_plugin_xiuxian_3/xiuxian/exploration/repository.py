@@ -126,6 +126,7 @@ from ..exploration.rules import (
     CLOUD_BOAT_STORM_CHOICES,
     CLOUD_BOAT_STORM_PAY_COST,
     CLOUD_BOAT_STORM_WAIT_SECONDS,
+    RULE_VERSION as EXPLORATION_RULE_VERSION,
     cloud_boat_storm_roll_bp,
     has_cloud_mine_access,
     battle_roll_bp,
@@ -361,6 +362,7 @@ class ExplorationRepositoryMixin:
                 ("breakthrough_sessions", ("preparing",)),
                 ("cloud_boat_sessions", ("created", "running")),
                 ("idle_assignments", ("assigned", "running")),
+                ("dispatch_assignments", ("accepted", "running")),
             ):
                 placeholders = ", ".join("?" for _ in statuses)
                 busy = connection.execute(
@@ -900,7 +902,11 @@ class ExplorationRepositoryMixin:
             if not expired:
                 seed = str(snapshot.get("random_seed", session["operation_id"]))
                 battle_pending = battle_roll_bp(seed + ":battle") < int(snapshot.get("battle_chance_bp", 0))
-                result = settlement_result(str(session["mode_key"]), seed)
+                result = settlement_result(
+                    str(session["mode_key"]),
+                    seed,
+                    rule_version=str(snapshot.get("rule_version", EXPLORATION_RULE_VERSION)),
+                )
                 storm_hit = (
                     str(session["mode_key"]) == "explore.cloud_boat_trial"
                     and not bool(stored_result.get("storm_resolved"))

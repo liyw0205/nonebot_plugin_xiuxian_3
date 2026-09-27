@@ -54,13 +54,13 @@
 | D3 | `quest.seven_day.day3_production_preview` | 灵石 ×30 | 已开放；以生产预览或已开始订单作为可审计来源 |
 | D4 | `quest.seven_day.day4_bounty` | 地方名望 +2 | 已开放；以接取悬赏作为可审计来源 |
 | D5 | `quest.seven_day.day5_tower` | 阵砂 ×2 | 未开放；等待试炼塔/战斗运行时 |
-| D6 | `quest.seven_day.day6_dispatch` | 灵石 ×50 | 未开放；等待派遣系统 |
+| D6 | `quest.seven_day.day6_dispatch` | 灵石 ×50 | 派遣已开放；routine 尚未接入已结算派遣来源 |
 | D7 | `quest.seven_day.day7_path` | 地方名望 +5、机缘签 ×2 | 已开放；以选择道途作为可审计来源 |
 
 用户发送 `七日入道` 查看状态，发送 `领取七日目标 <1-7>` 领取已完成目标。目标起点、
 目标日期、来源 operation、奖励和版本均持久化；同一日数或同一 operation 重试只回放原结果，
-不同 operation 不能重复占用同一来源事件。D5/D6 在依赖关闭期间返回未完成，不创建战斗或派遣
-会话。
+不同 operation 不能重复占用同一来源事件。D5 等待试炼塔运行时；D6 在 routine 派遣来源投影
+接入前返回未完成。七日目标查询/领奖不会自行创建战斗或派遣会话。
 
 称号与功业录当前开放以下来源：
 
@@ -70,7 +70,7 @@
 | `title.town_helper` | 累计三次道历问安 | 自动获得，可佩戴 |
 | `achievement.first_checkin` | 首次道历问安 | 地方名望 +3，可领取一次 |
 | `achievement.first_craft` | 首次完成生产订单 | 服务信誉 +2，可领取一次 |
-| `achievement.first_dispatch`、`achievement.codex_5`、`achievement.tower_10` | 派遣/图鉴/试炼塔 | 内容未开放，不可领取 |
+| `achievement.first_dispatch`、`achievement.codex_5`、`achievement.tower_10` | 派遣/图鉴/试炼塔 | 派遣已开放但功业来源事件尚未接入；图鉴收集和试炼塔内容仍未开放 |
 
 发送 `功业录` 查看功业与称号，发送 `领取功业 序号` 领取奖励，发送 `佩戴称号 序号`
 更换展示称号。称号是展示记录，不提供永久战斗属性；来源 operation、奖励版本和领取

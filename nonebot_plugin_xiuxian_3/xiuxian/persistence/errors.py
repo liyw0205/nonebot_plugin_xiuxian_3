@@ -20,6 +20,34 @@ class PlayerSuspendedError(RuntimeError):
     """A suspended or deleted player cannot perform a write operation."""
 
 
+class DispatchRequirementError(RuntimeError):
+    """The player lacks dispatch eligibility or required resources."""
+
+
+class DispatchBusyError(RuntimeError):
+    """The player already has an action occupying the dispatch slot."""
+
+
+class DispatchDailyLimitError(RuntimeError):
+    """The player exhausted the daily quota for a dispatch task."""
+
+
+class DispatchNotFoundError(RuntimeError):
+    """The player has no matching active dispatch task."""
+
+
+class DispatchNotReadyError(RuntimeError):
+    """The dispatch task has not reached its frozen end time."""
+
+
+class DispatchAlreadySettledError(RuntimeError):
+    """The dispatch task was already settled or cancelled."""
+
+
+class DispatchCancellationExpiredError(RuntimeError):
+    """The dispatch confirmation window has expired."""
+
+
 class SecretRealmRequirementError(RuntimeError):
     """The player lacks the realm, location, or ticket required by a realm."""
 

@@ -363,6 +363,12 @@ class ProductionRepositoryMixin:
             ).fetchone()
             if idle is not None:
                 raise ProductionBusyError("idle assignment is still running")
+            dispatch = connection.execute(
+                "SELECT 1 FROM dispatch_assignments WHERE player_id = ? AND status IN ('accepted', 'running') LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if dispatch is not None:
+                raise ProductionBusyError("dispatch assignment is still running")
             self._check_production_requirements(connection, row, recipe)
             self._check_production_special_requirements(connection, row, recipe, now)
             if recipe.key == "recipe.fruit.soul_seed":

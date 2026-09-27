@@ -1110,6 +1110,7 @@ class CultivationRepositoryMixin:
             ("final_battle_members", "asset_lock_status = 'locked'"),
             ("void_route_sessions", "status = 'running'"),
             ("idle_assignments", "status IN ('assigned', 'running')"),
+            ("dispatch_assignments", "status IN ('accepted', 'running')"),
             ("livelihood_trade_routes", "status = 'in_transit'"),
             ("secret_realm_runs", "status IN ('entered', 'routing', 'combat_pending', 'cleared', 'failed')"),
         )
