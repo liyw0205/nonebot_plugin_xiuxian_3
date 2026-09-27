@@ -641,7 +641,7 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
     asyncio.run(run())
 
 
-def test_endgame_recipes_require_dao_origin_gate_on_qq_and_onebot() -> None:
+def test_endgame_recipes_use_their_documented_locations_on_qq_and_onebot() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
@@ -678,6 +678,57 @@ def test_endgame_recipes_require_dao_origin_gate_on_qq_and_onebot() -> None:
                         (started.data["session_id"],),
                     ).fetchone()[0]
                 assert json.loads(snapshot_json)["location_key"] == "dao.origin_gate"
+
+                certificate_user = f"{user}-certificate"
+                await _create(runtime, adapter, certificate_user)
+                _set_player(
+                    runtime,
+                    adapter,
+                    certificate_user,
+                    stage="cultivator",
+                    realm_key="tribulation",
+                    realm_layer=10,
+                    endgame_status="tribulation",
+                    location_key="dao.origin_gate",
+                    dao_fruit_progress=1_000,
+                    ascension_merit=1_000,
+                    world_merit=1_000,
+                )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, certificate_user),
+                    ).fetchone()[0]
+                    for index, trial_key in enumerate(
+                        ("trial.body_and_mind", "trial.three_realms", "trial.dao_choice"), start=1
+                    ):
+                        connection.execute(
+                            "INSERT INTO tribulation_trial_sessions(session_id, player_id, operation_id, trial_key, status, starts_at, ends_at, result_json, created_at, updated_at) "
+                            "VALUES (?, ?, ?, ?, 'succeeded', 'start', 'end', '{}', 'created', 'updated')",
+                            (
+                                f"{certificate_user}-trial-{index}",
+                                player_id,
+                                f"{certificate_user}-trial-operation-{index}",
+                                trial_key,
+                            ),
+                        )
+                at_gate = await runtime.dispatch(
+                    _ctx(adapter, certificate_user, f"certificate-at-gate-{adapter}"),
+                    "开始终局配方 recipe.ascension.certificate",
+                )
+                assert at_gate.code == "ENDGAME_RECIPE_CONTEXT_INVALID"
+                _set_player(runtime, adapter, certificate_user, location_key="tribulation.sky_terrace")
+                at_terrace = await runtime.dispatch(
+                    _ctx(adapter, certificate_user, f"certificate-at-terrace-{adapter}"),
+                    "开始终局配方 recipe.ascension.certificate",
+                )
+                assert at_terrace.code == "ENDGAME_RECIPE_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    snapshot_json = connection.execute(
+                        "SELECT snapshot_json FROM endgame_sessions WHERE session_id = ?",
+                        (at_terrace.data["session_id"],),
+                    ).fetchone()[0]
+                assert json.loads(snapshot_json)["location_key"] == "tribulation.sky_terrace"
             await runtime.close()
 
     asyncio.run(run())
@@ -1067,7 +1118,13 @@ def test_endgame_recipe_replay_failure_refund_and_final_battle_preview_path() ->
             assert failed.data["refunds"] == {"item.dao_fruit_fragment": 5}
             assert failed.data["dao_fruit_progress"] == 1_100
 
-            _set_player(runtime, adapter, user, inventory_json=json.dumps({}))
+            _set_player(
+                runtime,
+                adapter,
+                user,
+                inventory_json=json.dumps({}),
+                location_key="tribulation.sky_terrace",
+            )
             certificate_op = next(
                 f"certificate-{index}"
                 for index in range(1_000)

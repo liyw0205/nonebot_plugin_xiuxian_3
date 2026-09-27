@@ -33,7 +33,7 @@ async def _prepare_terminal_player(runtime, adapter: str, user: str) -> None:
         db.execute(
             """
             UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=10,
-                endgame_status='tribulation', location_key='dao.origin_gate', path_key='body',
+                endgame_status='tribulation', location_key='tribulation.sky_terrace', path_key='body',
                 dao_fruit_progress=1000, ascension_merit=1000, world_merit=1000,
                 tribulation_debt=0, qualification_json=?, inventory_json=?
             WHERE platform=? AND platform_user_id=?
@@ -105,17 +105,6 @@ def test_qq_and_onebot_terminal_recipe_to_ending_command_chain() -> None:
                 assert settled.code == "ENDGAME_RECIPE_SETTLED"
                 assert settled.data["success"] is True
                 assert settled.data["rewards"] == {"item.ascension_certificate": 1}
-
-                travel = await runtime.dispatch(
-                    _ctx(adapter, user, f"{user}-sky-start"), "前往 天劫台"
-                )
-                assert travel.code == "TRAVEL_STARTED"
-                clock.advance(minutes=31)
-                arrived = await runtime.dispatch(
-                    _ctx(adapter, user, f"{user}-sky-settle"), "结算移动"
-                )
-                assert arrived.code == "TRAVEL_COMPLETED"
-                assert arrived.data["destination"] == "tribulation.sky_terrace"
 
                 created = await runtime.dispatch(
                     _ctx(adapter, user, f"{user}-final-create"), "创建终局战"

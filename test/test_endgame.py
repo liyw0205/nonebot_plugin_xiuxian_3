@@ -322,10 +322,13 @@ def test_tribulation_layer_requires_ordered_trials_and_origin_tasks() -> None:
     asyncio.run(run())
 
 
-def test_tribulation_l10_requires_three_current_season_events_per_origin_task() -> None:
+def test_tribulation_l10_requires_three_events_per_origin_task_in_a_shared_season() -> None:
     async def run() -> None:
         now = datetime(2026, 9, 24, tzinfo=timezone.utc)
-        season_id, _, _ = final_heaven_season_window(now)
+        season_id, season_start, _ = final_heaven_season_window(now)
+        historical_season_id, _, _ = final_heaven_season_window(
+            season_start - timedelta(seconds=1)
+        )
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, clock=lambda: now)
             for adapter, user in (("qq.official", "qq-season-gate"), ("onebot.v11", "ob-season-gate")):
@@ -359,7 +362,7 @@ def test_tribulation_l10_requires_three_current_season_events_per_origin_task() 
                         "task.dao_origin.teach",
                     ):
                         for index in range(3):
-                            event_season = season_id if index < 2 else "season.final_heaven:stale"
+                            event_season = season_id if index < 2 else historical_season_id
                             connection.execute(
                                 "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, content_version, rule_version, created_at) "
                                 "VALUES (?, ?, 'completed', ?, 'success', ?, 'content-0.6', 'events-0.6.0', 'created')",
@@ -384,7 +387,7 @@ def test_tribulation_l10_requires_three_current_season_events_per_origin_task() 
                     ):
                         connection.execute(
                             "UPDATE quest_events SET payload_json = ? WHERE player_id = ? AND quest_key = ?",
-                            (json.dumps({"season_id": season_id}), player_id, task_key),
+                            (json.dumps({"season_id": historical_season_id}), player_id, task_key),
                         )
 
                 advanced = await runtime.dispatch(

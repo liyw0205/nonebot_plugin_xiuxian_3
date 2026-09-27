@@ -7,7 +7,7 @@ from hashlib import blake2b
 
 
 CONTENT_VERSION = "content-0.6"
-RULE_VERSION = "production-0.6.0"
+RULE_VERSION = "production-0.6.1"
 SUCCESS_THRESHOLD_BP = 8_000
 DAO_FRUIT_PROGRESS_CAP = 1_300
 ASCENSION_CERTIFICATE_KEY = "item.ascension_certificate"
@@ -55,6 +55,7 @@ ENDGAME_RECIPES = {
         required_ascension_merit=1_000,
         required_realm="tribulation",
         required_endgame_statuses=("tribulation",),
+        required_location="tribulation.sky_terrace",
     ),
 }
 

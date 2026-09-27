@@ -1,6 +1,6 @@
 # v0.6 生产内容基线：终局自制与道统服务
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=production-0.6.0`。终局配方不可委托、不可交易、不可由协助者代工，只能角色本人在 `dao.origin_gate` 使用，且操作关联天劫/结局状态。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，终局配方规则版本为 `production-0.6.1`。终局配方不可委托、不可交易、不可由协助者代工，且操作关联天劫/结局状态。`recipe.dao.*` 与 `recipe.tribulation.guard` 只能在 `dao.origin_gate` 使用；三次天劫试炼完成后，`recipe.ascension.certificate` 只能在 `tribulation.sky_terrace` 使用，随后可直接创建最终战。
 
 | `recipe_key` | 前置 | 输入 | 时长/产出 | 限制/失败 |
 |:--|:--|:--|:--|:--|
@@ -8,7 +8,7 @@
 | `recipe.tribulation.guard` | 渡劫准备、领域已选 | 天劫 token 1、领域核心 3 | 30 分钟 / `item.tribulation_guard` 1 | 每次天劫最多 1；失败 token 不返 |
 | `recipe.ascension.certificate` | 三试炼成功、道果进度 >=800、功勋 >=1000 | 世界功勋 1000；道果进度只作门槛、不扣除 | 10 分钟 / `item.ascension_certificate` 1 | 每角色 1；失败返还世界功勋，仅记录诊断 |
 
-上述 `recipe.dao.*`、`recipe.tribulation.*` 和 `recipe.ascension.*` 道源门终局配方不可委托、不可交易、不可由协助者代工，只能角色本人在 `dao.origin_gate` 使用。道果加工只允许 `endgame_status=dao_union` 或 `tribulation`；保护阵和飞升凭证只允许 `endgame_status=tribulation`。终局配方会话与天劫试炼会话互斥，二者的启动事务彼此检查活动会话；配方创建快照冻结当时的终局状态。进入 `ascension_ready`、飞升或留界状态后，不再开放这些终局配方。
+上述配方不可委托、不可交易、不可由协助者代工。道果加工只允许 `endgame_status=dao_union` 或 `tribulation`；保护阵和飞升凭证只允许 `endgame_status=tribulation`。终局配方会话与天劫试炼会话互斥，二者的启动事务彼此检查活动会话；配方创建快照冻结当时的终局状态。进入 `ascension_ready`、飞升或留界状态后，不再开放这些终局配方。
 
 当前终局配方使用启动 operation ID 的 BLAKE2b 摘要生成稳定检定值，`roll_bp < 8000` 成功；相同 operation 重放原结果。道果加工失败返还 5 个道果碎片，其他投入按配方失败语义处理；道果进度总上限为 1,300。
 

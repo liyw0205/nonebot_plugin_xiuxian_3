@@ -17,6 +17,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_wi
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import trial_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import next_layer_threshold
+from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import recipe_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_TASKS
 from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
@@ -1967,63 +1968,64 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                 assert tribulation.data["realm_key"] == "tribulation"
                 assert tribulation.data["realm_layer"] == 1
 
-                # Continue the same character into the first unlocked trial.
-                reached_trial = False
-                for day in range(30):
-                    clock.advance(days=1)
-                    await _dispatch(runtime, adapter, user, 900000 + day * 20, "恢复状态")
-                    for slot in range(2):
-                        operation_base = 901000 + day * 20 + slot * 5
-                        started_refinement = await _dispatch(
-                            runtime,
-                            adapter,
-                            user,
-                            operation_base,
-                            "开始修炼 神魂淬炼",
+                async def cultivate_to_layer(
+                    target_layer: int, first_day: int, max_days: int
+                ) -> int | None:
+                    for day in range(first_day, first_day + max_days):
+                        clock.advance(days=1)
+                        await _dispatch(
+                            runtime, adapter, user, 900000 + day * 20, "恢复状态"
                         )
-                        assert started_refinement.code == "CULTIVATION_STARTED"
-                        clock.advance(minutes=30)
-                        cultivated = await _dispatch(
-                            runtime,
-                            adapter,
-                            user,
-                            operation_base + 1,
-                            "结算修炼",
-                        )
-                        assert cultivated.data["realm_key"] == "tribulation"
-                        assert cultivated.data["cultivation_gain"] >= 5_000
-                        threshold = next_layer_threshold(
-                            "tribulation", cultivated.data["realm_layer"]
-                        )
-                        while threshold is not None and cultivated.data["cultivation"] >= threshold:
-                            advanced = await _dispatch(
+                        for slot in range(2):
+                            operation_base = 901000 + day * 20 + slot * 5
+                            started_refinement = await _dispatch(
                                 runtime,
                                 adapter,
                                 user,
-                                operation_base + 2 + int(cultivated.data["realm_layer"]),
-                                "晋升境界",
+                                operation_base,
+                                "开始修炼 神魂淬炼",
                             )
-                            assert advanced.code == "REALM_LAYER_ADVANCED"
-                            threshold = next_layer_threshold(
-                                "tribulation", advanced.data["realm_layer"]
-                            )
-                            if advanced.data["realm_layer"] == 3:
-                                reached_trial = True
-                                break
-                        if slot == 0:
-                            clock.advance(hours=8)
-                            await _dispatch(
+                            assert started_refinement.code == "CULTIVATION_STARTED"
+                            clock.advance(minutes=30)
+                            cultivated = await _dispatch(
                                 runtime,
                                 adapter,
                                 user,
-                                operation_base + 4,
-                                "恢复状态",
+                                operation_base + 1,
+                                "结算修炼",
                             )
-                        if reached_trial:
-                            break
-                    if reached_trial:
-                        break
-                assert reached_trial, "new character did not reach tribulation L3"
+                            assert cultivated.data["realm_key"] == "tribulation"
+                            assert cultivated.data["cultivation_gain"] >= 5_000
+                            layer = int(cultivated.data["realm_layer"])
+                            cultivation = int(cultivated.data["cultivation"])
+                            threshold = next_layer_threshold("tribulation", layer)
+                            while threshold is not None and cultivation >= threshold:
+                                advanced = await _dispatch(
+                                    runtime,
+                                    adapter,
+                                    user,
+                                    operation_base + 2 + layer,
+                                    "晋升境界",
+                                )
+                                assert advanced.code == "REALM_LAYER_ADVANCED"
+                                layer = int(advanced.data["realm_layer"])
+                                cultivation = int(advanced.data["cultivation"])
+                                threshold = next_layer_threshold("tribulation", layer)
+                                if layer >= target_layer:
+                                    return day + 1
+                            if slot == 0:
+                                clock.advance(hours=8)
+                                await _dispatch(
+                                    runtime,
+                                    adapter,
+                                    user,
+                                    operation_base + 4,
+                                    "恢复状态",
+                                )
+                    return None
+
+                cultivation_day = await cultivate_to_layer(3, 0, 30)
+                assert cultivation_day is not None, "new character did not reach tribulation L3"
 
                 clock.advance(hours=13)
                 await _dispatch(runtime, adapter, user, 907700, "恢复状态")
@@ -2128,6 +2130,158 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                     ).fetchone()
                 assert tribulation_state[0:2] == ("tribulation", 3)
                 assert int(tribulation_state[2]) >= 220_000
+
+                cultivation_day = await cultivate_to_layer(6, cultivation_day, 100)
+                assert cultivation_day is not None, "new character did not reach tribulation L6"
+                three_realms_operation = next(
+                    f"{adapter}-new-player-three-realms-{candidate}"
+                    for candidate in range(1000)
+                    if trial_roll_bp(
+                        f"{adapter}-new-player-three-realms-{candidate}"
+                    ) < 7000
+                )
+                three_realms = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    907712,
+                    "开始天劫试炼 三界劫",
+                    operation_id=three_realms_operation,
+                )
+                assert three_realms.code == "TRIAL_STARTED"
+                assert three_realms.data["battle_outcome"] == "won"
+                clock.advance(minutes=31)
+                settled_three_realms = await _dispatch(
+                    runtime, adapter, user, 907713, "结算天劫试炼"
+                )
+                assert settled_three_realms.code == "TRIAL_SUCCEEDED"
+                assert settled_three_realms.data["dao_fruit_progress"] == 750
+                assert settled_three_realms.data["ascension_merit"] == 750
+                assert settled_three_realms.data["reward_world_merit"] == 500
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    tribulation_state = connection.execute(
+                        "SELECT realm_key, realm_layer, cultivation, faction_reputation_json, "
+                        "inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert tribulation_state[0:2] == ("tribulation", 6)
+                faction_reputation = json.loads(tribulation_state[3])
+                assert any(
+                    int(faction_reputation.get(key, 0)) < 2_000
+                    for key in ("xuantian", "demon", "beast")
+                )
+                assert json.loads(tribulation_state[4]).get("item.tribulation_token") == 1
+                assert json.loads(tribulation_state[4]).get("item.dao_fruit_fragment") == 1
+
+                cultivation_day = await cultivate_to_layer(9, cultivation_day, 200)
+                assert cultivation_day is not None, "new character did not reach tribulation L9"
+                dao_choice_operation = next(
+                    f"{adapter}-new-player-dao-choice-{candidate}"
+                    for candidate in range(1_000)
+                    if trial_roll_bp(f"{adapter}-new-player-dao-choice-{candidate}") < 7_000
+                )
+                dao_choice = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    907714,
+                    "开始天劫试炼 道果劫 fruit.allcraft",
+                    operation_id=dao_choice_operation,
+                )
+                assert dao_choice.code == "TRIAL_STARTED"
+                assert dao_choice.data["battle_outcome"] == "won"
+                clock.advance(minutes=31)
+                settled_dao_choice = await _dispatch(
+                    runtime, adapter, user, 907715, "结算天劫试炼"
+                )
+                assert settled_dao_choice.code == "TRIAL_SUCCEEDED"
+                assert settled_dao_choice.data["dao_fruit_progress"] == 1_000
+                assert settled_dao_choice.data["ascension_merit"] == 1_000
+
+                cultivation_day = await cultivate_to_layer(10, cultivation_day, 100)
+                assert cultivation_day is not None, "new character did not reach tribulation L10"
+                certificate_operation = next(
+                    f"{adapter}-new-player-certificate-{candidate}"
+                    for candidate in range(1_000)
+                    if recipe_roll_bp(f"{adapter}-new-player-certificate-{candidate}") < 8_000
+                )
+                certificate = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    907716,
+                    "开始终局配方 飞升凭证",
+                    operation_id=certificate_operation,
+                )
+                assert certificate.code == "ENDGAME_RECIPE_STARTED", (
+                    adapter,
+                    certificate.code,
+                    certificate.message,
+                )
+                clock.advance(minutes=11)
+                settled_certificate = await _dispatch(
+                    runtime, adapter, user, 907717, "结算终局配方"
+                )
+                assert settled_certificate.code == "ENDGAME_RECIPE_SETTLED"
+                assert settled_certificate.data["success"] is True
+                preview = await _dispatch(runtime, adapter, user, 907718, "终局战预览")
+                assert preview.code == "FINAL_BATTLE_PREVIEW"
+                assert preview.data["ready"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    terminal_state = connection.execute(
+                        "SELECT realm_key, realm_layer, dao_fruit_progress, ascension_merit, "
+                        "world_merit, inventory_json FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert terminal_state[0:4] == ("tribulation", 10, 1_000, 1_000)
+                assert int(terminal_state[4]) >= 500
+                assert json.loads(terminal_state[5]).get("item.ascension_certificate") == 1
+
+                created_battle = await _dispatch(
+                    runtime, adapter, user, 907719, "创建终局战"
+                )
+                assert created_battle.code == "FINAL_BATTLE_CREATED"
+                battle_id = str(created_battle.data["battle_id"])
+                battle = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    907720,
+                    f"开始终局战 {battle_id}",
+                )
+                if battle.code == "FINAL_BATTLE_CHOICE_REQUIRED":
+                    battle = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        907721,
+                        f"选择终局战 继续 {battle_id}",
+                    )
+                assert battle.code == "FINAL_BATTLE_SETTLED", (
+                    adapter,
+                    battle.code,
+                    battle.message,
+                )
+                assert battle.data["outcome"] == "won"
+                ending = await _dispatch(runtime, adapter, user, 907722, "选择结局 飞升")
+                assert ending.code == "ENDING_CHOSEN"
+                assert ending.data["ending_key"] == "ascend"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    ending_state = connection.execute(
+                        "SELECT endgame_status, location_key, inventory_json FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    ending_key = connection.execute(
+                        "SELECT endgame_endings.ending_key FROM endgame_endings "
+                        "JOIN players ON players.id=endgame_endings.player_id "
+                        "WHERE players.platform=? AND players.platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                assert ending_state[0:2] == ("ascended", "ascension.heaven_path")
+                assert json.loads(ending_state[2]).get("item.title.ascended") == 1
+                assert ending_key == "ascend"
                 await runtime.close()
 
     asyncio.run(run())

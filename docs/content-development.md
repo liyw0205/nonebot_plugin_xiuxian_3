@@ -272,7 +272,7 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 #### 5.4.1 终局任务来源与赛季窗口
 
-`season.final_heaven` 使用 UTC 固定 35 天窗口，以 `2025-01-01T00:00:00Z` 为锚点；角色任务进度按当前窗口统计，不能把旧赛季记录折算到新赛季。每项 `task.dao_origin.*` 的目标为 3 次，奖励只在第 3 次有效结算时发放。客户端只能请求核验任务，不能提交计数、来源 operation 或奖励。
+`season.final_heaven` 使用 UTC 固定 35 天窗口，以 `2025-01-01T00:00:00Z` 为锚点；角色任务进度和奖励按当前窗口统计，不能把旧赛季记录折算到新赛季。每项 `task.dao_origin.*` 的目标为 3 次，奖励只在第 3 次有效结算时发放。渡劫 L9→L10 的资格要求三项任务各有 3 条成功记录，且三项记录共同属于至少一个相同赛季；该赛季可以已经结束。客户端只能请求核验任务，不能提交计数、来源 operation 或奖励。
 
 终局榜单使用同一 UTC 窗口 `[starts_at, ends_at)`，规则版本 `events-0.6.1`。飞升榜只消费
 `endgame_endings.ending_key=ascend`，单次 +1000；留界道统榜只消费
@@ -296,7 +296,7 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 | `task.dao_origin.build` | 当前窗口内已结算、玩家有资格领奖的地方公共项目奖励 | 仅有贡献但项目未达标、无资格奖励记录 |
 | `task.dao_origin.teach` | 当前窗口内由该玩家作为师父且已毕业的师徒关系及毕业 operation | 邀请、未毕业关系或客户端报告的毕业 |
 
-任务事件必须在同一事务内引用证据记录和来源 operation、写入赛季键并发放对应奖励；同一来源 operation 对同一任务只能消费一次。`quest.dao_union` 的主线证据只接受 `story.mainline.dao_echoes` 三条 lane 各 10 个已领取 stage；历史旧 story 记录不会折算。渡劫 L9 晋升 L10 还要求三个道源任务都在当前赛季各有 3 条成功事件。`dao.origin_gate` 从 `void.archive_ruins` 开放服务端移动：合道 L6、道果进度 >=470（等于三项道源任务正式奖励总量）、2 个道果碎片、20 体力、60 分钟，每个 UTC 日最多创建 1 次行程，当前准入规则为 `world-0.6.1`。`tribulation.sky_terrace` 从 `dao.origin_gate` 开放移动：渡劫 L3、1 张天劫凭证、30 分钟；移动凭证独立于每次试炼消耗的 1 张凭证。试炼只能在天劫台启动，移动与试炼会话互斥。`recipe.dao.*`、`recipe.tribulation.*` 和 `recipe.ascension.*` 终局配方仅允许在道源门开始，创建会话时冻结地点；炼虚 L10 的 `recipe.masterwork.*` 是另一条个人生产订单，不要求抵达道源门，按主道途或辅修准入并写入生产订单快照。试炼、作品和最终战必须使用可回放的服务端战斗/生产/结算记录，不接受概率命令或手工资格标记替代。
+任务事件必须在同一事务内引用证据记录和来源 operation、写入赛季键并发放对应奖励；同一来源 operation 对同一任务只能消费一次。`quest.dao_union` 的主线证据只接受 `story.mainline.dao_echoes` 三条 lane 各 10 个已领取 stage；历史旧 story 记录不会折算。渡劫 L9 晋升 L10 要求三个道源任务各自 3 条成功事件来自同一个赛季，不要求晋升时该赛季仍在进行。`dao.origin_gate` 从 `void.archive_ruins` 开放服务端移动：合道 L6、道果进度 >=470（等于三项道源任务正式奖励总量）、2 个道果碎片、20 体力、60 分钟，每个 UTC 日最多创建 1 次行程，当前准入规则为 `world-0.6.1`。`tribulation.sky_terrace` 从 `dao.origin_gate` 开放移动：渡劫 L3、1 张天劫凭证、30 分钟；移动凭证独立于每次试炼消耗的 1 张凭证。试炼只能在天劫台启动，移动与试炼会话互斥。`recipe.dao.*` 与 `recipe.tribulation.guard` 只允许在道源门开始；三次天劫试炼完成后，`recipe.ascension.certificate` 只允许在天劫台开始，以便原地进入终局战。创建会话时冻结地点；炼虚 L10 的 `recipe.masterwork.*` 是另一条个人生产订单，不要求抵达道源门，按主道途或辅修准入并写入生产订单快照。试炼、作品和最终战必须使用可回放的服务端战斗/生产/结算记录，不接受概率命令或手工资格标记替代。
 
 `recipe.masterwork.body|spell|device|demonic|beast` 分别产出对应 `item.masterwork.*`，要求 `void_refining` L10 和同名主道途；`recipe.masterwork.alchemy|artifice|formation` 要求 `support` 道途以及任一合法辅修，各产出对应职业作品。`recipe.masterwork.support` 消耗上述三件辅修大师作品并产出 `item.masterwork.support`。作品走 `生产预览`、`开始生产`、`领取生产` 普通个人订单，不能委托；失败不产生作品，返还按配方快照结算。`交付合道作品` 仍由合道任务事务消费与当前道途匹配的 `item.masterwork.*`，不会创建作品或直接授予资格。
 

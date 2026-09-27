@@ -1245,24 +1245,29 @@ class CultivationRepositoryMixin:
                 if any(item not in completed for item in required):
                     raise TrialSequenceError("the required tribulation trial has not succeeded")
                 if layer == 9:
-                    from ..events.rules import final_heaven_season_window
                     from ..quests.rules import DAO_ORIGIN_TARGET, DAO_ORIGIN_TASKS
 
-                    season_id, _, _ = final_heaven_season_window(self._now())
-                    completed_tasks = set()
+                    task_seasons: list[set[str]] = []
                     for task_key in DAO_ORIGIN_TASKS:
                         evidence_rows = connection.execute(
                             "SELECT payload_json FROM quest_events WHERE player_id = ? AND quest_key = ? "
                             "AND component_key = 'completed' AND outcome = 'success'",
                             (row["id"], task_key),
                         ).fetchall()
-                        count = sum(
-                            self._json_object(item["payload_json"], {}).get("season_id") == season_id
-                            for item in evidence_rows
+                        season_counts: dict[str, int] = {}
+                        for item in evidence_rows:
+                            season_id = self._json_object(item["payload_json"], {}).get("season_id")
+                            if isinstance(season_id, str) and season_id:
+                                season_counts[season_id] = season_counts.get(season_id, 0) + 1
+                        task_seasons.append(
+                            {
+                                season_id
+                                for season_id, count in season_counts.items()
+                                if count >= DAO_ORIGIN_TARGET
+                            }
                         )
-                        if count >= DAO_ORIGIN_TARGET:
-                            completed_tasks.add(task_key)
-                    if not set(DAO_ORIGIN_TASKS).issubset(completed_tasks):
+                    eligible_seasons = set.intersection(*task_seasons) if task_seasons else set()
+                    if not eligible_seasons:
                         raise TrialSequenceError("dao origin tasks are incomplete")
             layer_unlocks_reached = layer_unlocks(realm_key, layer + 1)
             connection.execute(
