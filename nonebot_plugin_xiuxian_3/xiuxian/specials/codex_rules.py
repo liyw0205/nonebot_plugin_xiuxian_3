@@ -40,6 +40,7 @@ _ENTRY_LABELS = {
     "codex.creature.iron_boar": ("creature", "铁背野猪"),
     "codex.creature.mist_guardian": ("creature", "雾隐守卫"),
     "codex.route.town_road": ("route", "青石镇商路"),
+    "codex.route.boundary": ("route", "界隙裂隙路线"),
     "codex.dispatch.herb_search": ("dispatch", "药材搜寻"),
     "codex.instance.mist_grotto": ("challenge", "雾隐洞天"),
     "codex.instance.cloud_boat": ("challenge", "云舟秘境"),
@@ -110,6 +111,8 @@ def category_for_entry(entry_key: str) -> str | None:
         return "challenge"
     if entry_key.startswith("codex.story."):
         return "story"
+    if entry_key.startswith("codex.route."):
+        return "route"
     return None
 
 

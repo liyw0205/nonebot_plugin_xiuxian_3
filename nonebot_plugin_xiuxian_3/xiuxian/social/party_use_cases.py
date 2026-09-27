@@ -34,6 +34,7 @@ from .party_rules import (
     PARTY_TYPE_BEAST_REALM,
     PARTY_TYPE_DEMON_REALM,
     PARTY_TYPE_BOUNDARY_REALM,
+    PARTY_TYPE_SECRET_REALM_BOUNDARY,
     PARTY_TYPE_STANDARD_PVE,
 )
 
@@ -94,6 +95,14 @@ class PartyApplication:
 
     async def create_boundary_party(self, context: CommandContext) -> CommandResult:
         return await self._create_party(context, party_type=PARTY_TYPE_BOUNDARY_REALM, title="界隙队伍", invite_hint="一至四名同地点、已完成三界主线的元婴道友")
+
+    async def create_boundary_rift_party(self, context: CommandContext) -> CommandResult:
+        return await self._create_party(
+            context,
+            party_type=PARTY_TYPE_SECRET_REALM_BOUNDARY,
+            title="界隙裂隙秘境队伍",
+            invite_hint="一至四名同地点、已完成三界主线的元婴道友",
+        )
 
     async def create_demon_party(self, context: CommandContext) -> CommandResult:
         return await self._create_party(context, party_type=PARTY_TYPE_DEMON_REALM, title="魔渊队伍", invite_hint="一至四名同在堕落遗迹的元婴道友")

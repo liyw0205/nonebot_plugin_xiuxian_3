@@ -208,6 +208,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("进入秘境", application.enter_secret_realm)
     router.register("选择秘境节点", application.choose_secret_realm_node)
     router.register("结算秘境", application.settle_secret_realm)
+    router.register("结算界隙裂隙秘境", application.settle_boundary_rift)
+    router.register("创建界隙裂隙秘境队伍", application.create_boundary_rift_party)
     router.register("道源主线", application.get_dao_echoes_status)
     router.register("开始道源主线", application.start_dao_echoes_stage)
     router.register("领取道源主线奖励", application.claim_dao_echoes_stage)

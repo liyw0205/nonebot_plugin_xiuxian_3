@@ -160,6 +160,30 @@ class SecretRealmAlreadySettledError(RuntimeError):
     """The run was already settled and can only be replayed."""
 
 
+class BoundaryRiftRequirementError(RuntimeError):
+    """The party does not meet the boundary-rift entry requirements."""
+
+
+class BoundaryRiftBusyError(RuntimeError):
+    """A party member or the party already has an active secret-realm session."""
+
+
+class BoundaryRiftQuotaError(RuntimeError):
+    """A party member already used this UTC week's boundary-rift attempt."""
+
+
+class BoundaryRiftNotFoundError(RuntimeError):
+    """No boundary-rift run is available to the actor."""
+
+
+class BoundaryRiftNodeError(RuntimeError):
+    """The requested node is not the next server-authorized node."""
+
+
+class BoundaryRiftNotReadyError(RuntimeError):
+    """The boundary-rift run is not ready for the requested transition."""
+
+
 class SectExchangeInvalidOfferError(RuntimeError):
     """The requested sect exchange offer is not registered in the content."""
 

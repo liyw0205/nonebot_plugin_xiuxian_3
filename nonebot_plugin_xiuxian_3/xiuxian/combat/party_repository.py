@@ -44,6 +44,7 @@ from .party_rules import (
     BOUNDARY_REALM_STAMINA_COST,
     BOUNDARY_REALM_TICKET,
     BOUNDARY_REALM_TICKET_COST,
+    SECRET_REALM_BOUNDARY_PARTY_TYPE,
     BEAST_REALM_LOCATION,
     BEAST_REALM_REWARD,
     BEAST_REALM_STAMINA_COST,
@@ -52,7 +53,7 @@ from .party_rules import (
     DEMON_REALM_STAMINA_COST,
     party_enemy_for_location,
 )
-from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot
+from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot, enemy_definition
 from ..social.party_rules import (
     party_definition_for,
     PARTY_TYPE_BOUNDARY_REALM,
@@ -60,7 +61,9 @@ from ..social.party_rules import (
     PARTY_TYPE_DEMON_REALM,
     PARTY_TYPE_BEAST_REALM,
     PARTY_TYPE_STANDARD_PVE,
+    PARTY_TYPE_SECRET_REALM_BOUNDARY,
 )
+from ..adventures.boundary_rift_rules import BOUNDARY_RIFT_ENEMIES, BOUNDARY_RIFT_LOCATION
 
 
 class PartyCombatRepositoryMixin:
@@ -73,6 +76,7 @@ class PartyCombatRepositoryMixin:
         platform_user_id: str,
         party_id: str | None,
         operation_id: str,
+        boundary_rift_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         await self.initialize()
         async with self._inflight:
@@ -83,6 +87,7 @@ class PartyCombatRepositoryMixin:
                 platform_user_id,
                 party_id,
                 operation_id,
+                boundary_rift_run_id,
             )
 
     async def settle_party_battle(
@@ -171,11 +176,15 @@ class PartyCombatRepositoryMixin:
         platform_user_id: str,
         party_id: str | None,
         operation_id: str,
+        boundary_rift_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         operation_name = "battle.party.start"
+        request = {"platform": platform, "platform_user_id": platform_user_id, "party_id": party_id}
+        if boundary_rift_run_id is not None:
+            request["boundary_rift_run_id"] = boundary_rift_run_id
         request_hash = self._request_hash(
             operation_name,
-            {"platform": platform, "platform_user_id": platform_user_id, "party_id": party_id},
+            request,
         )
         now = self._now()
         now_text = serialize_datetime(now)
@@ -205,6 +214,7 @@ class PartyCombatRepositoryMixin:
                 PARTY_TYPE_DEMON_REALM,
                 PARTY_TYPE_BEAST_REALM,
                 PARTY_TYPE_STANDARD_PVE,
+                PARTY_TYPE_SECRET_REALM_BOUNDARY,
             }:
                 raise PartyBattleRequirementError("this party type cannot start party PVE")
             if str(party["status"]) != "ready":
@@ -225,27 +235,46 @@ class PartyCombatRepositoryMixin:
             definition = party_definition_for(party_type)
             if not (definition.min_members <= len(members) <= definition.max_members) or any(not row["member_confirmed_at"] for row in members):
                 raise PartyBattleRequirementError("all party members must confirm")
+            secret_rift_party = party_type == PARTY_TYPE_SECRET_REALM_BOUNDARY
+            if secret_rift_party != (boundary_rift_run_id is not None):
+                raise PartyBattleRequirementError("boundary-rift battles must be started by the active instance")
+            rift_run = None
+            if secret_rift_party:
+                rift_run = connection.execute(
+                    "SELECT * FROM boundary_rift_runs WHERE run_id=? AND party_id=? AND status='combat_pending' AND battle_id IS NULL",
+                    (boundary_rift_run_id, resolved_party_id),
+                ).fetchone()
+                if rift_run is None or str(rift_run["expires_at"]) <= now_text:
+                    raise PartyBattleRequirementError("boundary-rift node is not ready for battle")
+                run_snapshot = self._json_object(rift_run["snapshot_json"], {})
+                node_key = str(run_snapshot.get("current_node", ""))
+                enemy_key = BOUNDARY_RIFT_ENEMIES.get(node_key)
+                if enemy_key is None or str(party["location_key"]) != BOUNDARY_RIFT_LOCATION:
+                    raise PartyBattleRequirementError("boundary-rift node has no registered enemy")
+                enemy = enemy_definition(enemy_key)
             try:
-                enemy = party_enemy_for_location(str(party["location_key"]))
+                if not secret_rift_party:
+                    enemy = party_enemy_for_location(str(party["location_key"]))
             except ValueError as exc:
                 raise PartyBattleRequirementError("party PVE is not available at this location") from exc
             snapshots: list[dict[str, Any]] = []
             boundary_party = party_type in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}
+            boundary_rift_combat = boundary_party or secret_rift_party
             demon_party = party_type == PARTY_TYPE_DEMON_REALM
             beast_party = party_type == PARTY_TYPE_BEAST_REALM
             leader_ticket_inventory: dict[str, int] | None = None
             for row in members:
                 if str(row["location_key"]) != str(party["location_key"]):
-                    if boundary_party:
+                    if boundary_rift_combat:
                         raise BoundaryRealmRequirementError("party members must share the frozen location")
                     raise PartyBattleRequirementError("party members must share the frozen location")
                 if not self._meets_realm_values(
                     str(row["realm_key"]), int(row["realm_layer"]), enemy.required_realm, enemy.required_layer
                 ):
-                    if boundary_party:
+                    if boundary_rift_combat:
                         raise BoundaryRealmRequirementError("a party member does not meet the encounter realm")
                     raise PartyBattleRequirementError("a party member does not meet the encounter realm")
-                if boundary_party and not self._boundary_mainline_ready(connection, row):
+                if boundary_rift_combat and not self._boundary_mainline_ready(connection, row):
                     raise BoundaryRealmRequirementError("three-realms mainline evidence is missing")
                 if demon_party and not self._intro_flag(row, "access.demon.fallen_ruins"):
                     raise CrossRealmPartyRequirementError("demon fallen ruins access is missing")
@@ -259,7 +288,7 @@ class PartyCombatRepositoryMixin:
                     raise CrossRealmPartyRequirementError("a party member lacks demon-dungeon stamina")
                 if beast_party and int(row["stamina"]) < BEAST_REALM_STAMINA_COST:
                     raise CrossRealmPartyRequirementError("a party member lacks beast-dungeon stamina")
-                if boundary_party or demon_party or beast_party:
+                if boundary_rift_combat or demon_party or beast_party:
                     fatigue_until = row["soul_fatigue_until"]
                     if fatigue_until:
                         try:
@@ -269,7 +298,11 @@ class PartyCombatRepositoryMixin:
                             pass
                     if int(row["soul_power"]) <= 0:
                         raise SoulPowerInsufficientError("soul power is insufficient")
-                if self._has_active_long_action(connection, int(row["database_player_id"])):
+                if self._has_active_long_action(
+                    connection,
+                    int(row["database_player_id"]),
+                    ignore_boundary_rift_run_id=boundary_rift_run_id,
+                ):
                     raise PartyBattleBusyError("a party member has another active action")
                 locked = connection.execute(
                     "SELECT 1 FROM party_battle_members WHERE player_id = ? AND asset_lock_status = 'locked' LIMIT 1",
@@ -357,12 +390,14 @@ class PartyCombatRepositoryMixin:
                 if demon_party
                 else BEAST_REALM_REWARD
                 if beast_party
+                else {}
+                if secret_rift_party
                 else BOUNDARY_REALM_REWARD
                 if boundary_party
                 else PARTY_BATTLE_REWARD
             )
-            dungeon_content_version = "content-0.3" if (boundary_party or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
-            dungeon_rule_version = "combat-0.3.0" if (boundary_party or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
+            dungeon_content_version = "content-0.3" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
+            dungeon_rule_version = "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
             battle_id = f"party-battle-{uuid4().hex}"
             snapshot = {
                 "battle_type": PARTY_BATTLE_TYPE,
@@ -441,6 +476,11 @@ class PartyCombatRepositoryMixin:
                 "UPDATE parties SET current_session_id = ?, updated_at = ? WHERE party_id = ? AND current_session_id IS NULL",
                 (battle_id, now_text, resolved_party_id),
             )
+            if secret_rift_party:
+                connection.execute(
+                    "UPDATE boundary_rift_runs SET battle_id=?, updated_at=? WHERE run_id=? AND status='combat_pending' AND battle_id IS NULL",
+                    (battle_id, now_text, boundary_rift_run_id),
+                )
             payload = {
                 "battle_id": battle_id,
                 "party_id": resolved_party_id,
@@ -576,6 +616,7 @@ class PartyCombatRepositoryMixin:
             boundary_party = str(snapshot.get("party_type", "")) in {
                 PARTY_TYPE_BOUNDARY_REALM,
                 PARTY_TYPE_PARTY_BOUNDARY,
+                PARTY_TYPE_SECRET_REALM_BOUNDARY,
             }
             demon_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_DEMON_REALM
             beast_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_BEAST_REALM
@@ -857,12 +898,14 @@ class PartyCombatRepositoryMixin:
             reward_map: dict[str, dict[str, int]] = {}
             snapshot = self._json_object(session["snapshot_json"], {})
             boundary_party = str(snapshot.get("party_type", "")) in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}
+            secret_rift_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_SECRET_REALM_BOUNDARY
             demon_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_DEMON_REALM
             beast_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_BEAST_REALM
             cross_realm_party = boundary_party or demon_party or beast_party
+            fatigue_party = cross_realm_party or secret_rift_party
             reward_template = {
                 str(key): int(value)
-                for key, value in dict(snapshot.get("reward", BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
+                for key, value in dict(snapshot.get("reward", {} if secret_rift_party else BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
             }
             battle_members = connection.execute("SELECT * FROM party_battle_members WHERE battle_id = ? ORDER BY id", (battle_id,)).fetchall()
             state = self._json_object(session["state_json"], {})
@@ -942,7 +985,7 @@ class PartyCombatRepositoryMixin:
                         "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, world_merit=?, soul_power=?, soul_power_max=?, inventory_json=?, faction_reputation_json=?, updated_at=? WHERE id=?",
                         (cultivation, total_cultivation, spirit_stones, world_merit, soul_power, soul_power_max, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
                     )
-                if cross_realm_party and outcome in {"lost", "expired"}:
+                if fatigue_party and outcome in {"lost", "expired"}:
                     fatigue_until = serialize_datetime(self._now() + timedelta(hours=2))
                     connection.execute(
                         "UPDATE players SET soul_power=MAX(0, soul_power-2000), soul_fatigue_until=?, updated_at=? WHERE id=?",

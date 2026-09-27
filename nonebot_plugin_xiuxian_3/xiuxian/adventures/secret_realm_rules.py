@@ -88,6 +88,9 @@ CLOUD_BOAT = SecretRealmDefinition(
 DEFINITIONS = {item.key: item for item in (MIST_GROTTO, SPRING_PATH, MIST_DEPTH_2, CLOUD_BOAT)}
 ALIASES = {
     **{key: key for key in DEFINITIONS},
+    "instance.secret_realm.boundary_rift": "instance.secret_realm.boundary_rift",
+    "界隙裂隙": "instance.secret_realm.boundary_rift",
+    "界隙裂隙秘境": "instance.secret_realm.boundary_rift",
     "雾隐秘境": MIST_GROTTO.key,
     "雾隐洞天秘境": MIST_GROTTO.key,
     "灵泉小径": SPRING_PATH.key,

@@ -11,6 +11,7 @@ PARTY_TYPE_BOUNDARY_REALM = "boundary_realm"
 PARTY_TYPE_DEMON_REALM = "demon_realm"
 PARTY_TYPE_BEAST_REALM = "beast_realm"
 PARTY_TYPE_STANDARD_PVE = "standard_pve"
+PARTY_TYPE_SECRET_REALM_BOUNDARY = "secret_realm_boundary"
 # Keep the implementation name used by early design notes as an input alias.
 PARTY_TYPE_PARTY_BOUNDARY = "party_boundary"
 PARTY_MAX_MEMBERS = 2
@@ -52,6 +53,15 @@ BOUNDARY_REALM_DEFINITION = PartyDefinition(
     content_version="content-0.3",
     rule_version="social-0.3.0",
 )
+SECRET_REALM_BOUNDARY_DEFINITION = PartyDefinition(
+    party_type=PARTY_TYPE_SECRET_REALM_BOUNDARY,
+    min_members=BOUNDARY_REALM_MIN_MEMBERS,
+    max_members=BOUNDARY_REALM_MAX_MEMBERS,
+    required_location="cave.boundary_realm",
+    distribution_key="contribution",
+    content_version="content-0.3",
+    rule_version="social-0.3.1",
+)
 DEMON_REALM_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_DEMON_REALM,
     min_members=2,
@@ -86,6 +96,8 @@ def party_definition_for(party_type: str) -> PartyDefinition:
         return ARENA_TRIO_DEFINITION
     if party_type in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}:
         return BOUNDARY_REALM_DEFINITION
+    if party_type == PARTY_TYPE_SECRET_REALM_BOUNDARY:
+        return SECRET_REALM_BOUNDARY_DEFINITION
     if party_type == PARTY_TYPE_DEMON_REALM:
         return DEMON_REALM_DEFINITION
     if party_type == PARTY_TYPE_BEAST_REALM:
@@ -116,6 +128,7 @@ __all__ = [
     "PARTY_TYPE_BOUNDARY_REALM",
     "PARTY_TYPE_BEAST_REALM",
     "PARTY_TYPE_STANDARD_PVE",
+    "PARTY_TYPE_SECRET_REALM_BOUNDARY",
     "PARTY_TYPE_DEMON_REALM",
     "PARTY_TYPE_PARTY_BOUNDARY",
     "PartyDefinition",

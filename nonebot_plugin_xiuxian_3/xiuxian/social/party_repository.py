@@ -387,6 +387,11 @@ class PartyRepositoryMixin:
             party = connection.execute("SELECT current_session_id FROM parties WHERE party_id = ?", (party_id,)).fetchone()
             if party is not None and party["current_session_id"]:
                 raise PartyStateConflictError("party battle is still active")
+            if connection.execute(
+                "SELECT 1 FROM boundary_rift_runs WHERE party_id=? AND status IN ('routing','combat_pending','cleared') LIMIT 1",
+                (party_id,),
+            ).fetchone():
+                raise PartyStateConflictError("party is committed to an active boundary-rift run")
             connection.execute(
                 "UPDATE party_members SET status = 'left', left_at = ?, updated_at = ? WHERE id = ? AND status = 'active'",
                 (now_text, now_text, member["id"]),
@@ -440,7 +445,9 @@ class PartyRepositoryMixin:
     @staticmethod
     def _party_expire_due(connection: Any, now: datetime, now_text: str) -> None:
         rows = connection.execute(
-            "SELECT party_id FROM parties WHERE status IN ('forming', 'ready') AND confirmation_deadline <= ?",
+            "SELECT party_id FROM parties WHERE status IN ('forming', 'ready') AND confirmation_deadline <= ? "
+            "AND NOT EXISTS (SELECT 1 FROM boundary_rift_runs r WHERE r.party_id=parties.party_id "
+            "AND r.status IN ('routing','combat_pending','cleared'))",
             (now_text,),
         ).fetchall()
         for row in rows:

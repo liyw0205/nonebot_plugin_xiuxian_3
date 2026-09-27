@@ -20,6 +20,8 @@ from ..persistence.errors import (
     SecretRealmRequirementError,
 )
 from .secret_realm_rules import resolve_node, resolve_secret_realm
+from .boundary_rift_rules import BOUNDARY_RIFT_KEY, resolve_boundary_rift_node
+from .boundary_rift_use_cases import BoundaryRiftApplication
 
 
 ITEM_LABELS = {
@@ -38,6 +40,7 @@ ITEM_LABELS = {
 class SecretRealmApplication:
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
+        self.boundary_rift = BoundaryRiftApplication(repository)
 
     @staticmethod
     def _operation_id(context: CommandContext, name: str) -> str:
@@ -81,15 +84,26 @@ class SecretRealmApplication:
                 ]
             )
             data.append({"instance_key": definition.key, "label": definition.label, "nodes": definition.node_keys, "stamina_cost": definition.stamina_cost, "ticket_key": definition.ticket_key, "first_reward": definition.first_reward, "repeat_reward": definition.repeat_reward, "quota_period": definition.quota_period, "quota_limit": definition.quota_limit})
+        lines.extend(
+            [
+                "### 界隙裂隙秘境",
+                "- **前置**：创建专用界隙裂隙队伍；队员 2–5 人，均需元婴 L1、三界主线完成并位于 `cave.boundary_realm`。",
+                "- **路线**：裂隙入口 → 破碎岔路 → 跨界哨卫 → 神魂潮汐 → 界隙守望者 → 裂隙封印。",
+                "- **消耗**：每人 30 体力、队长 1 枚神魂晶；每人每 UTC 周 1 次。",
+                "",
+            ]
+        )
         if record.active_run_id:
             lines.append(f"> 当前已有进行中的秘境：`{record.active_run_id}`。")
         else:
-            lines.append("> 发送 `进入秘境 雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境` 或 `云舟秘境` 开始。")
+            lines.append("> 发送 `进入秘境 雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙` 开始；组队秘境先创建专用队伍。")
         return CommandResult(True, "SECRET_REALM_PREVIEW", "\n".join(lines), context.request_id, data={"realms": data, "active_run_id": record.active_run_id})
 
     async def enter(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1 or not (instance_key := resolve_secret_realm(context.command_args[0])):
-            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `进入秘境 雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境` 或 `云舟秘境`。", context.request_id)
+            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `进入秘境 雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙`。", context.request_id)
+        if instance_key == BOUNDARY_RIFT_KEY:
+            return await self.boundary_rift.enter(context)
         operation_id = self._operation_id(context, "secret_realm.enter")
         try:
             record = await self.repository.enter_secret_realm(platform=context.adapter, platform_user_id=context.user_id, instance_key=instance_key, operation_id=operation_id)
@@ -114,6 +128,8 @@ class SecretRealmApplication:
         return CommandResult(True, "SECRET_REALM_ENTERED", f"## {record.label}已进入\n\n已锁定体力 {record.stamina_locked} 点和秘境凭证。\n\n- **下一节点**：{record.current_node}\n- **状态**：路线进行中\n\n> 发送 `选择秘境节点 资源` 按服务端顺序推进。", context.request_id, operation_id, data=self._data(record))
 
     async def choose_node(self, context: CommandContext) -> CommandResult:
+        if context.command_args and resolve_boundary_rift_node(context.command_args[0]):
+            return await self.boundary_rift.choose_node(context)
         if len(context.command_args) != 1 or not (node_key := resolve_node(context.command_args[0])):
             return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `选择秘境节点 资源`、`遭遇` 或 `选择`。", context.request_id)
         operation_id = self._operation_id(context, "secret_realm.choose_node")

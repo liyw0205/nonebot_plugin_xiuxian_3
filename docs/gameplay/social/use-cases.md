@@ -4,7 +4,7 @@
 
 `create_sect`、`apply_sect`、`review_member`、`contribute_sect`、`change_role`、`leave_sect`、
 `invite_mentor`、`accept_mentor`、`reject_mentor`、`graduate_apprentice`、
-`create_party`、`invite_party`、`accept_party`、`reject_party`、`confirm_party`、`leave_party`、
+`create_party`、`create_boundary_rift_party`、`invite_party`、`accept_party`、`reject_party`、`confirm_party`、`leave_party`、
 `get_party`、`start_party_battle`、`settle_party_battle`、`replay_party_battle`、`start_service_order`、`deliver_service`、
 `get_sect_war`、`register_sect_war`、`contribute_sect_war`、`claim_sect_war_reward`。
 
@@ -24,6 +24,8 @@
 普通多人副本命令为 `创建多人副本队伍`，别名为 `创建四人副本队伍`、`创建普通副本队伍`。队伍必须有 4–5 名同地点成员；3 人确认时保持 `forming`，第 6 名成员在邀请阶段被拒绝。当前普通敌人地点为 `xuantian.outskirts` 和 `cave.mist_grotto`，开始事务使用独立 `party_battle_sessions`，保存全员快照并在自动回合结算后逐成员发放唯一奖励。
 
 界隙队伍只能在 `cave.boundary_realm` 创建。开始前服务端校验所有成员元婴 L1、`story.mainline.three_realms` 证据、地点、30 体力和队长 1 枚 `item.soul_crystal`；任一失败整体拒绝且不扣资源。成功后保存阵营/盟约/污染/血脉/跨界惩罚、技能和版本快照，自动战斗使用 `enemy.boundary_watcher`。成员倒地进入 `downed`，存活队友可由服务端原子消耗 25 点神魂复起一次；5/10 回合时间轴要求至少两人防御，否则全队各扣 10 点神魂。失败会扣除既有疲劳成本，不掉永久装备；奖励按贡献、角色上限和固定排序独立写入且不可重复发放。
+
+界隙裂隙秘境使用 `secret_realm_boundary` 专用队伍类型和独立 `instance.secret_realm.boundary_rift` 会话；它不创建或结算普通 `party_battle` 奖励。入口命令为 `创建界隙裂隙秘境队伍`，秘境命令为 `进入秘境 界隙裂隙`、`选择秘境节点 ...`、`结算界隙裂隙秘境`。2–5 名已确认成员逐一满足元婴 L1 和 `story.mainline.three_realms`，每人每 UTC 周一次，入场扣 30 体力、队长扣 1 枚神魂晶；六节点、两场自动战、首通/重复奖励、过期与启动失败补偿按[冒险域合同](../adventures/content-v0.3.md#instancesecret_realmboundary_rift-合同)执行。
 
 魔渊队伍只能在 `demon.fallen_ruins` 创建，所有成员需元婴 L1、持有 `access.demon.fallen_ruins`、污染低于 80 且有 20 体力；万兽队伍只能在 `beast.ten_thousand_hills` 创建，所有成员需元婴 L1、妖界声望至少 200 且有 20 体力。两类副本均使用独立队伍战斗会话，原子扣除体力并冻结污染/血脉/技能快照；`enemy.demon_overlord` 每 3 回合使全队污染 +8，`enemy.beast_ancestor` 每 4 回合召唤两只可被队员清除的祖灵。胜利奖励分别为魔核/魔界声望/世界功勋和妖血/妖界声望/世界功勋，失败进入神魂疲劳；复起、奖励唯一性和回放规则与界隙副本一致。
 

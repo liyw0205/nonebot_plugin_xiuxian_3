@@ -1111,6 +1111,7 @@ class CultivationRepositoryMixin:
         *,
         ignore_exploration_id: str | None = None,
         ignore_secret_realm_run_id: str | None = None,
+        ignore_boundary_rift_run_id: str | None = None,
         ignore_tower_run_id: str | None = None,
     ) -> bool:
         """Return whether a player has any session that locks another action."""
@@ -1132,6 +1133,7 @@ class CultivationRepositoryMixin:
             ("tower_runs", "status IN ('battle_running', 'reward_pending')"),
             ("livelihood_trade_routes", "status = 'in_transit'"),
             ("secret_realm_runs", "status IN ('entered', 'routing', 'combat_pending', 'cleared', 'failed')"),
+            ("boundary_rift_members", "status = 'active'"),
         )
         for table, predicate in checks:
             if table == "exploration_sessions" and ignore_exploration_id is not None:
@@ -1143,6 +1145,19 @@ class CultivationRepositoryMixin:
                 active = connection.execute(
                     "SELECT 1 FROM secret_realm_runs WHERE player_id = ? AND status IN ('entered', 'routing', 'combat_pending', 'cleared', 'failed') AND run_id != ? LIMIT 1",
                     (player_id, ignore_secret_realm_run_id),
+                ).fetchone()
+            elif table == "boundary_rift_members" and ignore_boundary_rift_run_id is not None:
+                active = connection.execute(
+                    "SELECT 1 FROM boundary_rift_members m JOIN boundary_rift_runs r ON r.run_id=m.run_id "
+                    "WHERE m.player_id=? AND m.status='active' AND r.status IN ('routing','combat_pending','cleared') "
+                    "AND r.run_id<>? LIMIT 1",
+                    (player_id, ignore_boundary_rift_run_id),
+                ).fetchone()
+            elif table == "boundary_rift_members":
+                active = connection.execute(
+                    "SELECT 1 FROM boundary_rift_members m JOIN boundary_rift_runs r ON r.run_id=m.run_id "
+                    "WHERE m.player_id=? AND m.status='active' AND r.status IN ('routing','combat_pending','cleared') LIMIT 1",
+                    (player_id,),
                 ).fetchone()
             elif table == "tower_runs" and ignore_tower_run_id is not None:
                 active = connection.execute(
