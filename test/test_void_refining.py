@@ -103,6 +103,105 @@ def test_void_refining_gate_and_failure_do_not_charge_incorrectly() -> None:
     asyncio.run(run())
 
 
+def test_void_refining_failure_replays_and_recovers_after_instability_expires() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "qq-void-recovery"), ("onebot.v11", "ob-void-recovery")):
+                await _prepare_void_player(runtime, user, adapter=adapter)
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.void_crystal": 5, "item.void_anchor": 7}), adapter, user),
+                    )
+                    player_id = db.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    for index in range(3):
+                        db.execute(
+                            "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, content_version, rule_version, created_at) "
+                            "VALUES (?, 'quest.break_void', 'void_wall_trial', ?, 'success', '{}', 'content-0.5', 'events-0.5.0', 'created')",
+                            (player_id, f"{user}-wall-trial-{index}"),
+                        )
+
+                failed_operation = next(
+                    f"{user}-failed-breakthrough-{index}"
+                    for index in range(1_000)
+                    if breakthrough_roll_bp(f"{user}-failed-breakthrough-{index}") >= 7_550
+                )
+                started = await runtime.dispatch(
+                    _ctx(adapter, user, failed_operation), "开始突破 炼虚"
+                )
+                assert started.code == "BREAKTHROUGH_STARTED"
+                _past_breakthrough(runtime, started.data["session_id"])
+                failed = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-settle-failed-breakthrough"), "结算突破"
+                )
+                assert failed.code == "BREAKTHROUGH_FAILED"
+                assert failed.data["weakness_until"]
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    failed_state = db.execute(
+                        "SELECT spirit_stones, world_merit, domain_charge, inventory_json, void_instability_until "
+                        "FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                failed_inventory = json.loads(failed_state[3])
+                assert failed_inventory["item.void_crystal"] == 0
+                assert failed_inventory["item.void_anchor"] == 5
+                assert failed_state[:3] == (20_000, 500, 50)
+                instability_until = datetime.fromisoformat(failed_state[4])
+                assert abs(
+                    (instability_until - datetime.now(timezone.utc)).total_seconds()
+                    - 48 * 60 * 60
+                ) < 10
+
+                replay = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-settle-failed-breakthrough"), "结算突破"
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    assert db.execute(
+                        "SELECT spirit_stones, world_merit, domain_charge, inventory_json, void_instability_until "
+                        "FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone() == failed_state
+
+                blocked = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-archive-during-instability"),
+                    "进入虚空航道 档案遗迹",
+                )
+                assert blocked.code == "VOID_INSTABILITY_ACTIVE"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    db.execute(
+                        "UPDATE players SET void_instability_until=? WHERE platform=? AND platform_user_id=?",
+                        (
+                            (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
+                            adapter,
+                            user,
+                        ),
+                    )
+
+                recovered = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-archive-after-instability"),
+                    "进入虚空航道 档案遗迹",
+                )
+                assert recovered.code == "VOID_ROUTE_STARTED"
+                assert recovered.data["anchor_cost"] == 4
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    player_state = db.execute(
+                        "SELECT void_instability_until, inventory_json, stamina FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert player_state[0] is None
+                assert json.loads(player_state[1])["item.void_anchor"] == 1
+                assert player_state[2] == 60
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_void_route_resistance_floor_and_adapter_simulation() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:

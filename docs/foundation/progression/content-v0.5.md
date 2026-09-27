@@ -5,7 +5,7 @@
 - `content_version`：`content-0.5`
 - `rule_version`：`progression-0.5.0`
 - 正式开放境界：`void_refining`（炼虚）。L1–L10 阈值和段位以[十层规范](layers.md)为准。
-- 写用例：`progression.breakthrough_void_refining`、`world.enter_void_route`、`progression.recover_void_instability`。
+- 写用例：`progression.breakthrough_void_refining`、`world.enter_void_route`。
 
 ## 1. 准入与开放内容
 
@@ -40,6 +40,8 @@
 成功：进入 `void_refining` L1、`realm_cultivation=0`，获得 `void_power=200/200`、`space_resistance=1500 bp`、虚空锚持有上限 20；发放 `progression.reward.void_refining_entry`：`item.void_anchor` 3（绑定 24 小时）、世界功勋 500。炼虚 L1–L10 门槛见 `layers.md`。
 
 失败：材料、功勋、灵石、领域能量全消耗；化神境内修为保留 75%（层数保持 L10），`pity_count +1`；获得 `void_instability` 48 小时。状态期间虚空移动费用 +30%（向上取整），虚空技能禁用，普通三界行动不受影响。没有保护丹；风险通过路线发现、领域与准备度降低，而不是额外付费跳过。
+
+虚空不稳定按服务端期限自然结束，不提供付费提前清除命令。结算失败的突破 operation 可安全重放；重放不会再次扣资源、叠加保底或刷新不稳定期限。期限内档案遗迹航道拒绝创建且不扣资源；期限过后，下次成功创建虚空航道时惰性清除过期状态，并按稳定航况冻结航道成本。
 
 ## 3. 虚空资源与行动规则
 

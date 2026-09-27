@@ -108,6 +108,8 @@ class WorldRepositoryMixin:
                     unstable = datetime.fromisoformat(str(instability_until)) > now
                 except ValueError:
                     unstable = False
+                if not unstable:
+                    instability_until = None
             if unstable and route_key == "void.archive_ruins":
                 from ..repository import VoidInstabilityActiveError
 
@@ -146,8 +148,14 @@ class WorldRepositoryMixin:
                 "rule_version": RULE_VERSION,
             }
             connection.execute(
-                "UPDATE players SET inventory_json = ?, stamina = stamina - ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), definition.stamina_cost, now_text, row["id"]),
+                "UPDATE players SET inventory_json = ?, stamina = stamina - ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
+                (
+                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    definition.stamina_cost,
+                    instability_until,
+                    now_text,
+                    row["id"],
+                ),
             )
             connection.execute(
                 "INSERT INTO void_route_sessions(session_id, player_id, operation_id, route_key, status, starts_at, ends_at, anchor_cost, stamina_cost, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)",
