@@ -8,6 +8,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.repository import RepositoryBusyError as C
 def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
     expected_modules = {
         "create_player": "nonebot_plugin_xiuxian_3.xiuxian.player.repository",
+        "expire_battle_session": "nonebot_plugin_xiuxian_3.xiuxian.combat.repository",
         "start_travel": "nonebot_plugin_xiuxian_3.xiuxian.world.travel_repository",
         "board_cloud_boat": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
         "settle_cloud_boat": "nonebot_plugin_xiuxian_3.xiuxian.world.cloud_repository",
@@ -74,6 +75,11 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "enter_secret_realm": "nonebot_plugin_xiuxian_3.xiuxian.adventures.secret_realm_repository",
         "choose_secret_realm_node": "nonebot_plugin_xiuxian_3.xiuxian.adventures.secret_realm_repository",
         "settle_secret_realm": "nonebot_plugin_xiuxian_3.xiuxian.adventures.secret_realm_repository",
+        "enter_demon_abyss": "nonebot_plugin_xiuxian_3.xiuxian.adventures.demon_abyss_repository",
+        "choose_demon_abyss_node": "nonebot_plugin_xiuxian_3.xiuxian.adventures.demon_abyss_repository",
+        "settle_demon_abyss": "nonebot_plugin_xiuxian_3.xiuxian.adventures.demon_abyss_repository",
+        "has_active_demon_abyss": "nonebot_plugin_xiuxian_3.xiuxian.adventures.demon_abyss_repository",
+        "compensate_demon_abyss_system_failure": "nonebot_plugin_xiuxian_3.xiuxian.adventures.demon_abyss_repository",
         "get_dao_echoes_status": "nonebot_plugin_xiuxian_3.xiuxian.adventures.dao_echoes_repository",
         "start_dao_echoes_stage": "nonebot_plugin_xiuxian_3.xiuxian.adventures.dao_echoes_repository",
         "claim_dao_echoes_stage": "nonebot_plugin_xiuxian_3.xiuxian.adventures.dao_echoes_repository",

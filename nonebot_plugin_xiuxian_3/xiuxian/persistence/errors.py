@@ -184,6 +184,30 @@ class BoundaryRiftNotReadyError(RuntimeError):
     """The boundary-rift run is not ready for the requested transition."""
 
 
+class DemonAbyssRequirementError(RuntimeError):
+    """The player lacks demon-abyss location, realm, access, or reputation."""
+
+
+class DemonAbyssBusyError(RuntimeError):
+    """The player has another active long action or secret-realm run."""
+
+
+class DemonAbyssQuotaError(RuntimeError):
+    """The player exhausted the current UTC-week demon-abyss attempt."""
+
+
+class DemonAbyssNotFoundError(RuntimeError):
+    """The player has no active demon-abyss run."""
+
+
+class DemonAbyssNodeError(RuntimeError):
+    """The selected demon-abyss node is not the current route node."""
+
+
+class DemonAbyssNotReadyError(RuntimeError):
+    """The demon-abyss run is not ready for its requested transition."""
+
+
 class SectExchangeInvalidOfferError(RuntimeError):
     """The requested sect exchange offer is not registered in the content."""
 

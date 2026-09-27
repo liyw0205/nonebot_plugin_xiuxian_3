@@ -25,6 +25,8 @@
 
 `instance.secret_realm.boundary_rift` 界隙裂隙秘境也已开放，但与 `cave.boundary_realm` 队伍战独立：使用专用 `secret_realm_boundary` 队伍类型，2–5 名元婴 L1 且持有三界主线证据的成员确认后进入；六节点路线含两场自动战，每名成员每 UTC 周一次，入场扣每人 30 体力和队长 1 枚神魂晶。首通逐成员发放神魂晶、`codex.route.boundary` 和 `story.boundary_rift`；战败/过期不退，战斗启动故障补偿退款并释放额度。QQ 官方与 OneBot V11 混合适配器专项覆盖两方向队长、准入原子拒绝、节点顺序、首通与重复通关、战败/过期、额度、重启恢复和启动故障补偿。
 
+`instance.secret_realm.demon_abyss` 魔界深渊秘境已从 `contract` 转为 `open`：筑基 L1、位于 `demon.abyss_gate`、持有门禁且魔界声望至少 200；单人四节点路线，每 UTC 周一次、入场扣 20 体力，污染渗流按冻结种子进行 +50 bp 判定，两场专用自动战使用 `combat-0.3.2`。首通发魔界声望、绑定线索和故事旗标，重复通关发魔核；战败/过期不退，明确的系统中止可退还成本并释放额度。路线、首通/重复奖励、过期战斗停止、污染锁、重启续跑及系统补偿已由 QQ 官方、OneBot V11 和 QQ→OneBot 混合适配器专项验收。
+
 魔界主线的准入现已分为两级：完成 `quest.demon_intro` 后可抵达堕落遗迹外层，由 `enemy.demon_ruins_scout`（`combat-0.3.1`）提供单人探索证据；完成主线后才获得 `access.demon.fallen_ruins` 遗迹队伍副本权限，8000 气血的 `enemy.demon_overlord` 仍只用于该队伍副本。QQ 官方和 OneBot V11 均以自然资质、元婴突破后的 600 气血快照覆盖外层移动、两次探索和主线领取；该魔界专项的声望仍为受控起点，不代表魔界主线已纳入新角色全链。
 
 v0.5 跨服宗门战已开放完整本地切片：宗门等级 5、虚空堡垒 48 小时建造与每周锚维护、5000 公共钱包报名费、每轮最多 30 个宗门和每宗门最多 15 名冻结成员；战争机关使用 `enemy.sect_war_engine` 服务端自动回合，`repair`/`break` 首次选择后锁定，客户端不能提交攻击或结算结果。占点/击败/摧毁机关积分必须绑定角色自有来源 operation，同目标每轮最多 3 次；前 3 宗门的虚空晶进入公共奖励箱，宗主/副宗主可审计分配，7 日后未分配物品仍保留；实际出战成员可领取唯一 `season.void_frontier.<week_id>` 虚空功勋。虚空信标要求 active 堡垒，10 锚/30 阵砂、24 小时建造、每周维护 2 锚，并将 `void.sect_fortress` 航道扣锚降低 1（最低为 1），折扣写入航行快照。生产联盟已开放双方宗主确认、24 小时窗口、7 天合同、提前解除双确认与一次 10000 公共钱包违约费、每周最多 3 项 `recipe_key` 解锁标记同步；不共享熟练度、材料、订单、金币、终局进度或仓库资产，解除后双方进入冷却。QQ 官方与 OneBot V11 已验收，恢复、过期自动发放、并发建造和幂等均有测试。跨服匹配、跨服身份合并和玩家间资产转移仍关闭。
@@ -56,7 +58,7 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 | 经济 | 固定价格摆摊：发布、购买、取消、过期清理与摆摊列表；生产委托报酬托管、物品/精力/工具锁、失败退款、成交手续费、经济流水和 operation 幂等；宗门商店固定兑换（每成员每日 5 次，贡献与仓库库存原子扣除）；v0.3 三条固定贸易均有地点准入、周限额、绑定、流水/快照和 QQ/OneBot 验收；跨界求购已开放 12 小时订单、3 单上限、800 bp 买方托管、卖方匹配/10 分钟交付、阵营与物品来源快照、超时解锁和幂等；限量拍卖已开放每周 20 槽、非绑定物品发布、+5% 递增竞价、被超越退款、成交/流拍和 10 分钟恢复窗口 | 复杂市场玩法、批量委托和跨服交易仍关闭 |
 | 活动 | 灵泉事件轮次、灵叶贡献、全服目标和领奖；v0.3 `event.demon_invasion`、`event.beast_trade`、`event.boundary_rift` 轮次、服务端来源 operation 投影、来源去重、轮次恢复和跨适配器领奖；v0.5 虚空档案副本、档案守卫、三项周任务与 `event.archive_unlock`；终局赛季候选、飞升/留界/协作三榜、匿名冻结快照、称号与篇章资格结算；三界赛季临时积分在查询/冻结前实时投影已结算来源并按来源 operation 去重；虚空前线 28 日匿名赛季、四类来源积分、周任务奖励箱和前 3 宗门集市优先权 | 每日任务、其他复杂世界事件仍以后续切片为准 |
 | 社交 | 宗门创建、入宗申请、管理审批、离宗冷却、宗门资料卡；宗门战最小闭环（报名、10 人快照、四类来源 operation 贡献、轮次结算、胜方宗门功勋和个人世界功勋领奖）；v0.5 虚空堡垒建造/维护、跨服宗门战周赛报名（30 宗门/15 成员）、冻结战斗快照、服务端战争机关自动回合、积分反刷、公共奖励箱审计分配、虚空功勋周奖励和过期恢复；虚空信标建造/维护与宗门航道折扣；生产联盟双宗主确认、7 日合同、研究标记同步、违约费和冷却；前置联邦 roster 冻结与远端结算审计仍保留；双人探索队伍、三人竞技队伍、普通 4–5 人副本队伍、界隙/魔渊/万兽队伍和专用界隙裂隙秘境队伍的创建、邀请、接受、全员确认、退出与队长转移；普通/界隙/跨界队伍保存全员快照并可发起独立自动回合 PVE，裂隙秘境另用独立六节点会话且不重复发队伍战奖励；个人 `arena.three_realms` 元婴/许可门槛下的同阵营与跨阵营匹配；师徒邀请、接受/拒绝、过期和毕业奖励 | 跨服匹配、身份合并、玩家间资产转移和复杂市场仍关闭 |
-| 冒险 | 草药补给、训练傀儡、生产订单、云铁矿区、洞天精英、魔界救援和妖界栖地保护悬赏；v0.1 `instance.secret_realm.mist_grotto`/`instance.secret_realm.spring_path` 秘境；v0.2 `instance.secret_realm.mist_depth_2`/`instance.secret_realm.cloud_boat` 秘境；v0.3 `instance.secret_realm.boundary_rift` 六节点队伍秘境；`instance.secret_realm.demon_abyss` 已闭合规则合同、尚未接入运行时；玄天主线前三关；v0.6 三界回响主线三线各 10 关（炼虚 L10 准入） | 斗法分享、魔界深渊秘境运行时、其他 v0.3 以后秘境、遗府和城镇委托关卡仍关闭 |
+| 冒险 | 草药补给、训练傀儡、生产订单、云铁矿区、洞天精英、魔界救援和妖界栖地保护悬赏；v0.1 `instance.secret_realm.mist_grotto`/`instance.secret_realm.spring_path` 秘境；v0.2 `instance.secret_realm.mist_depth_2`/`instance.secret_realm.cloud_boat` 秘境；v0.3 `instance.secret_realm.boundary_rift` 六节点队伍秘境与 `instance.secret_realm.demon_abyss` 单人秘境；玄天主线前三关；v0.6 三界回响主线三线各 10 关（炼虚 L10 准入） | 斗法分享、其他尚未闭合的 v0.3 以后秘境、遗府和城镇委托关卡仍关闭 |
 | 道历运营 | 道历问安、补录、灵木聚财、七日入道、功业录、机缘密令、测试道契、机缘寻宝、问道行卷；D5 以首层胜利事件为来源，D6 以已结算派遣事件为来源；首次派遣和试炼塔十层称号/功业来源及 QQ/OneBot 领奖均已验收 | 无本轮新增缺口 |
 | 特色玩法 | v0.1 挂机四条路线、基础三条派遣；v0.3 `dispatch.demon_relief` / `dispatch.beast_relocation`、基础图鉴、雾隐试炼塔 1–30 层、异步个人/组队竞技场和 `story.xuantian.road` 三分支均已接入；试炼塔 QQ/OneBot 覆盖日/周配额、首领、战败、层段准入、D5/十层功业、首通/练习和全部特殊奖励；剧情两个适配器各覆盖商路/守望/药圃、来源门槛、锁定、快照、领奖/重放及奖励边界 | 后续版本图鉴与剧情、高阶塔和跨服竞技匹配仍关闭 |
 | 适配器 | QQ 普通/Markdown、OneBot V11 普通/合并转发的统一 application 路由 | 展示失败不得回滚业务事务 |
@@ -73,7 +75,7 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 | 单人/多人 PVE | `partial`/`partial` | 训练傀儡、高阶任务证据战、探索遭遇、双人队伍 PVE、普通 4–5 人队伍 PVE、2–5 人界隙/魔渊/万兽副本和五人终局战已有会话；其他三界多人副本和完整匹配仍未开放，三人竞技队伍仅用于 PvP |
 | 魔界 v0.3 单人与跨界副本切片 | `partial` | 元婴 L1 玩家可完成堕落遗迹单人探索、魔渊队伍副本和魔界主线；魔渊队伍要求遗迹权限、污染低于 80、2–5 人和每人 20 体力，奖励冻结魔核/魔界声望/世界功勋；魔渊集市、首条妖兽契约、心魔事件和 `event.demon_invasion` 也已接入，其他跨界配方与副本仍关闭 |
 | 1v1/多方 PvP | `open`/`partial` | 开放异步 `arena.spar`、`arena.practice`、`arena.rank`、元婴/许可门槛的 `arena.three_realms` 和 2v2/3v3/2v3 `arena.team`；服务端自动选行动，客户端不得提交攻击、技能、目标或结果；跨服仍关闭 |
-| 其他 v0.3 以后秘境、遗府、高阶试炼塔、后续图鉴和后续剧情 | `partial` | `instance.secret_realm.boundary_rift` 已独立开放；`instance.secret_realm.demon_abyss` 的准入、路线、风险、失败/过期成本和奖励合同已闭合，尚待运行时与双适配器验收；其余 `instance.secret_realm.ancient_domain`、`instance.secret_realm.ancestral_hall`、`instance.secret_realm.void_ruins`、`instance.secret_realm.time_fort`、`instance.secret_realm.dao_origin`、`instance.secret_realm.heaven_echo` 和遗府仍待按版本文档闭合与切片。三界/虚空高阶塔及下方列出的后续剧情和图鉴仍待独立切片 |
+| 其他 v0.3 以后秘境、遗府、高阶试炼塔、后续图鉴和后续剧情 | `partial` | `instance.secret_realm.boundary_rift` 与 `instance.secret_realm.demon_abyss` 已开放；下一步先闭合 `instance.secret_realm.ancient_domain` 合同，再接运行时。其余 `instance.secret_realm.ancestral_hall`、`instance.secret_realm.void_ruins`、`instance.secret_realm.time_fort`、`instance.secret_realm.dao_origin`、`instance.secret_realm.heaven_echo` 和遗府仍待按版本文档顺序闭合与切片。三界/虚空高阶塔及下方列出的后续剧情和图鉴仍待独立切片 |
 | 灵兽与灵骑 | `locked` | 实体成长、装备、休养和 BattleSnapshot 规则完成后再接入 |
 | 完整跨阵营匹配和宗门战扩展 | `partial`/`open` | 本地 `arena.three_realms` 已开放同阵营/跨阵营匹配、阵营战术快照和双适配器验收；跨服宗门战堡垒准入、30/15 名额、自动战争机关、积分反刷、公共奖励箱、周奖励和恢复已开放；仍不开放跨服匹配、身份合并或玩家间资产转移；赛季临时积分实时来源投影已开放；界隙 2–5 人队伍、状态机、锁定和恢复已开放 |
 | 高阶境界与终局 | `open` | 新角色公开命令链已由 QQ/OneBot 双适配器从新手推进至渡劫 L10，完成三试炼、飞升凭证、终局战和飞升结局；道源任务共同历史赛季门槛、天劫台制证地点与终局状态均已走通 |
@@ -133,13 +135,13 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 
 ### 待完成清单（按优先级）
 
-1. **冒险合同与副本**：v0.3 许可、派遣与妖界栖地悬赏及 `instance.secret_realm.boundary_rift` 已完成；`instance.secret_realm.demon_abyss` 合同已闭合，下一步接入运行时并完成 QQ 官方/OneBot V11 混合适配器验收。随后按版本文档顺序处理 `instance.secret_realm.ancient_domain`、`instance.secret_realm.ancestral_hall`、`instance.secret_realm.void_ruins`、`instance.secret_realm.time_fort`、`instance.secret_realm.dao_origin`、`instance.secret_realm.heaven_echo` 及遗府内容；每条切片需覆盖锁定/恢复、首通唯一、双适配器及 operation 重放。`cave.boundary_realm` 队伍战不替代界隙裂隙秘境，也不与其奖励混用。
+1. **冒险合同与副本**：v0.3 许可、派遣与妖界栖地悬赏、`instance.secret_realm.boundary_rift` 和 `instance.secret_realm.demon_abyss` 均已开放并通过双适配器验收。下一步按版本文档顺序先补全 `instance.secret_realm.ancient_domain` 合同，再接运行时；随后处理 `instance.secret_realm.ancestral_hall`、`instance.secret_realm.void_ruins`、`instance.secret_realm.time_fort`、`instance.secret_realm.dao_origin`、`instance.secret_realm.heaven_echo` 及遗府内容。每条切片需覆盖锁定/恢复、首通唯一、双适配器及 operation 重放。`cave.boundary_realm` 队伍战不替代界隙裂隙秘境，也不与其奖励混用。
 2. **高阶塔、剧情与图鉴**：待开放 `tower.mist_trial` 31–45 层、`tower.three_realms` 1–40 层和 `tower.void_spire` 1–90 层。`story.mainline.three_realms` 与 `story.mainline.dao_echoes` 已接入；待补 `story.mainline.xuantian.chapter_2` 后续关卡、`story.mainline.domain_frontier`、`story.mainline.void_archive`。图鉴待补 v0.2 `codex.place.cloud_city`、`codex.material.cloud_iron`、`codex.creature.cloud_beast`；v0.3 `codex.place.demon_market`、`codex.place.beast_hills`；v0.4 `codex.domain.*`；v0.5 `codex.void.route_*`、`codex.void.archive_*`；v0.6 `codex.dao.service_*`、`codex.ending.public_*`。`codex.route.boundary` 已随界隙裂隙秘境首通开放，不再列为待办；v0.1 三分支也已开放。
 3. **灵兽与灵骑**：当前保持 `locked`；接入前需完成实体成长、装备、休养、归属/交易边界及 `BattleSnapshot` 规则，再补玩家端生命周期和双适配器验收。
 4. **跨服能力边界**：跨服匹配、身份合并、玩家间资产转移和跨服交易继续关闭，待身份路由、权限、审计、恢复和隔离合同全部通过后再评估开放。
 5. **运营扩展**：Web 写操作和外部支付仍锁定；先完成权限、CSRF、审计、备份恢复与 billing adapter 合同。
 
-已完成并不再列入待办：高阶来源审计与恢复、魔渊污染净化、虚空档案阶段 A、虚空前线阶段 B、
+已完成并不再列入待办：高阶来源审计与恢复、魔渊污染净化、魔界深渊秘境、虚空档案阶段 A、虚空前线阶段 B、
 跨服宗门战本地周赛、联盟/信标和跨服社交恢复演练。
 
 `quest.prepare_nascent_soul`、`quest.soul_transformation` 和 `quest.break_void` 现已有玩家命令生产者。`quest.break_void` 的正式路径为三次界壁试炼、档案航道结算、档案守卫胜利、档案交付和许可领取；档案探索不再回退到旧版直接发放物品的兼容入口。

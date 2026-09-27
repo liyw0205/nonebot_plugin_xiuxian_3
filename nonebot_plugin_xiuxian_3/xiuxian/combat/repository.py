@@ -45,6 +45,7 @@ from .rules import (
     V03_CONTENT_VERSION,
     V03_RULE_VERSION,
     V031_RULE_VERSION,
+    V032_RULE_VERSION,
     V02_CONTENT_VERSION,
     V02_RULE_VERSION,
     MIST_ELITE,
@@ -167,6 +168,35 @@ class CombatRepositoryMixin:
         async with self._inflight:
             return await asyncio.to_thread(self._retry_sync, self._resolve_battle_once, battle_id)
 
+    async def expire_battle_session(self, *, battle_id: str, reason: str) -> bool:
+        """Close an unstarted automatic battle when its owning activity expires."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync, self._expire_battle_session_sync, battle_id, reason
+            )
+
+    def _expire_battle_session_sync(self, battle_id: str, reason: str) -> bool:
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            session = connection.execute(
+                "SELECT status, result_json FROM battle_sessions WHERE battle_id=?",
+                (battle_id,),
+            ).fetchone()
+            if session is None or str(session["status"]) == "settled":
+                return False
+            if str(session["status"]) in {"created", "running"}:
+                result = self._json_object(session["result_json"], {})
+                result.update({"outcome": "expired", "reason": reason})
+                connection.execute(
+                    "UPDATE battle_sessions SET status='expired', result_json=?, updated_at=? "
+                    "WHERE battle_id=? AND status IN ('created','running')",
+                    (json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, battle_id),
+                )
+            return True
+
     async def claim_battle_reward(
         self, *, platform: str, platform_user_id: str, operation_id: str
     ) -> BattleRewardClaimRecord:
@@ -219,6 +249,8 @@ class CombatRepositoryMixin:
         v03_enemy_keys = {
             DEMON_OVERLORD.key,
             DEMON_RUINS_SCOUT.key,
+            "enemy.demon_abyss_echo_guardian",
+            "enemy.demon_abyss_heart",
             BEAST_GUARDIAN.key,
             DEMON_WAR_FRONT.key,
         }
@@ -230,7 +262,9 @@ class CombatRepositoryMixin:
             if enemy.key in v02_enemy_keys
             else CONTENT_VERSION
         )
-        if enemy.key == DEMON_RUINS_SCOUT.key:
+        if enemy.key in {"enemy.demon_abyss_echo_guardian", "enemy.demon_abyss_heart"}:
+            battle_rule_version = V032_RULE_VERSION
+        elif enemy.key == DEMON_RUINS_SCOUT.key:
             battle_rule_version = V031_RULE_VERSION
         elif enemy.key in v03_enemy_keys:
             battle_rule_version = V03_RULE_VERSION

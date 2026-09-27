@@ -33,6 +33,7 @@ from ..repository import (
     RecipeRequirementError,
     RepositoryBusyError,
     SQLitePlayerRepository,
+    SecretRealmBusyError,
     ToolDurabilityInsufficientError,
     ToolMissingError,
 )
@@ -278,6 +279,8 @@ class ProductionApplication:
             return CommandResult(False, "POLLUTION_ALREADY_CLEAR", "当前没有需要净化的污染，未修改背包。", context.request_id, operation_id)
         except HeartDemonPendingError:
             return CommandResult(False, "HEART_DEMON_PENDING", "请先处理待决心魔事件，再进行污染净化。", context.request_id, operation_id)
+        except SecretRealmBusyError:
+            return CommandResult(False, "SECRET_REALM_BUSY", "秘境进行期间不能修改污染状态。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能净化污染。", context.request_id, operation_id)
         except OperationConflictError:

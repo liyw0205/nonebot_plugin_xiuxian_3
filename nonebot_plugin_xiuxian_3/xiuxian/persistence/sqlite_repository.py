@@ -26,6 +26,7 @@ from ..combat.repository import CombatRepositoryMixin
 from ..combat.party_repository import PartyCombatRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.secret_realm_repository import SecretRealmRepositoryMixin
+from ..adventures.demon_abyss_repository import DemonAbyssRepositoryMixin
 from ..adventures.boundary_rift_repository import BoundaryRiftRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..adventures.three_realms_repository import ThreeRealmsRepositoryMixin
@@ -104,6 +105,7 @@ class SQLitePlayerRepository(
     PartyCombatRepositoryMixin,
     AdventuresRepositoryMixin,
     SecretRealmRepositoryMixin,
+    DemonAbyssRepositoryMixin,
     BoundaryRiftRepositoryMixin,
     DaoEchoesRepositoryMixin,
     ThreeRealmsRepositoryMixin,

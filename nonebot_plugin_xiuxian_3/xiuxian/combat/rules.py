@@ -12,6 +12,7 @@ RULE_VERSION = "combat-0.1.0"
 V03_CONTENT_VERSION = "content-0.3"
 V03_RULE_VERSION = "combat-0.3.0"
 V031_RULE_VERSION = "combat-0.3.1"
+V032_RULE_VERSION = "combat-0.3.2"
 V02_CONTENT_VERSION = "content-0.2"
 V02_RULE_VERSION = "combat-0.2.0"
 MAX_TURNS = 20
@@ -184,6 +185,36 @@ DEMON_RUINS_SCOUT = EnemyDefinition(
     agility=8,
     skill_key="enemy_skill.scratch",
     random_pool="combat.demon_ruins_scout.v0.3.1",
+    reward={},
+)
+
+DEMON_ABYSS_ECHO_GUARDIAN = EnemyDefinition(
+    key="enemy.demon_abyss_echo_guardian",
+    label="深渊残响守卫",
+    location_key="demon.abyss_gate",
+    required_realm="foundation",
+    required_layer=1,
+    max_hp=700,
+    attack=85,
+    initiative=14,
+    agility=14,
+    skill_key="enemy_skill.scratch",
+    random_pool="combat.enemy.demon_abyss_echo_guardian.v0.3.2",
+    reward={},
+)
+
+DEMON_ABYSS_HEART = EnemyDefinition(
+    key="enemy.demon_abyss_heart",
+    label="深渊之心",
+    location_key="demon.abyss_gate",
+    required_realm="foundation",
+    required_layer=1,
+    max_hp=1000,
+    attack=120,
+    initiative=18,
+    agility=20,
+    skill_key="enemy_skill.scratch",
+    random_pool="combat.enemy.demon_abyss_heart.v0.3.2",
     reward={},
 )
 
@@ -412,6 +443,8 @@ ENEMIES = {
     CLOUD_BOAT_GUARDIAN.key: CLOUD_BOAT_GUARDIAN,
     DEMON_OVERLORD.key: DEMON_OVERLORD,
     DEMON_RUINS_SCOUT.key: DEMON_RUINS_SCOUT,
+    DEMON_ABYSS_ECHO_GUARDIAN.key: DEMON_ABYSS_ECHO_GUARDIAN,
+    DEMON_ABYSS_HEART.key: DEMON_ABYSS_HEART,
     BEAST_GUARDIAN.key: BEAST_GUARDIAN,
     BEAST_ANCESTOR.key: BEAST_ANCESTOR,
     ANCESTRAL_SPIRIT.key: ANCESTRAL_SPIRIT,

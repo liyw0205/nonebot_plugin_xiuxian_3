@@ -51,7 +51,14 @@ def test_qq_and_onebot_secret_realm_preview_are_isolated() -> None:
                 "instance.secret_realm.spring_path",
                 "instance.secret_realm.mist_depth_2",
                 "instance.secret_realm.cloud_boat",
+                "instance.secret_realm.demon_abyss",
             }
+            demon_abyss = next(
+                item
+                for item in qq.data["realms"]
+                if item["instance_key"] == "instance.secret_realm.demon_abyss"
+            )
+            assert demon_abyss["first_reward"]["story.demon_abyss_echo"] == 1
             await runtime.close()
 
     asyncio.run(run())

@@ -13,6 +13,7 @@ from ..persistence.errors import (
     MaterialInsufficientError,
     OperationConflictError,
     PollutionAlreadyClearError,
+    SecretRealmBusyError,
 )
 from ..production.models import PollutionPurificationRecord
 
@@ -69,6 +70,13 @@ class PollutionRepositoryMixin:
                 )
 
             row = self._require_player(connection, platform, platform_user_id)
+            active_realm = connection.execute(
+                "SELECT 1 FROM secret_realm_runs WHERE player_id=? "
+                "AND status IN ('entered','routing','combat_pending','cleared','failed') LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if active_realm is not None:
+                raise SecretRealmBusyError("pollution cannot change during a secret-realm run")
             pending = connection.execute(
                 "SELECT 1 FROM heart_demon_sessions WHERE player_id = ? AND status = 'pending' LIMIT 1",
                 (row["id"],),

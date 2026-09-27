@@ -22,6 +22,19 @@ from ..persistence.errors import (
 from .secret_realm_rules import resolve_node, resolve_secret_realm
 from .boundary_rift_rules import BOUNDARY_RIFT_KEY, resolve_boundary_rift_node
 from .boundary_rift_use_cases import BoundaryRiftApplication
+from .demon_abyss_rules import (
+    DEMON_ABYSS_KEY,
+    DEMON_ABYSS_FIRST_REWARD,
+    DEMON_ABYSS_LABEL,
+    DEMON_ABYSS_NODES,
+    DEMON_ABYSS_QUOTA_LIMIT,
+    DEMON_ABYSS_REPEAT_REWARD,
+    DEMON_ABYSS_RISK_MODIFIER_BP,
+    DEMON_ABYSS_STAMINA_COST,
+    resolve_demon_abyss,
+    resolve_demon_abyss_node,
+)
+from .demon_abyss_use_cases import DemonAbyssApplication
 
 
 ITEM_LABELS = {
@@ -34,6 +47,10 @@ ITEM_LABELS = {
     "item.weapon.cloud_sword": "云纹剑",
     "item.ticket.cloud_boat_fragment": "云舟票碎片",
     "local_reputation": "地方名望",
+    "faction_reputation.demon": "魔界声望",
+    "item.clue.demon_abyss_echo": "深渊残响线索",
+    "item.demon_core": "魔核",
+    "story.demon_abyss_echo": "深渊残响故事",
 }
 
 
@@ -41,6 +58,7 @@ class SecretRealmApplication:
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
         self.boundary_rift = BoundaryRiftApplication(repository)
+        self.demon_abyss = DemonAbyssApplication(repository)
 
     @staticmethod
     def _operation_id(context: CommandContext, name: str) -> str:
@@ -84,8 +102,24 @@ class SecretRealmApplication:
                 ]
             )
             data.append({"instance_key": definition.key, "label": definition.label, "nodes": definition.node_keys, "stamina_cost": definition.stamina_cost, "ticket_key": definition.ticket_key, "first_reward": definition.first_reward, "repeat_reward": definition.repeat_reward, "quota_period": definition.quota_period, "quota_limit": definition.quota_limit})
+        data.append({
+            "instance_key": DEMON_ABYSS_KEY,
+            "label": DEMON_ABYSS_LABEL,
+            "nodes": DEMON_ABYSS_NODES,
+            "stamina_cost": DEMON_ABYSS_STAMINA_COST,
+            "first_reward": DEMON_ABYSS_FIRST_REWARD,
+            "repeat_reward": DEMON_ABYSS_REPEAT_REWARD,
+            "quota_period": "week",
+            "quota_limit": DEMON_ABYSS_QUOTA_LIMIT,
+        })
         lines.extend(
             [
+                "### 魔界深渊秘境",
+                "- **前置**：筑基 L1；位于 `demon.abyss_gate`；持有深渊门禁；魔界声望 >=200。",
+                "- **路线**：深渊门 → 污染渗流 → 残响守卫 → 深渊之心。",
+                f"- **消耗**：体力 {DEMON_ABYSS_STAMINA_COST}；每 UTC 周 {DEMON_ABYSS_QUOTA_LIMIT} 次；污染渗流风险 +{DEMON_ABYSS_RISK_MODIFIER_BP} bp。",
+                "- **首通/重复**：魔界声望 +20、深渊残响线索 / 魔核 ×1。",
+                "",
                 "### 界隙裂隙秘境",
                 "- **前置**：创建专用界隙裂隙队伍；队员 2–5 人，均需元婴 L1、三界主线完成并位于 `cave.boundary_realm`。",
                 "- **路线**：裂隙入口 → 破碎岔路 → 跨界哨卫 → 神魂潮汐 → 界隙守望者 → 裂隙封印。",
@@ -96,12 +130,14 @@ class SecretRealmApplication:
         if record.active_run_id:
             lines.append(f"> 当前已有进行中的秘境：`{record.active_run_id}`。")
         else:
-            lines.append("> 发送 `进入秘境 雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙` 开始；组队秘境先创建专用队伍。")
+            lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙` 开始；组队秘境先创建专用队伍。")
         return CommandResult(True, "SECRET_REALM_PREVIEW", "\n".join(lines), context.request_id, data={"realms": data, "active_run_id": record.active_run_id})
 
     async def enter(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) == 1 and resolve_demon_abyss(context.command_args[0]) == DEMON_ABYSS_KEY:
+            return await self.demon_abyss.enter(context)
         if len(context.command_args) != 1 or not (instance_key := resolve_secret_realm(context.command_args[0])):
-            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `进入秘境 雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙`。", context.request_id)
+            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙`。", context.request_id)
         if instance_key == BOUNDARY_RIFT_KEY:
             return await self.boundary_rift.enter(context)
         operation_id = self._operation_id(context, "secret_realm.enter")
@@ -130,6 +166,11 @@ class SecretRealmApplication:
     async def choose_node(self, context: CommandContext) -> CommandResult:
         if context.command_args and resolve_boundary_rift_node(context.command_args[0]):
             return await self.boundary_rift.choose_node(context)
+        if context.command_args and (
+            resolve_demon_abyss_node(context.command_args[0])
+            or await self.demon_abyss.has_active(context)
+        ):
+            return await self.demon_abyss.choose_node(context)
         if len(context.command_args) != 1 or not (node_key := resolve_node(context.command_args[0])):
             return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `选择秘境节点 资源`、`遭遇` 或 `选择`。", context.request_id)
         operation_id = self._operation_id(context, "secret_realm.choose_node")
@@ -154,6 +195,14 @@ class SecretRealmApplication:
     async def settle(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "结算秘境无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "demon_abyss.settle")
+        try:
+            active_demon = await self.demon_abyss.has_active(context)
+            replay_demon = await self.repository.has_demon_abyss_settlement_operation(operation_id)
+        except PlayerNotFoundError:
+            active_demon = replay_demon = False
+        if active_demon or replay_demon:
+            return await self.demon_abyss.settle(context)
         operation_id = self._operation_id(context, "secret_realm.settle")
         try:
             record = await self.repository.settle_secret_realm(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id)
