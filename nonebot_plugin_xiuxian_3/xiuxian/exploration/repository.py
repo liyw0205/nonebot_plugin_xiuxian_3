@@ -360,6 +360,7 @@ class ExplorationRepositoryMixin:
                 ("production_orders", ("processing",)),
                 ("breakthrough_sessions", ("preparing",)),
                 ("cloud_boat_sessions", ("created", "running")),
+                ("idle_assignments", ("assigned", "running")),
             ):
                 placeholders = ", ".join("?" for _ in statuses)
                 busy = connection.execute(

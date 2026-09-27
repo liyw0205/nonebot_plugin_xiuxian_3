@@ -53,6 +53,7 @@ from .events.void_archive_use_cases import VoidArchiveApplication
 from .events.void_frontier_use_cases import VoidFrontierApplication
 from .specials.arena_use_cases import ArenaApplication
 from .specials.team_arena_use_cases import TeamArenaApplication
+from .specials.idle_use_cases import IdleApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
 
@@ -110,6 +111,7 @@ class XiuxianApplication:
         self.void_frontier = VoidFrontierApplication(repository)
         self.arena = ArenaApplication(repository)
         self.team_arena = TeamArenaApplication(repository)
+        self.idle = IdleApplication(repository)
         self.quests = QuestApplication(repository)
 
     async def _invoke(
@@ -1456,6 +1458,18 @@ class XiuxianApplication:
             lambda: self.arena.claim_result(context),
             write_message="当前事件不允许确认竞技场结果。",
         )
+
+    async def preview_idle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.idle.preview(context), require_write=False)
+
+    async def start_idle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.idle.start(context), write_message="当前事件不允许开始挂机。")
+
+    async def claim_idle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.idle.claim(context), write_message="当前事件不允许领取挂机收益。")
+
+    async def cancel_idle(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.idle.cancel(context), write_message="当前事件不允许取消挂机。")
 
     async def publish_team_arena_snapshot(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

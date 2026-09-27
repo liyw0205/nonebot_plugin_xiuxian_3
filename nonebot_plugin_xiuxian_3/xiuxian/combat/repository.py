@@ -85,6 +85,7 @@ class CombatRepositoryMixin:
         enemy_key: str,
         battle_type: str,
         operation_id: str,
+        ignore_secret_realm_run_id: str | None = None,
     ) -> BattleStartRecord:
         """Create a named quest encounter using the same replayable battle core."""
 
@@ -98,6 +99,8 @@ class CombatRepositoryMixin:
                 operation_id,
                 enemy_key,
                 battle_type,
+                None,
+                ignore_secret_realm_run_id,
             )
 
     async def start_demon_war_front_battle(
@@ -206,6 +209,7 @@ class CombatRepositoryMixin:
         enemy_key: str = "enemy.training_dummy",
         battle_type: str = "pve.training",
         exploration_id: str | None = None,
+        ignore_secret_realm_run_id: str | None = None,
     ) -> BattleStartRecord:
         enemy = enemy_definition(enemy_key)
         v03_enemy_keys = {
@@ -303,6 +307,7 @@ class CombatRepositoryMixin:
                 connection,
                 int(player["id"]),
                 ignore_exploration_id=exploration_id,
+                ignore_secret_realm_run_id=ignore_secret_realm_run_id,
             ):
                 raise BattleBusyError("another long action is active")
             exploration = None

@@ -1093,6 +1093,7 @@ class CultivationRepositoryMixin:
         player_id: int,
         *,
         ignore_exploration_id: str | None = None,
+        ignore_secret_realm_run_id: str | None = None,
     ) -> bool:
         """Return whether a player has any session that locks another action."""
 
@@ -1108,12 +1109,20 @@ class CultivationRepositoryMixin:
             ("party_battle_members", "asset_lock_status = 'locked'"),
             ("final_battle_members", "asset_lock_status = 'locked'"),
             ("void_route_sessions", "status = 'running'"),
+            ("idle_assignments", "status IN ('assigned', 'running')"),
+            ("livelihood_trade_routes", "status = 'in_transit'"),
+            ("secret_realm_runs", "status IN ('entered', 'routing', 'combat_pending', 'cleared', 'failed')"),
         )
         for table, predicate in checks:
             if table == "exploration_sessions" and ignore_exploration_id is not None:
                 active = connection.execute(
                     "SELECT 1 FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') AND exploration_id != ? LIMIT 1",
                     (player_id, ignore_exploration_id),
+                ).fetchone()
+            elif table == "secret_realm_runs" and ignore_secret_realm_run_id is not None:
+                active = connection.execute(
+                    "SELECT 1 FROM secret_realm_runs WHERE player_id = ? AND status IN ('entered', 'routing', 'combat_pending', 'cleared', 'failed') AND run_id != ? LIMIT 1",
+                    (player_id, ignore_secret_realm_run_id),
                 ).fetchone()
             else:
                 active = connection.execute(

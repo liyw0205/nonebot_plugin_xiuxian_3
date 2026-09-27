@@ -397,6 +397,7 @@ class RouteRepositoryMixin:
             ("breakthrough_sessions", "status = 'preparing'"),
             ("exploration_sessions", "status IN ('created', 'running', 'combat_pending')"),
             ("retreat_sessions", "status = 'running'"),
+            ("idle_assignments", "status IN ('assigned', 'running')"),
         )
         for table, status_clause in checks:
             if connection.execute(f"SELECT 1 FROM {table} WHERE player_id = ? AND {status_clause} LIMIT 1", (player_id,)).fetchone() is not None:

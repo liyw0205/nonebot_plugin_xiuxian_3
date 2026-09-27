@@ -357,6 +357,12 @@ class ProductionRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "cultivator":
                 raise PlayerStageConflictError("player is not ready for production")
+            idle = connection.execute(
+                "SELECT 1 FROM idle_assignments WHERE player_id = ? AND status IN ('assigned', 'running') LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if idle is not None:
+                raise ProductionBusyError("idle assignment is still running")
             self._check_production_requirements(connection, row, recipe)
             self._check_production_special_requirements(connection, row, recipe, now)
             if recipe.key == "recipe.fruit.soul_seed":

@@ -228,6 +228,38 @@ class ResourceInsufficientError(RuntimeError):
     """A player does not have enough of a spendable resource."""
 
 
+class IdleRouteNotFoundError(RuntimeError):
+    """The requested idle route is not part of the active content."""
+
+
+class IdleRequirementError(RuntimeError):
+    """The player lacks the location, reputation, residence or tool gate."""
+
+
+class IdleBusyError(RuntimeError):
+    """The player already has an active long action or idle assignment."""
+
+
+class IdleDailyLimitError(RuntimeError):
+    """The route's daily settlement quota has been reached."""
+
+
+class IdleNotFoundError(RuntimeError):
+    """The player has no matching idle assignment."""
+
+
+class IdleClaimTooEarlyError(RuntimeError):
+    """An idle assignment has not reached its claim time."""
+
+
+class IdleAlreadySettledError(RuntimeError):
+    """An idle assignment was already claimed, expired or cancelled."""
+
+
+class IdleCancellationExpiredError(RuntimeError):
+    """The 60-second idle cancellation window has expired."""
+
+
 class EnergyInsufficientError(RuntimeError):
     """A player does not have enough energy for production."""
 

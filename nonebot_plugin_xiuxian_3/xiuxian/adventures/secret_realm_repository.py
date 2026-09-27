@@ -195,6 +195,7 @@ class SecretRealmRepositoryMixin:
                 enemy_key=secret_realm_definition(record.instance_key).enemy_key,
                 battle_type="pve.secret_realm",
                 operation_id=battle_operation,
+                ignore_secret_realm_run_id=record.run_id,
             )
         except Exception:
             await asyncio.to_thread(self._mark_secret_realm_failed, record.run_id, "battle_start_failed")

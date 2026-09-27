@@ -300,6 +300,12 @@ class FacilityRepositoryMixin:
                 ).fetchone()
                 if running is not None:
                     raise FacilitySlotOccupiedError("facility slot already has a running order")
+                idle = connection.execute(
+                    "SELECT 1 FROM idle_assignments WHERE facility_slot_key = ? AND status IN ('assigned', 'running') LIMIT 1",
+                    (slot["slot_key"],),
+                ).fetchone()
+                if idle is not None:
+                    raise FacilitySlotOccupiedError("facility slot is locked by an idle assignment")
                 return slot
         if inactive:
             raise FacilityMaintenanceUnpaidError("facility maintenance is unpaid")

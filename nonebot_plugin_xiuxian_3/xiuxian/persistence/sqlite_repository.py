@@ -64,6 +64,8 @@ from ..specials.arena_repository import ArenaRepositoryMixin
 from ..specials.team_arena_repository import TeamArenaRepositoryMixin
 from ..specials.arena_recovery_repository import ArenaRecoveryRepositoryMixin
 from ..specials.arena_projection import project_arena_result
+from ..specials.idle_repository import IdleRepositoryMixin
+from ..specials.idle_migration import ensure_idle_schema
 from ..quests.repository import QuestRepositoryMixin
 from ..quests.cross_realm_repository import DemonQuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
@@ -123,6 +125,7 @@ class SQLitePlayerRepository(
     ArenaRepositoryMixin,
     TeamArenaRepositoryMixin,
     ArenaRecoveryRepositoryMixin,
+    IdleRepositoryMixin,
     DemonQuestRepositoryMixin,
     QuestRepositoryMixin,
     EconomyRepositoryMixin,
@@ -239,6 +242,7 @@ class SQLitePlayerRepository(
             ensure_void_frontier_schema(connection)
             self._migrate_heart_demon_event_schema(connection)
             ensure_secret_realm_schema(connection)
+            ensure_idle_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
@@ -855,3 +859,5 @@ _cultivation_repository.SQLitePlayerRepository = SQLitePlayerRepository
 _breakthrough_repository.SQLitePlayerRepository = SQLitePlayerRepository
 from ..items import repository as _items_repository
 _items_repository.SQLitePlayerRepository = SQLitePlayerRepository
+from ..specials import idle_repository as _idle_repository
+_idle_repository.SQLitePlayerRepository = SQLitePlayerRepository

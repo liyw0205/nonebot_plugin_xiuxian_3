@@ -173,6 +173,7 @@ QQ/OneBot/Web 适配器、公式/并发/回放/故障测试、观测字段、关
 57. **已完成（v0.1 秘境试炼）**：新增独立 `secret_realm_models`、`secret_realm_rules`、`secret_realm_repository`、`secret_realm_use_cases` 与迁移表；开放 `instance.secret_realm.mist_grotto` 和 `instance.secret_realm.spring_path`。进入事务锁定体力/门票并冻结地点、境界、路线、内容/规则版本；节点强制 `resource -> encounter -> choice`（灵泉小径为两节点），遭遇复用服务端自动回合，失败不重抽资源，过期/失败按合同释放或消耗锁定资产，首通唯一且 operation 幂等。QQ 官方与 OneBot V11 双适配器专项覆盖门槛、节点跳跃、真实胜负、失败退票、过期恢复和角色隔离；更高版本秘境、遗府和训练傀儡悬赏仍关闭。
 58. **已完成（v0.2 秘境试炼）**：新增 `instance.secret_realm.mist_depth_2` 和 `instance.secret_realm.cloud_boat`；雾隐洞天二层使用金丹 L1/地点/进阶门票门槛与五节点路线，第二场遭遇按 `run_id/node_index` 生成独立战斗 operation，首通事务创建云纹剑装备实例；云舟秘境使用云舟地点/票券门槛并在首通事务写入图鉴和地方名望。两项均支持内容/规则版本快照、周限额、资源锁、失败/过期恢复、首通唯一、operation 回放及 QQ 官方/OneBot V11 双适配器验收。
 59. **已完成（训练傀儡悬赏）**：开放 `bounty.training_dummy`；悬赏接取时冻结角色已有 `pve.training` 胜场基线，进度只统计本人、目标敌人、已结算且胜利的服务端战斗，战斗奖励与悬赏奖励分别领取，完成 2 次后事务发放修为和焦点丹。QQ 官方与 OneBot V11 均通过真实自动战、悬赏进度、领取和 operation 回放验收。
+60. **已完成（v0.1 特色玩法：挂机收益）**：新增独立 `idle_models`、`idle_rules`、`idle_repository`、`idle_use_cases` 与迁移表；开放城镇跑腿、药圃看护、工具/作坊看守和商路观察四条路线。分配时冻结路线池、地点、成本、工具耐久、设施、服务端时间、完整/最大领取窗口和版本；领取按服务端 Clock 在完整窗口或超时最低保底结算，工具耐久只在成功完整领取时扣除。60 秒取消原子返还成本，长时会话与闭关/生产/移动/探索/战斗互斥；重复 operation、提前领取、超时、时间篡改、收益边界、QQ 官方/OneBot V11 身份隔离均有专项测试。下一阶段进入 v0.1 派遣任务。
 
 本节按首次验收阶段保留编号记录；其中早期“仍待”描述为当时快照，后续进展以第 53 条和[当前开发状态](current-status.md)为准。
 

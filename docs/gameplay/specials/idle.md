@@ -4,7 +4,7 @@
 
 ## 1. 会话与结算
 
-`specials.assign_idle` 输入路线键、可选工具/设施、`operation_id`。预检查角色 active、无其它 active 挂机、无互斥战斗/突破/移动/派遣锁、路线开放且体力/设施要求满足。开始时固定路线、角色地点、工具耐久、设施、路线池、开始时间、`claim_at`、`max_claim_at`、版本与输入摘要。
+`specials.preview_idle`、`specials.assign_idle`、`specials.claim_idle` 和取消用例已开放；文本入口为 `挂机预览`、`开始挂机 <路线键> [工具或设施键]`、`领取挂机 [挂机编号]`、`取消挂机 [挂机编号]`。预检查角色 active、无其它 active 挂机、无互斥战斗/突破/移动/派遣锁、路线开放且体力/设施要求满足。开始时固定路线、角色地点、工具耐久、设施、路线池、开始时间、`claim_at`、`max_claim_at`、版本与输入摘要。
 
 ```text
 claimable_at = started_at + duration
@@ -15,12 +15,11 @@ max_claim_at = started_at + min(duration + 24h, 48h)
 
 | 状态 | 可用行为 | 资产语义 |
 |:--|:--|:--|
-| `assigned` | 仅查看/取消确认窗口 | 未扣路线成本 |
-| `running` | 查询进度 | 工具/设施锁定，不能领取 |
-| `claimable` | 一次 `claim_idle` | 原子发奖并完成 operation |
+| `running` | 查询进度、60 秒内取消 | 已扣路线成本；工具/设施锁定，不能领取 |
+| `claimable` | 一次 `claim_idle` | 由服务端时间判定，原子发奖并完成 operation |
 | `claimed/expired` | 只读 | 不可重开、不可重复领奖 |
 
-创建后 60 秒内可取消，释放工具/设施并全额返还开始成本；之后不可取消。恢复任务只能按保存的时间/池结算，不可重新抽取。
+创建后 60 秒内可取消，释放设施并全额返还路线成本、返还锁定工具；之后不可取消。工具在进行期间会从背包移出并记录于会话快照，完整领取时返还工具并扣除耐久，超时保底领取不扣耐久；恢复任务只能按保存的时间/池结算，不可重新抽取。
 
 ## 2. 路线类型与资源边界
 
@@ -39,4 +38,4 @@ max_claim_at = started_at + min(duration + 24h, 48h)
 
 角色本人可分配/领取；管理员仅可查看、关闭路线或执行恢复。记录 `idle_assignment_id`、路线、开始/领取/最大时间、随机池、抽取、成本、工具耐久、设施、结果、版本和 operation。
 
-关闭内容时停止新分配；running 会话到 `claimable` 后按原池结算，超过最大窗口走最低保底。验收：同一领取 operation 不双发；时间篡改无效；超时不累计；路线/工具冲突不扣资源；收益日志不含修为/突破/终局资源键。
+当前 v0.1 路线已接入 `idle_assignments` 独立表、operation ledger、服务端 Clock、QQ 官方和 OneBot V11 双适配器。关闭内容时停止新分配；running 会话到 `claimable` 后按原池结算，超过最大窗口走最低保底。验收：同一领取 operation 不双发；时间篡改无效；超时不累计；路线/工具冲突不扣资源；收益日志不含修为/突破/终局资源键。
