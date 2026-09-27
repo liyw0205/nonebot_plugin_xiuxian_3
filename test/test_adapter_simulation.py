@@ -17,6 +17,7 @@ from nonebot_plugin_xiuxian_3.adapters.nonebot import _canonical_command
 from nonebot_plugin_xiuxian_3.adapters.onebot import is_onebot_v11_event, normalize_event
 from nonebot_plugin_xiuxian_3.adapters.qq import is_qq_event, normalize_event as normalize_qq_event
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
 
 
 class MutableClock:
@@ -427,12 +428,13 @@ def test_qq_and_onebot_normalization_reaches_soul_transformation_late_milestone(
 
 
 def test_qq_and_onebot_normalization_reaches_void_refining_late_milestone() -> None:
-    qq = normalize_qq_event(_qq_group_event("晋升境界", message_id="qq-void-late"))
-    onebot = normalize_event(_onebot_group_event("晋升境界", message_id=3016))
+    qq = normalize_qq_event(_qq_group_event("进入虚空航道 第一航道", message_id="qq-void-late"))
+    onebot = normalize_event(_onebot_group_event("进入虚空航道 第一航道", message_id=3016))
 
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            clock = MutableClock(datetime(2026, 1, 1, tzinfo=timezone.utc))
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
             for prefix, normalized in (("qq", qq), ("onebot", onebot)):
                 context = replace(normalized.context, operation_id=f"{prefix}-void-create")
                 assert (await runtime.adapters.dispatch(context.adapter, context, "开始修仙")).ok
@@ -441,20 +443,136 @@ def test_qq_and_onebot_normalization_reaches_void_refining_late_milestone() -> N
                         """
                         UPDATE players
                         SET stage = 'cultivator', realm_key = 'void_refining', realm_layer = 8,
-                            cultivation = 1700000, total_cultivation = 2500000, void_route_count = 3
+                            cultivation = 2150000, total_cultivation = 2500000,
+                            stamina = 200, stamina_max = 200, space_resistance_bp = 1500,
+                            inventory_json = ?
                         WHERE platform = ? AND platform_user_id = ?
                         """,
-                        (normalized.context.adapter, normalized.context.user_id),
+                        (
+                            json.dumps({"item.void_anchor": 12}),
+                            normalized.context.adapter,
+                            normalized.context.user_id,
+                        ),
                     )
-                advanced = await runtime.adapters.dispatch(
-                    normalized.context.adapter,
-                    replace(normalized.context, operation_id=f"{prefix}-void-advance"),
-                    normalized.text,
+
+                async def dispatch(operation: str, command: str):
+                    event_context = replace(
+                        normalized.context,
+                        request_id=f"{operation}-request",
+                        operation_id=operation,
+                    )
+                    return await runtime.adapters.dispatch(
+                        normalized.context.adapter,
+                        event_context,
+                        command,
+                    )
+
+                async def travel(route_label: str, operation_prefix: str) -> None:
+                    start_operation = next(
+                        f"{prefix}-{operation_prefix}-start-{candidate}"
+                        for candidate in range(1000)
+                        if void_route_roll_bp(
+                            f"{prefix}-{operation_prefix}-start-{candidate}"
+                        ) >= 1500
+                    )
+                    started = await dispatch(
+                        start_operation,
+                        f"进入虚空航道 {route_label}",
+                    )
+                    assert started.code == "VOID_ROUTE_STARTED", started.message
+                    clock.advance(minutes=46)
+                    settled = await dispatch(
+                        f"{prefix}-{operation_prefix}-settle",
+                        "结算虚空航道",
+                    )
+                    assert settled.code == "VOID_ROUTE_SETTLED", settled.message
+
+                await travel("第一航道", "first-a")
+                await travel("第一航道", "first-b")
+                await travel("档案遗迹", "archive")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    count = connection.execute(
+                        "SELECT void_route_count FROM players WHERE platform=? AND platform_user_id=?",
+                        (normalized.context.adapter, normalized.context.user_id),
+                    ).fetchone()[0]
+                assert count == 2
+                first_advance = await dispatch(f"{prefix}-void-l9", "晋升境界")
+                assert first_advance.code == "REALM_LAYER_ADVANCED"
+                assert first_advance.data["unlocks"] == []
+
+                market_blocked = await dispatch(
+                    f"{prefix}-void-market-blocked",
+                    "进入虚空航道 虚空集市",
                 )
+                fortress_blocked = await dispatch(
+                    f"{prefix}-void-fortress-blocked",
+                    "进入虚空航道 虚空堡垒",
+                )
+                assert market_blocked.code == fortress_blocked.code == "VOID_ROUTE_LOCKED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    row = connection.execute(
+                        "SELECT stamina, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (normalized.context.adapter, normalized.context.user_id),
+                    ).fetchone()
+                assert row[0] == 90
+                assert json.loads(row[1])["item.void_anchor"] == 2
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (normalized.context.adapter, normalized.context.user_id),
+                    ).fetchone()[0]
+                    sect_id = f"sect-{prefix}"
+                    created_at = clock.value.isoformat()
+                    connection.execute(
+                        """
+                        INSERT INTO sects(
+                            sect_id, name, name_key, leader_id, status, level, max_members,
+                            warehouse_capacity, construction, spirit_stones, sect_merit,
+                            warehouse_json, created_at, updated_at, content_version, rule_version
+                        ) VALUES (?, ?, ?, ?, 'active', 5, 120, 100, 0, 0, 0, '{}', ?, ?, 'content-0.5', 'social-0.5.0')
+                        """,
+                        (sect_id, f"{prefix} test sect", f"{prefix}-test-sect", player_id, created_at, created_at),
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO sect_members(
+                            sect_id, player_id, role, status, contribution, joined_at,
+                            last_action_at, created_at, updated_at
+                        ) VALUES (?, ?, 'member', 'active', 0, ?, ?, ?, ?)
+                        """,
+                        (sect_id, player_id, created_at, created_at, created_at, created_at),
+                    )
+
+                await travel("虚空堡垒", "fortress")
+                advanced = await dispatch(f"{prefix}-void-l10", "晋升境界")
                 assert advanced.code == "REALM_LAYER_ADVANCED"
                 assert {item["key"] for item in advanced.data["unlocks"]} == {
                     "milestone.void_refining_late"
                 }
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    snapshot = json.loads(
+                        connection.execute(
+                            "SELECT snapshot_json FROM progression_milestones WHERE milestone_key = 'milestone.void_refining_late' AND player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                            (normalized.context.adapter, normalized.context.user_id),
+                        ).fetchone()[0]
+                    )
+                assert snapshot["void_route_count"] == snapshot["required_void_route_count"] == 3
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    row = connection.execute(
+                        "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (normalized.context.adapter, normalized.context.user_id),
+                    ).fetchone()
+                    inventory = json.loads(row[0])
+                    inventory["item.void_anchor"] = 2
+                    connection.execute(
+                        "UPDATE players SET void_merit=1000, inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (
+                            json.dumps(inventory),
+                            normalized.context.adapter,
+                            normalized.context.user_id,
+                        ),
+                    )
+                await travel("虚空集市", "market")
             await runtime.close()
 
     asyncio.run(run())

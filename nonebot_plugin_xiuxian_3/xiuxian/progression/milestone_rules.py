@@ -88,7 +88,7 @@ VOID_REFINING_LATE_MILESTONE = ProgressionMilestoneDefinition(
     required_total_cultivation=2_500_000,
     required_void_route_count=3,
     content_version="content-0.5",
-    rule_version="progression-0.5.0",
+    rule_version="progression-0.5.1",
 )
 
 MILESTONE_DEFINITIONS = (

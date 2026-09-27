@@ -10,10 +10,22 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.persistence.errors import QuestAlreadyCompletedError
 
 
 def _context(adapter: str, user: str, request: str, operation: str = "") -> CommandContext:
     return CommandContext(adapter=adapter, user_id=user, request_id=request, operation_id=operation)
+
+
+class MutableClock:
+    def __init__(self, value: datetime):
+        self.value = value
+
+    def __call__(self) -> datetime:
+        return self.value
+
+    def advance(self, **kwargs: int) -> None:
+        self.value += timedelta(**kwargs)
 
 
 async def _high_realm_player(
@@ -58,10 +70,11 @@ async def _high_realm_player(
 
 
 def _expire_void_route(runtime) -> None:
+    expired_at = (runtime.repository._now() - timedelta(seconds=1)).isoformat()
     with sqlite3.connect(runtime.settings.database_path) as db:
         db.execute(
             "UPDATE void_route_sessions SET ends_at = ? WHERE status = 'running'",
-            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),),
+            (expired_at,),
         )
 
 
@@ -248,10 +261,11 @@ def test_soul_transformation_permit_is_player_reachable_and_idempotent(
     asyncio.run(run())
 
 
-def test_void_permit_counts_failed_trials_and_requires_archive_delivery() -> None:
+def test_void_permit_trial_attempts_are_weekly_capped_and_require_archive_delivery() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            clock = MutableClock(datetime(2026, 1, 5, tzinfo=timezone.utc))
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
             for adapter in ("qq.official", "onebot.v11"):
                 user = f"quest-void-{adapter}"
                 await _high_realm_player(
@@ -276,13 +290,44 @@ def test_void_permit_counts_failed_trials_and_requires_archive_delivery() -> Non
                     _context(adapter, user, f"archive-without-route-{adapter}"), "探索档案遗迹"
                 )
                 assert legacy_blocked.code == "ARCHIVE_ROUTE_REQUIRED"
-                for index in range(3):
+                for index in range(5):
                     result = await runtime.dispatch(
                         _context(adapter, user, f"trial-{adapter}-{index}", f"trial-{adapter}-{index}"),
                         "开始界壁试炼",
                     )
                     assert result.code == "VOID_WALL_TRIAL_RECORDED"
                     assert result.data["progress"]["void_wall_trial"] == index + 1
+                    if index == 0:
+                        with pytest.raises(QuestAlreadyCompletedError):
+                            await runtime.repository.record_void_wall_trial(
+                                platform=adapter,
+                                platform_user_id=user,
+                                operation_id=f"trial-{adapter}-duplicate-evidence",
+                                battle_id=str(result.data["battle_id"]),
+                                outcome="won",
+                            )
+                blocked_trial = await runtime.dispatch(
+                    _context(adapter, user, f"trial-{adapter}-weekly-blocked", f"trial-{adapter}-weekly-blocked"),
+                    "开始界壁试炼",
+                )
+                assert blocked_trial.code == "QUEST_WEEKLY_LIMIT"
+                with sqlite3.connect(runtime.settings.database_path) as db:
+                    inventory = json.loads(
+                        db.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                    )
+                    assert inventory["item.void_anchor"] == 18
+                    assert inventory["item.void_crystal"] == 10
+
+                clock.advance(days=7)
+                next_week_trial = await runtime.dispatch(
+                    _context(adapter, user, f"trial-{adapter}-next-week", f"trial-{adapter}-next-week"),
+                    "开始界壁试炼",
+                )
+                assert next_week_trial.code == "VOID_WALL_TRIAL_RECORDED"
+                assert next_week_trial.data["progress"]["void_wall_trial"] == 6
                 started = await runtime.dispatch(
                     _context(adapter, user, f"archive-route-{adapter}"), "进入虚空航道 档案遗迹"
                 )

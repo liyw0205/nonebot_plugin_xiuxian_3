@@ -101,6 +101,21 @@ class WorldRepositoryMixin:
                     raise VoidRouteLockedError("void route requires void refining")
             elif not meets_realm(realm_key, realm_layer, "void_refining", 1):
                 raise VoidRouteLockedError("void route requires void refining")
+            if route_key == "void.sect_fortress":
+                sect_access = connection.execute(
+                    """
+                    SELECT 1 FROM sect_members AS member
+                    JOIN sects AS sect ON sect.sect_id = member.sect_id
+                    WHERE member.player_id = ? AND member.status = 'active'
+                      AND sect.status = 'active' AND sect.level >= 5
+                    LIMIT 1
+                    """,
+                    (row["id"],),
+                ).fetchone()
+                if sect_access is None:
+                    raise VoidRouteLockedError("an active member of a level-five sect is required")
+            if route_key == "void.void_market" and int(row["void_merit"]) < 1000:
+                raise VoidRouteLockedError("void merit 1000 is required")
             instability_until = row["void_instability_until"]
             unstable = False
             if instability_until:
@@ -257,11 +272,16 @@ class WorldRepositoryMixin:
             # key as the arrival location so downstream gates can require a
             # real archive arrival instead of a manually forged player state.
             arrival_location = str(session["route_key"])
+            discovered_route = connection.execute(
+                "SELECT 1 FROM void_route_sessions WHERE player_id = ? AND route_key = ? AND status = 'settled' LIMIT 1",
+                (row["id"], arrival_location),
+            ).fetchone()
             connection.execute(
-                "UPDATE players SET location_key = ?, inventory_json = ?, void_route_count = void_route_count + 1, void_instability_until = ?, updated_at = ? WHERE id = ?",
+                "UPDATE players SET location_key = ?, inventory_json = ?, void_route_count = void_route_count + ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
                 (
                     arrival_location,
                     json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    0 if discovered_route is not None else 1,
                     instability_until,
                     now_text,
                     row["id"],

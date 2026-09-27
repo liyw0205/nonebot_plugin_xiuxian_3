@@ -239,6 +239,15 @@ class SQLitePlayerRepository(
             )
             if connection.execute(
                 "SELECT 1 FROM schema_migrations WHERE migration_key=?",
+                ("world.void_route_discoveries.v0.5.2",),
+            ).fetchone() is None:
+                self._migrate_void_route_discovery_count(connection)
+                connection.execute(
+                    "INSERT INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                    ("world.void_route_discoveries.v0.5.2", serialize_datetime(self._now())),
+                )
+            if connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE migration_key=?",
                 ("progression.foundation_quality.v0.1.6",),
             ).fetchone() is None:
                 connection.execute(
@@ -740,6 +749,23 @@ class SQLitePlayerRepository(
         connection.execute(
             "CREATE UNIQUE INDEX idx_cultivation_sessions_active "
             "ON cultivation_sessions(player_id) WHERE status = 'running'"
+        )
+
+    @staticmethod
+    def _migrate_void_route_discovery_count(connection: sqlite3.Connection) -> None:
+        """Reconcile legacy counts using only routes whose old gates are provable."""
+
+        # Old route snapshots did not freeze the guild or merit gates.
+        connection.execute(
+            """
+            UPDATE players
+            SET void_route_count = (
+                SELECT COUNT(DISTINCT route_key)
+                FROM void_route_sessions
+                WHERE player_id = players.id AND status = 'settled'
+                  AND route_key IN ('void.first_route', 'void.archive_ruins')
+            )
+            """
         )
 
     @staticmethod

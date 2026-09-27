@@ -16,6 +16,7 @@ from ..persistence.errors import (
     QuestNotCompletedError,
     QuestRequirementError,
     QuestResourceInsufficientError,
+    QuestWeeklyLimitError,
 )
 from .endgame_repository import EndgameQuestRepositoryMixin
 from .models import QuestActionRecord, QuestClaimRecord, QuestStatusRecord
@@ -30,12 +31,15 @@ from .rules import (
     SOUL_QUEST,
     VOID_ARCHIVE_DELIVERY,
     VOID_QUEST,
+    VOID_QUEST_RULE_VERSION,
     VOID_TRIAL_TARGET,
+    VOID_TRIAL_WEEKLY_LIMIT,
     VOID_WALL_TRIAL,
     DAO_ORIGIN_TARGET,
     DAO_ORIGIN_TASKS,
     DAO_UNION_QUEST,
     meets_realm,
+    utc_week_bounds,
 )
 from .cross_realm_rules import DEMON_MAINLINE
 
@@ -235,6 +239,9 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             target=VOID_TRIAL_TARGET,
             outcome=outcome if outcome in {"won", "lost"} else "lost",
             reward_per_event=reward,
+            allow_repeats_after_target=True,
+            weekly_limit=VOID_TRIAL_WEEKLY_LIMIT,
+            rule_version=VOID_QUEST_RULE_VERSION,
             payload_extra={"battle_id": battle_id},
             evidence_battle_id=battle_id,
             evidence_battle_type="pve.void_wall_trial",
@@ -395,6 +402,9 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         evidence_battle_type: str | None = None,
         evidence_outcome: str | None = None,
         evidence_party_battle_id: str | None = None,
+        allow_repeats_after_target: bool = False,
+        weekly_limit: int | None = None,
+        rule_version: str = RULE_VERSION,
     ) -> QuestActionRecord:
         operation_name = quest_key if quest_key.startswith("quest.") else f"quest.{quest_key}"
         request_payload = {
@@ -415,9 +425,10 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             player = self._require_player(connection, platform, platform_user_id)
             if not meets_realm(str(player["realm_key"]), int(player["realm_layer"]), required_realm):
                 raise QuestRequirementError(f"{quest_key} requires {required_realm}")
+            event_source_operation_id = operation_id
             if evidence_battle_id is not None:
                 battle = connection.execute(
-                    "SELECT player_id, battle_type, status, result_json FROM battle_sessions WHERE battle_id = ?",
+                    "SELECT player_id, start_operation_id, battle_type, status, result_json FROM battle_sessions WHERE battle_id = ?",
                     (evidence_battle_id,),
                 ).fetchone()
                 if battle is None or int(battle["player_id"]) != int(player["id"]):
@@ -430,7 +441,14 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                     raise QuestRequirementError("battle evidence outcome is not eligible")
                 if quest_key == VOID_QUEST:
                     outcome = actual_outcome
-            event_source_operation_id = operation_id
+                    if component_key == VOID_WALL_TRIAL:
+                        event_source_operation_id = str(battle["start_operation_id"])
+                        duplicate_source = connection.execute(
+                            "SELECT 1 FROM quest_events WHERE player_id = ? AND quest_key = ? AND component_key = ? AND source_operation_id = ?",
+                            (player["id"], quest_key, component_key, event_source_operation_id),
+                        ).fetchone()
+                        if duplicate_source is not None:
+                            raise QuestAlreadyCompletedError("wall trial battle evidence was already used")
             if evidence_party_battle_id is not None:
                 battle = connection.execute(
                     """
@@ -459,8 +477,26 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 if duplicate_source is not None:
                     raise QuestAlreadyCompletedError("boundary-realm battle evidence was already used")
             count = self._event_count(connection, int(player["id"]), quest_key, component_key)
-            if count >= target:
+            if count >= target and not allow_repeats_after_target:
                 raise QuestAlreadyCompletedError("quest component reached its target")
+            if weekly_limit is not None:
+                week_start, week_end = utc_week_bounds(self._now())
+                weekly_count = connection.execute(
+                    """
+                    SELECT COUNT(*) AS count FROM quest_events
+                    WHERE player_id = ? AND quest_key = ? AND component_key = ?
+                      AND substr(created_at, 1, 10) >= ? AND substr(created_at, 1, 10) < ?
+                    """,
+                    (
+                        player["id"],
+                        quest_key,
+                        component_key,
+                        week_start.isoformat(),
+                        week_end.isoformat(),
+                    ),
+                ).fetchone()
+                if int(weekly_count["count"]) >= weekly_limit:
+                    raise QuestWeeklyLimitError("quest component weekly limit reached")
             final_cost_due = final_material_cost and count + 1 >= target
             material_cost = dict(material_cost_per_event or {})
             if final_cost_due:
@@ -498,6 +534,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 outcome=outcome,
                 payload={"count": count, "material_cost": material_cost, **(payload_extra or {})},
                 now_text=now_text,
+                rule_version=rule_version,
             )
             progress = {component_key: count}
             self._upsert_progress(

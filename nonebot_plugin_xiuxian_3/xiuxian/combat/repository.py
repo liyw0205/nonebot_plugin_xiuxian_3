@@ -22,6 +22,7 @@ from ..persistence.errors import (
     BattleRewardNotAvailableError,
     OperationConflictError,
     PlayerNotFoundError,
+    QuestWeeklyLimitError,
     RepositoryBusyError,
 )
 from .models import (
@@ -251,6 +252,31 @@ class CombatRepositoryMixin:
                     raise EventNotActiveError("demon invasion war front is closed")
 
             player = self._require_player(connection, platform, platform_user_id)
+            if battle_type == "pve.void_wall_trial":
+                from ..quests.rules import (
+                    VOID_QUEST,
+                    VOID_TRIAL_WEEKLY_LIMIT,
+                    VOID_WALL_TRIAL,
+                    utc_week_bounds,
+                )
+
+                week_start, week_end = utc_week_bounds(now)
+                trial_count = connection.execute(
+                    """
+                    SELECT COUNT(*) AS count FROM quest_events
+                    WHERE player_id = ? AND quest_key = ? AND component_key = ?
+                      AND substr(created_at, 1, 10) >= ? AND substr(created_at, 1, 10) < ?
+                    """,
+                    (
+                        player["id"],
+                        VOID_QUEST,
+                        VOID_WALL_TRIAL,
+                        week_start.isoformat(),
+                        week_end.isoformat(),
+                    ),
+                ).fetchone()
+                if int(trial_count["count"]) >= VOID_TRIAL_WEEKLY_LIMIT:
+                    raise QuestWeeklyLimitError("void wall trial weekly limit reached")
             if (
                 str(player["location_key"]) != enemy.location_key
                 and exploration_id is None

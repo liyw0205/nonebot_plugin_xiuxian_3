@@ -1584,6 +1584,10 @@ class QuestAlreadyCompletedError(RuntimeError):
     """The requested one-time quest component has already been completed."""
 
 
+class QuestWeeklyLimitError(RuntimeError):
+    """The player has exhausted this quest component's weekly attempts."""
+
+
 class QuestNotCompletedError(RuntimeError):
     """The player has not completed all required quest components."""
 

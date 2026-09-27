@@ -3,7 +3,7 @@
 本文件遵守 [版本内容开发合同](../../content-development-contract.md)。
 
 - `content_version`：`content-0.5`
-- `rule_version`：`progression-0.5.0`
+- `rule_version`：`progression-0.5.1`
 - 正式开放境界：`void_refining`（炼虚）。L1–L10 阈值和段位以[十层规范](layers.md)为准。
 - 写用例：`progression.breakthrough_void_refining`、`world.enter_void_route`。
 
@@ -12,14 +12,14 @@
 | 内容键 | 前置条件 | 成功结果 | 状态 |
 |:--|:--|:--|:--|
 | `void_refining` | 化神 L10 混元、总修为 `>=848,960`、完成 `quest.break_void` | 可创建炼虚突破 | `open` |
-| `milestone.void_refining_late` | 炼虚 L9 圆满、总修为 `>=2,500,000`、虚空航道发现 3 条 | 解锁合道前置与跨服宗门战资格 | `open` |
+| `milestone.void_refining_late` | 炼虚 L9 圆满、总修为 `>=2,500,000`、成功结算 3 条不同虚空航道 | 解锁合道前置与跨服宗门战资格 | `open` |
 | `quest.break_void` | 完成界壁试炼 3 次、上交虚空档案 1 份 | 给予炼虚许可 | `open` |
 
-`quest.break_void` 的三次界壁试炼按周计数，失败仍计一次参与但不产出虚空档案；每周最多 5 次，避免通过无限试炼刷许可。
+`quest.break_void` 累计要求至少 3 次界壁试炼参与，失败仍计入许可参与数但不产出虚空锚/虚空晶；每个 UTC 周最多开始 5 次，额度耗尽后下一周恢复。胜利每次发放虚空锚 2、虚空晶 2，周上限阻止无限刷取；重复参加不会重复增加已达到的许可门槛。
 
 当前运行时在 `progression.advance_layer` 成功进入炼虚 L9（或之后的层数），总修为达到
-2,500,000 且已发现至少 3 条虚空航道时，原子写入 `milestone.void_refining_late` 资格记录。
-快照冻结境界、层数、总修为、航道发现数、内容/规则版本和来源 operation；同一角色只会获得
+2,500,000 且已成功结算至少 3 个不同 `route_key` 时，原子写入 `milestone.void_refining_late` 资格记录。
+重复结算同一航道不会增加发现数，未结算和失败会话也不计入。快照冻结境界、层数、总修为、航道发现数、内容/规则版本和来源 operation；同一角色只会获得
 一次，并随晋升 operation 回放原结果。
 
 ## 2. 炼虚突破：`progression.breakthrough_void_refining`
@@ -30,7 +30,7 @@
 | 必需资源 | 世界功勋 500、灵石 80,000、领域能量 100 |
 | 会话锁 | 15 分钟，`preparing`；地点必须为 `void.first_route`、已结算的 `void.archive_ruins` 或 `cave.time_garden` |
 | 基础成功率 | 7,500 bp |
-| 航道发现加成 | 每条 +200 bp，最多 600 bp |
+| 航道发现加成 | 每条不同且已结算的航道 +200 bp，最多 600 bp |
 | 领域稳定加成 | `domain_power // 10` bp，最多 500 bp |
 | 失败保底 | 每次 +250 bp，最多 750 bp |
 | 最终夹断 | 7,500–9,200 bp |

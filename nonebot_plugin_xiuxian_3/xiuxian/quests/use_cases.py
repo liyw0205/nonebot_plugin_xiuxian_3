@@ -15,6 +15,7 @@ from ..persistence.errors import (
     QuestNotCompletedError,
     QuestRequirementError,
     QuestResourceInsufficientError,
+    QuestWeeklyLimitError,
     RepositoryBusyError,
 )
 from .repository import QuestRepositoryMixin
@@ -44,6 +45,7 @@ class QuestApplication:
             DaoOriginTaskRequirementError: ("ENDGAME_EVENT_REQUIREMENT_MISSING", "需要先进入合道且满足道源任务前置。"),
             QuestNotCompletedError: ("QUEST_REQUIREMENT_MISSING", "任务前置尚未完成，未发放许可。"),
             QuestAlreadyCompletedError: ("QUEST_ALREADY_COMPLETED", "这个任务环节已经完成。"),
+            QuestWeeklyLimitError: ("QUEST_WEEKLY_LIMIT", "界壁试炼每周最多 5 次，本周次数已用完。"),
             BattleRequirementError: ("BATTLE_REQUIREMENT_MISSING", "当前境界或位置不满足战斗前置。"),
             BattleBusyError: ("BATTLE_BUSY", "已有行动或战斗会话，请先完成后再试。"),
             BattleNotReadyError: ("BATTLE_NOT_READY", "服务器自动战斗尚未完成。"),
@@ -348,7 +350,7 @@ class QuestApplication:
         return CommandResult(
             True,
             "VOID_WALL_TRIAL_RECORDED",
-            f"## 界壁试炼已记录\n\n- **结果**：{outcome}\n- **参与次数**：{evidence.progress.get(VOID_WALL_TRIAL, 0)}/3\n\n> 失败仍计一次参与，但不会产出虚空档案。",
+            f"## 界壁试炼已记录\n\n- **结果**：{outcome}\n- **累计参与**：{evidence.progress.get(VOID_WALL_TRIAL, 0)} 次（许可要求至少 3 次）\n\n> 失败仍计一次参与，但不会产出虚空档案。",
             context.request_id,
             operation_id,
             data={"battle_id": resolved.battle_id, "outcome": resolved.outcome, "progress": evidence.progress},

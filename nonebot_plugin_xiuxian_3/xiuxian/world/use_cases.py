@@ -497,11 +497,14 @@ class WorldApplication:
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except VoidRouteLockedError:
-            message = (
-                "化神角色须先完成三次界壁试炼，或先达到炼虚 L1；未扣除资源。"
-                if route_key == "void.archive_ruins"
-                else "需要炼虚 L1 才能进入虚空航道，未扣除资源。"
-            )
+            if route_key == "void.archive_ruins":
+                message = "化神角色须先完成三次界壁试炼，或先达到炼虚 L1；未扣除资源。"
+            elif route_key == "void.sect_fortress":
+                message = "需要加入有效的 5 级宗门才能进入虚空堡垒航道，未扣除资源。"
+            elif route_key == "void.void_market":
+                message = "需要虚空功勋达到 1000 才能进入虚空集市航道，未扣除资源。"
+            else:
+                message = "需要炼虚 L1 才能进入虚空航道，未扣除资源。"
             return CommandResult(False, "VOID_ROUTE_LOCKED", message, context.request_id, operation_id)
         except VoidInstabilityActiveError:
             return CommandResult(False, "VOID_INSTABILITY_ACTIVE", "虚空不稳定期间不能进入这条高风险航道，未扣除资源。", context.request_id, operation_id)

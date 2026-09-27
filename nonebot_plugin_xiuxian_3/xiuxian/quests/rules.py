@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta, timezone
+
 CONTENT_VERSION = "content-0.5"
 RULE_VERSION = "quests-0.5.0"
+VOID_QUEST_RULE_VERSION = "quests-0.5.1"
 
 SOUL_QUEST = "quest.soul_transformation"
 DOMAIN_COMMISSION = "quest.domain_material_commission"
@@ -17,6 +20,15 @@ VOID_ARCHIVE_DELIVERY = "void_archive_delivery"
 DOMAIN_COMMISSION_TARGET = 3
 ANCIENT_DOMAIN_TARGET = 3
 VOID_TRIAL_TARGET = 3
+VOID_TRIAL_WEEKLY_LIMIT = 5
+
+
+def utc_week_bounds(value: datetime) -> tuple[date, date]:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    utc_date = value.astimezone(timezone.utc).date()
+    start = utc_date - timedelta(days=utc_date.weekday())
+    return start, start + timedelta(days=7)
 
 DAO_UNION_QUEST = "quest.dao_union"
 DAO_UNION_FRAGMENT_REWARD = 12
@@ -84,7 +96,9 @@ __all__ = [
     "SOUL_QUEST",
     "VOID_ARCHIVE_DELIVERY",
     "VOID_QUEST",
+    "VOID_QUEST_RULE_VERSION",
     "VOID_TRIAL_TARGET",
+    "VOID_TRIAL_WEEKLY_LIMIT",
     "VOID_WALL_TRIAL",
     "DAO_ORIGIN_BUILD",
     "DAO_ORIGIN_CONTENT_VERSION",
@@ -109,4 +123,5 @@ __all__ = [
     "DAO_UNION_RULE_VERSION",
     "DAO_UNION_WORK",
     "meets_realm",
+    "utc_week_bounds",
 ]

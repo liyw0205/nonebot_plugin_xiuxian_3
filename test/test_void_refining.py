@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.persistence.sqlite_repository import SQLitePlayerRepository
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 
 
@@ -29,6 +30,36 @@ def _past_route(runtime, session_id: str) -> None:
             "UPDATE void_route_sessions SET ends_at = ? WHERE session_id = ?",
             ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), session_id),
         )
+
+
+def test_void_route_discovery_migration_counts_distinct_settled_routes() -> None:
+    with sqlite3.connect(":memory:") as connection:
+        connection.executescript(
+            """
+            CREATE TABLE players (id INTEGER PRIMARY KEY, void_route_count INTEGER NOT NULL);
+            CREATE TABLE void_route_sessions (
+                player_id INTEGER NOT NULL,
+                route_key TEXT NOT NULL,
+                status TEXT NOT NULL
+            );
+            CREATE TABLE progression_milestones (milestone_key TEXT PRIMARY KEY, status TEXT NOT NULL);
+            INSERT INTO players VALUES (1, 4);
+            INSERT INTO void_route_sessions VALUES
+                (1, 'void.first_route', 'settled'),
+                (1, 'void.first_route', 'settled'),
+                (1, 'void.archive_ruins', 'settled'),
+                (1, 'void.void_market', 'settled'),
+                (1, 'void.sect_fortress', 'settled');
+            INSERT INTO progression_milestones VALUES ('milestone.void_refining_late', 'unlocked');
+            """
+        )
+
+        SQLitePlayerRepository._migrate_void_route_discovery_count(connection)
+
+        assert connection.execute("SELECT void_route_count FROM players WHERE id=1").fetchone()[0] == 2
+        assert connection.execute(
+            "SELECT status FROM progression_milestones WHERE milestone_key='milestone.void_refining_late'"
+        ).fetchone()[0] == "unlocked"
 
 
 async def _prepare_void_player(runtime, user: str, *, adapter: str = "web") -> None:
@@ -274,7 +305,7 @@ def test_higher_realms_can_reenter_archive_route_on_both_adapters() -> None:
                         "SELECT snapshot_json FROM void_route_sessions WHERE session_id=?",
                         (started.data["session_id"],),
                     ).fetchone()[0]
-                assert json.loads(snapshot_json)["rule_version"] == "world-0.5.1"
+                assert json.loads(snapshot_json)["rule_version"] == "world-0.5.2"
             await runtime.close()
 
     asyncio.run(run())
