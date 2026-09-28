@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -13,13 +13,13 @@ from ...contracts import serialize_datetime
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .tower_models import TowerPreviewRecord, TowerRewardRecord, TowerRunRecord
 from .tower_rules import (
-    CONTENT_VERSION,
     MAX_FLOOR,
-    RULE_VERSION,
     TOWER_KEY,
+    attempt_band_for,
     floor_definition,
     practice_week_start,
     reward_for,
+    versions_for_floor,
 )
 from ..persistence.errors import (
     OperationConflictError,
@@ -57,8 +57,8 @@ class TowerRepositoryMixin:
             definition = floor_definition(max(next_floor, 1))
             start = now.date().isoformat()
             daily_used = int(connection.execute(
-                "SELECT COUNT(*) FROM tower_runs WHERE player_id=? AND status<>'aborted' AND substr(created_at,1,10)=? AND floor_no BETWEEN ? AND ?",
-                (player["id"], start, *_floor_band(next_floor)),
+                "SELECT COUNT(*) FROM tower_runs WHERE player_id=? AND tower_key=? AND status<>'aborted' AND substr(created_at,1,10)=? AND floor_no BETWEEN ? AND ?",
+                (player["id"], TOWER_KEY, start, *attempt_band_for(next_floor)),
             ).fetchone()[0])
             week_start = practice_week_start(now)
             practice_used = int(connection.execute(
@@ -111,13 +111,14 @@ class TowerRepositoryMixin:
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
         operation_name = "specials.start_tower"
+        content_version, rule_version = versions_for_floor(floor_no)
         payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
             "tower_key": TOWER_KEY,
             "floor_no": floor_no,
-            "content_version": CONTENT_VERSION,
-            "rule_version": RULE_VERSION,
+            "content_version": content_version,
+            "rule_version": rule_version,
         }
         request_hash = self._request_hash(operation_name, payload)
         now = self._now()
@@ -164,10 +165,10 @@ class TowerRepositoryMixin:
                 (player["id"], TOWER_KEY, floor_no),
             ).fetchone()
             first_clear = existing_clear is None
-            band_start, band_end = _floor_band(floor_no)
+            band_start, band_end = attempt_band_for(floor_no)
             daily_used = int(connection.execute(
-                "SELECT COUNT(*) FROM tower_runs WHERE player_id=? AND status<>'aborted' AND substr(created_at,1,10)=? AND floor_no BETWEEN ? AND ?",
-                (player["id"], now.date().isoformat(), band_start, band_end),
+                "SELECT COUNT(*) FROM tower_runs WHERE player_id=? AND tower_key=? AND status<>'aborted' AND substr(created_at,1,10)=? AND floor_no BETWEEN ? AND ?",
+                (player["id"], TOWER_KEY, now.date().isoformat(), band_start, band_end),
             ).fetchone()[0])
             if daily_used >= definition.daily_limit:
                 raise TowerQuotaError("daily tower attempts are exhausted")
@@ -197,8 +198,8 @@ class TowerRepositoryMixin:
                 """,
                 (
                     run_id, player["id"], TOWER_KEY, floor_no, int(first_clear), now_text,
-                    json.dumps(reward, ensure_ascii=False, sort_keys=True), CONTENT_VERSION,
-                    RULE_VERSION, now_text, now_text,
+                    json.dumps(reward, ensure_ascii=False, sort_keys=True), content_version,
+                    rule_version, now_text, now_text,
                 ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
@@ -340,7 +341,7 @@ class TowerRepositoryMixin:
                 connection, player_id=int(player["id"]), operation_id=operation_id,
                 occurred_at=now, reward=reward, snapshot={"source": TOWER_KEY, "floor_no": int(run["floor_no"])},
             )
-            if not bool(run["first_clear"]) or int(run["floor_no"]) in {5, 10}:
+            if not bool(run["first_clear"]) or int(run["floor_no"]) in {5, 10, 35, 40, 45}:
                 record_codex_discovery(
                     connection,
                     player_id=int(player["id"]),
@@ -438,14 +439,6 @@ class TowerRepositoryMixin:
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             already_completed=replay,
         )
-
-
-def _floor_band(floor_no: int) -> tuple[int, int]:
-    if floor_no <= 10:
-        return 1, 10
-    if floor_no <= 20:
-        return 11, 20
-    return 21, 30
 
 
 __all__ = ["TowerRepositoryMixin"]

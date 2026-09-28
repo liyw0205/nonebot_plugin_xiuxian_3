@@ -53,7 +53,7 @@ _ENTRY_LABELS = {
     "codex.story.dispatch_beast_relocation": ("story", "妖界迁徙线索"),
     "codex.story.beast_habitat": ("story", "万兽栖地保护记录"),
 }
-for _floor_no in range(1, 31):
+for _floor_no in range(1, 46):
     _ENTRY_LABELS.setdefault(
         f"codex.challenge.mist_trial.floor_{_floor_no}",
         ("challenge", f"雾隐试炼塔第 {_floor_no} 层"),

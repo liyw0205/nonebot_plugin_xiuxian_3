@@ -7,10 +7,12 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 
-CONTENT_VERSION = "content-0.1"
-RULE_VERSION = "specials-0.1.2"
+CONTENT_VERSION = "content-0.2"
+RULE_VERSION = "specials-0.2.0"
+LEGACY_CONTENT_VERSION = "content-0.1"
+LEGACY_RULE_VERSION = "specials-0.1.2"
 TOWER_KEY = "tower.mist_trial"
-MAX_FLOOR = 30
+MAX_FLOOR = 45
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,13 +27,15 @@ class TowerFloorDefinition:
 
 def floor_definition(floor_no: int) -> TowerFloorDefinition:
     if not isinstance(floor_no, int) or isinstance(floor_no, bool) or not 1 <= floor_no <= MAX_FLOOR:
-        raise ValueError("tower floor must be between 1 and 30")
+        raise ValueError(f"tower floor must be between 1 and {MAX_FLOOR}")
     if floor_no <= 10:
         realm, layer, cost, limit, tier = "qi_sensing", 1, 4, 5, "sensing"
     elif floor_no <= 20:
         realm, layer, cost, limit, tier = "qi_gathering", 4, 6, 4, "gathering"
-    else:
+    elif floor_no <= 30:
         realm, layer, cost, limit, tier = "foundation", 4, 8, 3, "foundation"
+    else:
+        realm, layer, cost, limit, tier = "golden_core", 3, 10, 3, "golden_core"
     suffix = "_boss" if floor_no % 5 == 0 else ""
     return TowerFloorDefinition(
         floor_no=floor_no,
@@ -50,16 +54,38 @@ def reward_for(floor_no: int, seed: str, *, first_clear: bool) -> dict[str, int]
             reward = {"spirit_stones": 10, "item.mat.array_sand": 1}
         elif floor_no <= 20:
             reward = {"spirit_stones": 20, "item.mat.array_sand": 1 + roll % 2}
-        else:
+        elif floor_no <= 30:
             reward = {"spirit_stones": 35, "item.mat.array_sand": 2}
+        else:
+            reward = {"spirit_stones": 60, "item.mat.array_sand": 2}
         if floor_no in {15, 20}:
             reward["item.clue.recipe_basic"] = 1
         if floor_no in {25, 30}:
             reward["item.clue.mist_cave_route"] = 1
+        if floor_no in {35, 40, 45}:
+            reward["item.clue.recipe_basic"] = 1
         if floor_no in {5, 10}:
             reward["local_reputation"] = 5
         return reward
     return {"item.mat.array_sand": 1} if roll % 2 else {}
+
+
+def versions_for_floor(floor_no: int) -> tuple[str, str]:
+    floor_definition(floor_no)
+    if floor_no <= 30:
+        return LEGACY_CONTENT_VERSION, LEGACY_RULE_VERSION
+    return CONTENT_VERSION, RULE_VERSION
+
+
+def attempt_band_for(floor_no: int) -> tuple[int, int]:
+    floor_definition(floor_no)
+    if floor_no <= 10:
+        return 1, 10
+    if floor_no <= 20:
+        return 11, 20
+    if floor_no <= 30:
+        return 21, 30
+    return 31, 45
 
 
 def practice_week_start(value) -> str:
@@ -68,11 +94,15 @@ def practice_week_start(value) -> str:
 
 __all__ = [
     "CONTENT_VERSION",
+    "LEGACY_CONTENT_VERSION",
+    "LEGACY_RULE_VERSION",
     "MAX_FLOOR",
     "RULE_VERSION",
     "TOWER_KEY",
     "TowerFloorDefinition",
+    "attempt_band_for",
     "floor_definition",
     "practice_week_start",
     "reward_for",
+    "versions_for_floor",
 ]

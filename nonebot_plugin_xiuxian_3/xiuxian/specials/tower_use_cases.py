@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from .tower_rules import MAX_FLOOR
 from ..persistence.errors import (
     BattleBusyError,
     BattleRequirementError,
@@ -94,7 +95,7 @@ class TowerApplication:
             state = "无进行中的塔层"
         message = (
             "## 雾隐试炼塔\n\n"
-            f"- **最高首通**：{record.highest_floor}/30 层\n"
+            f"- **最高首通**：{record.highest_floor}/{MAX_FLOOR} 层\n"
             f"- **下一层**：{record.next_floor}\n"
             f"- **入场体力**：{record.stamina_cost}\n"
             f"- **今日层段次数**：{record.daily_used}/{record.daily_limit}\n"
@@ -119,10 +120,10 @@ class TowerApplication:
 
     async def challenge(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1 or not context.command_args[0].isdigit():
-            return CommandResult(False, "INVALID_TOWER_COMMAND", "请使用 `挑战试炼塔 <1-30>`。", context.request_id)
+            return CommandResult(False, "INVALID_TOWER_COMMAND", f"请使用 `挑战试炼塔 <1-{MAX_FLOOR}>`。", context.request_id)
         floor_no = int(context.command_args[0])
-        if not 1 <= floor_no <= 30:
-            return CommandResult(False, "INVALID_TOWER_COMMAND", "试炼塔楼层范围为 1 至 30。", context.request_id)
+        if not 1 <= floor_no <= MAX_FLOOR:
+            return CommandResult(False, "INVALID_TOWER_COMMAND", f"试炼塔楼层范围为 1 至 {MAX_FLOOR}。", context.request_id)
         operation_id = self._operation_id(context, "specials.start_tower")
         try:
             record = await self.repository.start_tower_run(

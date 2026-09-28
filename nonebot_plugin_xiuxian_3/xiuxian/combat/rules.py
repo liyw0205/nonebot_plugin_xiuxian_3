@@ -525,6 +525,36 @@ MIST_TRIAL_FOUNDATION_BOSS = EnemyDefinition(
     reward={},
 )
 
+MIST_TRIAL_GOLDEN_CORE = EnemyDefinition(
+    key="enemy.mist_trial.golden_core",
+    label="金丹层试炼影",
+    location_key="tower.mist_trial",
+    required_realm="golden_core",
+    required_layer=3,
+    max_hp=2400,
+    attack=250,
+    initiative=20,
+    agility=22,
+    skill_key="enemy_skill.mist_exposed",
+    random_pool="battle.enemy.mist_trial.golden_core.v0.2",
+    reward={},
+)
+
+MIST_TRIAL_GOLDEN_CORE_BOSS = EnemyDefinition(
+    key="enemy.mist_trial.golden_core_boss",
+    label="金丹层守将",
+    location_key="tower.mist_trial",
+    required_realm="golden_core",
+    required_layer=3,
+    max_hp=3600,
+    attack=330,
+    initiative=25,
+    agility=28,
+    skill_key="enemy_skill.mist_exposed",
+    random_pool="battle.enemy.mist_trial.golden_core_boss.v0.2",
+    reward={},
+)
+
 ENEMIES = {
     TRAINING_DUMMY.key: TRAINING_DUMMY,
     WOOD_RAT.key: WOOD_RAT,
@@ -558,6 +588,8 @@ ENEMIES = {
     MIST_TRIAL_GATHERING_BOSS.key: MIST_TRIAL_GATHERING_BOSS,
     MIST_TRIAL_FOUNDATION.key: MIST_TRIAL_FOUNDATION,
     MIST_TRIAL_FOUNDATION_BOSS.key: MIST_TRIAL_FOUNDATION_BOSS,
+    MIST_TRIAL_GOLDEN_CORE.key: MIST_TRIAL_GOLDEN_CORE,
+    MIST_TRIAL_GOLDEN_CORE_BOSS.key: MIST_TRIAL_GOLDEN_CORE_BOSS,
 }
 
 

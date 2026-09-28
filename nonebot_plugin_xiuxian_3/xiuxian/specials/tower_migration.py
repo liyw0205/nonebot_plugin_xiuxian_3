@@ -13,7 +13,7 @@ def ensure_tower_schema(connection: sqlite3.Connection) -> None:
             run_id TEXT NOT NULL UNIQUE,
             player_id INTEGER NOT NULL REFERENCES players(id),
             tower_key TEXT NOT NULL,
-            floor_no INTEGER NOT NULL CHECK (floor_no BETWEEN 1 AND 30),
+            floor_no INTEGER NOT NULL CHECK (floor_no BETWEEN 1 AND 45),
             status TEXT NOT NULL CHECK (status IN ('battle_running', 'reward_pending', 'lost', 'claimed', 'aborted')),
             battle_id TEXT UNIQUE,
             first_clear INTEGER NOT NULL CHECK (first_clear IN (0, 1)),
@@ -44,6 +44,47 @@ def ensure_tower_schema(connection: sqlite3.Connection) -> None:
         );
         """
     )
+    table = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='tower_runs'"
+    ).fetchone()
+    if table is not None and "BETWEEN 1 AND 45" not in str(table[0]):
+        connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute("DROP INDEX IF EXISTS idx_tower_runs_player_floor")
+        connection.execute("DROP INDEX IF EXISTS idx_tower_runs_active_player")
+        connection.execute(
+            """
+            CREATE TABLE tower_runs_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL UNIQUE,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                tower_key TEXT NOT NULL,
+                floor_no INTEGER NOT NULL CHECK (floor_no BETWEEN 1 AND 45),
+                status TEXT NOT NULL CHECK (status IN ('battle_running', 'reward_pending', 'lost', 'claimed', 'aborted')),
+                battle_id TEXT UNIQUE,
+                first_clear INTEGER NOT NULL CHECK (first_clear IN (0, 1)),
+                starts_at TEXT NOT NULL,
+                result_json TEXT NOT NULL DEFAULT '{}',
+                reward_json TEXT NOT NULL DEFAULT '{}',
+                content_version TEXT NOT NULL,
+                rule_version TEXT NOT NULL,
+                claim_operation_id TEXT UNIQUE,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute("INSERT INTO tower_runs_new SELECT * FROM tower_runs")
+        connection.execute("DROP TABLE tower_runs")
+        connection.execute("ALTER TABLE tower_runs_new RENAME TO tower_runs")
+        connection.execute(
+            "CREATE INDEX idx_tower_runs_player_floor "
+            "ON tower_runs(player_id, tower_key, floor_no, created_at)"
+        )
+        connection.execute(
+            "CREATE UNIQUE INDEX idx_tower_runs_active_player "
+            "ON tower_runs(player_id) WHERE status IN ('battle_running', 'reward_pending')"
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
 
 
 __all__ = ["ensure_tower_schema"]

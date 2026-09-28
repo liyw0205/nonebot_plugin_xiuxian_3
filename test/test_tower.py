@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import enemy_definition
+from nonebot_plugin_xiuxian_3.xiuxian.specials.tower_migration import ensure_tower_schema
 from nonebot_plugin_xiuxian_3.xiuxian.specials.tower_rules import floor_definition, reward_for
 
 
@@ -151,6 +152,272 @@ def test_mist_trial_tower_floor_rules_match_v01_bands_and_bosses() -> None:
     assert reward_for(20, "seed", first_clear=True)["item.clue.recipe_basic"] == 1
     assert reward_for(25, "seed", first_clear=True)["item.clue.mist_cave_route"] == 1
     assert reward_for(30, "seed", first_clear=True)["item.clue.mist_cave_route"] == 1
+
+
+def test_mist_trial_tower_v02_rules_are_a_separate_band() -> None:
+    assert (floor_definition(31).required_realm, floor_definition(31).required_layer) == ("golden_core", 3)
+    assert (floor_definition(31).stamina_cost, floor_definition(31).daily_limit) == (10, 3)
+    assert floor_definition(34).enemy_key == "enemy.mist_trial.golden_core"
+    for floor_no in (35, 40, 45):
+        assert floor_definition(floor_no).enemy_key == "enemy.mist_trial.golden_core_boss"
+        assert reward_for(floor_no, "seed", first_clear=True) == {
+            "spirit_stones": 60,
+            "item.mat.array_sand": 2,
+            "item.clue.recipe_basic": 1,
+        }
+    assert reward_for(31, "seed", first_clear=True) == {
+        "spirit_stones": 60,
+        "item.mat.array_sand": 2,
+    }
+    assert reward_for(35, "seed", first_clear=False) in ({}, {"item.mat.array_sand": 1})
+
+
+def test_tower_schema_migration_expands_floor_check_and_preserves_claim_foreign_keys() -> None:
+    with sqlite3.connect(":memory:") as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("CREATE TABLE players(id INTEGER PRIMARY KEY)")
+        connection.execute("INSERT INTO players(id) VALUES (1)")
+        connection.executescript(
+            """
+            CREATE TABLE tower_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL UNIQUE,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                tower_key TEXT NOT NULL,
+                floor_no INTEGER NOT NULL CHECK (floor_no BETWEEN 1 AND 30),
+                status TEXT NOT NULL CHECK (status IN ('battle_running', 'reward_pending', 'lost', 'claimed', 'aborted')),
+                battle_id TEXT UNIQUE,
+                first_clear INTEGER NOT NULL CHECK (first_clear IN (0, 1)),
+                starts_at TEXT NOT NULL,
+                result_json TEXT NOT NULL DEFAULT '{}',
+                reward_json TEXT NOT NULL DEFAULT '{}',
+                content_version TEXT NOT NULL,
+                rule_version TEXT NOT NULL,
+                claim_operation_id TEXT UNIQUE,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE tower_reward_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL UNIQUE REFERENCES tower_runs(run_id),
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                floor_no INTEGER NOT NULL,
+                first_clear INTEGER NOT NULL CHECK (first_clear IN (0, 1)),
+                operation_id TEXT NOT NULL UNIQUE,
+                reward_json TEXT NOT NULL,
+                content_version TEXT NOT NULL,
+                rule_version TEXT NOT NULL,
+                claimed_at TEXT NOT NULL
+            );
+            """
+        )
+        connection.execute(
+            "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,starts_at,"
+            "result_json,reward_json,content_version,rule_version,created_at,updated_at) "
+            "VALUES('old-run',1,'tower.mist_trial',30,'claimed',1,'2026-01-01','{}','{}',"
+            "'content-0.1','specials-0.1.2','2026-01-01','2026-01-01')"
+        )
+        connection.execute(
+            "INSERT INTO tower_reward_claims(run_id,player_id,floor_no,first_clear,operation_id,"
+            "reward_json,content_version,rule_version,claimed_at) VALUES('old-run',1,30,1,'old-claim',"
+            "'{}','content-0.1','specials-0.1.2','2026-01-01')"
+        )
+        connection.commit()
+
+        ensure_tower_schema(connection)
+        ensure_tower_schema(connection)
+
+        connection.execute(
+            "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,starts_at,"
+            "result_json,reward_json,content_version,rule_version,created_at,updated_at) "
+            "VALUES('new-run',1,'tower.mist_trial',45,'claimed',1,'2026-01-02','{}','{}',"
+            "'content-0.2','specials-0.2.0','2026-01-02','2026-01-02')"
+        )
+        assert connection.execute(
+            "SELECT run_id, floor_no, content_version FROM tower_runs ORDER BY id"
+        ).fetchall() == [
+            ("old-run", 30, "content-0.1"),
+            ("new-run", 45, "content-0.2"),
+        ]
+        assert connection.execute("SELECT run_id, operation_id FROM tower_reward_claims").fetchall() == [
+            ("old-run", "old-claim")
+        ]
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_tower_v01_start_operation_hash_remains_replayable_after_expansion() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            adapter = "qq.official"
+            user = "tower-v01-hash-compat"
+            await _enter_tower_eligible_path(runtime, adapter, user, "tower-v01-hash")
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                ).fetchone()[0]
+                now = "2026-01-01T00:00:00+00:00"
+                connection.execute(
+                    "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,"
+                    "starts_at,result_json,reward_json,content_version,rule_version,created_at,updated_at) "
+                    "VALUES('v01-existing-run',?,'tower.mist_trial',1,'claimed',1,?,'{}','{}',"
+                    "'content-0.1','specials-0.1.2',?,?)",
+                    (player_id, now, now, now),
+                )
+                old_payload = {
+                    "platform": adapter,
+                    "platform_user_id": user,
+                    "tower_key": "tower.mist_trial",
+                    "floor_no": 1,
+                    "content_version": "content-0.1",
+                    "rule_version": "specials-0.1.2",
+                }
+                old_hash = runtime.repository._request_hash("specials.start_tower", old_payload)
+                connection.execute(
+                    "INSERT INTO operations(operation_id,operation_name,player_id,request_hash,result_json,created_at) "
+                    "VALUES('old-v01-start','specials.start_tower',?,?,?,?)",
+                    (
+                        player_id,
+                        old_hash,
+                        json.dumps(
+                            {"run_id": "v01-existing-run", "tower_key": "tower.mist_trial", "floor_no": 1},
+                            sort_keys=True,
+                        ),
+                        now,
+                    ),
+                )
+
+            replay = await _send(runtime, adapter, user, "old-v01-start", "挑战试炼塔 1")
+            assert replay.code == "TOWER_CHALLENGE_SETTLED"
+            assert replay.data["idempotent_replay"] is True
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM tower_runs WHERE player_id=?", (player_id,)
+                ).fetchone()[0] == 1
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_mist_trial_tower_upper_floors_and_quotas_on_both_adapters() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 28, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            for adapter in ("qq.official", "onebot.v11"):
+                prefix = adapter.replace(".", "-")
+                users = {floor_no: f"tower-v02-{prefix}-{floor_no}" for floor_no in (31, 35, 40, 45)}
+                for floor_no, user in users.items():
+                    await _enter_tower_eligible_path(runtime, adapter, user, f"{prefix}-{floor_no}")
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        player_id = connection.execute(
+                            "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                        connection.execute(
+                            "UPDATE players SET realm_key='golden_core',realm_layer=2,stamina=100,"
+                            "stamina_max=100,qualification_json=?,max_hp=30000,initiative=30000 "
+                            "WHERE id=?",
+                            (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                        )
+                        connection.execute(
+                            "UPDATE players SET realm_layer=3 WHERE id=?", (player_id,)
+                        )
+                        historical = "2026-09-01T00:00:00+00:00"
+                        connection.executemany(
+                            "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,"
+                            "starts_at,result_json,reward_json,content_version,rule_version,created_at,updated_at) "
+                            "VALUES(?,?,'tower.mist_trial',?,'claimed',1,?,'{}','{}','content-0.1',"
+                            "'specials-0.1.2',?,?)",
+                            [
+                                (f"history-{player_id}-{previous_floor}", player_id, previous_floor,
+                                 historical, historical, historical)
+                                for previous_floor in range(1, floor_no)
+                            ],
+                        )
+
+                    if floor_no == 31:
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            connection.execute(
+                                "UPDATE players SET realm_layer=2 WHERE platform=? AND platform_user_id=?",
+                                (adapter, user),
+                            )
+                        denied = await _send(
+                            runtime, adapter, user, f"{prefix}-31-underlevel", "挑战试炼塔 31"
+                        )
+                        assert denied.code == "TOWER_REQUIREMENT_MISSING"
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            connection.execute(
+                                "UPDATE players SET realm_layer=3 WHERE platform=? AND platform_user_id=?",
+                                (adapter, user),
+                            )
+
+                    challenge = await _send(
+                        runtime, adapter, user, f"{prefix}-floor-{floor_no}",
+                        f"挑战试炼塔 {floor_no}",
+                    )
+                    assert challenge.code == "TOWER_CHALLENGE_SETTLED"
+                    assert challenge.data["outcome"] == "won"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        snapshot_json, content_version, rule_version = connection.execute(
+                            "SELECT b.snapshot_json,t.content_version,t.rule_version FROM battle_sessions b "
+                            "JOIN tower_runs t ON t.battle_id=b.battle_id WHERE t.run_id=?",
+                            (challenge.data["run_id"],),
+                        ).fetchone()
+                    enemy_key = json.loads(snapshot_json)["enemy"]["key"]
+                    expected_enemy = (
+                        "enemy.mist_trial.golden_core_boss"
+                        if floor_no in (35, 40, 45)
+                        else "enemy.mist_trial.golden_core"
+                    )
+                    assert enemy_key == expected_enemy
+                    assert (content_version, rule_version) == ("content-0.2", "specials-0.2.0")
+
+                    claimed = await _send(
+                        runtime, adapter, user, f"{prefix}-claim-{floor_no}", "领取试炼塔奖励"
+                    )
+                    assert claimed.code == "TOWER_REWARD_CLAIMED"
+                    expected_reward = {"spirit_stones": 60, "item.mat.array_sand": 2}
+                    if floor_no in (35, 40, 45):
+                        expected_reward["item.clue.recipe_basic"] = 1
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            assert connection.execute(
+                                "SELECT 1 FROM codex_entries c JOIN players p ON p.id=c.player_id "
+                                "WHERE p.platform=? AND p.platform_user_id=? AND c.entry_key=?",
+                                (
+                                    adapter,
+                                    user,
+                                    f"codex.challenge.mist_trial.floor_{floor_no}",
+                                ),
+                            ).fetchone() is not None
+                    assert claimed.data["reward"] == expected_reward
+
+                    if floor_no == 31:
+                        for next_floor in (32, 33):
+                            next_challenge = await _send(
+                                runtime, adapter, user, f"{prefix}-floor-{next_floor}",
+                                f"挑战试炼塔 {next_floor}",
+                            )
+                            assert next_challenge.data["outcome"] == "won"
+                            next_claim = await _send(
+                                runtime, adapter, user, f"{prefix}-claim-{next_floor}",
+                                "领取试炼塔奖励",
+                            )
+                            assert next_claim.code == "TOWER_REWARD_CLAIMED"
+                        capped = await _send(
+                            runtime, adapter, user, f"{prefix}-floor-34-capped", "挑战试炼塔 34"
+                        )
+                        assert capped.code == "TOWER_ATTEMPT_CAP"
+                        clock.advance(days=1)
+                        retry = await _send(
+                            runtime, adapter, user, f"{prefix}-floor-34-next-day", "挑战试炼塔 34"
+                        )
+                        assert retry.code == "TOWER_CHALLENGE_SETTLED"
+                        assert retry.data["outcome"] == "won"
+
+            await runtime.close()
+
+    asyncio.run(run())
 
 
 def test_tower_battle_start_failure_refunds_stamina_and_attempt_quota(monkeypatch) -> None:

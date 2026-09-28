@@ -3,10 +3,10 @@
 特色玩法域提供六类可长期重复或累积的目标：挂机收益、派遣任务、图鉴收集、试炼塔、竞技场和多结局剧情线。它们是核心玩法，不属于已移除的媒体/小游戏/第三方娱乐系统。
 
 挂机收益四条 v0.1 路线、派遣三条 v0.1 任务、v0.1 基础图鉴、雾隐试炼塔
-`tower.mist_trial` 1–30 层、异步 `arena.spar`、`arena.practice`、`arena.rank`、
+`tower.mist_trial` 1–45 层（v0.1 1–30，v0.2 扩至 45）、异步 `arena.spar`、`arena.practice`、`arena.rank`、
 `arena.three_realms`、`arena.team` 和 `story.xuantian.road` 三分支切片均已接通。
 试炼塔支持首通/练习、层段准入、每日/每周限额、特殊奖励、恢复和 operation 重放；QQ 官方与
-OneBot V11 覆盖首领、战败、额度、功业、境界边界及全部特殊奖励领奖。故事支持查询、寻仙问道后
+OneBot V11 覆盖 5/10/15/20/25/30/35/40/45 层首领、战败、额度、功业、境界边界及全部特殊奖励领奖。故事支持查询、寻仙问道后
 开始、商路/守望/药圃证据门槛、选择锁定、结局领奖和来源快照；两个适配器均覆盖三分支、未达成
 拒绝、不可改选、幂等和奖励边界。后续版本图鉴、其他故事和三界/虚空高阶塔尚未开放。
 
@@ -26,6 +26,7 @@ OneBot V11 覆盖首领、战败、额度、功业、境界边界及全部特殊
 - [竞技场](arena.md)
 - [多结局剧情线](story.md)
 - [v0.1 内容包](content-v0.1.md)
+- [v0.2 内容包](content-v0.2.md)
 
 所有版本内容遵守[版本内容开发合同](../../content-development-contract.md)。所有写入经 Unit of Work 和 operation ledger 结算；文本、按钮和 Web 只能调用同一 application DTO。
 
