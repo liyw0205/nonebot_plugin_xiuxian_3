@@ -58,7 +58,7 @@ for _floor_no in range(1, 46):
         f"codex.challenge.mist_trial.floor_{_floor_no}",
         ("challenge", f"雾隐试炼塔第 {_floor_no} 层"),
     )
-for _floor_no in range(1, 21):
+for _floor_no in range(1, 41):
     _ENTRY_LABELS.setdefault(
         f"codex.challenge.three_realms.floor_{_floor_no}",
         ("challenge", f"三界塔第 {_floor_no} 层"),
@@ -67,6 +67,14 @@ for _faction, _label in (("xuantian", "玄天"), ("demon", "魔界"), ("beast", 
     _ENTRY_LABELS.setdefault(
         f"codex.story.three_realms.faction_{_faction}",
         ("story", f"三界塔{_label}阵营记录"),
+    )
+    _ENTRY_LABELS.setdefault(
+        f"codex.story.three_realms.reconstruction_{_faction}",
+        ("story", f"三界塔{_label}重建记录"),
+    )
+    _ENTRY_LABELS.setdefault(
+        f"codex.story.three_realms.domain_{_faction}",
+        ("story", f"三界塔{_label}领域记录"),
     )
 
 ENTRY_DEFINITIONS: dict[str, CodexEntryDefinition] = {

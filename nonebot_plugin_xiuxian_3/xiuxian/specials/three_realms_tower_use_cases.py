@@ -41,7 +41,7 @@ class ThreeRealmsTowerApplication:
         errors = {
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能挑战三界塔。"),
-            TowerRequirementError: ("THREE_REALMS_TOWER_REQUIREMENT_MISSING", "境界或三界主线许可不足，未扣除体力。"),
+            TowerRequirementError: ("THREE_REALMS_TOWER_REQUIREMENT_MISSING", "当前楼层的境界、重建名望或主线许可不足，未扣除体力。"),
             TowerBusyError: ("THREE_REALMS_TOWER_BUSY", "当前角色已有进行中的行动或待领取塔层奖励。"),
             TowerFloorLockedError: ("THREE_REALMS_TOWER_FLOOR_LOCKED", "请先依次通关并领取上一层奖励。"),
             TowerQuotaError: ("THREE_REALMS_TOWER_WEEKLY_CAP", f"本层本 UTC 周挑战次数已达 {WEEKLY_ATTEMPT_LIMIT} 次。"),

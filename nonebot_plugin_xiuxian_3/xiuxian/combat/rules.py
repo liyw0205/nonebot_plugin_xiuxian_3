@@ -621,6 +621,27 @@ for _faction, _faction_label in _THREE_REALMS_TOWER_FACTIONS.items():
             random_pool=f"battle.{_key}.v0.3",
             reward={},
         )
+    for _encounter, _label, _hp, _attack, _initiative, _agility in (
+        ("domain_vanguard", "领域巡守", 480, 52, 28, 22),
+        ("floor_30_boss", "三十层镇关者", 820, 75, 36, 32),
+        ("domain_veteran", "重建阵师", 580, 64, 32, 28),
+        ("floor_40_boss", "四十层守界者", 1100, 90, 40, 36),
+    ):
+        _key = f"enemy.three_realms_tower.{_faction}.{_encounter}"
+        ENEMIES[_key] = EnemyDefinition(
+            key=_key,
+            label=f"{_faction_label}{_label}",
+            location_key="tower.three_realms",
+            required_realm="mortal",
+            required_layer=0,
+            max_hp=_hp,
+            attack=_attack,
+            initiative=_initiative,
+            agility=_agility,
+            skill_key="enemy_skill.mist_exposed",
+            random_pool=f"battle.{_key}.v0.4",
+            reward={},
+        )
 
 
 def enemy_definition(enemy_key: str) -> EnemyDefinition:

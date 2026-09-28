@@ -4,7 +4,7 @@
 
 当前运行时开放 v0.1 基础图鉴：`我的图鉴 [分类或关键词]` 只读查询，`领取图鉴里程碑 <序号>` 原子领取。地点、材料、已登记异兽、道途/公开竞技场快照、挂机路线、派遣、已接入秘境、试炼塔首通和 `story.xuantian.road` 结局由正式结算事务投影；其他故事和 v0.2 以后条目仍按对应切片开放。
 
-三界塔 v0.3 另开放 `codex.challenge.three_realms.floor_1` 至 `_20`，在领奖事务首次记录；第 10/20 层首通按冻结阵营记录 `codex.story.three_realms.faction_<faction>`。阵营故事条目不由客户端参数选择，也不改变角色道途或声望。
+三界塔开放 `codex.challenge.three_realms.floor_1` 至 `_40`，在领奖事务首次记录；第 10/20 层首通按冻结阵营记录 `codex.story.three_realms.faction_<faction>`，第 30/40 层首通分别记录 `codex.story.three_realms.reconstruction_<faction>` 和 `codex.story.three_realms.domain_<faction>`。阵营故事条目不由客户端参数选择，也不改变角色道途或声望；1–20 层沿用 v0.3 版本，21–40 层记录 v0.4 版本。
 
 ## 1. 条目和发现
 

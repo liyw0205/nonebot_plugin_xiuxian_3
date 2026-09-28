@@ -262,9 +262,13 @@ class CombatRepositoryMixin:
         }
         v02_enemy_keys = {MIST_ELITE.key, CLOUD_BOAT_GUARDIAN.key}
         is_three_realms_tower_enemy = enemy.key.startswith("enemy.three_realms_tower.")
+        is_three_realms_tower_v04_enemy = is_three_realms_tower_enemy and any(
+            f".{encounter}" in enemy.key
+            for encounter in ("domain_vanguard", "floor_30_boss", "domain_veteran", "floor_40_boss")
+        )
         battle_content_version = (
             V04_CONTENT_VERSION
-            if enemy.key == ANCESTRAL_SPIRIT.key
+            if enemy.key == ANCESTRAL_SPIRIT.key or is_three_realms_tower_v04_enemy
             else V03_CONTENT_VERSION
             if enemy.key in v03_enemy_keys or is_three_realms_tower_enemy
             else V02_CONTENT_VERSION
@@ -273,6 +277,8 @@ class CombatRepositoryMixin:
         )
         if enemy.key == ANCESTRAL_SPIRIT.key:
             battle_rule_version = V041_RULE_VERSION
+        elif is_three_realms_tower_v04_enemy:
+            battle_rule_version = "combat-0.4.0"
         elif enemy.key in {"enemy.demon_abyss_echo_guardian", "enemy.demon_abyss_heart"}:
             battle_rule_version = V032_RULE_VERSION
         elif enemy.key == DEMON_RUINS_SCOUT.key:

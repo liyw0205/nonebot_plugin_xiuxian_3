@@ -1,4 +1,4 @@
-"""Versioned rules for the first, single-player three-realms tower release."""
+"""Versioned rules for the single-player three-realms tower."""
 
 from __future__ import annotations
 
@@ -7,12 +7,20 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 
-CONTENT_VERSION = "content-0.3"
-RULE_VERSION = "specials-0.3.0"
+V03_CONTENT_VERSION = "content-0.3"
+V03_RULE_VERSION = "specials-0.3.0"
+CONTENT_VERSION = "content-0.4"
+RULE_VERSION = "specials-0.4.0"
 TOWER_KEY = "tower.three_realms"
-MAX_FLOOR = 20
+V03_MAX_FLOOR = 20
+MAX_FLOOR = 40
 WEEKLY_ATTEMPT_LIMIT = 2
 FACTIONS = ("xuantian", "demon", "beast")
+REBUILD_REPUTATION_KEYS = (
+    "local.domain_refuge",
+    "local.abyss_outpost",
+    "local.ancestral_habitat",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,22 +37,50 @@ def floor_definition(floor_no: int) -> ThreeRealmsTowerFloorDefinition:
         raise ValueError(f"three-realms tower floor must be between 1 and {MAX_FLOOR}")
     return ThreeRealmsTowerFloorDefinition(
         floor_no=floor_no,
-        required_realm="nascent_soul",
+        required_realm="nascent_soul" if floor_no <= V03_MAX_FLOOR else "soul_transformation",
         required_layer=1,
         stamina_cost=12,
         weekly_limit=WEEKLY_ATTEMPT_LIMIT,
     )
 
 
+def versions_for_floor(floor_no: int) -> tuple[str, str]:
+    floor_definition(floor_no)
+    if floor_no <= V03_MAX_FLOOR:
+        return V03_CONTENT_VERSION, V03_RULE_VERSION
+    return CONTENT_VERSION, RULE_VERSION
+
+
+def rebuild_reputation_total(values: dict[str, object]) -> int:
+    total = 0
+    for key in REBUILD_REPUTATION_KEYS:
+        try:
+            total += max(0, int(values.get(key, 0)))
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
 def enemy_key_for(floor_no: int, faction: str) -> str:
     floor_definition(floor_no)
     if faction not in FACTIONS:
         raise ValueError(f"unsupported three-realms faction: {faction}")
-    encounter = (
-        "floor_10_boss" if floor_no == 10 else
-        "floor_20_boss" if floor_no == 20 else
-        "vanguard" if floor_no < 10 else "veteran"
-    )
+    if floor_no == 10:
+        encounter = "floor_10_boss"
+    elif floor_no == 20:
+        encounter = "floor_20_boss"
+    elif floor_no == 30:
+        encounter = "floor_30_boss"
+    elif floor_no == 40:
+        encounter = "floor_40_boss"
+    elif floor_no <= 9:
+        encounter = "vanguard"
+    elif floor_no <= 19:
+        encounter = "veteran"
+    elif floor_no <= 29:
+        encounter = "domain_vanguard"
+    else:
+        encounter = "domain_veteran"
     return f"enemy.three_realms_tower.{faction}.{encounter}"
 
 
@@ -64,12 +100,18 @@ __all__ = [
     "CONTENT_VERSION",
     "FACTIONS",
     "MAX_FLOOR",
+    "REBUILD_REPUTATION_KEYS",
     "RULE_VERSION",
     "TOWER_KEY",
     "WEEKLY_ATTEMPT_LIMIT",
+    "V03_CONTENT_VERSION",
+    "V03_MAX_FLOOR",
+    "V03_RULE_VERSION",
     "ThreeRealmsTowerFloorDefinition",
     "enemy_key_for",
     "floor_definition",
+    "rebuild_reputation_total",
     "reward_for",
+    "versions_for_floor",
     "week_start",
 ]

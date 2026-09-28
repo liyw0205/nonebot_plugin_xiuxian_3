@@ -30,14 +30,15 @@ from .three_realms_tower_models import (
     ThreeRealmsTowerRunRecord,
 )
 from .three_realms_tower_rules import (
-    CONTENT_VERSION,
     FACTIONS,
     MAX_FLOOR,
-    RULE_VERSION,
+    V03_MAX_FLOOR,
     TOWER_KEY,
     enemy_key_for,
     floor_definition,
+    rebuild_reputation_total,
     reward_for,
+    versions_for_floor,
     week_start,
 )
 
@@ -124,14 +125,15 @@ class ThreeRealmsTowerRepositoryMixin:
             definition = floor_definition(floor_no)
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
+        content_version, rule_version = versions_for_floor(floor_no)
         operation_name = "specials.start_three_realms_tower"
         payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
             "tower_key": TOWER_KEY,
             "floor_no": floor_no,
-            "content_version": CONTENT_VERSION,
-            "rule_version": RULE_VERSION,
+            "content_version": content_version,
+            "rule_version": rule_version,
         }
         request_hash = self._request_hash(operation_name, payload)
         now = self._now()
@@ -161,8 +163,17 @@ class ThreeRealmsTowerRepositoryMixin:
                 definition.required_realm,
                 definition.required_layer,
             )
-            if not meets_realm and not has_story_permit:
-                raise TowerRequirementError("nascent-soul rank or three-realms story permit is required")
+            if floor_no <= V03_MAX_FLOOR:
+                if not meets_realm and not has_story_permit:
+                    raise TowerRequirementError("nascent-soul rank or three-realms story permit is required")
+            elif not meets_realm:
+                reputation = connection.execute(
+                    "SELECT local_json FROM player_reputations WHERE player_id=?",
+                    (player["id"],),
+                ).fetchone()
+                local = self._json_object(reputation["local_json"], {}) if reputation else {}
+                if rebuild_reputation_total(local) < 500:
+                    raise TowerRequirementError("soul-transformation rank or 500 rebuild reputation is required")
             if self._has_active_long_action(connection, int(player["id"])):
                 raise TowerBusyError("another long action is active")
             active = connection.execute(
@@ -196,7 +207,14 @@ class ThreeRealmsTowerRepositoryMixin:
                 raise ResourceInsufficientError("stamina is insufficient")
 
             faction = player_faction(player)
-            context = self._three_realms_tower_context(connection, player, faction, now_text)
+            context = self._three_realms_tower_context(
+                connection,
+                player,
+                faction,
+                now_text,
+                content_version=content_version,
+                rule_version=rule_version,
+            )
             run_id = uuid4().hex
             reward = reward_for(floor_no, run_id, first_clear=first_clear)
             connection.execute(
@@ -216,8 +234,8 @@ class ThreeRealmsTowerRepositoryMixin:
                     now_text,
                     json.dumps({"tower_context": context}, ensure_ascii=False, sort_keys=True),
                     json.dumps(reward, ensure_ascii=False, sort_keys=True),
-                    CONTENT_VERSION,
-                    RULE_VERSION,
+                    content_version,
+                    rule_version,
                     now_text,
                     now_text,
                 ),
@@ -236,7 +254,14 @@ class ThreeRealmsTowerRepositoryMixin:
             return self._three_realms_tower_run_from_rows(run, updated)
 
     def _three_realms_tower_context(
-        self, connection: sqlite3.Connection, player: sqlite3.Row, faction: str, captured_at: str
+        self,
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        faction: str,
+        captured_at: str,
+        *,
+        content_version: str,
+        rule_version: str,
     ) -> dict[str, Any]:
         intro = self._json_object(player["intro_json"], {})
         qualification = self._json_object(player["qualification_json"], {})
@@ -266,8 +291,8 @@ class ThreeRealmsTowerRepositoryMixin:
             "local_reputation": local_reputation,
             "pollution": int(player["pollution"]),
             "bloodline_stability": int(player["bloodline_stability"]),
-            "content_version": CONTENT_VERSION,
-            "rule_version": RULE_VERSION,
+            "content_version": content_version,
+            "rule_version": rule_version,
             "captured_at": captured_at,
         }
 
@@ -370,8 +395,8 @@ class ThreeRealmsTowerRepositoryMixin:
                                     "floor_no": int(run["floor_no"]),
                                     "battle_id": run["battle_id"],
                                     "tower_context": result.get("tower_context", {}),
-                                    "content_version": CONTENT_VERSION,
-                                    "rule_version": RULE_VERSION,
+                                    "content_version": str(run["content_version"]),
+                                    "rule_version": str(run["rule_version"]),
                                 },
                                 ensure_ascii=False,
                                 sort_keys=True,
@@ -453,6 +478,8 @@ class ThreeRealmsTowerRepositoryMixin:
                 "run_id": str(run["run_id"]),
                 "practice": not bool(run["first_clear"]),
             }
+            content_version = str(run["content_version"])
+            rule_version = str(run["rule_version"])
             record_material_discoveries(
                 connection,
                 player_id=int(player["id"]),
@@ -468,29 +495,40 @@ class ThreeRealmsTowerRepositoryMixin:
                 operation_id=operation_id,
                 occurred_at=now,
                 snapshot=codex_snapshot,
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
+                content_version=content_version,
+                rule_version=rule_version,
             )
             faction = str(tower_context.get("faction", ""))
+            story_entry = None
             if bool(run["first_clear"]) and int(run["floor_no"]) in {10, 20}:
                 if faction not in FACTIONS:
                     raise TowerRequirementError("tower faction snapshot is invalid")
+                story_entry = f"codex.story.three_realms.faction_{faction}"
+            elif bool(run["first_clear"]) and int(run["floor_no"]) == 30:
+                if faction not in FACTIONS:
+                    raise TowerRequirementError("tower faction snapshot is invalid")
+                story_entry = f"codex.story.three_realms.reconstruction_{faction}"
+            elif bool(run["first_clear"]) and int(run["floor_no"]) == 40:
+                if faction not in FACTIONS:
+                    raise TowerRequirementError("tower faction snapshot is invalid")
+                story_entry = f"codex.story.three_realms.domain_{faction}"
+            if story_entry is not None:
                 record_codex_discovery(
                     connection,
                     player_id=int(player["id"]),
-                    entry_key=f"codex.story.three_realms.faction_{faction}",
+                    entry_key=story_entry,
                     operation_id=operation_id,
                     occurred_at=now,
                     snapshot=codex_snapshot,
-                    content_version=CONTENT_VERSION,
-                    rule_version=RULE_VERSION,
+                    content_version=content_version,
+                    rule_version=rule_version,
                 )
             connection.execute(
                 "INSERT INTO tower_reward_claims(run_id,player_id,floor_no,first_clear,operation_id,reward_json,"
                 "content_version,rule_version,claimed_at) VALUES (?,?,?,?,?,?,?,?,?)",
                 (
                     run["run_id"], player["id"], run["floor_no"], run["first_clear"], operation_id,
-                    json.dumps(reward, ensure_ascii=False, sort_keys=True), CONTENT_VERSION, RULE_VERSION, now_text,
+                    json.dumps(reward, ensure_ascii=False, sort_keys=True), content_version, rule_version, now_text,
                 ),
             )
             connection.execute(
@@ -506,8 +544,8 @@ class ThreeRealmsTowerRepositoryMixin:
                 "first_clear": bool(run["first_clear"]),
                 "faction": faction,
                 "reward": reward,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
+                "content_version": content_version,
+                "rule_version": rule_version,
             }
             self._insert_three_realms_tower_operation(
                 connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text
@@ -524,9 +562,10 @@ class ThreeRealmsTowerRepositoryMixin:
             ).fetchone()
             if run is None:
                 return
+            stamina_cost = floor_definition(int(run["floor_no"])).stamina_cost
             connection.execute(
-                "UPDATE players SET stamina=MIN(stamina_max,stamina+12),updated_at=? WHERE id=?",
-                (now_text, run["player_id"]),
+                "UPDATE players SET stamina=MIN(stamina_max,stamina+?),updated_at=? WHERE id=?",
+                (stamina_cost, now_text, run["player_id"]),
             )
             result = self._json_object(run["result_json"], {})
             result["reason"] = "battle_start_failed"

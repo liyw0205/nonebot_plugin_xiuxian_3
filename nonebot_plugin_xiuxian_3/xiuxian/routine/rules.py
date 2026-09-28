@@ -162,6 +162,11 @@ HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
     HonorTitleDefinition("title.dispatch_helper", "派遣行者", "specials.dispatch.settled"),
     HonorTitleDefinition("title.first_tower_clear", "试炼先行", "specials.tower.floor.10"),
     HonorTitleDefinition(
+        "title.three_realms_tower.domain_guardian",
+        "三界守界人",
+        "specials.three_realms_tower.floor.40",
+    ),
+    HonorTitleDefinition(
         "title.season.final_heaven.ascension",
         "凌霄先登",
         "season.final_heaven.claim.ascension",

@@ -67,6 +67,8 @@ operation 重放和赛季领奖。
 
 界隙裂隙秘境专项验收位于 `test/test_boundary_rift_secret_realm_v03.py`，覆盖 QQ 官方与 OneBot V11 双方向混合队伍、准入原子拒绝、六节点顺序、两场自动战、首通/跨 UTC 周重复奖励、额度、失败/过期成本、启动故障退款、重启恢复、队伍行动锁和奖励隔离。
 
+三界塔专项验收位于 `test/test_three_realms_tower_v03.py`，覆盖 QQ 官方与 OneBot V11 的 1–40 层单人首通；v0.3 1–20 层历史版本/operation 哈希兼容；v0.4 化神/500 重建名望准入；30/40 层阵营首领与故事快照、40 层展示称号；启动补偿、失败计次、练习/周限、奖励幂等及战斗奖励隔离。
+
 祖灵殿秘境专项验收位于 `test/test_ancestral_hall_secret_realm_v04.py`，覆盖 QQ 官方/OneBot V11、QQ→OneBot 与 OneBot→QQ 身份切换及重启、准入原子拒绝、节点/操作冲突、守灵第 4 回合召影、自动清影/超时恢复、失败/过期、首通故事旗标唯一、周额度和系统补偿。
 
 虚空遗迹秘境专项验收位于 `test/test_void_ruins_secret_realm_v05.py`，覆盖 QQ 官方/OneBot V11 双方向队长、十节点顺序、两场服务端自动战、不稳定快照强化敌人、重启续跑、首通/跨周重复奖励、锚托管返还、战败/过期清锁、启动故障系统补偿、周额度和 operation 幂等。
