@@ -456,6 +456,30 @@ class DaoOriginNotReadyError(RuntimeError):
     """The dao-origin run cannot accept the requested operation yet."""
 
 
+class HeavenEchoRequirementError(RuntimeError):
+    """The player is not a valid non-final-battle tribulation candidate."""
+
+
+class HeavenEchoFinalBattleError(RuntimeError):
+    """The player is currently part of a final battle."""
+
+
+class HeavenEchoBusyError(RuntimeError):
+    """The player already has an action or heaven-echo run in progress."""
+
+
+class HeavenEchoNotFoundError(RuntimeError):
+    """The player has no heaven-echo run to operate on."""
+
+
+class HeavenEchoNodeError(RuntimeError):
+    """The selected heaven-echo node is not the current route step."""
+
+
+class HeavenEchoNotReadyError(RuntimeError):
+    """The heaven-echo run cannot accept the requested operation yet."""
+
+
 class VoidRuinsRequirementError(RuntimeError):
     """The party, location, realm or anchor requirement is not met."""
 

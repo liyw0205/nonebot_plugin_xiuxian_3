@@ -33,6 +33,7 @@ from ..adventures.ancestral_hall_repository import AncestralHallRepositoryMixin
 from ..adventures.void_ruins_repository import VoidRuinsRepositoryMixin
 from ..adventures.time_fort_repository import TimeFortRepositoryMixin
 from ..adventures.dao_origin_repository import DaoOriginRepositoryMixin
+from ..adventures.heaven_echo_repository import HeavenEchoRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..adventures.three_realms_repository import ThreeRealmsRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
@@ -98,6 +99,7 @@ from ..adventures.ancestral_hall_migration import ensure_ancestral_hall_schema
 from ..adventures.void_ruins_migration import ensure_void_ruins_schema
 from ..adventures.time_fort_migration import ensure_time_fort_schema
 from ..adventures.dao_origin_migration import ensure_dao_origin_schema
+from ..adventures.heaven_echo_migration import ensure_heaven_echo_schema
 
 
 class SQLitePlayerRepository(
@@ -122,6 +124,7 @@ class SQLitePlayerRepository(
     VoidRuinsRepositoryMixin,
     TimeFortRepositoryMixin,
     DaoOriginRepositoryMixin,
+    HeavenEchoRepositoryMixin,
     DaoEchoesRepositoryMixin,
     ThreeRealmsRepositoryMixin,
     ContractProductionRepositoryMixin,
@@ -281,6 +284,7 @@ class SQLitePlayerRepository(
             ensure_void_ruins_schema(connection)
             ensure_time_fort_schema(connection)
             ensure_dao_origin_schema(connection)
+            ensure_heaven_echo_schema(connection)
             ensure_idle_schema(connection)
             ensure_dispatch_schema(connection)
             ensure_codex_schema(connection)

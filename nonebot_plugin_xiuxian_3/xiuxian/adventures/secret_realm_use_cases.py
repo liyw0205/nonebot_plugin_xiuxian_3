@@ -54,7 +54,9 @@ from .demon_abyss_use_cases import DemonAbyssApplication
 from .void_ruins_use_cases import VoidRuinsApplication
 from .time_fort_use_cases import TimeFortApplication
 from .dao_origin_use_cases import DaoOriginApplication
+from .heaven_echo_use_cases import HeavenEchoApplication
 from .dao_origin_rules import DAO_ORIGIN_FIRST_REWARD, DAO_ORIGIN_KEY, DAO_ORIGIN_LOCATION, DAO_ORIGIN_NODE_LABELS, DAO_ORIGIN_NODES, resolve_dao_origin_node
+from .heaven_echo_rules import HEAVEN_ECHO_KEY, HEAVEN_ECHO_NODES, resolve_heaven_echo_node
 from .time_fort_rules import TIME_FORT_FIRST_REWARD, TIME_FORT_KEY, TIME_FORT_NODES, TIME_FORT_REPEAT_REWARD, resolve_time_fort_node
 from .void_ruins_rules import VOID_RUINS_KEY, VOID_RUINS_NODES, VOID_RUINS_REPEAT_REWARD, resolve_void_ruins_node
 
@@ -86,6 +88,7 @@ class SecretRealmApplication:
         self.void_ruins = VoidRuinsApplication(repository)
         self.time_fort = TimeFortApplication(repository)
         self.dao_origin = DaoOriginApplication(repository)
+        self.heaven_echo = HeavenEchoApplication(repository)
 
     @staticmethod
     def _operation_id(context: CommandContext, name: str) -> str:
@@ -196,6 +199,18 @@ class SecretRealmApplication:
                 "quota_limit": 1,
                 "party_size": 1,
             })
+        if record.player.realm_key == "tribulation":
+            data.append({
+                "instance_key": HEAVEN_ECHO_KEY,
+                "label": "天劫回音秘境",
+                "nodes": HEAVEN_ECHO_NODES,
+                "stamina_cost": 0,
+                "first_reward": {"story.heaven_echo": 1},
+                "repeat_reward": {},
+                "quota_period": "none",
+                "quota_limit": 0,
+                "party_size": 1,
+            })
         lines.extend(
             [
                 "### 魔界深渊秘境",
@@ -237,12 +252,17 @@ class SecretRealmApplication:
                 f"- **路线**：{' → '.join(DAO_ORIGIN_NODES)}；单人，体力 60；每角色仅一次。",
                 "- **首通**：写入 `story.dao_origin` 并发现 `codex.dao.service_origin`；不发终局资源。",
                 "",
+                "### 天劫回音秘境",
+                "- **前置**：渡劫 L1；非最终战进行中。",
+                f"- **路线**：{' → '.join(HEAVEN_ECHO_NODES)}；单人，体力 0；60 分钟。",
+                "- **首通**：写入 `story.heaven_echo` 结局旁线旗标；不改变天劫债、终局状态或飞升资源。",
+                "",
             ]
         )
         if record.active_run_id:
             lines.append(f"> 当前已有进行中的秘境：`{record.active_run_id}`。")
         else:
-            lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境`、`界隙裂隙`、`远古洞天`、`祖灵殿`、`虚空遗迹`、`时序堡垒` 或 `道源秘境` 开始；组队秘境先创建专用队伍。")
+            lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境`、`界隙裂隙`、`远古洞天`、`祖灵殿`、`虚空遗迹`、`时序堡垒`、`道源秘境` 或 `天劫回音` 开始；组队秘境先创建专用队伍。")
         return CommandResult(True, "SECRET_REALM_PREVIEW", "\n".join(lines), context.request_id, data={"realms": data, "active_run_id": record.active_run_id})
 
     async def enter(self, context: CommandContext) -> CommandResult:
@@ -250,6 +270,8 @@ class SecretRealmApplication:
             return await self.time_fort.enter(context)
         if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == DAO_ORIGIN_KEY:
             return await self.dao_origin.enter(context)
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == HEAVEN_ECHO_KEY:
+            return await self.heaven_echo.enter(context)
         if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == VOID_RUINS_KEY:
             return await self.void_ruins.enter(context)
         if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == ANCESTRAL_HALL_KEY:
@@ -286,6 +308,13 @@ class SecretRealmApplication:
         return CommandResult(True, "SECRET_REALM_ENTERED", f"## {record.label}已进入\n\n已锁定体力 {record.stamina_locked} 点和秘境凭证。\n\n- **下一节点**：{record.current_node}\n- **状态**：路线进行中\n\n> 发送 `选择秘境节点 资源` 按服务端顺序推进。", context.request_id, operation_id, data=self._data(record))
 
     async def choose_node(self, context: CommandContext) -> CommandResult:
+        if context.command_args and resolve_heaven_echo_node(context.command_args[0]):
+            return await self.heaven_echo.choose_node(context)
+        try:
+            if context.command_args and await self.repository.has_active_heaven_echo(platform=context.adapter, platform_user_id=context.user_id):
+                return await self.heaven_echo.choose_node(context)
+        except PlayerNotFoundError:
+            pass
         if context.command_args and resolve_dao_origin_node(context.command_args[0]):
             return await self.dao_origin.choose_node(context)
         try:
@@ -376,6 +405,15 @@ class SecretRealmApplication:
                 return await self.dao_origin.settle(context)
         except PlayerNotFoundError:
             pass
+        heaven_echo_operation_id = self._operation_id(context, "heaven_echo.settle")
+        try:
+            if (
+                await self.repository.has_active_heaven_echo(platform=context.adapter, platform_user_id=context.user_id)
+                or await self.repository.has_heaven_echo_settlement_operation(heaven_echo_operation_id)
+            ):
+                return await self.heaven_echo.settle(context)
+        except PlayerNotFoundError:
+            pass
         void_operation_id = self._operation_id(context, "void_ruins.settle")
         try:
             if (
@@ -429,6 +467,11 @@ class SecretRealmApplication:
         try:
             if await self.repository.has_latest_dao_origin(platform=context.adapter, platform_user_id=context.user_id):
                 return await self.dao_origin.settle(context)
+        except PlayerNotFoundError:
+            pass
+        try:
+            if await self.repository.has_latest_heaven_echo(platform=context.adapter, platform_user_id=context.user_id):
+                return await self.heaven_echo.settle(context)
         except PlayerNotFoundError:
             pass
         operation_id = self._operation_id(context, "secret_realm.settle")

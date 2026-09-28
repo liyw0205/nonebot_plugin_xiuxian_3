@@ -1,4 +1,4 @@
-# v0.6 冒险内容基线：终局悬赏、道源秘境与飞升旁线
+# v0.6 冒险内容基线：终局悬赏、道源秘境、天劫回音与飞升旁线
 
 本文件遵守[版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=adventures-0.6.0`。终局冒险只能读取终局资格，不能替代天劫试炼、最终战或结局选择。
 
@@ -24,3 +24,11 @@
 路线推进由服务端按序校验，开始、节点、结算和系统补偿均写入 operation ledger；重启或 QQ/OneBot 身份切换后可从当前节点继续。跳跃节点、重复 operation 的不同输入、缺少地点/境界/许可、活动锁和一次性额度均原子拒绝。过期保留已扣体力和额度，不写首通结果；明确的系统中止才退还 60 体力并释放一次性额度。
 
 首次完成在结算事务中写入 `story.dao_origin` 和 `codex.dao.service_origin`，不修改道果进度、天劫债、飞升凭证、`resource.ascension_merit` 或任何战斗资产。重复请求只回放原结算；验收见 `test/test_dao_origin_secret_realm_v06.py`。
+
+#### 5.4.4 `instance.secret_realm.heaven_echo`
+
+天劫回音是渡劫角色的单人结局旁线。角色达到渡劫 L1 且不在最终战进行中即可进入；没有地点、体力、票券或次数成本，允许在完成后重复挑战。运行时长固定 60 分钟，固定三节点：`heaven_threshold -> echo_corridor -> side_story_gate`。节点、结算和系统中止均写入独立 operation ledger，活动运行记录存于 `heaven_echo_runs`，不复用通用秘境表。
+
+入口只读校验 `tribulation` 境界和最终战活动成员；任何拒绝均不创建运行记录。路线按序推进，重启或 QQ/OneBot V11 身份切换后可继续。过期只结束当前运行，不发旗标；明确的系统中止只结束运行，不退还资源（本合同无资源成本）。
+
+首次成功结算在同一事务向 `intro_json.flags` 写入 `story.heaven_echo`，重复成功不重复写入。秘境操作禁止写 `ending_state`、`ending_key`、道果进度、`resource.ascension_merit`、天劫债、飞升凭证或最终战记录；`ascension.choose_ending` 仍是唯一结局选择写入口。验收见 `test/test_heaven_echo_secret_realm_v06.py`。
