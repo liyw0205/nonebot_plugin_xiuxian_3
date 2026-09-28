@@ -432,6 +432,30 @@ class AncestralHallNotReadyError(RuntimeError):
     """The ancestral-hall route or combat is not ready to advance or settle."""
 
 
+class DaoOriginRequirementError(RuntimeError):
+    """The player lacks the location, realm, or permission for dao origin."""
+
+
+class DaoOriginBusyError(RuntimeError):
+    """The player already has an action occupying the dao-origin slot."""
+
+
+class DaoOriginQuotaError(RuntimeError):
+    """The player's one-time dao-origin quota is exhausted."""
+
+
+class DaoOriginNotFoundError(RuntimeError):
+    """The player has no dao-origin run to operate on."""
+
+
+class DaoOriginNodeError(RuntimeError):
+    """The requested dao-origin node is not the current server-owned node."""
+
+
+class DaoOriginNotReadyError(RuntimeError):
+    """The dao-origin run cannot accept the requested operation yet."""
+
+
 class VoidRuinsRequirementError(RuntimeError):
     """The party, location, realm or anchor requirement is not met."""
 

@@ -46,6 +46,7 @@ _ENTRY_LABELS = {
     "codex.instance.cloud_boat": ("challenge", "云舟秘境"),
     "codex.domain.ancient_domain": ("challenge", "远古洞天秘境"),
     "codex.void.route_ruins": ("route", "虚空遗迹航道"),
+    "codex.dao.service_origin": ("service", "道源服务篇章"),
     "codex.challenge.mist_trial.floor_5": ("challenge", "雾隐试炼塔五层"),
     "codex.challenge.mist_trial.floor_10": ("challenge", "雾隐试炼塔十层"),
     "codex.story.dispatch_demon_relief": ("story", "魔界救援线索"),
@@ -121,6 +122,8 @@ def category_for_entry(entry_key: str) -> str | None:
         return "route"
     if entry_key.startswith("codex.void.archive_"):
         return "story"
+    if entry_key.startswith("codex.dao.service_"):
+        return "service"
     return None
 
 
