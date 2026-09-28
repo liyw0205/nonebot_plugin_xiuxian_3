@@ -592,6 +592,36 @@ ENEMIES = {
     MIST_TRIAL_GOLDEN_CORE_BOSS.key: MIST_TRIAL_GOLDEN_CORE_BOSS,
 }
 
+_THREE_REALMS_TOWER_FACTIONS = {
+    "xuantian": "玄天",
+    "demon": "魔界",
+    "beast": "妖界",
+}
+for _faction, _faction_label in _THREE_REALMS_TOWER_FACTIONS.items():
+    for _encounter, _label, _hp, _attack, _skill, _initiative, _agility in (
+        ("vanguard", "试炼先锋", 120, 16, "enemy_skill.scratch", 8, 8),
+        ("veteran", "试炼精锐", 130, 16, "enemy_skill.mist_exposed", 10, 10),
+        ("floor_10_boss", "十层守将", 180, 18, "enemy_skill.mist_exposed", 12, 12),
+        ("floor_20_boss", "二十层守将", 200, 20, "enemy_skill.mist_exposed", 14, 14),
+    ):
+        _key = f"enemy.three_realms_tower.{_faction}.{_encounter}"
+        ENEMIES[_key] = EnemyDefinition(
+            key=_key,
+            label=f"{_faction_label}{_label}",
+            location_key="tower.three_realms",
+            # Tower entry rules are checked atomically by its repository, including
+            # the completed-story permit path for lower-realm characters.
+            required_realm="mortal",
+            required_layer=0,
+            max_hp=_hp,
+            attack=_attack,
+            initiative=_initiative,
+            agility=_agility,
+            skill_key=_skill,
+            random_pool=f"battle.{_key}.v0.3",
+            reward={},
+        )
+
 
 def enemy_definition(enemy_key: str) -> EnemyDefinition:
     try:

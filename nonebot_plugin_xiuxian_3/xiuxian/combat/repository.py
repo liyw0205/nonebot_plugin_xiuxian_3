@@ -261,11 +261,12 @@ class CombatRepositoryMixin:
             DEMON_WAR_FRONT.key,
         }
         v02_enemy_keys = {MIST_ELITE.key, CLOUD_BOAT_GUARDIAN.key}
+        is_three_realms_tower_enemy = enemy.key.startswith("enemy.three_realms_tower.")
         battle_content_version = (
             V04_CONTENT_VERSION
             if enemy.key == ANCESTRAL_SPIRIT.key
             else V03_CONTENT_VERSION
-            if enemy.key in v03_enemy_keys
+            if enemy.key in v03_enemy_keys or is_three_realms_tower_enemy
             else V02_CONTENT_VERSION
             if enemy.key in v02_enemy_keys
             else CONTENT_VERSION
@@ -276,7 +277,7 @@ class CombatRepositoryMixin:
             battle_rule_version = V032_RULE_VERSION
         elif enemy.key == DEMON_RUINS_SCOUT.key:
             battle_rule_version = V031_RULE_VERSION
-        elif enemy.key in v03_enemy_keys:
+        elif enemy.key in v03_enemy_keys or is_three_realms_tower_enemy:
             battle_rule_version = V03_RULE_VERSION
         elif enemy.key in v02_enemy_keys:
             battle_rule_version = V02_RULE_VERSION

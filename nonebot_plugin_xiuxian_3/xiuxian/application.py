@@ -58,6 +58,7 @@ from .specials.idle_use_cases import IdleApplication
 from .specials.dispatch_use_cases import DispatchApplication
 from .specials.codex_use_cases import CodexApplication
 from .specials.tower_use_cases import TowerApplication
+from .specials.three_realms_tower_use_cases import ThreeRealmsTowerApplication
 from .specials.story_use_cases import StoryApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
@@ -130,6 +131,7 @@ class XiuxianApplication:
         self.dispatch = DispatchApplication(repository)
         self.codex = CodexApplication(repository)
         self.tower = TowerApplication(repository)
+        self.three_realms_tower = ThreeRealmsTowerApplication(repository)
         self.story = StoryApplication(repository)
         self.quests = QuestApplication(repository)
 
@@ -1594,6 +1596,23 @@ class XiuxianApplication:
 
     async def claim_tower_reward(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.tower.claim_reward(context), write_message="当前事件不允许领取试炼塔奖励。")
+
+    async def preview_three_realms_tower(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.three_realms_tower.preview(context), require_write=False)
+
+    async def challenge_three_realms_tower(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.three_realms_tower.challenge(context),
+            write_message="当前事件不允许挑战三界塔。",
+        )
+
+    async def claim_three_realms_tower_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.three_realms_tower.claim_reward(context),
+            write_message="当前事件不允许领取三界塔奖励。",
+        )
 
     async def get_story_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.story.status(context), require_write=False)

@@ -81,6 +81,7 @@ from ..specials.dispatch_migration import ensure_dispatch_schema
 from ..specials.codex_repository import CodexRepositoryMixin
 from ..specials.codex_migration import ensure_codex_schema
 from ..specials.tower_repository import TowerRepositoryMixin
+from ..specials.three_realms_tower_repository import ThreeRealmsTowerRepositoryMixin
 from ..specials.tower_migration import ensure_tower_schema
 from ..specials.story_repository import StoryRepositoryMixin
 from ..specials.story_migration import ensure_story_schema
@@ -164,6 +165,7 @@ class SQLitePlayerRepository(
     DispatchRepositoryMixin,
     CodexRepositoryMixin,
     TowerRepositoryMixin,
+    ThreeRealmsTowerRepositoryMixin,
     StoryRepositoryMixin,
     DemonQuestRepositoryMixin,
     QuestRepositoryMixin,
