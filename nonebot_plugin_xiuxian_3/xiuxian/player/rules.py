@@ -83,6 +83,23 @@ REALM_LABELS = {
     "tribulation": "渡劫",
 }
 
+_CHINESE_NUMBERS = ("零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十")
+
+
+def realm_display_name(realm_key: str, layer: int = 0, *, labels: dict[str, str] | None = None) -> str:
+    """Format a realm for players without leaking internal ``L1`` notation."""
+
+    name = (labels or REALM_LABELS).get(realm_key, "未知境界")
+    if not layer:
+        return name
+    try:
+        layer_number = int(layer)
+    except (TypeError, ValueError):
+        return f"{name}境"
+    if not 1 <= layer_number <= 10:
+        return f"{name}境{layer_number}层"
+    return f"{name}境{_CHINESE_NUMBERS[layer_number]}层"
+
 DAO_NAME_MAX_LENGTH = 7
 
 

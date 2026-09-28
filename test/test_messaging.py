@@ -12,6 +12,9 @@ from nonebot_plugin_xiuxian_3.adapters.messaging import (
     send_onebot_v11_forward_message,
     send_onebot_v11_text_message,
     send_qq_markdown_message,
+    send_qq_blue_text_message,
+    send_qq_markdown_keyboard_message,
+    send_onebot_v11_markdown_message,
     send_qq_text_message,
     send_text_message,
 )
@@ -68,6 +71,27 @@ def test_qq_specific_senders_use_expected_formats() -> None:
         assert plain.sent_format == "text"
         assert markdown.sent_format == "markdown"
         assert bot.sent[0][1] == "QQ 普通消息"
+
+    asyncio.run(run())
+
+
+def test_qq_blue_text_and_keyboard_use_qq_segments() -> None:
+    async def run() -> None:
+        class FakeQQBot(FakeBot):
+            __module__ = "nonebot.adapters.qq.bot"
+
+        class FakeQQEvent:
+            __module__ = "nonebot.adapters.qq.event"
+
+        bot = FakeQQBot()
+        blue = await send_qq_blue_text_message(bot, FakeQQEvent(), "开始", "开始修仙")
+        keyboard = await send_qq_markdown_keyboard_message(
+            bot, FakeQQEvent(), "**请选择**", [[("开始", "开始修仙")]]
+        )
+        assert blue.sent_format == "markdown"
+        assert "mqqapi://aio/inlinecmd" in str(bot.sent[0])
+        assert keyboard.sent_format == "markdown+keyboard"
+        assert "keyboard" in str(bot.sent[1])
 
     asyncio.run(run())
 
@@ -144,5 +168,27 @@ def test_onebot_v11_specific_senders() -> None:
         assert len(nodes) == 2
         assert nodes[0].type == "node"
         assert nodes[0].data["content"].extract_plain_text() == "第一段"
+
+    asyncio.run(run())
+
+
+def test_onebot_markdown_is_plain_text_without_qq_metadata() -> None:
+    class FakeOneBot(FakeBot):
+        __module__ = "nonebot.adapters.onebot.v11.bot"
+
+    class FakeOneBotEvent:
+        __module__ = "nonebot.adapters.onebot.v11.event"
+
+    async def run() -> None:
+        bot = FakeOneBot()
+        result = await send_onebot_v11_markdown_message(
+            bot,
+            FakeOneBotEvent(),
+            "**开始** [修炼](mqqapi://aio/inlinecmd?command=x)",
+        )
+        assert result.sent_format == "text"
+        assert result.degraded is True
+        assert bot.sent[0][1] == "开始 修炼"
+        assert "mqqapi" not in str(bot.sent[0][1])
 
     asyncio.run(run())

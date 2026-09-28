@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from ..contracts import CommandContext, CommandResult, validate_command_identity
+from .content import ContentBundle
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
 from .production.facility_use_cases import FacilityApplication
@@ -68,8 +69,9 @@ from .repository import SQLitePlayerRepository
 class XiuxianApplication:
     """Expose feature services to adapters without mixing feature rules."""
 
-    def __init__(self, repository: SQLitePlayerRepository):
-        self.player = PlayerApplication(repository)
+    def __init__(self, repository: SQLitePlayerRepository, content: ContentBundle | None = None):
+        self.content = content
+        self.player = PlayerApplication(repository, content)
         self.progression = ProgressionApplication(repository)
         self.endgame = EndgameApplication(repository)
         self.final_battle = FinalBattleApplication(repository)

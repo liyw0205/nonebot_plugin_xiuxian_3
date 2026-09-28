@@ -163,7 +163,7 @@ def test_breakthrough_success_changes_realm_and_concurrent_start_is_unique() -> 
             assert settled.code == "BREAKTHROUGH_SUCCEEDED"
             assert settled.data["cultivation_after"] == 0
             profile = await runtime.dispatch(_context(user, "profile"), "我的状态")
-            assert "聚气 L1" in profile.message
+            assert "聚气境一层" in profile.message
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 inventory = json.loads(
                     connection.execute(

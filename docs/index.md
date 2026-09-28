@@ -85,6 +85,7 @@
 | [测试与验收](testing.md) | 测试分层、资产用例、适配器契约和恢复演练 | 工程规范 |
 | [目标架构](architecture.md) | 模块边界、依赖方向、生命周期和 feature manifest | 工程规范 |
 | [运行与安全](operations.md) | 配置、任务、备份、队列和安全底线 | 工程规范 |
+| [安装文档](installation.md) | Linux、Windows、Docker、Termux 部署和验证 | 运维入口 |
 | [运行基础框架](runtime-framework.md) | SQLite/WAL、寻仙问道用例、多适配器入口和并发边界 | 已实现骨架 |
 | [适配器与 Web 契约](adapters-and-web.md) | 已有的抽象接口约束 | 工程规范 |
 

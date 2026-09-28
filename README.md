@@ -1,74 +1,73 @@
 # nonebot_plugin_xiuxian_3
 
-从零设计的 NoneBot 修仙文字游戏插件。
+一个面向 NoneBot 2 的修仙文字游戏插件，使用 SQLite 保存玩家状态，使用 `data/` 下的 JSON 保存境界、物品、任务、法器、地图和配方等可复用内容。
 
-本仓库是一个**全新设计的修仙文字游戏**，不是
-`https://github.com/liyw0205/nonebot_plugin_xiuxian_2_pmv` 的代码复制或目录改名。上游公开文档用于通用玩法
-参考，上游魔改适配器用于兼容层复用；境界、道途、数值、数据模型和命令都在本仓库重新决定。
+## 特性
 
-当前阶段：基础成长、经营、高阶境界状态机和部分服务端自动回合 PVE 已接入可测试切片；
-探索遭遇和双人队伍 PVE 已开放，三人以上副本、终局最终战与 PvP 仍未开放。当前可运行边界和下一切片以
-[`docs/current-status.md`](docs/current-status.md) 为准，后续开发按可测试的垂直切片推进。
+- QQ 官方适配器：普通文本、原生 Markdown、蓝字命令链接和自定义按键。
+- OneBot V11：普通文本和合并转发；自动移除 Markdown、蓝字和按键标记。
+- 业务用例与适配器解耦，操作具备幂等键、版本快照和失败恢复语义。
+- 内容包可校验、可替换；运行数据与源码分离。
 
-## 目标
+境界展示使用中文格式，例如 `化神境一层`、`渡劫境十层`。文档中的 `v0.x` 只用于发布对照，运行时版本来自内容文件或历史操作快照，不应写死到业务文案中。
 
-- 为 QQ 群/私聊提供可长期维护的修仙文字游戏。
-- 支持“新用户 → 寻仙问道 → 凡人 → 道途分支 → 感气修炼”的清晰首版流程。
-- 以玄天界、魔界、妖界和洞天/福地构成可扩展世界。
-- 以公共境界、六大道途和炼丹/炼器/布阵辅修支撑多种玩家路线。
-- 同时支持 OneBot V11 与 QQ 官方适配器，并让领域规则不依赖平台 SDK。
-- 覆盖修炼、战斗、社交、经济、常驻经营、特色玩法、管理和 Web 运维能力。
-- 让资产变化具备明确事务、幂等键、审计记录和可恢复的失败语义。
-- 以新设计为唯一产品依据；旧项目只用于识别历史风险和可选参考信息。
+## 快速安装
 
-上游公开玩法文档可用于提取通用文字修仙玩法；上游魔改适配器可作为 OneBot V11、
-QQ 官方适配器、消息投递和路由兼容层的复用来源。具体边界见
-`docs/reference-sources.md`，适配器设计见 `docs/extensions/adapters/`。
-
-## 文档入口
-
-| 文档 | 内容 |
-|:--|:--|
-| [修仙 3 文档索引](docs/index.md) | 全部基础、玩法、扩展和工程文档入口 |
-| [开发文档总入口](docs/development-guide.md) | 阅读顺序、文档职责、切片交付和验证门槛 |
-| [完整内容开发总表](docs/content-development.md) | 首版 MVP、全部境界、功能路线、稳定键依赖和切片验收唯一权威 |
-| [当前开发状态](docs/current-status.md) | 当前已开放、锁定范围和下一步顺序的唯一入口 |
-| [修仙 3 总设计](docs/xiuxian3-design.md) | 世界观、境界、道途、辅修、数值和首版范围 |
-| [目标架构](docs/architecture.md) | 模块边界、依赖方向和启动生命周期 |
-| [适配器与 Web](docs/adapters-and-web.md) | OneBot/QQ 消息归一化、Web API 与权限 |
-| [运行与安全](docs/operations.md) | 配置、任务、备份、日志和安全边界 |
-| [运行基础框架](docs/runtime-framework.md) | SQLite/WAL、寻仙问道和多适配器接入 |
-| [消息与文案规范](docs/messaging-copywriting.md) | Markdown 消息、适配器降级和用户可见文案 |
-| [测试策略](docs/testing.md) | 测试分层、验收门槛和回滚演练 |
-
-## 开发约定
-
-1. 先完成文档对应的领域用例和测试，再接入命令或 Web。
-2. 业务规则只能依赖领域端口，不能直接导入 NoneBot、Flask 或 SQLite。
-3. 任何灵石、修为、物品、体力、积分、称号和交易状态变化都必须经过
-   一个可追踪的 operation，并支持重复请求不重复扣发。
-4. 新命令、外部 URL、数据结构和规则版本都必须经过文档化设计，不从旧项目推导。
-5. 运行数据、密钥、用户数据、备份和媒体缓存永远不提交到 Git。
-
-## 参考项目
-
-行为参考必须来自 GitHub 远端 `main` 的**独立干净克隆**。参考目录不是本仓库
-的必需文件；首次使用且目录不存在时执行一次：
+建议 Python 3.11+，并使用独立虚拟环境。完整的 Linux、Windows、Docker 和 Termux 步骤见 [`docs/installation.md`](docs/installation.md)。
 
 ```bash
-git clone --branch main --single-branch \
-  https://github.com/liyw0205/nonebot_plugin_xiuxian_2_pmv \
-  ../nonebot_plugin_xiuxian_2_pmv_upstream
+python -m venv "$HOME/myenv"
+"$HOME/myenv/bin/python" -m pip install -U pip
+"$HOME/myenv/bin/python" -m pip install -e '.[nonebot,onebot,qq]'
 ```
 
-本地克隆目录可能包含本地重构或未提交改动，严禁作为参考证据。独立目录建立后
-直接复用，只校验远端 URL、分支、HEAD 和工作区；
-除非明确要求刷新基线，否则不要删除或重新 clone。不能通过读取同名旧目录来
-代替。新项目以干净主分支的运行时观察和本仓库文档为准，不直接复制实现文件。
+仅运行规则测试可安装：
 
-## 当前仓库状态
+```bash
+"$HOME/myenv/bin/python" -m pip install -e '.[test]'
+```
 
-当前以 `docs/content-development.md` 作为内容、境界和功能范围入口，以
-`docs/current-status.md` 判断当前分支是否已经接入运行时，以 `docs/xiuxian3-design.md`
-作为跨系统设计总纲；后续实现按总表和实施计划拆分垂直切片。完整文档按
-`docs/index.md` 组织；每个阶段形成独立、可测试、可回滚的提交。
+## NoneBot 配置
+
+在你的 NoneBot 项目中启用插件：
+
+```python
+nonebot.load_plugin("nonebot_plugin_xiuxian_3")
+```
+
+设置数据目录（不设置时使用项目内 `data/`）：
+
+```dotenv
+XIUXIAN3_DATA_DIR=/var/lib/xiuxian3
+```
+
+QQ 和 OneBot 适配器都由同一个 application 处理，不要为两个平台复制一套业务命令。
+
+## 诊断运行
+
+不启动 NoneBot 也可以检查 SQLite 和内容包：
+
+```bash
+"$HOME/myenv/bin/python" -m nonebot_plugin_xiuxian_3 --data-dir ./data
+```
+
+## 开发与测试
+
+```bash
+"$HOME/myenv/bin/python" -m pytest -q
+"$HOME/myenv/bin/python" -m compileall -q nonebot_plugin_xiuxian_3
+find data -name '*.json' -print0 | xargs -0 -n1 "$HOME/myenv/bin/python" -m json.tool >/dev/null
+```
+
+开发顺序、当前开放范围和待办以 [`docs/development-guide.md`](docs/development-guide.md)、[`docs/current-status.md`](docs/current-status.md) 和 [`docs/content-development.md`](docs/content-development.md) 为准。
+
+## 目录约定
+
+```text
+data/                       # 只读内容包：境界、物品、任务、装备、配方等
+nonebot_plugin_xiuxian_3/  # 插件代码
+docs/                       # 安装、架构、玩法和运维文档
+test/                       # 单元、集成和双适配器模拟测试
+```
+
+数据库、日志、备份、密钥和用户数据不要提交到 Git。

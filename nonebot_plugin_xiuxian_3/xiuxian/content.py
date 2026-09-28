@@ -69,7 +69,10 @@ class ContentBundle:
                 identity = (kind, row["key"])
                 if identity in records:
                     raise ContentError(f"duplicate content key {kind}:{row['key']}")
-                records[identity] = copy.deepcopy(row)
+                normalized = copy.deepcopy(row)
+                normalized.setdefault("content_version", document["content_version"])
+                normalized.setdefault("rule_version", document["rule_version"])
+                records[identity] = normalized
 
         return cls(root=root, manifest=copy.deepcopy(manifest), _records=records)
 
@@ -102,6 +105,29 @@ class ContentBundle:
 
     def has(self, kind: str, key: str, *, include_locked: bool = True) -> bool:
         return self.get(kind, key, include_locked=include_locked) is not None
+
+    def label(self, kind: str, key: str, *, fallback: str | None = None) -> str:
+        """Return the user-facing name for a stable content key.
+
+        Presentation code should use this instead of keeping another key to
+        label mapping.  ``fallback`` is intentionally explicit so isolated
+        tests and old databases can keep their compatibility text.
+        """
+
+        row = self.get(kind, key)
+        if row is None or not isinstance(row.get("name"), str) or not row["name"].strip():
+            if fallback is not None:
+                return fallback
+            raise KeyError(f"content label not found: {kind}:{key}")
+        return row["name"].strip()
+
+    def versions(self, kind: str, key: str) -> tuple[str, str]:
+        """Return content/rule versions declared by one record."""
+
+        row = self.require(kind, key)
+        return str(row.get("content_version", self.content_version)), str(
+            row.get("rule_version", self.rule_version)
+        )
 
 
 def _read_object(path: Path) -> dict[str, Any]:

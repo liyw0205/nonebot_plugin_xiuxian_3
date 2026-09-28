@@ -16,6 +16,9 @@ def test_runtime_content_uses_normalized_records() -> None:
     assert sword["status"] == "active"
     assert bundle.require("realm", "foundation")["name"] == "筑基"
     assert bundle.get("item", "item.pill.foundation_guard", include_locked=False)
+    assert bundle.label("realm", "soul_transformation") == "化神"
+    assert bundle.label("item", "item.weapon.cloud_sword") == "云纹剑"
+    assert bundle.versions("realm", "soul_transformation") == ("content-0.6", "progression-0.6.0")
     constitution = bundle.require("constitution", "constitution.iron_bone")
     assert constitution["effect"] == {"type": "max_hp_bp", "value": 300}
     assert len(bundle.list("constitution", include_locked=False)) == 6

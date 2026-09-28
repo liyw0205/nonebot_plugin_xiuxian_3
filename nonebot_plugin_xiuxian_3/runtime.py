@@ -77,7 +77,7 @@ def create_runtime(
     resolved_settings = settings or XiuxianSettings.from_env(data_dir)
     content = ContentBundle.load_optional(resolved_settings.data_dir)
     repository = SQLitePlayerRepository(resolved_settings, clock=clock)
-    application = XiuxianApplication(repository)
+    application = XiuxianApplication(repository, content)
     router = CommandRouter()
     register_core_commands(router, application)
     registry = AdapterRegistry.create(router)

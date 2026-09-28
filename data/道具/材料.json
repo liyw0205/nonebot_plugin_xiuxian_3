@@ -485,6 +485,19 @@
       "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 1}],
       "status": "active",
       "key": "item.tribulation_guard"
+    },
+    {
+      "name": "云灵茶",
+      "item_type": "food",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [{"type": "next_cultivation_state_bonus_bp", "value": 500}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.food.cloud_tea"
     }
   ],
   "category": "材料",

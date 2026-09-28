@@ -32,6 +32,11 @@ data/
 每个文件包含 schema 版本、内容版本、更新时间、`kind` 和 `records`。每条记录
 使用统一的 `key` 字段；稳定键使用字符串，不使用上游 ID 区间。
 
+代码通过 `ContentBundle.get/require/list/label/versions` 读取定义；业务展示不应
+再复制境界、物品、任务或法器名称表。当前发布版本使用
+`xiuxian.versions.active_content_version()` / `active_rule_version()` 读取清单，历史
+结算仍保留生成当时的版本快照。
+
 ## 3. 加载校验
 
 启动或发布前检查：

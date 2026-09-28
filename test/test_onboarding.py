@@ -62,7 +62,7 @@ def test_mortal_intro_and_first_path_flow() -> None:
             assert entered.data["spirit_stones"] == 300
 
             profile = await runtime.dispatch(_context(user, "profile"), "我的状态")
-            assert "感气 L1" in profile.message
+            assert "感气境一层" in profile.message
             assert "xuantian" not in profile.message
             assert "玄天界·近郊" in profile.message
             assert "用户 ID" not in profile.message

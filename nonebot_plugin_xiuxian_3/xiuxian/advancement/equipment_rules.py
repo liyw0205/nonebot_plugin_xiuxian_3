@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from pathlib import Path
+
+from ..content import ContentBundle
+from ..versions import active_content_version
 
 
-CONTENT_VERSION = "content-0.1"
+# Compatibility export for historical equipment snapshots.
+CONTENT_VERSION = active_content_version(fallback="content-0.1")
 RULE_VERSION = "advancement-0.1.0"
 MAX_TEMPER_LEVEL = 3
 TEMPER_MATERIAL = "item.ore.ironstone"
@@ -30,7 +35,7 @@ class EquipmentDefinition:
     max_temper_level: int = MAX_TEMPER_LEVEL
 
 
-EQUIPMENT_DEFINITIONS = {
+_FALLBACK_EQUIPMENT_DEFINITIONS = {
     "item.weapon.wood_sword": EquipmentDefinition(
         key="item.weapon.wood_sword", label="木纹剑", slot="weapon"
     ),
@@ -42,6 +47,34 @@ EQUIPMENT_DEFINITIONS = {
     ),
 }
 
+
+def _content_equipment_definitions() -> dict[str, EquipmentDefinition]:
+    bundle = ContentBundle.load_optional(Path(__file__).resolve().parents[3] / "data")
+    if bundle is None:
+        return dict(_FALLBACK_EQUIPMENT_DEFINITIONS)
+    result: dict[str, EquipmentDefinition] = {}
+    for row in bundle.list("item", include_locked=False):
+        key = row.get("key")
+        if not isinstance(key, str) or row.get("item_type") not in {"weapon", "armor"}:
+            continue
+        fallback = _FALLBACK_EQUIPMENT_DEFINITIONS.get(key)
+        result[key] = EquipmentDefinition(
+            key=key,
+            label=str(row.get("name") or (fallback.label if fallback else key)),
+            slot=str(row.get("equipment_slot") or (fallback.slot if fallback else row["item_type"])),
+            max_temper_level=int(
+                ((row.get("growth") or {}).get("temper") or {}).get(
+                    "max_level", fallback.max_temper_level if fallback else MAX_TEMPER_LEVEL
+                )
+            ),
+        )
+    for key, definition in _FALLBACK_EQUIPMENT_DEFINITIONS.items():
+        result.setdefault(key, definition)
+    return result
+
+
+EQUIPMENT_DEFINITIONS = _content_equipment_definitions()
+
 EQUIPMENT_ALIASES = {
     "木纹剑": "item.weapon.wood_sword",
     "木剑": "item.weapon.wood_sword",
@@ -49,6 +82,7 @@ EQUIPMENT_ALIASES = {
     "云剑": "item.weapon.cloud_sword",
     "棉袍": "item.armor.cotton_robe",
     **{key: key for key in EQUIPMENT_DEFINITIONS},
+    **{definition.label: key for key, definition in EQUIPMENT_DEFINITIONS.items()},
 }
 
 AFFIX_POOL = (

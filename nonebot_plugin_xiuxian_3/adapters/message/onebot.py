@@ -5,12 +5,53 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 from .common import ForwardNode, MessageSendResult, message_id_from_response, require_adapter, require_content, send_text_message, value
+from .markdown import markdown_to_text
 
 
 async def send_onebot_v11_text_message(bot: Any, event: Any, text: str, **kwargs: Any) -> MessageSendResult:
     require_content(text, "text")
     require_adapter(bot, event, "onebot.v11")
     return await send_text_message(bot, event, text, **kwargs)
+
+
+async def send_onebot_v11_markdown_message(
+    bot: Any,
+    event: Any,
+    markdown: str,
+    *,
+    fallback_text: str | None = None,
+    **kwargs: Any,
+) -> MessageSendResult:
+    """Send Markdown content as plain OneBot text.
+
+    OneBot V11 is deliberately kept free of QQ Markdown/blue-link/keyboard
+    segments.  This explicit entry point makes that contract hard to bypass.
+    """
+
+    require_content(markdown, "markdown")
+    text = markdown_to_text(fallback_text if fallback_text is not None else markdown)
+    require_content(text, "fallback_text")
+    result = await send_onebot_v11_text_message(bot, event, text, **kwargs)
+    return MessageSendResult(
+        requested_format="markdown",
+        sent_format="text",
+        degraded=True,
+        response=result.response,
+        message_id=result.message_id,
+    )
+
+
+async def send_onebot_v11_keyboard_message(
+    bot: Any,
+    event: Any,
+    markdown: str,
+    rows: Iterable[Iterable[tuple[str, str]]] | None = None,
+    **kwargs: Any,
+) -> MessageSendResult:
+    """Drop QQ-only keyboard metadata and keep the readable message body."""
+
+    del rows
+    return await send_onebot_v11_markdown_message(bot, event, markdown, **kwargs)
 
 
 async def send_onebot_v11_forward_message(

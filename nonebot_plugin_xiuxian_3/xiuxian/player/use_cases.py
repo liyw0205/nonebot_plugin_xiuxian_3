@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentBundle
+from ..progression.rules import segment_for_layer
 from ..repository import (
     DaoNameTakenError,
     OperationConflictError,
@@ -20,18 +22,19 @@ from .rules import (
     QUALIFICATION_KEYS,
     QUALIFICATION_LABELS,
     REALM_LABELS,
+    realm_display_name,
     STAGE_LABELS,
     STATUS_LABELS,
     validate_dao_name,
 )
-from ..progression.rules import segment_for_layer
 
 
 class PlayerApplication:
     """Coordinates player commands without exposing persistence details to adapters."""
 
-    def __init__(self, repository: SQLitePlayerRepository):
+    def __init__(self, repository: SQLitePlayerRepository, content: ContentBundle | None = None):
         self.repository = repository
+        self.content = content
         self.intro = IntroApplication(repository)
         self.cultivation = CultivationApplication(repository)
 
@@ -67,15 +70,24 @@ class PlayerApplication:
         return LOCATION_LABELS.get(location_key, "未知地点")
 
     @staticmethod
-    def _realm_text(realm_key: str, layer: int) -> str:
-        name = REALM_LABELS.get(realm_key, "未知境界")
-        if not layer:
-            return name
-        try:
-            segment = segment_for_layer(layer)
-        except ValueError:
-            return f"{name} L{layer}"
-        return f"{name} L{layer}（{segment}）"
+    def _realm_text(
+        realm_key: str,
+        layer: int,
+        *,
+        content: ContentBundle | None = None,
+    ) -> str:
+        labels = dict(REALM_LABELS)
+        if content is not None:
+            record = content.get("realm", realm_key, include_locked=False)
+            if record is not None and isinstance(record.get("name"), str):
+                labels[realm_key] = record["name"]
+        text = realm_display_name(realm_key, layer, labels=labels)
+        if layer:
+            try:
+                text += f"（{segment_for_layer(int(layer))}）"
+            except (TypeError, ValueError):
+                pass
+        return text
 
     @staticmethod
     def _path_text(path_key: str | None, subprofession_key: str | None) -> str:
@@ -300,7 +312,7 @@ class PlayerApplication:
                 f"- **阶段**：{self._stage_text(player.stage)}\n"
                 f"- **状态**：{self._status_text(player.status)}\n"
                 f"- **位置**：{self._location_text(player.location_key)}\n"
-                f"- **境界**：{self._realm_text(player.realm_key, player.realm_layer)}\n"
+                f"- **境界**：{self._realm_text(player.realm_key, player.realm_layer, content=self.content)}\n"
                 f"- **灵石**：{player.spirit_stones}\n"
                 f"- **体力**：{player.stamina}/{player.stamina_max}\n"
                 f"- **精力**：{player.energy}/{player.energy_max}\n"

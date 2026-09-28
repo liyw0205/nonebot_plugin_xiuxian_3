@@ -296,8 +296,8 @@ Clock。
 - `adapters/web.py`：供 HTTP 框架调用的无依赖门面。
 - `adapters/cli.py`：供命令行和诊断脚本调用的无依赖门面。
 - `adapters/message/common.py`：通用文本结果和 Markdown 降级工具。
-- `adapters/message/qq.py`：QQ 普通消息与 Markdown 消息。
-- `adapters/message/onebot.py`：OneBot V11 普通消息与合并转发消息。
+- `adapters/message/qq.py`：QQ 普通消息、Markdown、蓝字命令链接与自定义按键。
+- `adapters/message/onebot.py`：OneBot V11 普通消息与合并转发消息；Markdown/蓝字/按键统一降级为纯文本。
 - `adapters/message/router.py`：按 bot/event 类型选择发送器；`adapters/messaging.py` 仅保留兼容导出。
 
 NoneBot 依赖按需安装：`pip install -e '.[nonebot,onebot,qq]'`。OneBot/QQ
@@ -311,6 +311,9 @@ NoneBot 项目通过 `nonebot.load_plugin("nonebot_plugin_xiuxian_3")` 加载插
 from nonebot_plugin_xiuxian_3.adapters.messaging import (
     ForwardNode,
     send_onebot_v11_forward_message,
+    send_onebot_v11_markdown_message,
+    send_qq_blue_text_message,
+    send_qq_markdown_keyboard_message,
     send_onebot_v11_text_message,
     send_qq_markdown_message,
     send_qq_text_message,
@@ -318,7 +321,12 @@ from nonebot_plugin_xiuxian_3.adapters.messaging import (
 
 await send_qq_text_message(bot, event, "QQ 普通消息")
 await send_qq_markdown_message(bot, event, "# 境界\n\n**感气**")
+await send_qq_blue_text_message(bot, event, "开始修炼", "开始修炼")
+await send_qq_markdown_keyboard_message(
+    bot, event, "**请选择**", [[("开始修炼", "开始修炼")]]
+)
 await send_onebot_v11_text_message(bot, event, "OneBot 普通消息")
+await send_onebot_v11_markdown_message(bot, event, "**OneBot 纯文本降级**")
 await send_onebot_v11_forward_message(
     bot,
     event,
@@ -328,6 +336,8 @@ await send_onebot_v11_forward_message(
 
 QQ Markdown 使用 QQ 适配器的 `MessageSegment.markdown`；OneBot V11 合并转发使用
 `send_group_forward_msg` 或 `send_private_forward_msg`，目标从事件场景自动判断。
+QQ 蓝字使用 `mqqapi://aio/inlinecmd`，按键使用官方 `MessageKeyboard`；OneBot
+不会构造这些 QQ 专属消息段。
 插件内普通 matcher 回复也通过同一适配器分发函数发送；不确定平台时才使用通用
 `send_text_message`，避免把 QQ 消息段发给 OneBot。
 

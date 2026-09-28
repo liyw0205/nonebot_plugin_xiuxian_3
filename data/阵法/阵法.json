@@ -24,6 +24,20 @@
       "requirements": [],
       "status": "active",
       "key": "item.array.gathering_basic"
+    },
+    {
+      "name": "迷雾屏障阵",
+      "item_type": "array",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "time_bound",
+      "bind_duration_seconds": 43200,
+      "tradeable": false,
+      "effects": [{"type": "exploration_risk_reduction_bp", "value": 500}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.array.mist_barrier"
     }
   ],
   "category": "阵法",
