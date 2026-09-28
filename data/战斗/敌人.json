@@ -148,6 +148,66 @@
       "status": "active"
     },
     {
+      "name": "虚空塔斥候",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 120, "attack": 2, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.scout",
+      "status": "active"
+    },
+    {
+      "name": "虚空塔哨卫",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 140, "attack": 3, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.sentinel",
+      "status": "active"
+    },
+    {
+      "name": "虚空塔观测者",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 160, "attack": 3, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.watcher",
+      "status": "active"
+    },
+    {
+      "name": "虚空塔战将",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 180, "attack": 4, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.warlord",
+      "status": "active"
+    },
+    {
+      "name": "风暴路线守关者",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 220, "attack": 5, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.route_storm_boss",
+      "status": "active"
+    },
+    {
+      "name": "回响路线守关者",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 240, "attack": 5, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.route_echo_boss",
+      "status": "active"
+    },
+    {
       "name": "三劫天尊",
       "location_key": "tribulation.sky_terrace",
       "requirements": [

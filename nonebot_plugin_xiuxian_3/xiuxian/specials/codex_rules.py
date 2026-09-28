@@ -65,6 +65,13 @@ for _floor_no in range(1, 41):
         f"codex.challenge.three_realms.floor_{_floor_no}",
         ("challenge", f"三界塔第 {_floor_no} 层"),
     )
+for _floor_no in range(1, 31):
+    _ENTRY_LABELS.setdefault(
+        f"codex.challenge.void_spire.floor_{_floor_no}",
+        ("challenge", f"虚空塔第 {_floor_no} 层"),
+    )
+_ENTRY_LABELS.setdefault("codex.void.route_spire_storm", ("route", "虚空塔风暴路线"))
+_ENTRY_LABELS.setdefault("codex.void.route_spire_echo", ("route", "虚空塔回响路线"))
 for _faction, _label in (("xuantian", "玄天"), ("demon", "魔界"), ("beast", "妖界")):
     _ENTRY_LABELS.setdefault(
         f"codex.story.three_realms.faction_{_faction}",

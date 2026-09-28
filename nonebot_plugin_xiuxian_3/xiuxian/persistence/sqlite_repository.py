@@ -81,9 +81,11 @@ from ..specials.dispatch_migration import ensure_dispatch_schema
 from ..specials.codex_repository import CodexRepositoryMixin
 from ..specials.codex_migration import ensure_codex_schema
 from ..specials.tower_repository import TowerRepositoryMixin
+from ..specials.void_spire_repository import VoidSpireRepositoryMixin
 from ..specials.three_realms_tower_repository import ThreeRealmsTowerRepositoryMixin
 from ..specials.three_realms_tower_duo_repository import ThreeRealmsTowerDuoRepositoryMixin
 from ..specials.tower_migration import ensure_tower_schema
+from ..specials.void_spire_migration import ensure_void_spire_schema
 from ..specials.three_realms_tower_duo_migration import ensure_three_realms_tower_duo_schema
 from ..specials.story_repository import StoryRepositoryMixin
 from ..specials.story_migration import ensure_story_schema
@@ -167,6 +169,7 @@ class SQLitePlayerRepository(
     DispatchRepositoryMixin,
     CodexRepositoryMixin,
     TowerRepositoryMixin,
+    VoidSpireRepositoryMixin,
     ThreeRealmsTowerRepositoryMixin,
     ThreeRealmsTowerDuoRepositoryMixin,
     StoryRepositoryMixin,
@@ -187,8 +190,15 @@ class SQLitePlayerRepository(
     prevents an unbounded burst from creating more connections than useful.
     """
 
-    def __init__(self, settings: XiuxianSettings, *, clock: Callable[[], datetime] | None = None):
+    def __init__(
+        self,
+        settings: XiuxianSettings,
+        *,
+        clock: Callable[[], datetime] | None = None,
+        content: ContentBundle | None = None,
+    ):
         self.settings = settings
+        self.content = content
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._initialized = False
         self._initialize_lock = asyncio.Lock()
@@ -298,6 +308,7 @@ class SQLitePlayerRepository(
             ensure_dispatch_schema(connection)
             ensure_codex_schema(connection)
             ensure_tower_schema(connection)
+            ensure_void_spire_schema(connection)
             ensure_three_realms_tower_duo_schema(connection)
             ensure_story_schema(connection)
             ensure_trade_permit_schema(connection)

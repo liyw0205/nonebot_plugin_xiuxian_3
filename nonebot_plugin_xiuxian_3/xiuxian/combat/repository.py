@@ -61,6 +61,7 @@ from .rules import (
 )
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
+from ..versions import module_versions
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
 
 
@@ -92,6 +93,7 @@ class CombatRepositoryMixin:
         operation_id: str,
         ignore_secret_realm_run_id: str | None = None,
         ignore_tower_run_id: str | None = None,
+        ignore_void_spire_run_id: str | None = None,
         ignore_ancestral_hall_run_id: str | None = None,
     ) -> BattleStartRecord:
         """Create a named quest encounter using the same replayable battle core."""
@@ -109,6 +111,7 @@ class CombatRepositoryMixin:
                 None,
                 ignore_secret_realm_run_id,
                 ignore_tower_run_id,
+                ignore_void_spire_run_id,
                 ignore_ancestral_hall_run_id,
             )
 
@@ -249,9 +252,15 @@ class CombatRepositoryMixin:
         exploration_id: str | None = None,
         ignore_secret_realm_run_id: str | None = None,
         ignore_tower_run_id: str | None = None,
+        ignore_void_spire_run_id: str | None = None,
         ignore_ancestral_hall_run_id: str | None = None,
     ) -> BattleStartRecord:
-        enemy = enemy_definition(enemy_key)
+        content = getattr(self, "content", None)
+        enemy = (
+            enemy_definition(enemy_key, content=content)
+            if content is not None and enemy_key.startswith("enemy.void_spire.")
+            else enemy_definition(enemy_key)
+        )
         v03_enemy_keys = {
             DEMON_OVERLORD.key,
             DEMON_RUINS_SCOUT.key,
@@ -262,12 +271,18 @@ class CombatRepositoryMixin:
         }
         v02_enemy_keys = {MIST_ELITE.key, CLOUD_BOAT_GUARDIAN.key}
         is_three_realms_tower_enemy = enemy.key.startswith("enemy.three_realms_tower.")
+        is_void_spire_enemy = enemy.key.startswith("enemy.void_spire.")
         is_three_realms_tower_v04_enemy = is_three_realms_tower_enemy and any(
             f".{encounter}" in enemy.key
             for encounter in ("domain_vanguard", "floor_30_boss", "domain_veteran", "floor_40_boss")
         )
+        void_spire_content_version, void_spire_rule_version = module_versions(
+            "nonebot_plugin_xiuxian_3.xiuxian.specials.void_spire_rules"
+        )
         battle_content_version = (
-            V04_CONTENT_VERSION
+            void_spire_content_version
+            if is_void_spire_enemy
+            else V04_CONTENT_VERSION
             if enemy.key == ANCESTRAL_SPIRIT.key or is_three_realms_tower_v04_enemy
             else V03_CONTENT_VERSION
             if enemy.key in v03_enemy_keys or is_three_realms_tower_enemy
@@ -275,7 +290,9 @@ class CombatRepositoryMixin:
             if enemy.key in v02_enemy_keys
             else CONTENT_VERSION
         )
-        if enemy.key == ANCESTRAL_SPIRIT.key:
+        if is_void_spire_enemy:
+            battle_rule_version = void_spire_rule_version
+        elif enemy.key == ANCESTRAL_SPIRIT.key:
             battle_rule_version = V041_RULE_VERSION
         elif is_three_realms_tower_v04_enemy:
             battle_rule_version = "combat-0.4.0"
@@ -364,6 +381,7 @@ class CombatRepositoryMixin:
                 ignore_exploration_id=exploration_id,
                 ignore_secret_realm_run_id=ignore_secret_realm_run_id,
                 ignore_tower_run_id=ignore_tower_run_id,
+                ignore_void_spire_run_id=ignore_void_spire_run_id,
                 ignore_ancestral_hall_run_id=ignore_ancestral_hall_run_id,
             ):
                 raise BattleBusyError("another long action is active")

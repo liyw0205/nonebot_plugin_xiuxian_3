@@ -379,7 +379,15 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 #### 5.4.7 `tower.three_realms` 高阶单人层
 
-三界塔 v0.3 的 1–20 层继续使用 `content-0.3` / `specials-0.3.0`；v0.4 新增 21–40 层，版本固定为 `content-0.4` / `specials-0.4.0`。升级不得改变旧层记录、旧随机结果或旧 operation 哈希。公开命令为 `三界塔`、`挑战三界塔 <1-40>`、`领取三界塔奖励`；双人命令为 `创建三界塔双人队伍`、`挑战三界塔双人 <1-40>`、`领取三界塔双人奖励`。双人挑战使用独立 `three_realms_tower_duo` 队伍、运行表和成员奖励表，`tower.void_spire` 仍关闭。
+三界塔 v0.3 的 1–20 层继续使用 `content-0.3` / `specials-0.3.0`；v0.4 新增 21–40 层，版本固定为 `content-0.4` / `specials-0.4.0`。升级不得改变旧层记录、旧随机结果或旧 operation 哈希。公开命令为 `三界塔`、`挑战三界塔 <1-40>`、`领取三界塔奖励`；双人命令为 `创建三界塔双人队伍`、`挑战三界塔双人 <1-40>`、`领取三界塔双人奖励`。双人挑战使用独立 `three_realms_tower_duo` 队伍、运行表和成员奖励表。
+
+#### 5.4.8 `tower.void_spire` 首个开放切片
+
+虚空塔设计总高 90 层，本切片只开放单人 1–30 层；31–60 层属于下一阶段，61–90 层在完整合同定义前保持关闭。命令为 `虚空塔`、`挑战虚空塔 <1-30>` 和 `领取虚空塔奖励`。进入条件为炼虚境一层，或 `player_reputations.local_json.local.void_supply >= 600`；每次扣 20 体力，每角色每 UTC 周最多 2 次，失败计次，战斗启动失败才退款并标记 `aborted`。前一层首通奖励领取后才解锁下一层，活动状态使用独立 `void_spire_runs` 和 `void_spire_reward_claims` 表，不能复用雾隐塔记录。
+
+1–15 层冻结 `route_key=storm`，16–30 层冻结 `route_key=echo`，15/30 层为路线首领。首通奖励为灵石 120、阵砂 3，路线首领额外给 `local.void_supply +30`；重复挑战只可能给阵砂 0–1，不发普通战斗奖励。战斗敌人键、路线、奖励、图鉴和 operation 均写入运行快照，版本从 `data/内容版本.json` 的 `nonebot_plugin_xiuxian_3.xiuxian.specials.void_spire_rules` 读取。图鉴键为 `codex.void.route_spire_storm`、`codex.void.route_spire_echo` 和 `codex.challenge.void_spire.floor_<N>`。
+
+验收至少覆盖 QQ 官方与 OneBot V11：门槛替代路径、31 层拒绝、锁层、首通/练习、周限、失败与启动补偿、operation/reward 幂等、路线首领快照、图鉴记录及普通战斗奖励隔离。OneBot 输出必须移除 Markdown 语法、蓝字和按键；QQ 可继续使用这些能力。该切片完成后再进入 31–60 层合同，不得把 31–90 层标为已开放。
 
 21–40 层的准入为化神 L1，或重建名望总值至少 500。重建名望定义为玩家 `local_json` 中 `local.domain_refuge`、`local.abyss_outpost`、`local.ancestral_habitat` 三项之和；不能以旧三界主线许可绕过该门槛。每次挑战消耗 12 体力；每角色、每层、每 UTC 周最多 2 次，胜利、失败和逃跑都计次。战斗启动失败标记 `aborted`、全额退还体力且不计次。首通必须按层胜利并领取上一层奖励后才解锁下一层；已首通层可练习。
 

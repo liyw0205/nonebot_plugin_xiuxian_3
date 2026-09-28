@@ -115,7 +115,7 @@ def _make_v04_eligible(
             "WHERE platform=? AND platform_user_id=?",
             (
                 realm,
-                json.dumps({"body": 100, "agility": 100, "spirit": 100}),
+                json.dumps({"body": 10000, "agility": 1000, "spirit": 100}),
                 json.dumps({"flags": ["story.mainline.three_realms", f"alliance.{faction}"]}),
                 json.dumps({faction: 500}),
                 adapter,

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+from nonebot_plugin_xiuxian_3.xiuxian.versions import bundled_content, module_content_version, module_rule_version
 
 import hashlib
 from dataclasses import dataclass
 from typing import Mapping
 
+from ..content import ContentBundle
 
 CONTENT_VERSION = module_content_version(__name__)
 RULE_VERSION = module_rule_version(__name__)
@@ -557,6 +558,38 @@ MIST_TRIAL_GOLDEN_CORE_BOSS = EnemyDefinition(
     reward={},
 )
 
+
+def _void_spire_enemy(key: str, *, content: ContentBundle | None = None) -> EnemyDefinition:
+    bundle = content if content is not None else _VOID_SPIRE_CONTENT
+    if bundle is None:
+        raise ValueError("void spire enemy content is unavailable")
+    record = bundle.require("enemy", key, include_locked=False)
+    stats = record["stats"]
+    requirement = record["requirements"][0]
+    return EnemyDefinition(
+        key=key,
+        label=str(record["name"]),
+        location_key=str(record["location_key"]),
+        required_realm=str(requirement.get("realm_key", requirement.get("stage"))),
+        required_layer=int(requirement.get("min_layer", 0)),
+        max_hp=int(stats["hp"]),
+        attack=int(stats["attack"]),
+        initiative=int(stats["initiative"]),
+        agility=int(stats["agility"]),
+        skill_key=str(record["skills"][0]),
+        random_pool="battle.enemy.void_spire",
+        reward={},
+    )
+
+
+_VOID_SPIRE_CONTENT = bundled_content()
+VOID_SPIRE_SCOUT = _void_spire_enemy("enemy.void_spire.scout")
+VOID_SPIRE_SENTINEL = _void_spire_enemy("enemy.void_spire.sentinel")
+VOID_SPIRE_WATCHER = _void_spire_enemy("enemy.void_spire.watcher")
+VOID_SPIRE_WARLORD = _void_spire_enemy("enemy.void_spire.warlord")
+VOID_SPIRE_STORM_BOSS = _void_spire_enemy("enemy.void_spire.route_storm_boss")
+VOID_SPIRE_ECHO_BOSS = _void_spire_enemy("enemy.void_spire.route_echo_boss")
+
 ENEMIES = {
     TRAINING_DUMMY.key: TRAINING_DUMMY,
     WOOD_RAT.key: WOOD_RAT,
@@ -592,6 +625,12 @@ ENEMIES = {
     MIST_TRIAL_FOUNDATION_BOSS.key: MIST_TRIAL_FOUNDATION_BOSS,
     MIST_TRIAL_GOLDEN_CORE.key: MIST_TRIAL_GOLDEN_CORE,
     MIST_TRIAL_GOLDEN_CORE_BOSS.key: MIST_TRIAL_GOLDEN_CORE_BOSS,
+    VOID_SPIRE_SCOUT.key: VOID_SPIRE_SCOUT,
+    VOID_SPIRE_SENTINEL.key: VOID_SPIRE_SENTINEL,
+    VOID_SPIRE_WATCHER.key: VOID_SPIRE_WATCHER,
+    VOID_SPIRE_WARLORD.key: VOID_SPIRE_WARLORD,
+    VOID_SPIRE_STORM_BOSS.key: VOID_SPIRE_STORM_BOSS,
+    VOID_SPIRE_ECHO_BOSS.key: VOID_SPIRE_ECHO_BOSS,
 }
 
 _THREE_REALMS_TOWER_FACTIONS = {
@@ -646,7 +685,9 @@ for _faction, _faction_label in _THREE_REALMS_TOWER_FACTIONS.items():
         )
 
 
-def enemy_definition(enemy_key: str) -> EnemyDefinition:
+def enemy_definition(enemy_key: str, *, content: ContentBundle | None = None) -> EnemyDefinition:
+    if content is not None and enemy_key.startswith("enemy.void_spire."):
+        return _void_spire_enemy(enemy_key, content=content)
     try:
         return ENEMIES[enemy_key]
     except KeyError as exc:

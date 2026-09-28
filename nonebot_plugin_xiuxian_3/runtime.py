@@ -104,7 +104,7 @@ def create_runtime(
         explicit_data_dir=data_dir,
         explicit_settings=settings is not None,
     )
-    repository = SQLitePlayerRepository(resolved_settings, clock=clock)
+    repository = SQLitePlayerRepository(resolved_settings, clock=clock, content=content)
     application = XiuxianApplication(repository, content)
     router = CommandRouter()
     register_core_commands(router, application)

@@ -59,6 +59,7 @@ from .specials.idle_use_cases import IdleApplication
 from .specials.dispatch_use_cases import DispatchApplication
 from .specials.codex_use_cases import CodexApplication
 from .specials.tower_use_cases import TowerApplication
+from .specials.void_spire_use_cases import VoidSpireApplication
 from .specials.three_realms_tower_use_cases import ThreeRealmsTowerApplication
 from .specials.three_realms_tower_duo_use_cases import ThreeRealmsTowerDuoApplication
 from .specials.story_use_cases import StoryApplication
@@ -134,6 +135,7 @@ class XiuxianApplication:
         self.dispatch = DispatchApplication(repository)
         self.codex = CodexApplication(repository)
         self.tower = TowerApplication(repository)
+        self.void_spire = VoidSpireApplication(repository)
         self.three_realms_tower = ThreeRealmsTowerApplication(repository)
         self.three_realms_tower_duo = ThreeRealmsTowerDuoApplication(repository)
         self.story = StoryApplication(repository)
@@ -1603,6 +1605,15 @@ class XiuxianApplication:
 
     async def claim_tower_reward(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.tower.claim_reward(context), write_message="当前事件不允许领取试炼塔奖励。")
+
+    async def preview_void_spire(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.void_spire.preview(context), require_write=False)
+
+    async def challenge_void_spire(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.void_spire.challenge(context), write_message="当前事件不允许挑战虚空塔。")
+
+    async def claim_void_spire_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.void_spire.claim_reward(context), write_message="当前事件不允许领取虚空塔奖励。")
 
     async def preview_three_realms_tower(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.three_realms_tower.preview(context), require_write=False)
