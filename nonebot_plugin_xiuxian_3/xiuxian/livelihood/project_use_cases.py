@@ -48,6 +48,11 @@ class ProjectApplication:
             "云铁": "item.material.cloud_iron",
             "灵石": "currency.spirit_stone",
             "灵叶": "item.herb.spirit_leaf",
+            "灵米": "item.food.coarse_spirit_rice",
+            "灵米饭": "item.food.coarse_spirit_rice",
+            "血草": "item.herb.blood_grass",
+            "阵砂": "item.mat.array_sand",
+            "疗伤丹": "item.pill.healing_low",
         }.get((value or "").strip(), value)
 
     async def list_projects(self, context: CommandContext) -> CommandResult:

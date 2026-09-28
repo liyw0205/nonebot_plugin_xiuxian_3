@@ -215,10 +215,16 @@ def commission_definition(value: str | None = None) -> TownCommissionDefinition:
 PROJECT_TOWN_WELL = "project.town_well"
 PROJECT_MARKET_ROAD = "project.market_road"
 PROJECT_HERB_GARDEN = "project.herb_garden"
+PROJECT_DOMAIN_REFUGE = "project.domain_refuge"
+PROJECT_ABYSS_PURIFICATION = "project.abyss_purification"
+PROJECT_ANCESTRAL_HABITAT = "project.ancestral_habitat"
 PROJECT_CONTENT_VERSION = "content-0.2"
 PROJECT_RULE_VERSION = "livelihood-0.2.0"
+PROJECT_V04_CONTENT_VERSION = "content-0.4"
+PROJECT_V04_RULE_VERSION = "livelihood-0.4.0"
 TRANSPORT_TICKET = "item.token.transport_coupon"
 HERB_SEED_BUNDLE = "item.seed.herb_bundle"
+CONSTRUCTION_COUPON = "item.token.construction_coupon"
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +235,10 @@ class PublicProjectDefinition:
     contribution_resources: tuple[str, ...]
     effect_key: str
     reward: dict[str, int | str]
+    local_reputation_key: str = "local.xuantian.new_town"
+    required_faction: str | None = None
+    required_faction_reputation: int = 0
+    required_sect_level: int = 0
     content_version: str = PROJECT_CONTENT_VERSION
     rule_version: str = PROJECT_RULE_VERSION
 
@@ -258,6 +268,54 @@ PUBLIC_PROJECT_DEFINITIONS = {
         effect_key="town_commission.herb_reward_bonus",
         reward={"item": HERB_SEED_BUNDLE},
     ),
+    # v0.4 projects are materialized on demand after their authority gate is met;
+    # the legacy weekly rotation remains limited to the three v0.2 projects.
+    PROJECT_DOMAIN_REFUGE: PublicProjectDefinition(
+        key=PROJECT_DOMAIN_REFUGE,
+        label="领域避难所",
+        requirements={
+            "item.mat.wood": 60,
+            "item.food.coarse_spirit_rice": 60,
+            "item.pill.healing_low": 20,
+        },
+        contribution_resources=(
+            "item.mat.wood",
+            "item.food.coarse_spirit_rice",
+            "item.pill.healing_low",
+        ),
+        effect_key="domain_refuge.low_risk_stock_bonus",
+        reward={"local_reputation": 8, "service_reputation": 3, "item": CONSTRUCTION_COUPON},
+        local_reputation_key="local.domain_refuge",
+        required_sect_level=4,
+        content_version=PROJECT_V04_CONTENT_VERSION,
+        rule_version=PROJECT_V04_RULE_VERSION,
+    ),
+    PROJECT_ABYSS_PURIFICATION: PublicProjectDefinition(
+        key=PROJECT_ABYSS_PURIFICATION,
+        label="魔渊净化工程",
+        requirements={"item.herb.blood_grass": 60, "item.mat.array_sand": 60},
+        contribution_resources=("item.herb.blood_grass", "item.mat.array_sand"),
+        effect_key="abyss_purification.route_delay_reduction",
+        reward={"local_reputation": 8, "service_reputation": 3, "item": CONSTRUCTION_COUPON},
+        local_reputation_key="local.abyss_outpost",
+        required_faction="demon",
+        required_faction_reputation=300,
+        content_version=PROJECT_V04_CONTENT_VERSION,
+        rule_version=PROJECT_V04_RULE_VERSION,
+    ),
+    PROJECT_ANCESTRAL_HABITAT: PublicProjectDefinition(
+        key=PROJECT_ANCESTRAL_HABITAT,
+        label="祖灵栖地修复",
+        requirements={"item.food.coarse_spirit_rice": 60, "item.herb.spirit_leaf": 60},
+        contribution_resources=("item.food.coarse_spirit_rice", "item.herb.spirit_leaf"),
+        effect_key="ancestral_habitat.commission_stock_bonus",
+        reward={"local_reputation": 8, "service_reputation": 3, "item": CONSTRUCTION_COUPON},
+        local_reputation_key="local.ancestral_habitat",
+        required_faction="beast",
+        required_faction_reputation=300,
+        content_version=PROJECT_V04_CONTENT_VERSION,
+        rule_version=PROJECT_V04_RULE_VERSION,
+    ),
 }
 
 PROJECT_ALIASES = {
@@ -270,6 +328,12 @@ PROJECT_ALIASES = {
     "百草园": PROJECT_HERB_GARDEN,
     "灵草园": PROJECT_HERB_GARDEN,
     "project.herb_garden": PROJECT_HERB_GARDEN,
+    "领域避难所": PROJECT_DOMAIN_REFUGE,
+    "project.domain_refuge": PROJECT_DOMAIN_REFUGE,
+    "魔渊净化工程": PROJECT_ABYSS_PURIFICATION,
+    "project.abyss_purification": PROJECT_ABYSS_PURIFICATION,
+    "祖灵栖地修复": PROJECT_ANCESTRAL_HABITAT,
+    "project.ancestral_habitat": PROJECT_ANCESTRAL_HABITAT,
 }
 
 
@@ -287,7 +351,9 @@ def weekly_project_key(week_key: str) -> str:
     import hashlib
 
     digest = hashlib.blake2b(week_key.encode("utf-8"), digest_size=2).digest()
-    keys = tuple(PUBLIC_PROJECT_DEFINITIONS)
+    # v0.4 reconstruction projects are authority-gated and materialized
+    # separately; changing this legacy pool would rewrite historical rotations.
+    keys = (PROJECT_TOWN_WELL, PROJECT_MARKET_ROAD, PROJECT_HERB_GARDEN)
     return keys[int.from_bytes(digest, "big") % len(keys)]
 
 
@@ -316,10 +382,16 @@ __all__ = [
     "HERB_SEED_BUNDLE",
     "PROJECT_ALIASES",
     "PROJECT_CONTENT_VERSION",
+    "PROJECT_V04_CONTENT_VERSION",
+    "PROJECT_V04_RULE_VERSION",
+    "PROJECT_DOMAIN_REFUGE",
+    "PROJECT_ABYSS_PURIFICATION",
+    "PROJECT_ANCESTRAL_HABITAT",
     "PROJECT_HERB_GARDEN",
     "PROJECT_MARKET_ROAD",
     "PROJECT_RULE_VERSION",
     "PROJECT_TOWN_WELL",
+    "CONSTRUCTION_COUPON",
     "PUBLIC_PROJECT_DEFINITIONS",
     "PublicProjectDefinition",
     "TRANSPORT_TICKET",

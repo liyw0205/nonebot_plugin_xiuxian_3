@@ -13,6 +13,7 @@
 | `item.pill.domain_restore` | 恢复丹，9 | 绑定 | 化神失败时改善裂痕；或裂痕提前恢复消耗 | 化神炼丹 |
 | `item.weapon.domain_blade` | 法器，唯一 | 绑定 12h 后可交易 | `domain_power +20`，耐久 10000 bp；领域战 -200 bp | 领域首领 |
 | `item.array.domain_guard` | 阵法实例，唯一 | 宗门绑定 | 宗门领域防御 +1500 bp，维护每周 1 核心 | 高阶阵堂 |
+| `item.token.construction_coupon` | 建设券，99 | 绑定，不可交易 | 下一次居所/设施维护减免 10 灵石；不能出售、换修为或用于突破 | 三界重建公共项目 |
 
 `item.domain_core` 不能用于普通装备强化、出售给 NPC 或作为生产替代材料。`domain_guard` 只能在宗门领地部署；宗门解散时进入 7 天受保护回收状态，之后返还最后宗主的绑定仓库，不能静默消失。
 

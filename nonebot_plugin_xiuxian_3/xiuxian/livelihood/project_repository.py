@@ -21,8 +21,7 @@ from ..persistence.errors import (
 )
 from .project_models import ProjectContributionRecord, ProjectSettlementRecord, PublicProjectView
 from .rules import (
-    PROJECT_CONTENT_VERSION,
-    PROJECT_RULE_VERSION,
+    PUBLIC_PROJECT_DEFINITIONS,
     PublicProjectDefinition,
     project_definition,
     weekly_project_key,
@@ -43,10 +42,27 @@ class ProjectRepositoryMixin:
         week = self._business_week(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            self._require_player(connection, platform, platform_user_id, writable=False)
-            project = self._ensure_project(connection, week, now)
-            self._refresh_status(project, connection, now, now_text)
-            return (self._project_view(project),)
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            self._ensure_project(connection, week, now)
+            # Authority-gated v0.4 projects are independent rows in the same
+            # weekly ledger.  They are created only for eligible players, so
+            # legacy users retain the original one-project view and rotation.
+            for definition in PUBLIC_PROJECT_DEFINITIONS.values():
+                if definition.content_version != "content-0.4":
+                    continue
+                if self._project_available(connection, player, definition):
+                    self._ensure_project(connection, week, now, definition.key, player=player)
+            projects = connection.execute(
+                "SELECT * FROM livelihood_projects WHERE business_week = ? ORDER BY id",
+                (week,),
+            ).fetchall()
+            for project in projects:
+                self._refresh_status(project, connection, now, now_text)
+            projects = connection.execute(
+                "SELECT * FROM livelihood_projects WHERE business_week = ? ORDER BY id",
+                (week,),
+            ).fetchall()
+            return tuple(self._project_view(project) for project in projects)
 
     async def contribute_project(
         self,
@@ -109,10 +125,18 @@ class ProjectRepositoryMixin:
             if existing is not None:
                 return self._contribution_from_payload(existing, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
-            project = self._ensure_project(connection, week, now)
+            project = self._ensure_project(
+                connection,
+                week,
+                now,
+                definition.key if definition is not None else None,
+                player=player,
+            )
             if definition is not None and definition.key != str(project["project_key"]):
                 raise ProjectContentClosedError("project is not in this week's rotation")
             definition = project_definition(str(project["project_key"]))
+            if definition.content_version == "content-0.4":
+                self._require_project_day_quota(connection, project, player, now, points)
             self._refresh_status(project, connection, now, now_text)
             project = connection.execute("SELECT * FROM livelihood_projects WHERE id = ?", (project["id"],)).fetchone()
             if project is None:
@@ -245,8 +269,15 @@ class ProjectRepositoryMixin:
                 project = connection.execute("SELECT * FROM livelihood_projects WHERE project_id = ?", (project_id,)).fetchone()
             else:
                 project = connection.execute(
-                    "SELECT * FROM livelihood_projects WHERE business_week = ? ORDER BY id DESC LIMIT 1",
-                    (self._business_week(now),),
+                    """
+                    SELECT p.*
+                    FROM livelihood_projects p
+                    JOIN livelihood_project_contributions c ON c.project_id = p.project_id
+                    WHERE p.business_week = ? AND c.player_id = ?
+                    ORDER BY p.id DESC
+                    LIMIT 1
+                    """,
+                    (self._business_week(now), player["id"]),
                 ).fetchone()
             if project is None:
                 raise ProjectNotFoundError("project does not exist")
@@ -291,9 +322,20 @@ class ProjectRepositoryMixin:
     def _project_target(definition: PublicProjectDefinition) -> int:
         return sum(value if key != "currency.spirit_stone" else value // 50 for key, value in definition.requirements.items())
 
-    def _ensure_project(self, connection: Any, week: str, now: datetime) -> Any:
-        key = weekly_project_key(week)
+    def _ensure_project(
+        self,
+        connection: Any,
+        week: str,
+        now: datetime,
+        project_key: str | None = None,
+        *,
+        player: Any | None = None,
+    ) -> Any:
+        key = weekly_project_key(week) if project_key is None else project_key
         definition = project_definition(key)
+        if definition.content_version == "content-0.4":
+            if player is None or not self._project_available(connection, player, definition):
+                raise ProjectContentClosedError("project authority is not available")
         row = connection.execute(
             "SELECT * FROM livelihood_projects WHERE project_key = ? AND business_week = ?",
             (definition.key, week),
@@ -301,7 +343,8 @@ class ProjectRepositoryMixin:
         if row is not None:
             return row
         now_text = serialize_datetime(now)
-        project_id = f"project.new_town.{week}.{definition.key.rsplit('.', 1)[-1]}"
+        project_prefix = "project.new_town" if definition.content_version != "content-0.4" else "project.reconstruction"
+        project_id = f"{project_prefix}.{week}.{definition.key.rsplit('.', 1)[-1]}"
         requirements = dict(definition.requirements)
         progress = {key: 0 for key in requirements}
         connection.execute(
@@ -320,12 +363,62 @@ class ProjectRepositoryMixin:
                 json.dumps(requirements, ensure_ascii=False, sort_keys=True),
                 json.dumps(progress, ensure_ascii=False, sort_keys=True),
                 definition.effect_key,
-                json.dumps({"label": definition.label, "content_version": PROJECT_CONTENT_VERSION, "rule_version": PROJECT_RULE_VERSION}, ensure_ascii=False, sort_keys=True),
+                json.dumps({"label": definition.label, "content_version": definition.content_version, "rule_version": definition.rule_version}, ensure_ascii=False, sort_keys=True),
                 now_text,
                 now_text,
             ),
         )
         return connection.execute("SELECT * FROM livelihood_projects WHERE project_id = ?", (project_id,)).fetchone()
+
+    @staticmethod
+    def _project_available(connection: Any, player: Any, definition: PublicProjectDefinition) -> bool:
+        """Check the v0.4 project authority without granting it implicitly."""
+
+        if definition.required_faction:
+            faction = ProjectRepositoryMixin._json_object(player["faction_reputation_json"], {})
+            if int(faction.get(definition.required_faction, 0)) < definition.required_faction_reputation:
+                return False
+        if definition.required_sect_level:
+            reputation = connection.execute(
+                "SELECT local_json FROM player_reputations WHERE player_id = ?",
+                (player["id"],),
+            ).fetchone()
+            local = ProjectRepositoryMixin._json_object(reputation["local_json"], {}) if reputation else {}
+            city_authorized = int(local.get("local.domain_refuge_authorized", 0)) > 0
+            sect_authorized = connection.execute(
+                """
+                SELECT 1
+                FROM sect_members m JOIN sects s ON s.sect_id = m.sect_id
+                WHERE m.player_id = ? AND m.status = 'active' AND s.status = 'active' AND s.level >= ?
+                LIMIT 1
+                """,
+                (player["id"], definition.required_sect_level),
+            ).fetchone()
+            if not city_authorized and sect_authorized is None:
+                return False
+        return True
+
+    @staticmethod
+    def _require_project_day_quota(
+        connection: Any,
+        project: Any,
+        player: Any,
+        now: datetime,
+        requested_points: int,
+    ) -> None:
+        """v0.4 caps each player's same-project contribution at 30 points/day."""
+
+        day = now.date().isoformat()
+        row = connection.execute(
+            """
+            SELECT COALESCE(SUM(contribution_points), 0) AS points
+            FROM livelihood_project_contributions
+            WHERE project_id = ? AND player_id = ? AND substr(created_at, 1, 10) = ?
+            """,
+            (project["project_id"], player["id"], day),
+        ).fetchone()
+        if int(row["points"] if row else 0) + int(requested_points) > 30:
+            raise ProjectContributionLimitError("v0.4 project daily contribution cap reached")
 
     @staticmethod
     def _refresh_status(project: Any, connection: Any, now: datetime, now_text: str) -> None:
@@ -357,6 +450,11 @@ class ProjectRepositoryMixin:
             "云铁": "item.material.cloud_iron",
             "灵石": "currency.spirit_stone",
             "灵叶": "item.herb.spirit_leaf",
+            "灵米": "item.food.coarse_spirit_rice",
+            "灵米饭": "item.food.coarse_spirit_rice",
+            "血草": "item.herb.blood_grass",
+            "阵砂": "item.mat.array_sand",
+            "疗伤丹": "item.pill.healing_low",
         }
         value = aliases.get((resource_key or "").strip(), (resource_key or "").strip())
         return value or definition.contribution_resources[0]
@@ -392,7 +490,7 @@ class ProjectRepositoryMixin:
         if local_delta or service_delta:
             row = connection.execute("SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?", (player["id"],)).fetchone()
             local = self._json_object(row["local_json"], {}) if row is not None else {}
-            local_key = "local.xuantian.new_town"
+            local_key = definition.local_reputation_key
             local[local_key] = min(1000, int(local.get(local_key, 0)) + local_delta)
             service = min(100, int(row["service_reputation"]) + service_delta) if row is not None else service_delta
             connection.execute(
