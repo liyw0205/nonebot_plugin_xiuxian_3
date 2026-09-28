@@ -141,6 +141,12 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "has_latest_heaven_echo": "nonebot_plugin_xiuxian_3.xiuxian.adventures.heaven_echo_repository",
         "has_heaven_echo_settlement_operation": "nonebot_plugin_xiuxian_3.xiuxian.adventures.heaven_echo_repository",
         "compensate_heaven_echo_system_failure": "nonebot_plugin_xiuxian_3.xiuxian.adventures.heaven_echo_repository",
+        "enter_legacy_manor": "nonebot_plugin_xiuxian_3.xiuxian.adventures.legacy_manor_repository",
+        "get_legacy_manor_status": "nonebot_plugin_xiuxian_3.xiuxian.adventures.legacy_manor_repository",
+        "choose_legacy_manor_node": "nonebot_plugin_xiuxian_3.xiuxian.adventures.legacy_manor_repository",
+        "settle_legacy_manor": "nonebot_plugin_xiuxian_3.xiuxian.adventures.legacy_manor_repository",
+        "has_active_legacy_manor": "nonebot_plugin_xiuxian_3.xiuxian.adventures.legacy_manor_repository",
+        "compensate_legacy_manor_system_failure": "nonebot_plugin_xiuxian_3.xiuxian.adventures.legacy_manor_repository",
         "start_quest_battle": "nonebot_plugin_xiuxian_3.xiuxian.combat.repository",
     }
 

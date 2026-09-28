@@ -1144,6 +1144,7 @@ class CultivationRepositoryMixin:
             ("ancestral_hall_runs", "status IN ('routing', 'combat_pending', 'cleared')"),
             ("dao_origin_runs", "status IN ('routing', 'cleared')"),
             ("heaven_echo_runs", "status IN ('routing', 'cleared')"),
+            ("legacy_manor_runs", "status IN ('routing', 'cleared')"),
         )
         for table, predicate in checks:
             if table == "exploration_sessions" and ignore_exploration_id is not None:
@@ -1222,6 +1223,11 @@ class CultivationRepositoryMixin:
             elif table == "heaven_echo_runs":
                 active = connection.execute(
                     "SELECT 1 FROM heaven_echo_runs WHERE player_id=? AND status IN ('routing', 'cleared') LIMIT 1",
+                    (player_id,),
+                ).fetchone()
+            elif table == "legacy_manor_runs":
+                active = connection.execute(
+                    "SELECT 1 FROM legacy_manor_runs WHERE player_id=? AND status IN ('routing', 'cleared') LIMIT 1",
                     (player_id,),
                 ).fetchone()
             elif table == "tower_runs" and ignore_tower_run_id is not None:

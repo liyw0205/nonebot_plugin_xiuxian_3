@@ -480,6 +480,30 @@ class HeavenEchoNotReadyError(RuntimeError):
     """The heaven-echo run cannot accept the requested operation yet."""
 
 
+class LegacyManorRequirementError(RuntimeError):
+    """The player lacks the location, realm, permission, or clue for a legacy manor."""
+
+
+class LegacyManorBusyError(RuntimeError):
+    """The player already has an action or legacy-manor run in progress."""
+
+
+class LegacyManorQuotaError(RuntimeError):
+    """The player has already completed this one-time legacy manor."""
+
+
+class LegacyManorNotFoundError(RuntimeError):
+    """The player has no legacy-manor run to operate on."""
+
+
+class LegacyManorNodeError(RuntimeError):
+    """The selected legacy-manor node is not the current route step."""
+
+
+class LegacyManorNotReadyError(RuntimeError):
+    """The legacy-manor run cannot accept the requested operation yet."""
+
+
 class VoidRuinsRequirementError(RuntimeError):
     """The party, location, realm or anchor requirement is not met."""
 

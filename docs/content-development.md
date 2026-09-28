@@ -353,6 +353,22 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 只有完成五节点并战胜守灵后，首次成功的角色在同一结算事务写入 `story.ancestral_hall`；重复成功不发资产或重复旗标。命令为 `进入秘境 祖灵殿`、`选择秘境节点 <当前节点>`、`结算秘境`；首个操作仅限本人，战斗结算和最终领取可由本人从原会话恢复。入场、节点、战斗开始/回合、最终结算和系统补偿均使用稳定 operation ID；节点作用域为角色/run/node，战斗作用域为角色/run/node/round，重复请求回放原结果，不同输入冲突。适配器验收至少覆盖 QQ 官方、OneBot V11、两种混合身份切换下的重启续战、全部准入、原子拒绝、周额度、战败/过期、首通唯一、系统补偿、战斗机制和资产隔离。
 
+#### 5.4.4 `instance.legacy.demon_reliquary`
+
+这是首条线索驱动遗府内容，运行时状态以 `current-status.md` 为准。角色须达到元婴 L1、位于 `demon.fallen_ruins`、持有 `access.demon.fallen_ruins`，并拥有至少一枚绑定 `item.clue.demon_contract`。线索只作非消耗准入依据，不会被扣除或转化为契约。每个角色同一时间仅可有一个进行中的遗府；成功首通后关闭新建。
+
+遗府固定单人三节点 `reliquary_seal -> pact_archive -> oath_chamber`，无随机池、无体力/灵石/物品成本，60 分钟过期。节点必须按序推进。完成路线后显式结算，首次成功只写 `story.legacy.demon_reliquary`；不发资产，不修改污染、声望、任务权限或终局状态。过期和明确系统中止均不写故事旗标且不涉及资源退款；未成功完成可重新进入，成功后不可重试。
+
+入口、节点、结算和系统中止均使用独立 operation ledger 与 `legacy_manor_runs` 持久化；身份切换/进程重启后通过只读 `遗府状态` 查询当前节点并按原 run 继续。前置不足不创建记录，活动冲突原子拒绝；同 operation 同输入回放、异输入返回 `OPERATION_CONFLICT`。适配器验收覆盖 QQ 官方、OneBot V11、双向身份切换、节点顺序、首通唯一、过期、系统中止、资产不变和重试。
+
+#### 5.4.5 `instance.secret_realm.heaven_echo`
+
+天劫回音是渡劫角色的单人结局旁线。角色达到渡劫 L1 且不在最终战进行中即可进入；没有地点、体力、票券或次数成本，允许在完成后重复挑战。运行时长固定 60 分钟，固定三节点：`heaven_threshold -> echo_corridor -> side_story_gate`。节点、结算和系统中止均写入独立 operation ledger，活动运行记录存于 `heaven_echo_runs`，不复用通用秘境表。
+
+入口只读校验 `tribulation` 境界和最终战活动成员；任何拒绝均不创建运行记录。路线按序推进，重启或 QQ/OneBot V11 身份切换后可继续。过期只结束当前运行，不发旗标；明确的系统中止只结束运行，不退还资源（本合同无资源成本）。
+
+首次成功结算在同一事务向 `intro_json.flags` 写入 `story.heaven_echo`，重复成功不重复写入。秘境操作禁止写 `ending_state`、`ending_key`、道果进度、`resource.ascension_merit`、天劫债、飞升凭证或最终战记录；`ascension.choose_ending` 仍是唯一结局选择写入口。验收见 `test/test_heaven_echo_secret_realm_v06.py`。
+
 ### 5.5 适配器、Web 和内容发布
 
 | 域 | 首版 | 完整扩展 |

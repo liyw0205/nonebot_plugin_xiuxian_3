@@ -2,7 +2,7 @@
 
 本域把已有的悬赏、秘境与战斗日志正规化，并新增主线关卡。它复用探索/战斗域的快照与结算，不复制第二套战斗引擎。
 
-当前开放草药补给、训练傀儡、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境和 `instance.secret_realm.heaven_echo` 天劫回音，以及已接入的主线关卡。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。斗法记录分享和其他尚未闭合的秘境仍保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
+当前开放草药补给、训练傀儡、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境、`instance.secret_realm.heaven_echo` 天劫回音和首条遗府 `instance.legacy.demon_reliquary`，以及已接入的主线关卡。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。斗法记录分享和其他尚未闭合的秘境/遗府仍保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，以及 v0.3 的
 `bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
@@ -48,6 +48,8 @@ QQ 官方与 OneBot V11 双方向混合队伍验收见 `test/test_boundary_rift_
 道源秘境使用独立 `DaoOriginRepositoryMixin` 与 `dao_origin_runs` 表，不复用通用秘境仓储。角色须在 `dao.origin_gate` 达到合道 L1 并持有 `access.dao.origin`；固定八节点、60 体力、60 分钟和每角色一次。首通结算写入 `story.dao_origin` 与 `codex.dao.service_origin`，不修改任何终局资源；系统补偿才退款，普通过期保留成本和额度。命令为 `进入秘境 道源秘境`、`选择秘境节点 <当前节点>` 和 `结算秘境`。
 
 天劫回音使用独立 `HeavenEchoRepositoryMixin` 与 `heaven_echo_runs` 表。角色须渡劫 L1 且不在最终战中；固定三节点、无体力/票券/次数成本、60 分钟过期，完成后允许重复挑战。首通结算只写 `story.heaven_echo` 结局旁线旗标，不改天劫债、终局状态或飞升资源；系统中止只结束无资源运行。命令为 `进入秘境 天劫回音`、`选择秘境节点 <当前节点>` 和 `结算秘境`，专项 QQ 官方/OneBot V11、重启和身份切换验收见 `test/test_heaven_echo_secret_realm_v06.py`。
+
+首条遗府 `instance.legacy.demon_reliquary` 使用独立 `LegacyManorRepositoryMixin` 与 `legacy_manor_runs` 表。角色须元婴 L1、位于 `demon.fallen_ruins`、持有 `access.demon.fallen_ruins` 和绑定 `item.clue.demon_contract`；线索不消耗。固定三节点、无资源成本，60 分钟过期；失败可重试，首通只写 `story.legacy.demon_reliquary` 并关闭后续新建。命令为 `进入遗府`、`遗府状态`、`选择遗府节点 <节点>` 和 `结算遗府`；状态查询用于跨适配器/重启恢复后查看当前节点。QQ/OneBot V11 双向身份切换、重启、过期、系统中止和资源隔离见 `test/test_legacy_manor_v06.py`。
 
 v0.2 秘境合同：`instance.secret_realm.mist_depth_2` 要求金丹 L1、`cave.mist_grotto_2` 和 `item.cave_pass_advanced`，
 路线为 `resource -> encounter -> choice -> encounter -> choice`，首通创建 `item.weapon.cloud_sword` 装备实例；

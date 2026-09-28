@@ -21,6 +21,7 @@ from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .adventures.dao_echoes_use_cases import DaoEchoesApplication
 from .adventures.three_realms_use_cases import ThreeRealmsApplication
 from .adventures.secret_realm_use_cases import SecretRealmApplication
+from .adventures.legacy_manor_use_cases import LegacyManorApplication
 from .advancement.use_cases import AdvancementApplication
 from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
@@ -82,6 +83,7 @@ class XiuxianApplication:
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
         self.secret_realms = SecretRealmApplication(repository)
+        self.legacy_manor = LegacyManorApplication(repository)
         self.advancement = AdvancementApplication(repository)
         self.constitution = ConstitutionApplication(repository)
         self.talent = TalentApplication(repository)
@@ -684,6 +686,30 @@ class XiuxianApplication:
             context,
             lambda: self.secret_realms.settle(context),
             write_message="当前事件不允许结算秘境。",
+        )
+
+    async def enter_legacy_manor(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.legacy_manor.enter(context),
+            write_message="当前事件不允许进入遗府。",
+        )
+
+    async def get_legacy_manor_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.legacy_manor.status(context), require_write=False)
+
+    async def choose_legacy_manor_node(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.legacy_manor.choose_node(context),
+            write_message="当前事件不允许选择遗府节点。",
+        )
+
+    async def settle_legacy_manor(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.legacy_manor.settle(context),
+            write_message="当前事件不允许结算遗府。",
         )
 
     async def settle_boundary_rift(self, context: CommandContext) -> CommandResult:
