@@ -432,6 +432,30 @@ class AncestralHallNotReadyError(RuntimeError):
     """The ancestral-hall route or combat is not ready to advance or settle."""
 
 
+class VoidRuinsRequirementError(RuntimeError):
+    """The party, location, realm or anchor requirement is not met."""
+
+
+class VoidRuinsBusyError(RuntimeError):
+    """A void-ruins member already has a conflicting action or run."""
+
+
+class VoidRuinsQuotaError(RuntimeError):
+    """A void-ruins member already used this UTC week."""
+
+
+class VoidRuinsNotFoundError(RuntimeError):
+    """No void-ruins run exists for the requesting member."""
+
+
+class VoidRuinsNodeError(RuntimeError):
+    """The selected node is not the next void-ruins route step."""
+
+
+class VoidRuinsNotReadyError(RuntimeError):
+    """The void-ruins route or automatic battle is not ready."""
+
+
 class IdleRouteNotFoundError(RuntimeError):
     """The requested idle route is not part of the active content."""
 

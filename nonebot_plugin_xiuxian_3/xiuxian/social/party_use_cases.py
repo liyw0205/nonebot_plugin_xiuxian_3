@@ -36,6 +36,7 @@ from .party_rules import (
     PARTY_TYPE_BOUNDARY_REALM,
     PARTY_TYPE_SECRET_REALM_BOUNDARY,
     PARTY_TYPE_SECRET_REALM_ANCIENT,
+    PARTY_TYPE_SECRET_REALM_VOID_RUINS,
     PARTY_TYPE_STANDARD_PVE,
 )
 
@@ -111,6 +112,14 @@ class PartyApplication:
             party_type=PARTY_TYPE_SECRET_REALM_ANCIENT,
             title="远古洞天秘境队伍",
             invite_hint="两名同在远古洞天、已达化神 L1 的道友",
+        )
+
+    async def create_void_ruins_party(self, context: CommandContext) -> CommandResult:
+        return await self._create_party(
+            context,
+            party_type=PARTY_TYPE_SECRET_REALM_VOID_RUINS,
+            title="虚空遗迹秘境队伍",
+            invite_hint="一至四名同在虚空档案遗迹、已达炼虚 L1 并携有虚空锚的道友",
         )
 
     async def create_demon_party(self, context: CommandContext) -> CommandResult:

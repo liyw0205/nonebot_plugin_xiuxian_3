@@ -91,7 +91,7 @@ class DemonInvasionRepositoryMixin:
             if event is None:
                 raise EventNotActiveError("no demon invasion event is available")
             event = self._demon_refresh_round(connection, event, now)
-            return self._demon_record(connection, player, event)
+            return self._demon_invasion_record(connection, player, event)
 
     def _record_demon_invasion_contribution_once(
         self,
@@ -171,7 +171,7 @@ class DemonInvasionRepositoryMixin:
                 (total, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, event["round_id"]),
             )
             event = connection.execute("SELECT * FROM world_event_rounds WHERE round_id=?", (event["round_id"],)).fetchone()
-            payload = self._demon_payload(connection, player["id"], event, applied + current_value)
+            payload = self._demon_invasion_payload(connection, player["id"], event, applied + current_value)
             payload["action_key"] = action_key
             payload["source_operation_id"] = source_id
             self._demon_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -225,7 +225,7 @@ class DemonInvasionRepositoryMixin:
                 (event["round_id"], player["id"], operation_id, json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text),
             )
             updated = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
-            payload = self._demon_payload(connection, updated["id"], event, contribution)
+            payload = self._demon_invasion_payload(connection, updated["id"], event, contribution)
             payload["reward"] = reward
             self._demon_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._demon_record_from_payload(payload)
@@ -325,11 +325,11 @@ class DemonInvasionRepositoryMixin:
                 return {"source_operation_id": str(row["start_operation_id"]), "quantity": damage // 100}
         raise EventSourceNotEligibleError("no eligible settled source operation")
 
-    def _demon_record(self, connection: Any, player: Any, event: Any) -> DemonInvasionEventRecord:
+    def _demon_invasion_record(self, connection: Any, player: Any, event: Any) -> DemonInvasionEventRecord:
         row = connection.execute("SELECT contribution FROM world_event_contributions WHERE round_id=? AND player_id=?", (event["round_id"], player["id"])).fetchone()
-        return self._demon_record_from_payload(self._demon_payload(connection, player["id"], event, int(row["contribution"]) if row else 0))
+        return self._demon_record_from_payload(self._demon_invasion_payload(connection, player["id"], event, int(row["contribution"]) if row else 0))
 
-    def _demon_payload(self, connection: Any, player_id: int, event: Any, contribution: int) -> dict[str, object]:
+    def _demon_invasion_payload(self, connection: Any, player_id: int, event: Any, contribution: int) -> dict[str, object]:
         player = connection.execute("SELECT * FROM players WHERE id=?", (player_id,)).fetchone()
         result = self._json_object(event["result_json"], {})
         return {"player": self._player_payload(self._row_to_player(player)), "round_id": str(event["round_id"]), "event_key": DEMON_EVENT_KEY, "status": str(event["status"]), "starts_at": str(event["starts_at"]), "ends_at": str(event["ends_at"]), "claim_expires_at": str(event["claim_expires_at"]), "target_quantity": int(event["target_quantity"]), "total_contribution": int(event["total_contribution"]), "player_contribution": contribution, "success": result.get("success"), "reward": {}}

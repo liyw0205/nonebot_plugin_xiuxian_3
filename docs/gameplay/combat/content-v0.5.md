@@ -1,12 +1,14 @@
 # v0.5 战斗内容基线：炼虚虚空副本与宗门战争机关
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.5`，`rule_version=combat-0.5.0`。开放自动回合 2–5 人虚空副本和 5 人跨服宗门战；创建时冻结虚力、锚、抗性、不稳定、服务器/宗门、规则版本和敌人池。玩家不提交战斗行动，服务端按快照和策略自动推进。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.5`，`rule_version=combat-0.5.1`。开放自动回合 2–5 人虚空副本和 5 人跨服宗门战；创建时冻结虚力、锚、抗性、不稳定、服务器/宗门、规则版本和敌人池。玩家不提交战斗行动，服务端按快照和策略自动推进。
 
 | `enemy_key` | 气血/攻击 | 阶段机制 | 胜利池 |
 |:--|:--|:--|:--|
 | `enemy.void_watcher` | 35000 / 1600 | 每 3 回合 `phase_shift`：普通攻击 -5000 bp，虚实技能正常 | 虚晶、航道声望 |
 | `enemy.archive_keeper` | 42000 / 1800 | 化神完成三次界壁试炼或炼虚；回合 4/8 `rule_rewrite`：随机封锁一个非基础技能 2 回合，保存目标 roll | 档案、规则碎片、虚功勋 |
 | `enemy.sect_war_engine` | 50000 / 1500 | 护城阶段 60/30%：需维修/破城二选一；未处理每回合范围伤害 | 堡垒贡献、跨服赛季奖励 |
+| `enemy.void_ruins_sentinel` / `enemy.void_ruins_sentinel_unstable` | 8000 / 420；10000 / 525 | 裂隙哨卫；队伍中有入场时快照的不稳定成员时使用加强快照 | 由秘境结算逐成员发放虚空晶 |
+| `enemy.void_ruins_keeper` / `enemy.void_ruins_keeper_unstable` | 12000 / 560；15000 / 700 | 档案守卫；不稳定快照使用加强敌人 | 由秘境结算逐成员发放虚空晶 |
 
 | `skill_key` | 前置/效果 | 成本/限制 |
 |:--|:--|:--|

@@ -211,6 +211,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("结算界隙裂隙秘境", application.settle_boundary_rift)
     router.register("创建界隙裂隙秘境队伍", application.create_boundary_rift_party)
     router.register("创建远古洞天秘境队伍", application.create_ancient_domain_party)
+    router.register("创建虚空遗迹秘境队伍", application.create_void_ruins_party)
     router.register("道源主线", application.get_dao_echoes_status)
     router.register("开始道源主线", application.start_dao_echoes_stage)
     router.register("领取道源主线奖励", application.claim_dao_echoes_stage)

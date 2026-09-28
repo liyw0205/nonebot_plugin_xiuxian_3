@@ -51,6 +51,8 @@ from .demon_abyss_rules import (
     resolve_demon_abyss_node,
 )
 from .demon_abyss_use_cases import DemonAbyssApplication
+from .void_ruins_use_cases import VoidRuinsApplication
+from .void_ruins_rules import VOID_RUINS_KEY, VOID_RUINS_NODES, VOID_RUINS_REPEAT_REWARD, resolve_void_ruins_node
 
 
 ITEM_LABELS = {
@@ -77,6 +79,7 @@ class SecretRealmApplication:
         self.ancient_domain = AncientDomainApplication(repository)
         self.ancestral_hall = AncestralHallApplication(repository)
         self.demon_abyss = DemonAbyssApplication(repository)
+        self.void_ruins = VoidRuinsApplication(repository)
 
     @staticmethod
     def _operation_id(context: CommandContext, name: str) -> str:
@@ -152,6 +155,18 @@ class SecretRealmApplication:
             "quota_limit": 1,
             "party_size": 1,
         })
+        data.append({
+            "instance_key": VOID_RUINS_KEY,
+            "label": "虚空遗迹秘境",
+            "nodes": VOID_RUINS_NODES,
+            "stamina_cost": 50,
+            "anchor_lock_per_member": 1,
+            "first_reward": {"access.void.time_fort": 1, "codex.void.route_ruins": 1, "item.void_crystal": 1},
+            "repeat_reward": VOID_RUINS_REPEAT_REWARD,
+            "quota_period": "week",
+            "quota_limit": 1,
+            "party_size": "2-5",
+        })
         lines.extend(
             [
                 "### 魔界深渊秘境",
@@ -176,15 +191,23 @@ class SecretRealmApplication:
                 f"- **路线**：{' → '.join(ANCESTRAL_HALL_NODES)}；单人，体力 {ANCESTRAL_HALL_STAMINA_COST}；每角色每 UTC 周一次。",
                 "- **首通**：完成始祖祭坛后写入 `story.ancestral_hall`，无资产奖励。",
                 "",
+                "### 虚空遗迹秘境",
+                "- **前置**：2–5 人专用队伍；全员炼虚 L1、位于 `void.archive_ruins`，各托管虚空锚 1 枚。",
+                f"- **路线**：{' → '.join(VOID_RUINS_NODES)}；队长支付体力 50；每名成员每 UTC 周一次。",
+                "- **奖励**：首通逐成员解锁 `access.void.time_fort`、发现 `codex.void.route_ruins` 并获得虚空晶 ×1；重复通关获得虚空晶 ×1。",
+                "- **战斗**：裂隙哨卫与档案守卫为服务端自动队伍战；虚空不稳定在入场时冻结。",
+                "",
             ]
         )
         if record.active_run_id:
             lines.append(f"> 当前已有进行中的秘境：`{record.active_run_id}`。")
         else:
-            lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境`、`界隙裂隙`、`远古洞天` 或 `祖灵殿` 开始；组队秘境先创建专用队伍。")
+            lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境`、`界隙裂隙`、`远古洞天`、`祖灵殿` 或 `虚空遗迹` 开始；组队秘境先创建专用队伍。")
         return CommandResult(True, "SECRET_REALM_PREVIEW", "\n".join(lines), context.request_id, data={"realms": data, "active_run_id": record.active_run_id})
 
     async def enter(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == VOID_RUINS_KEY:
+            return await self.void_ruins.enter(context)
         if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == ANCESTRAL_HALL_KEY:
             return await self.ancestral_hall.enter(context)
         if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == ANCIENT_DOMAIN_KEY:
@@ -219,6 +242,15 @@ class SecretRealmApplication:
         return CommandResult(True, "SECRET_REALM_ENTERED", f"## {record.label}已进入\n\n已锁定体力 {record.stamina_locked} 点和秘境凭证。\n\n- **下一节点**：{record.current_node}\n- **状态**：路线进行中\n\n> 发送 `选择秘境节点 资源` 按服务端顺序推进。", context.request_id, operation_id, data=self._data(record))
 
     async def choose_node(self, context: CommandContext) -> CommandResult:
+        if context.command_args and resolve_void_ruins_node(context.command_args[0]):
+            return await self.void_ruins.choose_node(context)
+        try:
+            if context.command_args and await self.repository.has_active_void_ruins(
+                platform=context.adapter, platform_user_id=context.user_id
+            ):
+                return await self.void_ruins.choose_node(context)
+        except PlayerNotFoundError:
+            pass
         if context.command_args and resolve_ancestral_hall_node(context.command_args[0]):
             return await self.ancestral_hall.choose_node(context)
         try:
@@ -268,6 +300,15 @@ class SecretRealmApplication:
     async def settle(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "结算秘境无需附加参数。", context.request_id)
+        void_operation_id = self._operation_id(context, "void_ruins.settle")
+        try:
+            if (
+                await self.repository.has_active_void_ruins(platform=context.adapter, platform_user_id=context.user_id)
+                or await self.repository.has_void_ruins_settlement_operation(void_operation_id)
+            ):
+                return await self.void_ruins.settle(context)
+        except PlayerNotFoundError:
+            pass
         ancient_operation_id = self._operation_id(context, "ancient_domain.settle")
         try:
             if (
@@ -294,6 +335,11 @@ class SecretRealmApplication:
             active_demon = replay_demon = False
         if active_demon or replay_demon:
             return await self.demon_abyss.settle(context)
+        try:
+            if await self.repository.has_latest_void_ruins(platform=context.adapter, platform_user_id=context.user_id):
+                return await self.void_ruins.settle(context)
+        except PlayerNotFoundError:
+            pass
         try:
             if await self.repository.has_latest_ancient_domain_run(platform=context.adapter, platform_user_id=context.user_id):
                 return await self.ancient_domain.settle(context)

@@ -2,7 +2,7 @@
 
 本域把已有的悬赏、秘境与战斗日志正规化，并新增主线关卡。它复用探索/战斗域的快照与结算，不复制第二套战斗引擎。
 
-当前开放草药补给、训练傀儡、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿，以及已接入的主线关卡。祖灵殿有独立仓储、准入、五节点路线、守灵自动战、过期恢复和系统补偿；专项 QQ 官方/OneBot V11 与混合身份测试见 `test/test_ancestral_hall_secret_realm_v04.py`。斗法记录分享和其他尚未闭合的秘境仍保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
+当前开放草药补给、训练傀儡、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹，以及已接入的主线关卡。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`。斗法记录分享和其他尚未闭合的秘境仍保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，以及 v0.3 的
 `bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
@@ -36,6 +36,8 @@ SQLite 角色记录保持隔离。
 `进入秘境 界隙裂隙`、`选择秘境节点 <节点>`，破碎岔路需追加 `内|外`，遭遇战/终局奖励使用 `结算界隙裂隙秘境`。
 规则、首通/重复奖励、成本补偿与节点顺序以[v0.3 冒险内容合同](content-v0.3.md#instancesecret_realmboundary_rift-合同)为准。
 QQ 官方与 OneBot V11 双方向混合队伍验收见 `test/test_boundary_rift_secret_realm_v03.py`。
+
+虚空遗迹秘境使用独立 `void_ruins_runs` / `void_ruins_members`，不复用通用 `secret_realm_runs` 或战斗奖励。队伍在 `void.archive_ruins` 创建并确认后，队长使用 `进入秘境 虚空遗迹`，再按十节点顺序选择；两场服务端自动战由任一队员使用 `结算秘境` 续跑。入场快照冻结不稳定风险、战斗属性和版本；战败/过期保留体力和周额度但返还锚，明确系统故障才补偿体力并释放额度。规则和稳定键以[v0.5 冒险内容合同](content-v0.5.md#instancesecret_realmvoid_ruins-合同)为准。
 
 魔界深渊秘境使用专用 `DemonAbyssRepositoryMixin` 事务，不把路线、风险、首通奖励和恢复逻辑塞入通用秘境仓储。命令为 `进入秘境 魔界深渊`、`选择秘境节点 深渊门|污染渗流|残响守卫|深渊之心` 和 `结算秘境`；要求筑基 L1、魔界深渊门地点、门禁旗标与魔界声望 200，每 UTC 周一次、入场扣 20 体力，运行 60 分钟。节点顺序、自动战、污染风险、失败/过期成本、首通/重复奖励及系统中止补偿按[v0.3 冒险内容合同](content-v0.3.md#instancesecret_realmdemon_abyss-合同)执行。战斗使用 `combat-0.3.2`，适配器覆盖 QQ 官方、OneBot V11 及 QQ→OneBot 重启续跑，详见 `test/test_demon_abyss_secret_realm_v03.py`。
 

@@ -397,6 +397,11 @@ class PartyRepositoryMixin:
                 (party_id,),
             ).fetchone():
                 raise PartyStateConflictError("party is committed to an active ancient-domain run")
+            if connection.execute(
+                "SELECT 1 FROM void_ruins_runs WHERE party_id=? AND status IN ('routing','combat_pending','cleared') LIMIT 1",
+                (party_id,),
+            ).fetchone():
+                raise PartyStateConflictError("party is committed to an active void-ruins run")
             connection.execute(
                 "UPDATE party_members SET status = 'left', left_at = ?, updated_at = ? WHERE id = ? AND status = 'active'",
                 (now_text, now_text, member["id"]),

@@ -460,6 +460,7 @@ class TravelRepositoryMixin:
             for table, status_clause in (
                 ("idle_assignments", "status IN ('assigned', 'running')"),
                 ("dispatch_assignments", "status IN ('accepted', 'running')"),
+                ("void_ruins_members", "status='active'"),
             ):
                 busy = connection.execute(
                     f"SELECT 1 FROM {table} WHERE player_id = ? AND {status_clause} LIMIT 1",

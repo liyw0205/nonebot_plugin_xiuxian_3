@@ -53,7 +53,7 @@ from .party_rules import (
     DEMON_REALM_STAMINA_COST,
     party_enemy_for_location,
 )
-from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot, enemy_definition
+from .rules import V051_RULE_VERSION, TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot, enemy_definition
 from ..social.party_rules import (
     party_definition_for,
     PARTY_TYPE_BOUNDARY_REALM,
@@ -63,6 +63,7 @@ from ..social.party_rules import (
     PARTY_TYPE_STANDARD_PVE,
     PARTY_TYPE_SECRET_REALM_BOUNDARY,
     PARTY_TYPE_SECRET_REALM_ANCIENT,
+    PARTY_TYPE_SECRET_REALM_VOID_RUINS,
 )
 from ..adventures.boundary_rift_rules import BOUNDARY_RIFT_ENEMIES, BOUNDARY_RIFT_LOCATION
 from ..adventures.ancient_domain_rules import (
@@ -70,6 +71,7 @@ from ..adventures.ancient_domain_rules import (
     ANCIENT_DOMAIN_ENERGY_SUPPRESSION,
     ANCIENT_DOMAIN_LOCATION,
 )
+from ..adventures.void_ruins_rules import VOID_RUINS_ENEMIES, VOID_RUINS_LOCATION
 
 
 class PartyCombatRepositoryMixin:
@@ -84,6 +86,7 @@ class PartyCombatRepositoryMixin:
         operation_id: str,
         boundary_rift_run_id: str | None = None,
         ancient_domain_run_id: str | None = None,
+        void_ruins_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         await self.initialize()
         async with self._inflight:
@@ -96,6 +99,7 @@ class PartyCombatRepositoryMixin:
                 operation_id,
                 boundary_rift_run_id,
                 ancient_domain_run_id,
+                void_ruins_run_id,
             )
 
     async def settle_party_battle(
@@ -186,6 +190,7 @@ class PartyCombatRepositoryMixin:
         operation_id: str,
         boundary_rift_run_id: str | None = None,
         ancient_domain_run_id: str | None = None,
+        void_ruins_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         operation_name = "battle.party.start"
         request = {"platform": platform, "platform_user_id": platform_user_id, "party_id": party_id}
@@ -193,6 +198,8 @@ class PartyCombatRepositoryMixin:
             request["boundary_rift_run_id"] = boundary_rift_run_id
         if ancient_domain_run_id is not None:
             request["ancient_domain_run_id"] = ancient_domain_run_id
+        if void_ruins_run_id is not None:
+            request["void_ruins_run_id"] = void_ruins_run_id
         request_hash = self._request_hash(
             operation_name,
             request,
@@ -227,6 +234,7 @@ class PartyCombatRepositoryMixin:
                 PARTY_TYPE_STANDARD_PVE,
                 PARTY_TYPE_SECRET_REALM_BOUNDARY,
                 PARTY_TYPE_SECRET_REALM_ANCIENT,
+                PARTY_TYPE_SECRET_REALM_VOID_RUINS,
             }:
                 raise PartyBattleRequirementError("this party type cannot start party PVE")
             if str(party["status"]) != "ready":
@@ -252,7 +260,12 @@ class PartyCombatRepositoryMixin:
             if secret_rift_party != (boundary_rift_run_id is not None):
                 raise PartyBattleRequirementError("boundary-rift battles must be started by the active instance")
             ancient_domain_party = party_type == PARTY_TYPE_SECRET_REALM_ANCIENT
-            if ancient_domain_party != (ancient_domain_run_id is not None) or (secret_rift_party and ancient_domain_party):
+            void_ruins_party = party_type == PARTY_TYPE_SECRET_REALM_VOID_RUINS
+            if (
+                ancient_domain_party != (ancient_domain_run_id is not None)
+                or void_ruins_party != (void_ruins_run_id is not None)
+                or sum((secret_rift_party, ancient_domain_party, void_ruins_party)) > 1
+            ):
                 raise PartyBattleRequirementError("ancient-domain battles must be started by the active instance")
             rift_run = None
             if secret_rift_party:
@@ -284,8 +297,24 @@ class PartyCombatRepositoryMixin:
                 ):
                     raise PartyBattleRequirementError("ancient-domain node has no registered enemy")
                 enemy = enemy_definition(ANCIENT_DOMAIN_ENEMY)
+            void_run = None
+            void_run_snapshot = {}
+            if void_ruins_party:
+                void_run = connection.execute(
+                    "SELECT * FROM void_ruins_runs WHERE run_id=? AND party_id=? AND status='combat_pending' AND battle_id IS NULL",
+                    (void_ruins_run_id, resolved_party_id),
+                ).fetchone()
+                if void_run is None or str(void_run["expires_at"]) <= now_text:
+                    raise PartyBattleRequirementError("void-ruins node is not ready for battle")
+                void_run_snapshot = self._json_object(void_run["snapshot_json"], {})
+                node_key = str(void_run_snapshot.get("current_node", ""))
+                unstable = any(bool(value) for value in void_run_snapshot.get("instability_active_by_player", {}).values())
+                enemy_key = VOID_RUINS_ENEMIES.get((node_key, unstable))
+                if enemy_key is None or str(party["location_key"]) != VOID_RUINS_LOCATION:
+                    raise PartyBattleRequirementError("void-ruins node has no registered enemy")
+                enemy = enemy_definition(enemy_key)
             try:
-                if not secret_rift_party and not ancient_domain_party:
+                if not secret_rift_party and not ancient_domain_party and not void_ruins_party:
                     enemy = party_enemy_for_location(str(party["location_key"]))
             except ValueError as exc:
                 raise PartyBattleRequirementError("party PVE is not available at this location") from exc
@@ -296,11 +325,18 @@ class PartyCombatRepositoryMixin:
                 int(member["database_id"]): member
                 for member in ancient_run_snapshot.get("member_combat_snapshots", [])
             }
+            void_member_snapshots = {
+                int(member["database_id"]): member
+                for member in void_run_snapshot.get("member_combat_snapshots", [])
+            }
             demon_party = party_type == PARTY_TYPE_DEMON_REALM
             beast_party = party_type == PARTY_TYPE_BEAST_REALM
             leader_ticket_inventory: dict[str, int] | None = None
             for row in members:
-                entry_snapshot = ancient_member_snapshots.get(int(row["database_player_id"]))
+                entry_snapshot = (
+                    ancient_member_snapshots.get(int(row["database_player_id"]))
+                    or void_member_snapshots.get(int(row["database_player_id"]))
+                )
                 member_location = str(entry_snapshot.get("location_key", row["location_key"]) if entry_snapshot else row["location_key"])
                 member_realm = str(entry_snapshot.get("realm_key", row["realm_key"]) if entry_snapshot else row["realm_key"])
                 member_realm_layer = int(entry_snapshot.get("realm_layer", row["realm_layer"]) if entry_snapshot else row["realm_layer"])
@@ -324,6 +360,8 @@ class PartyCombatRepositoryMixin:
                     raise FactionReputationInsufficientError("beast reputation is insufficient")
                 if ancient_domain_party and str(party["location_key"]) != ANCIENT_DOMAIN_LOCATION:
                     raise PartyBattleRequirementError("ancient-domain party is at the wrong location")
+                if void_ruins_party and str(party["location_key"]) != VOID_RUINS_LOCATION:
+                    raise PartyBattleRequirementError("void-ruins party is at the wrong location")
                 if boundary_party and int(row["stamina"]) < BOUNDARY_REALM_STAMINA_COST:
                     raise BoundaryRealmResourceError("a party member lacks boundary-realm stamina")
                 if demon_party and int(row["stamina"]) < DEMON_REALM_STAMINA_COST:
@@ -345,6 +383,7 @@ class PartyCombatRepositoryMixin:
                     int(row["database_player_id"]),
                     ignore_boundary_rift_run_id=boundary_rift_run_id,
                     ignore_ancient_domain_run_id=ancient_domain_run_id,
+                    ignore_void_ruins_run_id=void_ruins_run_id,
                 ):
                     raise PartyBattleBusyError("a party member has another active action")
                 locked = connection.execute(
@@ -436,13 +475,13 @@ class PartyCombatRepositoryMixin:
                 else BEAST_REALM_REWARD
                 if beast_party
                 else {}
-                if secret_rift_party or ancient_domain_party
+                if secret_rift_party or ancient_domain_party or void_ruins_party
                 else BOUNDARY_REALM_REWARD
                 if boundary_party
                 else PARTY_BATTLE_REWARD
             )
-            dungeon_content_version = "content-0.4" if ancient_domain_party else "content-0.3" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
-            dungeon_rule_version = "combat-0.4.0" if ancient_domain_party else "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
+            dungeon_content_version = "content-0.5" if void_ruins_party else "content-0.4" if ancient_domain_party else "content-0.3" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
+            dungeon_rule_version = V051_RULE_VERSION if void_ruins_party else "combat-0.4.0" if ancient_domain_party else "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
             battle_id = f"party-battle-{uuid4().hex}"
             snapshot = {
                 "battle_type": PARTY_BATTLE_TYPE,
@@ -464,6 +503,7 @@ class PartyCombatRepositoryMixin:
                 "reward": dict(dungeon_reward),
                 "party_type": party_type,
                 "ancient_domain_run_id": ancient_domain_run_id,
+                "void_ruins_run_id": void_ruins_run_id,
                 "resource_cost": {
                     "stamina": (
                         BOUNDARY_REALM_STAMINA_COST
@@ -536,6 +576,11 @@ class PartyCombatRepositoryMixin:
                 connection.execute(
                     "UPDATE ancient_domain_runs SET battle_id=?, updated_at=? WHERE run_id=? AND status='combat_pending' AND battle_id IS NULL",
                     (battle_id, now_text, ancient_domain_run_id),
+                )
+            if void_ruins_party:
+                connection.execute(
+                    "UPDATE void_ruins_runs SET battle_id=?, updated_at=? WHERE run_id=? AND status='combat_pending' AND battle_id IS NULL",
+                    (battle_id, now_text, void_ruins_run_id),
                 )
             payload = {
                 "battle_id": battle_id,
@@ -1035,10 +1080,11 @@ class PartyCombatRepositoryMixin:
             beast_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_BEAST_REALM
             cross_realm_party = boundary_party or demon_party or beast_party
             ancient_domain_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_SECRET_REALM_ANCIENT
+            void_ruins_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_SECRET_REALM_VOID_RUINS
             fatigue_party = cross_realm_party or secret_rift_party
             reward_template = {
                 str(key): int(value)
-                for key, value in dict(snapshot.get("reward", {} if secret_rift_party or ancient_domain_party else BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
+                for key, value in dict(snapshot.get("reward", {} if secret_rift_party or ancient_domain_party or void_ruins_party else BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
             }
             battle_members = connection.execute("SELECT * FROM party_battle_members WHERE battle_id = ? ORDER BY id", (battle_id,)).fetchall()
             state = self._json_object(session["state_json"], {})

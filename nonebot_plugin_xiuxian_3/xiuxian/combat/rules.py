@@ -15,6 +15,7 @@ V031_RULE_VERSION = "combat-0.3.1"
 V032_RULE_VERSION = "combat-0.3.2"
 V04_CONTENT_VERSION = "content-0.4"
 V041_RULE_VERSION = "combat-0.4.1"
+V051_RULE_VERSION = "combat-0.5.1"
 V02_CONTENT_VERSION = "content-0.2"
 V02_RULE_VERSION = "combat-0.2.0"
 MAX_TURNS = 20
@@ -325,6 +326,66 @@ ANCIENT_DOMAIN_LORD = EnemyDefinition(
     reward={},
 )
 
+VOID_RUINS_SENTINEL = EnemyDefinition(
+    key="enemy.void_ruins_sentinel",
+    label="裂隙哨卫",
+    location_key="void.archive_ruins",
+    required_realm="void_refining",
+    required_layer=1,
+    max_hp=8_000,
+    attack=420,
+    initiative=32,
+    agility=28,
+    skill_key="enemy_skill.scratch",
+    random_pool="none",
+    reward={},
+)
+
+VOID_RUINS_SENTINEL_UNSTABLE = EnemyDefinition(
+    key="enemy.void_ruins_sentinel_unstable",
+    label="虚蚀裂隙哨卫",
+    location_key="void.archive_ruins",
+    required_realm="void_refining",
+    required_layer=1,
+    max_hp=10_000,
+    attack=525,
+    initiative=36,
+    agility=32,
+    skill_key="enemy_skill.scratch",
+    random_pool="none",
+    reward={},
+)
+
+VOID_RUINS_KEEPER = EnemyDefinition(
+    key="enemy.void_ruins_keeper",
+    label="遗迹档案守卫",
+    location_key="void.archive_ruins",
+    required_realm="void_refining",
+    required_layer=1,
+    max_hp=12_000,
+    attack=560,
+    initiative=36,
+    agility=30,
+    skill_key="enemy_skill.scratch",
+    random_pool="none",
+    reward={},
+)
+
+VOID_RUINS_KEEPER_UNSTABLE = EnemyDefinition(
+    key="enemy.void_ruins_keeper_unstable",
+    label="虚蚀遗迹档案守卫",
+    location_key="void.archive_ruins",
+    required_realm="void_refining",
+    required_layer=1,
+    max_hp=15_000,
+    attack=700,
+    initiative=42,
+    agility=36,
+    skill_key="enemy_skill.scratch",
+    random_pool="none",
+    reward={},
+)
+
 BOUNDARY_TRIAL_GUARDIAN = EnemyDefinition(
     key="enemy.boundary_trial_guardian",
     label="界壁试炼守卫",
@@ -469,6 +530,10 @@ ENEMIES = {
     CROSS_REALM_SENTINEL.key: CROSS_REALM_SENTINEL,
     BOUNDARY_WATCHER.key: BOUNDARY_WATCHER,
     ANCIENT_DOMAIN_LORD.key: ANCIENT_DOMAIN_LORD,
+    VOID_RUINS_SENTINEL.key: VOID_RUINS_SENTINEL,
+    VOID_RUINS_SENTINEL_UNSTABLE.key: VOID_RUINS_SENTINEL_UNSTABLE,
+    VOID_RUINS_KEEPER.key: VOID_RUINS_KEEPER,
+    VOID_RUINS_KEEPER_UNSTABLE.key: VOID_RUINS_KEEPER_UNSTABLE,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
     ARCHIVE_KEEPER.key: ARCHIVE_KEEPER,
     MIST_TRIAL_SENSING.key: MIST_TRIAL_SENSING,
@@ -551,6 +616,7 @@ __all__ = [
     "V03_CONTENT_VERSION",
     "V03_RULE_VERSION",
     "V031_RULE_VERSION",
+    "V051_RULE_VERSION",
     "ENEMIES",
     "MAX_TURNS",
     "RULE_VERSION",
@@ -570,6 +636,10 @@ __all__ = [
     "SPRING_WISP",
     "WOOD_RAT",
     "ARCHIVE_KEEPER",
+    "VOID_RUINS_SENTINEL",
+    "VOID_RUINS_SENTINEL_UNSTABLE",
+    "VOID_RUINS_KEEPER",
+    "VOID_RUINS_KEEPER_UNSTABLE",
     "battle_roll_bp",
     "clamp",
     "enemy_definition",
