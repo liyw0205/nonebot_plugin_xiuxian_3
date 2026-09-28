@@ -66,6 +66,7 @@ def _qq_group_event(content: str, *, message_id: str = "qq-message-1"):
             id="qq-user-raw",
             bot=False,
             member_openid="qq-user-1",
+            member_role="member",
             username="QQ道友",
         ),
         group_id="qq-group-raw",

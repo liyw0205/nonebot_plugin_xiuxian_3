@@ -31,7 +31,7 @@ def _contexts():
             id="three-realms-qq-message",
             content="三界赛季",
             timestamp="2026-09-23T20:05:00+00:00",
-            author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="three-qq-user", username="匿名道号"),
+            author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="three-qq-user", member_role="member", username="匿名道号"),
             group_id="qq-raw-group",
             group_openid="three-qq-group",
         )

@@ -20,14 +20,15 @@ class ContentBundle:
     root: Path
     manifest: Mapping[str, Any]
     _records: Mapping[tuple[str, str], Mapping[str, Any]]
+    _metadata: Mapping[str, Any]
 
     @property
     def content_version(self) -> str:
-        return str(self.manifest["content_version"])
+        return str(self._metadata.get("release", "current"))
 
     @property
     def rule_version(self) -> str:
-        return str(self.manifest["rule_version"])
+        return "current"
 
     @classmethod
     def load(cls, data_dir: str | Path) -> "ContentBundle":
@@ -36,27 +37,17 @@ class ContentBundle:
         manifest = _read_object(manifest_path)
         if manifest.get("schema") != "xiuxian.content":
             raise ContentError(f"invalid content schema: {manifest_path}")
-        if manifest.get("schema_version") != 1:
-            raise ContentError(f"unsupported content schema version: {manifest_path}")
-        if not isinstance(manifest.get("content_version"), str) or not isinstance(
-            manifest.get("rule_version"), str
-        ):
-            raise ContentError(f"content and rule versions are required: {manifest_path}")
-
         files = manifest.get("files")
         if not isinstance(files, list) or not files or any(not isinstance(item, str) for item in files):
             raise ContentError(f"manifest files must be a non-empty string list: {manifest_path}")
 
+        metadata = _read_metadata(root / str(manifest.get("metadata", "内容版本.json")))
         records: dict[tuple[str, str], Mapping[str, Any]] = {}
         for relative_path in files:
             file_path = _safe_child(root, relative_path)
             document = _read_object(file_path)
             if document.get("schema") != "xiuxian.content":
                 raise ContentError(f"invalid content schema: {file_path}")
-            if document.get("schema_version") != 1:
-                raise ContentError(f"unsupported schema version: {file_path}")
-            if document.get("content_version") != manifest["content_version"]:
-                raise ContentError(f"content version mismatch: {file_path}")
             kind = document.get("kind")
             if not isinstance(kind, str) or not kind:
                 raise ContentError(f"missing content kind: {file_path}")
@@ -70,11 +61,19 @@ class ContentBundle:
                 if identity in records:
                     raise ContentError(f"duplicate content key {kind}:{row['key']}")
                 normalized = copy.deepcopy(row)
-                normalized.setdefault("content_version", document["content_version"])
-                normalized.setdefault("rule_version", document["rule_version"])
+                normalized.setdefault("content_version", metadata.get("release", "current"))
+                normalized.setdefault(
+                    "rule_version",
+                    metadata.get("rules", {}).get(kind, "current"),
+                )
                 records[identity] = normalized
 
-        return cls(root=root, manifest=copy.deepcopy(manifest), _records=records)
+        return cls(
+            root=root,
+            manifest=copy.deepcopy(manifest),
+            _records=records,
+            _metadata=copy.deepcopy(metadata),
+        )
 
     @classmethod
     def load_optional(cls, data_dir: str | Path) -> "ContentBundle | None":
@@ -139,6 +138,15 @@ def _read_object(path: Path) -> dict[str, Any]:
         raise ContentError(f"invalid JSON: {path}: {exc.msg}") from exc
     if not isinstance(value, dict):
         raise ContentError(f"content document must be an object: {path}")
+    return value
+
+
+def _read_metadata(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {"release": "current", "rules": {}}
+    value = _read_object(path)
+    if not isinstance(value.get("release"), str) or not isinstance(value.get("rules", {}), dict):
+        raise ContentError(f"invalid content metadata: {path}")
     return value
 
 

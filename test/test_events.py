@@ -39,7 +39,7 @@ def _adapter_contexts():
             id="event-qq-message",
             content="灵泉事件",
             timestamp="2026-09-23T20:05:00+00:00",
-            author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="qq-event-user", username="灵泉道友"),
+            author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="qq-event-user", member_role="member", username="灵泉道友"),
             group_id="qq-raw-group",
             group_openid="event-qq-group",
         )

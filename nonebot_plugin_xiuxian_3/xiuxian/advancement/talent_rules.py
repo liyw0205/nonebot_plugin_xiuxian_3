@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = "content-0.1"
-RULE_VERSION = "advancement-0.1.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 TALENT_POINT_RESOURCE = "resource.talent_point"
 MAX_TALENT_TIER = 5
 TALENT_COSTS = (0, 1, 2, 3, 5)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +19,29 @@ from .xiuxian.repository import SQLitePlayerRepository
 
 _LOGGER = logging.getLogger(__name__)
 _DISPATCH_RECOVERY_INTERVAL_SECONDS = 60
+
+
+def _bundled_content_dirs() -> tuple[Path, ...]:
+    """Return package and source-tree content locations in priority order."""
+
+    package_data = Path(__file__).resolve().parent / "data"
+    source_data = Path(__file__).resolve().parents[1] / "data"
+    return (package_data, source_data)
+
+
+def _load_content(settings: XiuxianSettings, *, explicit_data_dir: str | Path | None, explicit_settings: bool) -> ContentBundle | None:
+    content = ContentBundle.load_optional(settings.data_dir)
+    if content is not None or explicit_data_dir is not None or explicit_settings:
+        return content
+    # A wheel contains the read-only content pack.  Keep the default database
+    # under the host project's ./data while using the bundled pack as a source.
+    if os.getenv("XIUXIAN3_DATA_DIR"):
+        return content
+    for candidate in _bundled_content_dirs():
+        content = ContentBundle.load_optional(candidate)
+        if content is not None:
+            return content
+    return None
 
 
 @dataclass(slots=True)
@@ -75,7 +99,11 @@ def create_runtime(
     clock: Callable[[], datetime] | None = None,
 ) -> XiuxianRuntime:
     resolved_settings = settings or XiuxianSettings.from_env(data_dir)
-    content = ContentBundle.load_optional(resolved_settings.data_dir)
+    content = _load_content(
+        resolved_settings,
+        explicit_data_dir=data_dir,
+        explicit_settings=settings is not None,
+    )
     repository = SQLitePlayerRepository(resolved_settings, clock=clock)
     application = XiuxianApplication(repository, content)
     router = CommandRouter()

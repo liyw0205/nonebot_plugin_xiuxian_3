@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 import hashlib
 
 from .models import ExplorationDefinition
 
 
-RULE_VERSION = "exploration-0.1.1"
+RULE_VERSION = module_rule_version(__name__)
 V02_RULE_VERSION = "exploration-0.2.0"
 V02_CONTENT_VERSION = "content-0.2"
 V03_RULE_VERSION = "exploration-0.3.0"

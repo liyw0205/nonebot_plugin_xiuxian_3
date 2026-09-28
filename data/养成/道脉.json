@@ -1,8 +1,4 @@
 {
-  "schema_version": 1,
-  "content_version": "content-0.6",
-  "rule_version": "advancement-0.1.0",
-  "generated_at": "2026-09-22T00:00:00Z",
   "kind": "talent",
   "records": [
     {"key":"talent.tree.body.tier1","tree_key":"body","tier":1,"name":"体魄淬炼·第1阶","status":"active","cost_points":0,"prerequisites":[],"effect":{"type":"body_efficiency_bp","value":100}},

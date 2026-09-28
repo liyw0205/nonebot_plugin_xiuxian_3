@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from datetime import date, datetime, timedelta, timezone
 
-CONTENT_VERSION = "content-0.5"
-RULE_VERSION = "quests-0.5.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 VOID_QUEST_RULE_VERSION = "quests-0.5.1"
 
 SOUL_QUEST = "quest.soul_transformation"

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 import hashlib
 from dataclasses import dataclass
 from typing import Mapping
 
 
-CONTENT_VERSION = "content-0.1"
-RULE_VERSION = "combat-0.1.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 V03_CONTENT_VERSION = "content-0.3"
 V03_RULE_VERSION = "combat-0.3.0"
 V031_RULE_VERSION = "combat-0.3.1"

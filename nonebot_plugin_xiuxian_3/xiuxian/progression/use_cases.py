@@ -37,7 +37,7 @@ from .rules import (
     next_layer_threshold,
     segment_for_layer,
 )
-from ..player.rules import REALM_LABELS
+from ..player.rules import REALM_LABELS, realm_display_name
 
 
 class ProgressionApplication:
@@ -78,8 +78,11 @@ class ProgressionApplication:
 
     @staticmethod
     def _realm_text(player) -> str:
-        label = REALM_LABELS.get(player.realm_key, player.realm_key)
-        return f"{label} L{player.realm_layer}（{segment_for_layer(player.realm_layer)}）"
+        text = realm_display_name(player.realm_key, player.realm_layer, labels=REALM_LABELS)
+        try:
+            return f"{text}（{segment_for_layer(int(player.realm_layer))}）"
+        except (TypeError, ValueError):
+            return text
 
     async def start_cultivation(self, context: CommandContext) -> CommandResult:
         mode_key = self._resolve_mode(context.command_args)

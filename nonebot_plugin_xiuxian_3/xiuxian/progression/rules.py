@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -22,7 +24,7 @@ MODE_BREATHING = "cultivate.breathing"
 MODE_SPIRIT_SPRING = "cultivate.spirit_spring"
 MODE_SECLUSION = "cultivate.seclusion"
 MODE_SOUL_REFINEMENT = "cultivate.soul_refinement"
-RULE_VERSION = "progression-0.1.1"
+RULE_VERSION = module_rule_version(__name__)
 SPIRIT_SPRING_RULE_VERSION = "progression-0.1.2"
 SECLUSION_RULE_VERSION = "progression-0.1.5"
 SOUL_REFINEMENT_RULE_VERSION = "progression-0.4.1"

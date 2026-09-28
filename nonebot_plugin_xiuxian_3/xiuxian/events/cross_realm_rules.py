@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from datetime import datetime, timedelta, timezone
 
 
-CONTENT_VERSION = "content-0.3"
-RULE_VERSION = "events-0.3.1"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 BEAST_TRADE_EVENT_KEY = "event.beast_trade"
 BEAST_TRADE_LOCATION = "beast.three_realms_trade_port"
 BEAST_TRADE_DURATION_SECONDS = 7 * 24 * 60 * 60

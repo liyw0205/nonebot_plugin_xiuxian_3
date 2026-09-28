@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 import hashlib
 from dataclasses import dataclass
 from datetime import timedelta
 
 
-CONTENT_VERSION = "content-0.2"
-RULE_VERSION = "specials-0.2.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 LEGACY_CONTENT_VERSION = "content-0.1"
 LEGACY_RULE_VERSION = "specials-0.1.2"
 TOWER_KEY = "tower.mist_trial"

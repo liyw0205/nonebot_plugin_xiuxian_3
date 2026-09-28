@@ -745,6 +745,7 @@ def _qq_event(
             id="qq-user-raw",
             bot=False,
             member_openid=member_openid,
+            member_role="member",
             username="QQ道友",
         ),
         group_id="qq-group-raw",

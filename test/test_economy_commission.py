@@ -69,7 +69,7 @@ def test_production_commission_happy_path_uses_qq_and_onebot_contexts() -> None:
         id="commission-qq-1",
         content="开始修仙",
         timestamp="2026-01-01T00:00:00+00:00",
-        author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="publisher", username="委托人"),
+        author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="publisher", member_role="member", username="委托人"),
         group_id="qq-raw-group",
         group_openid="commission-group",
     )

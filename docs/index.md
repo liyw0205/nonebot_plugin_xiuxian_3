@@ -23,14 +23,16 @@
 | [开发文档总入口](development-guide.md) | 阅读顺序、文档职责、切片交付清单、状态判定和提交前验证 | 开发入口 |
 | [实施计划](implementation-plan.md) | P0-P8 依赖、首版垂直切片、风险、验收与回滚 | 执行权威 |
 | [完整内容开发总表](content-development.md) | 全部境界、功能域、发布边界、首版范围、稳定键依赖和完整切片验收 | 内容开发唯一权威 |
+| [内容快照合并说明](content-history.md) | v0.1-v0.6 历史边界、阅读顺序和迁移约束 | 历史归档入口 |
 | [当前开发状态](current-status.md) | 当前分支已开放、合同/锁定和下一步开发顺序 | 状态唯一入口 |
+| [完成状态](completion-status.md) | 已完成、未完成、关闭范围和验收入口 | 交付检查 |
 | [版本内容开发合同](content-development-contract.md) | 全部 `content-v*.md` 的字段、版本、事务、幂等、随机、失败、发布和回滚约束 | 内容工程权威 |
 | [上游参考与复用边界](reference-sources.md) | 上游文档的通用玩法参考、适配器复用范围和禁止事项 | 已整理 |
 | [基础域目录](foundation/) | 角色、境界、道途、属性、资源、物品和构筑养成的分文件规格 | 细节权威 |
 | [核心玩法域目录](gameplay/) | 世界、探索、战斗、生产、社交、经济、活动、常驻经营、道历运营、冒险主线、灵兽灵骑和特色玩法的分文件规格 | 细节权威 |
 | [扩展域目录](extensions/) | 适配器、Web 运营和数据内容的分文件规格 | 细节权威 |
 
-各域的 `content-v0.1.md` 至 `content-v0.6.md` 是历史发布快照，不是并列的开发规范。
+各域旧的 `content-v0.1.md` 至 `content-v0.6.md` 仅是历史发布快照；统一阅读入口见[内容快照合并说明](content-history.md)，不是并列的开发规范。
 全部境界和功能的完整开发范围以[完整内容开发总表](content-development.md)为准；
 快照只表示某个 `content_version` 的开放键和值，不能要求实现按版本逐个开发。
 所有版本内容文件同时受 [版本内容开发合同](content-development-contract.md) 约束。

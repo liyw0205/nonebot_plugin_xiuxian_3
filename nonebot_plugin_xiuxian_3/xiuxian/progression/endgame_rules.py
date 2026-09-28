@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from dataclasses import dataclass
 from hashlib import blake2b
 
 
-CONTENT_VERSION = "content-0.6"
-RULE_VERSION = "progression-0.6.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 ENDING_KEYS = frozenset({"ascend", "remain_in_world"})
 ASCENSION_READY_STATUS = "ascension_ready"
 ASCENDED_STATUS = "ascended"

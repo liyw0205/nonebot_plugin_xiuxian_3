@@ -32,7 +32,7 @@ def _contexts() -> tuple[CommandContext, CommandContext]:
             id="cross-war-qq",
             content="跨服宗门战",
             timestamp="2026-09-25T12:00:00+00:00",
-            author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="cross-qq", username="QQ成员"),
+                author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="cross-qq", member_role="member", username="QQ成员"),
             group_id="qq-group",
             group_openid="qq-group",
         )

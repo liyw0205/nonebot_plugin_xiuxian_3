@@ -47,6 +47,7 @@ def _qq_group_event(content: str):
             id="qq-user-raw",
             bot=False,
             member_openid="qq-masterwork-user",
+            member_role="member",
             username="QQ道友",
         ),
         group_id="qq-group-raw",

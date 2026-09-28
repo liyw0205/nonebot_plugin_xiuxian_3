@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 import math
 from hashlib import blake2b
 
 from .void_models import VoidRouteDefinition
 
-RULE_VERSION = "world-0.5.2"
-CONTENT_VERSION = "content-0.5"
+RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = module_content_version(__name__)
 VOID_ROUTE_DURATION_SECONDS = 30 * 60
 VOID_ROUTE_STORM_CHANCE_BP = 1500
 VOID_INSTABILITY_SECONDS = 48 * 60 * 60

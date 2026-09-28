@@ -42,7 +42,7 @@ def _contexts():
             id="sect-war-qq-message",
             content="宗门战",
             timestamp="2026-09-23T19:00:00+00:00",
-            author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="qq-war-user", username="隐私道号"),
+            author=GroupMemberAuthor(id="qq-raw", bot=False, member_openid="qq-war-user", member_role="member", username="隐私道号"),
             group_id="qq-raw-group",
             group_openid="qq-war-group",
         )

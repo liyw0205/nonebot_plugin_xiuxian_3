@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import content_key, module_content_version, module_rule_version
+
 import hashlib
 from dataclasses import dataclass
 
 
 RETREAT_BASIC = "progression.retreat.basic"
 RETREAT_RESTFUL = "progression.retreat.restful"
-CONTENT_VERSION = "content-0.1"
-RULE_VERSION = "advancement-0.1.0"
-BASIC_RANDOM_POOL = "retreat.basic.v0.1"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
+BASIC_RANDOM_POOL = content_key("retreat.basic")
 BASIC_DURATION_SECONDS = 2 * 60 * 60
 RESTFUL_DURATION_SECONDS = 4 * 60 * 60
 MAX_SETTLEMENT_SECONDS = 8 * 60 * 60

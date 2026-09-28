@@ -1,0 +1,12 @@
+.git
+.pytest_cache
+__pycache__
+*.py[cod]
+.venv
+venv
+runtime
+logs
+backups
+data/*.sqlite3
+data/*.db
+.wheel-check-*

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from datetime import date, timedelta
 import hashlib
 import json
@@ -9,8 +11,8 @@ from dataclasses import dataclass
 from typing import Any
 
 
-RULE_VERSION = "routine-0.1.0"
-CONTENT_VERSION = "content-0.1"
+RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = module_content_version(__name__)
 CHECKIN_ACTIVITY = "ritual.checkin.daily"
 MAKEUP_ACTIVITY = "ritual.makeup.daily"
 TREE_WATER_ACTIVITY = "ritual.spirit_tree.water"

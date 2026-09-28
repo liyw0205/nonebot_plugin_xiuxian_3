@@ -235,7 +235,7 @@ def test_real_adapters_reach_mentor_slice(kind: str) -> None:
             id=message_id,
             content=content,
             timestamp="2026-01-01T00:00:00+00:00",
-            author=GroupMemberAuthor(id="raw", bot=False, member_openid=user_id, username="道友"),
+            author=GroupMemberAuthor(id="raw", bot=False, member_openid=user_id, member_role="member", username="道友"),
             group_id="raw-group",
             group_openid="group-openid",
         )

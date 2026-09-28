@@ -1,10 +1,7 @@
 {
   "schema": "xiuxian.content",
-  "schema_version": 1,
-  "content_version": "content-0.6",
-  "rule_version": "rules-0.6",
-  "generated_at": "2026-09-22T00:00:00Z",
   "status": "active",
+  "metadata": "内容版本.json",
   "files": [
     "事件/事件.json",
     "任务/任务.json",

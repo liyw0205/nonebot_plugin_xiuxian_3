@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 import hashlib
 from datetime import timedelta
 from typing import Mapping
 
 from .three_realms_arena_rules import THREE_REALMS_ARENA_MODE_KEY
 
-CONTENT_VERSION = "content-0.6"
-RULE_VERSION = "arena-0.1.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 ARENA_MODE_KEY = "arena.spar"
 ARENA_RANK_MODE_KEY = "arena.rank"
 ARENA_PRACTICE_MODE_KEY = "arena.practice"

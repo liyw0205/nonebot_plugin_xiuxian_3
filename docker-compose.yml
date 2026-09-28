@@ -1,0 +1,14 @@
+services:
+  xiuxian3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xiuxian3
+    restart: unless-stopped
+    env_file:
+      - ./docker/.env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./runtime:/app/runtime

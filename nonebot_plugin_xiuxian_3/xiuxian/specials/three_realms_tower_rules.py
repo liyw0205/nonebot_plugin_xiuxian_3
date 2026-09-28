@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 import hashlib
 from dataclasses import dataclass
 from datetime import timedelta
@@ -9,8 +11,8 @@ from datetime import timedelta
 
 V03_CONTENT_VERSION = "content-0.3"
 V03_RULE_VERSION = "specials-0.3.0"
-CONTENT_VERSION = "content-0.4"
-RULE_VERSION = "specials-0.4.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 TOWER_KEY = "tower.three_realms"
 V03_MAX_FLOOR = 20
 MAX_FLOOR = 40

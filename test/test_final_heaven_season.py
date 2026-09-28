@@ -37,7 +37,7 @@ def _adapter_contexts():
             content="终局赛季",
             timestamp="2026-09-23T20:05:00+00:00",
             author=GroupMemberAuthor(
-                id="qq-raw", bot=False, member_openid="season-qq-user", username="隐私道号"
+                id="qq-raw", bot=False, member_openid="season-qq-user", member_role="member", username="隐私道号"
             ),
             group_id="qq-raw-group",
             group_openid="season-qq-group",

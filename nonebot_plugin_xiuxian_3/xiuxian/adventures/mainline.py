@@ -9,14 +9,16 @@ belong to the application/repository and reward services.
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
 
 MAINLINE_STORY_KEY = "story.mainline.xuantian"
-MAINLINE_CONTENT_VERSION = "content-0.1"
+MAINLINE_CONTENT_VERSION = module_content_version(__name__, fallback="current")
 MAINLINE_RULE_VERSION = "mainline-0.1.0"
-RULE_VERSION = "adventures-0.1.0"
+RULE_VERSION = module_rule_version(__name__)
 CONTENT_VERSION = MAINLINE_CONTENT_VERSION
 
 MAINLINE_LOCKED = "locked"

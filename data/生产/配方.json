@@ -1,8 +1,4 @@
 {
-  "schema_version": 1,
-  "content_version": "content-0.6",
-  "rule_version": "production-0.1.1",
-  "generated_at": "2026-09-22T00:00:00Z",
   "kind": "recipe",
   "records": [
     {
@@ -138,8 +134,6 @@
         "input_refund_bp": 5000,
         "produces_output": false
       },
-      "content_version": "content-0.1",
-      "rule_version": "production-0.1.1",
       "key": "recipe.pill.qi_guard",
       "status": "active"
     },
@@ -188,8 +182,6 @@
         "input_refund_bp": 5000,
         "produces_output": false
       },
-      "content_version": "content-0.1",
-      "rule_version": "production-0.1.0",
       "key": "recipe.pill.foundation_draft",
       "status": "active"
     },
@@ -238,8 +230,6 @@
         "input_refund_bp": 5000,
         "produces_output": false
       },
-      "content_version": "content-0.1",
-      "rule_version": "production-0.1.1",
       "key": "recipe.pill.foundation_guard",
       "status": "active"
     },
@@ -408,8 +398,6 @@
         "currency_refund_bp": 0,
         "produces_output": false
       },
-      "content_version": "content-0.2",
-      "rule_version": "production-0.2.0",
       "key": "recipe.pill.golden_core_guard",
       "status": "active"
     },
@@ -440,8 +428,6 @@
         "currency_refund_bp": 0,
         "produces_output": false
       },
-      "content_version": "content-0.2",
-      "rule_version": "production-0.2.0",
       "key": "recipe.pill.core_condense",
       "status": "active"
     },
@@ -472,8 +458,6 @@
         "currency_refund_bp": 0,
         "produces_output": false
       },
-      "content_version": "content-0.2",
-      "rule_version": "production-0.2.0",
       "key": "recipe.weapon.cloud_sword",
       "status": "active"
     },
@@ -503,8 +487,6 @@
         "currency_refund_bp": 0,
         "produces_output": false
       },
-      "content_version": "content-0.2",
-      "rule_version": "production-0.2.0",
       "key": "recipe.array.mist_barrier",
       "status": "active"
     },
@@ -531,8 +513,6 @@
         "currency_refund_bp": 0,
         "produces_output": false
       },
-      "content_version": "content-0.2",
-      "rule_version": "production-0.2.0",
       "key": "recipe.food.cloud_tea",
       "status": "active"
     },
@@ -558,8 +538,6 @@
         "currency_refund_bp": 0,
         "produces_output": false
       },
-      "content_version": "content-0.3",
-      "rule_version": "production-0.3.0",
       "key": "recipe.pill.soul_restore",
       "status": "active"
     },
@@ -582,8 +560,6 @@
         "currency_refund_bp": 0,
         "produces_output": false
       },
-      "content_version": "content-0.3",
-      "rule_version": "production-0.3.0",
       "key": "recipe.contract.beast_pact",
       "status": "active"
     }

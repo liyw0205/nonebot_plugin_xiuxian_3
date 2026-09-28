@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from dataclasses import dataclass
 
 from ..player.path_rules import PATH_LABELS
 
 
-CONTENT_VERSION = "content-0.1"
-RULE_VERSION = "specials-0.1.1"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 
 
 @dataclass(frozen=True, slots=True)

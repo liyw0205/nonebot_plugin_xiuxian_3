@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from .secret_realm_models import SecretRealmDefinition
 
-RULE_VERSION = "adventures-0.1.1"
-CONTENT_VERSION = "content-0.1"
+RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = module_content_version(__name__)
 V02_RULE_VERSION = "adventures-0.2.0"
 V02_CONTENT_VERSION = "content-0.2"
 

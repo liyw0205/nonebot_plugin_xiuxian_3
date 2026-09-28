@@ -1,0 +1,6 @@
+[tool.nonebot]
+plugin_dirs = []
+builtin_plugins = []
+
+[tool.nonebot.plugins]
+"@local" = ["nonebot_plugin_xiuxian_3"]

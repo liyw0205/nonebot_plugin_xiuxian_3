@@ -300,7 +300,8 @@ Clock。
 - `adapters/message/onebot.py`：OneBot V11 普通消息与合并转发消息；Markdown/蓝字/按键统一降级为纯文本。
 - `adapters/message/router.py`：按 bot/event 类型选择发送器；`adapters/messaging.py` 仅保留兼容导出。
 
-NoneBot 依赖按需安装：`pip install -e '.[nonebot,onebot,qq]'`。OneBot/QQ
+NoneBot 依赖按需安装：`pip install '.[nonebot,onebot,qq]'`。使用普通 wheel 安装，避免
+editable finder 绕过 NoneBot 的插件注册流程。OneBot/QQ
 角色命令共用一个 matcher，按平台事件归一化，不会重复注册命令。
 NoneBot 项目通过 `nonebot.load_plugin("nonebot_plugin_xiuxian_3")` 加载插件包；
 普通 Python 导入不会自动注册 matcher。

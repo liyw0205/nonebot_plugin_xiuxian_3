@@ -185,5 +185,6 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 - 改玩法边界、境界或跨域依赖：先改 `content-development.md`。
 - 改实体、状态机或用例契约：改对应域的 `model.md`、`workflow.md` 或 `use-cases.md`。
 - 改当前实现状态：只改本文，并在对应域 README 保留链接，不复制整张状态表。
-- 改历史发布参数：只改相应 `content-v*.md`，同时说明 `content_version` 和 `rule_version`。
+- 改历史发布参数：只在需要兼容旧操作时维护归档快照；当前规则统一改
+  `content-development.md`、对应域文档和 `data/内容版本.json`，并说明兼容影响。
 - 代码、命令处理器和测试不得自行创建与文档冲突的第二套规则。

@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..content import ContentBundle
-from ..versions import active_content_version
 
 
 # Kept as a compatibility export for old snapshots; new operations read the
 # active content manifest rather than a documentation release number.
-CONTENT_VERSION = active_content_version(fallback="content-0.2")
-RULE_VERSION = "items-0.2.0"
+CONTENT_VERSION = module_content_version(__name__, fallback="current")
+RULE_VERSION = module_rule_version(__name__)
 MIST_BARRIER_RISK_REDUCTION_BP = 500
 MIST_BARRIER_DURATION_SECONDS = 12 * 60 * 60
 CLOUD_TEA_STATE_BP_BONUS = 500

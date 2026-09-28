@@ -40,6 +40,7 @@ from ...repository import (
 )
 from .rules import breakthrough_definition, success_bp
 from ...paths.rules import domain_definition, resolve_domain
+from ...player.rules import REALM_LABELS, realm_display_name
 
 
 ITEM_LABELS = {
@@ -66,15 +67,6 @@ ITEM_LABELS = {
     "item.pill.domain_restore": "领域复原丹",
     "item.void_crystal": "虚空晶体",
     "item.void_anchor": "虚空锚",
-}
-
-REALM_LABELS = {
-    "qi_gathering": "聚气",
-    "foundation": "筑基",
-    "golden_core": "金丹",
-    "nascent_soul": "元婴",
-    "soul_transformation": "化神",
-    "void_refining": "炼虚",
 }
 
 PROTECTION_LABELS = {
@@ -267,7 +259,7 @@ class BreakthroughApplication:
         message = (
             f"## {realm_label}突破预览\n\n"
             f"**{self._display_name(player)}**当前{('满足' if ready else '尚未满足')}突破条件。\n\n"
-            f"- **境界要求**：{REALM_LABELS.get(definition.source_realm, definition.source_realm)} L10（混元）\n"
+            f"- **境界要求**：{realm_display_name(definition.source_realm, 10, labels=REALM_LABELS)}\n"
             f"- **总修为要求**：{definition.required_total_cultivation}\n"
             f"{quality_line}"
             f"- **当前成功率**：{current_success_bp / 100:.0f}%（基础 {definition.base_success_bp / 100:.0f}%）\n"
@@ -303,9 +295,9 @@ class BreakthroughApplication:
         except PlayerStageConflictError:
             return CommandResult(False, "REALM_MISMATCH", "完成入道后才能进行跨境突破。", context.request_id, operation_id)
         except BreakthroughRequirementError:
-            return CommandResult(False, "BREAKTHROUGH_REQUIREMENT_MISSING", f"只有{REALM_LABELS.get(definition.source_realm, definition.source_realm)} L10 混元且总修为达到 {definition.required_total_cultivation:,} 才能开始{REALM_LABELS[target]}突破。", context.request_id, operation_id)
+            return CommandResult(False, "BREAKTHROUGH_REQUIREMENT_MISSING", f"只有{realm_display_name(definition.source_realm, 10, labels=REALM_LABELS)}且总修为达到 {definition.required_total_cultivation:,} 才能开始{REALM_LABELS[target]}突破。", context.request_id, operation_id)
         except RealmMismatchError:
-            return CommandResult(False, "REALM_MISMATCH", f"需要{REALM_LABELS.get(definition.source_realm, definition.source_realm)} L10 才能开始{REALM_LABELS[target]}突破，未扣除任何资源。", context.request_id, operation_id)
+            return CommandResult(False, "REALM_MISMATCH", f"需要{realm_display_name(definition.source_realm, 10, labels=REALM_LABELS)}才能开始{REALM_LABELS[target]}突破，未扣除任何资源。", context.request_id, operation_id)
         except CultivationInsufficientError:
             return CommandResult(False, "CULTIVATION_INSUFFICIENT", f"化神需要总修为达到 {definition.required_total_cultivation:,}，未扣除任何资源。", context.request_id, operation_id)
         except SoulPowerInsufficientError:
@@ -349,7 +341,7 @@ class BreakthroughApplication:
             "BREAKTHROUGH_STARTED",
             (
                 "## 突破已开始\n\n"
-                f"**{self._display_name(record.player)}**开始冲击 **{REALM_LABELS[target]} L1**。\n\n"
+                f"**{self._display_name(record.player)}**开始冲击 **{realm_display_name(target, 1, labels=REALM_LABELS)}**。\n\n"
                 f"- **成功率**：{record.success_bp / 100:.0f}%\n"
                 f"- **准备时长**：{definition.duration_seconds // 60} 分钟\n"
                 f"- **灵石**：{record.player.spirit_stones}\n\n"
@@ -398,7 +390,7 @@ class BreakthroughApplication:
                 reward_lines.append(f"{ITEM_LABELS.get(item_key, '凭证')} ×{quantity}")
             message = (
                 "## 突破成功\n\n"
-                f"**{self._display_name(player)}**已踏入 **{target_label} L1（入门）**。\n\n"
+                f"**{self._display_name(player)}**已踏入 **{realm_display_name(record.target_realm, 1, labels=REALM_LABELS)}（入门）**。\n\n"
                 f"- **消耗灵石**：{record.currency_spent}\n"
                 f"- **入境奖励**：{'、'.join(reward_lines) or '无'}\n"
                 f"- **当前境内修为**：{player.cultivation}\n\n"

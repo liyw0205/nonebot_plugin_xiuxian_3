@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from dataclasses import dataclass
 from datetime import timedelta
 
 
-CONTENT_VERSION = "content-0.3"
-RULE_VERSION = "economy-0.3.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 WEEKLY_LIMIT = 5
 BINDING_SECONDS = 24 * 60 * 60
 TRADE_LOCATION = "demon.abyss_market"

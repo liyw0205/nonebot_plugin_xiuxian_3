@@ -36,7 +36,7 @@ def _adapter_contexts() -> tuple[CommandContext, CommandContext]:
             content="挑战竞技场",
             timestamp="2026-09-25T00:00:00+00:00",
             author=GroupMemberAuthor(
-                id="qq-raw", bot=False, member_openid="arena-qq-user", username="QQ道友"
+                id="qq-raw", bot=False, member_openid="arena-qq-user", member_role="member", username="QQ道友"
             ),
             group_id="qq-raw-group",
             group_openid="arena-qq-group",

@@ -7,6 +7,8 @@ grow the arena repositories further.
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 import json
 import sqlite3
 from collections.abc import Iterable, Mapping
@@ -16,8 +18,8 @@ from .arena_federation import ensure_identity_route, record_settlement_audit
 from .codex_projection import record_codex_discovery
 
 
-CONTENT_VERSION = "content-0.6"
-RULE_VERSION = "arena-projection-0.1.0"
+CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = module_rule_version(__name__)
 ARENA_LOCATION_KEY = "xuantian.new_town"
 ARENA_LOCAL_REPUTATION_KEY = f"local.{ARENA_LOCATION_KEY}"
 

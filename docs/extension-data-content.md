@@ -29,12 +29,13 @@ data/
   ...
 ```
 
-每个文件包含 schema 版本、内容版本、更新时间、`kind` 和 `records`。每条记录
+领域文件只包含 `kind`、`records` 和业务字段；内容版本与规则版本集中登记在
+`data/内容版本.json`，不在每个 JSON 文件重复写生成时间或 schema 版本。每条记录
 使用统一的 `key` 字段；稳定键使用字符串，不使用上游 ID 区间。
 
 代码通过 `ContentBundle.get/require/list/label/versions` 读取定义；业务展示不应
 再复制境界、物品、任务或法器名称表。当前发布版本使用
-`xiuxian.versions.active_content_version()` / `active_rule_version()` 读取清单，历史
+`xiuxian.versions.active_content_version()` / `active_rule_version()` 读取集中元数据，历史
 结算仍保留生成当时的版本快照。
 
 ## 3. 加载校验
@@ -92,14 +93,12 @@ Web 编辑只能修改白名单字段，并生成草稿、校验、预览、发�
 ```json
 {
   "schema": "xiuxian.content",
-  "schema_version": 1,
-  "content_version": "content-2026-01",
-  "rule_version": "rules-v1",
-  "generated_at": "2026-01-01T00:00:00Z",
   "kind": "item",
   "records": [{"key": "item.weapon.wood_sword", "name": "木纹剑"}]
 }
 ```
+
+版本集中维护在 `data/内容版本.json`，宿主内容目录可覆盖该文件和领域 JSON。
 
 内容包加载为不可变发布对象。运行时只激活通过校验的版本，旧版本保留到所有引用和历史结算不再需要后再清理。
 

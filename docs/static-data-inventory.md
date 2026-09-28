@@ -5,12 +5,10 @@
 
 ## 1. 建议的内容包文件
 
-运行时统一从 `data/内容清单.json` 读取文件清单。当前清单是 `content-0.6` 的活动配置包，
-但配置包的注册状态不决定玩家入口；入口和关闭语义仍由[当前开发状态](current-status.md)
-裁决。每个领域文件都带
-`schema_version`、`content_version`、`rule_version`、`generated_at`、`kind` 和
-`records`；每条记录统一使用 `key`，引用仍使用带类型的 `item_key`、`realm_key`
-等字段：
+运行时统一从 `data/内容清单.json` 读取文件清单。当前清单是活动配置包，版本元数据集中
+在 `data/内容版本.json`；配置包的注册状态不决定玩家入口，入口和关闭语义仍由[当前开发状态](current-status.md)
+裁决。每个领域文件只保留 `kind` 和 `records` 等业务结构；每条记录统一使用 `key`，
+引用仍使用带类型的 `item_key`、`realm_key` 等字段：
 
 ```text
 data/
@@ -162,7 +160,7 @@ data/
 ### 当前战斗配置的版本解释
 
 `技能/技能.json` 和 `战斗/敌人.json` 同时承载历史首版键与当前高阶键。文件中的
-`content_version` 说明它们属于活动内容包；具体战斗结算使用的 `rule_version` 必须
+内容版本说明来自 `data/内容版本.json`；具体战斗结算使用的 `rule_version` 必须
 由战斗开始快照记录，不能用文件名、记录顺序或历史 `content-v0.1.md` 的版本猜测。
 天劫三阶段当前使用 `combat-0.6.1`，其阶段边界、技能选择、债务护盾和回放字段以
 [战斗模型](gameplay/combat/model.md)与[行动流程](gameplay/combat/workflow.md)为准；

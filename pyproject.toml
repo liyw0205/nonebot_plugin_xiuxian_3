@@ -14,10 +14,13 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
-nonebot = ["nonebot2>=2.4"]
+nonebot = ["nonebot2[fastapi,httpx,websockets,aiohttp]>=2.4", "nb-cli>=1.4"]
 onebot = ["nonebot-adapter-onebot>=2.4.6"]
 qq = ["nonebot-adapter-qq>=1.7.1"]
 billing = ["cryptography>=41"]
+
+[tool.setuptools]
+include-package-data = true
 
 [project.scripts]
 xiuxian3 = "nonebot_plugin_xiuxian_3.__main__:main"
@@ -25,6 +28,9 @@ xiuxian3 = "nonebot_plugin_xiuxian_3.__main__:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["nonebot_plugin_xiuxian_3*"]
+
+[tool.setuptools.package-data]
+nonebot_plugin_xiuxian_3 = ["data/**/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

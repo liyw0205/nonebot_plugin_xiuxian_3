@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 from .cloud_rules import BEAST_INTRO_FLAG
 
 
-RULE_VERSION = "world-0.1.0"
+RULE_VERSION = module_rule_version(__name__)
 CAVE_LOCATION = "cave.mist_grotto"
 CAVE_PASS = "item.cave_pass_basic"
 BEAST_HILLS_REQUIRED_REPUTATION = 200
