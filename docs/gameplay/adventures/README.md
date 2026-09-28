@@ -39,6 +39,8 @@ QQ 官方与 OneBot V11 双方向混合队伍验收见 `test/test_boundary_rift_
 
 虚空遗迹秘境使用独立 `void_ruins_runs` / `void_ruins_members`，不复用通用 `secret_realm_runs` 或战斗奖励。队伍在 `void.archive_ruins` 创建并确认后，队长使用 `进入秘境 虚空遗迹`，再按十节点顺序选择；两场服务端自动战由任一队员使用 `结算秘境` 续跑。入场快照冻结不稳定风险、战斗属性和版本；战败/过期保留体力和周额度但返还锚，明确系统故障才补偿体力并释放额度。规则和稳定键以[v0.5 冒险内容合同](content-v0.5.md#instancesecret_realmvoid_ruins-合同)为准。
 
+时序堡垒秘境使用专属 `TimeFortRepositoryMixin` 与 `time_fort_runs` / `time_fort_members`，不复用通用秘境会话或虚空遗迹奖励。全员需炼虚 L1、位于 `void.archive_ruins` 并持有 `access.void.time_fort`；队长支付 40 体力，每位成员每 UTC 周尝试一次。六节点路线在 `time_keeper` 进行一场自动队伍战，时间风暴按冻结快照每三回合伤害全体存活队员；首通逐成员发阵砂并写入独立主线旗标。失败/过期保留成本和额度，明确系统故障补偿才退款并释放额度。命令及失败边界按[v0.5 时序堡垒合同](content-v0.5.md)执行。
+
 魔界深渊秘境使用专用 `DemonAbyssRepositoryMixin` 事务，不把路线、风险、首通奖励和恢复逻辑塞入通用秘境仓储。命令为 `进入秘境 魔界深渊`、`选择秘境节点 深渊门|污染渗流|残响守卫|深渊之心` 和 `结算秘境`；要求筑基 L1、魔界深渊门地点、门禁旗标与魔界声望 200，每 UTC 周一次、入场扣 20 体力，运行 60 分钟。节点顺序、自动战、污染风险、失败/过期成本、首通/重复奖励及系统中止补偿按[v0.3 冒险内容合同](content-v0.3.md#instancesecret_realmdemon_abyss-合同)执行。战斗使用 `combat-0.3.2`，适配器覆盖 QQ 官方、OneBot V11 及 QQ→OneBot 重启续跑，详见 `test/test_demon_abyss_secret_realm_v03.py`。
 
 祖灵殿秘境使用独立 `AncestralHallRepositoryMixin` 与 `ancestral_hall_runs` 表，不把领域事务挤入通用秘境仓储。命令为 `进入秘境 祖灵殿`、`选择秘境节点 祖灵门|誓言石阵|血脉回廊|祖灵守灵|始祖祭坛` 和 `结算秘境`；入口检查化神 L1、祖灵湖、妖界声望 3000、血脉稳定 5000 bp，单人消耗 25 体力，每 UTC 周尝试一次，60 分钟过期。首次完成只写 `story.ancestral_hall`，没有资产奖励；守灵自动战按 `combat-0.4.1` 持久化召影、自动清影和超时恢复。QQ 官方、OneBot V11 及两个身份切换方向、补偿、过期和重启续战见 `test/test_ancestral_hall_secret_realm_v04.py`。

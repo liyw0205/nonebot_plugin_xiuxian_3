@@ -1001,6 +1001,9 @@ class XiuxianApplication:
     async def create_void_ruins_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_void_ruins_party(context), write_message="当前事件不允许创建虚空遗迹秘境队伍。")
 
+    async def create_time_fort_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.create_time_fort_party(context), write_message="当前事件不允许创建时序堡垒秘境队伍。")
+
     async def create_demon_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_demon_party(context), write_message="当前事件不允许创建魔渊队伍。")
 

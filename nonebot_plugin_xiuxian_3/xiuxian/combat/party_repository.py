@@ -64,6 +64,7 @@ from ..social.party_rules import (
     PARTY_TYPE_SECRET_REALM_BOUNDARY,
     PARTY_TYPE_SECRET_REALM_ANCIENT,
     PARTY_TYPE_SECRET_REALM_VOID_RUINS,
+    PARTY_TYPE_SECRET_REALM_TIME_FORT,
 )
 from ..adventures.boundary_rift_rules import BOUNDARY_RIFT_ENEMIES, BOUNDARY_RIFT_LOCATION
 from ..adventures.ancient_domain_rules import (
@@ -72,6 +73,13 @@ from ..adventures.ancient_domain_rules import (
     ANCIENT_DOMAIN_LOCATION,
 )
 from ..adventures.void_ruins_rules import VOID_RUINS_ENEMIES, VOID_RUINS_LOCATION
+from ..adventures.time_fort_rules import (
+    TIME_FORT_ENEMY,
+    TIME_FORT_LOCATION,
+    TIME_FORT_PARTY_TYPE,
+    TIME_FORT_STORM_DAMAGE_BP,
+    TIME_FORT_STORM_INTERVAL,
+)
 
 
 class PartyCombatRepositoryMixin:
@@ -87,6 +95,7 @@ class PartyCombatRepositoryMixin:
         boundary_rift_run_id: str | None = None,
         ancient_domain_run_id: str | None = None,
         void_ruins_run_id: str | None = None,
+        time_fort_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         await self.initialize()
         async with self._inflight:
@@ -100,6 +109,7 @@ class PartyCombatRepositoryMixin:
                 boundary_rift_run_id,
                 ancient_domain_run_id,
                 void_ruins_run_id,
+                time_fort_run_id,
             )
 
     async def settle_party_battle(
@@ -191,6 +201,7 @@ class PartyCombatRepositoryMixin:
         boundary_rift_run_id: str | None = None,
         ancient_domain_run_id: str | None = None,
         void_ruins_run_id: str | None = None,
+        time_fort_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         operation_name = "battle.party.start"
         request = {"platform": platform, "platform_user_id": platform_user_id, "party_id": party_id}
@@ -200,6 +211,8 @@ class PartyCombatRepositoryMixin:
             request["ancient_domain_run_id"] = ancient_domain_run_id
         if void_ruins_run_id is not None:
             request["void_ruins_run_id"] = void_ruins_run_id
+        if time_fort_run_id is not None:
+            request["time_fort_run_id"] = time_fort_run_id
         request_hash = self._request_hash(
             operation_name,
             request,
@@ -235,6 +248,7 @@ class PartyCombatRepositoryMixin:
                 PARTY_TYPE_SECRET_REALM_BOUNDARY,
                 PARTY_TYPE_SECRET_REALM_ANCIENT,
                 PARTY_TYPE_SECRET_REALM_VOID_RUINS,
+                PARTY_TYPE_SECRET_REALM_TIME_FORT,
             }:
                 raise PartyBattleRequirementError("this party type cannot start party PVE")
             if str(party["status"]) != "ready":
@@ -261,12 +275,14 @@ class PartyCombatRepositoryMixin:
                 raise PartyBattleRequirementError("boundary-rift battles must be started by the active instance")
             ancient_domain_party = party_type == PARTY_TYPE_SECRET_REALM_ANCIENT
             void_ruins_party = party_type == PARTY_TYPE_SECRET_REALM_VOID_RUINS
+            time_fort_party = party_type == PARTY_TYPE_SECRET_REALM_TIME_FORT
             if (
                 ancient_domain_party != (ancient_domain_run_id is not None)
                 or void_ruins_party != (void_ruins_run_id is not None)
-                or sum((secret_rift_party, ancient_domain_party, void_ruins_party)) > 1
+                or time_fort_party != (time_fort_run_id is not None)
+                or sum((secret_rift_party, ancient_domain_party, void_ruins_party, time_fort_party)) > 1
             ):
-                raise PartyBattleRequirementError("ancient-domain battles must be started by the active instance")
+                raise PartyBattleRequirementError("secret-realm battles must be started by the active instance")
             rift_run = None
             if secret_rift_party:
                 rift_run = connection.execute(
@@ -313,8 +329,24 @@ class PartyCombatRepositoryMixin:
                 if enemy_key is None or str(party["location_key"]) != VOID_RUINS_LOCATION:
                     raise PartyBattleRequirementError("void-ruins node has no registered enemy")
                 enemy = enemy_definition(enemy_key)
+            time_fort_run = None
+            time_fort_run_snapshot = {}
+            if time_fort_party:
+                time_fort_run = connection.execute(
+                    "SELECT * FROM time_fort_runs WHERE run_id=? AND party_id=? AND status='combat_pending' AND battle_id IS NULL",
+                    (time_fort_run_id, resolved_party_id),
+                ).fetchone()
+                if time_fort_run is None or str(time_fort_run["expires_at"]) <= now_text:
+                    raise PartyBattleRequirementError("time-fort node is not ready for battle")
+                time_fort_run_snapshot = self._json_object(time_fort_run["snapshot_json"], {})
+                if (
+                    time_fort_run_snapshot.get("current_node") != "time_keeper"
+                    or str(party["location_key"]) != TIME_FORT_LOCATION
+                ):
+                    raise PartyBattleRequirementError("time-fort node has no registered enemy")
+                enemy = enemy_definition(TIME_FORT_ENEMY)
             try:
-                if not secret_rift_party and not ancient_domain_party and not void_ruins_party:
+                if not secret_rift_party and not ancient_domain_party and not void_ruins_party and not time_fort_party:
                     enemy = party_enemy_for_location(str(party["location_key"]))
             except ValueError as exc:
                 raise PartyBattleRequirementError("party PVE is not available at this location") from exc
@@ -329,6 +361,10 @@ class PartyCombatRepositoryMixin:
                 int(member["database_id"]): member
                 for member in void_run_snapshot.get("member_combat_snapshots", [])
             }
+            time_fort_member_snapshots = {
+                int(member["database_id"]): member
+                for member in time_fort_run_snapshot.get("member_combat_snapshots", [])
+            }
             demon_party = party_type == PARTY_TYPE_DEMON_REALM
             beast_party = party_type == PARTY_TYPE_BEAST_REALM
             leader_ticket_inventory: dict[str, int] | None = None
@@ -336,6 +372,7 @@ class PartyCombatRepositoryMixin:
                 entry_snapshot = (
                     ancient_member_snapshots.get(int(row["database_player_id"]))
                     or void_member_snapshots.get(int(row["database_player_id"]))
+                    or time_fort_member_snapshots.get(int(row["database_player_id"]))
                 )
                 member_location = str(entry_snapshot.get("location_key", row["location_key"]) if entry_snapshot else row["location_key"])
                 member_realm = str(entry_snapshot.get("realm_key", row["realm_key"]) if entry_snapshot else row["realm_key"])
@@ -384,6 +421,7 @@ class PartyCombatRepositoryMixin:
                     ignore_boundary_rift_run_id=boundary_rift_run_id,
                     ignore_ancient_domain_run_id=ancient_domain_run_id,
                     ignore_void_ruins_run_id=void_ruins_run_id,
+                    ignore_time_fort_run_id=time_fort_run_id,
                 ):
                     raise PartyBattleBusyError("a party member has another active action")
                 locked = connection.execute(
@@ -475,13 +513,13 @@ class PartyCombatRepositoryMixin:
                 else BEAST_REALM_REWARD
                 if beast_party
                 else {}
-                if secret_rift_party or ancient_domain_party or void_ruins_party
+                if secret_rift_party or ancient_domain_party or void_ruins_party or time_fort_party
                 else BOUNDARY_REALM_REWARD
                 if boundary_party
                 else PARTY_BATTLE_REWARD
             )
-            dungeon_content_version = "content-0.5" if void_ruins_party else "content-0.4" if ancient_domain_party else "content-0.3" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
-            dungeon_rule_version = V051_RULE_VERSION if void_ruins_party else "combat-0.4.0" if ancient_domain_party else "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
+            dungeon_content_version = "content-0.5" if (void_ruins_party or time_fort_party) else "content-0.4" if ancient_domain_party else "content-0.3" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
+            dungeon_rule_version = V051_RULE_VERSION if (void_ruins_party or time_fort_party) else "combat-0.4.0" if ancient_domain_party else "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
             battle_id = f"party-battle-{uuid4().hex}"
             snapshot = {
                 "battle_type": PARTY_BATTLE_TYPE,
@@ -504,6 +542,12 @@ class PartyCombatRepositoryMixin:
                 "party_type": party_type,
                 "ancient_domain_run_id": ancient_domain_run_id,
                 "void_ruins_run_id": void_ruins_run_id,
+                "time_fort_run_id": time_fort_run_id,
+                "time_storm": {
+                    "enabled": time_fort_party,
+                    "interval_rounds": TIME_FORT_STORM_INTERVAL if time_fort_party else 0,
+                    "damage_bp_of_entry_max_hp": TIME_FORT_STORM_DAMAGE_BP if time_fort_party else 0,
+                },
                 "resource_cost": {
                     "stamina": (
                         BOUNDARY_REALM_STAMINA_COST
@@ -581,6 +625,11 @@ class PartyCombatRepositoryMixin:
                 connection.execute(
                     "UPDATE void_ruins_runs SET battle_id=?, updated_at=? WHERE run_id=? AND status='combat_pending' AND battle_id IS NULL",
                     (battle_id, now_text, void_ruins_run_id),
+                )
+            if time_fort_party:
+                connection.execute(
+                    "UPDATE time_fort_runs SET battle_id=?, updated_at=? WHERE run_id=? AND status='combat_pending' AND battle_id IS NULL",
+                    (battle_id, now_text, time_fort_run_id),
                 )
             payload = {
                 "battle_id": battle_id,
@@ -743,6 +792,7 @@ class PartyCombatRepositoryMixin:
             }
             demon_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_DEMON_REALM
             beast_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_BEAST_REALM
+            time_fort_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_SECRET_REALM_TIME_FORT
             members = sorted(
                 [member for member in snapshot.get("members", []) if member["player_id"] in member_hp],
                 key=lambda member: (-int(member["stats"]["initiative"]), str(member["player_id"]),),
@@ -830,6 +880,31 @@ class PartyCombatRepositoryMixin:
                     member_status[target_id] = "downed"
                 actions.append({"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.auto", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage})
                 target_index += 1
+            storm = dict(snapshot.get("time_storm", {}))
+            if time_fort_party and storm.get("enabled") and expected_round % int(storm.get("interval_rounds", TIME_FORT_STORM_INTERVAL)) == 0:
+                damage_bp = int(storm.get("damage_bp_of_entry_max_hp", TIME_FORT_STORM_DAMAGE_BP))
+                for member in members:
+                    player_id = str(member["player_id"])
+                    if member_hp[player_id] <= 0 or member_status.get(player_id) == "downed":
+                        continue
+                    entry_max_hp = int(member["stats"].get("max_hp", 0))
+                    storm_damage = max(1, entry_max_hp * damage_bp // 10_000)
+                    member_hp[player_id] = max(0, member_hp[player_id] - storm_damage)
+                    if member_hp[player_id] <= 0:
+                        member_status[player_id] = "downed"
+                    sequence += 1
+                    actions.append(
+                        {
+                            "sequence_no": sequence,
+                            "actor_key": "environment:time_storm",
+                            "strategy_key": "environment.time_storm",
+                            "skill_key": "environment.time_storm",
+                            "target_key": f"member:{player_id}",
+                            "hit_roll_bp": 10_000,
+                            "damage": storm_damage,
+                            "direct_damage": True,
+                        }
+                    )
             if demon_party and expected_round % 3 == 0:
                 for member in members:
                     player_id = str(member["player_id"])

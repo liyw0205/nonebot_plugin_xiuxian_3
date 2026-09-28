@@ -14,6 +14,7 @@ PARTY_TYPE_STANDARD_PVE = "standard_pve"
 PARTY_TYPE_SECRET_REALM_BOUNDARY = "secret_realm_boundary"
 PARTY_TYPE_SECRET_REALM_ANCIENT = "secret_realm_ancient"
 PARTY_TYPE_SECRET_REALM_VOID_RUINS = "secret_realm_void_ruins"
+PARTY_TYPE_SECRET_REALM_TIME_FORT = "secret_realm_time_fort"
 # Keep the implementation name used by early design notes as an input alias.
 PARTY_TYPE_PARTY_BOUNDARY = "party_boundary"
 PARTY_MAX_MEMBERS = 2
@@ -82,6 +83,15 @@ SECRET_REALM_VOID_RUINS_DEFINITION = PartyDefinition(
     content_version="content-0.5",
     rule_version="social-0.5.0",
 )
+SECRET_REALM_TIME_FORT_DEFINITION = PartyDefinition(
+    party_type=PARTY_TYPE_SECRET_REALM_TIME_FORT,
+    min_members=2,
+    max_members=5,
+    required_location="void.archive_ruins",
+    distribution_key="contribution",
+    content_version="content-0.5",
+    rule_version="social-0.5.0",
+)
 DEMON_REALM_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_DEMON_REALM,
     min_members=2,
@@ -122,6 +132,8 @@ def party_definition_for(party_type: str) -> PartyDefinition:
         return SECRET_REALM_ANCIENT_DEFINITION
     if party_type == PARTY_TYPE_SECRET_REALM_VOID_RUINS:
         return SECRET_REALM_VOID_RUINS_DEFINITION
+    if party_type == PARTY_TYPE_SECRET_REALM_TIME_FORT:
+        return SECRET_REALM_TIME_FORT_DEFINITION
     if party_type == PARTY_TYPE_DEMON_REALM:
         return DEMON_REALM_DEFINITION
     if party_type == PARTY_TYPE_BEAST_REALM:
@@ -155,6 +167,7 @@ __all__ = [
     "PARTY_TYPE_SECRET_REALM_BOUNDARY",
     "PARTY_TYPE_SECRET_REALM_ANCIENT",
     "PARTY_TYPE_SECRET_REALM_VOID_RUINS",
+    "PARTY_TYPE_SECRET_REALM_TIME_FORT",
     "PARTY_TYPE_DEMON_REALM",
     "PARTY_TYPE_PARTY_BOUNDARY",
     "PartyDefinition",

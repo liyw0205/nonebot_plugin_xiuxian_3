@@ -386,6 +386,21 @@ VOID_RUINS_KEEPER_UNSTABLE = EnemyDefinition(
     reward={},
 )
 
+TIME_FORT_KEEPER = EnemyDefinition(
+    key="enemy.time_fort_keeper",
+    label="时序守时者",
+    location_key="void.archive_ruins",
+    required_realm="void_refining",
+    required_layer=1,
+    max_hp=14_000,
+    attack=620,
+    initiative=40,
+    agility=34,
+    skill_key="enemy_skill.time_fort_strike",
+    random_pool="none",
+    reward={},
+)
+
 BOUNDARY_TRIAL_GUARDIAN = EnemyDefinition(
     key="enemy.boundary_trial_guardian",
     label="界壁试炼守卫",
@@ -534,6 +549,7 @@ ENEMIES = {
     VOID_RUINS_SENTINEL_UNSTABLE.key: VOID_RUINS_SENTINEL_UNSTABLE,
     VOID_RUINS_KEEPER.key: VOID_RUINS_KEEPER,
     VOID_RUINS_KEEPER_UNSTABLE.key: VOID_RUINS_KEEPER_UNSTABLE,
+    TIME_FORT_KEEPER.key: TIME_FORT_KEEPER,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
     ARCHIVE_KEEPER.key: ARCHIVE_KEEPER,
     MIST_TRIAL_SENSING.key: MIST_TRIAL_SENSING,

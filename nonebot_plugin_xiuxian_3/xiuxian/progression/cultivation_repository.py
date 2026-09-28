@@ -1114,6 +1114,7 @@ class CultivationRepositoryMixin:
         ignore_boundary_rift_run_id: str | None = None,
         ignore_ancient_domain_run_id: str | None = None,
         ignore_void_ruins_run_id: str | None = None,
+        ignore_time_fort_run_id: str | None = None,
         ignore_ancestral_hall_run_id: str | None = None,
         ignore_tower_run_id: str | None = None,
     ) -> bool:
@@ -1139,6 +1140,7 @@ class CultivationRepositoryMixin:
             ("boundary_rift_members", "status = 'active'"),
             ("ancient_domain_members", "status = 'active'"),
             ("void_ruins_members", "status = 'active'"),
+            ("time_fort_members", "status = 'active'"),
             ("ancestral_hall_runs", "status IN ('routing', 'combat_pending', 'cleared')"),
         )
         for table, predicate in checks:
@@ -1188,6 +1190,19 @@ class CultivationRepositoryMixin:
             elif table == "void_ruins_members":
                 active = connection.execute(
                     "SELECT 1 FROM void_ruins_members m JOIN void_ruins_runs r ON r.run_id=m.run_id "
+                    "WHERE m.player_id=? AND m.status='active' AND r.status IN ('routing','combat_pending','cleared') LIMIT 1",
+                    (player_id,),
+                ).fetchone()
+            elif table == "time_fort_members" and ignore_time_fort_run_id is not None:
+                active = connection.execute(
+                    "SELECT 1 FROM time_fort_members m JOIN time_fort_runs r ON r.run_id=m.run_id "
+                    "WHERE m.player_id=? AND m.status='active' AND r.status IN ('routing','combat_pending','cleared') "
+                    "AND r.run_id<>? LIMIT 1",
+                    (player_id, ignore_time_fort_run_id),
+                ).fetchone()
+            elif table == "time_fort_members":
+                active = connection.execute(
+                    "SELECT 1 FROM time_fort_members m JOIN time_fort_runs r ON r.run_id=m.run_id "
                     "WHERE m.player_id=? AND m.status='active' AND r.status IN ('routing','combat_pending','cleared') LIMIT 1",
                     (player_id,),
                 ).fetchone()

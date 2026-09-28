@@ -37,6 +37,7 @@ from .party_rules import (
     PARTY_TYPE_SECRET_REALM_BOUNDARY,
     PARTY_TYPE_SECRET_REALM_ANCIENT,
     PARTY_TYPE_SECRET_REALM_VOID_RUINS,
+    PARTY_TYPE_SECRET_REALM_TIME_FORT,
     PARTY_TYPE_STANDARD_PVE,
 )
 
@@ -120,6 +121,14 @@ class PartyApplication:
             party_type=PARTY_TYPE_SECRET_REALM_VOID_RUINS,
             title="虚空遗迹秘境队伍",
             invite_hint="一至四名同在虚空档案遗迹、已达炼虚 L1 并携有虚空锚的道友",
+        )
+
+    async def create_time_fort_party(self, context: CommandContext) -> CommandResult:
+        return await self._create_party(
+            context,
+            party_type=PARTY_TYPE_SECRET_REALM_TIME_FORT,
+            title="时序堡垒秘境队伍",
+            invite_hint="一至四名同在虚空档案遗迹、已达炼虚 L1 并持有时序许可的道友",
         )
 
     async def create_demon_party(self, context: CommandContext) -> CommandResult:

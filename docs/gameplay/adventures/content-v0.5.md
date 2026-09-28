@@ -7,7 +7,7 @@
 | 悬赏 | `bounty.void_supply`：虚空补给许可 | 交付普通补给 5；8h；商会名望 +15、灵石 500 |
 | 悬赏 | `bounty.archive_recovery`：档案许可 | 找回档案片段 3；6h；图鉴/故事线索；失败不掉虚空锚 |
 | 秘境 | `instance.secret_realm.void_ruins`：2–5 人专用队伍；全员炼虚 L1、位于 `void.archive_ruins`，并托管 1 枚虚空锚 | 固定 10 节点、队长支付 50 体力；每名成员每 UTC 周 1 次；首通逐成员解锁 `access.void.time_fort`、发现 `codex.void.route_ruins` 并获得 `item.void_crystal` ×1；重复通关每人 `item.void_crystal` ×1 |
-| 秘境 | `instance.secret_realm.time_fort`：时序许可、2–5 人 | 6 节点；时间风暴词缀；首通普通材料/主线旗标 |
+| 秘境 | `instance.secret_realm.time_fort`：2–5 人专用队伍；全员炼虚 L1、位于 `void.archive_ruins` 并持有 `access.void.time_fort` | 固定 6 节点、队长支付 40 体力；每名成员每 UTC 周尝试 1 次；每第 3 战斗回合时间风暴对每名存活成员造成快照最大气血 5% 的不可防御伤害；首通逐成员获得 `item.mat.array_sand` ×2 并写入 `story.mainline.void_archive.time_fort`，重复通关每人 `item.mat.array_sand` ×1 |
 | 主线 | `story.mainline.void_archive` | 记录者/护航者/归乡者三线各 8 关；不给虚力/虚晶/突破资格 |
 | 斗法留影 | `combat.replay.v0.5` | 保留 180 天/5000 场；跨服对局只保留脱敏回放摘要 |
 
@@ -20,3 +20,11 @@
 固定路线为：`ruins_entrance -> fractured_beacon -> void_corridor -> rift_sentinel -> archive_fringe -> unstable_storm -> anchor_field -> archive_keeper -> route_tablet -> exit_gate`。`rift_sentinel` 与 `archive_keeper` 是服务端自动队伍战，其余节点由队长按顺序推进。入场时冻结全队战斗快照、首通状态、规则/内容版本和每名队员当时是否处于 `void_instability`；不稳定成员在两场战斗中使用加强敌人快照，入场后状态变化不会改写本次风险。
 
 通关时对每名成员分别结算：首次完成写入 `access.void.time_fort` 与 `codex.void.route_ruins`，并发放 `item.void_crystal` ×1；后续每周完成只发虚空晶 ×1。战败或 60 分钟超时不退队长体力、不释放成员周额度、不发通关奖励，但返还托管锚；只有明确的系统启动/持久化故障补偿才同时退还队长体力、释放全队周额度并返还托管锚。当前战斗或路线可由任一队员经正式命令续跑；队长独占路线推进权。所有写操作使用 operation ledger，重复 operation 回放原结果；活动关闭后拒绝新建，已开始会话按冻结快照完成或恢复。
+
+### `instance.secret_realm.time_fort` 合同
+
+专用队伍类型为 `secret_realm_time_fort`，必须 2–5 名已确认成员；队长从 `void.archive_ruins` 启动。所有成员均需炼虚 L1、位于该地点并持有 `access.void.time_fort`；任何成员有其他长行动、秘境或战斗资产锁时整队拒绝且零变化。入场事务一次性扣除队长 40 体力，并为每名成员占用当前 UTC 周额度；不托管或消耗虚空锚。会话固定 60 分钟。
+
+固定路线为 `fort_gate -> clock_gallery -> time_storm -> broken_hourglass -> time_keeper -> chronicle_exit`。`time_keeper` 启动一次服务端自动队伍战，其余节点只按路线推进，不发独立奖励。时间风暴是入场时冻结的战斗词缀：自动战每第 3 回合对每名存活成员造成其入场快照最大气血 5% 的直接伤害；该伤害不受防御、护盾或敌方攻击修正影响，并作为独立动作写入战斗回放。自动战不发普通队伍战奖励。
+
+入场时冻结队伍成员、战斗属性/装备/技能、成员首通状态、路线、时间风暴词缀和内容/规则版本。队长独占路线推进权；任一成员可使用正式秘境命令续跑当前路线或结算自动战。首次成功结算逐成员发放 `item.mat.array_sand` ×2 并写入 `story.mainline.void_archive.time_fort`；同一旗标只写一次。每名成员后续每周成功完成固定发放阵砂 ×1；不发虚力、虚空晶、突破资格或整条 `story.mainline.void_archive` 完成证据。失败或 60 分钟超时不退队长体力、不释放成员周额度、不发通关奖励。只有明确的系统启动/持久化故障补偿才退还队长体力并释放全队周额度。所有写操作使用 operation ledger，重复 operation 回放原结果；关闭新建后已开始会话仍按冻结快照完成或恢复。

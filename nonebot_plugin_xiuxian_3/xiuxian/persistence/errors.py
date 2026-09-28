@@ -456,6 +456,30 @@ class VoidRuinsNotReadyError(RuntimeError):
     """The void-ruins route or automatic battle is not ready."""
 
 
+class TimeFortRequirementError(RuntimeError):
+    """The party, time-fort permission, location, or realm requirement is unmet."""
+
+
+class TimeFortBusyError(RuntimeError):
+    """A time-fort member already has a conflicting action or run."""
+
+
+class TimeFortQuotaError(RuntimeError):
+    """A time-fort member already used this UTC week."""
+
+
+class TimeFortNotFoundError(RuntimeError):
+    """No time-fort run exists for the requesting member."""
+
+
+class TimeFortNodeError(RuntimeError):
+    """The selected node is not the next time-fort route step."""
+
+
+class TimeFortNotReadyError(RuntimeError):
+    """The time-fort route or automatic battle is not ready."""
+
+
 class IdleRouteNotFoundError(RuntimeError):
     """The requested idle route is not part of the active content."""
 
