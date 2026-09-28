@@ -29,6 +29,7 @@ from ..adventures.secret_realm_repository import SecretRealmRepositoryMixin
 from ..adventures.demon_abyss_repository import DemonAbyssRepositoryMixin
 from ..adventures.boundary_rift_repository import BoundaryRiftRepositoryMixin
 from ..adventures.ancient_domain_repository import AncientDomainRepositoryMixin
+from ..adventures.ancestral_hall_repository import AncestralHallRepositoryMixin
 from ..adventures.dao_echoes_repository import DaoEchoesRepositoryMixin
 from ..adventures.three_realms_repository import ThreeRealmsRepositoryMixin
 from ..production.repository import ProductionRepositoryMixin
@@ -90,6 +91,7 @@ from .schema import SCHEMA
 from ..adventures.secret_realm_migration import ensure_secret_realm_schema
 from ..adventures.boundary_rift_migration import ensure_boundary_rift_schema
 from ..adventures.ancient_domain_migration import ensure_ancient_domain_schema
+from ..adventures.ancestral_hall_migration import ensure_ancestral_hall_schema
 
 
 class SQLitePlayerRepository(
@@ -110,6 +112,7 @@ class SQLitePlayerRepository(
     DemonAbyssRepositoryMixin,
     BoundaryRiftRepositoryMixin,
     AncientDomainRepositoryMixin,
+    AncestralHallRepositoryMixin,
     DaoEchoesRepositoryMixin,
     ThreeRealmsRepositoryMixin,
     ContractProductionRepositoryMixin,
@@ -265,6 +268,7 @@ class SQLitePlayerRepository(
             ensure_secret_realm_schema(connection)
             ensure_boundary_rift_schema(connection)
             ensure_ancient_domain_schema(connection)
+            ensure_ancestral_hall_schema(connection)
             ensure_idle_schema(connection)
             ensure_dispatch_schema(connection)
             ensure_codex_schema(connection)

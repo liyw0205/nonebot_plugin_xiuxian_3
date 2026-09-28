@@ -1113,6 +1113,7 @@ class CultivationRepositoryMixin:
         ignore_secret_realm_run_id: str | None = None,
         ignore_boundary_rift_run_id: str | None = None,
         ignore_ancient_domain_run_id: str | None = None,
+        ignore_ancestral_hall_run_id: str | None = None,
         ignore_tower_run_id: str | None = None,
     ) -> bool:
         """Return whether a player has any session that locks another action."""
@@ -1136,6 +1137,7 @@ class CultivationRepositoryMixin:
             ("secret_realm_runs", "status IN ('entered', 'routing', 'combat_pending', 'cleared', 'failed')"),
             ("boundary_rift_members", "status = 'active'"),
             ("ancient_domain_members", "status = 'active'"),
+            ("ancestral_hall_runs", "status IN ('routing', 'combat_pending', 'cleared')"),
         )
         for table, predicate in checks:
             if table == "exploration_sessions" and ignore_exploration_id is not None:
@@ -1173,6 +1175,12 @@ class CultivationRepositoryMixin:
                     "SELECT 1 FROM ancient_domain_members m JOIN ancient_domain_runs r ON r.run_id=m.run_id "
                     "WHERE m.player_id=? AND m.status='active' AND r.status IN ('routing','combat_pending','cleared') LIMIT 1",
                     (player_id,),
+                ).fetchone()
+            elif table == "ancestral_hall_runs" and ignore_ancestral_hall_run_id is not None:
+                active = connection.execute(
+                    "SELECT 1 FROM ancestral_hall_runs WHERE player_id=? "
+                    "AND status IN ('routing','combat_pending','cleared') AND run_id<>? LIMIT 1",
+                    (player_id, ignore_ancestral_hall_run_id),
                 ).fetchone()
             elif table == "tower_runs" and ignore_tower_run_id is not None:
                 active = connection.execute(

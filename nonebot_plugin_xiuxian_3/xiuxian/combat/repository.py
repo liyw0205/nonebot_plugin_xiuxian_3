@@ -35,6 +35,7 @@ from .models import (
 from .rules import (
     CONTENT_VERSION,
     BEAST_GUARDIAN,
+    ANCESTRAL_SPIRIT,
     DEMON_OVERLORD,
     DEMON_RUINS_SCOUT,
     DEMON_WAR_FRONT,
@@ -46,6 +47,8 @@ from .rules import (
     V03_RULE_VERSION,
     V031_RULE_VERSION,
     V032_RULE_VERSION,
+    V04_CONTENT_VERSION,
+    V041_RULE_VERSION,
     V02_CONTENT_VERSION,
     V02_RULE_VERSION,
     MIST_ELITE,
@@ -89,6 +92,7 @@ class CombatRepositoryMixin:
         operation_id: str,
         ignore_secret_realm_run_id: str | None = None,
         ignore_tower_run_id: str | None = None,
+        ignore_ancestral_hall_run_id: str | None = None,
     ) -> BattleStartRecord:
         """Create a named quest encounter using the same replayable battle core."""
 
@@ -105,6 +109,7 @@ class CombatRepositoryMixin:
                 None,
                 ignore_secret_realm_run_id,
                 ignore_tower_run_id,
+                ignore_ancestral_hall_run_id,
             )
 
     async def start_demon_war_front_battle(
@@ -244,6 +249,7 @@ class CombatRepositoryMixin:
         exploration_id: str | None = None,
         ignore_secret_realm_run_id: str | None = None,
         ignore_tower_run_id: str | None = None,
+        ignore_ancestral_hall_run_id: str | None = None,
     ) -> BattleStartRecord:
         enemy = enemy_definition(enemy_key)
         v03_enemy_keys = {
@@ -256,13 +262,17 @@ class CombatRepositoryMixin:
         }
         v02_enemy_keys = {MIST_ELITE.key, CLOUD_BOAT_GUARDIAN.key}
         battle_content_version = (
-            V03_CONTENT_VERSION
+            V04_CONTENT_VERSION
+            if enemy.key == ANCESTRAL_SPIRIT.key
+            else V03_CONTENT_VERSION
             if enemy.key in v03_enemy_keys
             else V02_CONTENT_VERSION
             if enemy.key in v02_enemy_keys
             else CONTENT_VERSION
         )
-        if enemy.key in {"enemy.demon_abyss_echo_guardian", "enemy.demon_abyss_heart"}:
+        if enemy.key == ANCESTRAL_SPIRIT.key:
+            battle_rule_version = V041_RULE_VERSION
+        elif enemy.key in {"enemy.demon_abyss_echo_guardian", "enemy.demon_abyss_heart"}:
             battle_rule_version = V032_RULE_VERSION
         elif enemy.key == DEMON_RUINS_SCOUT.key:
             battle_rule_version = V031_RULE_VERSION
@@ -347,6 +357,7 @@ class CombatRepositoryMixin:
                 ignore_exploration_id=exploration_id,
                 ignore_secret_realm_run_id=ignore_secret_realm_run_id,
                 ignore_tower_run_id=ignore_tower_run_id,
+                ignore_ancestral_hall_run_id=ignore_ancestral_hall_run_id,
             ):
                 raise BattleBusyError("another long action is active")
             exploration = None
@@ -542,6 +553,9 @@ class CombatRepositoryMixin:
             sequence = int(session["action_sequence"])
             actions: list[dict[str, object]] = []
             defending = False
+            is_ancestral_spirit = str(enemy.get("key", "")) == ANCESTRAL_SPIRIT.key
+            bloodline_shadow = bool(state.get("bloodline_shadow", False)) if is_ancestral_spirit else False
+            shadow_at_round_start = bloodline_shadow
             player_first = player_goes_first(
                 player_initiative=int(player_stats["initiative"]),
                 enemy_initiative=int(enemy["initiative"]),
@@ -552,7 +566,22 @@ class CombatRepositoryMixin:
             reason = ""
             for actor in actor_order:
                 phase = phase_for_hp(enemy_hp, int(enemy["max_hp"])) if is_tribulation_trial else None
-                if actor == "player" and timeout:
+                if actor == "player" and bloodline_shadow and not timeout:
+                    action = {
+                        "battle_id": battle_id,
+                        "sequence_no": sequence + 1,
+                        "actor_key": "player",
+                        "strategy_key": "strategy.ancestral_spirit.clear_shadow.v0.4.1",
+                        "skill_key": "skill.ancestral_spirit.shadow_clear",
+                        "target_key": "bloodline_shadow",
+                        "hit_roll_bp": 0,
+                        "crit_roll_bp": 0,
+                        "hit_bp": 10_000,
+                        "damage": 0,
+                        "operation_id": operation_id,
+                    }
+                    bloodline_shadow = False
+                elif actor == "player" and timeout:
                     action = self._defend_action(
                         battle_id=battle_id,
                         round_no=expected_round,
@@ -605,6 +634,21 @@ class CombatRepositoryMixin:
                             ) if base_damage > 0 else 0,
                         )
                     enemy_hp = max(0, enemy_hp - int(action["damage"]))
+                elif actor == "enemy" and is_ancestral_spirit and expected_round % 4 == 0 and not bloodline_shadow:
+                    action = {
+                        "battle_id": battle_id,
+                        "sequence_no": sequence + 1,
+                        "actor_key": "enemy",
+                        "strategy_key": "strategy.ancestral_spirit.bloodline_call.v0.4.1",
+                        "skill_key": "skill.beast.ancestral_form",
+                        "target_key": "bloodline_shadow",
+                        "hit_roll_bp": 0,
+                        "crit_roll_bp": 0,
+                        "hit_bp": 10_000,
+                        "damage": 0,
+                        "operation_id": operation_id,
+                    }
+                    bloodline_shadow = True
                 else:
                     if actor == "enemy" and is_tribulation_trial:
                         phase = phase_for_hp(enemy_hp, int(enemy["max_hp"]))
@@ -617,6 +661,8 @@ class CombatRepositoryMixin:
                         strategy_key=(
                             "strategy.tribulation_phase.v0.6"
                             if phase is not None
+                            else "strategy.ancestral_spirit.v0.4.1"
+                            if is_ancestral_spirit
                             else "strategy.training_dummy.v0.1"
                         ),
                         attacker_attack=phase.attack if phase is not None else int(enemy["attack"]),
@@ -632,6 +678,8 @@ class CombatRepositoryMixin:
                     player_hp = max(0, player_hp - int(action["damage"]))
                 sequence += 1
                 action["state"] = {"player_hp": player_hp, "enemy_hp": enemy_hp}
+                if is_ancestral_spirit:
+                    action["state"]["bloodline_shadow"] = bloodline_shadow
                 if phase is not None:
                     action["state"].update(
                         {
@@ -647,6 +695,31 @@ class CombatRepositoryMixin:
                 if player_hp <= 0:
                     outcome, reason = "lost", "player_defeated"
                     break
+            if is_ancestral_spirit and shadow_at_round_start and timeout and bloodline_shadow:
+                recovery = max(1, int(enemy["max_hp"]) * 500 // 10_000)
+                enemy_hp = min(int(enemy["max_hp"]), enemy_hp + recovery)
+                bloodline_shadow = False
+                sequence += 1
+                recovery_action = {
+                    "battle_id": battle_id,
+                    "sequence_no": sequence,
+                    "actor_key": "enemy",
+                    "strategy_key": "strategy.ancestral_spirit.bloodline_recovery.v0.4.1",
+                    "skill_key": "skill.beast.ancestral_form",
+                    "target_key": "enemy",
+                    "hit_roll_bp": 0,
+                    "crit_roll_bp": 0,
+                    "hit_bp": 10_000,
+                    "damage": 0,
+                    "state": {
+                        "player_hp": player_hp,
+                        "enemy_hp": enemy_hp,
+                        "bloodline_shadow": False,
+                        "recovery": recovery,
+                    },
+                    "operation_id": operation_id,
+                }
+                actions.append(recovery_action)
             if outcome is None and timeout_count >= 3:
                 outcome, reason = "lost", "three_turn_timeouts"
             if outcome is None and expected_round >= MAX_TURNS:
@@ -685,6 +758,8 @@ class CombatRepositoryMixin:
                 "enemy_hp": enemy_hp,
                 "timeout_count": timeout_count,
             }
+            if is_ancestral_spirit:
+                state["bloodline_shadow"] = bloodline_shadow
             if is_tribulation_trial:
                 state.update(
                     {

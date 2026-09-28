@@ -2,7 +2,7 @@
 
 本域把已有的悬赏、秘境与战斗日志正规化，并新增主线关卡。它复用探索/战斗域的快照与结算，不复制第二套战斗引擎。
 
-当前开放草药补给、训练傀儡、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天，以及已接入的主线关卡。`instance.secret_realm.ancestral_hall` 的 v0.4 合同已闭合，运行时待接入；斗法记录分享和其他尚未闭合的秘境仍保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
+当前开放草药补给、训练傀儡、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿，以及已接入的主线关卡。祖灵殿有独立仓储、准入、五节点路线、守灵自动战、过期恢复和系统补偿；专项 QQ 官方/OneBot V11 与混合身份测试见 `test/test_ancestral_hall_secret_realm_v04.py`。斗法记录分享和其他尚未闭合的秘境仍保持锁定。世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，以及 v0.3 的
 `bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
@@ -38,6 +38,8 @@ SQLite 角色记录保持隔离。
 QQ 官方与 OneBot V11 双方向混合队伍验收见 `test/test_boundary_rift_secret_realm_v03.py`。
 
 魔界深渊秘境使用专用 `DemonAbyssRepositoryMixin` 事务，不把路线、风险、首通奖励和恢复逻辑塞入通用秘境仓储。命令为 `进入秘境 魔界深渊`、`选择秘境节点 深渊门|污染渗流|残响守卫|深渊之心` 和 `结算秘境`；要求筑基 L1、魔界深渊门地点、门禁旗标与魔界声望 200，每 UTC 周一次、入场扣 20 体力，运行 60 分钟。节点顺序、自动战、污染风险、失败/过期成本、首通/重复奖励及系统中止补偿按[v0.3 冒险内容合同](content-v0.3.md#instancesecret_realmdemon_abyss-合同)执行。战斗使用 `combat-0.3.2`，适配器覆盖 QQ 官方、OneBot V11 及 QQ→OneBot 重启续跑，详见 `test/test_demon_abyss_secret_realm_v03.py`。
+
+祖灵殿秘境使用独立 `AncestralHallRepositoryMixin` 与 `ancestral_hall_runs` 表，不把领域事务挤入通用秘境仓储。命令为 `进入秘境 祖灵殿`、`选择秘境节点 祖灵门|誓言石阵|血脉回廊|祖灵守灵|始祖祭坛` 和 `结算秘境`；入口检查化神 L1、祖灵湖、妖界声望 3000、血脉稳定 5000 bp，单人消耗 25 体力，每 UTC 周尝试一次，60 分钟过期。首次完成只写 `story.ancestral_hall`，没有资产奖励；守灵自动战按 `combat-0.4.1` 持久化召影、自动清影和超时恢复。QQ 官方、OneBot V11 及两个身份切换方向、补偿、过期和重启续战见 `test/test_ancestral_hall_secret_realm_v04.py`。
 
 v0.2 秘境合同：`instance.secret_realm.mist_depth_2` 要求金丹 L1、`cave.mist_grotto_2` 和 `item.cave_pass_advanced`，
 路线为 `resource -> encounter -> choice -> encounter -> choice`，首通创建 `item.weapon.cloud_sword` 装备实例；

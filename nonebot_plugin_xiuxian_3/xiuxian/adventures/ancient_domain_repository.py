@@ -474,6 +474,12 @@ class AncientDomainRepositoryMixin:
             ancient = self._latest_ancient_domain_for_actor(connection, int(player["id"]))
             if ancient is None:
                 return False
+            ancestral = connection.execute(
+                "SELECT starts_at FROM ancestral_hall_runs WHERE player_id=? ORDER BY id DESC LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            if ancestral is not None and str(ancestral["starts_at"]) > str(ancient["starts_at"]):
+                return False
             ordinary = connection.execute(
                 "SELECT run_id, created_at FROM secret_realm_runs WHERE player_id=? ORDER BY id DESC LIMIT 1",
                 (player["id"],),

@@ -408,6 +408,30 @@ class ResourceInsufficientError(RuntimeError):
     """A player does not have enough of a spendable resource."""
 
 
+class AncestralHallRequirementError(RuntimeError):
+    """The player lacks a location, realm, reputation, or bloodline requirement."""
+
+
+class AncestralHallBusyError(RuntimeError):
+    """The player already has an action or ancestral-hall run in progress."""
+
+
+class AncestralHallQuotaError(RuntimeError):
+    """The player already attempted the ancestral hall this UTC week."""
+
+
+class AncestralHallNotFoundError(RuntimeError):
+    """The player has no ancestral-hall run to operate on."""
+
+
+class AncestralHallNodeError(RuntimeError):
+    """The selected ancestral-hall node is not the next route step."""
+
+
+class AncestralHallNotReadyError(RuntimeError):
+    """The ancestral-hall route or combat is not ready to advance or settle."""
+
+
 class IdleRouteNotFoundError(RuntimeError):
     """The requested idle route is not part of the active content."""
 
