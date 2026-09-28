@@ -583,12 +583,11 @@ def _void_spire_enemy(key: str, *, content: ContentBundle | None = None) -> Enem
 
 
 _VOID_SPIRE_CONTENT = bundled_content()
-VOID_SPIRE_SCOUT = _void_spire_enemy("enemy.void_spire.scout")
-VOID_SPIRE_SENTINEL = _void_spire_enemy("enemy.void_spire.sentinel")
-VOID_SPIRE_WATCHER = _void_spire_enemy("enemy.void_spire.watcher")
-VOID_SPIRE_WARLORD = _void_spire_enemy("enemy.void_spire.warlord")
-VOID_SPIRE_STORM_BOSS = _void_spire_enemy("enemy.void_spire.route_storm_boss")
-VOID_SPIRE_ECHO_BOSS = _void_spire_enemy("enemy.void_spire.route_echo_boss")
+_VOID_SPIRE_ENEMIES = {
+    str(row["key"]): _void_spire_enemy(str(row["key"]))
+    for row in _VOID_SPIRE_CONTENT.list("enemy", include_locked=False)
+    if str(row["key"]).startswith("enemy.void_spire.")
+}
 
 ENEMIES = {
     TRAINING_DUMMY.key: TRAINING_DUMMY,
@@ -625,13 +624,8 @@ ENEMIES = {
     MIST_TRIAL_FOUNDATION_BOSS.key: MIST_TRIAL_FOUNDATION_BOSS,
     MIST_TRIAL_GOLDEN_CORE.key: MIST_TRIAL_GOLDEN_CORE,
     MIST_TRIAL_GOLDEN_CORE_BOSS.key: MIST_TRIAL_GOLDEN_CORE_BOSS,
-    VOID_SPIRE_SCOUT.key: VOID_SPIRE_SCOUT,
-    VOID_SPIRE_SENTINEL.key: VOID_SPIRE_SENTINEL,
-    VOID_SPIRE_WATCHER.key: VOID_SPIRE_WATCHER,
-    VOID_SPIRE_WARLORD.key: VOID_SPIRE_WARLORD,
-    VOID_SPIRE_STORM_BOSS.key: VOID_SPIRE_STORM_BOSS,
-    VOID_SPIRE_ECHO_BOSS.key: VOID_SPIRE_ECHO_BOSS,
 }
+ENEMIES.update(_VOID_SPIRE_ENEMIES)
 
 _THREE_REALMS_TOWER_FACTIONS = {
     "xuantian": "玄天",

@@ -29,6 +29,7 @@ from .dispatch_models import (
 from .dispatch_rules import (
     CANCEL_WINDOW_SECONDS,
     CONTENT_VERSION,
+    DAO_SERVICE,
     DISPATCHES,
     HERB_SEARCH,
     RULE_VERSION,
@@ -84,6 +85,15 @@ class DispatchRepositoryMixin:
             flags = {str(value) for value in intro.get("flags", [])}
             if "guide.choose_service" not in flags:
                 missing.append("需要完成任一教学服务")
+        if definition.key == DAO_SERVICE:
+            reputation = connection.execute(
+                "SELECT service_reputation FROM player_reputations WHERE player_id=?", (player["id"],)
+            ).fetchone()
+            service = int(reputation["service_reputation"]) if reputation else 0
+            if service < 80 and not self._meets_realm_values(
+                str(player["realm_key"]), int(player["realm_layer"]), "dao_union", 1
+            ):
+                missing.append("需要合道一层或通用服务信誉 80")
         if definition.required_permit and self._active_dispatch_permit(
             connection, int(player["id"]), definition.required_permit, now
         ) is None:

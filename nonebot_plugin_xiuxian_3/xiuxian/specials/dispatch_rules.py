@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
+from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version, module_versions
 
 import hashlib
 from dataclasses import dataclass
@@ -34,6 +34,8 @@ HERB_SEARCH = "dispatch.herb_search"
 WORKSHOP_HELP = "dispatch.workshop_help"
 DEMON_RELIEF = "dispatch.demon_relief"
 BEAST_RELOCATION = "dispatch.beast_relocation"
+DAO_SERVICE = "dispatch.dao_service"
+DAO_SERVICE_VERSIONS = module_versions(f"{__name__}.dao_service")
 
 DISPATCHES: dict[str, DispatchDefinition] = {
     TOWN_DELIVERY: DispatchDefinition(
@@ -94,6 +96,18 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         content_version="content-0.3",
         rule_version="specials-0.3.0",
     ),
+    DAO_SERVICE: DispatchDefinition(
+        key=DAO_SERVICE,
+        label="道统服务",
+        duration_seconds=8 * 60 * 60,
+        daily_limit=2,
+        costs=(("stamina", 6), ("energy", 4)),
+        risk_pool="dispatch.dao_service",
+        risk_weights=(("success", 8500), ("partial", 1000), ("failed", 500)),
+        requirement="dao_union_or_service_reputation_80",
+        content_version=DAO_SERVICE_VERSIONS[0],
+        rule_version=DAO_SERVICE_VERSIONS[1],
+    ),
 }
 
 ALIASES = {
@@ -102,6 +116,7 @@ ALIASES = {
     "作坊帮工": WORKSHOP_HELP,
     "魔界救援": DEMON_RELIEF,
     "妖界迁徙": BEAST_RELOCATION,
+    "道统服务": DAO_SERVICE,
 }
 
 
@@ -166,6 +181,15 @@ def reward_for(definition: DispatchDefinition, seed: str, outcome: str) -> dict[
             return {local_key: 3}
         clue_key = "codex.story.dispatch_demon_relief" if definition.key == DEMON_RELIEF else "codex.story.dispatch_beast_relocation"
         return {local_key: 6, clue_key: 1}
+    if definition.key == DAO_SERVICE:
+        if outcome == "partial":
+            return {"local.dao_service": 4}
+        return {
+            "local.dao_service": 8,
+            "service_reputation": 4,
+            "codex.dao.service_origin": 1,
+            "codex.story.dao_service_origin": 1,
+        }
     raise ValueError(f"unsupported dispatch reward: {definition.key}")
 
 
@@ -175,6 +199,7 @@ __all__ = [
     "CANCEL_WINDOW_SECONDS",
     "CONTENT_VERSION",
     "DISPATCHES",
+    "DAO_SERVICE",
     "DEMON_RELIEF",
     "HERB_SEARCH",
     "RULE_VERSION",

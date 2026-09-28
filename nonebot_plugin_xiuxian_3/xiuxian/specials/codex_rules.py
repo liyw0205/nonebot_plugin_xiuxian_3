@@ -49,6 +49,7 @@ _ENTRY_LABELS = {
     "codex.domain.ancient_domain": ("challenge", "远古洞天秘境"),
     "codex.void.route_ruins": ("route", "虚空遗迹航道"),
     "codex.dao.service_origin": ("service", "道源服务篇章"),
+    "codex.story.dao_service_origin": ("story", "道统服务缘起"),
     "codex.challenge.mist_trial.floor_5": ("challenge", "雾隐试炼塔五层"),
     "codex.challenge.mist_trial.floor_10": ("challenge", "雾隐试炼塔十层"),
     "codex.story.dispatch_demon_relief": ("story", "魔界救援线索"),
@@ -65,13 +66,17 @@ for _floor_no in range(1, 41):
         f"codex.challenge.three_realms.floor_{_floor_no}",
         ("challenge", f"三界塔第 {_floor_no} 层"),
     )
-for _floor_no in range(1, 31):
+for _floor_no in range(1, 61):
     _ENTRY_LABELS.setdefault(
         f"codex.challenge.void_spire.floor_{_floor_no}",
         ("challenge", f"虚空塔第 {_floor_no} 层"),
     )
 _ENTRY_LABELS.setdefault("codex.void.route_spire_storm", ("route", "虚空塔风暴路线"))
 _ENTRY_LABELS.setdefault("codex.void.route_spire_echo", ("route", "虚空塔回响路线"))
+_ENTRY_LABELS.setdefault("codex.void.route_spire_inscription", ("route", "虚空塔碑铭路线"))
+_ENTRY_LABELS.setdefault("codex.void.route_spire_witness", ("route", "虚空塔见证路线"))
+_ENTRY_LABELS.setdefault("codex.story.void_spire.inscription", ("story", "虚空碑铭记录"))
+_ENTRY_LABELS.setdefault("codex.story.void_spire.witness", ("story", "虚空见证记录"))
 for _faction, _label in (("xuantian", "玄天"), ("demon", "魔界"), ("beast", "妖界")):
     _ENTRY_LABELS.setdefault(
         f"codex.story.three_realms.faction_{_faction}",

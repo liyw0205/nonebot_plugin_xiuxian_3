@@ -4,7 +4,7 @@ import asyncio
 import json
 import sqlite3
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from shutil import copytree
 from tempfile import TemporaryDirectory
@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import ENEMIES, enemy_definition
+from nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_rules import DAO_SERVICE, DISPATCHES, choose_outcome
 from nonebot_plugin_xiuxian_3.xiuxian.specials.void_spire_rules import (
     DESIGN_MAX_FLOOR,
     MAX_FLOOR,
@@ -51,6 +52,24 @@ async def _setup(runtime, adapter: str, user: str, prefix: str) -> None:
         )
 
 
+def _seed_claimed_floors(connection: sqlite3.Connection, player_id: int, start: int, stop: int) -> None:
+    history = "2026-01-01T00:00:00+00:00"
+    connection.executemany(
+        "INSERT INTO void_spire_runs(run_id,player_id,tower_key,floor_no,route_key,"
+        "status,first_clear,starts_at,result_json,reward_json,content_version,rule_version,"
+        "created_at,updated_at) VALUES(?,?,'tower.void_spire',?,?,'claimed',1,"
+        "?,'{}','{}',?,?,?,?)",
+        [
+            (
+                f"seed-{player_id}-{floor_no}", player_id, floor_no,
+                floor_definition(floor_no).route_key, history,
+                *versions_for_floor(floor_no), history, history,
+            )
+            for floor_no in range(start, stop + 1)
+        ],
+    )
+
+
 def test_void_spire_first_slice_works_on_qq_and_onebot() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
@@ -67,7 +86,7 @@ def test_void_spire_first_slice_works_on_qq_and_onebot() -> None:
                 assert preview.data["highest_floor"] == 0
                 assert preview.data["weekly_limit"] == 2
 
-                invalid = await _send(runtime, adapter, user, f"{prefix}-invalid", "挑战虚空塔 31")
+                invalid = await _send(runtime, adapter, user, f"{prefix}-invalid", "挑战虚空塔 61")
                 assert invalid.code == "INVALID_VOID_SPIRE_COMMAND"
 
                 first = await _send(runtime, adapter, user, f"{prefix}-first", "挑战虚空塔 1")
@@ -113,12 +132,18 @@ def test_void_spire_first_slice_works_on_qq_and_onebot() -> None:
 
 
 def test_void_spire_rules_and_content_records_are_stable() -> None:
-    assert MAX_FLOOR == 30
+    assert MAX_FLOOR == 60
     assert DESIGN_MAX_FLOOR == 90
     assert floor_definition(15).boss is True
     assert floor_definition(15).route_key == "storm"
     assert floor_definition(30).boss is True
     assert floor_definition(30).route_key == "echo"
+    assert floor_definition(45).boss is True
+    assert floor_definition(45).route_key == "inscription"
+    assert floor_definition(60).boss is True
+    assert floor_definition(60).route_key == "witness"
+    assert floor_definition(31).weekly_limit == 1
+    assert versions_for_floor(30) != versions_for_floor(31)
     with open("data/战斗/敌人.json", encoding="utf-8") as handle:
         records = {row["key"]: row for row in json.load(handle)["records"]}
     expected = {
@@ -128,6 +153,12 @@ def test_void_spire_rules_and_content_records_are_stable() -> None:
         "enemy.void_spire.warlord",
         "enemy.void_spire.route_storm_boss",
         "enemy.void_spire.route_echo_boss",
+        "enemy.void_spire.scribe",
+        "enemy.void_spire.keeper",
+        "enemy.void_spire.route_inscription_boss",
+        "enemy.void_spire.echo_warden",
+        "enemy.void_spire.origin_guard",
+        "enemy.void_spire.route_witness_boss",
     }
     assert expected <= records.keys()
     for key in expected:
@@ -335,6 +366,373 @@ def test_void_spire_enemy_uses_host_content_override(tmp_path: Path) -> None:
                 "SELECT snapshot_json FROM battle_sessions WHERE battle_id=?", (challenge.data["battle_id"],)
             ).fetchone()[0]
             assert json.loads(snapshot)["enemy"]["max_hp"] == 125
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_spire_upper_floors_have_independent_weekly_quota_on_both_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
+            for adapter, user in (("qq.official", "upper-qq"), ("onebot.v11", "upper-onebot")):
+                await _setup(runtime, adapter, user, user)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                    ).fetchone()[0]
+                    _seed_claimed_floors(connection, player_id, 1, 30)
+                    connection.execute(
+                        "UPDATE players SET realm_key='dao_union',realm_layer=1,stamina=200,stamina_max=200,"
+                        "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
+                        (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                    )
+                preview = await _send(runtime, adapter, user, f"{user}-preview", "虚空塔")
+                assert (preview.data["next_floor"], preview.data["weekly_used"], preview.data["weekly_limit"]) == (31, 0, 1)
+                lower = await _send(runtime, adapter, user, f"{user}-lower-1", "挑战虚空塔 30")
+                assert lower.data["outcome"] == "won"
+                assert (await _send(runtime, adapter, user, f"{user}-lower-claim-1", "领取虚空塔奖励")).ok
+
+                upper = await _send(runtime, adapter, user, f"{user}-upper-31", "挑战虚空塔 31")
+                assert upper.code == "VOID_SPIRE_CHALLENGE_SETTLED"
+                assert upper.data["status"] == "reward_pending"
+                assert upper.data["reward"] == {}
+                claim = await _send(runtime, adapter, user, f"{user}-upper-claim", "领取虚空塔奖励")
+                assert claim.code == "VOID_SPIRE_REWARD_CLAIMED"
+                assert set(claim.data["discoveries"]) == {
+                    "codex.void.route_spire_inscription", "codex.challenge.void_spire.floor_31",
+                }
+                assert claim.data["title"] is None
+                replay = await _send(runtime, adapter, user, f"{user}-upper-claim", "领取虚空塔奖励")
+                assert replay.data["idempotent_replay"] is True
+                assert replay.data["discoveries"] == claim.data["discoveries"]
+                capped = await _send(runtime, adapter, user, f"{user}-upper-32", "挑战虚空塔 32")
+                assert capped.code == "VOID_SPIRE_WEEKLY_LIMIT"
+
+                second_lower = await _send(runtime, adapter, user, f"{user}-lower-2", "挑战虚空塔 30")
+                assert second_lower.data["outcome"] == "won"
+                assert (await _send(runtime, adapter, user, f"{user}-lower-claim-2", "领取虚空塔奖励")).ok
+                assert (await _send(runtime, adapter, user, f"{user}-lower-3", "挑战虚空塔 30")).code == "VOID_SPIRE_WEEKLY_LIMIT"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    battle = connection.execute(
+                        "SELECT b.snapshot_json,b.reward_status,t.content_version,t.rule_version "
+                        "FROM battle_sessions b JOIN void_spire_runs t ON t.battle_id=b.battle_id "
+                        "WHERE t.run_id=?", (upper.data["run_id"],)
+                    ).fetchone()
+                    assert json.loads(battle[0])["enemy"]["key"] == floor_definition(31).enemy_key
+                    assert battle[1] == "none"
+                    assert tuple(battle[2:]) == versions_for_floor(31)
+                    assert connection.execute(
+                        "SELECT stamina FROM players WHERE id=?", (player_id,)
+                    ).fetchone()[0] == 140
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_spire_upper_reputation_gate_boss_stories_and_display_title() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
+            for floor_no, adapter in ((31, "qq.official"), (45, "onebot.v11"), (60, "qq.official")):
+                user = f"high-{floor_no}"
+                await _setup(runtime, adapter, user, user)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                    ).fetchone()[0]
+                    _seed_claimed_floors(connection, player_id, 1, floor_no - 1)
+                    connection.execute(
+                        "UPDATE players SET max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
+                        (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                    )
+                    connection.execute(
+                        "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) "
+                        "VALUES(?,?,100,?)",
+                        (player_id, json.dumps({"local.dao_service": 699}), "2026-01-01T00:00:00+00:00"),
+                    )
+                denied = await _send(runtime, adapter, user, f"{user}-denied", f"挑战虚空塔 {floor_no}")
+                assert denied.code == "VOID_SPIRE_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE player_reputations SET local_json=? WHERE player_id=?",
+                        (json.dumps({"local.dao_service": 700}), player_id),
+                    )
+                challenge = await _send(runtime, adapter, user, f"{user}-challenge", f"挑战虚空塔 {floor_no}")
+                assert challenge.data["outcome"] == "won"
+                assert challenge.data["route_key"] == floor_definition(floor_no).route_key
+                assert challenge.data["reward"] == {}
+                claim = await _send(runtime, adapter, user, f"{user}-claim", "领取虚空塔奖励")
+                assert claim.data["reward"] == {}
+                assert f"codex.challenge.void_spire.floor_{floor_no}" in claim.data["discoveries"]
+                if floor_no in (45, 60):
+                    assert f"codex.story.void_spire.{floor_definition(floor_no).route_key}" in claim.data["discoveries"]
+                if floor_no == 60:
+                    assert claim.data["title"] == "虚空见证者"
+                    honors = await _send(runtime, adapter, user, f"{user}-honors", "功业录")
+                    assert next(
+                        item for item in honors.data["titles"]
+                        if item["title_key"] == "title.void_spire.witness"
+                    )["acquired"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM codex_entries WHERE player_id=? AND entry_key=?",
+                        (player_id, f"codex.challenge.void_spire.floor_{floor_no}"),
+                    ).fetchone()[0] == 1
+                    snapshot_json, reward_status, content_version, rule_version = connection.execute(
+                        "SELECT b.snapshot_json,b.reward_status,t.content_version,t.rule_version "
+                        "FROM battle_sessions b JOIN void_spire_runs t ON t.battle_id=b.battle_id "
+                        "WHERE t.run_id=?", (challenge.data["run_id"],)
+                    ).fetchone()
+                    assert json.loads(snapshot_json)["enemy"]["key"] == floor_definition(floor_no).enemy_key
+                    assert reward_status == "none"
+                    assert (content_version, rule_version) == versions_for_floor(floor_no)
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_spire_upgrade_preserves_legacy_claims_and_operation_replays() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
+            await _setup(runtime, "qq.official", "legacy", "legacy")
+            first = await _send(runtime, "qq.official", "legacy", "legacy-start", "挑战虚空塔 1")
+            claim = await _send(runtime, "qq.official", "legacy", "legacy-claim", "领取虚空塔奖励")
+            assert first.ok and claim.ok
+            database_path = runtime.settings.database_path
+            await runtime.close()
+
+            with sqlite3.connect(database_path) as connection:
+                connection.execute("PRAGMA foreign_keys = OFF")
+                schema = connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='void_spire_runs'"
+                ).fetchone()[0]
+                legacy_schema = schema.replace("void_spire_runs (", "void_spire_runs_v01 (", 1)
+                legacy_schema = legacy_schema.replace("BETWEEN 1 AND 60", "BETWEEN 1 AND 30")
+                connection.execute(legacy_schema)
+                connection.execute("INSERT INTO void_spire_runs_v01 SELECT * FROM void_spire_runs")
+                connection.execute("DROP TABLE void_spire_runs")
+                connection.execute("ALTER TABLE void_spire_runs_v01 RENAME TO void_spire_runs")
+                assert "BETWEEN 1 AND 30" in connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='void_spire_runs'"
+                ).fetchone()[0]
+
+            reopened = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
+            preview = await _send(reopened, "qq.official", "legacy", "legacy-preview", "虚空塔")
+            assert preview.code == "VOID_SPIRE_PREVIEW"
+            start_replay = await _send(reopened, "qq.official", "legacy", "legacy-start", "挑战虚空塔 1")
+            claim_replay = await _send(reopened, "qq.official", "legacy", "legacy-claim", "领取虚空塔奖励")
+            assert start_replay.data["idempotent_replay"] is True
+            assert claim_replay.data["idempotent_replay"] is True
+            assert claim_replay.data["reward"] == claim.data["reward"]
+            assert "codex.challenge.void_spire.floor_1" in claim_replay.data["discoveries"]
+            with sqlite3.connect(database_path) as connection:
+                connection.execute("PRAGMA foreign_keys = ON")
+                assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+                assert "BETWEEN 1 AND 60" in connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='void_spire_runs'"
+                ).fetchone()[0]
+                assert connection.execute("SELECT COUNT(*) FROM void_spire_reward_claims").fetchone()[0] == 1
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform_user_id='legacy'"
+                ).fetchone()[0]
+                _seed_claimed_floors(connection, player_id, 2, 30)
+                connection.execute(
+                    "UPDATE players SET realm_key='dao_union',realm_layer=1,stamina=100,"
+                    "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
+                    (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                )
+            upper = await _send(reopened, "qq.official", "legacy", "new-upper", "挑战虚空塔 31")
+            assert upper.code == "VOID_SPIRE_CHALLENGE_SETTLED" and upper.data["outcome"] == "won"
+            await reopened.close()
+
+    asyncio.run(run())
+
+
+def test_dao_service_dispatch_produces_upper_floor_admission_on_both_adapters(monkeypatch) -> None:
+    async def run() -> None:
+        now = [datetime(2026, 9, 29, tzinfo=timezone.utc)]
+        successful = (
+            f"{seed:032x}" for seed in range(100)
+            if choose_outcome(DISPATCHES[DAO_SERVICE], f"{seed:032x}") == "success"
+        )
+        uuid_values = iter(
+            (next(successful), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+             next(successful), "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        )
+        monkeypatch.setattr(
+            "nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_repository.uuid4",
+            lambda: SimpleNamespace(hex=next(uuid_values)),
+        )
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: now[0])
+            for adapter, user in (("qq.official", "service-qq"), ("onebot.v11", "service-onebot")):
+                await _setup(runtime, adapter, user, user)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                    ).fetchone()[0]
+                    _seed_claimed_floors(connection, player_id, 1, 30)
+                    connection.execute(
+                        "UPDATE players SET max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
+                        (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                    )
+                    connection.execute(
+                        "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) "
+                        "VALUES(?,?,80,?)",
+                        (player_id, json.dumps({"local.dao_service": 696}), now[0].isoformat()),
+                    )
+                before = await _send(runtime, adapter, user, f"{user}-before", "挑战虚空塔 31")
+                assert before.code == "VOID_SPIRE_REQUIREMENT_MISSING"
+                preview = await _send(runtime, adapter, user, f"{user}-dispatch-preview", "派遣预览 道统服务")
+                assert preview.data["dispatches"][0]["ready"] is True
+                accepted = await _send(runtime, adapter, user, f"{user}-accept", "接受派遣 道统服务")
+                assert accepted.code == "DISPATCH_ACCEPTED"
+                assert accepted.data["outcome"] == "success"
+                now[0] += timedelta(hours=8, seconds=1)
+                settled = await _send(runtime, adapter, user, f"{user}-settle", "结算派遣")
+                assert settled.code == "DISPATCH_SETTLED"
+                assert settled.data["reward"]["local.dao_service"] == 8
+                replay = await _send(runtime, adapter, user, f"{user}-settle", "结算派遣")
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    local_json, service = connection.execute(
+                        "SELECT local_json,service_reputation FROM player_reputations WHERE player_id=?",
+                        (player_id,),
+                    ).fetchone()
+                    assert json.loads(local_json)["local.dao_service"] == 704
+                    assert service == 84
+                upper = await _send(runtime, adapter, user, f"{user}-upper", "挑战虚空塔 31")
+                assert upper.code == "VOID_SPIRE_CHALLENGE_SETTLED" and upper.data["outcome"] == "won"
+                assert (await _send(runtime, adapter, user, f"{user}-claim", "领取虚空塔奖励")).ok
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_spire_upper_start_failure_and_restart_keep_quota_and_stamina(monkeypatch) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = lambda: datetime(2026, 9, 29, tzinfo=timezone.utc)
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            adapter, user = "onebot.v11", "upper-recovery"
+            await _setup(runtime, adapter, user, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                ).fetchone()[0]
+                _seed_claimed_floors(connection, player_id, 1, 30)
+                connection.execute(
+                    "UPDATE players SET realm_key='dao_union',realm_layer=1,"
+                    "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
+                    (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                )
+
+            original = runtime.repository.start_quest_battle
+
+            async def fail_start(**kwargs):
+                raise RuntimeError("battle unavailable")
+
+            monkeypatch.setattr(runtime.repository, "start_quest_battle", fail_start)
+            failed = await _send(runtime, adapter, user, "upper-failed", "挑战虚空塔 31")
+            assert failed.code == "VOID_SPIRE_START_FAILED"
+            assert (await _send(runtime, adapter, user, "upper-failed", "挑战虚空塔 31")).code == failed.code
+            assert (await _send(runtime, adapter, user, "upper-preview", "虚空塔")).data["weekly_used"] == 0
+            monkeypatch.setattr(runtime.repository, "start_quest_battle", original)
+
+            async def keep_running(**kwargs):
+                return SimpleNamespace(status="running")
+
+            monkeypatch.setattr(runtime.repository, "run_battle_turn", keep_running)
+            pending = await _send(runtime, adapter, user, "upper-pending", "挑战虚空塔 31")
+            assert pending.code == "VOID_SPIRE_NOT_READY"
+            await runtime.close()
+
+            restarted = create_runtime(data_dir=data_dir, clock=clock)
+            resolved = await _send(restarted, adapter, user, "upper-pending", "挑战虚空塔 31")
+            assert resolved.code == "VOID_SPIRE_CHALLENGE_SETTLED"
+            assert resolved.data["status"] == "reward_pending"
+            assert (await _send(restarted, adapter, user, "upper-claim", "领取虚空塔奖励")).ok
+            assert (await _send(restarted, adapter, user, "upper-capped", "挑战虚空塔 31")).code == "VOID_SPIRE_WEEKLY_LIMIT"
+            with sqlite3.connect(restarted.settings.database_path) as connection:
+                statuses = connection.execute(
+                    "SELECT status FROM void_spire_runs WHERE player_id=? AND floor_no=31 ORDER BY id",
+                    (player_id,),
+                ).fetchall()
+                assert statuses == [("aborted",), ("claimed",)]
+                assert connection.execute(
+                    "SELECT stamina FROM players WHERE id=?", (player_id,)
+                ).fetchone()[0] == 80
+            await restarted.close()
+
+    asyncio.run(run())
+
+
+def test_void_spire_upper_concurrent_requests_take_only_one_quota_slot() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
+            adapter, user = "onebot.v11", "upper-concurrent"
+            await _setup(runtime, adapter, user, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+                ).fetchone()[0]
+                _seed_claimed_floors(connection, player_id, 1, 30)
+                connection.execute(
+                    "UPDATE players SET realm_key='dao_union',realm_layer=1,"
+                    "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
+                    (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                )
+            results = await asyncio.gather(
+                _send(runtime, adapter, user, "upper-concurrent-1", "挑战虚空塔 31"),
+                _send(runtime, adapter, user, "upper-concurrent-2", "挑战虚空塔 31"),
+            )
+            assert sorted(result.code for result in results) == [
+                "VOID_SPIRE_BUSY", "VOID_SPIRE_CHALLENGE_SETTLED",
+            ]
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM void_spire_runs WHERE player_id=? AND floor_no=31", (player_id,)
+                ).fetchone()[0] == 1
+                assert connection.execute(
+                    "SELECT stamina FROM players WHERE id=?", (player_id,)
+                ).fetchone()[0] == 80
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_spire_upper_enemy_uses_host_json_override(tmp_path: Path) -> None:
+    async def run() -> None:
+        content_dir = tmp_path / "data"
+        copytree(Path(__file__).parents[1] / "data", content_dir)
+        enemy_file = content_dir / "战斗" / "敌人.json"
+        document = json.loads(enemy_file.read_text(encoding="utf-8"))
+        scribe = next(row for row in document["records"] if row["key"] == "enemy.void_spire.scribe")
+        scribe["stats"]["hp"] = 261
+        enemy_file.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+
+        runtime = create_runtime(data_dir=content_dir)
+        await _setup(runtime, "qq.official", "upper-override", "upper-override")
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            player_id = connection.execute(
+                "SELECT id FROM players WHERE platform_user_id='upper-override'"
+            ).fetchone()[0]
+            _seed_claimed_floors(connection, player_id, 1, 30)
+            connection.execute(
+                "UPDATE players SET realm_key='dao_union',realm_layer=1,"
+                "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
+                (json.dumps({"body": 1000, "agility": 1000}), player_id),
+            )
+        challenge = await _send(runtime, "qq.official", "upper-override", "upper-override-31", "挑战虚空塔 31")
+        assert challenge.data["outcome"] == "won"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            snapshot = connection.execute(
+                "SELECT snapshot_json FROM battle_sessions WHERE battle_id=?", (challenge.data["battle_id"],)
+            ).fetchone()[0]
+            assert json.loads(snapshot)["enemy"]["max_hp"] == 261
         await runtime.close()
 
     asyncio.run(run())

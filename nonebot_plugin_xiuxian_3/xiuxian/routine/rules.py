@@ -183,6 +183,11 @@ HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
         "同道共济",
         "season.final_heaven.claim.cooperation",
     ),
+    HonorTitleDefinition(
+        "title.void_spire.witness",
+        "虚空见证者",
+        "specials.void_spire.floor.60",
+    ),
 )
 
 

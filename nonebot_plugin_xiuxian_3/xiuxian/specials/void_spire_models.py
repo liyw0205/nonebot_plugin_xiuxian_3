@@ -18,6 +18,7 @@ class VoidSpirePreviewRecord:
     weekly_limit: int
     weekly_used: int
     supply_reputation: int
+    dao_service_reputation: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +45,7 @@ class VoidSpireRewardRecord:
     route_key: str
     first_clear: bool
     reward: dict[str, int]
+    discoveries: tuple[str, ...] = ()
     already_completed: bool = False
 
 

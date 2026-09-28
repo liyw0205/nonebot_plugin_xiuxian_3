@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..routine.rules import HONOR_TITLES
 from ..persistence.errors import (
     BattleBusyError,
     BattleRequirementError,
@@ -22,6 +23,7 @@ from ..persistence.errors import (
     TowerStartFailedError,
 )
 from .void_spire_repository import VoidSpireRepositoryMixin
+from .codex_rules import ENTRY_DEFINITIONS
 from .void_spire_rules import DESIGN_MAX_FLOOR, MAX_FLOOR
 
 
@@ -50,7 +52,7 @@ class VoidSpireApplication:
         errors = {
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能挑战虚空塔。"),
-            TowerRequirementError: ("VOID_SPIRE_REQUIREMENT_MISSING", "需要炼虚境一层，或虚空补给名望达到 600，未扣除体力。"),
+            TowerRequirementError: ("VOID_SPIRE_REQUIREMENT_MISSING", "1–30 层需要炼虚 L1 或虚空补给名望 600；31–60 层需要合道 L1 或道统服务名望 700。未扣体力。"),
             TowerBusyError: ("VOID_SPIRE_BUSY", "当前角色已有进行中的行动或待领取虚空塔奖励。"),
             TowerFloorLockedError: ("VOID_SPIRE_FLOOR_LOCKED", "请先领取上一层虚空塔首通奖励。"),
             TowerQuotaError: ("VOID_SPIRE_WEEKLY_LIMIT", "本周虚空塔挑战次数已用尽。"),
@@ -99,14 +101,16 @@ class VoidSpireApplication:
             state = f"第 {record.active_floor} 层自动战斗中"
         else:
             state = "无进行中的塔层"
+        next_floor = "已完成当前开放楼层" if record.highest_floor >= MAX_FLOOR else str(record.next_floor)
         message = (
             "## 虚空塔\n\n"
             f"- **已开放**：1-{MAX_FLOOR}/{DESIGN_MAX_FLOOR} 层\n"
             f"- **最高首通**：{record.highest_floor}/{MAX_FLOOR} 层\n"
-            f"- **下一层**：{record.next_floor}\n"
+            f"- **下一层**：{next_floor}\n"
             f"- **入场体力**：{record.stamina_cost}\n"
             f"- **本周次数**：{record.weekly_used}/{record.weekly_limit}\n"
             f"- **虚空补给名望**：{record.supply_reputation}\n"
+            f"- **道统服务名望**：{record.dao_service_reputation}\n"
             f"- **当前状态**：{state}\n\n"
             "> 发送 `挑战虚空塔 <层数>` 挑战，胜利后发送 `领取虚空塔奖励`。"
         )
@@ -125,6 +129,7 @@ class VoidSpireApplication:
                 "weekly_limit": record.weekly_limit,
                 "weekly_used": record.weekly_used,
                 "supply_reputation": record.supply_reputation,
+                "dao_service_reputation": record.dao_service_reputation,
             },
         )
 
@@ -133,7 +138,7 @@ class VoidSpireApplication:
             return CommandResult(False, "INVALID_VOID_SPIRE_COMMAND", f"请使用 `挑战虚空塔 <1-{MAX_FLOOR}>`。", context.request_id)
         floor_no = int(context.command_args[0])
         if not 1 <= floor_no <= MAX_FLOOR:
-            return CommandResult(False, "INVALID_VOID_SPIRE_COMMAND", f"当前开放楼层范围为 1 至 {MAX_FLOOR}；31-{DESIGN_MAX_FLOOR} 尚未开放。", context.request_id)
+            return CommandResult(False, "INVALID_VOID_SPIRE_COMMAND", f"当前开放楼层范围为 1 至 {MAX_FLOOR}；{MAX_FLOOR + 1}-{DESIGN_MAX_FLOOR} 尚未开放。", context.request_id)
         operation_id = self._operation_id(context, "specials.start_void_spire")
         try:
             record = await self.repository.start_void_spire_run(
@@ -191,10 +196,21 @@ class VoidSpireApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
+        discoveries = "、".join(
+            ENTRY_DEFINITIONS[key].label for key in record.discoveries if key in ENTRY_DEFINITIONS
+        ) or "无"
+        title = next(
+            (
+                definition.label for definition in HONOR_TITLES
+                if record.first_clear and definition.source_event == f"specials.void_spire.floor.{record.floor_no}"
+            ),
+            None,
+        )
+        title_line = f"\n- **展示称号**：{title}" if title else ""
         return CommandResult(
             True,
             "VOID_SPIRE_REWARD_CLAIMED",
-            f"## 虚空塔第 {record.floor_no} 层奖励\n\n- **路线**：{record.route_key}\n- **首通**：{'是' if record.first_clear else '否'}\n- **领取**：{self._reward_text(record.reward)}\n\n> 同一 operation 重放不会重复发奖。",
+            f"## 虚空塔第 {record.floor_no} 层奖励\n\n- **路线**：{record.route_key}\n- **首通**：{'是' if record.first_clear else '否'}\n- **领取**：{self._reward_text(record.reward)}\n- **图鉴**：{discoveries}{title_line}\n\n> 同一 operation 重放不会重复发奖。",
             context.request_id,
             operation_id,
             data={
@@ -203,6 +219,8 @@ class VoidSpireApplication:
                 "route_key": record.route_key,
                 "first_clear": record.first_clear,
                 "reward": record.reward,
+                "discoveries": record.discoveries,
+                "title": title,
                 "idempotent_replay": record.already_completed,
             },
         )

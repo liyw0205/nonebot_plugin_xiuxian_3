@@ -1,4 +1,4 @@
-"""Transactional persistence for the currently open void-spire floors."""
+"""Transactional persistence for the open void-spire floors."""
 
 from __future__ import annotations
 
@@ -25,14 +25,17 @@ from ..persistence.errors import (
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .void_spire_models import VoidSpirePreviewRecord, VoidSpireRewardRecord, VoidSpireRunRecord
 from .void_spire_rules import (
+    DAO_SERVICE_REPUTATION_KEY,
+    DAO_SERVICE_REPUTATION_REQUIRED,
+    LEGACY_MAX_FLOOR,
     MAX_FLOOR,
-    REQUIRED_LAYER,
-    REQUIRED_REALM,
     SUPPLY_REPUTATION_KEY,
     SUPPLY_REPUTATION_REQUIRED,
     TOWER_KEY,
     floor_definition,
+    quota_floor_range,
     reward_for,
+    story_codex_for_floor,
     versions_for_floor,
     week_start,
 )
@@ -55,6 +58,7 @@ class VoidSpireRepositoryMixin:
                 ).fetchone()[0]
             )
             next_floor = min(highest + 1, MAX_FLOOR)
+            quota_start, quota_end = quota_floor_range(next_floor)
             active = connection.execute(
                 "SELECT floor_no,status FROM void_spire_runs "
                 "WHERE player_id=? AND tower_key=? AND status IN ('battle_running','reward_pending') ORDER BY id DESC LIMIT 1",
@@ -63,8 +67,8 @@ class VoidSpireRepositoryMixin:
             weekly_used = int(
                 connection.execute(
                     "SELECT COUNT(*) FROM void_spire_runs WHERE player_id=? AND tower_key=? "
-                    "AND status<>'aborted' AND substr(created_at,1,10)>=?",
-                    (player["id"], TOWER_KEY, week_start(now)),
+                    "AND floor_no BETWEEN ? AND ? AND status<>'aborted' AND substr(created_at,1,10)>=?",
+                    (player["id"], TOWER_KEY, quota_start, quota_end, week_start(now)),
                 ).fetchone()[0]
             )
             reputation = self._void_spire_supply_reputation(connection, int(player["id"]))
@@ -78,6 +82,9 @@ class VoidSpireRepositoryMixin:
                 weekly_limit=floor_definition(max(next_floor, 1)).weekly_limit,
                 weekly_used=weekly_used,
                 supply_reputation=reputation,
+                dao_service_reputation=self._void_spire_local_reputation(
+                    connection, int(player["id"]), DAO_SERVICE_REPUTATION_KEY
+                ),
             )
 
     async def start_void_spire_run(
@@ -146,11 +153,14 @@ class VoidSpireRepositoryMixin:
                 return self._void_spire_run_from_row(run, player, replay=True)
 
             player = self._require_player(connection, platform, platform_user_id)
-            supply = self._void_spire_supply_reputation(connection, int(player["id"]))
+            upper_floor = floor_no > LEGACY_MAX_FLOOR
+            reputation_key = DAO_SERVICE_REPUTATION_KEY if upper_floor else SUPPLY_REPUTATION_KEY
+            required_reputation = DAO_SERVICE_REPUTATION_REQUIRED if upper_floor else SUPPLY_REPUTATION_REQUIRED
+            reputation = self._void_spire_local_reputation(connection, int(player["id"]), reputation_key)
             if not self._meets_realm_values(
-                str(player["realm_key"]), int(player["realm_layer"]), REQUIRED_REALM, REQUIRED_LAYER
-            ) and supply < SUPPLY_REPUTATION_REQUIRED:
-                raise TowerRequirementError("void refining or void supply reputation is required")
+                str(player["realm_key"]), int(player["realm_layer"]), definition.required_realm, definition.required_layer
+            ) and reputation < required_reputation:
+                raise TowerRequirementError("realm or stage-specific reputation is required")
             if self._has_active_long_action(connection, int(player["id"])):
                 raise TowerBusyError("another long action is active")
             active = connection.execute(
@@ -173,11 +183,12 @@ class VoidSpireRepositoryMixin:
                 (player["id"], TOWER_KEY, floor_no),
             ).fetchone()
             first_clear = existing_clear is None
+            quota_start, quota_end = quota_floor_range(floor_no)
             weekly_used = int(
                 connection.execute(
                     "SELECT COUNT(*) FROM void_spire_runs WHERE player_id=? AND tower_key=? "
-                    "AND status<>'aborted' AND substr(created_at,1,10)>=?",
-                    (player["id"], TOWER_KEY, week_start(now)),
+                    "AND floor_no BETWEEN ? AND ? AND status<>'aborted' AND substr(created_at,1,10)>=?",
+                    (player["id"], TOWER_KEY, quota_start, quota_end, week_start(now)),
                 ).fetchone()[0]
             )
             if weekly_used >= definition.weekly_limit:
@@ -369,27 +380,26 @@ class VoidSpireRepositoryMixin:
                 reward=reward,
                 snapshot=snapshot,
             )
+            discoveries: list[str] = []
             if bool(run["first_clear"]):
-                record_codex_discovery(
-                    connection,
-                    player_id=int(player["id"]),
-                    entry_key=f"codex.void.route_spire_{run['route_key']}",
-                    operation_id=operation_id,
-                    occurred_at=now,
-                    snapshot=snapshot,
-                    content_version=str(run["content_version"]),
-                    rule_version=str(run["rule_version"]),
-                )
-                record_codex_discovery(
-                    connection,
-                    player_id=int(player["id"]),
-                    entry_key=f"codex.challenge.void_spire.floor_{run['floor_no']}",
-                    operation_id=operation_id,
-                    occurred_at=now,
-                    snapshot=snapshot,
-                    content_version=str(run["content_version"]),
-                    rule_version=str(run["rule_version"]),
-                )
+                discoveries = [
+                    f"codex.void.route_spire_{run['route_key']}",
+                    f"codex.challenge.void_spire.floor_{run['floor_no']}",
+                ]
+                story = story_codex_for_floor(int(run["floor_no"]))
+                if story:
+                    discoveries.append(story)
+                for entry_key in discoveries:
+                    record_codex_discovery(
+                        connection,
+                        player_id=int(player["id"]),
+                        entry_key=entry_key,
+                        operation_id=operation_id,
+                        occurred_at=now,
+                        snapshot=snapshot,
+                        content_version=str(run["content_version"]),
+                        rule_version=str(run["rule_version"]),
+                    )
             connection.execute(
                 "INSERT INTO void_spire_reward_claims(run_id,player_id,floor_no,route_key,first_clear,operation_id,reward_json,content_version,rule_version,claimed_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (run["run_id"], player["id"], run["floor_no"], run["route_key"], run["first_clear"], operation_id, json.dumps(reward, sort_keys=True), run["content_version"], run["rule_version"], now_text),
@@ -406,6 +416,7 @@ class VoidSpireRepositoryMixin:
                 "route_key": str(run["route_key"]),
                 "first_clear": bool(run["first_clear"]),
                 "reward": reward,
+                "discoveries": discoveries,
             }
             self._insert_void_spire_operation(
                 connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text
@@ -433,6 +444,10 @@ class VoidSpireRepositoryMixin:
 
     @staticmethod
     def _void_spire_supply_reputation(connection: sqlite3.Connection, player_id: int) -> int:
+        return VoidSpireRepositoryMixin._void_spire_local_reputation(connection, player_id, SUPPLY_REPUTATION_KEY)
+
+    @staticmethod
+    def _void_spire_local_reputation(connection: sqlite3.Connection, player_id: int, key: str) -> int:
         row = connection.execute(
             "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
         ).fetchone()
@@ -443,7 +458,7 @@ class VoidSpireRepositoryMixin:
         except (TypeError, ValueError):
             return 0
         try:
-            return max(0, int(values.get(SUPPLY_REPUTATION_KEY, 0)))
+            return max(0, int(values.get(key, 0))) if isinstance(values, dict) else 0
         except (TypeError, ValueError):
             return 0
 
@@ -484,6 +499,15 @@ class VoidSpireRepositoryMixin:
     def _void_spire_reward_from_payload(
         self, payload: dict[str, Any], *, replay: bool = False
     ) -> VoidSpireRewardRecord:
+        discoveries = payload.get("discoveries")
+        if discoveries is None and bool(payload["first_clear"]):
+            discoveries = [
+                f"codex.void.route_spire_{payload['route_key']}",
+                f"codex.challenge.void_spire.floor_{payload['floor_no']}",
+            ]
+            story = story_codex_for_floor(int(payload["floor_no"]))
+            if story:
+                discoveries.append(story)
         return VoidSpireRewardRecord(
             player=self._row_to_player(payload["player"]),
             run_id=str(payload["run_id"]),
@@ -491,6 +515,7 @@ class VoidSpireRepositoryMixin:
             route_key=str(payload["route_key"]),
             first_clear=bool(payload["first_clear"]),
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            discoveries=tuple(str(key) for key in (discoveries or ())),
             already_completed=replay,
         )
 

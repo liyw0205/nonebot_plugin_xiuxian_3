@@ -208,6 +208,66 @@
       "status": "active"
     },
     {
+      "name": "虚空碑铭记录者",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 260, "attack": 6, "initiative": 7, "agility": 7},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.scribe",
+      "status": "active"
+    },
+    {
+      "name": "虚空碑铭守卫",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 300, "attack": 6, "initiative": 7, "agility": 7},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.keeper",
+      "status": "active"
+    },
+    {
+      "name": "碑铭路线守关者",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 340, "attack": 7, "initiative": 8, "agility": 8},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.route_inscription_boss",
+      "status": "active"
+    },
+    {
+      "name": "虚空见证巡守",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 380, "attack": 7, "initiative": 8, "agility": 8},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.echo_warden",
+      "status": "active"
+    },
+    {
+      "name": "道源见证守卫",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 420, "attack": 8, "initiative": 8, "agility": 8},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.origin_guard",
+      "status": "active"
+    },
+    {
+      "name": "见证路线守关者",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 500, "attack": 9, "initiative": 9, "agility": 9},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.route_witness_boss",
+      "status": "active"
+    },
+    {
       "name": "三劫天尊",
       "location_key": "tribulation.sky_terrace",
       "requirements": [

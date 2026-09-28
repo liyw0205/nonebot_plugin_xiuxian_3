@@ -12,4 +12,6 @@
 | 竞技场 | `arena.dao_echo`：合道 L1 或公开道统演练资格 | 异步演练，赛季只给称号/名望/服务权限；飞升角色只可作为只读历史快照 |
 | 剧情 | `story.dao_echoes` | 建设者/见证者/远行者多结局；结局写展示旗标和新篇章预览，不能替代 `ascension.choose_ending` |
 
+虚空塔高层的具体路线、首通图鉴/故事、展示称号、分段周额度及旧记录兼容规则见[完整内容开发总表](../../content-development.md)；道统服务名望与通用服务信誉必须分开存储。
+
 终局内容关闭时不建新旁线会话；已 `ending_pending` 故事可在 7 天内完成一次展示结局领取。任何 attempt 将 `resource.dao_fruit_progress`、`resource.ascension_merit`、`resource.tribulation_debt` 或 `ending_state` 写入特色玩法操作的行为必须拒绝 `ENDGAME_ASSET_FORBIDDEN`。
