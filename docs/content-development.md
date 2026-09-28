@@ -379,13 +379,13 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 #### 5.4.7 `tower.three_realms` 高阶单人层
 
-三界塔 v0.3 的 1–20 层继续使用 `content-0.3` / `specials-0.3.0`；v0.4 新增 21–40 层，版本固定为 `content-0.4` / `specials-0.4.0`。升级不得改变旧层记录、旧随机结果或旧 operation 哈希。公开命令为 `三界塔`、`挑战三界塔 <1-40>`、`领取三界塔奖励`；本切片只开放单人挑战，双人挑战和 `tower.void_spire` 仍关闭。
+三界塔 v0.3 的 1–20 层继续使用 `content-0.3` / `specials-0.3.0`；v0.4 新增 21–40 层，版本固定为 `content-0.4` / `specials-0.4.0`。升级不得改变旧层记录、旧随机结果或旧 operation 哈希。公开命令为 `三界塔`、`挑战三界塔 <1-40>`、`领取三界塔奖励`；双人命令为 `创建三界塔双人队伍`、`挑战三界塔双人 <1-40>`、`领取三界塔双人奖励`。双人挑战使用独立 `three_realms_tower_duo` 队伍、运行表和成员奖励表，`tower.void_spire` 仍关闭。
 
 21–40 层的准入为化神 L1，或重建名望总值至少 500。重建名望定义为玩家 `local_json` 中 `local.domain_refuge`、`local.abyss_outpost`、`local.ancestral_habitat` 三项之和；不能以旧三界主线许可绕过该门槛。每次挑战消耗 12 体力；每角色、每层、每 UTC 周最多 2 次，胜利、失败和逃跑都计次。战斗启动失败标记 `aborted`、全额退还体力且不计次。首通必须按层胜利并领取上一层奖励后才解锁下一层；已首通层可练习。
 
 每层首通奖励固定为灵石 60、阵砂 2，并在领取事务发现 `codex.challenge.three_realms.floor_N`。练习奖励由 run ID 的 BLAKE2b 摘要稳定决定为阵砂 0 或 1；不发灵石、修为、神魂晶、突破物、声望或普通战斗掉落。第 30 层额外发现 `codex.story.three_realms.reconstruction_<faction>`，第 40 层额外发现 `codex.story.three_realms.domain_<faction>`；故事图鉴使用战斗开始时冻结的三界阵营，不接受命令参数覆盖。第 40 层首通胜利事件授予展示称号 `title.three_realms_tower.domain_guardian`，来源为 `specials.three_realms_tower.floor.40`，称号只用于展示。
 
-阵营首领固定在 10/20/30/40 层。v0.4 稳定敌人键为 `enemy.three_realms_tower.<faction>.domain_vanguard`（21–29 层）、`enemy.three_realms_tower.<faction>.floor_30_boss`、`enemy.three_realms_tower.<faction>.domain_veteran`（31–39 层）和 `enemy.three_realms_tower.<faction>.floor_40_boss`；`<faction>` 仅为 `xuantian`、`demon`、`beast`。敌人、阵营/盟约、三界名望、污染、血脉稳定、奖励、内容/规则版本均进入塔局与战斗快照。首通、失败、启动补偿、每层周限、待领奖互斥、双适配器路由、operation 重放及资产隔离由 QQ 官方和 OneBot V11 模拟适配器专项验收。
+阵营首领固定在 10/20/30/40 层。v0.4 稳定敌人键为 `enemy.three_realms_tower.<faction>.domain_vanguard`（21–29 层）、`enemy.three_realms_tower.<faction>.floor_30_boss`、`enemy.three_realms_tower.<faction>.domain_veteran`（31–39 层）和 `enemy.three_realms_tower.<faction>.floor_40_boss`；`<faction>` 仅为 `xuantian`、`demon`、`beast`。敌人、阵营/盟约、三界名望、污染、血脉稳定、奖励、内容/规则版本均进入塔局与战斗快照。双人塔要求两名已确认成员，分别扣体力、计周限和首通，普通队伍奖励保持为空；失败不发奖，启动故障双方全额退款，成员独立 operation 领奖。首通、失败、启动补偿、每层周限、待领奖互斥、双适配器路由、operation 重放及资产隔离由 QQ 官方和 OneBot V11 模拟适配器专项验收。
 
 ### 5.5 适配器、Web 和内容发布
 

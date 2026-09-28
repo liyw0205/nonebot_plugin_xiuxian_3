@@ -39,6 +39,7 @@ from .party_rules import (
     PARTY_TYPE_SECRET_REALM_VOID_RUINS,
     PARTY_TYPE_SECRET_REALM_TIME_FORT,
     PARTY_TYPE_STANDARD_PVE,
+    PARTY_TYPE_THREE_REALMS_TOWER_DUO,
 )
 
 
@@ -143,6 +144,14 @@ class PartyApplication:
             party_type=PARTY_TYPE_STANDARD_PVE,
             title="多人副本队伍",
             invite_hint="三至四名同地点道友",
+        )
+
+    async def create_three_realms_tower_duo_party(self, context: CommandContext) -> CommandResult:
+        return await self._create_party(
+            context,
+            party_type=PARTY_TYPE_THREE_REALMS_TOWER_DUO,
+            title="三界塔双人队伍",
+            invite_hint="一名同地点道友",
         )
 
     async def _create_party(self, context: CommandContext, *, party_type: str, title: str, invite_hint: str) -> CommandResult:

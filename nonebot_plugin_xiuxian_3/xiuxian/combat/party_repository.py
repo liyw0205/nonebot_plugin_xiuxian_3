@@ -65,6 +65,7 @@ from ..social.party_rules import (
     PARTY_TYPE_SECRET_REALM_ANCIENT,
     PARTY_TYPE_SECRET_REALM_VOID_RUINS,
     PARTY_TYPE_SECRET_REALM_TIME_FORT,
+    PARTY_TYPE_THREE_REALMS_TOWER_DUO,
 )
 from ..adventures.boundary_rift_rules import BOUNDARY_RIFT_ENEMIES, BOUNDARY_RIFT_LOCATION
 from ..adventures.ancient_domain_rules import (
@@ -96,6 +97,7 @@ class PartyCombatRepositoryMixin:
         ancient_domain_run_id: str | None = None,
         void_ruins_run_id: str | None = None,
         time_fort_run_id: str | None = None,
+        three_realms_tower_duo_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         await self.initialize()
         async with self._inflight:
@@ -110,6 +112,7 @@ class PartyCombatRepositoryMixin:
                 ancient_domain_run_id,
                 void_ruins_run_id,
                 time_fort_run_id,
+                three_realms_tower_duo_run_id,
             )
 
     async def settle_party_battle(
@@ -202,6 +205,7 @@ class PartyCombatRepositoryMixin:
         ancient_domain_run_id: str | None = None,
         void_ruins_run_id: str | None = None,
         time_fort_run_id: str | None = None,
+        three_realms_tower_duo_run_id: str | None = None,
     ) -> PartyBattleStartRecord:
         operation_name = "battle.party.start"
         request = {"platform": platform, "platform_user_id": platform_user_id, "party_id": party_id}
@@ -213,6 +217,8 @@ class PartyCombatRepositoryMixin:
             request["void_ruins_run_id"] = void_ruins_run_id
         if time_fort_run_id is not None:
             request["time_fort_run_id"] = time_fort_run_id
+        if three_realms_tower_duo_run_id is not None:
+            request["three_realms_tower_duo_run_id"] = three_realms_tower_duo_run_id
         request_hash = self._request_hash(
             operation_name,
             request,
@@ -249,12 +255,31 @@ class PartyCombatRepositoryMixin:
                 PARTY_TYPE_SECRET_REALM_ANCIENT,
                 PARTY_TYPE_SECRET_REALM_VOID_RUINS,
                 PARTY_TYPE_SECRET_REALM_TIME_FORT,
+                PARTY_TYPE_THREE_REALMS_TOWER_DUO,
             }:
                 raise PartyBattleRequirementError("this party type cannot start party PVE")
             if str(party["status"]) != "ready":
                 raise PartyBattleRequirementError("party is not ready")
             if party["current_session_id"]:
                 raise PartyBattleBusyError("party already has a battle")
+            tower_duo_party = party_type == PARTY_TYPE_THREE_REALMS_TOWER_DUO
+            if tower_duo_party != (three_realms_tower_duo_run_id is not None):
+                raise PartyBattleRequirementError("tower duo battles must be started by the tower instance")
+            tower_duo_run = None
+            tower_duo_snapshot: dict[str, Any] = {}
+            if tower_duo_party:
+                tower_duo_run = connection.execute(
+                    "SELECT * FROM three_realms_tower_duo_runs WHERE duo_run_id=? AND party_id=? "
+                    "AND status='battle_running' AND battle_id IS NULL",
+                    (three_realms_tower_duo_run_id, resolved_party_id),
+                ).fetchone()
+                if tower_duo_run is None:
+                    raise PartyBattleRequirementError("tower duo run is not ready for battle")
+                tower_duo_snapshot = self._json_object(tower_duo_run["result_json"], {})
+                tower_enemy_key = str(tower_duo_snapshot.get("enemy_key", ""))
+                if not tower_enemy_key:
+                    raise PartyBattleRequirementError("tower duo enemy is not registered")
+                enemy = enemy_definition(tower_enemy_key)
             members = connection.execute(
                 "SELECT m.id AS membership_id, m.player_id AS database_player_id, m.role AS member_role, "
                 "m.confirmed_at AS member_confirmed_at, p.player_id AS stable_player_id, "
@@ -346,7 +371,7 @@ class PartyCombatRepositoryMixin:
                     raise PartyBattleRequirementError("time-fort node has no registered enemy")
                 enemy = enemy_definition(TIME_FORT_ENEMY)
             try:
-                if not secret_rift_party and not ancient_domain_party and not void_ruins_party and not time_fort_party:
+                if not tower_duo_party and not secret_rift_party and not ancient_domain_party and not void_ruins_party and not time_fort_party:
                     enemy = party_enemy_for_location(str(party["location_key"]))
             except ValueError as exc:
                 raise PartyBattleRequirementError("party PVE is not available at this location") from exc
@@ -395,6 +420,8 @@ class PartyCombatRepositoryMixin:
                     raise PollutionTooHighError("pollution is too high for the demon dungeon")
                 if beast_party and self._faction_reputation(row, "beast") < 200:
                     raise FactionReputationInsufficientError("beast reputation is insufficient")
+                if tower_duo_party and int(row["stamina"]) < 12:
+                    raise PartyBattleRequirementError("a tower duo member lacks stamina")
                 if ancient_domain_party and str(party["location_key"]) != ANCIENT_DOMAIN_LOCATION:
                     raise PartyBattleRequirementError("ancient-domain party is at the wrong location")
                 if void_ruins_party and str(party["location_key"]) != VOID_RUINS_LOCATION:
@@ -495,6 +522,10 @@ class PartyCombatRepositoryMixin:
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
                     (json.dumps(leader_ticket_inventory, ensure_ascii=False, sort_keys=True), now_text, leader["id"]),
                 )
+            elif tower_duo_party:
+                # The tower-duo repository debits both members atomically before
+                # delegating to the shared battle engine.
+                pass
             elif demon_party or beast_party:
                 expected_location = DEMON_REALM_LOCATION if demon_party else BEAST_REALM_LOCATION
                 if str(party["location_key"]) != expected_location:
@@ -516,10 +547,26 @@ class PartyCombatRepositoryMixin:
                 if secret_rift_party or ancient_domain_party or void_ruins_party or time_fort_party
                 else BOUNDARY_REALM_REWARD
                 if boundary_party
+                else {}
+                if tower_duo_party
                 else PARTY_BATTLE_REWARD
             )
-            dungeon_content_version = "content-0.5" if (void_ruins_party or time_fort_party) else "content-0.4" if ancient_domain_party else "content-0.3" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_CONTENT_VERSION
-            dungeon_rule_version = V051_RULE_VERSION if (void_ruins_party or time_fort_party) else "combat-0.4.0" if ancient_domain_party else "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party) else PARTY_BATTLE_RULE_VERSION
+            dungeon_content_version = (
+                str(tower_duo_run["content_version"])
+                if tower_duo_party
+                else "content-0.5" if (void_ruins_party or time_fort_party)
+                else "content-0.4" if ancient_domain_party
+                else "content-0.3" if (boundary_rift_combat or demon_party or beast_party)
+                else PARTY_BATTLE_CONTENT_VERSION
+            )
+            dungeon_rule_version = (
+                str(tower_duo_run["rule_version"])
+                if tower_duo_party
+                else V051_RULE_VERSION if (void_ruins_party or time_fort_party)
+                else "combat-0.4.0" if ancient_domain_party
+                else "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party)
+                else PARTY_BATTLE_RULE_VERSION
+            )
             battle_id = f"party-battle-{uuid4().hex}"
             snapshot = {
                 "battle_type": PARTY_BATTLE_TYPE,
@@ -543,6 +590,7 @@ class PartyCombatRepositoryMixin:
                 "ancient_domain_run_id": ancient_domain_run_id,
                 "void_ruins_run_id": void_ruins_run_id,
                 "time_fort_run_id": time_fort_run_id,
+                "three_realms_tower_duo_run_id": three_realms_tower_duo_run_id,
                 "time_storm": {
                     "enabled": time_fort_party,
                     "interval_rounds": TIME_FORT_STORM_INTERVAL if time_fort_party else 0,
@@ -630,6 +678,12 @@ class PartyCombatRepositoryMixin:
                 connection.execute(
                     "UPDATE time_fort_runs SET battle_id=?, updated_at=? WHERE run_id=? AND status='combat_pending' AND battle_id IS NULL",
                     (battle_id, now_text, time_fort_run_id),
+                )
+            if tower_duo_party:
+                connection.execute(
+                    "UPDATE three_realms_tower_duo_runs SET battle_id=?, updated_at=? "
+                    "WHERE duo_run_id=? AND status='battle_running' AND battle_id IS NULL",
+                    (battle_id, now_text, three_realms_tower_duo_run_id),
                 )
             payload = {
                 "battle_id": battle_id,

@@ -15,6 +15,7 @@ PARTY_TYPE_SECRET_REALM_BOUNDARY = "secret_realm_boundary"
 PARTY_TYPE_SECRET_REALM_ANCIENT = "secret_realm_ancient"
 PARTY_TYPE_SECRET_REALM_VOID_RUINS = "secret_realm_void_ruins"
 PARTY_TYPE_SECRET_REALM_TIME_FORT = "secret_realm_time_fort"
+PARTY_TYPE_THREE_REALMS_TOWER_DUO = "three_realms_tower_duo"
 # Keep the implementation name used by early design notes as an input alias.
 PARTY_TYPE_PARTY_BOUNDARY = "party_boundary"
 PARTY_MAX_MEMBERS = 2
@@ -119,6 +120,15 @@ STANDARD_PVE_DEFINITION = PartyDefinition(
     content_version="content-0.3",
     rule_version="social-0.3.2",
 )
+THREE_REALMS_TOWER_DUO_DEFINITION = PartyDefinition(
+    party_type=PARTY_TYPE_THREE_REALMS_TOWER_DUO,
+    min_members=2,
+    max_members=2,
+    required_location=None,
+    distribution_key="tower_duo",
+    content_version="content-0.4",
+    rule_version="social-0.4.1",
+)
 
 
 def party_definition_for(party_type: str) -> PartyDefinition:
@@ -140,6 +150,8 @@ def party_definition_for(party_type: str) -> PartyDefinition:
         return BEAST_REALM_DEFINITION
     if party_type == PARTY_TYPE_STANDARD_PVE:
         return STANDARD_PVE_DEFINITION
+    if party_type == PARTY_TYPE_THREE_REALMS_TOWER_DUO:
+        return THREE_REALMS_TOWER_DUO_DEFINITION
     if party_type != PARTY_TYPE_EXPLORATION_PAIR:
         raise ValueError(f"unsupported party type: {party_type}")
     return PARTY_DEFINITION
@@ -169,7 +181,9 @@ __all__ = [
     "PARTY_TYPE_SECRET_REALM_VOID_RUINS",
     "PARTY_TYPE_SECRET_REALM_TIME_FORT",
     "PARTY_TYPE_DEMON_REALM",
+    "PARTY_TYPE_THREE_REALMS_TOWER_DUO",
     "PARTY_TYPE_PARTY_BOUNDARY",
     "PartyDefinition",
+    "THREE_REALMS_TOWER_DUO_DEFINITION",
     "party_definition_for",
 ]

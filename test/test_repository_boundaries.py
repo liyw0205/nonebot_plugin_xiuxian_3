@@ -25,6 +25,8 @@ def test_sqlite_repository_composes_domain_transaction_mixins() -> None:
         "preview_three_realms_tower": "nonebot_plugin_xiuxian_3.xiuxian.specials.three_realms_tower_repository",
         "start_three_realms_tower_run": "nonebot_plugin_xiuxian_3.xiuxian.specials.three_realms_tower_repository",
         "claim_three_realms_tower_reward": "nonebot_plugin_xiuxian_3.xiuxian.specials.three_realms_tower_repository",
+        "start_three_realms_tower_duo": "nonebot_plugin_xiuxian_3.xiuxian.specials.three_realms_tower_duo_repository",
+        "claim_three_realms_tower_duo_reward": "nonebot_plugin_xiuxian_3.xiuxian.specials.three_realms_tower_duo_repository",
         "get_story_status": "nonebot_plugin_xiuxian_3.xiuxian.specials.story_repository",
         "start_story": "nonebot_plugin_xiuxian_3.xiuxian.specials.story_repository",
         "choose_story_route": "nonebot_plugin_xiuxian_3.xiuxian.specials.story_repository",

@@ -59,6 +59,7 @@ from .specials.dispatch_use_cases import DispatchApplication
 from .specials.codex_use_cases import CodexApplication
 from .specials.tower_use_cases import TowerApplication
 from .specials.three_realms_tower_use_cases import ThreeRealmsTowerApplication
+from .specials.three_realms_tower_duo_use_cases import ThreeRealmsTowerDuoApplication
 from .specials.story_use_cases import StoryApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
@@ -132,6 +133,7 @@ class XiuxianApplication:
         self.codex = CodexApplication(repository)
         self.tower = TowerApplication(repository)
         self.three_realms_tower = ThreeRealmsTowerApplication(repository)
+        self.three_realms_tower_duo = ThreeRealmsTowerDuoApplication(repository)
         self.story = StoryApplication(repository)
         self.quests = QuestApplication(repository)
 
@@ -1074,6 +1076,9 @@ class XiuxianApplication:
     async def create_standard_pve_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_standard_pve_party(context), write_message="当前事件不允许创建多人副本队伍。")
 
+    async def create_three_realms_tower_duo_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.create_three_realms_tower_duo_party(context), write_message="当前事件不允许创建三界塔双人队伍。")
+
     async def invite_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.invite_party(context), write_message="当前事件不允许邀请队伍成员。")
 
@@ -1613,6 +1618,12 @@ class XiuxianApplication:
             lambda: self.three_realms_tower.claim_reward(context),
             write_message="当前事件不允许领取三界塔奖励。",
         )
+
+    async def challenge_three_realms_tower_duo(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.three_realms_tower_duo.challenge(context), write_message="当前事件不允许挑战三界塔双人。")
+
+    async def claim_three_realms_tower_duo_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.three_realms_tower_duo.claim_reward(context), write_message="当前事件不允许领取三界塔双人奖励。")
 
     async def get_story_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.story.status(context), require_write=False)

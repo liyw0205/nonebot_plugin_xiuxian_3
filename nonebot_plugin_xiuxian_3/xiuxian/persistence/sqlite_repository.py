@@ -82,7 +82,9 @@ from ..specials.codex_repository import CodexRepositoryMixin
 from ..specials.codex_migration import ensure_codex_schema
 from ..specials.tower_repository import TowerRepositoryMixin
 from ..specials.three_realms_tower_repository import ThreeRealmsTowerRepositoryMixin
+from ..specials.three_realms_tower_duo_repository import ThreeRealmsTowerDuoRepositoryMixin
 from ..specials.tower_migration import ensure_tower_schema
+from ..specials.three_realms_tower_duo_migration import ensure_three_realms_tower_duo_schema
 from ..specials.story_repository import StoryRepositoryMixin
 from ..specials.story_migration import ensure_story_schema
 from ..quests.repository import QuestRepositoryMixin
@@ -166,6 +168,7 @@ class SQLitePlayerRepository(
     CodexRepositoryMixin,
     TowerRepositoryMixin,
     ThreeRealmsTowerRepositoryMixin,
+    ThreeRealmsTowerDuoRepositoryMixin,
     StoryRepositoryMixin,
     DemonQuestRepositoryMixin,
     QuestRepositoryMixin,
@@ -295,6 +298,7 @@ class SQLitePlayerRepository(
             ensure_dispatch_schema(connection)
             ensure_codex_schema(connection)
             ensure_tower_schema(connection)
+            ensure_three_realms_tower_duo_schema(connection)
             ensure_story_schema(connection)
             ensure_trade_permit_schema(connection)
             connection.execute(
@@ -638,7 +642,7 @@ class SQLitePlayerRepository(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'parties'"
         ).fetchone()
         schema_sql = str(table[0]) if table and table[0] else ""
-        if all(value in schema_sql for value in ("'boundary_realm'", "'party_boundary'", "'demon_realm'", "'beast_realm'", "'standard_pve'", "'secret_realm_boundary'", "'secret_realm_ancient'", "'secret_realm_void_ruins'", "'secret_realm_time_fort'")):
+        if all(value in schema_sql for value in ("'boundary_realm'", "'party_boundary'", "'demon_realm'", "'beast_realm'", "'standard_pve'", "'secret_realm_boundary'", "'secret_realm_ancient'", "'secret_realm_void_ruins'", "'secret_realm_time_fort'", "'three_realms_tower_duo'")):
             return
         connection.execute("PRAGMA foreign_keys = OFF")
         connection.execute("DROP INDEX IF EXISTS idx_parties_leader")
@@ -648,7 +652,7 @@ class SQLitePlayerRepository(
             CREATE TABLE parties_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 party_id TEXT NOT NULL UNIQUE,
-                party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio', 'boundary_realm', 'party_boundary', 'demon_realm', 'beast_realm', 'standard_pve', 'secret_realm_boundary', 'secret_realm_ancient', 'secret_realm_void_ruins', 'secret_realm_time_fort')),
+                party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio', 'boundary_realm', 'party_boundary', 'demon_realm', 'beast_realm', 'standard_pve', 'secret_realm_boundary', 'secret_realm_ancient', 'secret_realm_void_ruins', 'secret_realm_time_fort', 'three_realms_tower_duo')),
                 status TEXT NOT NULL CHECK (status IN ('forming', 'ready', 'disbanded', 'expired')),
                 leader_id INTEGER NOT NULL REFERENCES players(id),
                 location_key TEXT NOT NULL,

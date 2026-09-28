@@ -69,6 +69,8 @@ operation 重放和赛季领奖。
 
 三界塔专项验收位于 `test/test_three_realms_tower_v03.py`，覆盖 QQ 官方与 OneBot V11 的 1–40 层单人首通；v0.3 1–20 层历史版本/operation 哈希兼容；v0.4 化神/500 重建名望准入；30/40 层阵营首领与故事快照、40 层展示称号；启动补偿、失败计次、练习/周限、奖励幂等及战斗奖励隔离。
 
+三界塔双人专项验收位于 `test/test_three_realms_tower_duo_v04.py`，覆盖 QQ 官方队长 + OneBot V11 成员、第三人拒绝、v0.4 境界/重建名望门槛、每名成员体力和周限、成员战斗快照、双成员独立奖励、普通队伍奖励隔离、失败/启动故障退款、重启后领奖和 operation 幂等。
+
 v0.4 重建项目专项验收位于 `test/test_livelihood_project_v04.py`，覆盖 QQ 官方与 OneBot V11 的项目权限、材料贡献、UTC 日 30 点上限、完成奖励、建设券、operation 重放、版本快照和无权限拒绝；运输、净化、驯养/修复服务来源仍按关闭状态验证。
 
 祖灵殿秘境专项验收位于 `test/test_ancestral_hall_secret_realm_v04.py`，覆盖 QQ 官方/OneBot V11、QQ→OneBot 与 OneBot→QQ 身份切换及重启、准入原子拒绝、节点/操作冲突、守灵第 4 回合召影、自动清影/超时恢复、失败/过期、首通故事旗标唯一、周额度和系统补偿。
