@@ -361,7 +361,15 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 入口、节点、结算和系统中止均使用独立 operation ledger 与 `legacy_manor_runs` 持久化；身份切换/进程重启后通过只读 `遗府状态` 查询当前节点并按原 run 继续。前置不足不创建记录，活动冲突原子拒绝；同 operation 同输入回放、异输入返回 `OPERATION_CONFLICT`。适配器验收覆盖 QQ 官方、OneBot V11、双向身份切换、节点顺序、首通唯一、过期、系统中止、资产不变和重试。
 
-#### 5.4.5 `instance.secret_realm.heaven_echo`
+#### 5.4.5 `instance.legacy.demon_abyss_echo`
+
+这是使用深渊秘境既有首通线索的第二条遗府，内容版本为 `content-0.6`、规则版本为 `adventures-0.6.1`。角色须达到筑基 L1、位于 `demon.abyss_gate`、持有 `access.demon_abyss_gate`，并拥有绑定 `item.clue.demon_abyss_echo`。线索只作为非消耗准入依据；本遗府不改变线索原有来源或语义，也不将其扣除、转化或复制。
+
+遗府固定单人三节点 `echo_threshold -> sealed_resonance -> final_whisper`，无随机池、无体力/灵石/物品成本，60 分钟过期。路线按序推进；首通只写 `story.legacy.demon_abyss_echo`，不发资产，不修改污染、声望、权限、任务进度或终局状态。未成功完成可重试；首通后关闭新建。过期和明确系统中止均不写故事旗标且无资源退款。
+
+本遗府与 `instance.legacy.demon_reliquary` 共用遗府专属持久化引擎，但记录按稳定 `instance_key` 隔离；同一角色仍最多持有一个活动遗府。`残响遗府状态` 只查询本遗府。入口、节点、结算和系统中止使用 operation ledger；重启/QQ 与 OneBot 身份切换可按原 run 续行。同 operation 同输入回放，异输入返回 `OPERATION_CONFLICT`。适配器验收覆盖 QQ 官方、OneBot V11、前置原子拒绝、节点顺序、首通唯一、过期、系统中止、资产不变、身份切换和重试。
+
+#### 5.4.6 `instance.secret_realm.heaven_echo`
 
 天劫回音是渡劫角色的单人结局旁线。角色达到渡劫 L1 且不在最终战进行中即可进入；没有地点、体力、票券或次数成本，允许在完成后重复挑战。运行时长固定 60 分钟，固定三节点：`heaven_threshold -> echo_corridor -> side_story_gate`。节点、结算和系统中止均写入独立 operation ledger，活动运行记录存于 `heaven_echo_runs`，不复用通用秘境表。
 

@@ -1,4 +1,4 @@
-# v0.6 冒险内容基线：终局悬赏、道源秘境、天劫回音与飞升旁线
+# v0.6 冒险内容基线：终局悬赏、道源秘境、遗府与天劫旁线
 
 本文件遵守[版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=adventures-0.6.0`。终局冒险只能读取终局资格，不能替代天劫试炼、最终战或结局选择。
 
@@ -8,6 +8,7 @@
 | 悬赏 | `bounty.ascension_supply`：普通角色也可参加 | 交付疗伤/维修物 5；8h；世界功勋 50、灵石 300；不得发飞升功勋 |
 | 秘境 | `instance.secret_realm.dao_origin`：合道 L1、道源许可 | 单人 8 节点、60 体力/人；首通新篇章线索/展示；每角色 1 次 |
 | 秘境 | `instance.secret_realm.heaven_echo`：渡劫 L1、非最终战 | 3 节点、天劫债不变；首通结局旁线旗标 |
+| 遗府 | `instance.legacy.demon_abyss_echo`：筑基 L1、深渊门地点/权限、绑定深渊残响线索 | 固定 3 节点、无资源成本；首通仅写故事旗标 |
 | 主线 | `story.mainline.dao_echoes`：炼虚 L10 | 建设者/见证者/远行者三线各 10 关；lane 内顺序推进；只写故事/服务/图鉴旗标 |
 | 斗法留影 | `combat.replay.v0.6` | 终局战日志永久保留但默认私有；公开只显示脱敏摘要和结局编号 |
 
@@ -32,3 +33,9 @@
 入口只读校验 `tribulation` 境界和最终战活动成员；任何拒绝均不创建运行记录。路线按序推进，重启或 QQ/OneBot V11 身份切换后可继续。过期只结束当前运行，不发旗标；明确的系统中止只结束运行，不退还资源（本合同无资源成本）。
 
 首次成功结算在同一事务向 `intro_json.flags` 写入 `story.heaven_echo`，重复成功不重复写入。秘境操作禁止写 `ending_state`、`ending_key`、道果进度、`resource.ascension_merit`、天劫债、飞升凭证或最终战记录；`ascension.choose_ending` 仍是唯一结局选择写入口。验收见 `test/test_heaven_echo_secret_realm_v06.py`。
+
+#### 5.4.5 `instance.legacy.demon_abyss_echo`
+
+本遗府以 `content-0.6` / `adventures-0.6.1` 运行。角色须筑基 L1、位于 `demon.abyss_gate`、持有 `access.demon_abyss_gate` 和绑定 `item.clue.demon_abyss_echo`；线索只检查、不消耗。固定三节点 `echo_threshold -> sealed_resonance -> final_whisper`，单次 60 分钟，无资源成本、随机池或战斗奖励。每个角色同一时间只能进行一处遗府；过期/系统中止不写旗标，未成功可重试；首通只写 `story.legacy.demon_abyss_echo`，此后不允许再次进入。
+
+命令为 `进入残响遗府`、`残响遗府状态`、`选择残响遗府节点 <节点>` 和 `结算残响遗府`。该稳定键使用遗府专属仓储中的独立 `instance_key` 行记录，不与 `instance.legacy.demon_reliquary` 混淆；完整准入、失败和幂等合同见[完整内容开发总表](../../content-development.md)。

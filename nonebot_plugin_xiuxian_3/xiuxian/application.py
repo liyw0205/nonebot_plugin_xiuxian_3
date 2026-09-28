@@ -84,6 +84,15 @@ class XiuxianApplication:
         self.three_realms = ThreeRealmsApplication(repository)
         self.secret_realms = SecretRealmApplication(repository)
         self.legacy_manor = LegacyManorApplication(repository)
+        self.abyss_echo_manor = LegacyManorApplication(
+            repository,
+            instance_key="instance.legacy.demon_abyss_echo",
+            display_name="残响遗府",
+            enter_command="进入残响遗府",
+            status_command="残响遗府状态",
+            choose_command="选择残响遗府节点",
+            settle_command="结算残响遗府",
+        )
         self.advancement = AdvancementApplication(repository)
         self.constitution = ConstitutionApplication(repository)
         self.talent = TalentApplication(repository)
@@ -710,6 +719,30 @@ class XiuxianApplication:
             context,
             lambda: self.legacy_manor.settle(context),
             write_message="当前事件不允许结算遗府。",
+        )
+
+    async def enter_abyss_echo_manor(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.abyss_echo_manor.enter(context),
+            write_message="当前事件不允许进入残响遗府。",
+        )
+
+    async def get_abyss_echo_manor_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.abyss_echo_manor.status(context), require_write=False)
+
+    async def choose_abyss_echo_manor_node(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.abyss_echo_manor.choose_node(context),
+            write_message="当前事件不允许推进残响遗府。",
+        )
+
+    async def settle_abyss_echo_manor(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.abyss_echo_manor.settle(context),
+            write_message="当前事件不允许结算残响遗府。",
         )
 
     async def settle_boundary_rift(self, context: CommandContext) -> CommandResult:

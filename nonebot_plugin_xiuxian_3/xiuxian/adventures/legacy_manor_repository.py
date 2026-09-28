@@ -20,15 +20,8 @@ from ..persistence.errors import (
 )
 from .legacy_manor_models import LegacyManorRunRecord
 from .legacy_manor_rules import (
-    LEGACY_MANOR_CLUE,
-    LEGACY_MANOR_CONTENT_VERSION,
-    LEGACY_MANOR_EXPIRY_SECONDS,
     LEGACY_MANOR_KEY,
-    LEGACY_MANOR_LOCATION,
-    LEGACY_MANOR_NODES,
-    LEGACY_MANOR_PERMISSION,
-    LEGACY_MANOR_RULE_VERSION,
-    LEGACY_MANOR_STORY_FLAG,
+    get_legacy_manor_definition,
 )
 from .secret_realm_rules import realm_at_least
 
@@ -38,6 +31,18 @@ ACTIVE_LEGACY_MANOR_STATUSES = ("routing", "cleared")
 
 class LegacyManorRepositoryMixin:
     """Own legacy-manor sessions, replay records, expiry, and story projection."""
+
+    @staticmethod
+    def _legacy_manor_operation_name(action: str, instance_key: str) -> str:
+        definition = get_legacy_manor_definition(instance_key)
+        suffix = "" if instance_key == LEGACY_MANOR_KEY else definition.operation_scope.removeprefix("legacy_manor")
+        return f"legacy_manor{suffix}.{action}"
+
+    @staticmethod
+    def _legacy_manor_request(operation_payload: dict[str, Any], instance_key: str) -> dict[str, Any]:
+        if instance_key == LEGACY_MANOR_KEY:
+            return operation_payload
+        return {**operation_payload, "instance_key": instance_key}
 
     @staticmethod
     def _legacy_manor_json(raw: Any, default: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -66,10 +71,11 @@ class LegacyManorRepositoryMixin:
     @staticmethod
     def _legacy_manor_payload(run, snapshot: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
         index = int(run["node_index"])
-        nodes = tuple(str(key) for key in snapshot.get("node_keys", LEGACY_MANOR_NODES))
+        definition = get_legacy_manor_definition(str(snapshot.get("instance_key", LEGACY_MANOR_KEY)))
+        nodes = tuple(str(key) for key in snapshot.get("node_keys", definition.nodes))
         return {
             "run_id": str(run["run_id"]),
-            "instance_key": LEGACY_MANOR_KEY,
+            "instance_key": definition.instance_key,
             "status": str(run["status"]),
             "node_index": index,
             "current_node": nodes[index] if str(run["status"]) == "routing" and index < len(nodes) else None,
@@ -105,16 +111,21 @@ class LegacyManorRepositoryMixin:
                 (player["id"],),
             ).fetchone() is not None
 
-    async def get_legacy_manor_status(self, *, platform: str, platform_user_id: str) -> LegacyManorRunRecord | None:
+    async def get_legacy_manor_status(
+        self, *, platform: str, platform_user_id: str, instance_key: str = LEGACY_MANOR_KEY
+    ) -> LegacyManorRunRecord | None:
         await self.initialize()
-        return await asyncio.to_thread(self._get_legacy_manor_status_sync, platform, platform_user_id)
+        return await asyncio.to_thread(self._get_legacy_manor_status_sync, platform, platform_user_id, instance_key)
 
-    def _get_legacy_manor_status_sync(self, platform: str, platform_user_id: str) -> LegacyManorRunRecord | None:
+    def _get_legacy_manor_status_sync(
+        self, platform: str, platform_user_id: str, instance_key: str
+    ) -> LegacyManorRunRecord | None:
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             run = connection.execute(
-                "SELECT * FROM legacy_manor_runs WHERE player_id=? AND status IN ('routing','cleared') ORDER BY id DESC LIMIT 1",
-                (player["id"],),
+                "SELECT * FROM legacy_manor_runs WHERE player_id=? AND instance_key=? "
+                "AND status IN ('routing','cleared') ORDER BY id DESC LIMIT 1",
+                (player["id"], instance_key),
             ).fetchone()
             if run is None:
                 return None
@@ -130,14 +141,21 @@ class LegacyManorRepositoryMixin:
                 result.update({"outcome": "expired", "first_clear": False, "story_flag_written": False})
             return self._legacy_manor_record(self._legacy_manor_payload(payload_run, snapshot, result))
 
-    async def enter_legacy_manor(self, *, platform: str, platform_user_id: str, operation_id: str) -> LegacyManorRunRecord:
+    async def enter_legacy_manor(
+        self, *, platform: str, platform_user_id: str, operation_id: str, instance_key: str = LEGACY_MANOR_KEY
+    ) -> LegacyManorRunRecord:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._retry_sync, self._legacy_manor_enter_sync, platform, platform_user_id, operation_id)
+            return await asyncio.to_thread(
+                self._retry_sync, self._legacy_manor_enter_sync, platform, platform_user_id, operation_id, instance_key
+            )
 
-    def _legacy_manor_enter_sync(self, platform: str, platform_user_id: str, operation_id: str) -> LegacyManorRunRecord:
-        operation_name = "legacy_manor.enter"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "instance_key": LEGACY_MANOR_KEY})
+    def _legacy_manor_enter_sync(
+        self, platform: str, platform_user_id: str, operation_id: str, instance_key: str
+    ) -> LegacyManorRunRecord:
+        definition = get_legacy_manor_definition(instance_key)
+        operation_name = self._legacy_manor_operation_name("enter", instance_key)
+        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "instance_key": instance_key})
         now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
@@ -146,18 +164,20 @@ class LegacyManorRepositoryMixin:
             if replay is not None:
                 return self._legacy_manor_record(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
-            if str(player["location_key"]) != LEGACY_MANOR_LOCATION:
+            if str(player["location_key"]) != definition.location_key:
                 raise LegacyManorRequirementError("player is not at the reliquary location")
-            if not realm_at_least(str(player["realm_key"]), int(player["realm_layer"]), "nascent_soul", 1):
-                raise LegacyManorRequirementError("nascent-soul L1 is required")
+            if not realm_at_least(
+                str(player["realm_key"]), int(player["realm_layer"]), definition.realm_key, definition.realm_layer
+            ):
+                raise LegacyManorRequirementError("minimum legacy-manor realm is required")
             intro = self._legacy_manor_json(player["intro_json"], {})
             flags = list(intro.get("flags", []))
-            if LEGACY_MANOR_PERMISSION not in flags:
-                raise LegacyManorRequirementError("the fallen-ruins permission is missing")
+            if definition.permission not in flags:
+                raise LegacyManorRequirementError("the legacy-manor permission is missing")
             inventory = self._legacy_manor_json(player["inventory_json"], {})
-            if int(inventory.get(LEGACY_MANOR_CLUE, 0)) < 1:
-                raise LegacyManorRequirementError("the demon-contract clue is missing")
-            if LEGACY_MANOR_STORY_FLAG in flags:
+            if int(inventory.get(definition.clue, 0)) < 1:
+                raise LegacyManorRequirementError("the required clue is missing")
+            if definition.story_flag in flags:
                 raise LegacyManorQuotaError("the legacy manor has already been cleared")
             if connection.execute(
                 "SELECT 1 FROM legacy_manor_runs WHERE player_id=? AND status IN ('routing','cleared') LIMIT 1",
@@ -166,25 +186,25 @@ class LegacyManorRepositoryMixin:
                 raise LegacyManorBusyError("another action or legacy-manor run is active")
 
             run_id = f"legacy-manor-{uuid4().hex}"
-            expires_at = serialize_datetime(now + timedelta(seconds=LEGACY_MANOR_EXPIRY_SECONDS))
+            expires_at = serialize_datetime(now + timedelta(seconds=definition.expiry_seconds))
             snapshot = {
-                "instance_key": LEGACY_MANOR_KEY,
-                "location_key": LEGACY_MANOR_LOCATION,
+                "instance_key": definition.instance_key,
+                "location_key": definition.location_key,
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": int(player["realm_layer"]),
-                "permission": LEGACY_MANOR_PERMISSION,
-                "clue_key": LEGACY_MANOR_CLUE,
+                "permission": definition.permission,
+                "clue_key": definition.clue,
                 "clue_consumed": False,
-                "node_keys": list(LEGACY_MANOR_NODES),
+                "node_keys": list(definition.nodes),
                 "first_clear": True,
-                "content_version": LEGACY_MANOR_CONTENT_VERSION,
-                "rule_version": LEGACY_MANOR_RULE_VERSION,
+                "content_version": definition.content_version,
+                "rule_version": definition.rule_version,
             }
             connection.execute(
-                "INSERT INTO legacy_manor_runs(run_id, player_id, status, node_index, starts_at, expires_at, "
+                "INSERT INTO legacy_manor_runs(run_id, player_id, instance_key, status, node_index, starts_at, expires_at, "
                 "snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, 'routing', 0, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
-                (run_id, player["id"], now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, LEGACY_MANOR_CONTENT_VERSION, LEGACY_MANOR_RULE_VERSION, now_text, now_text),
+                "VALUES (?, ?, ?, 'routing', 0, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
+                (run_id, player["id"], definition.instance_key, now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, definition.content_version, definition.rule_version, now_text, now_text),
             )
             run = connection.execute("SELECT * FROM legacy_manor_runs WHERE run_id=?", (run_id,)).fetchone()
             payload = self._legacy_manor_payload(run, snapshot, {})
@@ -192,15 +212,23 @@ class LegacyManorRepositoryMixin:
             return self._legacy_manor_record(payload)
 
     async def choose_legacy_manor_node(
-        self, *, platform: str, platform_user_id: str, node_key: str, operation_id: str
+        self, *, platform: str, platform_user_id: str, node_key: str, operation_id: str,
+        instance_key: str = LEGACY_MANOR_KEY,
     ) -> LegacyManorRunRecord:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._retry_sync, self._legacy_manor_choose_sync, platform, platform_user_id, node_key, operation_id)
+            return await asyncio.to_thread(
+                self._retry_sync, self._legacy_manor_choose_sync, platform, platform_user_id, node_key, operation_id, instance_key
+            )
 
-    def _legacy_manor_choose_sync(self, platform, platform_user_id, node_key, operation_id):
-        operation_name = "legacy_manor.choose_node"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "node_key": node_key})
+    def _legacy_manor_choose_sync(self, platform, platform_user_id, node_key, operation_id, instance_key):
+        operation_name = self._legacy_manor_operation_name("choose_node", instance_key)
+        request_hash = self._request_hash(
+            operation_name,
+            self._legacy_manor_request(
+                {"platform": platform, "platform_user_id": platform_user_id, "node_key": node_key}, instance_key
+            ),
+        )
         now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
@@ -210,8 +238,9 @@ class LegacyManorRepositoryMixin:
                 return self._legacy_manor_record(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             run = connection.execute(
-                "SELECT * FROM legacy_manor_runs WHERE player_id=? AND status='routing' ORDER BY id DESC LIMIT 1",
-                (player["id"],),
+                "SELECT * FROM legacy_manor_runs WHERE player_id=? AND instance_key=? "
+                "AND status='routing' ORDER BY id DESC LIMIT 1",
+                (player["id"], instance_key),
             ).fetchone()
             if run is None:
                 raise LegacyManorNotFoundError("no active legacy-manor run")
@@ -226,7 +255,8 @@ class LegacyManorRepositoryMixin:
                 self._legacy_manor_store_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
                 return self._legacy_manor_record(payload)
             snapshot = self._legacy_manor_json(run["snapshot_json"])
-            nodes = tuple(str(item) for item in snapshot.get("node_keys", LEGACY_MANOR_NODES))
+            definition = get_legacy_manor_definition(instance_key)
+            nodes = tuple(str(item) for item in snapshot.get("node_keys", definition.nodes))
             index = int(run["node_index"])
             if index >= len(nodes) or nodes[index] != node_key:
                 raise LegacyManorNodeError("node is not the current route node")
@@ -240,23 +270,34 @@ class LegacyManorRepositoryMixin:
             self._legacy_manor_store_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._legacy_manor_record(payload)
 
-    async def settle_legacy_manor(self, *, platform: str, platform_user_id: str, operation_id: str) -> LegacyManorRunRecord:
+    async def settle_legacy_manor(
+        self, *, platform: str, platform_user_id: str, operation_id: str, instance_key: str = LEGACY_MANOR_KEY
+    ) -> LegacyManorRunRecord:
         await self.initialize()
-        operation_name = "legacy_manor.settle"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
+        operation_name = self._legacy_manor_operation_name("settle", instance_key)
+        request_hash = self._request_hash(
+            operation_name,
+            self._legacy_manor_request({"platform": platform, "platform_user_id": platform_user_id}, instance_key),
+        )
         replay = await asyncio.to_thread(self._legacy_manor_read_operation, operation_id, operation_name, request_hash)
         if replay is not None:
             return self._legacy_manor_record(replay, replay=True)
         async with self._inflight:
-            return await asyncio.to_thread(self._retry_sync, self._legacy_manor_settle_sync, platform, platform_user_id, operation_id)
+            return await asyncio.to_thread(
+                self._retry_sync, self._legacy_manor_settle_sync, platform, platform_user_id, operation_id, instance_key
+            )
 
     def _legacy_manor_read_operation(self, operation_id, operation_name, request_hash):
         with self._connect() as connection:
             return self._legacy_manor_operation(connection, operation_id, operation_name, request_hash)
 
-    def _legacy_manor_settle_sync(self, platform, platform_user_id, operation_id):
-        operation_name = "legacy_manor.settle"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
+    def _legacy_manor_settle_sync(self, platform, platform_user_id, operation_id, instance_key):
+        definition = get_legacy_manor_definition(instance_key)
+        operation_name = self._legacy_manor_operation_name("settle", instance_key)
+        request_hash = self._request_hash(
+            operation_name,
+            self._legacy_manor_request({"platform": platform, "platform_user_id": platform_user_id}, instance_key),
+        )
         now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
@@ -266,7 +307,8 @@ class LegacyManorRepositoryMixin:
                 return self._legacy_manor_record(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             run = connection.execute(
-                "SELECT * FROM legacy_manor_runs WHERE player_id=? ORDER BY id DESC LIMIT 1", (player["id"],)
+                "SELECT * FROM legacy_manor_runs WHERE player_id=? AND instance_key=? ORDER BY id DESC LIMIT 1",
+                (player["id"], instance_key),
             ).fetchone()
             if run is None:
                 raise LegacyManorNotFoundError("no legacy-manor run exists")
@@ -279,9 +321,9 @@ class LegacyManorRepositoryMixin:
             elif status == "cleared":
                 intro = self._legacy_manor_json(player["intro_json"], {})
                 flags = list(intro.get("flags", []))
-                first_clear = LEGACY_MANOR_STORY_FLAG not in flags
+                first_clear = definition.story_flag not in flags
                 if first_clear:
-                    flags.append(LEGACY_MANOR_STORY_FLAG)
+                    flags.append(definition.story_flag)
                     intro["flags"] = flags
                     connection.execute(
                         "UPDATE players SET intro_json=?, updated_at=? WHERE id=?",
@@ -304,14 +346,20 @@ class LegacyManorRepositoryMixin:
             self._legacy_manor_store_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._legacy_manor_record(payload)
 
-    async def compensate_legacy_manor_system_failure(self, *, run_id: str, operation_id: str) -> LegacyManorRunRecord:
+    async def compensate_legacy_manor_system_failure(
+        self, *, run_id: str, operation_id: str, instance_key: str = LEGACY_MANOR_KEY
+    ) -> LegacyManorRunRecord:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._retry_sync, self._legacy_manor_compensate_sync, run_id, operation_id)
+            return await asyncio.to_thread(
+                self._retry_sync, self._legacy_manor_compensate_sync, run_id, operation_id, instance_key
+            )
 
-    def _legacy_manor_compensate_sync(self, run_id, operation_id):
-        operation_name = "legacy_manor.system_abort"
-        request_hash = self._request_hash(operation_name, {"run_id": run_id})
+    def _legacy_manor_compensate_sync(self, run_id, operation_id, instance_key):
+        operation_name = self._legacy_manor_operation_name("system_abort", instance_key)
+        request_hash = self._request_hash(
+            operation_name, self._legacy_manor_request({"run_id": run_id}, instance_key)
+        )
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -319,7 +367,11 @@ class LegacyManorRepositoryMixin:
             if replay is not None:
                 return self._legacy_manor_record(replay, replay=True)
             run = connection.execute("SELECT * FROM legacy_manor_runs WHERE run_id=?", (run_id,)).fetchone()
-            if run is None or str(run["status"]) not in ACTIVE_LEGACY_MANOR_STATUSES:
+            if (
+                run is None
+                or str(run["instance_key"]) != instance_key
+                or str(run["status"]) not in ACTIVE_LEGACY_MANOR_STATUSES
+            ):
                 raise LegacyManorNotReadyError("only an active legacy-manor run can be compensated")
             result = {"outcome": "system_aborted", "resource_refunded": {}}
             connection.execute(

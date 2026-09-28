@@ -185,6 +185,7 @@ QQ/OneBot/Web 适配器、公式/并发/回放/故障测试、观测字段、关
 65. **已完成（v0.3 界隙裂隙队伍秘境）**：新增独立 `boundary_rift` 规则、DTO、迁移和 `BoundaryRiftRepositoryMixin`，不扩充通用 `repository.py`；开放专用 `secret_realm_boundary` 队伍类型、`instance.secret_realm.boundary_rift` 六节点路线、两场服务端自动战、UTC 周额度、逐角色首通和 `codex.route.boundary` 投影。进入/顺序/节点战斗/结算使用独立事务及 operation，支持战败和过期按合同保留成本、战斗启动故障退款并释放额度、重启续跑、行动锁和退出保护。QQ 官方与 OneBot V11 双方向混合队伍覆盖准入、2–5 人队伍边界、首通/重复奖励、失败、过期、额度、恢复和补偿；兼容回归 28 项通过。
 
 66. **已完成（v0.6 首条线索驱动遗府）**：新增独立 `legacy_manor` 规则、DTO、迁移、`LegacyManorRepositoryMixin` 与 application 命令，不向通用秘境仓储或 facade `repository.py` 增加业务事务。`instance.legacy.demon_reliquary` 要求元婴 L1、堕落遗迹地点/权限和既有绑定契约线索；三节点、无资源成本、60 分钟，失败/过期可重试，首通只写故事旗标。QQ 官方与 OneBot V11 覆盖准入原子拒绝、节点顺序、幂等冲突、资产不变、状态查询、重启身份切换、过期、系统中止、长行动锁与 operation 写入故障回滚。
+67. **已完成（v0.6 第二条线索驱动遗府）**：将遗府规则按稳定 `instance_key` 配置化并在 `legacy_manor_runs` 增加兼容迁移字段；开放 `instance.legacy.demon_abyss_echo`，消费方只读取魔界深渊秘境既有的绑定线索，不改变其来源或资产语义。筑基 L1、深渊门地点/权限、三节点、60 分钟、零资源成本，首通只写故事旗标；与首条遗府共用一个活动锁和事务引擎，旧首条 operation 哈希保持兼容。QQ 官方、OneBot V11 分别覆盖准入原子拒绝、路线、幂等、跨适配器身份恢复、资产隔离、迁移及遗府间活动锁。
 
 本节按首次验收阶段保留编号记录；其中早期“仍待”描述为当时快照，后续进展以本节后续条目和[当前开发状态](current-status.md)为准。
 
