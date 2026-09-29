@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import sqlite3
+import shutil
 from tempfile import TemporaryDirectory
+from pathlib import Path
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -135,3 +139,42 @@ def test_support_path_requires_and_rewards_subprofession() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_initial_path_skill_reward_comes_from_path_content() -> None:
+    async def run(data_dir: Path) -> None:
+        path_file = data_dir / "道途" / "道途.json"
+        document = json.loads(path_file.read_text(encoding="utf-8"))
+        body_path = next(row for row in document["records"] if row["key"] == "body")
+        body_path["active_skill"] = "skill.body.mountain_palm"
+        path_file.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        runtime = create_runtime(data_dir=data_dir)
+        user = "configured-path-skill"
+        commands = (
+            "开始修仙",
+            "寻仙问道",
+            "完成引导 阅读",
+            "前往近郊",
+            "完成引导 采集",
+            "完成引导 炼丹",
+            "选择道途 体修",
+        )
+        for index, command in enumerate(commands):
+            result = await runtime.dispatch(_context(user, index), command)
+            assert result.ok, (command, result.code)
+
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            row = connection.execute(
+                "SELECT inventory_json FROM players WHERE platform = 'web' AND platform_user_id = ?",
+                (user,),
+            ).fetchone()
+        inventory = json.loads(row[0])
+        assert inventory["skill.body.mountain_palm"] == 1
+        assert "skill.body.heavy_strike" not in inventory
+        await runtime.close()
+
+    with TemporaryDirectory() as directory:
+        data_dir = Path(directory) / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        asyncio.run(run(data_dir))

@@ -21,6 +21,7 @@ class CodexMilestoneRecord:
     required_count: int
     ready: bool
     claimed: bool
+    reputation_key: str | None
     reputation_reward: int
     unlocks: tuple[str, ...]
 

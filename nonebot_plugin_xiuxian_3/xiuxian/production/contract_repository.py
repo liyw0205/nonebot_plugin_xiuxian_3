@@ -102,8 +102,6 @@ class ContractProductionRepositoryMixin:
                             "quantity": int(quantity),
                             "binding_kind": binding_kind,
                             "bound_until": bound_until,
-                            "content_version": snapshot.get("content_version"),
-                            "rule_version": snapshot.get("rule_version"),
                         },
                         ensure_ascii=False,
                         sort_keys=True,

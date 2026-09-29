@@ -3,11 +3,19 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import shutil
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
+from pathlib import Path
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
+from nonebot_plugin_xiuxian_3.xiuxian.items.manual_rules import (
+    manual_breakthrough_bonus,
+    manual_effect_totals,
+    manual_grants_permission,
+)
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 
 
@@ -54,6 +62,103 @@ def test_breakthrough_preview_accepts_read_only_identity() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_manual_breakthrough_bonus_comes_from_owned_manual_content() -> None:
+    async def run(data_dir: Path) -> None:
+        manuals_path = data_dir / "道具" / "功法.json"
+        document = json.loads(manuals_path.read_text(encoding="utf-8"))
+        basic = next(row for row in document["records"] if row["key"] == "item.manual.basic_qi")
+        basic_bonus = next(effect for effect in basic["effects"] if effect["type"] == "breakthrough_bonus_bp")
+        basic_bonus["value"] = 700
+        cycle = next(row for row in document["records"] if row["key"] == "item.manual.cycle_qi")
+        cycle_bonus = next(effect for effect in cycle["effects"] if effect["type"] == "breakthrough_bonus_bp")
+        cycle_bonus["target_realm"] = "foundation"
+        cycle_bonus["value"] = 900
+        manuals_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        runtime = create_runtime(data_dir=data_dir)
+        user = "breakthrough-manual-config"
+        await _cultivator(runtime, user)
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            row = connection.execute(
+                "SELECT inventory_json FROM players WHERE platform = 'web' AND platform_user_id = ?",
+                (user,),
+            ).fetchone()
+            inventory = json.loads(row[0])
+            inventory["item.manual.cycle_qi"] = 1
+            connection.execute(
+                "UPDATE players SET realm_key = 'qi_gathering', realm_layer = 10, cultivation = 2900, total_cultivation = 4260, inventory_json = ? WHERE platform = 'web' AND platform_user_id = ?",
+                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), user),
+            )
+
+        preview = await runtime.dispatch(_context(user, "manual-preview"), "突破预览 筑基")
+        assert preview.code == "BREAKTHROUGH_PREVIEW"
+        assert preview.data["preparation_bp"] == 900
+        assert preview.data["success_bp"] == 8400
+        await runtime.close()
+
+    with TemporaryDirectory() as directory:
+        data_dir = Path(directory) / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        asyncio.run(run(data_dir))
+
+
+def test_high_realm_manual_content_grants_permission_and_breakthrough_bonus() -> None:
+    inventory = {"item.manual.nascent_spirit_return": 1}
+    assert manual_grants_permission(inventory, "nascent_soul")
+    assert manual_breakthrough_bonus(inventory, "soul_transformation") == 650
+
+    inventory = {"item.manual.dao_union_mysteries": 1}
+    assert manual_grants_permission(inventory, "dao_union")
+    assert manual_breakthrough_bonus(inventory, "tribulation") == 900
+
+
+def test_tribulation_manual_supplies_its_configured_breakthrough_bonus() -> None:
+    inventory = {"item.manual.transcendence_tribulation": 1}
+    assert manual_grants_permission(inventory, "tribulation")
+    assert manual_breakthrough_bonus(inventory, "tribulation") == 1100
+
+
+def test_same_quality_manuals_share_cultivation_bonus_but_offer_distinct_combat_passives() -> None:
+    content = bundled_content()
+    morning = manual_effect_totals({"item.manual.basic_qi": 1}, content)
+    sunrise = manual_effect_totals({"item.manual.sunrise_breath": 1}, content)
+    assert morning["cultivation_gain_bp"] == sunrise["cultivation_gain_bp"] == 250
+    assert morning["combat_stat_bonus_bp"] != sunrise["combat_stat_bonus_bp"]
+
+    rare_defensive = manual_effect_totals({"item.manual.earth_root": 1}, content)
+    rare_reflective = manual_effect_totals({"item.manual.lotus_soul": 1}, content)
+    assert rare_defensive["cultivation_gain_bp"] == rare_reflective["cultivation_gain_bp"]
+    assert rare_defensive["combat_stat_bonus_bp"] != rare_reflective["combat_stat_bonus_bp"]
+    assert rare_reflective["damage_reflection_bp"] > 0
+
+
+def test_manual_catalog_has_multiple_methods_for_each_open_realm() -> None:
+    content = bundled_content()
+    manuals = [
+        row
+        for row in content.list("item", include_locked=False)
+        if row.get("item_type") == "manual"
+    ]
+    permissions: dict[str, list[str]] = {}
+    for manual in manuals:
+        for effect in manual["effects"]:
+            if effect["type"] == "cultivation_permission":
+                permissions.setdefault(str(effect["target"]), []).append(str(manual["key"]))
+
+    open_realms = {
+        str(row["key"])
+        for row in content.list("realm", include_locked=False)
+        if row.get("rank", 0) > 0
+    }
+    assert open_realms <= permissions.keys()
+    assert all(len(permissions[realm]) >= 2 for realm in open_realms)
+    assert all(
+        manual_grants_permission({manual_key: 1}, realm, content)
+        for realm in open_realms
+        for manual_key in permissions[realm]
+    )
 
 
 def _prepare_player(runtime, user_id: str, *, inventory: dict[str, int], stones: int = 500, layer: int = 10, cultivation: int = 1360) -> None:

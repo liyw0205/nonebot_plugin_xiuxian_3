@@ -1,17 +1,14 @@
-"""Pure, versioned rules for the v0.1 talent trees."""
+"""Data-backed talent-tree definitions and lookups."""
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
-
 from dataclasses import dataclass
+from typing import Any
+
+from ..content import ContentBundle, ContentError, bundled_content
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
-TALENT_POINT_RESOURCE = "resource.talent_point"
-MAX_TALENT_TIER = 5
-TALENT_COSTS = (0, 1, 2, 3, 5)
+_DEFAULT_CONTENT = bundled_content()
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,127 +19,168 @@ class TalentNodeDefinition:
     tier: int
     label: str
     description: str
-    effect: dict[str, int | str]
+    effect: dict[str, Any]
     cost_points: int
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
+    prerequisites: tuple[str, ...]
 
 
-_TREE_META = {
-    "body": ("体修道脉", "体魄淬炼"),
-    "spell": ("法修道脉", "灵力运转"),
-    "device": ("器修道脉", "机关精研"),
-    "demonic": ("魔修道脉", "魔息锻魂"),
-    "beast": ("妖修道脉", "血脉驭形"),
-    "support": ("辅修道脉", "百艺通明"),
-}
-
-_TREE_EFFECTS = {
-    "body": ("body_efficiency_bp", "体魄行动效率"),
-    "spell": ("spell_efficiency_bp", "术法行动效率"),
-    "device": ("device_efficiency_bp", "机关行动效率"),
-    "demonic": ("demonic_efficiency_bp", "魔息行动效率"),
-    "beast": ("beast_efficiency_bp", "灵兽行动效率"),
-    "support": ("support_efficiency_bp", "辅修行动效率"),
-}
-
-_TIER_VALUES = (100, 150, 200, 250, 300)
+def _content(content: ContentBundle | None) -> ContentBundle:
+    return content or _DEFAULT_CONTENT
 
 
-def _build_definitions() -> dict[str, TalentNodeDefinition]:
-    definitions: dict[str, TalentNodeDefinition] = {}
-    for tree_key, (tree_label, stem) in _TREE_META.items():
-        effect_type, effect_label = _TREE_EFFECTS[tree_key]
-        for tier, (cost, value) in enumerate(zip(TALENT_COSTS, _TIER_VALUES, strict=True), start=1):
-            key = f"talent.tree.{tree_key}.tier{tier}"
-            whole = value // 100
-            fraction = value % 100
-            definitions[key] = TalentNodeDefinition(
+def talent_node_definitions(content: ContentBundle | None = None) -> tuple[TalentNodeDefinition, ...]:
+    bundle = _content(content)
+    definitions: list[TalentNodeDefinition] = []
+    positions: set[tuple[str, int]] = set()
+    for row in bundle.list("talent", include_locked=False):
+        key = row.get("key")
+        tree_key = row.get("tree_key")
+        label = row.get("name")
+        description = row.get("desc")
+        tier = row.get("tier")
+        cost = row.get("cost_points")
+        effect = row.get("effect")
+        prerequisites = row.get("prerequisites")
+        if not isinstance(key, str) or not key:
+            raise ContentError("talent record requires key")
+        if not isinstance(tree_key, str) or not tree_key:
+            raise ContentError(f"talent {key} requires tree_key")
+        tree = _tree_record(bundle, tree_key)
+        tree_label = tree.get("talent_tree_label")
+        if not isinstance(tree_label, str) or not tree_label.strip():
+            raise ContentError(f"path {tree_key} requires talent_tree_label")
+        if not isinstance(label, str) or not label.strip():
+            raise ContentError(f"talent {key} requires name")
+        if not isinstance(description, str) or not description.strip():
+            raise ContentError(f"talent {key} requires desc")
+        if not isinstance(tier, int) or isinstance(tier, bool) or tier < 1:
+            raise ContentError(f"talent {key} tier must be a positive integer")
+        if not isinstance(cost, int) or isinstance(cost, bool) or cost < 0:
+            raise ContentError(f"talent {key} cost_points must be a non-negative integer")
+        if not isinstance(effect, dict) or not effect:
+            raise ContentError(f"talent {key} effect must be a non-empty object")
+        if not isinstance(prerequisites, list) or any(not isinstance(item, str) for item in prerequisites):
+            raise ContentError(f"talent {key} prerequisites must be a string list")
+        position = (tree_key, tier)
+        if position in positions:
+            raise ContentError(f"duplicate talent tier: {tree_key}:{tier}")
+        positions.add(position)
+        definitions.append(
+            TalentNodeDefinition(
                 key=key,
                 tree_key=tree_key,
-                tree_label=tree_label,
+                tree_label=tree_label.strip(),
                 tier=tier,
-                label=f"{stem}·第{tier}阶",
-                description=f"{effect_label} +{whole}.{fraction // 10}%。",
-                effect={"type": effect_type, "value": value},
+                label=label.strip(),
+                description=description.strip(),
+                effect=dict(effect),
                 cost_points=cost,
+                prerequisites=tuple(prerequisites),
             )
-    return definitions
+        )
+
+    keys = {definition.key for definition in definitions}
+    for definition in definitions:
+        for prerequisite_key in definition.prerequisites:
+            prerequisite = next((item for item in definitions if item.key == prerequisite_key), None)
+            if prerequisite is None:
+                raise ContentError(f"talent {definition.key} references missing prerequisite {prerequisite_key}")
+            if prerequisite.tree_key != definition.tree_key or prerequisite.tier >= definition.tier:
+                raise ContentError(f"talent {definition.key} has invalid prerequisite {prerequisite_key}")
+    if len(keys) != len(definitions):
+        raise ContentError("duplicate talent key")
+    return tuple(definitions)
 
 
-TALENT_NODE_DEFINITIONS = _build_definitions()
-TREE_ALIASES = {
-    "体修": "body",
-    "体修道脉": "body",
-    "法修": "spell",
-    "法修道脉": "spell",
-    "器修": "device",
-    "器修道脉": "device",
-    "魔修": "demonic",
-    "魔修道脉": "demonic",
-    "妖修": "beast",
-    "妖修道脉": "beast",
-    "辅修": "support",
-    "辅修道脉": "support",
-    **{key: key for key in _TREE_META},
-}
+def _tree_record(content: ContentBundle, value: str) -> dict[str, Any]:
+    for row in content.list("path", include_locked=False):
+        if value in {str(row.get("key", "")), str(row.get("name", "")), str(row.get("talent_tree_label", ""))}:
+            return row
+    raise ContentError(f"talent tree references unknown path: {value}")
 
 
-def tree_definition(tree_key: str | None) -> tuple[str, str]:
+def tree_definition(tree_key: str | None, content: ContentBundle | None = None) -> tuple[str, str]:
     normalized = (tree_key or "").strip()
-    key = TREE_ALIASES.get(normalized, normalized)
-    try:
-        return key, _TREE_META[key][0]
-    except KeyError as exc:
-        raise ValueError(f"unsupported talent tree: {tree_key}") from exc
+    bundle = _content(content)
+    if not normalized:
+        raise ValueError(f"unsupported talent tree: {tree_key}")
+    for row in bundle.list("path", include_locked=False):
+        if normalized not in {
+            str(row.get("key", "")),
+            str(row.get("name", "")),
+            str(row.get("talent_tree_label", "")),
+        }:
+            continue
+        key = str(row["key"])
+        label = row.get("talent_tree_label")
+        if not isinstance(label, str) or not label.strip():
+            raise ContentError(f"path {key} requires talent_tree_label")
+        return key, label.strip()
+    raise ValueError(f"unsupported talent tree: {tree_key}")
 
 
-def talent_node_definition(node_key: str) -> TalentNodeDefinition:
+def talent_node_definition(
+    node_key: str,
+    content: ContentBundle | None = None,
+) -> TalentNodeDefinition:
     normalized = node_key.strip()
-    try:
-        return TALENT_NODE_DEFINITIONS[normalized]
-    except KeyError as exc:
-        raise ValueError(f"unsupported talent node: {node_key}") from exc
+    for definition in talent_node_definitions(content):
+        if definition.key == normalized:
+            return definition
+    raise ValueError(f"unsupported talent node: {node_key}")
 
 
-def talent_node_for_reference(reference: str, *, tree_key: str | None = None) -> TalentNodeDefinition:
+def talent_node_for_reference(
+    reference: str,
+    *,
+    tree_key: str | None = None,
+    content: ContentBundle | None = None,
+) -> TalentNodeDefinition:
     normalized = reference.strip()
-    if normalized in TALENT_NODE_DEFINITIONS:
-        definition = TALENT_NODE_DEFINITIONS[normalized]
-    else:
+    definitions = talent_node_definitions(content)
+    definition = next((item for item in definitions if item.key == normalized), None)
+    if definition is None:
         try:
             tier = int(normalized)
         except ValueError as exc:
             raise ValueError(f"unsupported talent node: {reference}") from exc
-        if tier < 1 or tier > MAX_TALENT_TIER:
+        if tree_key is None:
+            raise ValueError(f"talent tier requires a tree: {reference}")
+        resolved_tree, _ = tree_definition(tree_key, content)
+        matches = [item for item in definitions if item.tree_key == resolved_tree and item.tier == tier]
+        if len(matches) != 1:
             raise ValueError(f"unsupported talent tier: {reference}")
-        resolved_tree, _ = tree_definition(tree_key)
-        definition = talent_node_definition(f"talent.tree.{resolved_tree}.tier{tier}")
-    if tree_key:
-        resolved_tree, _ = tree_definition(tree_key)
+        definition = matches[0]
+    if tree_key is not None:
+        resolved_tree, _ = tree_definition(tree_key, content)
         if definition.tree_key != resolved_tree:
             raise ValueError("talent node does not belong to the selected path")
     return definition
 
 
-def talent_tree_nodes(tree_key: str) -> tuple[TalentNodeDefinition, ...]:
-    resolved_tree, _ = tree_definition(tree_key)
-    return tuple(
-        TALENT_NODE_DEFINITIONS[f"talent.tree.{resolved_tree}.tier{tier}"]
-        for tier in range(1, MAX_TALENT_TIER + 1)
+def talent_tree_keys(content: ContentBundle | None = None) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(item.tree_key for item in talent_node_definitions(content)))
+
+
+def talent_tree_nodes(tree_key: str, content: ContentBundle | None = None) -> tuple[TalentNodeDefinition, ...]:
+    resolved_tree, _ = tree_definition(tree_key, content)
+    nodes = tuple(
+        sorted(
+            (item for item in talent_node_definitions(content) if item.tree_key == resolved_tree),
+            key=lambda item: item.tier,
+        )
     )
+    if not nodes:
+        raise ValueError(f"talent tree has no nodes: {tree_key}")
+    return nodes
 
 
 __all__ = [
-    "CONTENT_VERSION",
-    "MAX_TALENT_TIER",
-    "RULE_VERSION",
-    "TALENT_COSTS",
-    "TALENT_NODE_DEFINITIONS",
-    "TALENT_POINT_RESOURCE",
     "TalentNodeDefinition",
     "talent_node_definition",
+    "talent_node_definitions",
     "talent_node_for_reference",
+    "talent_tree_keys",
     "talent_tree_nodes",
     "tree_definition",
 ]

@@ -1,0 +1,21 @@
+{
+  "kind": "resource",
+  "records": [
+    {
+      "key": "currency.spirit_stone",
+      "name": "灵石",
+      "desc": "修仙界通用的流通货币。",
+      "storage": "spirit_stones",
+      "status": "active"
+    },
+    {
+      "key": "resource.skill_insight",
+      "name": "技能心得",
+      "desc": "用于参悟神通的心得积累。",
+      "storage": "skill_insights",
+      "status": "active"
+    }
+  ],
+  "category": "资源",
+  "schema": "xiuxian.content"
+}

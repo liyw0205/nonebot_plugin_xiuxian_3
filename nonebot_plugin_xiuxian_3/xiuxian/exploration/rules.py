@@ -1,21 +1,13 @@
-"""Pure, versioned rules for the v0.1 exploration modes."""
+"""Pure rules for exploration modes."""
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 import hashlib
 
 from .models import ExplorationDefinition
 
 
-RULE_VERSION = module_rule_version(__name__)
-V02_RULE_VERSION = "exploration-0.2.0"
-V02_CONTENT_VERSION = "content-0.2"
-V03_RULE_VERSION = "exploration-0.3.0"
-V03_CONTENT_VERSION = "content-0.3"
-V04_RULE_VERSION = "exploration-0.4.0"
-V04_CONTENT_VERSION = "content-0.4"
 CLOUD_BOAT_STORM_CHANCE_BP = 2500
 CLOUD_BOAT_STORM_WAIT_SECONDS = 2 * 60
 CLOUD_BOAT_STORM_PAY_COST = 100
@@ -53,9 +45,8 @@ DEFINITIONS = {
         required_realm="mortal",
         required_layer=0,
         daily_limit=12,
-        random_pool="gather.outskirts.v0.1.1",
+        random_pool="gather.outskirts",
         battle_chance_bp=1000,
-        rule_version=RULE_VERSION,
     ),
     "explore.trial_outskirts": ExplorationDefinition(
         key="explore.trial_outskirts",
@@ -66,9 +57,8 @@ DEFINITIONS = {
         required_realm="qi_sensing",
         required_layer=2,
         daily_limit=8,
-        random_pool="trial.outskirts.v0.1",
+        random_pool="trial.outskirts",
         battle_chance_bp=2000,
-        rule_version=RULE_VERSION,
     ),
     "explore.spring_gather": ExplorationDefinition(
         key="explore.spring_gather",
@@ -79,9 +69,8 @@ DEFINITIONS = {
         required_realm="qi_sensing",
         required_layer=2,
         daily_limit=6,
-        random_pool="gather.spirit_field.v0.1",
+        random_pool="gather.spirit_field",
         battle_chance_bp=0,
-        rule_version=RULE_VERSION,
     ),
     "explore.mist_grotto": ExplorationDefinition(
         key="explore.mist_grotto",
@@ -92,9 +81,8 @@ DEFINITIONS = {
         required_realm="qi_gathering",
         required_layer=4,
         daily_limit=2,
-        random_pool="cave.mist_grotto.v0.1",
+        random_pool="cave.mist_grotto",
         battle_chance_bp=2500,
-        rule_version=RULE_VERSION,
     ),
     "explore.cloud_mine": ExplorationDefinition(
         key="explore.cloud_mine",
@@ -105,11 +93,9 @@ DEFINITIONS = {
         required_realm="foundation",
         required_layer=1,
         daily_limit=6,
-        random_pool="gather.cloud_mine.v0.2",
+        random_pool="gather.cloud_mine",
         battle_chance_bp=3000,
-        rule_version=V02_RULE_VERSION,
         energy_cost=2,
-        content_version=V02_CONTENT_VERSION,
     ),
     "explore.mist_grotto_2": ExplorationDefinition(
         key="explore.mist_grotto_2",
@@ -120,10 +106,8 @@ DEFINITIONS = {
         required_realm="golden_core",
         required_layer=1,
         daily_limit=2,
-        random_pool="cave.mist_grotto_2.v0.2",
+        random_pool="cave.mist_grotto_2",
         battle_chance_bp=4000,
-        rule_version=V02_RULE_VERSION,
-        content_version=V02_CONTENT_VERSION,
     ),
     "explore.cloud_boat_trial": ExplorationDefinition(
         key="explore.cloud_boat_trial",
@@ -134,10 +118,8 @@ DEFINITIONS = {
         required_realm="golden_core",
         required_layer=1,
         daily_limit=3,
-        random_pool="trial.cloud_boat.v0.2",
+        random_pool="trial.cloud_boat",
         battle_chance_bp=0,
-        rule_version=V02_RULE_VERSION,
-        content_version=V02_CONTENT_VERSION,
     ),
     "explore.demon_threshold": ExplorationDefinition(
         key="explore.demon_threshold",
@@ -148,11 +130,9 @@ DEFINITIONS = {
         required_realm="golden_core",
         required_layer=9,
         daily_limit=6,
-        random_pool="gather.demon_threshold.v0.3",
+        random_pool="gather.demon_threshold",
         battle_chance_bp=0,
         energy_cost=2,
-        rule_version="exploration-0.3.1",
-        content_version=V03_CONTENT_VERSION,
     ),
     "explore.demon_abyss": ExplorationDefinition(
         key="explore.demon_abyss",
@@ -163,10 +143,8 @@ DEFINITIONS = {
         required_realm="nascent_soul",
         required_layer=1,
         daily_limit=2,
-        random_pool="loot.demon.abyss.v0.3",
+        random_pool="loot.demon.abyss",
         battle_chance_bp=10000,
-        rule_version=V03_RULE_VERSION,
-        content_version=V03_CONTENT_VERSION,
     ),
     "explore.beast_hunt": ExplorationDefinition(
         key="explore.beast_hunt",
@@ -177,10 +155,8 @@ DEFINITIONS = {
         required_realm="nascent_soul",
         required_layer=1,
         daily_limit=2,
-        random_pool="loot.beast.hills.v0.3",
+        random_pool="loot.beast.hills",
         battle_chance_bp=10000,
-        rule_version=V03_RULE_VERSION,
-        content_version=V03_CONTENT_VERSION,
     ),
     "explore.ancestral_lake": ExplorationDefinition(
         key="explore.ancestral_lake",
@@ -191,10 +167,8 @@ DEFINITIONS = {
         required_realm="soul_transformation",
         required_layer=1,
         daily_limit=2,
-        random_pool="event.ancestral_lake.v0.4",
+        random_pool="event.ancestral_lake",
         battle_chance_bp=3500,
-        rule_version=V04_RULE_VERSION,
-        content_version=V04_CONTENT_VERSION,
     ),
 }
 
@@ -286,6 +260,23 @@ def weighted_value(seed: str, values: tuple[int, ...], weights: tuple[int, ...])
     return values[-1]
 
 
+def weighted_value_with_item_bonus(
+    seed: str,
+    values: tuple[int, ...],
+    weights: tuple[int, ...],
+    *,
+    item_values: frozenset[int],
+    bonus_bp: int,
+) -> int:
+    if isinstance(bonus_bp, bool) or not isinstance(bonus_bp, int) or bonus_bp < 0:
+        raise ValueError("item drop weight bonus must be a non-negative integer")
+    scaled_weights = tuple(
+        weight * (10_000 + bonus_bp) if value in item_values else weight
+        for value, weight in zip(values, weights, strict=True)
+    )
+    return weighted_value(seed, values, scaled_weights)
+
+
 def battle_roll_bp(seed: str) -> int:
     digest = hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest()
     return int.from_bytes(digest, "big") % 10000
@@ -295,14 +286,17 @@ def cloud_boat_storm_roll_bp(seed: str) -> int:
     return battle_roll_bp(seed + ":storm")
 
 
-def settlement_result(mode_key: str, seed: str, *, rule_version: str = RULE_VERSION) -> dict[str, int]:
+def settlement_result(
+    mode_key: str,
+    seed: str,
+    *,
+    drop_weight_bp: int = 0,
+) -> dict[str, int]:
     if mode_key == "explore.gather_outskirts":
         result = {
             "item.herb.blood_grass": 1 + weighted_value(seed + ":blood", (0, 1, 2), (35, 45, 20)),
             "item.ore.ironstone": weighted_value(seed + ":iron", (0, 1, 2), (50, 35, 15)),
         }
-        if rule_version == "exploration-0.1.1":
-            result["item.mat.wood"] = weighted_value(seed + ":wood", (0, 1), (90, 10))
         return result
     if mode_key == "explore.trial_outskirts":
         return {
@@ -348,7 +342,10 @@ def settlement_result(mode_key: str, seed: str, *, rule_version: str = RULE_VERS
         # Keep the pool stable in the session snapshot: the final 10% is the
         # documented heart-demon encounter, whose separate event flow remains
         # closed in this slice and therefore yields no asset here.
-        reward = weighted_value(seed + ":reward", (0, 1, 2, 3), (45, 30, 15, 10))
+        reward = weighted_value_with_item_bonus(
+            seed + ":reward", (0, 1, 2, 3), (45, 30, 15, 10),
+            item_values=frozenset({0, 2}), bonus_bp=drop_weight_bp,
+        )
         if reward == 0:
             return {"item.demon_core": 1}
         if reward == 1:
@@ -359,7 +356,10 @@ def settlement_result(mode_key: str, seed: str, *, rule_version: str = RULE_VERS
     if mode_key == "explore.beast_hunt":
         # The final branch is the documented ancestor event, which remains a
         # later independent slice and therefore does not mint an asset here.
-        reward = weighted_value(seed + ":reward", (0, 1, 2, 3), (45, 30, 15, 10))
+        reward = weighted_value_with_item_bonus(
+            seed + ":reward", (0, 1, 2, 3), (45, 30, 15, 10),
+            item_values=frozenset({0, 2}), bonus_bp=drop_weight_bp,
+        )
         if reward == 0:
             return {"item.beast_blood": 1}
         if reward == 1:
@@ -378,13 +378,6 @@ def settlement_result(mode_key: str, seed: str, *, rule_version: str = RULE_VERS
 __all__ = [
     "DEFINITIONS",
     "BATTLE_ENEMY_BY_MODE",
-    "RULE_VERSION",
-    "V02_CONTENT_VERSION",
-    "V02_RULE_VERSION",
-    "V03_CONTENT_VERSION",
-    "V03_RULE_VERSION",
-    "V04_CONTENT_VERSION",
-    "V04_RULE_VERSION",
     "battle_roll_bp",
     "CLOUD_MINE_ACCESS_FLAGS",
     "CLOUD_MINE_ACCESS_ITEMS",
@@ -395,4 +388,5 @@ __all__ = [
     "resolve_exploration_mode",
     "settlement_result",
     "weighted_value",
+    "weighted_value_with_item_bonus",
 ]

@@ -162,8 +162,8 @@ class SectExchangeRepositoryMixin:
             member_contribution=int(payload["member_contribution"]),
             warehouse_quantity=int(payload["warehouse_quantity"]),
             inventory_quantity=int(payload["inventory_quantity"]),
-            content_version=str(payload.get("content_version", "content-0.2")),
-            rule_version=str(payload.get("rule_version", "economy-0.2.0")),
+            content_version=str(payload.get("content_version", "")),
+            rule_version=str(payload.get("rule_version", "")),
             already_completed=replay,
         )
 

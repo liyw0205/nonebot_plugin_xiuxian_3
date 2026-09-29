@@ -7,8 +7,6 @@ from dataclasses import dataclass
 
 
 FATE_POOL_KEY = "gacha.fate.basic"
-FATE_CONTENT_VERSION = "content-0.1"
-FATE_RULE_VERSION = "gacha-fate-0.1.0"
 FATE_TICKET = "item.ticket.fate_basic"
 FATE_PITY_LIMIT = 10
 FATE_SINGLE_COST = 50
@@ -83,7 +81,7 @@ def roll_fate_pool(
         raise ValueError("draw_count must be 1 or 10")
     if pity_before < 0 or pity_before >= FATE_PITY_LIMIT:
         raise ValueError("pity_before is outside the pool range")
-    seed = f"{FATE_POOL_KEY}:{FATE_RULE_VERSION}:{operation_id}"
+    seed = f"{FATE_POOL_KEY}:{operation_id}"
     seed_hash = hashlib.sha256(seed.encode("utf-8")).hexdigest()
     pity = pity_before
     draws: list[FateDraw] = []
@@ -122,11 +120,9 @@ def reward_totals(draws: tuple[FateDraw, ...]) -> dict[str, int]:
 
 
 __all__ = [
-    "FATE_CONTENT_VERSION",
     "FATE_PITY_LIMIT",
     "FATE_POOL",
     "FATE_POOL_KEY",
-    "FATE_RULE_VERSION",
     "FATE_SINGLE_COST",
     "FATE_TEN_COST",
     "FATE_TICKET",

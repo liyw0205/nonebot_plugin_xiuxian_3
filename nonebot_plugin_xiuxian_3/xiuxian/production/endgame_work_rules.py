@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from .recipe_models import RecipeDefinition
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
 SUPPORT_SUBPROFESSIONS = ("alchemy", "artifice", "formation")
 
 ENDGAME_WORK_RECIPES = {
@@ -29,8 +26,6 @@ ENDGAME_WORK_RECIPES = {
         min_realm_layer=10,
         required_realm="void_refining",
         required_path="body",
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
     "recipe.masterwork.spell": RecipeDefinition(
         key="recipe.masterwork.spell",
@@ -49,8 +44,6 @@ ENDGAME_WORK_RECIPES = {
         min_realm_layer=10,
         required_realm="void_refining",
         required_path="spell",
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
     "recipe.masterwork.device": RecipeDefinition(
         key="recipe.masterwork.device",
@@ -69,8 +62,6 @@ ENDGAME_WORK_RECIPES = {
         min_realm_layer=10,
         required_realm="void_refining",
         required_path="device",
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
     "recipe.masterwork.demonic": RecipeDefinition(
         key="recipe.masterwork.demonic",
@@ -89,8 +80,6 @@ ENDGAME_WORK_RECIPES = {
         min_realm_layer=10,
         required_realm="void_refining",
         required_path="demonic",
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
     "recipe.masterwork.beast": RecipeDefinition(
         key="recipe.masterwork.beast",
@@ -109,8 +98,6 @@ ENDGAME_WORK_RECIPES = {
         min_realm_layer=10,
         required_realm="void_refining",
         required_path="beast",
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
     "recipe.masterwork.alchemy": RecipeDefinition(
         key="recipe.masterwork.alchemy",
@@ -130,8 +117,6 @@ ENDGAME_WORK_RECIPES = {
         required_realm="void_refining",
         required_path="support",
         required_subprofession=SUPPORT_SUBPROFESSIONS,
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
     "recipe.masterwork.artifice": RecipeDefinition(
         key="recipe.masterwork.artifice",
@@ -151,8 +136,6 @@ ENDGAME_WORK_RECIPES = {
         required_realm="void_refining",
         required_path="support",
         required_subprofession=SUPPORT_SUBPROFESSIONS,
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
     "recipe.masterwork.formation": RecipeDefinition(
         key="recipe.masterwork.formation",
@@ -172,8 +155,6 @@ ENDGAME_WORK_RECIPES = {
         required_realm="void_refining",
         required_path="support",
         required_subprofession=SUPPORT_SUBPROFESSIONS,
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
     "recipe.masterwork.support": RecipeDefinition(
         key="recipe.masterwork.support",
@@ -201,8 +182,6 @@ ENDGAME_WORK_RECIPES = {
         required_realm="void_refining",
         required_path="support",
         required_subprofession=SUPPORT_SUBPROFESSIONS,
-        content_version=CONTENT_VERSION,
-        rule_version=RULE_VERSION,
     ),
 }
 

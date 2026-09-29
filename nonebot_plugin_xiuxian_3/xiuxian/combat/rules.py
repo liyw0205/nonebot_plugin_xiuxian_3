@@ -1,29 +1,23 @@
-"""Pure, versioned rules for the first automatic training battle."""
+"""Pure rules for automatic combat."""
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import bundled_content, module_content_version, module_rule_version
 
 import hashlib
 from dataclasses import dataclass
 from typing import Mapping
 
-from ..content import ContentBundle
+from ..content import ContentBundle, ContentError, bundled_content
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
-V03_CONTENT_VERSION = "content-0.3"
-V03_RULE_VERSION = "combat-0.3.0"
-V031_RULE_VERSION = "combat-0.3.1"
-V032_RULE_VERSION = "combat-0.3.2"
-V04_CONTENT_VERSION = "content-0.4"
-V041_RULE_VERSION = "combat-0.4.1"
-V051_RULE_VERSION = "combat-0.5.1"
-V02_CONTENT_VERSION = "content-0.2"
-V02_RULE_VERSION = "combat-0.2.0"
 MAX_TURNS = 20
 TURN_TIMEOUT_SECONDS = 60
 DEFEAT_COOLDOWN_SECONDS = 15 * 60
+
+
+def combat_random_pool(enemy_key: str) -> str:
+    """Return the stable random stream name for the current combat rules."""
+
+    return f"battle.{enemy_key}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,8 +47,8 @@ TRAINING_DUMMY = EnemyDefinition(
     initiative=8,
     agility=8,
     skill_key="enemy_skill.dummy_tap",
-    random_pool="battle.enemy.training_dummy.v0.1",
-    reward={"cultivation": 20, "spirit_stones": 5},
+    random_pool=combat_random_pool("enemy.training_dummy"),
+    reward={},
 )
 
 WOOD_RAT = EnemyDefinition(
@@ -68,7 +62,7 @@ WOOD_RAT = EnemyDefinition(
     initiative=10,
     agility=8,
     skill_key="enemy_skill.scratch",
-    random_pool="battle.enemy.wood_rat.v0.1",
+    random_pool=combat_random_pool("enemy.wood_rat"),
     reward={},
 )
 
@@ -83,7 +77,7 @@ IRON_BOAR = EnemyDefinition(
     initiative=7,
     agility=8,
     skill_key="enemy_skill.charge",
-    random_pool="battle.enemy.iron_boar.v0.1",
+    random_pool=combat_random_pool("enemy.iron_boar"),
     reward={},
 )
 
@@ -98,7 +92,7 @@ MIST_GUARDIAN = EnemyDefinition(
     initiative=10,
     agility=14,
     skill_key="enemy_skill.mist_shield",
-    random_pool="battle.enemy.mist_guardian.v0.1",
+    random_pool=combat_random_pool("enemy.mist_guardian"),
     reward={},
 )
 
@@ -113,24 +107,7 @@ SPRING_WISP = EnemyDefinition(
     initiative=11,
     agility=10,
     skill_key="enemy_skill.scratch",
-    random_pool="battle.enemy.spring_wisp.v0.1",
-    reward={},
-)
-
-CLOUD_BEAST = EnemyDefinition(
-    key="enemy.cloud_beast",
-    label="云铁矿兽",
-    location_key="xuantian.cloud_mine",
-    required_realm="foundation",
-    required_layer=1,
-    max_hp=700,
-    attack=85,
-    initiative=14,
-    agility=14,
-    skill_key="enemy_skill.cloud_armor",
-    random_pool="battle.enemy.cloud_beast.v0.2",
-    # Exploration owns the frozen reward. Keeping this empty prevents the
-    # generic battle reward claim from duplicating exploration materials.
+    random_pool=combat_random_pool("enemy.spring_wisp"),
     reward={},
 )
 
@@ -145,7 +122,7 @@ MIST_ELITE = EnemyDefinition(
     initiative=15,
     agility=18,
     skill_key="enemy_skill.mist_exposed",
-    random_pool="battle.enemy.mist_elite.v0.2",
+    random_pool=combat_random_pool("enemy.mist_elite"),
     reward={},
 )
 
@@ -160,7 +137,7 @@ CLOUD_BOAT_GUARDIAN = EnemyDefinition(
     initiative=16,
     agility=16,
     skill_key="enemy_skill.cloud_armor",
-    random_pool="combat.enemy.cloud_boat_guardian.v0.2",
+    random_pool=combat_random_pool("enemy.cloud_boat_guardian"),
     reward={},
 )
 
@@ -175,7 +152,7 @@ DEMON_OVERLORD = EnemyDefinition(
     initiative=22,
     agility=24,
     skill_key="skill.demonic.abyss_communion",
-    random_pool="combat.demon_overlord.v0.3",
+    random_pool=combat_random_pool("enemy.demon_overlord"),
     reward={},
 )
 
@@ -190,7 +167,7 @@ DEMON_RUINS_SCOUT = EnemyDefinition(
     initiative=8,
     agility=8,
     skill_key="enemy_skill.scratch",
-    random_pool="combat.demon_ruins_scout.v0.3.1",
+    random_pool=combat_random_pool("enemy.demon_ruins_scout"),
     reward={},
 )
 
@@ -205,7 +182,7 @@ DEMON_ABYSS_ECHO_GUARDIAN = EnemyDefinition(
     initiative=14,
     agility=14,
     skill_key="enemy_skill.scratch",
-    random_pool="combat.enemy.demon_abyss_echo_guardian.v0.3.2",
+    random_pool=combat_random_pool("enemy.demon_abyss_echo_guardian"),
     reward={},
 )
 
@@ -220,7 +197,7 @@ DEMON_ABYSS_HEART = EnemyDefinition(
     initiative=18,
     agility=20,
     skill_key="enemy_skill.scratch",
-    random_pool="combat.enemy.demon_abyss_heart.v0.3.2",
+    random_pool=combat_random_pool("enemy.demon_abyss_heart"),
     reward={},
 )
 
@@ -235,7 +212,7 @@ BEAST_GUARDIAN = EnemyDefinition(
     initiative=22,
     agility=24,
     skill_key="skill.beast.guardian_roar",
-    random_pool="combat.beast_guardian.v0.3",
+    random_pool=combat_random_pool("enemy.beast_guardian"),
     reward={},
 )
 
@@ -250,7 +227,7 @@ BEAST_ANCESTOR = EnemyDefinition(
     initiative=22,
     agility=24,
     skill_key="skill.beast.ancestral_form",
-    random_pool="combat.beast_ancestor.v0.3",
+    random_pool=combat_random_pool("enemy.beast_ancestor"),
     reward={},
 )
 
@@ -265,7 +242,7 @@ ANCESTRAL_SPIRIT = EnemyDefinition(
     initiative=26,
     agility=30,
     skill_key="skill.beast.ancestral_form",
-    random_pool="combat.ancestral_spirit.v0.4",
+    random_pool=combat_random_pool("enemy.ancestral_spirit"),
     reward={},
 )
 
@@ -280,7 +257,7 @@ DEMON_WAR_FRONT = EnemyDefinition(
     initiative=12,
     agility=10,
     skill_key="skill.demonic.war_front_strike",
-    random_pool="combat.demon_war_front.v0.3",
+    random_pool=combat_random_pool("enemy.demon_war_front"),
     reward={},
 )
 
@@ -295,7 +272,7 @@ CROSS_REALM_SENTINEL = EnemyDefinition(
     initiative=14,
     agility=12,
     skill_key="enemy_skill.boundary_sweep",
-    random_pool="battle.enemy.cross_realm_sentinel.v0.4",
+    random_pool=combat_random_pool("enemy.cross_realm_sentinel"),
     reward={},
 )
 
@@ -310,7 +287,7 @@ BOUNDARY_WATCHER = EnemyDefinition(
     initiative=24,
     agility=28,
     skill_key="enemy_skill.boundary_impact",
-    random_pool="combat.boundary_watcher.v0.3",
+    random_pool=combat_random_pool("enemy.boundary_watcher"),
     reward={},
 )
 
@@ -415,7 +392,7 @@ BOUNDARY_TRIAL_GUARDIAN = EnemyDefinition(
     initiative=16,
     agility=14,
     skill_key="enemy_skill.boundary_wall",
-    random_pool="battle.enemy.boundary_trial_guardian.v0.5",
+    random_pool=combat_random_pool("enemy.boundary_trial_guardian"),
     reward={},
 )
 
@@ -434,7 +411,7 @@ ARCHIVE_KEEPER = EnemyDefinition(
     initiative=1,
     agility=1,
     skill_key="enemy_skill.archive_rule_rewrite",
-    random_pool="combat.enemy.archive_keeper.v0.5",
+    random_pool=combat_random_pool("enemy.archive_keeper"),
     reward={},
 )
 
@@ -449,7 +426,7 @@ MIST_TRIAL_SENSING = EnemyDefinition(
     initiative=8,
     agility=8,
     skill_key="enemy_skill.dummy_tap",
-    random_pool="battle.enemy.mist_trial.sensing.v0.1",
+    random_pool=combat_random_pool("enemy.mist_trial.sensing"),
     reward={},
 )
 
@@ -464,7 +441,7 @@ MIST_TRIAL_SENSING_BOSS = EnemyDefinition(
     initiative=10,
     agility=10,
     skill_key="enemy_skill.dummy_tap",
-    random_pool="battle.enemy.mist_trial.sensing_boss.v0.1",
+    random_pool=combat_random_pool("enemy.mist_trial.sensing_boss"),
     reward={},
 )
 
@@ -479,7 +456,7 @@ MIST_TRIAL_GATHERING = EnemyDefinition(
     initiative=12,
     agility=14,
     skill_key="enemy_skill.scratch",
-    random_pool="battle.enemy.mist_trial.gathering.v0.1",
+    random_pool=combat_random_pool("enemy.mist_trial.gathering"),
     reward={},
 )
 
@@ -494,7 +471,7 @@ MIST_TRIAL_GATHERING_BOSS = EnemyDefinition(
     initiative=14,
     agility=16,
     skill_key="enemy_skill.scratch",
-    random_pool="battle.enemy.mist_trial.gathering_boss.v0.1",
+    random_pool=combat_random_pool("enemy.mist_trial.gathering_boss"),
     reward={},
 )
 
@@ -509,7 +486,7 @@ MIST_TRIAL_FOUNDATION = EnemyDefinition(
     initiative=15,
     agility=18,
     skill_key="enemy_skill.scratch",
-    random_pool="battle.enemy.mist_trial.foundation.v0.1",
+    random_pool=combat_random_pool("enemy.mist_trial.foundation"),
     reward={},
 )
 
@@ -524,7 +501,7 @@ MIST_TRIAL_FOUNDATION_BOSS = EnemyDefinition(
     initiative=18,
     agility=20,
     skill_key="enemy_skill.scratch",
-    random_pool="battle.enemy.mist_trial.foundation_boss.v0.1",
+    random_pool=combat_random_pool("enemy.mist_trial.foundation_boss"),
     reward={},
 )
 
@@ -539,7 +516,7 @@ MIST_TRIAL_GOLDEN_CORE = EnemyDefinition(
     initiative=20,
     agility=22,
     skill_key="enemy_skill.mist_exposed",
-    random_pool="battle.enemy.mist_trial.golden_core.v0.2",
+    random_pool=combat_random_pool("enemy.mist_trial.golden_core"),
     reward={},
 )
 
@@ -554,9 +531,63 @@ MIST_TRIAL_GOLDEN_CORE_BOSS = EnemyDefinition(
     initiative=25,
     agility=28,
     skill_key="enemy_skill.mist_exposed",
-    random_pool="battle.enemy.mist_trial.golden_core_boss.v0.2",
+    random_pool=combat_random_pool("enemy.mist_trial.golden_core_boss"),
     reward={},
 )
+
+
+def _content_enemy(key: str, content: ContentBundle) -> EnemyDefinition:
+    record = content.require("enemy", key, include_locked=False)
+    profile = record.get("combat_profile")
+    requirements = record.get("requirements")
+    stats = record.get("stats")
+    skills = record.get("skills")
+    if (
+        not isinstance(profile, dict)
+        or not isinstance(requirements, list)
+        or len(requirements) != 1
+        or not isinstance(requirements[0], dict)
+        or not isinstance(stats, dict)
+        or not isinstance(skills, list)
+        or not skills
+    ):
+        raise ContentError(f"enemy {key} has an invalid combat profile")
+    requirement = requirements[0]
+    realm = requirement.get("realm_key", requirement.get("stage"))
+    values = (stats.get("hp"), stats.get("attack"), stats.get("initiative"), stats.get("agility"))
+    random_pool = profile.get("random_pool_key")
+    if (
+        not isinstance(realm, str)
+        or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in values)
+        or not isinstance(requirement.get("min_layer", 0), int)
+        or not isinstance(random_pool, str)
+        or not random_pool
+        or not isinstance(skills[0], str)
+    ):
+        raise ContentError(f"enemy {key} has invalid combat values")
+    reward = profile.get("reward", {})
+    if not isinstance(reward, dict) or any(
+        not isinstance(reward_key, str)
+        or isinstance(amount, bool)
+        or not isinstance(amount, int)
+        or amount < 0
+        for reward_key, amount in reward.items()
+    ):
+        raise ContentError(f"enemy {key} has an invalid battle reward")
+    return EnemyDefinition(
+        key=key,
+        label=str(record["name"]),
+        location_key=str(record["location_key"]),
+        required_realm=realm,
+        required_layer=int(requirement.get("min_layer", 0)),
+        max_hp=int(values[0]),
+        attack=int(values[1]),
+        initiative=int(values[2]),
+        agility=int(values[3]),
+        skill_key=skills[0],
+        random_pool=random_pool,
+        reward=dict(reward),
+    )
 
 
 def _void_spire_enemy(key: str, *, content: ContentBundle | None = None) -> EnemyDefinition:
@@ -595,7 +626,6 @@ ENEMIES = {
     IRON_BOAR.key: IRON_BOAR,
     MIST_GUARDIAN.key: MIST_GUARDIAN,
     SPRING_WISP.key: SPRING_WISP,
-    CLOUD_BEAST.key: CLOUD_BEAST,
     MIST_ELITE.key: MIST_ELITE,
     CLOUD_BOAT_GUARDIAN.key: CLOUD_BOAT_GUARDIAN,
     DEMON_OVERLORD.key: DEMON_OVERLORD,
@@ -653,7 +683,7 @@ for _faction, _faction_label in _THREE_REALMS_TOWER_FACTIONS.items():
             initiative=_initiative,
             agility=_agility,
             skill_key=_skill,
-            random_pool=f"battle.{_key}.v0.3",
+            random_pool=combat_random_pool(_key),
             reward={},
         )
     for _encounter, _label, _hp, _attack, _initiative, _agility in (
@@ -674,14 +704,18 @@ for _faction, _faction_label in _THREE_REALMS_TOWER_FACTIONS.items():
             initiative=_initiative,
             agility=_agility,
             skill_key="enemy_skill.mist_exposed",
-            random_pool=f"battle.{_key}.v0.4",
+            random_pool=combat_random_pool(_key),
             reward={},
         )
 
 
 def enemy_definition(enemy_key: str, *, content: ContentBundle | None = None) -> EnemyDefinition:
-    if content is not None and enemy_key.startswith("enemy.void_spire."):
-        return _void_spire_enemy(enemy_key, content=content)
+    bundle = content or _VOID_SPIRE_CONTENT
+    if enemy_key.startswith("enemy.void_spire."):
+        return _void_spire_enemy(enemy_key, content=bundle)
+    record = bundle.get("enemy", enemy_key, include_locked=False)
+    if record is not None and isinstance(record.get("combat_profile"), dict):
+        return _content_enemy(enemy_key, bundle)
     try:
         return ENEMIES[enemy_key]
     except KeyError as exc:
@@ -697,8 +731,19 @@ def clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, value))
 
 
-def hit_chance_bp(*, attacker_initiative: int, defender_agility: int, skill_hit_bp: int = 0) -> int:
-    return clamp(8_500 + attacker_initiative * 20 - defender_agility * 20 + skill_hit_bp, 2_000, 9_800)
+def hit_chance_bp(
+    *,
+    attacker_initiative: int,
+    defender_agility: int,
+    skill_hit_bp: int = 0,
+    accuracy_bp: int = 0,
+    evasion_bp: int = 0,
+) -> int:
+    return clamp(
+        8_500 + attacker_initiative * 20 - defender_agility * 20 + skill_hit_bp + accuracy_bp - evasion_bp,
+        2_000,
+        9_800,
+    )
 
 
 def player_stat_snapshot(
@@ -707,35 +752,136 @@ def player_stat_snapshot(
     max_hp: int,
     initiative: int,
     equipment: tuple[Mapping[str, object], ...],
+    constitution_effect: Mapping[str, object] | None = None,
+    manual_stat_bonus_bp: Mapping[str, int] | None = None,
 ) -> dict[str, int]:
-    """Build the v0.1 basic-attack stats from the existing player projections.
+    """Build combat stats from player projections and frozen equipment effects.
 
-    The wider stat service is intentionally not invented in the combat layer.
-    This first slice only consumes the stable qualification, player projection,
-    and equipment-instance fields that already exist.
+    The wider stat service is intentionally not invented in the combat layer;
+    configured flat equipment effects are applied to the existing projections.
     """
 
     body = max(0, int(qualification.get("body", 0)))
     agility = max(0, int(qualification.get("agility", 0)))
+    spirit = max(0, int(qualification.get("spirit", 0)))
     damage_bonus = 0
     hp_bonus = 0
     initiative_bonus = 0
     temper_bonus = 0
+    flat_stats = {"physical_damage": 0, "max_hp": 0, "initiative": 0, "agility": 0,
+                  "max_mana": 0, "hp_regen": 0, "mana_regen": 0}
+    combat_stats = {
+        "damage_reduction_bp": 0,
+        "crit_chance_bp": 0,
+        "crit_damage_bp": 0,
+        "evasion_bp": 0,
+        "accuracy_bp": 0,
+        "anti_crit_bp": 0,
+        "damage_reflection_bp": 0,
+        "lifesteal_bp": 0,
+        "mana_leech_bp": 0,
+        "healing_reduction_bp": 0,
+        "recovery_reduction_bp": 0,
+    }
     for item in equipment:
+        durability_bp = max(0, min(10_000, int(item.get("durability_bp", 10_000))))
         affixes = item.get("affixes", {})
         if isinstance(affixes, Mapping):
-            damage_bonus += max(0, int(affixes.get("damage", 0)))
-            hp_bonus += max(0, int(affixes.get("hp", 0)))
-            initiative_bonus += max(0, int(affixes.get("initiative", 0)))
+            damage_bonus += max(0, int(affixes.get("damage", 0))) * durability_bp // 10_000
+            hp_bonus += max(0, int(affixes.get("hp", 0))) * durability_bp // 10_000
+            initiative_bonus += max(0, int(affixes.get("initiative", 0))) * durability_bp // 10_000
+            for key, stat in _EQUIPMENT_AFFIX_STATS.items():
+                combat_stats[stat] += max(0, int(affixes.get(key, 0))) * durability_bp // 10_000
+            flat_stats["hp_regen"] += max(0, int(affixes.get("hp_regen", 0))) * durability_bp // 10_000
+            flat_stats["max_mana"] += max(0, int(affixes.get("max_mana", 0))) * durability_bp // 10_000
+            flat_stats["mana_regen"] += max(0, int(affixes.get("mana_regen", 0))) * durability_bp // 10_000
         if str(item.get("slot", "")) == "weapon":
             temper_bonus += max(0, int(item.get("temper_level", 0))) * 2
-    base_hp = 100 + body * 4 + hp_bonus
-    return {
-        "max_hp": max(base_hp, max(0, int(max_hp))),
-        "attack": 10 + body // 2 + temper_bonus + damage_bonus,
-        "initiative": max(8 + agility // 2 + initiative_bonus, max(0, int(initiative))),
-        "agility": agility,
+        effects = item.get("effects", ())
+        if not isinstance(effects, (list, tuple)):
+            raise ValueError(f"equipment {item.get('item_key')} effects must be a list")
+        for effect in effects:
+            if not isinstance(effect, Mapping) or effect.get("type") != "flat_stat":
+                continue
+            stat = effect.get("stat")
+            value = effect.get("value")
+            if not isinstance(stat, str) or isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"equipment {item.get('item_key')} has an invalid flat_stat effect")
+            if stat not in flat_stats:
+                raise ValueError(f"equipment {item.get('item_key')} has unsupported combat stat: {stat}")
+            flat_stats[stat] += value * durability_bp // 10_000
+        for effect in effects:
+            if not isinstance(effect, Mapping) or effect.get("type") != "combat_stat_bp":
+                continue
+            stat = effect.get("stat")
+            value = effect.get("value")
+            if stat not in combat_stats or isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"equipment {item.get('item_key')} has an invalid combat_stat_bp effect")
+            combat_stats[str(stat)] += value * durability_bp // 10_000
+    base_hp = max(100 + body * 4, max(0, int(max_hp))) + hp_bonus + flat_stats["max_hp"]
+    stats = {
+        "max_hp": base_hp,
+        "attack": 10 + body // 2 + temper_bonus + damage_bonus + flat_stats["physical_damage"],
+        "initiative": max(
+            8 + agility // 2 + initiative_bonus + flat_stats["initiative"],
+            max(0, int(initiative)),
+        ),
+        "agility": agility + flat_stats["agility"],
+        "max_mana": 80 + spirit * 10 + flat_stats["max_mana"],
+        "hp_regen": flat_stats["hp_regen"],
+        "mana_regen": flat_stats["mana_regen"],
     }
+    stats.update(combat_stats)
+    stats["damage_reduction_bp"] = min(7_000, stats["damage_reduction_bp"])
+    stats["crit_chance_bp"] = min(5_000, stats["crit_chance_bp"])
+    stats["crit_damage_bp"] = min(15_000, stats["crit_damage_bp"])
+    stats["evasion_bp"] = min(7_500, stats["evasion_bp"])
+    stats["accuracy_bp"] = min(5_000, stats["accuracy_bp"])
+    stats["anti_crit_bp"] = min(5_000, stats["anti_crit_bp"])
+    stats["damage_reflection_bp"] = min(5_000, stats["damage_reflection_bp"])
+    stats["lifesteal_bp"] = min(5_000, stats["lifesteal_bp"])
+    stats["mana_leech_bp"] = min(5_000, stats["mana_leech_bp"])
+    stats["healing_reduction_bp"] = min(9_000, stats["healing_reduction_bp"])
+    stats["recovery_reduction_bp"] = min(9_000, stats["recovery_reduction_bp"])
+    for stat, value in (manual_stat_bonus_bp or {}).items():
+        if stat not in stats or isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"manual has an invalid combat stat bonus: {stat}")
+        stats[stat] += stats[stat] * value // 10_000
+    return apply_constitution_combat_effect(stats, constitution_effect)
+
+
+_EQUIPMENT_AFFIX_STATS = {
+    "damage_reduction": "damage_reduction_bp",
+    "crit_chance": "crit_chance_bp",
+    "crit_damage": "crit_damage_bp",
+    "evasion": "evasion_bp",
+    "accuracy": "accuracy_bp",
+    "anti_crit": "anti_crit_bp",
+    "reflection": "damage_reflection_bp",
+    "lifesteal": "lifesteal_bp",
+    "mana_leech": "mana_leech_bp",
+    "healing_reduction": "healing_reduction_bp",
+    "recovery_reduction": "recovery_reduction_bp",
+}
+
+
+def apply_constitution_combat_effect(
+    stats: Mapping[str, int], effect: Mapping[str, object] | None
+) -> dict[str, int]:
+    result = {str(key): int(value) for key, value in stats.items()}
+    if not effect:
+        return result
+    effect_type = effect.get("type")
+    value = effect.get("value")
+    if not isinstance(effect_type, str) or isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("constitution combat effect is invalid")
+    if effect_type == "max_hp_bp":
+        result["max_hp"] += result.get("max_hp", 0) * value // 10_000
+    elif effect_type == "initiative_bp":
+        result["initiative"] += result.get("initiative", 0) * value // 10_000
+    elif effect_type not in {"production_quality_bp", "drop_weight_bp"}:
+        raise ValueError(f"unsupported constitution combat effect: {effect_type}")
+    return result
 
 
 def player_goes_first(*, player_initiative: int, enemy_initiative: int, seed: str) -> bool:
@@ -745,20 +891,12 @@ def player_goes_first(*, player_initiative: int, enemy_initiative: int, seed: st
 
 
 __all__ = [
-    "CONTENT_VERSION",
-    "V02_CONTENT_VERSION",
-    "V02_RULE_VERSION",
     "DEFEAT_COOLDOWN_SECONDS",
-    "V03_CONTENT_VERSION",
-    "V03_RULE_VERSION",
-    "V031_RULE_VERSION",
-    "V051_RULE_VERSION",
     "ENEMIES",
     "MAX_TURNS",
-    "RULE_VERSION",
+    "combat_random_pool",
     "TURN_TIMEOUT_SECONDS",
     "EnemyDefinition",
-    "CLOUD_BEAST",
     "CLOUD_BOAT_GUARDIAN",
     "DEMON_OVERLORD",
     "DEMON_RUINS_SCOUT",
@@ -778,6 +916,7 @@ __all__ = [
     "VOID_RUINS_KEEPER_UNSTABLE",
     "battle_roll_bp",
     "clamp",
+    "apply_constitution_combat_effect",
     "enemy_definition",
     "hit_chance_bp",
     "player_goes_first",

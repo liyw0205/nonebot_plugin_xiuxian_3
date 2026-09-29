@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 
 SECT_EXCHANGE_DAILY_CAP = 5
-SECT_EXCHANGE_CONTENT_VERSION = "content-0.2"
-SECT_EXCHANGE_RULE_VERSION = "economy-0.2.0"
-SECT_SUPPLY_RULE_VERSION = "social-0.2.1"
+SECT_EXCHANGE_CONTENT_VERSION = ""
+SECT_EXCHANGE_RULE_VERSION = ""
+SECT_SUPPLY_RULE_VERSION = ""
 SECT_DONATION_ITEMS = frozenset({
     "item.herb.spirit_leaf", "item.herb.blood_grass",
     "item.mat.array_sand", "item.material.cloud_iron",

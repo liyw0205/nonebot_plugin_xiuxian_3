@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..repository import (
     EquipmentAmbiguousError,
     EquipmentNotOwnedError,
+    EquipmentRequirementError,
     EquipmentTemperingMaxedError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -17,12 +19,14 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .equipment_rules import (
-    EQUIPMENT_DEFINITIONS,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    TEMPER_COSTS,
-    TEMPER_MATERIAL,
-    TEMPER_SUCCESS_BP,
+    equipment_affix_label,
+    equipment_definitions,
+    equipment_resource_label,
+    refinement_cost,
+    refinement_pity_failures,
+    refinement_success_bp,
+    temper_cost,
+    temper_success_bp,
 )
 
 
@@ -50,43 +54,66 @@ class EquipmentApplication:
             .replace("~", "\\~")
         )
 
-    @staticmethod
-    def _item_label(item_key: str) -> str:
-        definition = EQUIPMENT_DEFINITIONS.get(item_key)
-        return definition.label if definition else item_key
+    def _cost_text(self, costs: dict[str, int]) -> str:
+        content = self.repository.content
+        return "、".join(
+            f"{equipment_resource_label(resource_key, content)} ×{quantity}"
+            for resource_key, quantity in costs.items()
+        ) or "无消耗"
 
-    @staticmethod
-    def _material_label(item_key: str) -> str:
-        return {"item.ore.ironstone": "铁石"}.get(item_key, item_key)
-
-    @staticmethod
-    def _affix_text(affixes: dict[str, int]) -> str:
-        labels = {"damage": "伤害", "hp": "气血", "initiative": "先手"}
+    def _affix_text(self, affixes: dict[str, int]) -> str:
         if not affixes:
             return "无"
-        return "、".join(f"**{labels.get(key, key)}** +{value}" for key, value in affixes.items())
+        return "、".join(
+            f"**{equipment_affix_label(key, self.repository.content)}** +{value}"
+            for key, value in affixes.items()
+        )
 
     async def preview_tempering(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "法器预览无需附加参数。", context.request_id)
-        lines = ["## 法器祭炼", "", "木纹剑与棉袍可强化至 3 阶；失败不降级，只损失本次成本。", ""]
-        for level in range(1, MAX_TEMPER_LEVEL + 1):
-            material, stones = TEMPER_COSTS[level]
-            lines.append(
-                f"- **{level} 阶**：铁石 ×{material}，灵石 ×{stones}，成功率 `{TEMPER_SUCCESS_BP[level] / 100:.0f}%`。"
-            )
-        lines.extend(["", "> 使用 `强化法器 木纹剑` 或 `强化法器 棉袍`。"])
+        definitions = equipment_definitions(self.repository.content)
+        lines = ["## 装备祭炼", ""]
+        for definition in sorted(definitions.values(), key=lambda item: item.label):
+            lines.append(f"### {definition.label}")
+            if definition.min_realm_key:
+                lines.append(
+                    f"最低境界：{(self.repository.content or bundled_content()).label('realm', definition.min_realm_key)} L{definition.min_layer}"
+                )
+            lines.append(f"最高阶数：{definition.max_temper_level}")
+            for level in range(1, definition.max_temper_level + 1):
+                costs = temper_cost(level, definition)
+                success_bp = temper_success_bp(level, definition)
+                lines.append(
+                    f"- **{level} 阶**：{self._cost_text(costs)}，成功率 `{success_bp / 100:.0f}%`。"
+                )
+            lines.append("")
+        lines.append("> 使用 `强化法器 <装备名称>`。")
         return CommandResult(True, "EQUIPMENT_TEMPER_PREVIEW", "\n".join(lines), context.request_id)
 
     async def preview_refinement(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "重铸预览无需附加参数。", context.request_id)
-        return CommandResult(
-            True,
-            "EQUIPMENT_REFINE_PREVIEW",
-            "## 灵纹重铸\n\n每次消耗 **铁石 ×2** 与 **灵石 ×30**，随机获得 **伤害 +1**、**气血 +5** 或 **先手 +1**。\n\n失败保留旧词条；连续失败 3 次后，下一次必定获得非空词条。\n\n> 使用 `重铸法器 木纹剑` 或 `重铸法器 棉袍`。",
-            context.request_id,
-        )
+        definitions = equipment_definitions(self.repository.content)
+        lines = ["## 灵纹重铸", ""]
+        for definition in sorted(definitions.values(), key=lambda item: item.label):
+            refinement = definition.growth["refinement"]
+            affixes = refinement["affix_pool"]
+            results = "、".join(
+                f"**{equipment_affix_label(row['key'], self.repository.content)} +{row['value']}**"
+                for row in affixes
+            )
+            lines.extend(
+                [
+                    f"### {definition.label}",
+                    f"消耗：{self._cost_text(refinement_cost(definition))}",
+                    f"成功率：`{refinement_success_bp(definition) / 100:.0f}%`；连续失败 {refinement_pity_failures(definition)} 次后必定成功。",
+                    f"可能词条：{results}。",
+                    "",
+                ]
+            )
+        lines.append("> 使用 `重铸法器 <装备名称>`。")
+        return CommandResult(True, "EQUIPMENT_REFINE_PREVIEW", "\n".join(lines), context.request_id)
 
     async def temper(self, context: CommandContext) -> CommandResult:
         return await self._mutate(context, mode="temper")
@@ -124,10 +151,12 @@ class EquipmentApplication:
             return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成入道后才能养成法器。", context.request_id, operation_id)
         except EquipmentNotOwnedError:
             return CommandResult(False, "EQUIPMENT_NOT_OWNED", "你当前没有这件法器。", context.request_id, operation_id)
+        except EquipmentRequirementError:
+            return CommandResult(False, "EQUIPMENT_REQUIREMENT_MISSING", "当前境界尚未达到这件装备的养成要求。", context.request_id, operation_id)
         except EquipmentAmbiguousError:
             return CommandResult(False, "EQUIPMENT_AMBIGUOUS", "同名法器不止一件，请先处理已有法器。", context.request_id, operation_id)
         except EquipmentTemperingMaxedError:
-            return CommandResult(False, "EQUIPMENT_MAXED", "这件法器已经达到当前版本强化上限。", context.request_id, operation_id)
+            return CommandResult(False, "EQUIPMENT_MAXED", "这件法器已经达到淬炼上限。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "EQUIPMENT_RESOURCE_INSUFFICIENT", "材料或灵石不足，未改变法器。", context.request_id, operation_id)
         except EquipmentBusyError:
@@ -147,7 +176,7 @@ class EquipmentApplication:
                 f"从 **{record.from_level} 阶**提升至 **{record.to_level} 阶**。\n\n"
                 f"- **结果**：{'成功' if record.success else '失败，等级不变'}\n"
                 f"- **判定**：`{record.roll_bp}/{record.success_bp}`\n"
-                f"- **消耗**：{self._material_label(record.material_key)} ×{record.material_spent}，灵石 ×{record.spirit_stones_spent}"
+                f"- **消耗**：{self._cost_text(record.costs_spent)}"
             )
             data = {
                 "instance_id": record.equipment.instance_id,
@@ -156,8 +185,7 @@ class EquipmentApplication:
                 "success": record.success,
                 "roll_bp": record.roll_bp,
                 "success_bp": record.success_bp,
-                "material_spent": record.material_spent,
-                "spirit_stones_spent": record.spirit_stones_spent,
+                "costs_spent": record.costs_spent,
                 "idempotent_replay": record.already_completed,
             }
             code = "EQUIPMENT_TEMPERED"
@@ -167,7 +195,7 @@ class EquipmentApplication:
                 f"- **结果**：{'获得新词条' if record.success else '失败，保留旧词条'}\n"
                 f"- **词条**：{self._affix_text(record.new_affixes)}\n"
                 f"- **连续失败**：`{record.failure_streak_after}`\n"
-                f"- **消耗**：{self._material_label(record.material_key)} ×{record.material_spent}，灵石 ×{record.spirit_stones_spent}"
+                f"- **消耗**：{self._cost_text(record.costs_spent)}"
             )
             data = {
                 "instance_id": record.equipment.instance_id,
@@ -178,8 +206,7 @@ class EquipmentApplication:
                 "failure_streak_after": record.failure_streak_after,
                 "roll_bp": record.roll_bp,
                 "success_bp": record.success_bp,
-                "material_spent": record.material_spent,
-                "spirit_stones_spent": record.spirit_stones_spent,
+                "costs_spent": record.costs_spent,
                 "idempotent_replay": record.already_completed,
             }
             code = "EQUIPMENT_REFINED"

@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
+from nonebot_plugin_xiuxian_3.xiuxian.adventures.rules import (
+    _reward_outcomes,
+    bounty_definition,
+    meets_realm,
+    reward_map,
+)
 
 
 def _context(user_id: str, request_id: str, *, operation_id: str = "") -> CommandContext:
@@ -63,6 +72,175 @@ def _finish_order(runtime, order_id: str) -> None:
         )
 
 
+def test_bounty_reward_pools_can_select_new_gear_and_manual_content() -> None:
+    void = bounty_definition("bounty.void_anchoring")
+    void_rewards = [reward_map(void, seed=f"void:{seed}") for seed in range(500)]
+    assert any("item.manual.dao_union_mysteries" in reward for reward in void_rewards)
+    assert any("item.weapon.primal_creation_sword" in reward for reward in void_rewards)
+    assert any("item.armor.chaos_immortal_raiment" in reward for reward in void_rewards)
+
+
+def test_accessory_reward_pools_cover_all_paths_and_open_realms() -> None:
+    content = bundled_content()
+    sources = (
+        ("foundation", "reward_pool.bounty.cloud_mine"),
+        ("golden_core", "reward_pool.bounty.elite_hunt"),
+        ("nascent_soul", "reward_pool.bounty.elite_hunt"),
+        ("soul_transformation", "reward_pool.bounty.elite_hunt"),
+        ("void_refining", "reward_pool.bounty.void_anchoring"),
+        ("dao_union", "reward_pool.bounty.void_anchoring"),
+        ("tribulation", "reward_pool.bounty.void_anchoring"),
+    )
+    for path_key in ("body", "spell", "device", "demonic", "beast", "support"):
+        for realm_key, pool_key in sources:
+            outcomes = _reward_outcomes(
+                content,
+                pool_key,
+                path_key=path_key,
+                realm_key=realm_key,
+                realm_layer=1,
+            )
+            accessory_keys = {
+                key
+                for outcome in outcomes
+                for key in outcome["rewards"]
+                if key.startswith("item.accessory.")
+            }
+            assert accessory_keys, (path_key, realm_key, pool_key)
+            for item_key in accessory_keys:
+                item = content.require("item", item_key, include_locked=False)
+                assert item["path_key"] == path_key
+                requirement = next(row for row in item["requirements"] if row["type"] == "realm")
+                assert meets_realm(
+                    realm_key,
+                    1,
+                    requirement["realm_key"],
+                    requirement["min_layer"],
+                    content,
+                )
+
+
+def test_equipment_quality_rewards_select_path_and_realm_eligible_gear() -> None:
+    content = bundled_content()
+    for path_key in ("body", "spell", "device", "demonic", "beast", "support"):
+        for realm_key, pool_key in (
+            ("foundation", "reward_pool.bounty.cloud_mine"),
+            ("golden_core", "reward_pool.bounty.elite_hunt"),
+            ("nascent_soul", "reward_pool.bounty.elite_hunt"),
+            ("soul_transformation", "reward_pool.bounty.elite_hunt"),
+            ("void_refining", "reward_pool.bounty.void_anchoring"),
+            ("dao_union", "reward_pool.bounty.void_anchoring"),
+            ("tribulation", "reward_pool.bounty.void_anchoring"),
+        ):
+            outcomes = _reward_outcomes(
+                content,
+                pool_key,
+                path_key=path_key,
+                realm_key=realm_key,
+                realm_layer=1,
+            )
+            gear = {
+                key
+                for outcome in outcomes
+                for key in outcome["rewards"]
+                if key.startswith(("item.weapon.", "item.armor."))
+            }
+            weapons = {key for key in gear if key.startswith("item.weapon.")}
+            armors = {key for key in gear if key.startswith("item.armor.")}
+            assert weapons, ("weapon", path_key, realm_key, pool_key)
+            assert armors, ("armor", path_key, realm_key, pool_key)
+            assert any(content.require("item", key).get("path_key") == path_key for key in weapons)
+            assert any(content.require("item", key).get("path_key") == path_key for key in armors)
+            for item_key in gear:
+                item = content.require("item", item_key, include_locked=False)
+                assert item.get("path_key") in {None, path_key}
+                requirement = next(
+                    (row for row in item["requirements"] if row["type"] == "realm"),
+                    None,
+                )
+                assert requirement is None or meets_realm(
+                    realm_key,
+                    1,
+                    requirement["realm_key"],
+                    requirement["min_layer"],
+                    content,
+                )
+
+
+def test_equipment_rewards_follow_path_and_realm_and_create_instances() -> None:
+    async def run(data_dir: Path) -> None:
+        reward_path = data_dir / "奖励" / "奖励.json"
+        rewards = json.loads(reward_path.read_text(encoding="utf-8"))
+        pool = next(
+            record
+            for record in rewards["records"]
+            if record.get("key") == "reward_pool.bounty.herb_supply"
+        )
+        pool["equipment_reward_qualities"] = {}
+        pool["outcomes"] = [
+            {
+                "weight": 1,
+                "rewards": {
+                    "item.accessory.body.stone_pulse_bracer": 1,
+                    "item.weapon.body.pulse_edge": 1,
+                    "item.armor.body.stoneheart_guard": 1,
+                },
+            }
+        ]
+        reward_path.write_text(json.dumps(rewards, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        runtime = create_runtime(data_dir=data_dir)
+        user = "bounty-accessory-instance"
+        await _enter_mortal(runtime, user)
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=1, path_key='body' "
+                "WHERE platform='web' AND platform_user_id=?",
+                (user,),
+            )
+        accepted = await runtime.dispatch(_context(user, "accept"), "接取悬赏 草药补给")
+        assert accepted.code == "BOUNTY_ACCEPTED"
+        _inventory(runtime, user, **{"item.herb.blood_grass": 5})
+        claimed = await runtime.dispatch(_context(user, "claim"), "领取悬赏")
+        assert claimed.code == "BOUNTY_CLAIMED"
+        assert claimed.data["rewards"] == {
+            "item.accessory.body.stone_pulse_bracer": 1,
+            "item.weapon.body.pulse_edge": 1,
+            "item.armor.body.stoneheart_guard": 1,
+        }
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            items = connection.execute(
+                "SELECT item_key, slot FROM equipment_instances "
+                "WHERE player_id=(SELECT id FROM players WHERE platform='web' AND platform_user_id=?) "
+                "ORDER BY item_key",
+                (user,),
+            ).fetchall()
+        assert items == [
+            ("item.accessory.body.stone_pulse_bracer", "accessory"),
+            ("item.armor.body.stoneheart_guard", "armor"),
+            ("item.weapon.body.pulse_edge", "weapon"),
+        ]
+
+        started = await runtime.dispatch(_context(user, "equipment-combat"), "开始训练战")
+        assert started.code == "BATTLE_SETTLED"
+        replay = await runtime.dispatch(_context(user, "equipment-combat-replay"), "战斗回放")
+        snapshot = replay.data["snapshot"]["player"]
+        equipment_keys = {item["item_key"] for item in snapshot["equipment"]}
+        assert {
+            "item.accessory.body.stone_pulse_bracer",
+            "item.armor.body.stoneheart_guard",
+            "item.weapon.body.pulse_edge",
+        } <= equipment_keys
+        assert snapshot["stats"]["accuracy_bp"] >= 190
+        assert snapshot["stats"]["damage_reduction_bp"] >= 110
+        await runtime.close()
+
+    with TemporaryDirectory() as directory:
+        data_dir = Path(directory) / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        asyncio.run(run(data_dir))
+
+
 def test_bounty_board_herb_claim_replay_and_reputation() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
@@ -73,7 +251,6 @@ def test_bounty_board_herb_claim_replay_and_reputation() -> None:
             board = await runtime.dispatch(_context(user, "board"), "悬赏榜")
             assert board.code == "BOUNTY_BOARD"
             assert "草药补给" in board.message
-            assert "训练傀儡" in board.message
             assert "前置不足" in board.message
             assert board.data["offers"][0]["status"] == "available"
 
@@ -90,7 +267,10 @@ def test_bounty_board_herb_claim_replay_and_reputation() -> None:
                 "领取悬赏",
             )
             assert claimed.code == "BOUNTY_CLAIMED"
-            assert claimed.data["rewards"] == {"spirit_stones": 30, "local_reputation": 2}
+            assert claimed.data["rewards"] in (
+                {"spirit_stones": 30, "local_reputation": 2},
+                {"spirit_stones": 45, "local_reputation": 1},
+            )
             replay = await runtime.dispatch(
                 _context(user, "claim-replay", operation_id="bounty-claim-1"),
                 "领取悬赏",
@@ -105,7 +285,7 @@ def test_bounty_board_herb_claim_replay_and_reputation() -> None:
                     "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
                     (user,),
                 ).fetchone()
-                assert json.loads(reputation[0])["local.xuantian.new_town"] == 2
+                assert json.loads(reputation[0])["local.xuantian.new_town"] == claimed.data["rewards"]["local_reputation"]
                 assert reputation[1] == 0
             await runtime.close()
 
@@ -148,51 +328,6 @@ def test_bounty_progress_guards_expiry_and_operation_conflict() -> None:
 
             limited = await runtime.dispatch(_context(user, "accept-second"), "接取悬赏 草药补给")
             assert limited.code == "BOUNTY_DAILY_LIMIT"
-            await runtime.close()
-
-    asyncio.run(run())
-
-
-def test_training_bounty_tracks_real_wins_for_qq_and_onebot() -> None:
-    async def run() -> None:
-        with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir, adapters=("qq.official", "onebot.v11"))
-            for adapter, user in (("qq.official", "bounty-qq-training"), ("onebot.v11", "bounty-ob-training")):
-                context = lambda request, operation_id="": CommandContext(
-                    adapter=adapter, user_id=user, request_id=request, operation_id=operation_id
-                )
-                assert (await runtime.dispatch(context("create"), "开始修仙")).ok
-                assert (await runtime.dispatch(context("seek"), "寻仙问道")).ok
-                with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=1, "
-                        "location_key='xuantian.new_town', max_hp=5000, initiative=100, qualification_json=? "
-                        "WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"body": 1000, "agility": 100}), adapter, user),
-                    )
-                accepted = await runtime.dispatch(
-                    context("accept", f"{adapter}-training-accept"), "接取悬赏 训练傀儡"
-                )
-                assert accepted.code == "BOUNTY_ACCEPTED"
-                for index in range(2):
-                    battle = await runtime.dispatch(
-                        context(f"battle-{index}", f"{adapter}-training-battle-{index}"), "开始训练战"
-                    )
-                    assert battle.code == "BATTLE_SETTLED"
-                    assert battle.data["outcome"] == "won"
-                board = await runtime.dispatch(context("board"), "悬赏榜")
-                training = next(item for item in board.data["offers"] if item["bounty_key"] == "bounty.training_dummy")
-                assert training["status"] == "completed"
-                assert training["progress"] == 2
-                claimed = await runtime.dispatch(
-                    context("claim", f"{adapter}-training-claim"), "领取悬赏"
-                )
-                assert claimed.code == "BOUNTY_CLAIMED"
-                assert claimed.data["rewards"] == {"cultivation": 120, "item.pill.focus_low": 1}
-                replay = await runtime.dispatch(
-                    context("claim-replay", f"{adapter}-training-claim"), "领取悬赏"
-                )
-                assert replay.data["idempotent_replay"] is True
             await runtime.close()
 
     asyncio.run(run())

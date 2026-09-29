@@ -7,8 +7,6 @@ grow the arena repositories further.
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
-
 import json
 import sqlite3
 from collections.abc import Iterable, Mapping
@@ -18,8 +16,8 @@ from .arena_federation import ensure_identity_route, record_settlement_audit
 from .codex_projection import record_codex_discovery
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 ARENA_LOCATION_KEY = "xuantian.new_town"
 ARENA_LOCAL_REPUTATION_KEY = f"local.{ARENA_LOCATION_KEY}"
 
@@ -118,8 +116,6 @@ def project_arena_result(
                 operation_id=operation_id,
                 occurred_at=settled_at,
                 snapshot=payload,
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
             )
         for path_key in participant["observed_path_keys"]:
             record_codex_discovery(
@@ -134,8 +130,6 @@ def project_arena_result(
                     "mode_key": mode_key,
                     "path_key": path_key,
                 },
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
             )
         for event_key in (
             "arena.participation",

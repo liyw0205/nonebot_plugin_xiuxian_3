@@ -19,9 +19,7 @@ class ExplorationDefinition:
     daily_limit: int
     random_pool: str
     battle_chance_bp: int
-    rule_version: str
     energy_cost: int = 0
-    content_version: str = "content-0.1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,7 +58,6 @@ class ExplorationSettlementRecord:
     battle_outcome: str | None = None
     already_completed: bool = False
     energy_cost: int = 0
-    content_version: str = "content-0.1"
     storm_pending: bool = False
     storm_options: tuple[str, ...] = ()
     storm_deadline: str | None = None

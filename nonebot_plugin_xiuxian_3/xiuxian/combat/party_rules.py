@@ -6,8 +6,6 @@ from .rules import EnemyDefinition
 
 
 PARTY_BATTLE_TYPE = "pve.party"
-PARTY_BATTLE_RULE_VERSION = "combat-party-0.1.0"
-PARTY_BATTLE_CONTENT_VERSION = "content-0.1"
 PARTY_BATTLE_MAX_TURNS = 20
 PARTY_BATTLE_REWARD = {"cultivation": 30, "spirit_stones": 10}
 BOUNDARY_REALM_LOCATION = "cave.boundary_realm"
@@ -51,10 +49,8 @@ def party_enemy_for_location(location_key: str) -> EnemyDefinition:
 
 
 __all__ = [
-    "PARTY_BATTLE_CONTENT_VERSION",
     "PARTY_BATTLE_MAX_TURNS",
     "PARTY_BATTLE_REWARD",
-    "PARTY_BATTLE_RULE_VERSION",
     "PARTY_BATTLE_TYPE",
     "BOUNDARY_REALM_ENEMY",
     "BOUNDARY_REALM_LOCATION",

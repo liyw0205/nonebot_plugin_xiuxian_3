@@ -3,6 +3,8 @@
   "records": [
     {
       "name": "凡人",
+      "desc": "尚未引气入体的凡俗之身，亦是踏上仙途的起点。",
+      "rank": 0,
       "status": "open",
       "layer_min": 0,
       "layer_max": 0,
@@ -17,6 +19,8 @@
     },
     {
       "name": "感气",
+      "desc": "初识天地灵息，引气淬体，在吐纳之间打下修行根基。",
+      "rank": 1,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,
@@ -38,6 +42,8 @@
     },
     {
       "name": "聚气",
+      "desc": "将灵气汇入丹田，渐渐凝实气海，为筑基积蓄力量。",
+      "rank": 2,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,
@@ -59,6 +65,8 @@
     },
     {
       "name": "筑基",
+      "desc": "灵力由散入稳，根基初成，修士自此真正立定仙途。",
+      "rank": 3,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,
@@ -80,6 +88,8 @@
     },
     {
       "name": "金丹",
+      "desc": "将周身灵力凝成金丹，举手投足间皆有深厚根基支撑。",
+      "rank": 4,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,
@@ -101,6 +111,8 @@
     },
     {
       "name": "元婴",
+      "desc": "金丹化生元婴，神魂与灵力相合，寿元和神识皆更进一步。",
+      "rank": 5,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,
@@ -122,6 +134,8 @@
     },
     {
       "name": "化神",
+      "desc": "神魂蜕变而生神念，可感天地变化，并开始参悟自身领域。",
+      "rank": 6,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,
@@ -150,6 +164,8 @@
     },
     {
       "name": "炼虚",
+      "desc": "以神念触及虚空，在天地间寻得属于自己的前行之路。",
+      "rank": 7,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,
@@ -161,6 +177,8 @@
     },
     {
       "name": "合道",
+      "desc": "将所行之道融入天地感悟，行止之间渐与大道相合。",
+      "rank": 8,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,
@@ -172,6 +190,8 @@
     },
     {
       "name": "渡劫",
+      "desc": "道途已至凡界尽头，修士需历经天劫试炼，方可叩问飞升。",
+      "rank": 9,
       "status": "open",
       "layer_min": 1,
       "layer_max": 10,

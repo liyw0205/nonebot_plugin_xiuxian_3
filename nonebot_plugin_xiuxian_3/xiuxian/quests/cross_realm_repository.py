@@ -22,7 +22,6 @@ from .cross_realm_rules import (
     DEMON_MAINLINE_RULE_VERSION,
     demon_mainline_realm_ready,
 )
-from ..exploration.rules import V03_RULE_VERSION
 from .models import QuestClaimRecord
 
 
@@ -82,8 +81,6 @@ class DemonQuestRepositoryMixin:
             evidence = evidence[:DEMON_MAINLINE_EXPLORATION_TARGET]
             snapshot: dict[str, object] = {
                 "quest_key": DEMON_MAINLINE,
-                "content_version": DEMON_MAINLINE_CONTENT_VERSION,
-                "rule_version": DEMON_MAINLINE_RULE_VERSION,
                 "required_realm": "nascent_soul",
                 "required_layer": 1,
                 "required_reputation": DEMON_MAINLINE_REQUIRED_REPUTATION,
@@ -167,10 +164,6 @@ class DemonQuestRepositoryMixin:
         for row in rows:
             snapshot = DemonQuestRepositoryMixin._json_object(row["snapshot_json"], {})
             result = DemonQuestRepositoryMixin._json_object(row["result_json"], {})
-            if snapshot.get("content_version") != DEMON_MAINLINE_CONTENT_VERSION:
-                continue
-            if snapshot.get("rule_version") != V03_RULE_VERSION:
-                continue
             if str(row["location_key"]) != "demon.fallen_ruins":
                 continue
             if result.get("battle_outcome") != "won":

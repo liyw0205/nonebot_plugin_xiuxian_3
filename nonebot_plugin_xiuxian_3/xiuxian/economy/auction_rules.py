@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from datetime import timedelta
 
 from .rules import NON_TRADEABLE_ITEMS, resolve_market_item
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 AUCTION_SLOT_LIMIT = 20
 AUCTION_DURATION = timedelta(hours=12)
 AUCTION_SETTLEMENT_GRACE = timedelta(minutes=10)

@@ -63,10 +63,19 @@ class BattleReplayRecord:
     actions: tuple[dict[str, object], ...]
 
 
+@dataclass(frozen=True, slots=True)
+class SpectatorPreviewRecord:
+    outcome: str
+    rounds: int
+    snapshots: dict[str, object]
+    actions: tuple[dict[str, object], ...] = field(default_factory=tuple)
+
+
 __all__ = [
     "BattleReplayRecord",
     "BattleResolutionRecord",
     "BattleRewardClaimRecord",
     "BattleStartRecord",
     "BattleTurnRecord",
+    "SpectatorPreviewRecord",
 ]

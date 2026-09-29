@@ -16,8 +16,8 @@ class SectExchangeRecord:
     member_contribution: int
     warehouse_quantity: int
     inventory_quantity: int
-    content_version: str = "content-0.2"
-    rule_version: str = "economy-0.2.0"
+    content_version: str = ""
+    rule_version: str = ""
     already_completed: bool = False
 
 

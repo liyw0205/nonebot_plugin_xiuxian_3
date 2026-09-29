@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..content import ContentBundle, ContentError, bundled_content
+
 
 PATH_LABELS = {
     "body": "体修",
@@ -28,23 +30,6 @@ SUBPROFESSION_ALIASES = {
     **{label: key for key, label in SUBPROFESSION_LABELS.items()},
 }
 
-PATH_SKILLS = {
-    "body": "skill.body.heavy_strike",
-    "spell": "skill.spell.water_bolt",
-    "device": "skill.device.scout_doll",
-    "demonic": "skill.demonic.pain_exchange",
-    "beast": "skill.beast.partial_transform",
-    "support": "skill.support.quick_assessment",
-}
-
-PATH_ITEM_REWARDS = {
-    "device": (("item.tool.basic_hammer", 1),),
-    "support:alchemy": (("item.tool.basic_furnace", 1),),
-    "support:artifice": (("item.tool.basic_hammer", 1),),
-    "support:formation": (("item.mat.array_sand", 3),),
-}
-
-
 def resolve_path(value: str) -> str | None:
     return PATH_ALIASES.get(value.strip())
 
@@ -53,6 +38,62 @@ def resolve_subprofession(value: str) -> str | None:
     return SUBPROFESSION_ALIASES.get(value.strip())
 
 
-def reward_items(path_key: str, subprofession_key: str | None) -> tuple[tuple[str, int], ...]:
-    key = f"{path_key}:{subprofession_key}" if path_key == "support" else path_key
-    return (("item.manual.basic_qi", 1), (PATH_SKILLS[path_key], 1), *PATH_ITEM_REWARDS.get(key, ()))
+def reward_items(
+    path_key: str,
+    subprofession_key: str | None,
+    content: ContentBundle | None = None,
+) -> tuple[tuple[str, int], ...]:
+    bundle = content or bundled_content()
+    path = bundle.get("path", path_key, include_locked=False)
+    if path is None:
+        raise ContentError(f"unknown active path: {path_key}")
+    skill_key = path.get("active_skill")
+    if not isinstance(skill_key, str) or not bundle.has("skill", skill_key, include_locked=False):
+        raise ContentError(f"path {path_key} references an unavailable active skill")
+
+    item_rewards = path.get("entry_item_rewards")
+    if not isinstance(item_rewards, list):
+        raise ContentError(f"path {path_key} entry_item_rewards must be a list")
+    rows: list[tuple[str, int]] = []
+    for reward in item_rewards:
+        if not isinstance(reward, dict):
+            raise ContentError(f"path {path_key} has an invalid entry item reward")
+        item_key = reward.get("item_key")
+        quantity = reward.get("quantity")
+        if (
+            not isinstance(item_key, str)
+            or isinstance(quantity, bool)
+            or not isinstance(quantity, int)
+            or quantity <= 0
+        ):
+            raise ContentError(f"path {path_key} has an invalid entry item reward")
+        if not bundle.has("item", item_key, include_locked=False):
+            raise ContentError(f"path {path_key} rewards an unavailable item: {item_key}")
+        rows.append((item_key, quantity))
+
+    by_subprofession = path.get("subprofession_item_rewards", {})
+    if not isinstance(by_subprofession, dict):
+        raise ContentError(f"path {path_key} subprofession_item_rewards must be an object")
+    if path_key == "support":
+        rewards = by_subprofession.get(subprofession_key or "")
+        if not isinstance(rewards, list):
+            raise ContentError(f"path {path_key} has no entry rewards for {subprofession_key}")
+        for reward in rewards:
+            if not isinstance(reward, dict):
+                raise ContentError(f"path {path_key} has an invalid sub-profession reward")
+            item_key = reward.get("item_key")
+            quantity = reward.get("quantity")
+            if (
+                not isinstance(item_key, str)
+                or isinstance(quantity, bool)
+                or not isinstance(quantity, int)
+                or quantity <= 0
+            ):
+                raise ContentError(f"path {path_key} has an invalid sub-profession reward")
+            if not bundle.has("item", item_key, include_locked=False):
+                raise ContentError(f"path {path_key} rewards an unavailable item: {item_key}")
+            rows.append((item_key, quantity))
+    elif subprofession_key is not None:
+        raise ContentError(f"path {path_key} cannot select a sub-profession")
+
+    return (*rows[:1], (skill_key, 1), *rows[1:])

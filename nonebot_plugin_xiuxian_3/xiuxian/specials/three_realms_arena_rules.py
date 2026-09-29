@@ -12,15 +12,11 @@ from collections.abc import Mapping
 from typing import Any
 
 THREE_REALMS_ARENA_MODE_KEY = "arena.three_realms"
-THREE_REALMS_ARENA_RULE_VERSION = "arena-three-realms-0.1.0"
-THREE_REALMS_ARENA_CONTENT_VERSION = "content-0.3"
+THREE_REALMS_ARENA_RULE_VERSION = ""
+THREE_REALMS_ARENA_CONTENT_VERSION = ""
 THREE_REALMS_ARENA_MIN_REALM = "nascent_soul"
 THREE_REALMS_ARENA_MIN_LAYER = 1
-THREE_REALMS_ARENA_PERMIT_KEYS = (
-    "item.permit.three_realms_arena",
-    "permit.arena.three_realms",
-    "access.arena.three_realms",
-)
+THREE_REALMS_ARENA_PERMIT_KEY = "item.permit.three_realms_arena"
 THREE_REALMS = ("xuantian", "demon", "beast")
 
 
@@ -84,10 +80,7 @@ def player_faction(player: Mapping[str, Any]) -> str:
 
 def has_three_realms_permit(player: Mapping[str, Any]) -> bool:
     inventory = player_inventory(player)
-    if any(inventory.get(key, 0) > 0 for key in THREE_REALMS_ARENA_PERMIT_KEYS):
-        return True
-    flags = intro_flags(player)
-    return any(key in flags for key in THREE_REALMS_ARENA_PERMIT_KEYS)
+    return inventory.get(THREE_REALMS_ARENA_PERMIT_KEY, 0) > 0
 
 
 def meets_three_realms_gate(player: Mapping[str, Any]) -> bool:
@@ -122,7 +115,7 @@ __all__ = [
     "THREE_REALMS_ARENA_MODE_KEY",
     "THREE_REALMS_ARENA_MIN_LAYER",
     "THREE_REALMS_ARENA_MIN_REALM",
-    "THREE_REALMS_ARENA_PERMIT_KEYS",
+    "THREE_REALMS_ARENA_PERMIT_KEY",
     "THREE_REALMS_ARENA_RULE_VERSION",
     "has_three_realms_permit",
     "meets_three_realms_gate",

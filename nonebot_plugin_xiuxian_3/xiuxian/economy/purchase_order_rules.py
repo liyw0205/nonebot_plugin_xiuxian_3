@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from dataclasses import dataclass
 from datetime import timedelta
@@ -10,8 +9,8 @@ from datetime import timedelta
 from .rules import NON_TRADEABLE_ITEMS, resolve_market_item
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 PURCHASE_ORDER_TTL_SECONDS = 12 * 60 * 60
 PURCHASE_DELIVERY_GRACE_SECONDS = 10 * 60
 PURCHASE_MAX_LISTINGS = 3

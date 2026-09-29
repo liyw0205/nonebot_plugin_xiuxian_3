@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "灵泉事件",
+      "desc": "灵泉谷泉眼涌动，修士可贡献灵叶，共同换取修为与名望。",
       "status": "open",
       "location_key": "xuantian.spirit_field",
       "duration_seconds": 1800,
@@ -39,6 +40,7 @@
     },
     {
       "name": "心魔试炼",
+      "desc": "突破受挫后心魔乘隙而起，修士须在限期内直面它、净化心神或寻求化解。",
       "status": "open",
       "trigger": {"operation": "progression.breakthrough_nascent_soul", "result": "failed"},
       "choices": ["heart_demon.face", "heart_demon.purify", "heart_demon.bargain"],
@@ -47,30 +49,35 @@
     },
     {
       "name": "领域前线",
-      "status": "locked",
+      "desc": "领域裂痕附近战事渐起，各方修士集结守望，稳住动荡的天地边界。",
+      "status": "active",
       "location_key": "xuantian.domain_front",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
       "reward_key": "reward.event.domain_front",
+      "codex_entry_key": "codex.domain.frontline",
       "key": "event.domain_front"
     },
     {
       "name": "虚空风暴",
+      "desc": "虚空乱流骤然增强，航行者需在风暴平息前守住航路。",
       "status": "open",
       "duration_seconds": 7200,
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
-      "random_pool": "void.route.storm.v0.5",
+      "random_pool": "void.route.storm",
       "key": "event.void_storm"
     },
     {
       "name": "道源任务",
+      "desc": "合道修士受托守护边界、建设道场并传承所学，以此积累飞升道果。",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "dao_union", "min_layer": 1}],
       "task_keys": ["task.dao_origin.guard", "task.dao_origin.build", "task.dao_origin.teach"],
-      "random_pool": "dao.origin.v0.6",
+      "random_pool": "dao.origin",
       "key": "event.dao_origin"
     },
     {
       "name": "天劫试炼台",
+      "desc": "渡劫修士在此依次磨炼身心、守望三界并作出最终抉择。",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}],
       "trial_order": ["trial.body_and_mind", "trial.three_realms", "trial.dao_choice"],

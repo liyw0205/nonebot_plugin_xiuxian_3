@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from datetime import date, timedelta
 import hashlib
@@ -11,19 +10,19 @@ from dataclasses import dataclass
 from typing import Any
 
 
-RULE_VERSION = module_rule_version(__name__)
-CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = ""
+CONTENT_VERSION = ""
 CHECKIN_ACTIVITY = "ritual.checkin.daily"
 MAKEUP_ACTIVITY = "ritual.makeup.daily"
 TREE_WATER_ACTIVITY = "ritual.spirit_tree.water"
 TREE_HARVEST_ACTIVITY = "ritual.spirit_tree.harvest"
 FATE_TICKET = "item.ticket.fate_basic"
 TREE_SEED = "item.seed.spirit_tree"
-SEVEN_DAY_CONTENT_VERSION = CONTENT_VERSION
-SEVEN_DAY_RULE_VERSION = "seven-day-0.1.0"
-HONOR_RULE_VERSION = "honor-0.1.0"
-REDEMPTION_RULE_VERSION = "redemption-0.1.0"
-DAO_CONTRACT_RULE_VERSION = "dao-contract-0.1.0"
+SEVEN_DAY_CONTENT_VERSION = ""
+SEVEN_DAY_RULE_VERSION = ""
+HONOR_RULE_VERSION = ""
+REDEMPTION_RULE_VERSION = ""
+DAO_CONTRACT_RULE_VERSION = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,7 +279,7 @@ def normalize_redemption_code(value: str) -> str:
 def redemption_code_hash(value: str) -> str:
     normalized = normalize_redemption_code(value)
     return hashlib.sha256(
-        f"redemption.code.v0.1:{normalized}".encode("utf-8")
+        f"redemption.code:{normalized}".encode("utf-8")
     ).hexdigest()
 
 
@@ -446,7 +445,7 @@ def makeup_reward() -> dict[str, int]:
 
 def tree_harvest_reward(operation_id: str) -> dict[str, int]:
     digest = hashlib.blake2b(
-        f"tree.harvest.v0.1:{operation_id}".encode("utf-8"), digest_size=16
+        f"tree.harvest:{operation_id}".encode("utf-8"), digest_size=16
     ).digest()
     bucket = int.from_bytes(digest[:8], "big") % 100
     stone_bucket = int.from_bytes(digest[8:], "big") % 100

@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "粗糙灵米",
+      "desc": "灵气稀薄的粗粮，可略微恢复体力或精力。",
       "item_type": "food",
       "quality": "common",
       "stack_limit": 99,
@@ -26,6 +27,7 @@
     },
     {
       "name": "止血草",
+      "desc": "常见的疗伤草药，可用于炼制基础伤药。",
       "item_type": "herb",
       "quality": "common",
       "stack_limit": 99,
@@ -46,6 +48,7 @@
     },
     {
       "name": "灵叶",
+      "desc": "蕴含少许灵气的叶片，常被用作修炼类丹药的辅材。",
       "item_type": "herb",
       "quality": "common",
       "stack_limit": 99,
@@ -67,6 +70,7 @@
     },
     {
       "name": "铁石",
+      "desc": "质地坚实的常见矿石，是锻造低阶法器的基础材料。",
       "item_type": "ore",
       "quality": "common",
       "stack_limit": 99,
@@ -88,6 +92,7 @@
     },
     {
       "name": "木材",
+      "desc": "可供制作器具与机关的寻常木料。",
       "item_type": "material",
       "quality": "common",
       "stack_limit": 99,
@@ -109,6 +114,7 @@
     },
     {
       "name": "阵砂",
+      "desc": "研磨后的灵性砂粒，可用于布置和修补基础阵法。",
       "item_type": "material",
       "quality": "common",
       "stack_limit": 99,
@@ -130,6 +136,7 @@
     },
     {
       "name": "灵米饭",
+      "desc": "以灵米烹成的饭食，可补充少许体力或精力。",
       "item_type": "food",
       "quality": "common",
       "stack_limit": 99,
@@ -153,6 +160,7 @@
     },
     {
       "name": "道号碎片",
+      "desc": "留有旧日名号印记的碎片，集齐后可辨认其中的道号。",
       "item_type": "fragment",
       "quality": "uncommon",
       "stack_limit": 99,
@@ -171,6 +179,7 @@
     },
     {
       "name": "基础配方线索",
+      "desc": "记载着基础炼制手法的零散线索，可供寻找入门配方。",
       "item_type": "clue",
       "quality": "rare",
       "stack_limit": 99,
@@ -189,6 +198,7 @@
     },
     {
       "name": "基础功法线索",
+      "desc": "来自旧卷残页的修行线索，或能指向一门入门功法。",
       "item_type": "clue",
       "quality": "rare",
       "stack_limit": 99,
@@ -207,6 +217,7 @@
     },
     {
       "name": "魔界契约线索",
+      "desc": "刻有魔界气息的残缺契文，可用于追寻契约之法。",
       "item_type": "clue",
       "quality": "rare",
       "stack_limit": 99,
@@ -231,6 +242,7 @@
     },
     {
       "name": "妖界血脉线索",
+      "desc": "留有妖族血脉痕迹的线索，可助你探寻自身来历。",
       "item_type": "clue",
       "quality": "rare",
       "stack_limit": 99,
@@ -255,6 +267,7 @@
     },
     {
       "name": "云铁",
+      "desc": "云城矿脉所出的轻韧灵铁，是锻造金丹境器物的珍材。",
       "item_type": "material",
       "quality": "rare",
       "stack_limit": 99,
@@ -276,6 +289,7 @@
     },
     {
       "name": "云舟票碎片",
+      "desc": "记录着云舟试炼印记的残票，可作为再次踏上云舟航线的凭证。",
       "item_type": "fragment",
       "quality": "rare",
       "stack_limit": 99,
@@ -289,6 +303,7 @@
     },
     {
       "name": "神魂晶",
+      "desc": "凝聚神魂之力的晶石，可用于高阶修行与秘境往来。",
       "item_type": "material",
       "quality": "heaven",
       "stack_limit": 99,
@@ -302,6 +317,7 @@
     },
     {
       "name": "魔核",
+      "desc": "魔界生灵留下的核心，蕴含适合魔修炼化的力量。",
       "item_type": "material",
       "quality": "heaven",
       "stack_limit": 99,
@@ -315,6 +331,7 @@
     },
     {
       "name": "兽血",
+      "desc": "妖兽精血凝成的材料，可供妖修淬炼血脉或炼制丹药。",
       "item_type": "material",
       "quality": "heaven",
       "stack_limit": 99,
@@ -328,6 +345,7 @@
     },
     {
       "name": "妖兽契约",
+      "desc": "与妖兽暂结同行之约，契约效力会在一日后消散。",
       "item_type": "contract",
       "quality": "heaven",
       "stack_limit": 1,
@@ -341,6 +359,7 @@
     },
     {
       "name": "化神魂种",
+      "desc": "蕴藏神魂本源的种子，可作为化神突破的关键材料。",
       "item_type": "breakthrough_material",
       "quality": "heaven",
       "stack_limit": 9,
@@ -354,6 +373,7 @@
     },
     {
       "name": "领域核心",
+      "desc": "承载一方领域本源的核心，是修复与拓展领域的重要材料。",
       "item_type": "domain_material",
       "quality": "heaven",
       "stack_limit": 9,
@@ -367,6 +387,7 @@
     },
     {
       "name": "领域核心碎片",
+      "desc": "领域本源破碎后留下的残片，可积攒后换取完整核心。",
       "item_type": "domain_fragment",
       "quality": "rare",
       "stack_limit": 99,
@@ -380,6 +401,7 @@
     },
     {
       "name": "远古古果",
+      "desc": "自远古遗迹中发现的灵果，可用于化神境突破准备。",
       "item_type": "material",
       "quality": "heaven",
       "stack_limit": 99,
@@ -393,6 +415,7 @@
     },
     {
       "name": "虚空晶体",
+      "desc": "凝结虚空之力的晶体，是炼虚境修行与突破的珍贵材料。",
       "item_type": "breakthrough_material",
       "quality": "heaven",
       "stack_limit": 99,
@@ -406,6 +429,7 @@
     },
     {
       "name": "虚空锚",
+      "desc": "能在虚空航路上留下坐标的锚石，可用于稳固远行路线。",
       "item_type": "void_navigation_material",
       "quality": "rare",
       "stack_limit": 20,
@@ -419,6 +443,7 @@
     },
     {
       "name": "虚空档案",
+      "desc": "封存着虚空遗迹见闻的古老卷册，可作为破虚历练的凭证。",
       "item_type": "quest_item",
       "quality": "rare",
       "stack_limit": 9,
@@ -432,6 +457,7 @@
     },
     {
       "name": "道果碎片",
+      "desc": "蕴含一缕大道感悟的碎片，可用于积累道果进境。",
       "item_type": "endgame_material",
       "quality": "heaven",
       "stack_limit": 99,
@@ -445,6 +471,7 @@
     },
     {
       "name": "天劫凭证",
+      "desc": "记有天劫台印记的凭证，可供渡劫修士开启试炼。",
       "item_type": "tribulation_token",
       "quality": "heaven",
       "stack_limit": 9,
@@ -458,6 +485,7 @@
     },
     {
       "name": "飞升凭证",
+      "desc": "承载飞升仪式印记的凭证，是叩问仙途终境的重要信物。",
       "item_type": "ascension_certificate",
       "quality": "mythic",
       "stack_limit": 1,
@@ -471,6 +499,7 @@
     },
     {
       "name": "天劫护符",
+      "desc": "护持神魂与道心的符箓，可减轻天劫试炼带来的损耗。",
       "item_type": "tribulation_guard",
       "quality": "heaven",
       "stack_limit": 9,
@@ -484,6 +513,8 @@
     },
     {
       "name": "云灵茶",
+      "desc": "饮用后提升下一次修炼获得的状态加成。",
+      "aliases": ["云茶"],
       "item_type": "food",
       "quality": "rare",
       "stack_limit": 99,

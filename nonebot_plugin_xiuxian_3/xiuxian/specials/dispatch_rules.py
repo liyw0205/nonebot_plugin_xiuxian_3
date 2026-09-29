@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version, module_versions
 
 import hashlib
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 CANCEL_WINDOW_SECONDS = 60
 
 
@@ -35,7 +34,7 @@ WORKSHOP_HELP = "dispatch.workshop_help"
 DEMON_RELIEF = "dispatch.demon_relief"
 BEAST_RELOCATION = "dispatch.beast_relocation"
 DAO_SERVICE = "dispatch.dao_service"
-DAO_SERVICE_VERSIONS = module_versions(f"{__name__}.dao_service")
+DAO_SERVICE_VERSIONS = ("", "")
 
 DISPATCHES: dict[str, DispatchDefinition] = {
     TOWN_DELIVERY: DispatchDefinition(
@@ -44,7 +43,7 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         duration_seconds=30 * 60,
         daily_limit=3,
         costs=(("stamina", 3),),
-        risk_pool="dispatch.town.v0.1",
+        risk_pool="dispatch.town",
         risk_weights=(("success", 7500), ("delayed", 1500), ("partial", 1000)),
         requirement="mortal",
     ),
@@ -54,7 +53,7 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         duration_seconds=60 * 60,
         daily_limit=2,
         costs=(("stamina", 4),),
-        risk_pool="dispatch.herb.v0.1",
+        risk_pool="dispatch.herb",
         risk_weights=(("success", 7000), ("partial", 2000), ("failed", 1000)),
         requirement="guide.gather_blood_grass",
     ),
@@ -64,7 +63,7 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         duration_seconds=2 * 60 * 60,
         daily_limit=2,
         costs=(("energy", 4), ("item.mat.wood", 2)),
-        risk_pool="dispatch.workshop.v0.1",
+        risk_pool="dispatch.workshop",
         risk_weights=(("success", 6500), ("delayed", 2000), ("failed", 1500)),
         requirement="guide.choose_service",
     ),
@@ -74,13 +73,13 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         duration_seconds=4 * 60 * 60,
         daily_limit=3,
         costs=(("item.herb.blood_grass", 2), ("item.food.coarse_spirit_rice", 2)),
-        risk_pool="dispatch.demon_relief.v0.3",
+        risk_pool="dispatch.demon_relief",
         risk_weights=(("success", 7000), ("partial", 2000), ("failed", 1000)),
         requirement="permit.demon_trade",
         required_permit="permit.demon_trade",
         failure_refunds=(("item.herb.blood_grass", 1), ("item.food.coarse_spirit_rice", 1)),
-        content_version="content-0.3",
-        rule_version="specials-0.3.0",
+        content_version="",
+        rule_version="",
     ),
     BEAST_RELOCATION: DispatchDefinition(
         key=BEAST_RELOCATION,
@@ -88,13 +87,13 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         duration_seconds=4 * 60 * 60,
         daily_limit=3,
         costs=(("item.herb.spirit_leaf", 2), ("item.food.coarse_spirit_rice", 2)),
-        risk_pool="dispatch.beast_relocation.v0.3",
+        risk_pool="dispatch.beast_relocation",
         risk_weights=(("success", 7000), ("partial", 2000), ("failed", 1000)),
         requirement="permit.beast_trade",
         required_permit="permit.beast_trade",
         failure_refunds=(("item.herb.spirit_leaf", 1), ("item.food.coarse_spirit_rice", 1)),
-        content_version="content-0.3",
-        rule_version="specials-0.3.0",
+        content_version="",
+        rule_version="",
     ),
     DAO_SERVICE: DispatchDefinition(
         key=DAO_SERVICE,

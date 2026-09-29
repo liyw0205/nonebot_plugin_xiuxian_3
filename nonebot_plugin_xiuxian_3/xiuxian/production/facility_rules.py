@@ -8,8 +8,8 @@ from dataclasses import dataclass
 FACILITY_LOCATION = "cave.mist_grotto_2"
 FACILITY_MAINTENANCE_FEE = 100
 FACILITY_DURATION_BONUS_BP = 1000
-FACILITY_CONTENT_VERSION = "content-0.2"
-FACILITY_RULE_VERSION = "production-0.2.0"
+FACILITY_CONTENT_VERSION = ""
+FACILITY_RULE_VERSION = ""
 
 
 @dataclass(frozen=True, slots=True)

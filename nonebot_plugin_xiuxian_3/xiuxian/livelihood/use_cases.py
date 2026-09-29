@@ -13,6 +13,7 @@ from ..repository import (
     CommissionNotAcceptedError,
     CommissionNotFoundError,
     CommissionQuotaError,
+    CommissionRequirementError,
     CommissionStockExhaustedError,
     CurrencyInsufficientError,
     FieldPlotAlreadyHarvestedError,
@@ -76,14 +77,13 @@ class LivelihoodApplication:
         except ValueError:
             return None
 
-    @staticmethod
-    def _resolve_commission(args: tuple[str, ...], *, required: bool = True) -> str | None:
+    def _resolve_commission(self, args: tuple[str, ...], *, required: bool = True) -> str | None:
         if len(args) > 1:
             return None
         if not args and not required:
             return None
         try:
-            return commission_definition(args[0] if args else None).key
+            return commission_definition(args[0] if args else None, self.repository.content).key
         except ValueError:
             return None
 
@@ -350,7 +350,7 @@ class LivelihoodApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看城镇委托。", context.request_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
-        lines = ["## 今日城镇委托", ""]
+        lines = ["## 今日委托", ""]
         data = []
         for record in records:
             inputs = "、".join(f"{key} ×{value}" for key, value in record.inputs.items())
@@ -384,7 +384,7 @@ class LivelihoodApplication:
     async def accept_commission(self, context: CommandContext) -> CommandResult:
         key = self._resolve_commission(context.command_args)
         if key is None:
-            return CommandResult(False, "INVALID_COMMISSION", "可用 `接取委托 止血草供应`、`接取委托 工具修缮`、`接取委托 灵米饭供应` 或已解锁的 `接取委托 灵泉谷灵叶收集`。", context.request_id)
+            return CommandResult(False, "INVALID_COMMISSION", "请使用 `接取委托 <订单名>`，订单名可从 `城镇委托` 查询。", context.request_id)
         operation_id = self._operation_id(context, "livelihood.accept_commission")
         try:
             record = await self.repository.accept_commission(
@@ -395,6 +395,8 @@ class LivelihoodApplication:
             )
         except CommissionNotFoundError:
             return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该城镇委托今天未开放。", context.request_id, operation_id)
+        except CommissionRequirementError:
+            return CommandResult(False, "COMMISSION_REQUIREMENT_MISSING", "境界或云城名望尚未达到该订单要求。", context.request_id, operation_id)
         except CommissionExpiredError:
             return CommandResult(False, "COMMISSION_EXPIRED", "该城镇委托已过期。", context.request_id, operation_id)
         except CommissionStockExhaustedError:
@@ -425,7 +427,7 @@ class LivelihoodApplication:
     async def deliver_commission(self, context: CommandContext) -> CommandResult:
         key = self._resolve_commission(context.command_args, required=False)
         if len(context.command_args) > 1 or (context.command_args and key is None):
-            return CommandResult(False, "INVALID_COMMISSION", "可用 `交付委托 [止血草供应]`。", context.request_id)
+            return CommandResult(False, "INVALID_COMMISSION", "可用 `交付委托 [订单名]`。", context.request_id)
         operation_id = self._operation_id(context, "livelihood.deliver_commission")
         try:
             record = await self.repository.deliver_commission(

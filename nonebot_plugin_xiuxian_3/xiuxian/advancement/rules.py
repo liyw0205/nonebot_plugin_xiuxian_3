@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import content_key, module_content_version, module_rule_version
 
 import hashlib
 from dataclasses import dataclass
@@ -10,9 +9,7 @@ from dataclasses import dataclass
 
 RETREAT_BASIC = "progression.retreat.basic"
 RETREAT_RESTFUL = "progression.retreat.restful"
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
-BASIC_RANDOM_POOL = content_key("retreat.basic")
+BASIC_RANDOM_POOL = "retreat.basic"
 BASIC_DURATION_SECONDS = 2 * 60 * 60
 RESTFUL_DURATION_SECONDS = 4 * 60 * 60
 MAX_SETTLEMENT_SECONDS = 8 * 60 * 60
@@ -36,8 +33,6 @@ class RetreatDefinition:
     required_stage: str
     required_item: str | None
     random_pool: str | None
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
     def item_cost_map(self) -> dict[str, int]:
         return {key: int(value) for key, value in self.item_cost}
@@ -126,7 +121,6 @@ __all__ = [
     "BASIC_DAILY_LIMIT",
     "BASIC_DURATION_SECONDS",
     "BASIC_RANDOM_POOL",
-    "CONTENT_VERSION",
     "MAX_OFFLINE_SECONDS",
     "MAX_SETTLEMENT_SECONDS",
     "RESTFUL_DAILY_LIMIT",
@@ -134,7 +128,6 @@ __all__ = [
     "RETREAT_BASIC",
     "RETREAT_DEFINITIONS",
     "RETREAT_RESTFUL",
-    "RULE_VERSION",
     "RetreatDefinition",
     "retreat_definition",
     "retreat_mode_key",

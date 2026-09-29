@@ -1,0 +1,21 @@
+{
+  "kind": "advancement_rule",
+  "records": [
+    {
+      "key": "skill.mastery",
+      "name": "神通参悟规则",
+      "desc": "参悟等级、资源消耗和等级效果增量。",
+      "insight_resource_key": "resource.skill_insight",
+      "status": "active"
+    },
+    {
+      "key": "constitution.reshape",
+      "name": "体质重塑规则",
+      "desc": "体质重塑使用的凭证与冷却时间。",
+      "reset_item_key": "item.token.constitution_reset",
+      "cooldown_seconds": 2592000,
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

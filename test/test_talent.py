@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from tempfile import TemporaryDirectory
+from pathlib import Path
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -44,7 +46,9 @@ def test_talent_preview_profile_and_linear_unlocks_are_idempotent() -> None:
             preview = await runtime.dispatch(_context(user, "preview"), "道脉预览")
             assert preview.ok
             assert "体修道脉" in preview.message
-            assert "1/2/3/5" in preview.message
+            assert "消耗 1 点天赋点" in preview.message
+            assert "当前版本" not in preview.message
+            assert "资源键" not in preview.message
 
             missing = await runtime.dispatch(_context(user, "missing"), "我的道脉")
             assert missing.code == "PLAYER_NOT_FOUND"
@@ -102,8 +106,56 @@ def test_talent_preview_profile_and_linear_unlocks_are_idempotent() -> None:
             assert points_events == 4
             snapshot = json.loads(node_snapshot)
             assert snapshot["path_key"] == "body"
-            assert snapshot["content_version"] == "content-0.1"
+            assert "content_version" not in snapshot
+            assert "rule_version" not in snapshot
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_talent_runtime_uses_modified_content_without_version_fields(tmp_path: Path) -> None:
+    source_data = Path(__file__).parents[1] / "data"
+    content_dir = tmp_path / "content"
+    shutil.copytree(source_data, content_dir)
+    talent_path = content_dir / "养成/道脉.json"
+    talent_document = json.loads(talent_path.read_text(encoding="utf-8"))
+    tier_two = next(
+        row for row in talent_document["records"] if row["key"] == "talent.tree.body.tier2"
+    )
+    tier_two["desc"] = "配置测试：体魄行动效率提高 4.5%。"
+    tier_two["cost_points"] = 4
+    tier_two["effect"]["value"] = 450
+    talent_path.write_text(json.dumps(talent_document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    async def run() -> None:
+        runtime = create_runtime(data_dir=content_dir)
+        user = "talent-config-driven"
+        preview = await runtime.dispatch(_context(user, "preview"), "道脉预览")
+        assert "配置测试：体魄行动效率提高 4.5%。" in preview.message
+        await _enter_cultivator(runtime, user)
+        first = await runtime.dispatch(_context(user, "tier-one"), "解锁天赋 1")
+        assert first.code == "TALENT_UNLOCKED"
+        _set_talent_points(runtime, user, 4)
+        second = await runtime.dispatch(
+            _context(user, "tier-two", operation_id="talent-config-tier-two"),
+            "解锁天赋 2",
+        )
+        assert second.code == "TALENT_UNLOCKED"
+        assert second.data["cost_points"] == 4
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            snapshot_json = connection.execute(
+                "SELECT snapshot_json FROM talent_node_states WHERE player_id = "
+                "(SELECT id FROM players WHERE platform_user_id = ?) AND tier = 2",
+                (user,),
+            ).fetchone()[0]
+            event_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(talent_point_events)")
+            }
+        snapshot = json.loads(snapshot_json)
+        assert snapshot["effect"]["value"] == 450
+        assert "content_version" not in snapshot and "rule_version" not in snapshot
+        assert not {"content_version", "rule_version"} & event_columns
+        await runtime.close()
 
     asyncio.run(run())
 

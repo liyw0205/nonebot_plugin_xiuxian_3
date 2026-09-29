@@ -65,46 +65,6 @@ from ..advancement.rules import (
     retreat_definition,
     retreat_reward,
 )
-from ..advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
-    constitution_definition,
-)
-from ..advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
-    talent_node_for_reference,
-    talent_tree_nodes,
-    tree_definition,
-)
-from ..advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
-    available_skill_keys,
-    effective_skill_effect,
-    skill_cost,
-    skill_definition,
-)
-from ..advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
-    EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
-    equipment_definition,
-    refinement_affix,
-    refinement_roll_bp,
-    temper_cost,
-    temper_roll_bp,
-    temper_success_bp,
-)
 from ..livelihood.models import ResidenceRecord
 from ..livelihood.rules import residence_definition
 from ..world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
@@ -186,10 +146,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -753,7 +711,7 @@ class RoutineRepositoryMixin:
             cycle_no = int(tree["cycle_no"])
             reward = tree_harvest_reward(operation_id)
             digest = hashlib.blake2b(
-                f"tree.harvest.v0.1:{operation_id}".encode("utf-8"), digest_size=16
+                f"tree.harvest:{operation_id}".encode("utf-8"), digest_size=16
             ).hexdigest()
             inventory = self._json_object(row["inventory_json"], {})
             stones = int(row["spirit_stones"]) + int(reward.get("spirit_stones", 0))
@@ -790,7 +748,7 @@ class RoutineRepositoryMixin:
                 (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
             )
             result = {
-                "pool_key": "tree.harvest.v0.1",
+                "pool_key": "tree.harvest",
                 "seed": digest,
                 "reward": actual_reward,
                 "content_version": ROUTINE_CONTENT_VERSION,
@@ -1974,13 +1932,11 @@ class RoutineRepositoryMixin:
                 """
                 INSERT INTO fate_pools(
                     player_id, pool_key, pity_count, total_draws,
-                    content_version, rule_version, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(player_id, pool_key) DO UPDATE SET
                     pity_count = excluded.pity_count,
                     total_draws = excluded.total_draws,
-                    content_version = excluded.content_version,
-                    rule_version = excluded.rule_version,
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -1988,8 +1944,6 @@ class RoutineRepositoryMixin:
                     FATE_POOL_KEY,
                     pity_after,
                     total_draws,
-                    FATE_CONTENT_VERSION,
-                    FATE_RULE_VERSION,
                     now_text,
                 ),
             )
@@ -2008,8 +1962,8 @@ class RoutineRepositoryMixin:
                 INSERT INTO fate_rolls(
                     player_id, pool_key, operation_id, draw_count, cost_kind,
                     cost_quantity, pity_before, pity_after, seed_hash, reward_json,
-                    draws_json, content_version, rule_version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    draws_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row["id"],
@@ -2023,8 +1977,6 @@ class RoutineRepositoryMixin:
                     seed_hash,
                     json.dumps(reward, ensure_ascii=False, sort_keys=True),
                     json.dumps(draws_payload, ensure_ascii=False, sort_keys=True),
-                    FATE_CONTENT_VERSION,
-                    FATE_RULE_VERSION,
                     now_text,
                 ),
             )
@@ -2042,8 +1994,6 @@ class RoutineRepositoryMixin:
                 "seed_hash": seed_hash,
                 "draws": draws_payload,
                 "reward": reward,
-                "content_version": FATE_CONTENT_VERSION,
-                "rule_version": FATE_RULE_VERSION,
             }
             connection.execute(
                 """

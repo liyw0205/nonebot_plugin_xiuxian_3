@@ -17,8 +17,7 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .talent_rules import (
-    MAX_TALENT_TIER,
-    TALENT_POINT_RESOURCE,
+    talent_tree_keys,
     talent_tree_nodes,
     tree_definition,
 )
@@ -54,19 +53,20 @@ class TalentApplication:
         lines = [
             "## 道脉天书",
             "",
-            "入道后按首要道途修习对应道脉。每条道脉五阶，首阶免费，后续消耗天赋点：",
+            "入道后可依所选道途修习相应道脉，各阶效果与消耗如下：",
             "",
         ]
-        for tree_key in ("body", "spell", "device", "demonic", "beast", "support"):
-            _, tree_label = tree_definition(tree_key)
-            nodes = talent_tree_nodes(tree_key)
-            costs = "/".join(str(node.cost_points) for node in nodes)
-            lines.append(f"- **{tree_label}**：{nodes[0].description}；五阶消耗 `{costs}` 点。")
+        for tree_key in talent_tree_keys(self.repository.content):
+            _, tree_label = tree_definition(tree_key, self.repository.content)
+            nodes = talent_tree_nodes(tree_key, self.repository.content)
+            lines.append(f"- **{tree_label}**")
+            for node in nodes:
+                cost = "免费" if node.cost_points == 0 else f"消耗 {node.cost_points} 点天赋点"
+                lines.append(f"  - {node.label}（{cost}）：{node.description}")
         lines.extend(
             [
                 "",
-                f"> 当前版本只开放首要道途对应的道脉；天赋点资源键为 `{TALENT_POINT_RESOURCE}`。",
-                "> 节点效果写入构筑快照，不直接提高突破成功率。",
+                "> 修习时请按前置次序逐阶精进。",
             ]
         )
         return CommandResult(True, "TALENT_PREVIEW", "\n".join(lines), context.request_id)
@@ -95,7 +95,7 @@ class TalentApplication:
             f"**{self._display_name(record.player)}**的天赋点：`{record.points_available}`（已用 `{record.points_spent}`）。",
             "",
         ]
-        for node in talent_tree_nodes(record.tree_key):
+        for node in talent_tree_nodes(record.tree_key, self.repository.content):
             marker = "已解锁" if node.tier in learned else "未解锁"
             cost = "免费" if node.cost_points == 0 else f"{node.cost_points} 点"
             lines.append(f"- **{node.label}** · {marker} · {cost}：{node.description}")
@@ -146,7 +146,7 @@ class TalentApplication:
             return CommandResult(
                 False,
                 "INVALID_TALENT_NODE",
-                f"无法识别天赋层级 `{reference}`，请输入 1-{MAX_TALENT_TIER}。",
+                f"无法识别道脉层级 `{reference}`，请查看 `我的道脉` 后再试。",
                 context.request_id,
                 operation_id,
             )

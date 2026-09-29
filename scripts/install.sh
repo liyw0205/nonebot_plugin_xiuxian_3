@@ -6,7 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 ACTION=install
 TARGET=""
 VENV="${VENV_PATH:-$HOME/myenv}"
-PYTHON="${PYTHON_BIN:-python3}"
+PYTHON="${PYTHON_BIN:-}"
+INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 START=0
 YES=0
 
@@ -18,7 +19,7 @@ usage() {
   install              安装或修复宿主（默认命令）
   update               更新插件依赖和缺少的内容文件
   uninstall            卸载宿主目录（必须额外传 --yes）
-  start|pause|resume|stop|restart|status
+  start|pause|resume|stop|restart|status|login
                        控制安装后由 xiu3 管理的 nb run 进程
 
 选项：
@@ -47,7 +48,7 @@ on_error() {
 trap on_error ERR
 
 case "${1:-}" in
-    install|update|uninstall|start|pause|resume|stop|restart|status)
+    install|update|uninstall|start|pause|resume|stop|restart|status|login)
         ACTION=$1
         shift
         ;;
@@ -68,6 +69,7 @@ while (($#)); do
         --index-url)
             (($# >= 2)) || fail "--index-url 需要一个 URL"
             export PIP_INDEX_URL=$2
+            INDEX_URL=$2
             shift 2
             ;;
         --run)
@@ -93,13 +95,24 @@ while (($#)); do
     esac
 done
 
-TARGET="${TARGET:-$ROOT/nonebot-bot}"
+TARGET="${TARGET:-$ROOT/xiu3}"
 if [ "$ACTION" = update ] && [ ! -d "$TARGET" ]; then
     fail "更新目标不存在：$TARGET；请先执行 install。"
 fi
 mkdir -p "$TARGET"
 TARGET="$(cd "$TARGET" && pwd -P)"
 VENV="$(mkdir -p "$(dirname "$VENV")" && cd "$(dirname "$VENV")" && pwd -P)/$(basename "$VENV")"
+
+if [ -z "$PYTHON" ]; then
+    for candidate in python3.13 python3.12 python3.11 python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1 && \
+            "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+            PYTHON=$candidate
+            break
+        fi
+    done
+    PYTHON="${PYTHON:-python3}"
+fi
 
 if [[ "$ACTION" != install && "$ACTION" != update ]]; then
     control_args=()
@@ -108,6 +121,7 @@ if [[ "$ACTION" != install && "$ACTION" != update ]]; then
 fi
 
 [ -f "$ROOT/pyproject.toml" ] || fail "找不到项目 pyproject.toml：$ROOT"
+[ -f "$ROOT/requirements.txt" ] || fail "找不到项目 requirements.txt：$ROOT"
 [ -f "$ROOT/examples/nonebot/bot.py" ] || fail "找不到宿主模板：$ROOT/examples/nonebot/bot.py"
 [ -d "$ROOT/data" ] || fail "找不到内容目录：$ROOT/data"
 
@@ -161,19 +175,12 @@ retry() {
     || fail "虚拟环境没有 pip：$VENV_PY。请确认 Python 安装包含 ensurepip。"
 
 log "升级 pip、setuptools 和 wheel"
-retry "$VENV_PY" -m pip install --upgrade pip setuptools wheel \
+retry "$VENV_PY" -m pip install --index-url "$INDEX_URL" --upgrade pip setuptools wheel \
     || fail "pip 基础工具安装失败。请检查网络、代理、证书或使用 --index-url 指定镜像。"
 
-log "安装 NoneBot、适配器和本插件（普通 wheel 安装）"
-project_pip_args=(--no-build-isolation)
-if [ "$ACTION" = update ]; then
-    project_pip_args=(--upgrade --no-build-isolation)
-    if [ -z "${PREFIX:-}" ]; then
-        project_pip_args=(--upgrade --upgrade-strategy eager --no-build-isolation)
-    fi
-fi
-retry "$VENV_PY" -m pip install "${project_pip_args[@]}" "$ROOT[nonebot,onebot,qq]" \
-    || fail "项目依赖安装失败。保留的宿主目录和虚拟环境可以直接重试。"
+log "配置虚拟环境使用 pip 镜像：$INDEX_URL"
+"$VENV_PY" -m pip config --site set global.index-url "$INDEX_URL" >/dev/null \
+    || warn "无法写入虚拟环境 pip 配置，将只对本次安装使用指定镜像。"
 
 copy_if_missing() {
     local source=$1
@@ -191,6 +198,36 @@ copy_if_missing "$ROOT/examples/nonebot/bot.py" "$TARGET/bot.py"
 copy_if_missing "$ROOT/examples/nonebot/pyproject.toml" "$TARGET/pyproject.toml"
 copy_if_missing "$ROOT/examples/nonebot/.env.example" "$TARGET/.env"
 
+log "从 requirements.txt 安装 nb-cli==1.5.0"
+retry "$VENV_PY" -m pip install --upgrade --index-url "$INDEX_URL" -r "$ROOT/requirements.txt" \
+    || fail "nb-cli 安装失败。保留的宿主目录和虚拟环境可以直接重试。"
+export PIP_INDEX_URL="$INDEX_URL"
+
+component_action=install
+[ "$ACTION" != update ] || component_action=update
+install_nb_component() {
+    local group=$1 name=$2
+    local install_args=()
+    if [ "$component_action" = install ] && [ "$group" = adapter ]; then
+        install_args+=(--no-restrict-version)
+    fi
+    log "通过 nb $group $component_action 安装 $name"
+    retry "$VENV_NB" --cwd "$TARGET" --python "$VENV_PY" "$group" "$component_action" "${install_args[@]}" "$name" \
+        || fail "nb $group $component_action $name 失败。请检查 NoneBot CLI 的网络错误后重试。"
+}
+install_nb_component adapter "QQ"
+install_nb_component adapter "OneBot V11"
+install_nb_component driver "FastAPI"
+install_nb_component driver "HTTPX"
+install_nb_component driver "websockets"
+install_nb_component driver "AIOHTTP"
+
+log "安装修仙插件本身，不重复解析 CLI 已安装的运行依赖"
+project_pip_args=(--no-build-isolation --no-deps --index-url "$INDEX_URL")
+if [ "$ACTION" = update ]; then project_pip_args=(--upgrade "${project_pip_args[@]}"); fi
+retry "$VENV_PY" -m pip install "${project_pip_args[@]}" "$ROOT" \
+    || fail "修仙插件安装失败。保留的宿主目录和虚拟环境可以直接重试。"
+
 while IFS= read -r -d '' source; do
     relative="${source#"$ROOT/data/"}"
     copy_if_missing "$source" "$TARGET/data/$relative"
@@ -198,6 +235,7 @@ done < <(find "$ROOT/data" -type f -name '*.json' -print0)
 
 mkdir -p "$TARGET/.xiuxian3"
 cp "$ROOT/scripts/control.sh" "$TARGET/.xiuxian3/control.sh"
+cp "$ROOT/scripts/qq_login.py" "$TARGET/.xiuxian3/qq_login.py"
 chmod +x "$TARGET/.xiuxian3/control.sh"
 
 CONTROL_BIN="$TARGET/xiu3"
@@ -228,7 +266,7 @@ else
 fi
 
 log "校验已安装包、NoneBot 入口和 JSON 内容"
-"$VENV_PY" -c 'import nonebot; import nonebot_plugin_xiuxian_3'
+"$VENV_PY" -c 'import importlib.metadata; import nonebot; import nonebot.adapters.qq; import nonebot.adapters.onebot.v11; import nonebot_plugin_xiuxian_3; assert importlib.metadata.version("nb-cli") == "1.5.0"'
 "$VENV_NB" --help >/dev/null 2>&1 \
     || fail "nb 命令未安装：$VENV_NB"
 "$VENV_PY" - "$TARGET/data" <<'PY'
@@ -257,7 +295,8 @@ cat <<EOF
 安装完成。
 宿主目录：$TARGET
 虚拟环境：$VENV
-控制命令：$CONTROL_COMMAND start|pause|resume|stop|restart|status|update|uninstall
+控制命令：$CONTROL_COMMAND start|pause|resume|stop|restart|status|update|login|uninstall
 宿主内命令：$CONTROL_BIN start
 更新命令：$CONTROL_COMMAND update
+QQ 扫码：$CONTROL_COMMAND login
 EOF

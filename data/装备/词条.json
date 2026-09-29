@@ -1,0 +1,39 @@
+{
+  "kind": "equipment_affix",
+  "records": [
+    {
+      "key": "damage",
+      "name": "伤害",
+      "desc": "提高装备持有者的伤害。",
+      "status": "active"
+    },
+    {
+      "key": "hp",
+      "name": "气血",
+      "desc": "提高装备持有者的气血。",
+      "status": "active"
+    },
+    {
+      "key": "initiative",
+      "name": "先手",
+      "desc": "提高装备持有者的先手。",
+      "status": "active"
+    },
+    {"key":"damage_reduction","name":"减伤","desc":"降低装备持有者承受的直接伤害。","status":"active"},
+    {"key":"crit_chance","name":"会心","desc":"提高装备持有者的会心概率。","status":"active"},
+    {"key":"crit_damage","name":"会心伤害","desc":"提高装备持有者会心时造成的额外伤害。","status":"active"},
+    {"key":"evasion","name":"闪避","desc":"降低敌方攻击命中装备持有者的概率。","status":"active"},
+    {"key":"accuracy","name":"命中","desc":"提高装备持有者攻击的命中概率。","status":"active"},
+    {"key":"anti_crit","name":"抗暴","desc":"降低敌方攻击装备持有者时的会心概率。","status":"active"},
+    {"key":"reflection","name":"反伤","desc":"按承受伤害比例反弹伤害。","status":"active"},
+    {"key":"lifesteal","name":"吸血","desc":"按造成伤害比例恢复气血。","status":"active"},
+    {"key":"mana_leech","name":"吸灵","desc":"按造成伤害比例恢复灵力。","status":"active"},
+    {"key":"healing_reduction","name":"疗愈压制","desc":"降低敌方受到的气血治疗。","status":"active"},
+    {"key":"recovery_reduction","name":"恢复压制","desc":"降低敌方气血恢复效果。","status":"active"},
+    {"key":"hp_regen","name":"气血回复","desc":"每次行动后恢复固定气血。","status":"active"},
+    {"key":"max_mana","name":"灵力上限","desc":"提高战斗中的灵力上限。","status":"active"},
+    {"key":"mana_regen","name":"灵力回复","desc":"每次行动后恢复固定灵力。","status":"active"}
+  ],
+  "category": "装备词条",
+  "schema": "xiuxian.content"
+}

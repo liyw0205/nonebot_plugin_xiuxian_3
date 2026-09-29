@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from dataclasses import dataclass
 from hashlib import blake2b
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
 ENDING_KEYS = frozenset({"ascend", "remain_in_world"})
 ASCENSION_READY_STATUS = "ascension_ready"
 ASCENDED_STATUS = "ascended"
@@ -100,7 +97,7 @@ TRIAL_DEFINITIONS = {
         merit_reward=TRIBULATION_MERIT_REWARD[key],
         debt_delta=TRIBULATION_DEBT_DELTA[key],
         cooldown_seconds=TRIBULATION_COOLDOWN_SECONDS[key],
-        random_pool=f"tribulation.{key}.v0.6",
+        random_pool=f"tribulation.{key}",
     )
     for key in TRIAL_ORDER
 }
@@ -128,8 +125,6 @@ __all__ = [
     "ASCENDED_STATUS",
     "ASCENSION_READY_STATUS",
     "ASCENSION_CERTIFICATE_KEY",
-    "CONTENT_VERSION",
-    "RULE_VERSION",
     "DAO_UNION_TOTAL_CULTIVATION",
     "TRIBULATION_TOTAL_CULTIVATION",
     "DAO_UNION_FRAGMENT_COST",

@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..combat.rules import enemy_definition, player_stat_snapshot
 from ..persistence.errors import (
     OperationConflictError,
@@ -211,9 +212,11 @@ class VoidRuinsRepositoryMixin:
                 instability[player_id] = unstable
                 equipment = self._battle_equipment_snapshot(connection, player_id)
                 qualification = self._json_object(row["qualification_json"], {})
+                constitution_effect = constitution_effect_snapshot(connection, player_id)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
                 stats = player_stat_snapshot(
                     qualification, max_hp=int(row["max_hp"]), initiative=int(row["initiative"]), equipment=equipment,
+                    constitution_effect=constitution_effect,
                 )
                 first_clear[player_id] = connection.execute(
                     "SELECT 1 FROM void_ruins_members WHERE player_id=? AND status='settled' LIMIT 1", (player_id,)
@@ -230,6 +233,7 @@ class VoidRuinsRepositoryMixin:
                     "path_key": row["path_key"],
                     "qualification": qualification,
                     "stats": stats,
+                    "constitution_effect": constitution_effect,
                     "equipment": list(equipment),
                     "skills": skills,
                     "void_instability_active": unstable,
@@ -548,8 +552,6 @@ class VoidRuinsRepositoryMixin:
                             operation_id=f"{operation_id}:codex:{member['player_id']}",
                             occurred_at=now,
                             snapshot={"run_id": str(run["run_id"]), "instance_key": VOID_RUINS_KEY},
-                            content_version=VOID_RUINS_CONTENT_VERSION,
-                            rule_version=VOID_RUINS_RULE_VERSION,
                         )
                     rewards[stable_id] = reward
                     connection.execute(

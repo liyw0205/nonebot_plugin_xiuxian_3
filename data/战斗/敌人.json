@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "训练傀儡",
+      "desc": "演武场中用于磨炼基本功的木铁傀儡，招式简单，却不会轻易停手。",
       "location_key": "xuantian.new_town",
       "requirements": [
         {
@@ -14,7 +15,8 @@
       "stats": {
         "hp": 80,
         "attack": 8,
-        "initiative": 8
+        "initiative": 8,
+        "agility": 8
       },
       "skills": [
         "enemy_skill.dummy_tap"
@@ -23,14 +25,18 @@
         "can_critical": false,
         "can_escape": false
       },
-      "reward_refs": [
-        "reward.battle.training_dummy"
-      ],
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.training_dummy",
+        "preview_max_rounds": 20,
+        "reward": {}
+      },
       "key": "enemy.training_dummy",
       "status": "active"
     },
     {
       "name": "木鼠",
+      "desc": "常在近郊草丛间出没的小兽，行动灵巧，受惊时会迅速反扑。",
       "location_key": "xuantian.outskirts",
       "requirements": [
         {
@@ -49,11 +55,13 @@
       "reward_refs": [
         "reward.battle.wood_rat"
       ],
+      "codex_entry_key": "codex.creature.wood_rat",
       "key": "enemy.wood_rat",
       "status": "active"
     },
     {
       "name": "铁鬃野猪",
+      "desc": "鬃毛坚硬、冲势凶猛的野猪，常在山道间横冲直撞。",
       "location_key": "xuantian.outskirts",
       "requirements": [
         {
@@ -73,11 +81,13 @@
       "reward_refs": [
         "reward.battle.iron_boar"
       ],
+      "codex_entry_key": "codex.creature.iron_boar",
       "key": "enemy.iron_boar",
       "status": "active"
     },
     {
       "name": "劫修学徒",
+      "desc": "在近郊拦路掠夺的年轻劫修，刀法粗疏，却已懂得以灵力伤人。",
       "location_key": "xuantian.outskirts",
       "requirements": [
         {
@@ -102,6 +112,7 @@
     },
     {
       "name": "雾隐守卫",
+      "desc": "守在洞天深处的古老卫士，借浓雾护体，步步逼近闯入者。",
       "location_key": "cave.mist_grotto",
       "requirements": [
         {
@@ -121,11 +132,41 @@
       "reward_refs": [
         "reward.battle.mist_guardian"
       ],
+      "codex_entry_key": "codex.creature.mist_guardian",
       "key": "enemy.mist_guardian",
       "status": "active"
     },
     {
+      "name": "云铁矿兽",
+      "desc": "栖居矿脉深处，以铁砂护体；战斗结算确认踪迹后，矿区异兽记录方可点亮。",
+      "location_key": "xuantian.cloud_mine",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 700,
+        "attack": 85,
+        "initiative": 14,
+        "agility": 14
+      },
+      "skills": [
+        "enemy_skill.cloud_armor"
+      ],
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.cloud_beast"
+      },
+      "codex_entry_key": "codex.creature.cloud_beast",
+      "key": "enemy.cloud_beast",
+      "status": "active"
+    },
+    {
       "name": "万兽山守山兽",
+      "desc": "镇守万兽山山径的强大妖兽，咆哮声能令群兽闻风而动。",
       "location_key": "beast.ten_thousand_hills",
       "requirements": [
         {
@@ -149,6 +190,7 @@
     },
     {
       "name": "虚空塔斥候",
+      "desc": "游走在塔中低层的虚空斥候，最先察觉闯塔者的行踪。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 120, "attack": 2, "initiative": 6, "agility": 6},
@@ -159,6 +201,7 @@
     },
     {
       "name": "虚空塔哨卫",
+      "desc": "守在通道要处的虚空哨卫，不会放任来者轻易深入。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 140, "attack": 3, "initiative": 6, "agility": 6},
@@ -169,6 +212,7 @@
     },
     {
       "name": "虚空塔观测者",
+      "desc": "静候塔中异动的观测者，目光始终追随着闯塔之人。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 160, "attack": 3, "initiative": 6, "agility": 6},
@@ -179,6 +223,7 @@
     },
     {
       "name": "虚空塔战将",
+      "desc": "历经多场守塔之战的战将，出手沉稳，擅长封住去路。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 180, "attack": 4, "initiative": 6, "agility": 6},
@@ -189,6 +234,7 @@
     },
     {
       "name": "风暴路线守关者",
+      "desc": "守在风暴路线尽头的强敌，周身虚空乱流呼啸不止。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 220, "attack": 5, "initiative": 6, "agility": 6},
@@ -199,6 +245,7 @@
     },
     {
       "name": "回响路线守关者",
+      "desc": "镇守回响路线的强敌，能将塔中的余音化作压迫人心的回声。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 240, "attack": 5, "initiative": 6, "agility": 6},
@@ -209,6 +256,7 @@
     },
     {
       "name": "虚空碑铭记录者",
+      "desc": "看守古老碑铭的记录者，默默记下每一位来客的足迹。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 260, "attack": 6, "initiative": 7, "agility": 7},
@@ -219,6 +267,7 @@
     },
     {
       "name": "虚空碑铭守卫",
+      "desc": "守护碑铭不受侵扰的卫士，绝不容许旁人轻慢古老誓言。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 300, "attack": 6, "initiative": 7, "agility": 7},
@@ -229,6 +278,7 @@
     },
     {
       "name": "碑铭路线守关者",
+      "desc": "立于碑铭路线尽头的强敌，守着通往更深层的最后一道关口。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 340, "attack": 7, "initiative": 8, "agility": 8},
@@ -239,6 +289,7 @@
     },
     {
       "name": "虚空见证巡守",
+      "desc": "巡行于虚空塔中的见证者，记录攀塔者的每一次抉择。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 380, "attack": 7, "initiative": 8, "agility": 8},
@@ -249,6 +300,7 @@
     },
     {
       "name": "道源见证守卫",
+      "desc": "守护道源遗迹的卫士，只会向真正走过此路的人让开。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 420, "attack": 8, "initiative": 8, "agility": 8},
@@ -259,6 +311,7 @@
     },
     {
       "name": "见证路线守关者",
+      "desc": "镇守见证路线终点的强敌，考验来者是否配得上继续前行。",
       "location_key": "tower.void_spire",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
       "stats": {"hp": 500, "attack": 9, "initiative": 9, "agility": 9},
@@ -269,6 +322,7 @@
     },
     {
       "name": "三劫天尊",
+      "desc": "天劫幻境中的至强身影，依次引动雷劫、心劫与道劫。",
       "location_key": "tribulation.sky_terrace",
       "requirements": [
         {

@@ -51,6 +51,9 @@ from ...advancement.constitution_models import ConstitutionRecord
 from ...advancement.talent_models import TalentNodeRecord, TalentProfileRecord
 from ...advancement.skill_models import SkillMasteryRecord, SkillProfileRecord
 from ...advancement.equipment_models import EquipmentRecord, RefinementRecord, TemperingRecord
+from ...items.manual_rules import manual_breakthrough_bonus
+from ...specials.codex_projection import record_codex_discovery
+from ...content import bundled_content
 from ...advancement.rules import (
     MAX_OFFLINE_SECONDS,
     MAX_SETTLEMENT_SECONDS,
@@ -58,46 +61,6 @@ from ...advancement.rules import (
     RETREAT_RESTFUL,
     retreat_definition,
     retreat_reward,
-)
-from ...advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
-    constitution_definition,
-)
-from ...advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
-    talent_node_for_reference,
-    talent_tree_nodes,
-    tree_definition,
-)
-from ...advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
-    available_skill_keys,
-    effective_skill_effect,
-    skill_cost,
-    skill_definition,
-)
-from ...advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
-    EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
-    equipment_definition,
-    refinement_affix,
-    refinement_roll_bp,
-    temper_cost,
-    temper_roll_bp,
-    temper_success_bp,
 )
 from ...livelihood.models import ResidenceRecord
 from ...livelihood.rules import residence_definition
@@ -113,7 +76,7 @@ from ...world.void_rules import (
 from ...progression.repository import ProgressionRepositoryMixin
 from ...progression.endgame_repository import EndgameRepositoryMixin
 from ...world.repository import WorldRepositoryMixin
-from ...world.rules import destination_definition, meets_realm, RULE_VERSION
+from ...world.rules import destination_definition, meets_realm
 from ...exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ...exploration.rules import (
     battle_roll_bp,
@@ -129,11 +92,9 @@ from ...adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ...adventures.mainline import (
-    MAINLINE_CONTENT_VERSION,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
     mainline_definition,
@@ -166,12 +127,10 @@ from ...routine.models import (
     SpiritTreeRecord,
 )
 from ...routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -180,10 +139,8 @@ from ...routine.wayfaring import (
 )
 from ...routine.billing import BillingReceiptError, verify_receipt
 from ...routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -192,18 +149,13 @@ from ...routine.gacha import (
 )
 from ...routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -510,10 +462,10 @@ class BreakthroughRepositoryMixin:
                     definition.quality_bonus_cap_bp,
                     foundation_quality // definition.quality_bonus_divisor,
                 )
-            technique_bonus_bp = (
-                definition.technique_bonus_bp
-                if definition.technique_bonus_bp and inventory.get("item.manual.basic_qi", 0) > 0
-                else 0
+            technique_bonus_bp = manual_breakthrough_bonus(
+                inventory,
+                definition.target_realm,
+                self.content,
             )
             formation_bonus_bp = (
                 definition.formation_bonus_bp
@@ -544,7 +496,8 @@ class BreakthroughRepositoryMixin:
             if is_nascent:
                 flags = {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])}
                 preparation_bp = 0
-                if int(inventory.get("item.manual.basic_qi", 0)) > 0 or "preparation.nascent_soul.technique" in flags:
+                preparation_bp += technique_bonus_bp
+                if "preparation.nascent_soul.technique" in flags:
                     preparation_bp += 300
                 if f"alliance.{str(row['location_key']).split('.', 1)[0]}" in flags:
                     preparation_bp += 300
@@ -565,12 +518,12 @@ class BreakthroughRepositoryMixin:
                 soul_prepare_bp = min(1000, max(0, int(row["soul_power"]) - 200) * 4)
                 reputation_prepare_bp = min(1000, max(0, max((int(value) for value in faction.values()), default=0) - 2000) // 2)
                 quest_prepare_bp = 600 if "quest.soul_transformation" in {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])} else 0
-                preparation_bp = soul_prepare_bp + reputation_prepare_bp + quest_prepare_bp
+                preparation_bp = soul_prepare_bp + reputation_prepare_bp + quest_prepare_bp + technique_bonus_bp
                 final_success_bp = max(6500, min(9000, 6500 + preparation_bp + pity_before))
             elif is_void_refining:
                 route_bonus_bp = min(600, max(0, int(row["void_route_count"])) * 200)
                 domain_bonus_bp = min(500, max(0, int(row["domain_power"])) // 10)
-                preparation_bp = route_bonus_bp + domain_bonus_bp
+                preparation_bp = route_bonus_bp + domain_bonus_bp + technique_bonus_bp
                 final_success_bp = max(7500, min(9200, 7500 + preparation_bp + min(750, pity_before)))
             else:
                 final_success_bp = success_bp(definition, pity_before, preparation_bp)
@@ -595,8 +548,6 @@ class BreakthroughRepositoryMixin:
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
                 "qualification": self._json_object(row["qualification_json"], {}),
-                "rule_version": definition.rule_version,
-                "content_version": definition.content_version,
                 "random_pool": definition.random_pool,
                 "base_success_bp": definition.base_success_bp,
                 "required_foundation_quality": definition.required_foundation_quality,
@@ -765,7 +716,7 @@ class BreakthroughRepositoryMixin:
                 raise CurrencyInsufficientError("domain selection requires spirit stones")
             session_id = uuid4().hex
             ends_at = serialize_datetime(now + timedelta(minutes=5))
-            snapshot = {"domain_key": definition.domain_key, "path_key": path_key, "energy_cost": definition.energy_cost, "content_version": "content-0.4", "rule_version": "paths-0.4.0"}
+            snapshot = {"domain_key": definition.domain_key, "path_key": path_key, "energy_cost": definition.energy_cost}
             connection.execute("INSERT INTO domain_selection_sessions(session_id, player_id, operation_id, domain_key, status, starts_at, ends_at, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)", (session_id, row["id"], operation_id, definition.domain_key, now_text, ends_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), now_text, now_text))
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             payload = {"player": self._player_payload(self._row_to_player(updated)), "session_id": session_id, "domain_key": definition.domain_key, "status": "pending", "ends_at": ends_at, "energy_cost": definition.energy_cost}
@@ -845,6 +796,21 @@ class BreakthroughRepositoryMixin:
             bloodline_delta = -10 if domain_key == "domain.ancestral_wild" else 0
             connection.execute("UPDATE players SET domain_key = ?, inventory_json = ?, spirit_stones = spirit_stones - 10000, pollution = pollution + ?, bloodline_stability = MAX(0, bloodline_stability + ?), updated_at = ? WHERE id = ?", (domain_key, json.dumps(inventory, ensure_ascii=False, sort_keys=True), pollution_delta, bloodline_delta, now_text, row["id"]))
             connection.execute("UPDATE domain_selection_sessions SET status = 'confirmed', result_json = ?, updated_at = ? WHERE id = ?", (json.dumps({"domain_key": domain_key, "pollution_delta": pollution_delta, "bloodline_delta": bloodline_delta}, ensure_ascii=False, sort_keys=True), now_text, session["id"]))
+            content = self.content or bundled_content()
+            path_key = str(snapshot["path_key"])
+            path = content.require("path", path_key)
+            codex_entry_key = path.get("codex_entry_key")
+            if not isinstance(codex_entry_key, str):
+                raise ValueError(f"path {path_key} has no configured domain codex entry")
+            record_codex_discovery(
+                connection,
+                player_id=int(row["id"]),
+                entry_key=codex_entry_key,
+                operation_id=operation_id,
+                occurred_at=now_text,
+                snapshot={"domain_key": domain_key, "path_key": path_key},
+                content=content,
+            )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             payload = {"player": self._player_payload(self._row_to_player(updated)), "session_id": session["session_id"], "domain_key": domain_key, "status": "confirmed"}
             connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
@@ -1148,8 +1114,6 @@ class BreakthroughRepositoryMixin:
                 "weakness_until": weakness_until,
                 "currency_spent": int(snapshot.get("currency_cost", definition.currency_cost)),
                 "materials": snapshot.get("materials", definition.materials),
-                "content_version": str(snapshot.get("content_version", definition.content_version)),
-                "rule_version": str(snapshot.get("rule_version", definition.rule_version)),
                 "random_pool": str(snapshot.get("random_pool", definition.random_pool)),
                 "foundation_quality": int(snapshot.get("foundation_quality", 0)),
                 "required_foundation_quality": int(snapshot.get("required_foundation_quality", definition.required_foundation_quality)),
@@ -1180,8 +1144,6 @@ class BreakthroughRepositoryMixin:
                     "breakthrough_operation_id": operation_id,
                     "target_realm": "nascent_soul",
                     "expires_at": serialize_datetime(now + timedelta(hours=24)),
-                    "content_version": result["content_version"],
-                    "rule_version": result["rule_version"],
                     "pollution_before": int(row["pollution"]),
                     "pity_before_bp": pity_before,
                 }

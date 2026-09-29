@@ -1120,6 +1120,10 @@ class EquipmentNotOwnedError(RuntimeError):
     """The player does not own the requested equipment."""
 
 
+class EquipmentRequirementError(RuntimeError):
+    """The player's realm does not meet the equipment requirement."""
+
+
 class EquipmentAmbiguousError(RuntimeError):
     """More than one matching equipment instance needs an explicit selector."""
 
@@ -2110,3 +2114,11 @@ class AllianceNotFoundError(RuntimeError):
 
 class AllianceRequirementError(RuntimeError):
     """The production alliance prerequisites are not met."""
+
+
+class SparRequirementError(RuntimeError):
+    """The player or direct-spar configuration does not meet its requirements."""
+
+
+class SparMatchNotFoundError(RuntimeError):
+    """The requested direct-spar match does not exist or is not visible."""

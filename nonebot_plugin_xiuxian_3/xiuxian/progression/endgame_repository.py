@@ -16,7 +16,6 @@ from .endgame_rules import (
     ASCENDED_STATUS,
     ASCENSION_CERTIFICATE_KEY,
     ASCENSION_READY_STATUS,
-    CONTENT_VERSION,
     DAO_UNION_FRAGMENT_COST,
     DAO_UNION_MERIT_COST,
     DAO_UNION_STONE_COST,
@@ -24,7 +23,6 @@ from .endgame_rules import (
     ENDING_KEYS,
     FINAL_BATTLE_MIN_MERIT,
     FINAL_BATTLE_MIN_PROGRESS,
-    RULE_VERSION,
     REMAINED_IN_WORLD_STATUS,
     TRIBULATION_TOTAL_CULTIVATION,
     TRIAL_ORDER,
@@ -190,8 +188,6 @@ class EndgameRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "ending_key": ending_key,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             },
         )
         existing = connection.execute(
@@ -241,7 +237,7 @@ class EndgameRepositoryMixin:
             raise RuntimeError("ending choice returned no player")
         payload = self._ending_payload(updated, ending_key=ending_key, status=status)
         connection.execute(
-            "INSERT INTO endgame_endings(player_id, ending_key, status, fruit_key, snapshot_json, operation_id, content_version, rule_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO endgame_endings(player_id, ending_key, status, fruit_key, snapshot_json, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 updated["id"],
                 ending_key,
@@ -249,8 +245,6 @@ class EndgameRepositoryMixin:
                 fruit_key,
                 json.dumps(payload["snapshot"], ensure_ascii=False, sort_keys=True),
                 operation_id,
-                CONTENT_VERSION,
-                RULE_VERSION,
                 now_text,
             ),
         )
@@ -375,8 +369,6 @@ class EndgameRepositoryMixin:
             "status": status,
             "fruit_key": player.dao_fruit_key,
             "snapshot": player_payload,
-            "content_version": CONTENT_VERSION,
-            "rule_version": RULE_VERSION,
         }
 
     @staticmethod

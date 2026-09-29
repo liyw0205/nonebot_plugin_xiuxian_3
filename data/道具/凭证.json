@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "雾隐洞天一层凭证",
+      "desc": "通往雾隐洞天一层的凭证，启程时交由守门人验看。",
       "item_type": "credential",
       "quality": "common",
       "stack_limit": 1,
@@ -21,7 +22,28 @@
       "key": "item.cave_pass_basic"
     },
     {
+      "name": "雾隐洞天二层凭证",
+      "desc": "由洞天精英悬赏颁发的进阶凭证，可用于搭乘云舟前往洞天深层。",
+      "item_type": "credential",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "location_access",
+          "location_key": "cave.mist_grotto_2",
+          "consume_on": "travel_created"
+        }
+      ],
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}],
+      "status": "active",
+      "key": "item.cave_pass_advanced"
+    },
+    {
       "name": "道途更换令",
+      "desc": "重择修行道路的凭令，须满足境界要求并经许可方可使用。",
       "item_type": "token",
       "quality": "common",
       "stack_limit": 1,
@@ -41,6 +63,7 @@
     },
     {
       "name": "体质重塑令",
+      "desc": "重塑既定体质的珍贵凭令，使用后需经过一段调养期。",
       "item_type": "token",
       "quality": "common",
       "stack_limit": 1,
@@ -59,6 +82,7 @@
     },
     {
       "name": "改名卡",
+      "desc": "记录一个新的道号，可用于更改当前名号。",
       "item_type": "token",
       "quality": "common",
       "stack_limit": 99,
@@ -77,6 +101,7 @@
     },
     {
       "name": "灵木水分券",
+      "desc": "可抵作一次灵木浇灌所需的清水。",
       "item_type": "token",
       "quality": "common",
       "stack_limit": 99,
@@ -95,6 +120,7 @@
     },
     {
       "name": "宗门护法令",
+      "desc": "宗门护法颁下的信物，可在凝结金丹时提供助力。",
       "item_type": "token",
       "quality": "rare",
       "stack_limit": 1,

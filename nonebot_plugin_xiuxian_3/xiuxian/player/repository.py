@@ -23,7 +23,7 @@ from ..player.models import (
     TravelRecord,
 )
 from ..player.rules import STAGE_MORTAL, STAGE_NEW_USER, qualification_for
-from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
+from ..specials.codex_projection import record_location_discovery, record_material_discoveries
 from ..progression.models import (
     CultivationCancelRecord,
     CultivationRecoveryRecord,
@@ -60,46 +60,6 @@ from ..advancement.rules import (
     retreat_definition,
     retreat_reward,
 )
-from ..advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
-    constitution_definition,
-)
-from ..advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
-    talent_node_for_reference,
-    talent_tree_nodes,
-    tree_definition,
-)
-from ..advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
-    available_skill_keys,
-    effective_skill_effect,
-    skill_cost,
-    skill_definition,
-)
-from ..advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
-    EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
-    equipment_definition,
-    refinement_affix,
-    refinement_roll_bp,
-    temper_cost,
-    temper_roll_bp,
-    temper_success_bp,
-)
 from ..livelihood.models import ResidenceRecord
 from ..livelihood.rules import residence_definition
 from ..world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
@@ -114,7 +74,7 @@ from ..world.void_rules import (
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
-from ..world.rules import destination_definition, meets_realm, RULE_VERSION
+from ..world.rules import destination_definition, meets_realm
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     battle_roll_bp,
@@ -130,11 +90,9 @@ from ..adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ..adventures.mainline import (
-    MAINLINE_CONTENT_VERSION,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
     mainline_definition,
@@ -167,12 +125,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -181,10 +137,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -193,18 +147,13 @@ from ..routine.gacha import (
 )
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -331,11 +280,11 @@ class PlayerRepositoryMixin:
                     """
                     INSERT INTO players (
                         player_id, platform, platform_user_id, scene_id, nickname, dao_name, stage,
-                        status, location_key, rule_version, qualification_json,
+                        status, location_key, qualification_json,
                         spirit_stones, stamina, stamina_max, energy, energy_max,
                         inventory_json, intro_json, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 'xuantian.new_town',
-                              'player-onboarding-v0.1.0', '{}', 0, 0, 0, 0, 0, '{}', '{}', ?, ?)
+                              '{}', 0, 0, 0, 0, 0, '{}', '{}', ?, ?)
                     """,
                     (
                         public_id,
@@ -512,13 +461,14 @@ class PlayerRepositoryMixin:
                     serialize_datetime(now),
                 ),
             )
-            record_codex_discovery(
+            record_location_discovery(
                 connection,
                 player_id=int(row["id"]),
-                entry_key="codex.place.new_town",
+                location_key="xuantian.new_town",
                 operation_id=operation_id,
                 occurred_at=now,
                 snapshot={"source": "player.start_seeking", "location_key": "xuantian.new_town"},
+                content=self.content,
             )
             record_material_discoveries(
                 connection,
@@ -876,13 +826,14 @@ class PlayerRepositoryMixin:
                 ),
             )
             if changed:
-                record_codex_discovery(
+                record_location_discovery(
                     connection,
                     player_id=int(row["id"]),
-                    entry_key=f"codex.place.{destination.rsplit('.', 1)[-1]}",
+                    location_key=destination,
                     operation_id=operation_id,
                     occurred_at=now,
                     snapshot={"source": "world.travel_intro", "destination": destination},
+                    content=self.content,
                 )
             return TravelRecord(player=player, destination=destination, changed=changed, stamina_cost=cost)
 
@@ -1088,7 +1039,6 @@ class PlayerRepositoryMixin:
             updated_at=datetime.fromisoformat(str(value("updated_at"))),
             status=str(value("status", "active")),
             location_key=str(value("location_key", "xuantian.new_town")),
-            rule_version=str(value("rule_version", "player-onboarding-v0.1.0")),
             path_key=value("path_key"),
             subprofession_key=value("subprofession_key"),
             stamina=int(value("stamina", 0)),
@@ -1197,7 +1147,6 @@ class PlayerRepositoryMixin:
             "updated_at": serialize_datetime(player.updated_at),
             "status": player.status,
             "location_key": player.location_key,
-            "rule_version": player.rule_version,
             "path_key": player.path_key,
             "subprofession_key": player.subprofession_key,
             "stamina": player.stamina,

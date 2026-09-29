@@ -1,0 +1,60 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "codex_category",
+  "records": [
+    {
+      "key": "place",
+      "name": "地点",
+      "desc": "地点类图鉴记录。",
+      "status": "active"
+    },
+    {
+      "key": "material",
+      "name": "材料",
+      "desc": "材料类图鉴记录。",
+      "status": "active"
+    },
+    {
+      "key": "creature",
+      "name": "异兽",
+      "desc": "异兽类图鉴记录。",
+      "status": "active"
+    },
+    {
+      "key": "path",
+      "name": "道途",
+      "desc": "道途类图鉴记录。",
+      "status": "active"
+    },
+    {
+      "key": "route",
+      "name": "路线",
+      "desc": "路线类图鉴记录。",
+      "status": "active"
+    },
+    {
+      "key": "dispatch",
+      "name": "派遣",
+      "desc": "派遣类图鉴记录。",
+      "status": "active"
+    },
+    {
+      "key": "challenge",
+      "name": "挑战",
+      "desc": "挑战类图鉴记录。",
+      "status": "active"
+    },
+    {
+      "key": "story",
+      "name": "故事",
+      "desc": "故事类图鉴记录。",
+      "status": "active"
+    },
+    {
+      "key": "service",
+      "name": "服务",
+      "desc": "服务类图鉴记录。",
+      "status": "active"
+    }
+  ]
+}

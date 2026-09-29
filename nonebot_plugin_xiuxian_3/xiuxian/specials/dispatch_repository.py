@@ -409,8 +409,6 @@ class DispatchRepositoryMixin:
                         operation_id=operation_id,
                         occurred_at=now,
                         snapshot=snapshot,
-                        content_version=str(snapshot.get("content_version", CONTENT_VERSION)),
-                        rule_version=str(snapshot.get("rule_version", RULE_VERSION)),
                     )
                 else:
                     raise RuntimeError(f"unsupported dispatch reward asset: {key}")

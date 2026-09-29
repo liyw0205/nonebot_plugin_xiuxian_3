@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..combat.rules import MAX_TURNS, TURN_TIMEOUT_SECONDS
+from ..advancement.constitution_effects import constitution_effect_snapshot
+from ..combat.rules import apply_constitution_combat_effect, MAX_TURNS, TURN_TIMEOUT_SECONDS
 from ..combat.tribulation_rules import (
-    CONTENT_VERSION as COMBAT_CONTENT_VERSION,
     ENEMY_AGILITY,
     ENEMY_ATTACK,
     ENEMY_INITIATIVE,
@@ -18,15 +18,12 @@ from ..combat.tribulation_rules import (
     ENEMY_MAX_HP,
     PHASES,
     PROFILE_KEY,
-    RULE_VERSION as COMBAT_RULE_VERSION,
     debt_shield_bp,
     stat_snapshot as tribulation_stat_snapshot,
 )
 from .endgame_models import TrialSessionRecord, TrialSettlementRecord
 from .endgame_rules import (
-    CONTENT_VERSION,
     FRUIT_KEYS,
-    RULE_VERSION,
     TRIAL_ORDER,
     TRIBULATION_TRIAL_DURATION_SECONDS,
     TRIBULATION_WORLD_MERIT_REWARD,
@@ -85,9 +82,6 @@ class TribulationTrialRepositoryMixin:
                 "platform_user_id": platform_user_id,
                 "trial_key": trial_key,
                 "choice_key": choice_key,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
-                "combat_rule_version": COMBAT_RULE_VERSION,
             },
         )
         now = self._now()
@@ -180,10 +174,14 @@ class TribulationTrialRepositoryMixin:
 
             equipment = self._battle_equipment_snapshot(connection, int(row["id"]))
             qualification = self._json_object(row["qualification_json"], {})
-            stats = tribulation_stat_snapshot(
-                qualification,
-                realm_layer=int(row["realm_layer"]),
-                equipment=equipment,
+            constitution_effect = constitution_effect_snapshot(connection, int(row["id"]))
+            stats = apply_constitution_combat_effect(
+                tribulation_stat_snapshot(
+                    qualification,
+                    realm_layer=int(row["realm_layer"]),
+                    equipment=equipment,
+                ),
+                constitution_effect,
             )
             # Keep the published random pool in the immutable battle snapshot. It
             # changes the encounter's pressure, while the persisted battle result
@@ -205,6 +203,7 @@ class TribulationTrialRepositoryMixin:
                     "qualification": qualification,
                     "stats": stats,
                     "equipment": list(equipment),
+                    "constitution_effect": constitution_effect,
                     "realm_key": str(row["realm_key"]),
                     "realm_layer": int(row["realm_layer"]),
                     "dao_fruit_key": row["dao_fruit_key"],
@@ -242,13 +241,11 @@ class TribulationTrialRepositoryMixin:
                     "debt_shield_bp": shield_bp,
                     "guard_used": guard_used,
                     "fate_roll_bp": fate_bp,
-                    "fate_rule": "battle_pressure_v0.6",
+                    "fate_rule": "battle_pressure",
                 },
-                "random_pool": "battle.enemy.tribulation_heaven.content-0.6",
+                "random_pool": "battle.enemy.tribulation_heaven",
                 "random_seed": operation_id,
                 "reward": {},
-                "content_version": COMBAT_CONTENT_VERSION,
-                "rule_version": COMBAT_RULE_VERSION,
             }
             state = {
                 "round_no": 0,
@@ -280,8 +277,8 @@ class TribulationTrialRepositoryMixin:
                 ),
             )
             connection.execute(
-                "INSERT INTO battle_sessions(battle_id, player_id, start_operation_id, battle_type, enemy_key, location_key, status, reward_status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, ?, 'pve.tribulation_trial', ?, ?, 'created', 'none', 0, 0, ?, ?, ?, ?, '{}', ?, ?, ?, ?)",
+                "INSERT INTO battle_sessions(battle_id, player_id, start_operation_id, battle_type, enemy_key, location_key, status, reward_status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, result_json, created_at, updated_at) "
+                "VALUES (?, ?, ?, 'pve.tribulation_trial', ?, ?, 'created', 'none', 0, 0, ?, ?, ?, ?, '{}', ?, ?)",
                 (
                     battle_id,
                     row["id"],
@@ -292,8 +289,6 @@ class TribulationTrialRepositoryMixin:
                     serialize_datetime(now + timedelta(seconds=TURN_TIMEOUT_SECONDS)),
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(state, ensure_ascii=False, sort_keys=True),
-                    COMBAT_CONTENT_VERSION,
-                    COMBAT_RULE_VERSION,
                     now_text,
                     now_text,
                 ),
@@ -394,7 +389,7 @@ class TribulationTrialRepositoryMixin:
                     raise TribulationTrialNotReadyError("linked tribulation battle has no final outcome")
                 success = battle_outcome == "won"
             else:
-                # Complete active sessions from the previous deterministic trial version.
+                # Complete any active session using its frozen deterministic trial state.
                 roll_bp = trial_roll_bp(str(snapshot.get("random_seed", session["operation_id"])))
                 success = trial_success(str(session["trial_key"]), roll_bp)
 

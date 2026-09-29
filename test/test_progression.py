@@ -3,11 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import shutil
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import cultivation_gain
 
 
 def _context(user_id: str, request_id: str, *, operation_id: str = "") -> CommandContext:
@@ -97,6 +100,52 @@ def test_cultivation_session_settlement_and_layer_advance() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_manual_cultivation_bonus_is_configured_and_frozen_at_session_start() -> None:
+    async def run(data_dir: Path) -> None:
+        manuals_path = data_dir / "道具" / "功法.json"
+        document = json.loads(manuals_path.read_text(encoding="utf-8"))
+        manual = next(row for row in document["records"] if row["key"] == "item.manual.basic_qi")
+        effect = next(effect for effect in manual["effects"] if effect["type"] == "cultivation_gain_bp")
+        effect["value"] = 1500
+        manuals_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        clock = MutableClock()
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
+        user = "manual-cultivation-snapshot"
+        await _enter_cultivator(runtime, user)
+        started = await runtime.dispatch(_context(user, "manual-start"), "开始修炼")
+        assert started.code == "CULTIVATION_STARTED"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            row = connection.execute(
+                "SELECT snapshot_json FROM cultivation_sessions WHERE session_id = ?",
+                (started.data["session_id"],),
+            ).fetchone()
+            snapshot = json.loads(row[0])
+            assert snapshot["manual_cultivation_gain_bp"] == 1500
+            connection.execute(
+                "UPDATE players SET inventory_json = '{}' WHERE platform = 'web' AND platform_user_id = ?",
+                (user,),
+            )
+
+        clock.advance(minutes=11)
+        settled = await runtime.dispatch(_context(user, "manual-settle"), "结算修炼")
+        assert settled.code == "CULTIVATION_SETTLED"
+        expected = cultivation_gain(
+            snapshot["base_cultivation"],
+            snapshot["qualification"],
+            environment_bp=snapshot["environment_bp"],
+            state_bp=snapshot["state_bp"],
+            manual_bonus_bp=1500,
+        )
+        assert settled.data["cultivation_gain"] == expected
+        await runtime.close()
+
+    with TemporaryDirectory() as directory:
+        data_dir = Path(directory) / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        asyncio.run(run(data_dir))
 
 
 def test_cultivation_cancel_and_resource_recovery_are_idempotent() -> None:
@@ -256,7 +305,7 @@ def test_foundation_late_milestone_is_recorded_with_the_layer_advance() -> None:
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 record = connection.execute(
                     """
-                    SELECT milestone_key, status, source_operation_id, snapshot_json, content_version, rule_version
+                    SELECT milestone_key, status, source_operation_id, snapshot_json
                     FROM progression_milestones
                     """
                 ).fetchone()
@@ -279,7 +328,6 @@ def test_foundation_late_milestone_is_recorded_with_the_layer_advance() -> None:
                     "required_void_route_count": 0,
                     "void_route_count": 0,
                 }
-                assert record[4:] == ("content-0.2", "progression-0.2.0")
             await runtime.close()
 
     asyncio.run(run())

@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from datetime import datetime, timedelta, timezone
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 ARCHIVE_EVENT_KEY = "event.archive_unlock"
 ARCHIVE_ROUTE_KEY = "void.archive_ruins"
 ARCHIVE_ENEMY_KEY = "enemy.archive_keeper"

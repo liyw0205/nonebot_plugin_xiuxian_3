@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "寻仙问道基础奖励",
+      "desc": "踏上仙途的启程之礼，备有灵石、饭食、草药与修行补给。",
       "operation": "player.start_seeking",
       "entries": [
         {
@@ -39,6 +40,7 @@
     },
     {
       "name": "寻仙里程碑奖励",
+      "desc": "完成寻仙之行后所得的谢礼，助你备好接下来的旅程。",
       "operation": "quest.claim.first_seeking",
       "entries": [
         {
@@ -58,6 +60,7 @@
     },
     {
       "name": "入道里程碑奖励",
+      "desc": "正式入道后获赠的入门功法与灵石。",
       "operation": "quest.claim.first_cultivation",
       "entries": [
         {
@@ -77,6 +80,7 @@
     },
     {
       "name": "采集里程碑奖励",
+      "desc": "首次采集成功后的嘉奖，包含草药与修为积累。",
       "operation": "quest.claim.first_gather",
       "entries": [
         {
@@ -96,6 +100,7 @@
     },
     {
       "name": "生产里程碑奖励",
+      "desc": "完成初次生产后的报酬，可补充灵石并赢得玄天界认可。",
       "operation": "quest.claim.first_craft",
       "entries": [
         {
@@ -114,26 +119,8 @@
       "status": "active"
     },
     {
-      "name": "训练傀儡奖励",
-      "operation": "battle.claim_reward",
-      "entries": [
-        {
-          "kind": "resource",
-          "resource_key": "cultivation",
-          "quantity": 20
-        },
-        {
-          "kind": "currency",
-          "currency_key": "currency.spirit_stone",
-          "quantity": 5
-        }
-      ],
-      "once_per_battle": true,
-      "key": "reward.battle.training_dummy",
-      "status": "active"
-    },
-    {
       "name": "木鼠奖励",
+      "desc": "击退近郊木鼠后获得的历练所得，偶尔可采得止血草。",
       "operation": "battle.claim_reward",
       "entries": [
         {
@@ -156,6 +143,7 @@
     },
     {
       "name": "铁鬃野猪奖励",
+      "desc": "战胜铁鬃野猪后获得铁石、修为与灵石。",
       "operation": "battle.claim_reward",
       "entries": [
         {
@@ -180,6 +168,7 @@
     },
     {
       "name": "劫修学徒奖励",
+      "desc": "击退劫修学徒后缴获的灵石与修为，偶有焦点丹遗落。",
       "operation": "battle.claim_reward",
       "entries": [
         {
@@ -205,6 +194,7 @@
     },
     {
       "name": "雾隐守卫奖励",
+      "desc": "战胜雾隐守卫后所得的修为与洞天材料。",
       "operation": "battle.claim_reward",
       "entries": [
         {
@@ -240,6 +230,7 @@
     },
     {
       "name": "灵泉事件基础奖励",
+      "desc": "参与灵泉谷共同行动的谢礼，包含修为与灵石。",
       "operation": "event.claim_reward",
       "entries": [
         {
@@ -259,6 +250,7 @@
     },
     {
       "name": "灵泉事件完成加奖",
+      "desc": "为灵泉谷共同行动出力达到要求后，可额外获得玄天界声望。",
       "operation": "event.claim_reward",
       "entries": [
         {
@@ -273,6 +265,7 @@
     },
     {
       "name": "基础机缘池",
+      "desc": "供修士寻觅日常机缘的签筒，常见灵材居多，也藏有少量珍稀线索。",
       "operation": "routine.roll_fate_pool",
       "pool_key": "gacha.fate.basic",
       "draw_costs": {
@@ -292,67 +285,416 @@
           "label": "灵石返还",
           "rarity": "common",
           "weight": 280,
-          "quantity_range": [20, 80]
+          "quantity_range": [
+            20,
+            80
+          ]
         },
         {
           "item_key": "item.herb.blood_grass",
           "label": "止血草",
           "rarity": "common",
           "weight": 180,
-          "quantity_range": [1, 3]
+          "quantity_range": [
+            1,
+            3
+          ]
         },
         {
           "item_key": "item.herb.spirit_leaf",
           "label": "灵叶",
           "rarity": "common",
           "weight": 150,
-          "quantity_range": [1, 2]
+          "quantity_range": [
+            1,
+            2
+          ]
         },
         {
           "item_key": "item.ore.ironstone",
           "label": "铁石",
           "rarity": "common",
           "weight": 130,
-          "quantity_range": [1, 3]
+          "quantity_range": [
+            1,
+            3
+          ]
         },
         {
           "item_key": "item.mat.wood",
           "label": "木材",
           "rarity": "common",
           "weight": 120,
-          "quantity_range": [1, 3]
+          "quantity_range": [
+            1,
+            3
+          ]
         },
         {
           "item_key": "item.mat.array_sand",
           "label": "阵砂",
           "rarity": "common",
           "weight": 90,
-          "quantity_range": [1, 2]
+          "quantity_range": [
+            1,
+            2
+          ]
         },
         {
           "item_key": "item.fragment.dao_name",
           "label": "道号碎片",
           "rarity": "rare",
           "weight": 25,
-          "quantity_range": [1, 1]
+          "quantity_range": [
+            1,
+            1
+          ]
         },
         {
           "item_key": "item.clue.recipe_basic",
           "label": "配方线索",
           "rarity": "rare",
           "weight": 15,
-          "quantity_range": [1, 1]
+          "quantity_range": [
+            1,
+            1
+          ]
         },
         {
           "item_key": "item.clue.manual_basic",
           "label": "功法线索",
           "rarity": "rare",
           "weight": 10,
-          "quantity_range": [1, 1]
+          "quantity_range": [
+            1,
+            1
+          ]
         }
       ],
       "status": "active",
       "key": "reward.gacha.fate.basic"
+    },
+    {
+      "key": "reward_pool.bounty.herb_supply",
+      "name": "草药补给悬赏奖励",
+      "desc": "按悬赏结果抽取灵石与城镇名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "spirit_stones": 30,
+            "local_reputation": 2
+          }
+        },
+        {
+          "weight": 40,
+          "rewards": {
+            "spirit_stones": 45,
+            "local_reputation": 1
+          }
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.bounty.craft_order",
+      "name": "生产悬赏奖励",
+      "desc": "按悬赏结果恢复精力并提升服务信誉。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "energy": 10,
+            "service_reputation": 2
+          }
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.bounty.cloud_mine",
+      "name": "云铁悬赏奖励",
+      "desc": "按悬赏结果抽取灵石与云城名望。",
+      "pool_type": "weighted",
+      "equipment_reward_qualities": {"rare": 5},
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "spirit_stones": 120,
+            "local_reputation": 8
+          }
+        },
+        {
+          "weight": 25,
+          "rewards": {
+            "item.manual.cycle_qi": 1,
+            "item.weapon.green_frost_sword": 1
+          }
+        },
+        {
+          "weight": 15,
+          "rewards": {
+            "item.armor.cloud_heartguard": 1,
+            "local_reputation": 4
+          }
+        },
+        {
+          "weight": 18,
+          "rewards": {
+            "item.weapon.azure_sky_sword": 1,
+            "item.armor.spirit_vine_robe": 1
+          }
+        },
+        {
+          "weight": 5,
+          "rewards": {
+            "item.armor.mountain_river_armor": 1
+          }
+        },
+        {
+          "weight": 14,
+          "rewards": {
+            "item.manual.river_circulation": 1,
+            "item.weapon.azurewind_twinblades": 1
+          }
+        },
+        {
+          "weight": 10,
+          "rewards": {
+            "item.armor.mistwoven_cloak": 1,
+            "local_reputation": 4
+          }
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.bounty.elite_hunt",
+      "name": "精英悬赏奖励",
+      "desc": "按悬赏结果抽取洞天凭证与云城名望。",
+      "pool_type": "weighted",
+      "equipment_reward_qualities": {"rare": 8, "heaven": 3},
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "item.cave_pass_advanced": 1,
+            "local_reputation": 12
+          }
+        },
+        {
+          "weight": 35,
+          "rewards": {
+            "item.manual.purple_mansion": 1,
+            "item.armor.mountain_river_armor": 1
+          }
+        },
+        {
+          "weight": 25,
+          "rewards": {
+            "item.manual.cave_mystery": 1,
+            "item.weapon.nine_sky_thunder": 1
+          }
+        },
+        {
+          "weight": 20,
+          "rewards": {
+            "item.armor.starry_robe": 1,
+            "local_reputation": 8
+          }
+        },
+        {
+          "weight": 18,
+          "rewards": {
+            "item.manual.nascent_spirit_return": 1,
+            "item.weapon.mystic_flame_sword": 1,
+            "item.armor.sunfire_iron_armor": 1
+          }
+        },
+        {
+          "weight": 12,
+          "rewards": {
+            "item.manual.heaven_observation": 1,
+            "item.weapon.golden_suppressor_sword": 1,
+            "item.armor.qianyuan_robe": 1
+          }
+        },
+        {
+          "weight": 16,
+          "rewards": {
+            "item.manual.earth_root": 1,
+            "item.weapon.red_lotus_fan": 1,
+            "item.armor.ember_scale_mail": 1
+          }
+        },
+        {
+          "weight": 12,
+          "rewards": {
+            "item.manual.starry_core": 1,
+            "item.weapon.starfall_spear": 1,
+            "item.armor.moonwheel_robe": 1
+          }
+        },
+        {
+          "weight": 8,
+          "rewards": {
+            "item.manual.lotus_soul": 1,
+            "item.manual.clear_mind": 1
+          }
+        },
+        {
+          "weight": 8,
+          "rewards": {
+            "item.manual.skill_legacy": 1
+          }
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.bounty.demon_relief",
+      "name": "魔界救援悬赏奖励",
+      "desc": "按悬赏结果抽取灵石与魔界声望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "faction_reputation.demon": 10,
+            "spirit_stones": 240
+          }
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.bounty.beast_habitat",
+      "name": "妖界栖地悬赏奖励",
+      "desc": "按悬赏结果记录妖界声望与图鉴发现。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "faction_reputation.beast": 10,
+            "codex.story.beast_habitat": 1
+          }
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.bounty.body_trial",
+      "name": "体魄淬炼悬赏奖励",
+      "desc": "体修完成历练后随机获得灵石或修为。",
+      "pool_type": "weighted",
+      "equipment_reward_qualities": {"common": 12, "uncommon": 7},
+      "outcomes": [
+        {
+          "weight": 70,
+          "rewards": {
+            "cultivation": 180,
+            "spirit_stones": 25
+          }
+        },
+        {
+          "weight": 30,
+          "rewards": {
+            "cultivation": 120,
+            "item.pill.healing_low": 1
+          }
+        },
+        {
+          "weight": 20,
+          "rewards": {
+            "item.weapon.wingwood_dagger": 1,
+            "item.armor.hemp_guard": 1
+          }
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.bounty.spell_trial",
+      "name": "灵术校验悬赏奖励",
+      "desc": "法修完成历练后随机获得灵石或修为。",
+      "pool_type": "weighted",
+      "equipment_reward_qualities": {"common": 12, "uncommon": 7},
+      "outcomes": [
+        {
+          "weight": 70,
+          "rewards": {
+            "cultivation": 160,
+            "spirit_stones": 30
+          }
+        },
+        {
+          "weight": 30,
+          "rewards": {
+            "cultivation": 100,
+            "item.pill.focus_low": 1
+          }
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.bounty.void_anchoring",
+      "name": "虚空锚定悬赏奖励",
+      "desc": "完成虚空物资交付后，依悬赏结果获得高阶功法或法器。",
+      "pool_type": "weighted",
+      "equipment_reward_qualities": {"heaven": 6, "mythic": 3},
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "item.manual.void_journey": 1,
+            "item.weapon.void_splitting_sword": 1
+          }
+        },
+        {
+          "weight": 75,
+          "rewards": {
+            "item.armor.boundless_void_robe": 1,
+            "local_reputation": 20
+          }
+        },
+        {
+          "weight": 50,
+          "rewards": {
+            "item.manual.void_journey": 1,
+            "item.armor.boundless_void_robe": 1
+          }
+        },
+        {
+          "weight": 25,
+          "rewards": {
+            "item.manual.dao_union_mysteries": 1,
+            "item.manual.transcendence_tribulation": 1,
+            "item.weapon.primal_creation_sword": 1,
+            "item.armor.chaos_immortal_raiment": 1
+          }
+        },
+        {
+          "weight": 20,
+          "rewards": {
+            "item.manual.void_heart": 1,
+            "item.weapon.origin_edge": 1,
+            "item.armor.origin_silk_raiment": 1
+          }
+        },
+        {
+          "weight": 12,
+          "rewards": {
+            "item.manual.myriad_return": 1,
+            "item.manual.ascension_inquiry": 1
+          }
+        }
+      ],
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

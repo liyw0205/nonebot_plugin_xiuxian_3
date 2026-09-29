@@ -149,8 +149,8 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 raise ResourceInsufficientError("tower duo stamina changed during start")
             duo_run_id = f"tower-duo-{uuid4().hex}"
             member_run_ids = [f"{duo_run_id}:member:{row['id']}" for row in members]
-            content_version = TOWER_DUO_CONTENT_VERSION if floor_no > 20 else "content-0.3"
-            rule_version = TOWER_DUO_RULE_VERSION if floor_no > 20 else "specials-0.3.1"
+            content_version = TOWER_DUO_CONTENT_VERSION
+            rule_version = TOWER_DUO_RULE_VERSION
             result = {
                 "enemy_key": enemy_key_for(floor_no, self._tower_run_faction_for_player(connection, int(leader["id"]))),
                 "member_database_ids": [int(row["id"]) for row in members],

@@ -13,10 +13,7 @@ from ...contracts import serialize_datetime
 from ..persistence.errors import *  # noqa: F401,F403
 from .models import ItemUseRecord
 from .rules import (
-    CLOUD_TEA_STATE_BP_BONUS,
     CONTENT_VERSION,
-    MIST_BARRIER_DURATION_SECONDS,
-    MIST_BARRIER_RISK_REDUCTION_BP,
     RULE_VERSION,
     resolve_item,
 )
@@ -127,7 +124,7 @@ class ItemRepositoryMixin:
                 raise ItemInsufficientError("item is missing")
 
             effect: dict[str, object]
-            if definition.kind == "cloud_tea":
+            if definition.effect_type == "next_cultivation_state_bonus_bp":
                 effects = self._json_object(row["item_effects_json"], {})
                 if int(effects.get("cloud_tea_state_bp", 0)) > 0 or effects.get("cloud_tea_operation_id"):
                     raise ItemEffectAlreadyPendingError("cloud tea effect is already pending")
@@ -135,7 +132,7 @@ class ItemRepositoryMixin:
                 if inventory[definition.key] <= 0:
                     inventory.pop(definition.key, None)
                 effects = {
-                    "cloud_tea_state_bp": CLOUD_TEA_STATE_BP_BONUS,
+                    "cloud_tea_state_bp": definition.effect_value,
                     "cloud_tea_operation_id": operation_id,
                     "content_version": CONTENT_VERSION,
                     "rule_version": RULE_VERSION,
@@ -145,8 +142,12 @@ class ItemRepositoryMixin:
                     "UPDATE players SET inventory_json = ?, item_effects_json = ?, updated_at = ? WHERE id = ?",
                     (json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(effects, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
                 )
-                effect = {"state_bp_bonus": CLOUD_TEA_STATE_BP_BONUS, "pending": True}
-            elif definition.kind == "mist_barrier":
+                effect = {
+                    "type": definition.effect_type,
+                    "state_bp_bonus": definition.effect_value,
+                    "pending": True,
+                }
+            elif definition.effect_type == "exploration_risk_reduction_bp":
                 if str(row["location_key"]) != "cave.mist_grotto_2":
                     raise ItemLocationRequiredError("mist barrier must be deployed from mist grotto two")
                 target = normalized_location or str(row["location_key"])
@@ -166,16 +167,19 @@ class ItemRepositoryMixin:
                 if inventory[definition.key] <= 0:
                     inventory.pop(definition.key, None)
                 barrier_id = uuid4().hex
-                expires_at = serialize_datetime(now + timedelta(seconds=MIST_BARRIER_DURATION_SECONDS))
+                duration_seconds = definition.duration_seconds
+                if duration_seconds is None:
+                    raise RuntimeError(f"usable item {definition.key} has no configured duration")
+                expires_at = serialize_datetime(now + timedelta(seconds=duration_seconds))
                 connection.execute(
                     "INSERT INTO mist_barrier_instances(barrier_id, player_id, operation_id, location_key, status, starts_at, expires_at, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)",
-                    (barrier_id, row["id"], operation_id, target, now_text, expires_at, json.dumps({"risk_reduction_bp": MIST_BARRIER_RISK_REDUCTION_BP, "content_version": CONTENT_VERSION, "rule_version": RULE_VERSION}, ensure_ascii=False, sort_keys=True), now_text, now_text),
+                    (barrier_id, row["id"], operation_id, target, now_text, expires_at, json.dumps({"risk_reduction_bp": definition.effect_value, "content_version": CONTENT_VERSION, "rule_version": RULE_VERSION}, ensure_ascii=False, sort_keys=True), now_text, now_text),
                 )
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
                     (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
                 )
-                effect = {"barrier_id": barrier_id, "location_key": target, "risk_reduction_bp": MIST_BARRIER_RISK_REDUCTION_BP, "expires_at": expires_at}
+                effect = {"type": definition.effect_type, "barrier_id": barrier_id, "location_key": target, "risk_reduction_bp": definition.effect_value, "expires_at": expires_at}
             else:
                 raise ItemNotUsableError("item has no active use effect")
 

@@ -4,66 +4,2870 @@
   "records": [
     {
       "key": "skill.basic_attack",
-      "name": "基础攻击",
-      "path_key": null,
       "max_level": 3,
-      "growth": {"effect_delta_bp_per_level": 300},
-      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
-      "status": "active"
+      "growth": {
+        "effect_fields": {
+          "value": 300
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 20
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        }
+      }
     },
     {
       "key": "skill.body.heavy_strike",
-      "name": "重击",
-      "path_key": "body",
       "max_level": 3,
-      "growth": {"effect_delta_bp_per_level": 300},
-      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
-      "status": "active"
+      "growth": {
+        "effect_fields": {
+          "value": 300
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 20
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        }
+      }
     },
     {
       "key": "skill.spell.water_bolt",
-      "name": "水箭",
-      "path_key": "spell",
       "max_level": 3,
-      "growth": {"effect_delta_bp_per_level": 300},
-      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
-      "status": "active"
+      "growth": {
+        "effect_fields": {
+          "value": 300
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 20
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        }
+      }
     },
     {
       "key": "skill.device.scout_doll",
-      "name": "侦查机关",
-      "path_key": "device",
       "max_level": 3,
-      "growth": {"effect_delta_bp_per_level": 300},
-      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
-      "status": "active"
+      "growth": {
+        "effect_fields": {
+          "value": 300
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 20
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        }
+      }
     },
     {
       "key": "skill.demonic.pain_exchange",
-      "name": "痛苦交换",
-      "path_key": "demonic",
       "max_level": 3,
-      "growth": {"effect_delta_bp_per_level": 300},
-      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
-      "status": "active"
+      "growth": {
+        "effect_fields": {
+          "value": 300
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 20
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        }
+      }
     },
     {
       "key": "skill.beast.partial_transform",
-      "name": "半化形",
-      "path_key": "beast",
       "max_level": 3,
-      "growth": {"effect_delta_bp_per_level": 300},
-      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
-      "status": "active"
+      "growth": {
+        "effect_fields": {
+          "value": 300
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 20
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        }
+      }
     },
     {
       "key": "skill.support.quick_assessment",
-      "name": "快速鉴定",
-      "path_key": "support",
       "max_level": 3,
-      "growth": {"effect_delta_bp_per_level": 300},
-      "cost_by_target_level": {"1": {"skill_insight": 1, "spirit_stone": 20}, "2": {"skill_insight": 1, "spirit_stone": 40}, "3": {"skill_insight": 2, "spirit_stone": 80}},
-      "status": "active"
+      "growth": {
+        "effect_fields": {
+          "value": 300
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 20
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        }
+      }
+    },
+    {
+      "key": "skill.body.mountain_palm",
+      "max_level": 4,
+      "growth": {
+        "effect_fields": {
+          "value": 400
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 25
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 50
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 90
+        },
+        "4": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 140
+        }
+      }
+    },
+    {
+      "key": "skill.body.mountain_fist",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 150
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 250
+        },
+        "4": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 400
+        },
+        "5": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 600
+        }
+      }
+    },
+    {
+      "key": "skill.spell.cold_tide",
+      "max_level": 4,
+      "growth": {
+        "effect_fields": {
+          "value": 350
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 30
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 60
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 100
+        },
+        "4": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 150
+        }
+      }
+    },
+    {
+      "key": "skill.spell.red_lotus",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 550
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 90
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 170
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 280
+        },
+        "4": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "5": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 700
+        }
+      }
+    },
+    {
+      "key": "skill.device.piercing_bolt",
+      "max_level": 4,
+      "growth": {
+        "effect_fields": {
+          "value": 325
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 30
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 65
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 110
+        },
+        "4": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 170
+        }
+      }
+    },
+    {
+      "key": "skill.device.thunder_core",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 90
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 180
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "4": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 480
+        },
+        "5": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 750
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.blood_blade",
+      "max_level": 4,
+      "growth": {
+        "effect_fields": {
+          "value": 375
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 35
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 70
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 120
+        },
+        "4": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 180
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.nether_break",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 550
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 100
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 190
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 320
+        },
+        "4": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 500
+        },
+        "5": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 800
+        }
+      }
+    },
+    {
+      "key": "skill.beast.rending_claw",
+      "max_level": 4,
+      "growth": {
+        "effect_fields": {
+          "value": 350
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 30
+        },
+        "2": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 65
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 110
+        },
+        "4": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 170
+        }
+      }
+    },
+    {
+      "key": "skill.beast.ancestral_howl",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 90
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 180
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "4": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 480
+        },
+        "5": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 750
+        }
+      }
+    },
+    {
+      "key": "skill.support.binding_talisman",
+      "max_level": 4,
+      "growth": {
+        "effect_fields": {
+          "value": 300
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 35
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 70
+        },
+        "3": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 120
+        },
+        "4": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 180
+        }
+      }
+    },
+    {
+      "key": "skill.support.array_pulse",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 450
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 90
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 180
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "4": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 480
+        },
+        "5": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 750
+        }
+      }
+    },
+    {
+      "key": "skill.body.mountain_collapse",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.spell.purple_sky_thunder",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 320
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 480
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 700
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 950
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1300
+        }
+      }
+    },
+    {
+      "key": "skill.device.void_piercer",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.soul_devouring_slash",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 750
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 350
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 520
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 750
+        },
+        "4": {
+          "resource.skill_insight": 7,
+          "currency.spirit_stone": 1050
+        },
+        "5": {
+          "resource.skill_insight": 9,
+          "currency.spirit_stone": 1450
+        }
+      }
+    },
+    {
+      "key": "skill.beast.true_form",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.support.sealing_array",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.body.golden_core_shaking_fist",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.spell.golden_core_frost_seal",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.device.golden_core_thunder_lance",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.golden_core_blood_sunder",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.beast.golden_core_ancestral_claw",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.support.golden_core_star_array",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 300
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 450
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 650
+        },
+        "4": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 900
+        },
+        "5": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1200
+        }
+      }
+    },
+    {
+      "key": "skill.body.soul_transform_war_god",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 900
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1300
+        },
+        "4": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1800
+        },
+        "5": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 2500
+        }
+      }
+    },
+    {
+      "key": "skill.spell.soul_transform_tidal_law",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 900
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1300
+        },
+        "4": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1800
+        },
+        "5": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 2500
+        }
+      }
+    },
+    {
+      "key": "skill.device.soul_transform_soulseeker",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 900
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1300
+        },
+        "4": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1800
+        },
+        "5": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 2500
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.soul_transform_soulflame",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 900
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1300
+        },
+        "4": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1800
+        },
+        "5": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 2500
+        }
+      }
+    },
+    {
+      "key": "skill.beast.soul_transform_ancient_claw",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 900
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1300
+        },
+        "4": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1800
+        },
+        "5": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 2500
+        }
+      }
+    },
+    {
+      "key": "skill.support.soul_transform_four_symbols",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 900
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1300
+        },
+        "4": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 1800
+        },
+        "5": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 2500
+        }
+      }
+    },
+    {
+      "key": "skill.body.void_refining_worldbreaker",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1000
+        },
+        "2": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1500
+        },
+        "3": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2200
+        },
+        "4": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3200
+        },
+        "5": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 4500
+        }
+      }
+    },
+    {
+      "key": "skill.spell.void_refining_thunderfall",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1000
+        },
+        "2": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1500
+        },
+        "3": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2200
+        },
+        "4": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3200
+        },
+        "5": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 4500
+        }
+      }
+    },
+    {
+      "key": "skill.device.void_refining_rift_crossbow",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1000
+        },
+        "2": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1500
+        },
+        "3": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2200
+        },
+        "4": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3200
+        },
+        "5": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 4500
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.void_refining_abyss_sunder",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1000
+        },
+        "2": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1500
+        },
+        "3": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2200
+        },
+        "4": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3200
+        },
+        "5": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 4500
+        }
+      }
+    },
+    {
+      "key": "skill.beast.void_refining_moonrend",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1000
+        },
+        "2": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1500
+        },
+        "3": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2200
+        },
+        "4": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3200
+        },
+        "5": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 4500
+        }
+      }
+    },
+    {
+      "key": "skill.support.void_refining_heavenly_net",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1000
+        },
+        "2": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1500
+        },
+        "3": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2200
+        },
+        "4": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3200
+        },
+        "5": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 4500
+        }
+      }
+    },
+    {
+      "key": "skill.body.dao_union_mountain_return",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 800
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1600
+        },
+        "2": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2400
+        },
+        "3": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3500
+        },
+        "4": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5000
+        },
+        "5": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 7000
+        }
+      }
+    },
+    {
+      "key": "skill.spell.dao_union_star_origin",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 800
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1600
+        },
+        "2": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2400
+        },
+        "3": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3500
+        },
+        "4": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5000
+        },
+        "5": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 7000
+        }
+      }
+    },
+    {
+      "key": "skill.device.dao_union_zhou_tian_array",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 800
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1600
+        },
+        "2": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2400
+        },
+        "3": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3500
+        },
+        "4": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5000
+        },
+        "5": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 7000
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.dao_union_blood_river",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 800
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1600
+        },
+        "2": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2400
+        },
+        "3": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3500
+        },
+        "4": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5000
+        },
+        "5": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 7000
+        }
+      }
+    },
+    {
+      "key": "skill.beast.dao_union_ancestral_breaker",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 800
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1600
+        },
+        "2": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2400
+        },
+        "3": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3500
+        },
+        "4": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5000
+        },
+        "5": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 7000
+        }
+      }
+    },
+    {
+      "key": "skill.support.dao_union_three_talents",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 800
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 1600
+        },
+        "2": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2400
+        },
+        "3": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3500
+        },
+        "4": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5000
+        },
+        "5": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 7000
+        }
+      }
+    },
+    {
+      "key": "skill.body.tribulation_immortal_frame",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 900
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2500
+        },
+        "2": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3800
+        },
+        "3": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5500
+        },
+        "4": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 8000
+        },
+        "5": {
+          "resource.skill_insight": 18,
+          "currency.spirit_stone": 11000
+        }
+      }
+    },
+    {
+      "key": "skill.spell.tribulation_three_realms_thunder",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 900
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2500
+        },
+        "2": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3800
+        },
+        "3": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5500
+        },
+        "4": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 8000
+        },
+        "5": {
+          "resource.skill_insight": 18,
+          "currency.spirit_stone": 11000
+        }
+      }
+    },
+    {
+      "key": "skill.device.tribulation_creation_cannon",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 900
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2500
+        },
+        "2": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3800
+        },
+        "3": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5500
+        },
+        "4": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 8000
+        },
+        "5": {
+          "resource.skill_insight": 18,
+          "currency.spirit_stone": 11000
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.tribulation_living_flame",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 900
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2500
+        },
+        "2": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3800
+        },
+        "3": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5500
+        },
+        "4": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 8000
+        },
+        "5": {
+          "resource.skill_insight": 18,
+          "currency.spirit_stone": 11000
+        }
+      }
+    },
+    {
+      "key": "skill.beast.tribulation_true_spirit_roar",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 900
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2500
+        },
+        "2": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3800
+        },
+        "3": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5500
+        },
+        "4": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 8000
+        },
+        "5": {
+          "resource.skill_insight": 18,
+          "currency.spirit_stone": 11000
+        }
+      }
+    },
+    {
+      "key": "skill.support.tribulation_myriad_law_array",
+      "max_level": 5,
+      "growth": {
+        "effect_fields": {
+          "value": 900
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 8,
+          "currency.spirit_stone": 2500
+        },
+        "2": {
+          "resource.skill_insight": 10,
+          "currency.spirit_stone": 3800
+        },
+        "3": {
+          "resource.skill_insight": 12,
+          "currency.spirit_stone": 5500
+        },
+        "4": {
+          "resource.skill_insight": 15,
+          "currency.spirit_stone": 8000
+        },
+        "5": {
+          "resource.skill_insight": 18,
+          "currency.spirit_stone": 11000
+        }
+      }
+    },
+    {
+      "key": "skill.body.qi_sensing.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 350
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 160
+        }
+      }
+    },
+    {
+      "key": "skill.spell.qi_sensing.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 350
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 160
+        }
+      }
+    },
+    {
+      "key": "skill.device.qi_sensing.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 350
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 160
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.qi_sensing.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 350
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 160
+        }
+      }
+    },
+    {
+      "key": "skill.beast.qi_sensing.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 350
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 160
+        }
+      }
+    },
+    {
+      "key": "skill.support.qi_sensing.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 350
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 40
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 80
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 160
+        }
+      }
+    },
+    {
+      "key": "skill.body.qi_gathering.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 400
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 120
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 240
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 480
+        }
+      }
+    },
+    {
+      "key": "skill.spell.qi_gathering.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 400
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 120
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 240
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 480
+        }
+      }
+    },
+    {
+      "key": "skill.device.qi_gathering.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 400
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 120
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 240
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 480
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.qi_gathering.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 400
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 120
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 240
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 480
+        }
+      }
+    },
+    {
+      "key": "skill.beast.qi_gathering.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 400
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 120
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 240
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 480
+        }
+      }
+    },
+    {
+      "key": "skill.support.qi_gathering.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 400
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 1,
+          "currency.spirit_stone": 120
+        },
+        "2": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 240
+        },
+        "3": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 480
+        }
+      }
+    },
+    {
+      "key": "skill.body.foundation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 450
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 200
+        },
+        "2": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 400
+        },
+        "3": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 800
+        }
+      }
+    },
+    {
+      "key": "skill.spell.foundation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 450
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 200
+        },
+        "2": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 400
+        },
+        "3": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 800
+        }
+      }
+    },
+    {
+      "key": "skill.device.foundation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 450
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 200
+        },
+        "2": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 400
+        },
+        "3": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 800
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.foundation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 450
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 200
+        },
+        "2": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 400
+        },
+        "3": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 800
+        }
+      }
+    },
+    {
+      "key": "skill.beast.foundation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 450
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 200
+        },
+        "2": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 400
+        },
+        "3": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 800
+        }
+      }
+    },
+    {
+      "key": "skill.support.foundation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 450
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 2,
+          "currency.spirit_stone": 200
+        },
+        "2": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 400
+        },
+        "3": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 800
+        }
+      }
+    },
+    {
+      "key": "skill.body.golden_core.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 280
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 560
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1120
+        }
+      }
+    },
+    {
+      "key": "skill.spell.golden_core.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 280
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 560
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1120
+        }
+      }
+    },
+    {
+      "key": "skill.device.golden_core.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 280
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 560
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1120
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.golden_core.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 280
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 560
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1120
+        }
+      }
+    },
+    {
+      "key": "skill.beast.golden_core.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 280
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 560
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1120
+        }
+      }
+    },
+    {
+      "key": "skill.support.golden_core.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 500
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 280
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 560
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1120
+        }
+      }
+    },
+    {
+      "key": "skill.body.nascent_soul.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 550
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 360
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 720
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1440
+        }
+      }
+    },
+    {
+      "key": "skill.spell.nascent_soul.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 550
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 360
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 720
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1440
+        }
+      }
+    },
+    {
+      "key": "skill.device.nascent_soul.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 550
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 360
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 720
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1440
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.nascent_soul.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 550
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 360
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 720
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1440
+        }
+      }
+    },
+    {
+      "key": "skill.beast.nascent_soul.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 550
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 360
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 720
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1440
+        }
+      }
+    },
+    {
+      "key": "skill.support.nascent_soul.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 550
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 360
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 720
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1440
+        }
+      }
+    },
+    {
+      "key": "skill.body.soul_transformation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 440
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 880
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1760
+        }
+      }
+    },
+    {
+      "key": "skill.spell.soul_transformation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 440
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 880
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1760
+        }
+      }
+    },
+    {
+      "key": "skill.device.soul_transformation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 440
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 880
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1760
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.soul_transformation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 440
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 880
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1760
+        }
+      }
+    },
+    {
+      "key": "skill.beast.soul_transformation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 440
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 880
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1760
+        }
+      }
+    },
+    {
+      "key": "skill.support.soul_transformation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 600
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 3,
+          "currency.spirit_stone": 440
+        },
+        "2": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 880
+        },
+        "3": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1760
+        }
+      }
+    },
+    {
+      "key": "skill.body.void_refining.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 520
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1040
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2080
+        }
+      }
+    },
+    {
+      "key": "skill.spell.void_refining.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 520
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1040
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2080
+        }
+      }
+    },
+    {
+      "key": "skill.device.void_refining.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 520
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1040
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2080
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.void_refining.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 520
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1040
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2080
+        }
+      }
+    },
+    {
+      "key": "skill.beast.void_refining.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 520
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1040
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2080
+        }
+      }
+    },
+    {
+      "key": "skill.support.void_refining.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 650
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 520
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1040
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2080
+        }
+      }
+    },
+    {
+      "key": "skill.body.dao_union.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1200
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2400
+        }
+      }
+    },
+    {
+      "key": "skill.spell.dao_union.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1200
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2400
+        }
+      }
+    },
+    {
+      "key": "skill.device.dao_union.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1200
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2400
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.dao_union.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1200
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2400
+        }
+      }
+    },
+    {
+      "key": "skill.beast.dao_union.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1200
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2400
+        }
+      }
+    },
+    {
+      "key": "skill.support.dao_union.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 700
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 600
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1200
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2400
+        }
+      }
+    },
+    {
+      "key": "skill.body.tribulation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 750
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 680
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1360
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2720
+        }
+      }
+    },
+    {
+      "key": "skill.spell.tribulation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 750
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 680
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1360
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2720
+        }
+      }
+    },
+    {
+      "key": "skill.device.tribulation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 750
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 680
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1360
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2720
+        }
+      }
+    },
+    {
+      "key": "skill.demonic.tribulation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 750
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 680
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1360
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2720
+        }
+      }
+    },
+    {
+      "key": "skill.beast.tribulation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 750
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 680
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1360
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2720
+        }
+      }
+    },
+    {
+      "key": "skill.support.tribulation.variant",
+      "max_level": 3,
+      "growth": {
+        "effect_fields": {
+          "value": 750
+        }
+      },
+      "cost_by_target_level": {
+        "1": {
+          "resource.skill_insight": 4,
+          "currency.spirit_stone": 680
+        },
+        "2": {
+          "resource.skill_insight": 5,
+          "currency.spirit_stone": 1360
+        },
+        "3": {
+          "resource.skill_insight": 6,
+          "currency.spirit_stone": 2720
+        }
+      }
     }
   ]
 }

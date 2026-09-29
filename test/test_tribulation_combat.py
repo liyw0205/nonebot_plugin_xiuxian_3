@@ -73,7 +73,7 @@ def test_tribulation_phase_boundaries_and_derived_stats_are_versioned_inputs() -
             },
         ),
     )
-    assert stats == {
+    assert {key: stats[key] for key in ("max_hp", "attack", "initiative", "agility")} == {
         "max_hp": 155_400,
         "attack": 31_500,
         "initiative": 21_360,
@@ -84,12 +84,36 @@ def test_tribulation_phase_boundaries_and_derived_stats_are_versioned_inputs() -
         realm_layer=3,
         equipment=(),
     )
-    assert natural_stats == {
+    assert {key: natural_stats[key] for key in ("max_hp", "attack", "initiative", "agility")} == {
         "max_hp": 135_000,
         "attack": 23_333,
         "initiative": 21_300,
         "agility": 20_550,
     }
+
+
+def test_tribulation_snapshot_applies_accessory_effects_at_trial_scale() -> None:
+    accessory = {
+        "slot": "accessory",
+        "durability_bp": 10_000,
+        "effects": [
+            {"type": "flat_stat", "stat": "physical_damage", "value": 5},
+            {"type": "flat_stat", "stat": "max_hp", "value": 20},
+            {"type": "flat_stat", "stat": "max_mana", "value": 30},
+            {"type": "flat_stat", "stat": "hp_regen", "value": 2},
+            {"type": "flat_stat", "stat": "mana_regen", "value": 3},
+            {"type": "combat_stat_bp", "stat": "crit_chance_bp", "value": 400},
+            {"type": "combat_stat_bp", "stat": "damage_reduction_bp", "value": 500},
+        ],
+    }
+    stats = stat_snapshot({"body": 0, "agility": 0, "spirit": 1}, realm_layer=1, equipment=(accessory,))
+    assert stats["attack"] == 8_500
+    assert stats["max_hp"] == 82_000
+    assert stats["max_mana"] == 120
+    assert stats["hp_regen"] == 200
+    assert stats["mana_regen"] == 3
+    assert stats["crit_chance_bp"] == 400
+    assert stats["damage_reduction_bp"] == 500
 
 
 def test_tribulation_actions_replay_after_restart_and_settlement_is_idempotent() -> None:
@@ -123,7 +147,7 @@ def test_tribulation_actions_replay_after_restart_and_settlement_is_idempotent()
             snapshot = json.loads(snapshot_text)
             assert session_status == "preparing"
             assert battle_status == "settled"
-            assert snapshot["profile_key"] == "battle_profile.tribulation_trial.v1"
+            assert snapshot["profile_key"] == "battle_profile.tribulation_trial"
             assert snapshot["tribulation"]["debt_shield_bp"] == 600
             assert snapshot["player"]["stats"]["max_hp"] == 155_000
             assert {json.loads(row[4])["tribulation_phase"] for row in actions} == {

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from ..contracts import CommandContext, CommandResult, validate_command_identity
+from ..contracts import CommandContext, CommandResult, strip_runtime_metadata, validate_command_identity
 from .content import ContentBundle
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
@@ -40,6 +40,7 @@ from .social.sect_war_cross_server_use_cases import SectWarCrossServerApplicatio
 from .social.sect_beacon_use_cases import SectBeaconApplication
 from .social.sect_alliance_use_cases import SectAllianceApplication
 from .social.sect_social_recovery_use_cases import SectSocialRecoveryApplication
+from .social.spar_use_cases import SparApplication
 from .routine.use_cases import RoutineApplication
 from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
@@ -115,6 +116,7 @@ class XiuxianApplication:
         self.sect_beacon = SectBeaconApplication(repository)
         self.sect_alliance = SectAllianceApplication(repository)
         self.sect_social_recovery = SectSocialRecoveryApplication(repository)
+        self.spar = SparApplication(repository)
         self.routine = RoutineApplication(repository)
         self.gacha = GachaApplication(repository)
         self.wayfaring = WayfaringApplication(repository)
@@ -158,7 +160,18 @@ class XiuxianApplication:
         )
         if invalid is not None:
             return invalid
-        return await handler()
+        result = await handler()
+        if not result.data:
+            return result
+        return CommandResult(
+            ok=result.ok,
+            code=result.code,
+            message=result.message,
+            request_id=result.request_id,
+            operation_id=result.operation_id,
+            data=strip_runtime_metadata(result.data),
+            retryable=result.retryable,
+        )
 
     async def create_player(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
@@ -1562,6 +1575,9 @@ class XiuxianApplication:
             lambda: self.arena.claim_result(context),
             write_message="当前事件不允许确认竞技场结果。",
         )
+
+    async def spar_players(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.spar.spar(context), require_write=False)
 
     async def preview_idle(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.idle.preview(context), require_write=False)

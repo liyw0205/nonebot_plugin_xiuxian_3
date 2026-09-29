@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..repository import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -16,11 +17,11 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .skill_rules import (
-    MAX_SKILL_LEVEL,
-    SKILL_INSIGHT_RESOURCE,
-    SKILL_DEFINITIONS,
     available_skill_keys,
     skill_cost,
+    skill_definitions,
+    skill_mastery_rules,
+    skill_resource_definition,
 )
 
 
@@ -51,26 +52,38 @@ class SkillApplication:
     async def preview(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_SKILL_COMMAND", "神通预览无需附加参数。", context.request_id)
+        content = self.repository.content or bundled_content()
+        definitions = skill_definitions(content)
+        skill_mastery_rules(content)
         lines = [
             "## 神通参悟",
             "",
-            "基础攻击与当前首要道途主动技能均可参悟至 3 级；每级效果增加 3%。",
+            "各项神通均可依自身参悟规则精进。",
             "",
         ]
-        for definition in SKILL_DEFINITIONS.values():
-            insight_1, stones_1 = skill_cost(1)
-            insight_2, stones_2 = skill_cost(2)
-            insight_3, stones_3 = skill_cost(3)
-            path = "通用" if definition.path_key is None else definition.path_key
-            lines.append(
-                f"- **{definition.label}**（{path}）：{definition.description}；费用 `技能心得/灵石 {insight_1}/{stones_1}、{insight_2}/{stones_2}、{insight_3}/{stones_3}`。"
+        for definition in definitions.values():
+            if definition.status != "active":
+                continue
+            costs = []
+            for level in sorted(definition.level_costs):
+                resource_costs = skill_cost(level, definition)
+                details = "、".join(
+                    f"{content.label('resource', key)} {amount}"
+                    for key, amount in resource_costs.items()
+                )
+                costs.append(f"{level}级 {details}")
+            path = "通用" if definition.path_key is None else content.label("path", definition.path_key)
+            requirement = (
+                f"，{content.label('realm', definition.min_realm_key)} L{definition.min_layer} 起可参悟"
+                if definition.min_realm_key
+                else ""
             )
-        lines.extend(
-            [
-                "",
-                f"> 技能心得资源键：`{SKILL_INSIGHT_RESOURCE}`。参悟只保存构筑快照，不启动战斗或手动操作入口。",
-            ]
-        )
+            lines.append(
+                f"- **{definition.label}**（{path} · {definition.style_label}{requirement}，上限 {definition.max_level} 级）：{definition.description}；费用 {'；'.join(costs)}。"
+            )
+            if definition.acquisition_item_key:
+                item_name = content.label("item", definition.acquisition_item_key)
+                lines.append(f"  - 首次参悟需持有：{item_name}。")
         return CommandResult(True, "SKILL_PREVIEW", "\n".join(lines), context.request_id)
 
     async def profile(self, context: CommandContext) -> CommandResult:
@@ -91,24 +104,49 @@ class SkillApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
 
         mastery_by_key = {item.skill_key: item for item in record.skills}
+        content = self.repository.content or bundled_content()
+        mastery_rules = skill_mastery_rules(content)
+        insight_resource = skill_resource_definition(mastery_rules["insight_resource_key"], content)
         lines = [
             "## 我的神通",
             "",
-            f"**{self._display_name(record.player)}**的技能心得：`{record.skill_insights}`。",
+            f"**{self._display_name(record.player)}**的{insight_resource['name']}：`{record.insight_balance}`。",
             "",
         ]
-        for key in available_skill_keys(record.player.path_key):
-            definition = SKILL_DEFINITIONS[key]
+        definitions = skill_definitions(content)
+        display_inventory = dict(record.player.inventory)
+        for definition in definitions.values():
+            if definition.acquisition_item_key:
+                display_inventory.setdefault(definition.acquisition_item_key, 1)
+        for key in available_skill_keys(
+            record.player.path_key,
+            content,
+            realm_key=record.player.realm_key,
+            realm_layer=record.player.realm_layer,
+            inventory=display_inventory,
+            mastered_keys=tuple(item.skill_key for item in record.skills),
+        ):
+            definition = definitions[key]
             mastery = mastery_by_key.get(key)
             level = mastery.level if mastery else 0
-            lines.append(f"- **{definition.label}**：{level}/{MAX_SKILL_LEVEL} 级")
+            locked = (
+                definition.acquisition_item_key
+                and mastery is None
+                and int(record.player.inventory.get(definition.acquisition_item_key, 0)) <= 0
+            )
+            status = (
+                f"未获{content.label('item', definition.acquisition_item_key)}"
+                if locked
+                else f"{level}/{definition.max_level} 级"
+            )
+            lines.append(f"- **{definition.label}**（{definition.style_label}）：{status}")
         return CommandResult(
             True,
             "SKILL_PROFILE",
             "\n".join(lines),
             context.request_id,
             data={
-                "skill_insights": record.skill_insights,
+                "insight_balance": record.insight_balance,
                 "skills": [
                     {
                         "skill_key": item.skill_key,
@@ -146,11 +184,11 @@ class SkillApplication:
         except PlayerStageConflictError:
             return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成入道后才能参悟神通。", context.request_id, operation_id)
         except SkillNotAvailableError:
-            return CommandResult(False, "SKILL_NOT_AVAILABLE", "这项神通不属于当前首要道途。", context.request_id, operation_id)
+            return CommandResult(False, "SKILL_NOT_AVAILABLE", "这项神通尚未满足道途、境界或传承条件。", context.request_id, operation_id)
         except SkillAlreadyMaxedError:
-            return CommandResult(False, "SKILL_MAXED", "这项神通已经达到当前版本上限。", context.request_id, operation_id)
+            return CommandResult(False, "SKILL_MAXED", "这项神通已经达到参悟上限。", context.request_id, operation_id)
         except ResourceInsufficientError:
-            return CommandResult(False, "SKILL_RESOURCE_INSUFFICIENT", "技能心得或灵石不足，未扣除任何资源。", context.request_id, operation_id)
+            return CommandResult(False, "SKILL_RESOURCE_INSUFFICIENT", "参悟所需资源不足，未扣除任何资源。", context.request_id, operation_id)
         except SkillBusyError:
             return CommandResult(False, "SKILL_BUSY", "当前有其他长时会话进行中，请先完成结算。", context.request_id, operation_id)
         except PlayerSuspendedError:
@@ -161,10 +199,23 @@ class SkillApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        content = self.repository.content or bundled_content()
+        definition = skill_definitions(content)[record.skill_key]
+        effect_values = []
+        for field in definition.effect_deltas:
+            value = record.effective_effect[field]
+            if field.endswith("_bp") or (field == "value" and str(definition.effect.get("type", "")).endswith("_bp")):
+                effect_values.append(f"{int(value) / 100:g}%")
+            else:
+                effect_values.append(str(value))
+        resource_costs = "、".join(
+            f"{content.label('resource', key)} {amount}"
+            for key, amount in record.resource_costs.items()
+        )
         return CommandResult(
             True,
             "SKILL_TRAINED",
-            f"## 神通精进\n\n**{self._display_name(record.player)}**将 **{record.label}** 参悟至 **{record.level} 级**。\n\n- **效果**：`{record.effective_effect.get('value', 0)} bp`\n- **消耗**：技能心得 {record.insight_cost}，灵石 {record.spirit_stone_cost}\n\n> 结果已写入构筑快照，当前战斗运行时仍未开放。",
+            f"## 神通精进\n\n**{self._display_name(record.player)}**将 **{record.label}** 参悟至 **{record.level} 级**。\n\n- **效果数值**：{'、'.join(effect_values)}\n- **消耗**：{resource_costs}\n\n> 参悟结果已记入神通。",
             context.request_id,
             operation_id,
             data={
@@ -172,8 +223,7 @@ class SkillApplication:
                 "label": record.label,
                 "level": record.level,
                 "effective_effect": record.effective_effect,
-                "insight_cost": record.insight_cost,
-                "spirit_stone_cost": record.spirit_stone_cost,
+                "resource_costs": dict(record.resource_costs),
                 "trained_at": record.trained_at,
                 "idempotent_replay": record.already_completed,
             },

@@ -14,7 +14,7 @@ from typing import Any
 
 
 LOCAL_SHARD_KEY = "local"
-FEDERATION_RULE_VERSION = "arena-federation-0.1.0"
+FEDERATION_RULE_VERSION = ""
 
 
 def ensure_identity_route(

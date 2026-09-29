@@ -125,8 +125,6 @@ class SecretRealmRepositoryMixin:
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": int(player["realm_layer"]),
                 "node_keys": list(definition.node_keys),
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "first_clear": self._is_first_clear(connection, int(player["id"]), definition.key),
                 "resource_roll": self._resource_roll(definition.key, run_id),
             }
@@ -136,8 +134,8 @@ class SecretRealmRepositoryMixin:
                 INSERT INTO secret_realm_runs(
                     run_id, player_id, instance_key, status, node_index, starts_at, expires_at,
                     quota_period, quota_key, ticket_key, ticket_locked, stamina_locked,
-                    snapshot_json, result_json, content_version, rule_version, created_at, updated_at
-                ) VALUES (?, ?, ?, 'entered', 0, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)
+                    snapshot_json, result_json, created_at, updated_at
+                ) VALUES (?, ?, ?, 'entered', 0, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)
                 """,
                 (
                     run_id,
@@ -151,8 +149,6 @@ class SecretRealmRepositoryMixin:
                     definition.ticket_quantity,
                     definition.stamina_cost,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                    definition.content_version,
-                    definition.rule_version,
                     now_text,
                     now_text,
                 ),
@@ -537,30 +533,18 @@ class SecretRealmRepositoryMixin:
                 local = SecretRealmRepositoryMixin._json_object(rep["local_json"], {}) if rep else {}
                 local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + int(value)
                 connection.execute("INSERT INTO player_reputations(player_id, local_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json, updated_at=excluded.updated_at", (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), now_text))
-            elif key.startswith("item.weapon.") or key.startswith("item.armor."):
-                from ..advancement.equipment_rules import equipment_definition
+            elif key.startswith("item.weapon.") or key.startswith("item.armor.") or key.startswith("item.accessory."):
+                from ..utils.equipment import create_equipment_instances
 
-                definition = equipment_definition(key)
-                for _ in range(int(value)):
-                    connection.execute(
-                        """
-                        INSERT INTO equipment_instances(
-                            instance_id, player_id, item_key, label, slot, status,
-                            durability_bp, temper_level, max_temper_level, affixes_json,
-                            refinement_failure_streak, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, 'active', 10000, 0, ?, '{}', 0, ?, ?)
-                        """,
-                        (
-                            uuid4().hex,
-                            player["id"],
-                            definition.key,
-                            definition.label,
-                            definition.slot,
-                            definition.max_temper_level,
-                            now_text,
-                            now_text,
-                        ),
-                    )
+                if not create_equipment_instances(
+                    connection,
+                    player_id=int(player["id"]),
+                    item_key=key,
+                    quantity=int(value),
+                    now_text=now_text,
+                    durability_bp=10_000,
+                ):
+                    raise RuntimeError(f"equipment definition disappeared: {key}")
             else:
                 inventory[key] = int(inventory.get(key, 0)) + int(value)
         connection.execute("UPDATE players SET spirit_stones=?, inventory_json=?, updated_at=? WHERE id=?", (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]))

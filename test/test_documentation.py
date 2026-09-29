@@ -42,3 +42,11 @@ def test_local_markdown_links_resolve_within_the_repository() -> None:
             if not resolved.is_relative_to(ROOT) or not resolved.exists():
                 broken.append(f"{source.relative_to(ROOT)} -> {target}")
     assert not broken, "Broken local Markdown links:\n" + "\n".join(broken)
+
+
+def test_player_copywriting_contract_excludes_mixed_development_tone() -> None:
+    copywriting = (ROOT / "docs/messaging-copywriting.md").read_text(encoding="utf-8")
+    assert "## 文案风格" in copywriting
+    assert "不要把半段" in copywriting
+    assert "不把开发进度写成世界设定" in copywriting
+    assert "当前版本暂未接入" in copywriting

@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "炼制低阶疗伤丹",
+      "desc": "以止血草与粗糙灵米炼成疗伤丹，为战斗备下应急药物。",
       "profession": "alchemy",
       "requirements": [
         {
@@ -51,6 +52,7 @@
     },
     {
       "name": "炼制焦点丹",
+      "desc": "汇合灵叶与止血草，炼成可助人凝神修炼的焦点丹。",
       "profession": "alchemy",
       "requirements": [
         {
@@ -95,6 +97,7 @@
     },
     {
       "name": "炼制聚气护脉丹",
+      "desc": "以灵叶和止血草调和药力，炼成聚气突破时护持经脉的丹药。",
       "profession": "alchemy",
       "requirements": [
         {
@@ -139,6 +142,7 @@
     },
     {
       "name": "炼制筑基丹",
+      "desc": "汇集灵叶、阵砂与铁石炼制筑基丹，助修士跨过筑基门槛。",
       "profession": "alchemy",
       "requirements": [
         {
@@ -187,6 +191,7 @@
     },
     {
       "name": "炼制筑基护脉丹",
+      "desc": "将灵叶、阵砂与止血草炼成护脉丹，为筑基突破增添一重保障。",
       "profession": "alchemy",
       "requirements": [
         {
@@ -235,6 +240,7 @@
     },
     {
       "name": "锻造木纹剑",
+      "desc": "以铁石与木材锻成轻便长剑，供初入器道的修士使用。",
       "profession": "artifice",
       "requirements": [
         {
@@ -266,11 +272,7 @@
       "outputs": [
         {
           "item_key": "item.weapon.wood_sword",
-          "quantity": 1,
-          "durability_bp_min": 8000,
-          "durability_formula": {
-            "quality_divisor": 5
-          }
+          "quantity": 1
         }
       ],
       "daily_limit": 4,
@@ -283,6 +285,7 @@
     },
     {
       "name": "布置基础聚灵阵",
+      "desc": "以阵砂在灵泉谷布下聚灵阵，使周围灵气在一日内更加充盈。",
       "profession": "formation",
       "requirements": [
         {
@@ -337,6 +340,7 @@
     },
     {
       "name": "烹饪灵米饭",
+      "desc": "将粗糙灵米细心烹煮，做成能补充体力或精力的饭食。",
       "profession": "cooking",
       "requirements": [
         {
@@ -373,6 +377,7 @@
     },
     {
       "name": "炼制金丹护脉丹",
+      "desc": "以灵叶、云铁与止血草炼成护脉丹，助金丹修士稳住突破根基。",
       "profession": "alchemy",
       "requirements": [
         {"type": "profession_level", "value": 3},
@@ -403,6 +408,7 @@
     },
     {
       "name": "炼制凝核丹",
+      "desc": "以灵叶、云铁与阵砂凝炼成丹，供金丹修士冲击更高境界。",
       "profession": "alchemy",
       "requirements": [
         {"type": "profession_level", "value": 4},
@@ -433,6 +439,7 @@
     },
     {
       "name": "锻造云纹剑",
+      "desc": "以云铁、阵砂和木材锻出云纹长剑，剑身轻韧，灵纹流转。",
       "profession": "artifice",
       "requirements": [
         {"type": "profession_level", "value": 3},
@@ -448,7 +455,7 @@
       "tool": {"item_key": "item.tool.basic_hammer", "durability_cost_bp": 250},
       "energy_cost": 10,
       "duration_seconds": 180,
-      "outputs": [{"item_key": "item.weapon.cloud_sword", "quantity": 1, "durability_bp_min": 8500}],
+      "outputs": [{"item_key": "item.weapon.cloud_sword", "quantity": 1}],
       "daily_limit": 2,
       "failure": {
         "input_refund": [
@@ -463,6 +470,7 @@
     },
     {
       "name": "布置迷雾屏障阵",
+      "desc": "以阵砂和灵叶布下迷雾屏障，遮蔽洞天入口并维持半日。",
       "profession": "formation",
       "requirements": [
         {"type": "profession_level", "value": 3},
@@ -492,6 +500,7 @@
     },
     {
       "name": "烹饪云灵茶",
+      "desc": "取灵叶与灵米熬煮成茶，清灵之气可助下一次修炼凝神聚气。",
       "profession": "cooking",
       "requirements": [
         {"type": "profession_level", "value": 2},
@@ -518,6 +527,7 @@
     },
     {
       "name": "炼制魂元丹",
+      "desc": "以神魂晶与兽血炼成魂元丹，可涤荡魔染、安定心神。",
       "profession": "alchemy",
       "requirements": [
         {"type": "profession_level", "value": 5},
@@ -543,6 +553,7 @@
     },
     {
       "name": "缔结妖兽契约",
+      "desc": "以兽血为引，与妖兽缔结短暂同行之约。",
       "profession": null,
       "requirements": [
         {"type": "path_any", "values": ["beast", "demonic"]},

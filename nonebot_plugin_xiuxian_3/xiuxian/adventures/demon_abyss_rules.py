@@ -1,4 +1,4 @@
-"""Versioned contract for the solo demon-abyss secret realm."""
+"""Contract for the solo demon-abyss secret realm."""
 
 from __future__ import annotations
 
@@ -14,8 +14,6 @@ DEMON_ABYSS_QUOTA_LIMIT = 1
 DEMON_ABYSS_EXPIRY_SECONDS = 60 * 60
 DEMON_ABYSS_RISK_BASE_BP = 0
 DEMON_ABYSS_RISK_MODIFIER_BP = 50
-DEMON_ABYSS_CONTENT_VERSION = "content-0.3"
-DEMON_ABYSS_RULE_VERSION = "adventures-0.3.2"
 
 DEMON_ABYSS_NODES = (
     "abyss_threshold",
@@ -68,7 +66,6 @@ def demon_abyss_risk_applies(roll_bp: int, risk_bp: int) -> bool:
 
 
 __all__ = [
-    "DEMON_ABYSS_CONTENT_VERSION",
     "DEMON_ABYSS_ENEMIES",
     "DEMON_ABYSS_EXPIRY_SECONDS",
     "DEMON_ABYSS_FIRST_REWARD",
@@ -81,7 +78,6 @@ __all__ = [
     "DEMON_ABYSS_REQUIRED_FLAG",
     "DEMON_ABYSS_RISK_BASE_BP",
     "DEMON_ABYSS_RISK_MODIFIER_BP",
-    "DEMON_ABYSS_RULE_VERSION",
     "DEMON_ABYSS_STAMINA_COST",
     "demon_abyss_risk_roll_bp",
     "demon_abyss_risk_applies",

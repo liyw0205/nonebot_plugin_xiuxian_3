@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from datetime import date, datetime, timedelta, timezone
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
-VOID_QUEST_RULE_VERSION = "quests-0.5.1"
+CONTENT_VERSION = ""
+RULE_VERSION = ""
+VOID_QUEST_RULE_VERSION = ""
 
 SOUL_QUEST = "quest.soul_transformation"
 DOMAIN_COMMISSION = "quest.domain_material_commission"
@@ -35,21 +34,21 @@ def utc_week_bounds(value: datetime) -> tuple[date, date]:
 DAO_UNION_QUEST = "quest.dao_union"
 DAO_UNION_FRAGMENT_REWARD = 12
 DAO_UNION_TRIBULATION_TOKEN_REWARD = 1
-DAO_UNION_CONTENT_VERSION = "content-0.6"
-DAO_UNION_RULE_VERSION = "quests-0.6.1"
+DAO_UNION_CONTENT_VERSION = ""
+DAO_UNION_RULE_VERSION = ""
 DAO_UNION_MAINLINE = "three_realm_mainline"
 DAO_UNION_CHALLENGE = "cross_server_challenge"
 DAO_UNION_WORK = "endgame_work"
 DAO_UNION_MAINLINE_STORY_KEY = "story.mainline.dao_echoes"
-DAO_UNION_MAINLINE_CONTENT_VERSION = "content-0.6"
-DAO_UNION_MAINLINE_RULE_VERSION = "adventures-0.6.0"
+DAO_UNION_MAINLINE_CONTENT_VERSION = ""
+DAO_UNION_MAINLINE_RULE_VERSION = ""
 DAO_UNION_MAINLINE_LANES = ("builder", "witness", "traveler")
 DAO_UNION_MAINLINE_STAGE_KEYS = {
     lane: tuple(f"lane.{lane}.chapter.{chapter:02d}" for chapter in range(1, 11))
     for lane in DAO_UNION_MAINLINE_LANES
 }
-DAO_ORIGIN_CONTENT_VERSION = "content-0.6"
-DAO_ORIGIN_RULE_VERSION = "events-0.6.0"
+DAO_ORIGIN_CONTENT_VERSION = ""
+DAO_ORIGIN_RULE_VERSION = ""
 DAO_ORIGIN_GUARD = "task.dao_origin.guard"
 DAO_ORIGIN_BUILD = "task.dao_origin.build"
 DAO_ORIGIN_TEACH = "task.dao_origin.teach"

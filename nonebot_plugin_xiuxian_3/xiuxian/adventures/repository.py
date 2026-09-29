@@ -59,46 +59,6 @@ from ..advancement.rules import (
     retreat_definition,
     retreat_reward,
 )
-from ..advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
-    constitution_definition,
-)
-from ..advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
-    talent_node_for_reference,
-    talent_tree_nodes,
-    tree_definition,
-)
-from ..advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
-    available_skill_keys,
-    effective_skill_effect,
-    skill_cost,
-    skill_definition,
-)
-from ..advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
-    EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
-    equipment_definition,
-    refinement_affix,
-    refinement_roll_bp,
-    temper_cost,
-    temper_roll_bp,
-    temper_success_bp,
-)
 from ..livelihood.models import ResidenceRecord
 from ..livelihood.rules import residence_definition
 from ..world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
@@ -121,7 +81,6 @@ from ..exploration.rules import (
     meets_realm as exploration_meets_realm,
     settlement_result,
 )
-from ..exploration.rules import has_cloud_mine_access
 from ..adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from ..adventures.mainline_models import (
     MainlineClaimRecord,
@@ -144,7 +103,14 @@ from ..adventures.mainline import (
     mainline_stage_status,
     resolve_mainline,
 )
-from ..adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
+from ..adventures.rules import (
+    bounty_definition,
+    bounty_definitions,
+    choose_bounty,
+    meets_realm as bounty_meets_realm,
+    reward_map,
+)
+from ..utils.equipment import create_equipment_instances
 from ..specials.codex_projection import record_codex_discovery
 from ..routine.models import (
     AchievementClaimRecord,
@@ -182,10 +148,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -250,7 +214,7 @@ class AdventuresRepositoryMixin:
                     (row["id"], serialize_datetime(now)),
                 ).fetchone()
             offers: list[BountyOfferView] = []
-            for definition in BOUNTY_DEFINITIONS.values():
+            for definition in bounty_definitions(self.content):
                 progress = 0
                 expires_at: str | None = None
                 if accepted is not None and accepted["bounty_key"] == definition.key:
@@ -280,7 +244,11 @@ class AdventuresRepositoryMixin:
                         status=status,
                         progress=progress,
                         target=definition.target_amount,
-                        reward=reward_map(definition),
+                        reward=reward_map(
+                            definition,
+                            self.content,
+                            seed=f"{row['id']}:{business_date}:{definition.key}",
+                        ),
                         expires_at=expires_at,
                     )
                 )
@@ -290,15 +258,21 @@ class AdventuresRepositoryMixin:
                 offers=tuple(offers),
             )
 
-    @staticmethod
     def _bounty_player_eligible(
-        connection: sqlite3.Connection, row: sqlite3.Row | dict[str, Any], definition, now: datetime
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row | dict[str, Any],
+        definition,
+        now: datetime,
     ) -> bool:
         stage = str(row["stage"] if isinstance(row, sqlite3.Row) else row.get("stage", ""))
         if stage not in {STAGE_MORTAL, "seeker", "cultivator"}:
             return False
         realm_key = str(row["realm_key"] if isinstance(row, sqlite3.Row) else row.get("realm_key", "mortal"))
         layer = int(row["realm_layer"] if isinstance(row, sqlite3.Row) else row.get("realm_layer", 0))
+        path_key = row["path_key"] if isinstance(row, sqlite3.Row) else row.get("path_key")
+        if definition.path_keys and path_key not in definition.path_keys:
+            return False
         if definition.required_intro_flag:
             intro_raw = row["intro_json"] if isinstance(row, sqlite3.Row) else row.get("intro_json", {})
             intro = SQLitePlayerRepository._json_object(intro_raw, {})
@@ -312,21 +286,47 @@ class AdventuresRepositoryMixin:
                 (player_id, definition.required_permit, serialize_datetime(now)),
             ).fetchone():
                 return False
-        if bounty_meets_realm(realm_key, layer, definition.required_realm, definition.required_layer):
+        if bounty_meets_realm(
+            realm_key,
+            layer,
+            definition.required_realm,
+            definition.required_layer,
+            self.content,
+        ):
             return True
-        if definition.key == "bounty.cloud_mine":
-            if isinstance(row, sqlite3.Row):
-                inventory = SQLitePlayerRepository._json_object(row["inventory_json"], {})
-                intro = SQLitePlayerRepository._json_object(row["intro_json"], {})
-                subprofession = row["subprofession_key"]
-            else:
-                inventory = SQLitePlayerRepository._json_object(row.get("inventory_json", {}), {})
-                intro = SQLitePlayerRepository._json_object(row.get("intro_json", {}), {})
-                subprofession = row.get("subprofession_key")
-            return has_cloud_mine_access(
-                subprofession_key=subprofession,
-                inventory=inventory,
-                intro_flags={str(flag) for flag in intro.get("flags", [])},
+        return any(
+            self._bounty_access_condition_met(connection, row, condition, now)
+            for condition in definition.access_any
+        )
+
+    @staticmethod
+    def _bounty_access_condition_met(
+        connection: sqlite3.Connection,
+        row: sqlite3.Row | dict[str, Any],
+        condition: dict[str, Any],
+        now: datetime,
+    ) -> bool:
+        condition_type = condition.get("type")
+        if condition_type == "subprofession":
+            value = row["subprofession_key"] if isinstance(row, sqlite3.Row) else row.get("subprofession_key")
+            return str(value or "") == str(condition.get("value", ""))
+        if condition_type == "intro_flag":
+            intro_raw = row["intro_json"] if isinstance(row, sqlite3.Row) else row.get("intro_json", {})
+            flags = SQLitePlayerRepository._json_object(intro_raw, {}).get("flags", [])
+            return str(condition.get("value", "")) in {str(flag) for flag in flags}
+        if condition_type == "inventory_item":
+            inventory_raw = row["inventory_json"] if isinstance(row, sqlite3.Row) else row.get("inventory_json", {})
+            inventory = SQLitePlayerRepository._json_object(inventory_raw, {})
+            item_key = str(condition.get("item_key", ""))
+            quantity = int(condition.get("quantity", 1))
+            return bool(item_key) and int(inventory.get(item_key, 0)) >= quantity
+        if condition_type == "permit":
+            player_id = int(row["id"] if isinstance(row, sqlite3.Row) else row.get("id", 0))
+            return bool(
+                connection.execute(
+                    "SELECT 1 FROM trade_permits WHERE player_id=? AND permit_key=? AND expires_at>? LIMIT 1",
+                    (player_id, str(condition.get("permit_key", "")), serialize_datetime(now)),
+                ).fetchone()
             )
         return False
 
@@ -360,21 +360,6 @@ class AdventuresRepositoryMixin:
             ).fetchone()
             baseline = int(snapshot.get("baseline_exploration_battle_wins", 0))
             return max(0, min(definition.target_amount, int(current["count"]) - baseline))
-        if definition.target_kind == "training_dummy_wins":
-            current = connection.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM battle_sessions
-                WHERE player_id = ?
-                  AND battle_type = 'pve.training'
-                  AND enemy_key = ?
-                  AND status = 'settled'
-                  AND json_extract(result_json, '$.outcome') = 'won'
-                """,
-                (row["id"], definition.target_key),
-            ).fetchone()
-            baseline = int(snapshot.get("baseline_training_battle_wins", 0))
-            return max(0, min(definition.target_amount, int(current["count"]) - baseline))
         if definition.target_kind == "dispatch_successes":
             rows = connection.execute(
                 """
@@ -397,7 +382,7 @@ class AdventuresRepositoryMixin:
         *,
         platform: str,
         platform_user_id: str,
-        bounty_key: str,
+        bounty_key: str | None,
         operation_id: str,
     ) -> BountyAcceptRecord:
         await self.initialize()
@@ -417,18 +402,16 @@ class AdventuresRepositoryMixin:
         bounty_key: str,
         operation_id: str,
     ) -> BountyAcceptRecord:
-        definition = bounty_definition(bounty_key)
         operation_name = "bounty.accept"
         request_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
-            "bounty_key": definition.key,
+            "bounty_key": bounty_key if bounty_key is not None else "$random",
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
         business_date = now.date().isoformat()
         starts_at = serialize_datetime(now)
-        expires_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
@@ -440,6 +423,22 @@ class AdventuresRepositoryMixin:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._bounty_accept_from_payload(json.loads(existing["result_json"]), replay=True)
             row = self._require_player(connection, platform, platform_user_id)
+            if bounty_key is None:
+                candidates = [
+                    definition
+                    for definition in bounty_definitions(self.content)
+                    if definition.runtime_status == "open"
+                    and self._bounty_player_eligible(connection, row, definition, now)
+                ]
+                if not candidates:
+                    raise BountyRequirementError("no eligible bounty candidates")
+                definition = choose_bounty(
+                    candidates,
+                    seed=f"{operation_id}:{row['id']}:{business_date}:{row['realm_key']}:{row['path_key'] or ''}",
+                )
+            else:
+                definition = bounty_definition(bounty_key, self.content)
+            expires_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
             if definition.runtime_status != "open":
                 raise BountyContentClosedError("bounty runtime is closed")
             if not self._bounty_player_eligible(connection, row, definition, now):
@@ -465,8 +464,8 @@ class AdventuresRepositoryMixin:
                 "SELECT COUNT(*) AS count FROM production_orders WHERE player_id = ? AND status = 'completed'",
                 (row["id"],),
             ).fetchone()
-            if definition.target_kind in {"exploration_battle_wins", "training_dummy_wins"}:
-                battle_type = "pve.exploration" if definition.target_kind == "exploration_battle_wins" else "pve.training"
+            if definition.target_kind == "exploration_battle_wins":
+                battle_type = "pve.exploration"
                 battle_wins = connection.execute(
                     """
                     SELECT COUNT(*) AS count
@@ -494,6 +493,15 @@ class AdventuresRepositoryMixin:
                 "bounty_key": definition.key,
                 "content_version": definition.content_version,
                 "rule_version": definition.rule_version,
+                "reward_pool_key": definition.reward_pool_key,
+                "reward": reward_map(
+                    definition,
+                    self.content,
+                    seed=f"{row['id']}:{business_date}:{definition.key}",
+                    path_key=str(row["path_key"]) if row["path_key"] else None,
+                    realm_key=str(row["realm_key"]),
+                    realm_layer=int(row["realm_layer"]),
+                ),
                 "target_kind": definition.target_kind,
                 "target_key": definition.target_key,
                 "target_amount": definition.target_amount,
@@ -503,7 +511,6 @@ class AdventuresRepositoryMixin:
                 "baseline_quantity": int(inventory.get(str(definition.target_key), 0)) if definition.target_key else 0,
                 "baseline_completed_orders": int(completed_orders["count"]),
                 "baseline_exploration_battle_wins": int(battle_wins["count"]),
-                "baseline_training_battle_wins": int(battle_wins["count"]),
                 "baseline_dispatch_assignment_ids": baseline_dispatch_ids,
             }
             offer_id = uuid4().hex
@@ -610,7 +617,7 @@ class AdventuresRepositoryMixin:
                 if claimed is not None:
                     raise BountyAlreadyClaimedError("bounty reward was already claimed")
                 raise BountyNotFoundError("no bounty is waiting for a claim")
-            definition = bounty_definition(str(offer["bounty_key"]))
+            definition = bounty_definition(str(offer["bounty_key"]), self.content)
             progress = self._bounty_progress(connection, row, offer, definition)
             if now > datetime.fromisoformat(str(offer["expires_at"])):
                 connection.execute(
@@ -640,7 +647,8 @@ class AdventuresRepositoryMixin:
             cultivation = int(row["cultivation"])
             total_cultivation = int(row["total_cultivation"])
             energy = int(row["energy"])
-            rewards = reward_map(definition)
+            snapshot = self._json_object(offer["snapshot_json"], {})
+            rewards = {str(key): int(value) for key, value in dict(snapshot["reward"]).items()}
             actual_rewards: dict[str, int] = {}
             local_reputation = 0
             service_reputation = 0
@@ -675,10 +683,17 @@ class AdventuresRepositoryMixin:
                         entry_key=key,
                         operation_id=operation_id,
                         occurred_at=now,
-                        snapshot=self._json_object(offer["snapshot_json"], {}),
-                        content_version=definition.content_version,
-                        rule_version=definition.rule_version,
+                        snapshot=snapshot,
                     )
+                    actual_rewards[key] = quantity
+                elif key.startswith("item.") and create_equipment_instances(
+                    connection,
+                    player_id=int(row["id"]),
+                    item_key=key,
+                    quantity=quantity,
+                    now_text=now_text,
+                    content=self.content,
+                ):
                     actual_rewards[key] = quantity
                 else:
                     inventory[key] = int(inventory.get(key, 0)) + quantity
@@ -689,7 +704,6 @@ class AdventuresRepositoryMixin:
                 (row["id"],),
             ).fetchone()
             local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-            snapshot = self._json_object(offer["snapshot_json"], {})
             reputation_key = str(snapshot.get("reputation_key", "local.xuantian.new_town"))
             local[reputation_key] = int(local.get(reputation_key, 0)) + local_reputation
             current_service = int(reputation["service_reputation"]) if reputation is not None else 0

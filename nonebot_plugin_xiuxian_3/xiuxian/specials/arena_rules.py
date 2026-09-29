@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
-import hashlib
 from datetime import timedelta
 from typing import Mapping
 
+from ..combat.spectator_rules import battle_roll_bp, simulate_spectator_match
 from .three_realms_arena_rules import THREE_REALMS_ARENA_MODE_KEY
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 ARENA_MODE_KEY = "arena.spar"
 ARENA_RANK_MODE_KEY = "arena.rank"
 ARENA_PRACTICE_MODE_KEY = "arena.practice"
@@ -25,11 +24,6 @@ MAX_ROUNDS = 15
 WIN_RATING_DELTA = 25
 LOSS_RATING_DELTA = -10
 DRAW_RATING_DELTA = 5
-
-
-def battle_roll_bp(seed: str) -> int:
-    digest = hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest()
-    return int.from_bytes(digest, "big") % 10_000
 
 
 def rating_band(rating: int) -> int:
@@ -93,70 +87,19 @@ def simulate_match(
     *,
     seed: str,
     environment: Mapping[str, object] | None = None,
+    max_rounds: int = MAX_ROUNDS,
 ) -> tuple[str, int, list[dict[str, object]]]:
     """Resolve both immutable snapshots without accepting client actions."""
-
-    left = _stats(challenger)
-    right = _stats(defender)
-    hp = {"challenger": left["max_hp"], "defender": right["max_hp"]}
-    stats = {"challenger": left, "defender": right}
-    sequence = 0
-    actions: list[dict[str, object]] = []
-    for round_no in range(1, MAX_ROUNDS + 1):
-        if left["initiative"] == right["initiative"]:
-            first = "challenger" if battle_roll_bp(f"{seed}:first:{round_no}") < 5_000 else "defender"
-        else:
-            first = "challenger" if left["initiative"] > right["initiative"] else "defender"
-        order = (first, "defender" if first == "challenger" else "challenger")
-        for actor in order:
-            target = "defender" if actor == "challenger" else "challenger"
-            if hp[actor] <= 0 or hp[target] <= 0:
-                continue
-            sequence += 1
-            actor_stats = stats[actor]
-            target_stats = stats[target]
-            environment_bonus = 0
-            if environment:
-                relation = str(environment.get("relation", ""))
-                environment_bonus = 150 if relation == "same_faction" else -150
-                if actor == "challenger":
-                    environment_bonus += max(0, int(environment.get("challenger_bloodline_stability", 0))) // 20
-                else:
-                    environment_bonus += max(0, int(environment.get("defender_bloodline_stability", 0))) // 20
-            hit_bp = max(
-                2_000,
-                min(
-                    9_800,
-                    8_500 + actor_stats["initiative"] * 20 - target_stats["agility"] * 20 + environment_bonus,
-                ),
-            )
-            hit_roll = battle_roll_bp(f"{seed}:round:{round_no}:action:{sequence}:hit")
-            hit = hit_roll < hit_bp
-            damage = 0
-            if hit:
-                variance = battle_roll_bp(f"{seed}:round:{round_no}:action:{sequence}:damage") % 5
-                damage = max(1, actor_stats["attack"] - 2 + variance)
-                hp[target] = max(0, hp[target] - damage)
-            action = {
-                "sequence_no": sequence,
-                "round_no": round_no,
-                "actor_key": actor,
-                "strategy_key": "arena.auto.basic",
-                "skill_key": "skill.arena.basic_attack",
-                "target_key": target,
-                "hit_roll_bp": hit_roll,
-                "hit_bp": hit_bp,
-                "damage": damage,
-                "state": {"challenger_hp": hp["challenger"], "defender_hp": hp["defender"]},
-                "environment": dict(environment or {}),
-            }
-            actions.append(action)
-            if hp[target] <= 0:
-                outcome = "challenger_won" if target == "defender" else "defender_won"
-                return outcome, round_no, actions
-        if hp["challenger"] <= 0 or hp["defender"] <= 0:
-            break
-    return "draw", MAX_ROUNDS, actions
+    return simulate_spectator_match(
+        challenger,
+        defender,
+        seed=seed,
+        environment=environment,
+        max_rounds=max_rounds,
+        challenger_skill_key="skill.arena.basic_attack",
+        defender_skill_key="skill.arena.basic_attack",
+        strategy_key="arena.auto.basic",
+    )
 
 
 def public_summary(player: Mapping[str, object], *, snapshot_id: str, rating: int, created_at: str) -> dict[str, object]:

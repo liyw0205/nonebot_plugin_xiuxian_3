@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 import hashlib
 from dataclasses import dataclass
 from datetime import timedelta
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
-LEGACY_CONTENT_VERSION = "content-0.1"
-LEGACY_RULE_VERSION = "specials-0.1.2"
+CONTENT_VERSION = ""
+RULE_VERSION = ""
+LEGACY_CONTENT_VERSION = ""
+LEGACY_RULE_VERSION = ""
 TOWER_KEY = "tower.mist_trial"
 MAX_FLOOR = 45
 
@@ -72,13 +71,6 @@ def reward_for(floor_no: int, seed: str, *, first_clear: bool) -> dict[str, int]
     return {"item.mat.array_sand": 1} if roll % 2 else {}
 
 
-def versions_for_floor(floor_no: int) -> tuple[str, str]:
-    floor_definition(floor_no)
-    if floor_no <= 30:
-        return LEGACY_CONTENT_VERSION, LEGACY_RULE_VERSION
-    return CONTENT_VERSION, RULE_VERSION
-
-
 def attempt_band_for(floor_no: int) -> tuple[int, int]:
     floor_definition(floor_no)
     if floor_no <= 10:
@@ -106,5 +98,4 @@ __all__ = [
     "floor_definition",
     "practice_week_start",
     "reward_for",
-    "versions_for_floor",
 ]

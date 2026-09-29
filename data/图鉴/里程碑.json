@@ -1,0 +1,118 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "codex_milestone",
+  "records": [
+    {
+      "key": "codex.xuantian.place_3",
+      "name": "玄天地点三览",
+      "desc": "收录指定的 3 条图鉴记录后领取。",
+      "entry_keys": [
+        "codex.place.new_town",
+        "codex.place.outskirts",
+        "codex.place.spirit_field"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 5
+      },
+      "unlocks": [
+        "commission.town.extra_offer"
+      ],
+      "status": "active"
+    },
+    {
+      "key": "codex.xuantian.materials_5",
+      "name": "玄天材料五录",
+      "desc": "收录指定的 5 条图鉴记录后领取。",
+      "entry_keys": [
+        "codex.material.blood_grass",
+        "codex.material.spirit_leaf",
+        "codex.material.ironstone",
+        "codex.material.wood",
+        "codex.material.array_sand"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 5
+      },
+      "unlocks": [
+        "hint.herb_route"
+      ],
+      "status": "active"
+    },
+    {
+      "key": "codex.xuantian.creature_3",
+      "name": "近郊异兽三录",
+      "desc": "收录指定的 3 条图鉴记录后领取。",
+      "entry_keys": [
+        "codex.creature.wood_rat",
+        "codex.creature.iron_boar",
+        "codex.creature.mist_guardian"
+      ],
+      "reward": {},
+      "unlocks": [
+        "display.codex_creature_badge",
+        "hint.tower_route"
+      ],
+      "status": "active"
+    },
+    {
+      "key": "codex.paths_6",
+      "name": "六道途百科",
+      "desc": "收录指定的 6 条图鉴记录后领取。",
+      "entry_keys": [
+        "codex.path.body",
+        "codex.path.spell",
+        "codex.path.device",
+        "codex.path.demonic",
+        "codex.path.beast",
+        "codex.path.support"
+      ],
+      "reward": {},
+      "unlocks": [
+        "encyclopedia.paths_6"
+      ],
+      "status": "active"
+    },
+    {
+      "key": "codex.cloud_city.discovery_3",
+      "name": "云城商会见闻",
+      "desc": "发现云城、云铁并确认云铁矿兽踪迹后，可领取云城名望并解锁一项商会订单。",
+      "entry_keys": [
+        "codex.place.cloud_city",
+        "codex.material.cloud_iron",
+        "codex.creature.cloud_beast"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.cloud_city",
+        "name": "云城名望",
+        "amount": 8
+      },
+      "unlocks": [
+        "commission.cloud_city.extra_order"
+      ],
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.frontier_records_3",
+      "name": "三界守望",
+      "desc": "远古洞天、祖灵殿与领域前线的三则见闻尽数收录后，可领取此赏。",
+      "entry_keys": [
+        "codex.domain.ancient_domain",
+        "codex.domain.ancestral_hall",
+        "codex.domain.frontline"
+      ],
+      "reward": {},
+      "unlocks": [
+        "encyclopedia.domain_tactics",
+        "display.domain_observatory"
+      ],
+      "status": "active"
+    }
+  ]
+}

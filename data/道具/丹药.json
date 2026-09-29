@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "低阶疗伤丹",
+      "desc": "用于战斗中疗愈伤势，可恢复部分气血。",
       "item_type": "pill",
       "quality": "common",
       "stack_limit": 99,
@@ -22,6 +23,7 @@
     },
     {
       "name": "焦点丹",
+      "desc": "凝神静气，助你在下一次修炼中多得一成修为。",
       "item_type": "pill",
       "quality": "common",
       "stack_limit": 99,
@@ -41,6 +43,7 @@
     },
     {
       "name": "聚气护脉丹",
+      "desc": "护住聚气时的经脉，突破失败也能留住大部分修为。",
       "item_type": "pill",
       "quality": "common",
       "stack_limit": 9,
@@ -61,6 +64,7 @@
     },
     {
       "name": "筑基丹",
+      "desc": "药力沉稳，可助修士迈过筑基门槛。",
       "item_type": "pill",
       "quality": "common",
       "stack_limit": 9,
@@ -79,6 +83,7 @@
     },
     {
       "name": "筑基护脉丹",
+      "desc": "筑基时护持经脉，降低失败后修为受损的程度。",
       "item_type": "pill",
       "quality": "common",
       "stack_limit": 9,
@@ -99,6 +104,7 @@
     },
     {
       "name": "凝核丹",
+      "desc": "凝炼金丹所需的丹药，筑基圆满后方可服用。",
       "item_type": "pill",
       "quality": "rare",
       "stack_limit": 9,
@@ -123,6 +129,7 @@
     },
     {
       "name": "金丹护脉丹",
+      "desc": "金丹突破时稳固经脉，减轻失败带来的修为损耗。",
       "item_type": "pill",
       "quality": "rare",
       "stack_limit": 9,
@@ -143,6 +150,7 @@
     },
     {
       "name": "金丹恢复丹",
+      "desc": "平复金丹突破后的震荡，服用需耗费灵石调息。",
       "item_type": "pill",
       "quality": "rare",
       "stack_limit": 9,
@@ -162,6 +170,7 @@
     },
     {
       "name": "凝魂丹",
+      "desc": "温养神魂、凝聚元婴的关键丹药，金丹圆满后方可使用。",
       "item_type": "pill",
       "quality": "heaven",
       "stack_limit": 9,
@@ -175,6 +184,7 @@
     },
     {
       "name": "魂元丹",
+      "desc": "以魂元涤荡心神，可减轻魔渊污染，也会带来一段疲乏。",
       "item_type": "pill",
       "quality": "heaven",
       "stack_limit": 9,
@@ -188,6 +198,7 @@
     },
     {
       "name": "领域复原丹",
+      "desc": "修复受损的领域根基，服用后需静养一段时日。",
       "item_type": "pill",
       "quality": "heaven",
       "stack_limit": 9,

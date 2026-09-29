@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-ECONOMY_CONTENT_VERSION = "content-0.1"
-ECONOMY_RULE_VERSION = "economy-0.1.0"
+ECONOMY_CONTENT_VERSION = ""
+ECONOMY_RULE_VERSION = ""
 MARKET_ORDER_TTL_SECONDS = 24 * 60 * 60
 MARKET_MAX_LISTINGS = 10
 MARKET_MIN_QUANTITY = 1

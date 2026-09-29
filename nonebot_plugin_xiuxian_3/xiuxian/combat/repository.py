@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 import json
 import sqlite3
 import time
@@ -11,6 +12,9 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
+from ..advancement.constitution_effects import constitution_effect_snapshot
+from ..items.manual_rules import manual_effect_totals
 from ..persistence.errors import (
     BattleAlreadySettledError,
     BattleBusyError,
@@ -31,56 +35,61 @@ from .models import (
     BattleRewardClaimRecord,
     BattleStartRecord,
     BattleTurnRecord,
+    SpectatorPreviewRecord,
+)
+from .skill_effects import (
+    apply_player_skill_style,
+    mitigate_enemy_attack,
+    mitigate_player_damage,
+    prepare_skill_action,
+    reflected_enemy_damage,
 )
 from .rules import (
-    CONTENT_VERSION,
-    BEAST_GUARDIAN,
     ANCESTRAL_SPIRIT,
-    DEMON_OVERLORD,
-    DEMON_RUINS_SCOUT,
     DEMON_WAR_FRONT,
-    DEFEAT_COOLDOWN_SECONDS,
     MAX_TURNS,
-    RULE_VERSION,
     TURN_TIMEOUT_SECONDS,
-    V03_CONTENT_VERSION,
-    V03_RULE_VERSION,
-    V031_RULE_VERSION,
-    V032_RULE_VERSION,
-    V04_CONTENT_VERSION,
-    V041_RULE_VERSION,
-    V02_CONTENT_VERSION,
-    V02_RULE_VERSION,
-    MIST_ELITE,
-    CLOUD_BOAT_GUARDIAN,
     battle_roll_bp,
     enemy_definition,
     hit_chance_bp,
     player_goes_first,
     player_stat_snapshot,
 )
+from .spectator_rules import (
+    public_spectator_summary,
+    simulate_spectator_match,
+    spar_definition,
+    spectator_seed,
+    training_dummy_preview_rounds,
+)
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
-from ..versions import module_versions
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
 
 
 class CombatRepositoryMixin:
     """Persist every automatic combat transition as an independently replayable write."""
 
-    async def start_training_battle(
-        self, *, platform: str, platform_user_id: str, operation_id: str
-    ) -> BattleStartRecord:
+    async def preview_training_dummy(
+        self, *, platform: str, platform_user_id: str
+    ) -> SpectatorPreviewRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync, self._preview_training_dummy_once, platform, platform_user_id
+            )
+
+    async def preview_player_spar(
+        self, *, platform: str, platform_user_id: str, target_ref: str
+    ) -> SpectatorPreviewRecord:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
                 self._retry_sync,
-                self._start_training_battle_once,
+                self._preview_player_spar_once,
                 platform,
                 platform_user_id,
-                operation_id,
-                "enemy.training_dummy",
-                "pve.training",
+                target_ref,
             )
 
     async def start_quest_battle(
@@ -118,7 +127,7 @@ class CombatRepositoryMixin:
     async def start_demon_war_front_battle(
         self, *, platform: str, platform_user_id: str, operation_id: str
     ) -> BattleStartRecord:
-        """Start the fixed, rewardless v0.3 war-front encounter."""
+        """Start the fixed, rewardless war-front encounter."""
 
         await self.initialize()
         async with self._inflight:
@@ -247,8 +256,8 @@ class CombatRepositoryMixin:
         platform: str,
         platform_user_id: str,
         operation_id: str,
-        enemy_key: str = "enemy.training_dummy",
-        battle_type: str = "pve.training",
+        enemy_key: str,
+        battle_type: str,
         exploration_id: str | None = None,
         ignore_secret_realm_run_id: str | None = None,
         ignore_tower_run_id: str | None = None,
@@ -256,57 +265,8 @@ class CombatRepositoryMixin:
         ignore_ancestral_hall_run_id: str | None = None,
     ) -> BattleStartRecord:
         content = getattr(self, "content", None)
-        enemy = (
-            enemy_definition(enemy_key, content=content)
-            if content is not None and enemy_key.startswith("enemy.void_spire.")
-            else enemy_definition(enemy_key)
-        )
-        v03_enemy_keys = {
-            DEMON_OVERLORD.key,
-            DEMON_RUINS_SCOUT.key,
-            "enemy.demon_abyss_echo_guardian",
-            "enemy.demon_abyss_heart",
-            BEAST_GUARDIAN.key,
-            DEMON_WAR_FRONT.key,
-        }
-        v02_enemy_keys = {MIST_ELITE.key, CLOUD_BOAT_GUARDIAN.key}
-        is_three_realms_tower_enemy = enemy.key.startswith("enemy.three_realms_tower.")
-        is_void_spire_enemy = enemy.key.startswith("enemy.void_spire.")
-        is_three_realms_tower_v04_enemy = is_three_realms_tower_enemy and any(
-            f".{encounter}" in enemy.key
-            for encounter in ("domain_vanguard", "floor_30_boss", "domain_veteran", "floor_40_boss")
-        )
-        void_spire_content_version, void_spire_rule_version = module_versions(
-            "nonebot_plugin_xiuxian_3.xiuxian.specials.void_spire_rules"
-        )
-        battle_content_version = (
-            void_spire_content_version
-            if is_void_spire_enemy
-            else V04_CONTENT_VERSION
-            if enemy.key == ANCESTRAL_SPIRIT.key or is_three_realms_tower_v04_enemy
-            else V03_CONTENT_VERSION
-            if enemy.key in v03_enemy_keys or is_three_realms_tower_enemy
-            else V02_CONTENT_VERSION
-            if enemy.key in v02_enemy_keys
-            else CONTENT_VERSION
-        )
-        if is_void_spire_enemy:
-            battle_rule_version = void_spire_rule_version
-        elif enemy.key == ANCESTRAL_SPIRIT.key:
-            battle_rule_version = V041_RULE_VERSION
-        elif is_three_realms_tower_v04_enemy:
-            battle_rule_version = "combat-0.4.0"
-        elif enemy.key in {"enemy.demon_abyss_echo_guardian", "enemy.demon_abyss_heart"}:
-            battle_rule_version = V032_RULE_VERSION
-        elif enemy.key == DEMON_RUINS_SCOUT.key:
-            battle_rule_version = V031_RULE_VERSION
-        elif enemy.key in v03_enemy_keys or is_three_realms_tower_enemy:
-            battle_rule_version = V03_RULE_VERSION
-        elif enemy.key in v02_enemy_keys:
-            battle_rule_version = V02_RULE_VERSION
-        else:
-            battle_rule_version = RULE_VERSION
-        operation_name = "battle.start" if battle_type == "pve.training" else f"battle.start.{battle_type}"
+        enemy = enemy_definition(enemy_key, content=content)
+        operation_name = f"battle.start.{battle_type}"
         request_hash = self._request_hash(
             operation_name,
             {
@@ -315,8 +275,6 @@ class CombatRepositoryMixin:
                 "enemy_key": enemy.key,
                 "battle_type": battle_type,
                 "exploration_id": exploration_id,
-                "content_version": battle_content_version,
-                "rule_version": battle_rule_version,
             },
         )
         now = self._now()
@@ -373,7 +331,7 @@ class CombatRepositoryMixin:
             ):
                 raise BattleRequirementError("battle requires a specific location")
             cooldown = player["battle_defeat_until"]
-            if battle_type == "pve.training" and cooldown and now < datetime.fromisoformat(str(cooldown)):
+            if cooldown and now < datetime.fromisoformat(str(cooldown)):
                 raise BattleCooldownError("battle defeat cooldown is active")
             if self._has_active_long_action(
                 connection,
@@ -429,11 +387,24 @@ class CombatRepositoryMixin:
                 if exploration is not None
                 else self._json_object(player["qualification_json"], {})
             )
+            constitution_effect = (
+                dict(exploration_snapshot.get("constitution_effect", {}))
+                if exploration is not None
+                else constitution_effect_snapshot(connection, int(player["id"]))
+            )
+            manual_effects = manual_effect_totals(
+                self._json_object(player["inventory_json"], {}), self.content
+            )
+            manual_stat_bonus = manual_effects["combat_stat_bonus_bp"]
+            if not isinstance(manual_stat_bonus, dict):
+                raise ValueError("manual combat stat bonuses must be an object")
             stats = player_stat_snapshot(
                 qualification,
                 max_hp=int(exploration_snapshot.get("max_hp", player["max_hp"])),
                 initiative=int(exploration_snapshot.get("initiative", player["initiative"])),
                 equipment=equipment,
+                constitution_effect=constitution_effect,
+                manual_stat_bonus_bp=manual_stat_bonus,
             )
             skills = self._battle_skill_snapshot(
                 connection,
@@ -450,6 +421,8 @@ class CombatRepositoryMixin:
                     "path_key": player["path_key"],
                     "qualification": qualification,
                     "stats": stats,
+                    "constitution_effect": constitution_effect,
+                    "manual_effects": manual_effects,
                     "equipment": list(equipment),
                     "skills": skills,
                     "cross_realm_penalty_bp": int(exploration_snapshot.get("cross_realm_penalty_bp", 0)),
@@ -466,13 +439,17 @@ class CombatRepositoryMixin:
                 "random_pool": enemy.random_pool,
                 "random_seed": operation_id,
                 "reward": dict(enemy.reward),
-                "content_version": battle_content_version,
-                "rule_version": battle_rule_version,
             }
             state = {
                 "round_no": 0,
                 "player_hp": stats["max_hp"],
+                "player_mana": stats["max_mana"],
                 "enemy_hp": enemy.max_hp,
+                "manual_reflect_damage_bp": min(
+                    10_000,
+                    int(manual_effects["damage_reflection_bp"])
+                    + int(stats.get("damage_reflection_bp", 0)),
+                ),
                 "timeout_count": 0,
             }
             turn_deadline = serialize_datetime(now + timedelta(seconds=TURN_TIMEOUT_SECONDS))
@@ -481,9 +458,8 @@ class CombatRepositoryMixin:
                 INSERT INTO battle_sessions(
                     battle_id, player_id, start_operation_id, battle_type, enemy_key, location_key,
                     status, reward_status, round_no, action_sequence, starts_at, turn_deadline,
-                    snapshot_json, state_json, result_json, content_version, rule_version,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 'created', 'none', 0, 0, ?, ?, ?, ?, '{}', ?, ?, ?, ?)
+                    snapshot_json, state_json, result_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 'created', 'none', 0, 0, ?, ?, ?, ?, '{}', ?, ?)
                 """,
                 (
                     battle_id,
@@ -496,8 +472,6 @@ class CombatRepositoryMixin:
                     turn_deadline,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(state, ensure_ascii=False, sort_keys=True),
-                    battle_content_version,
-                    battle_rule_version,
                     now_text,
                     now_text,
                 ),
@@ -529,6 +503,156 @@ class CombatRepositoryMixin:
                 )
             return self._battle_start_from_payload(payload)
 
+    def _preview_training_dummy_once(
+        self, platform: str, platform_user_id: str
+    ) -> SpectatorPreviewRecord:
+        content = getattr(self, "content", None) or bundled_content()
+        enemy = enemy_definition("enemy.training_dummy", content=content)
+        max_rounds = training_dummy_preview_rounds(content)
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            if (
+                str(player["location_key"]) != enemy.location_key
+                or not self._meets_enemy_requirement(player, enemy.required_realm, enemy.required_layer)
+            ):
+                raise BattleRequirementError("training dummy spectator requires its configured location and realm")
+            player_snapshot, selected_skill = self._spectator_player_snapshot(connection, player)
+
+        enemy_snapshot = {
+            "dao_name": enemy.label,
+            "path_key": "training_dummy",
+            "realm_key": "mortal",
+            "realm_layer": 0,
+            "stats": {
+                "max_hp": enemy.max_hp,
+                "attack": enemy.attack,
+                "initiative": enemy.initiative,
+                "agility": enemy.agility,
+            },
+        }
+        rules = {"enemy_key": enemy.key, "max_rounds": max_rounds, "random_pool": enemy.random_pool}
+        seed = spectator_seed(
+            participants={"player": player_snapshot, "enemy": enemy_snapshot}, rules=rules
+        )
+        outcome, rounds, actions = simulate_spectator_match(
+            player_snapshot,
+            enemy_snapshot,
+            seed=seed,
+            max_rounds=max_rounds,
+            challenger_skill_key=selected_skill,
+            defender_skill_key=enemy.skill_key,
+            strategy_key="strategy.spectator.training_dummy",
+        )
+        return SpectatorPreviewRecord(
+            outcome=outcome,
+            rounds=rounds,
+            snapshots={
+                "player": public_spectator_summary(player_snapshot),
+                "enemy": public_spectator_summary(enemy_snapshot),
+            },
+            actions=tuple(self._rename_spectator_sides(actions)),
+        )
+
+    def _preview_player_spar_once(
+        self, platform: str, platform_user_id: str, target_ref: str
+    ) -> SpectatorPreviewRecord:
+        content = getattr(self, "content", None) or bundled_content()
+        definition = spar_definition(content)
+        with self._connect() as connection:
+            challenger = self._require_player(connection, platform, platform_user_id, writable=False)
+            target = target_ref.strip()
+            defender = connection.execute(
+                "SELECT * FROM players WHERE dao_name = ? OR player_id = ? LIMIT 1", (target, target)
+            ).fetchone()
+            if defender is None:
+                raise PlayerNotFoundError("target player does not exist")
+            if str(defender["status"]) != "active":
+                raise PlayerSuspendedError("target player is not readable")
+            if int(challenger["id"]) == int(defender["id"]):
+                raise BattleRequirementError("cannot spectate a spar between the same player")
+            if str(challenger["stage"]) != "cultivator" or str(defender["stage"]) != "cultivator":
+                raise BattleRequirementError("spar spectator requires two active cultivators")
+            challenger_snapshot, challenger_skill = self._spectator_player_snapshot(connection, challenger)
+            defender_snapshot, defender_skill = self._spectator_player_snapshot(connection, defender)
+
+        environment = {"environment_key": definition.environment_key, "relation": "neutral"}
+        rules = {"max_rounds": definition.max_rounds, "environment": environment}
+        seed = spectator_seed(
+            participants={"challenger": challenger_snapshot, "defender": defender_snapshot},
+            rules=rules,
+        )
+        outcome, rounds, actions = simulate_spectator_match(
+            challenger_snapshot,
+            defender_snapshot,
+            seed=seed,
+            environment=environment,
+            max_rounds=definition.max_rounds,
+            challenger_skill_key=challenger_skill,
+            defender_skill_key=defender_skill,
+            strategy_key="strategy.spectator.player_spar",
+        )
+        return SpectatorPreviewRecord(
+            outcome=outcome,
+            rounds=rounds,
+            snapshots={
+                "challenger": public_spectator_summary(challenger_snapshot),
+                "defender": public_spectator_summary(defender_snapshot),
+            },
+            actions=tuple(actions),
+        )
+
+    def _spectator_player_snapshot(
+        self, connection: sqlite3.Connection, player: sqlite3.Row
+    ) -> tuple[dict[str, object], str]:
+        qualification = self._json_object(player["qualification_json"], {})
+        equipment = self._battle_equipment_snapshot(connection, int(player["id"]))
+        constitution_effect = constitution_effect_snapshot(connection, int(player["id"]))
+        manual_effects = manual_effect_totals(self._json_object(player["inventory_json"], {}), self.content)
+        manual_bonus = manual_effects["combat_stat_bonus_bp"]
+        if not isinstance(manual_bonus, dict):
+            raise ValueError("manual combat stat bonuses must be an object")
+        stats = player_stat_snapshot(
+            qualification,
+            max_hp=int(player["max_hp"]),
+            initiative=int(player["initiative"]),
+            equipment=equipment,
+            constitution_effect=constitution_effect,
+            manual_stat_bonus_bp=manual_bonus,
+        )
+        skills = self._battle_skill_snapshot(connection, int(player["id"]), str(player["path_key"] or ""))
+        selected_skill = self._select_battle_skill(skills, available_mana=stats["max_mana"])
+        return (
+            {
+                "dao_name": str(player["dao_name"] or ""),
+                "path_key": str(player["path_key"] or ""),
+                "realm_key": str(player["realm_key"]),
+                "realm_layer": int(player["realm_layer"]),
+                "qualification": qualification,
+                "stats": stats,
+                "equipment": list(equipment),
+                "selected_skill_key": str(selected_skill["skill_key"]),
+            },
+            str(selected_skill["skill_key"]),
+        )
+
+    @staticmethod
+    def _rename_spectator_sides(actions: list[dict[str, object]]) -> list[dict[str, object]]:
+        renamed = []
+        for source in actions:
+            action = dict(source)
+            for field in ("actor_key", "target_key"):
+                action[field] = {"challenger": "player", "defender": "enemy"}.get(
+                    str(action[field]), action[field]
+                )
+            state = action.get("state")
+            if isinstance(state, dict):
+                action["state"] = {
+                    "player_hp": state.get("challenger_hp", 0),
+                    "enemy_hp": state.get("defender_hp", 0),
+                }
+            renamed.append(action)
+        return renamed
+
     def _run_battle_turn_once(self, battle_id: str, expected_round: int) -> BattleTurnRecord:
         if expected_round < 1 or expected_round > MAX_TURNS:
             raise ValueError("expected battle round is invalid")
@@ -536,7 +660,7 @@ class CombatRepositoryMixin:
         operation_name = "battle.run_turn"
         request_hash = self._request_hash(
             operation_name,
-            {"battle_id": battle_id, "expected_round": expected_round, "rule_version": RULE_VERSION},
+            {"battle_id": battle_id, "expected_round": expected_round},
         )
         now = self._now()
         now_text = serialize_datetime(now)
@@ -570,7 +694,8 @@ class CombatRepositoryMixin:
             tribulation = self._json_object(snapshot.get("tribulation"), {})
             debt_shield_bp = int(tribulation.get("debt_shield_bp", 0)) if is_tribulation_trial else 0
             player_skills = list(snapshot.get("player", {}).get("skills", []))
-            selected_skill = self._select_battle_skill(player_skills)
+            player_mana = int(state.get("player_mana", player_stats.get("max_mana", 0)))
+            selected_skill = self._select_battle_skill(player_skills, available_mana=player_mana)
             player_hp = int(state["player_hp"])
             enemy_hp = int(state["enemy_hp"])
             timeout = now >= datetime.fromisoformat(str(session["turn_deadline"]))
@@ -596,7 +721,7 @@ class CombatRepositoryMixin:
                         "battle_id": battle_id,
                         "sequence_no": sequence + 1,
                         "actor_key": "player",
-                        "strategy_key": "strategy.ancestral_spirit.clear_shadow.v0.4.1",
+                        "strategy_key": "strategy.ancestral_spirit.clear_shadow",
                         "skill_key": "skill.ancestral_spirit.shadow_clear",
                         "target_key": "bloodline_shadow",
                         "hit_roll_bp": 0,
@@ -617,29 +742,65 @@ class CombatRepositoryMixin:
                     )
                     defending = True
                 elif actor == "player":
-                    action = self._attack_action(
-                        battle_id=battle_id,
-                        round_no=expected_round,
-                        sequence=sequence + 1,
-                        actor_key="player",
-                        skill_key=str(selected_skill.get("skill_key", "skill.basic_attack")),
-                        strategy_key=(
-                            "strategy.basic_attack.v0.1"
-                            if str(selected_skill.get("skill_key", "skill.basic_attack")) == "skill.basic_attack"
-                            else "strategy.mastered_skill.v0.3"
-                        ),
-                        attacker_attack=int(player_stats["attack"]),
-                        attacker_initiative=int(player_stats["initiative"]),
-                        defender_agility=int(enemy["agility"]),
-                        target_hp=(
-                            enemy_hp
-                            if not is_tribulation_trial
-                            else max(enemy_hp, int(player_stats["attack"])) + int(player_stats["attack"])
-                        ),
-                        seed=str(snapshot["random_seed"]),
-                        operation_id=operation_id,
-                        damage_multiplier_bp=self._skill_damage_multiplier(selected_skill),
+                    damage_multiplier_bp, skill_hit_bonus_bp, charging = prepare_skill_action(
+                        selected_skill, state, expected_round
                     )
+                    if charging:
+                        action = {
+                            "battle_id": battle_id,
+                            "sequence_no": sequence + 1,
+                            "actor_key": "player",
+                            "strategy_key": "strategy.skill.charge",
+                            "skill_key": str(selected_skill.get("skill_key", "skill.basic_attack")),
+                            "target_key": "self",
+                            "hit_roll_bp": 0,
+                            "crit_roll_bp": 0,
+                            "hit_bp": 10_000,
+                            "damage": 0,
+                            "operation_id": operation_id,
+                        }
+                    else:
+                        action = self._attack_action(
+                            battle_id=battle_id,
+                            round_no=expected_round,
+                            sequence=sequence + 1,
+                            actor_key="player",
+                            skill_key=str(selected_skill.get("skill_key", "skill.basic_attack")),
+                            strategy_key=(
+                                "strategy.basic_attack"
+                                if str(selected_skill.get("skill_key", "skill.basic_attack")) == "skill.basic_attack"
+                                else "strategy.mastered_skill"
+                            ),
+                            attacker_attack=int(player_stats["attack"]),
+                            attacker_initiative=int(player_stats["initiative"]),
+                            defender_agility=int(enemy["agility"]),
+                            target_hp=(
+                                enemy_hp
+                                if not is_tribulation_trial
+                                else max(enemy_hp, int(player_stats["attack"])) + int(player_stats["attack"])
+                            ),
+                            seed=str(snapshot["random_seed"]),
+                            operation_id=operation_id,
+                            skill_hit_bp=skill_hit_bonus_bp,
+                            damage_multiplier_bp=damage_multiplier_bp,
+                            accuracy_bp=int(player_stats.get("accuracy_bp", 0)),
+                            crit_chance_bp=int(player_stats.get("crit_chance_bp", 0)),
+                            crit_damage_bp=int(player_stats.get("crit_damage_bp", 0)),
+                        )
+                        mana_cost = int(selected_skill.get("mana_cost", 0))
+                        if mana_cost > 0:
+                            player_mana = max(0, player_mana - mana_cost)
+                    hit = int(action["hit_roll_bp"]) < int(action["hit_bp"])
+                    ongoing_damage = apply_player_skill_style(
+                        selected_skill,
+                        state,
+                        round_no=expected_round,
+                        player_attack=int(player_stats["attack"]),
+                        hit=hit,
+                        enemy_acted=actor_order[0] == "enemy",
+                        direct_damage=int(action["damage"]),
+                    )
+                    action["damage"] = min(enemy_hp, int(action["damage"]) + ongoing_damage)
                     if phase is not None:
                         effective_damage_bp = phase.player_damage_bp * (10_000 - debt_shield_bp) // 10_000
                         base_damage = int(action["damage"])
@@ -659,12 +820,31 @@ class CombatRepositoryMixin:
                             ) if base_damage > 0 else 0,
                         )
                     enemy_hp = max(0, enemy_hp - int(action["damage"]))
+                    dealt = int(action["damage"])
+                    healing = min(
+                        max(0, int(player_stats["max_hp"]) - player_hp),
+                        dealt * int(player_stats.get("lifesteal_bp", 0)) // 10_000,
+                    )
+                    player_hp += healing
+                    mana_recovered = min(
+                        max(0, int(player_stats.get("max_mana", 0)) - player_mana),
+                        max(0, int(player_stats.get("mana_regen", 0)))
+                        + dealt * int(player_stats.get("mana_leech_bp", 0)) // 10_000,
+                    )
+                    player_mana += mana_recovered
+                    hp_regen = min(
+                        max(0, int(player_stats["max_hp"]) - player_hp),
+                        max(0, int(player_stats.get("hp_regen", 0))),
+                    )
+                    player_hp += hp_regen
+                    if healing or mana_recovered or hp_regen:
+                        action["recovery"] = {"hp": healing + hp_regen, "mana": mana_recovered}
                 elif actor == "enemy" and is_ancestral_spirit and expected_round % 4 == 0 and not bloodline_shadow:
                     action = {
                         "battle_id": battle_id,
                         "sequence_no": sequence + 1,
                         "actor_key": "enemy",
-                        "strategy_key": "strategy.ancestral_spirit.bloodline_call.v0.4.1",
+                        "strategy_key": "strategy.ancestral_spirit.bloodline_call",
                         "skill_key": "skill.beast.ancestral_form",
                         "target_key": "bloodline_shadow",
                         "hit_roll_bp": 0,
@@ -677,6 +857,8 @@ class CombatRepositoryMixin:
                 else:
                     if actor == "enemy" and is_tribulation_trial:
                         phase = phase_for_hp(enemy_hp, int(enemy["max_hp"]))
+                    enemy_attack = phase.attack if phase is not None else int(enemy["attack"])
+                    enemy_attack = mitigate_enemy_attack(enemy_attack, state, round_no=expected_round)
                     action = self._attack_action(
                         battle_id=battle_id,
                         round_no=expected_round,
@@ -684,25 +866,62 @@ class CombatRepositoryMixin:
                         actor_key="enemy",
                         skill_key=phase.skill_key if phase is not None else str(enemy["skill_key"]),
                         strategy_key=(
-                            "strategy.tribulation_phase.v0.6"
+                            "strategy.tribulation_phase"
                             if phase is not None
-                            else "strategy.ancestral_spirit.v0.4.1"
+                            else "strategy.ancestral_spirit"
                             if is_ancestral_spirit
-                            else "strategy.training_dummy.v0.1"
+                            else "strategy.enemy.automatic"
                         ),
-                        attacker_attack=phase.attack if phase is not None else int(enemy["attack"]),
+                        attacker_attack=enemy_attack,
                         attacker_initiative=int(enemy["initiative"]),
                         defender_agility=int(player_stats["agility"]),
                         target_hp=player_hp,
                         seed=str(snapshot["random_seed"]),
                         operation_id=operation_id,
                         skill_hit_bp=phase.enemy_hit_bonus_bp if phase is not None else 0,
+                        evasion_bp=int(player_stats.get("evasion_bp", 0)),
+                        crit_chance_bp=500,
+                        defender_anti_crit_bp=int(player_stats.get("anti_crit_bp", 0)),
                     )
                     if defending:
                         action["damage"] = int(action["damage"]) * 8_000 // 10_000
+                    action["damage"] = mitigate_player_damage(
+                        int(action["damage"]), state, round_no=expected_round,
+                        equipment_reduction_bp=int(player_stats.get("damage_reduction_bp", 0)),
+                    )
+                    reflected = reflected_enemy_damage(
+                        int(action["damage"]), state, round_no=expected_round
+                    )
+                    if reflected:
+                        action["reflected_damage"] = reflected
+                        enemy_hp = max(0, enemy_hp - reflected)
                     player_hp = max(0, player_hp - int(action["damage"]))
                 sequence += 1
-                action["state"] = {"player_hp": player_hp, "enemy_hp": enemy_hp}
+                action["state"] = {
+                    "player_hp": player_hp,
+                    "player_mana": player_mana,
+                    "enemy_hp": enemy_hp,
+                }
+                if action.get("critical"):
+                    action["state"]["critical"] = True
+                if "recovery" in action:
+                    action["state"]["recovery"] = action["recovery"]
+                if int(action.get("reflected_damage", 0)) > 0:
+                    action["state"]["reflected_damage"] = int(action["reflected_damage"])
+                for key in (
+                    "charged_skill_key",
+                    "charged_skill_round",
+                    "skill_statuses",
+                    "player_guard_bp",
+                    "player_guard_until_round",
+                    "player_reflect_damage_bp",
+                    "player_reflect_until_round",
+                    "manual_reflect_damage_bp",
+                    "enemy_attack_reduction_bp",
+                    "enemy_debuff_until_round",
+                ):
+                    if key in state:
+                        action["state"][key] = deepcopy(state[key])
                 if is_ancestral_spirit:
                     action["state"]["bloodline_shadow"] = bloodline_shadow
                 if phase is not None:
@@ -722,6 +941,12 @@ class CombatRepositoryMixin:
                     break
             if is_ancestral_spirit and shadow_at_round_start and timeout and bloodline_shadow:
                 recovery = max(1, int(enemy["max_hp"]) * 500 // 10_000)
+                recovery = recovery * (
+                    10_000 - min(10_000, int(player_stats.get("healing_reduction_bp", 0)))
+                ) // 10_000
+                recovery = recovery * (
+                    10_000 - min(10_000, int(player_stats.get("recovery_reduction_bp", 0)))
+                ) // 10_000
                 enemy_hp = min(int(enemy["max_hp"]), enemy_hp + recovery)
                 bloodline_shadow = False
                 sequence += 1
@@ -729,7 +954,7 @@ class CombatRepositoryMixin:
                     "battle_id": battle_id,
                     "sequence_no": sequence,
                     "actor_key": "enemy",
-                    "strategy_key": "strategy.ancestral_spirit.bloodline_recovery.v0.4.1",
+                    "strategy_key": "strategy.ancestral_spirit.bloodline_recovery",
                     "skill_key": "skill.beast.ancestral_form",
                     "target_key": "enemy",
                     "hit_roll_bp": 0,
@@ -777,12 +1002,28 @@ class CombatRepositoryMixin:
                         now_text,
                     ),
                 )
+            skill_state = state
             state = {
                 "round_no": expected_round,
                 "player_hp": player_hp,
+                "player_mana": player_mana,
                 "enemy_hp": enemy_hp,
                 "timeout_count": timeout_count,
             }
+            for key in (
+                "charged_skill_key",
+                "charged_skill_round",
+                "skill_statuses",
+                "player_guard_bp",
+                "player_guard_until_round",
+                "player_reflect_damage_bp",
+                "player_reflect_until_round",
+                "manual_reflect_damage_bp",
+                "enemy_attack_reduction_bp",
+                "enemy_debuff_until_round",
+            ):
+                if key in skill_state:
+                    state[key] = deepcopy(skill_state[key])
             if is_ancestral_spirit:
                 state["bloodline_shadow"] = bloodline_shadow
             if is_tribulation_trial:
@@ -837,7 +1078,7 @@ class CombatRepositoryMixin:
         operation_id = f"battle.resolve:{battle_id}"
         operation_name = "battle.resolve"
         request_hash = self._request_hash(
-            operation_name, {"battle_id": battle_id, "rule_version": RULE_VERSION}
+            operation_name, {"battle_id": battle_id}
         )
         now = self._now()
         now_text = serialize_datetime(now)
@@ -879,7 +1120,7 @@ class CombatRepositoryMixin:
                 durable_ids = [
                     str(item["instance_id"])
                     for item in list(snapshot.get("player", {}).get("equipment", []))
-                    if str(item.get("slot", "")) in {"weapon", "armor"}
+                    if str(item.get("slot", "")) in {"weapon", "armor", "accessory"}
                 ]
                 if durable_ids:
                     placeholders = ", ".join("?" for _ in durable_ids)
@@ -894,15 +1135,6 @@ class CombatRepositoryMixin:
                         (now_text, player["id"], *durable_ids),
                     )
                     durability_loss = 50
-            elif outcome in {"lost", "expired"} and str(session["battle_type"]) == "pve.training":
-                connection.execute(
-                    "UPDATE players SET battle_defeat_until = ?, updated_at = ? WHERE id = ?",
-                    (
-                        serialize_datetime(now + timedelta(seconds=DEFEAT_COOLDOWN_SECONDS)),
-                        now_text,
-                        player["id"],
-                    ),
-                )
             result.update(
                 {
                     "outcome": outcome,
@@ -913,24 +1145,26 @@ class CombatRepositoryMixin:
                     "settled_at": now_text,
                 }
             )
-            creature_entries = {
-                "enemy.wood_rat": "codex.creature.wood_rat",
-                "enemy.iron_boar": "codex.creature.iron_boar",
-                "enemy.mist_guardian": "codex.creature.mist_guardian",
-            }
-            if outcome == "won" and str(session["enemy_key"]) in creature_entries:
+            enemy_record = (self.content or bundled_content()).get(
+                "enemy", str(session["enemy_key"]), include_locked=False
+            )
+            creature_entry = enemy_record.get("codex_entry_key") if enemy_record is not None else None
+            if (
+                outcome == "won"
+                and isinstance(creature_entry, str)
+            ):
                 record_codex_discovery(
                     connection,
                     player_id=int(player["id"]),
-                    entry_key=creature_entries[str(session["enemy_key"])],
+                    entry_key=creature_entry,
                     operation_id=operation_id,
                     occurred_at=now,
                     snapshot={
                         "battle_id": battle_id,
                         "enemy_key": str(session["enemy_key"]),
                         "battle_type": str(session["battle_type"]),
-                        "rule_version": snapshot.get("rule_version", RULE_VERSION),
                     },
+                    content=self.content,
                 )
             connection.execute(
                 """
@@ -1172,20 +1406,30 @@ class CombatRepositoryMixin:
             """,
             (player_id,),
         ).fetchall()
-        return tuple(
-            {
-                "instance_id": str(row["instance_id"]),
-                "item_key": str(row["item_key"]),
-                "slot": str(row["slot"]),
-                "durability_bp": int(row["durability_bp"]),
-                "temper_level": int(row["temper_level"]),
-                "affixes": {
-                    str(key): int(value)
-                    for key, value in self._json_object(row["affixes_json"], {}).items()
-                },
-            }
-            for row in rows
-        )
+        content = self.content or bundled_content()
+        player = connection.execute("SELECT path_key FROM players WHERE id = ?", (player_id,)).fetchone()
+        path_key = str(player["path_key"] or "") if player is not None else ""
+        equipment = []
+        for row in rows:
+            item_key = str(row["item_key"])
+            item_definition = content.require("item", item_key, include_locked=False)
+            if item_definition.get("path_key") not in {None, path_key}:
+                continue
+            equipment.append(
+                {
+                    "instance_id": str(row["instance_id"]),
+                    "item_key": item_key,
+                    "slot": str(row["slot"]),
+                    "effects": list(item_definition.get("effects", [])),
+                    "durability_bp": int(row["durability_bp"]),
+                    "temper_level": int(row["temper_level"]),
+                    "affixes": {
+                        str(key): int(value)
+                        for key, value in self._json_object(row["affixes_json"], {}).items()
+                    },
+                }
+            )
+        return tuple(equipment)
 
     def _battle_skill_snapshot(
         self,
@@ -1196,14 +1440,14 @@ class CombatRepositoryMixin:
         """Freeze mastered skills and their effective effects at battle start."""
 
         rows = connection.execute(
-            "SELECT skill_key, path_key, level, snapshot_json FROM skill_masteries "
+            "SELECT skill_key, level, snapshot_json FROM skill_masteries "
             "WHERE player_id = ? ORDER BY level DESC, skill_key",
             (player_id,),
         ).fetchall()
         skills: list[dict[str, object]] = []
         for row in rows:
             try:
-                definition = skill_definition(str(row["skill_key"]))
+                definition = skill_definition(str(row["skill_key"]), self.content)
             except ValueError:
                 continue
             if definition.path_key not in {None, path_key}:
@@ -1211,43 +1455,50 @@ class CombatRepositoryMixin:
             level = int(row["level"])
             stored = self._json_object(row["snapshot_json"], {})
             effect = dict(stored.get("effective_effect", effective_skill_effect(definition, level)))
+            raw_skill = (self.content or bundled_content()).require(
+                "skill", str(row["skill_key"]), include_locked=False
+            )
+            raw_cost = raw_skill.get("cost", {})
+            mana_cost = (
+                max(0, int(raw_cost.get("amount", 0)))
+                if isinstance(raw_cost, dict) and raw_cost.get("resource_key") == "mana"
+                else 0
+            )
             skills.append(
                 {
                     "skill_key": str(row["skill_key"]),
-                    "path_key": row["path_key"],
+                    "path_key": definition.path_key,
                     "level": level,
                     "effect": effect,
-                    "content_version": definition.content_version,
-                    "rule_version": definition.rule_version,
+                    "mana_cost": mana_cost,
+                    "combat_style": {
+                        "key": definition.style_key,
+                        "effect": definition.combat_effect or {},
+                    },
                 }
             )
         return skills
 
     @staticmethod
-    def _select_battle_skill(skills: list[dict[str, object]]) -> dict[str, object]:
+    def _select_battle_skill(
+        skills: list[dict[str, object]], *, available_mana: int | None = None
+    ) -> dict[str, object]:
         """Choose the strongest mastered active skill deterministically."""
 
-        if not skills:
+        affordable = [
+            skill for skill in skills
+            if available_mana is None or int(skill.get("mana_cost", 0)) <= available_mana
+        ]
+        if not affordable:
             return {"skill_key": "skill.basic_attack", "effect": {"value": 10000, "level": 0}}
         return sorted(
-            skills,
+            affordable,
             key=lambda item: (
                 str(item.get("skill_key", "")) == "skill.basic_attack",
                 -int(item.get("level", 0)),
                 str(item.get("skill_key", "")),
             ),
         )[0]
-
-    @staticmethod
-    def _skill_damage_multiplier(skill: dict[str, object]) -> int:
-        effect = dict(skill.get("effect", {}))
-        value = int(effect.get("value", 10_000))
-        effect_type = str(effect.get("type", ""))
-        if effect_type == "damage_bonus_bp":
-            return 10_000 + value
-        if effect_type.endswith("_multiplier_bp"):
-            return value
-        return 10_000
 
     @staticmethod
     def _attack_action(
@@ -1266,15 +1517,27 @@ class CombatRepositoryMixin:
         operation_id: str,
         skill_hit_bp: int = 0,
         damage_multiplier_bp: int = 10_000,
+        accuracy_bp: int = 0,
+        evasion_bp: int = 0,
+        crit_chance_bp: int = 0,
+        crit_damage_bp: int = 0,
+        defender_anti_crit_bp: int = 0,
     ) -> dict[str, object]:
         hit_bp = hit_chance_bp(
             attacker_initiative=attacker_initiative,
             defender_agility=defender_agility,
             skill_hit_bp=skill_hit_bp,
+            accuracy_bp=accuracy_bp,
+            evasion_bp=evasion_bp,
         )
         hit_roll = battle_roll_bp(f"{seed}:round:{round_no}:action:{sequence}:hit")
         crit_roll = battle_roll_bp(f"{seed}:round:{round_no}:action:{sequence}:crit")
         hit = hit_roll < hit_bp
+        effective_crit_bp = max(0, int(crit_chance_bp) - max(0, int(defender_anti_crit_bp)))
+        critical = hit and crit_roll < min(10_000, effective_crit_bp)
+        base_damage = max(0, attacker_attack) * max(0, int(damage_multiplier_bp)) // 10_000
+        if critical:
+            base_damage = base_damage * (15_000 + max(0, int(crit_damage_bp))) // 10_000
         return {
             "battle_id": battle_id,
             "sequence_no": sequence,
@@ -1285,7 +1548,8 @@ class CombatRepositoryMixin:
             "hit_roll_bp": hit_roll,
             "crit_roll_bp": crit_roll,
             "hit_bp": hit_bp,
-            "damage": min(target_hp, max(0, attacker_attack) * max(0, int(damage_multiplier_bp)) // 10_000) if hit else 0,
+            "critical": critical,
+            "damage": min(target_hp, base_damage) if hit else 0,
             "operation_id": operation_id,
         }
 
@@ -1303,7 +1567,7 @@ class CombatRepositoryMixin:
             "battle_id": battle_id,
             "sequence_no": sequence,
             "actor_key": "player",
-            "strategy_key": "strategy.timeout_defend.v0.1",
+            "strategy_key": "strategy.timeout_defend",
             "skill_key": "skill.defend",
             "target_key": "player",
             "hit_roll_bp": 0,

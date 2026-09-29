@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "第一次寻仙",
+      "desc": "离开熟悉的日常，亲自踏出寻仙问道的第一步。",
       "status": "open",
       "trigger": {
         "operation": "player.start_seeking",
@@ -15,6 +16,7 @@
     },
     {
       "name": "第一次入道",
+      "desc": "完成凡人引导，选定修行道路，正式开始修炼。",
       "status": "open",
       "trigger": {
         "operation": "player.enter_cultivation",
@@ -27,6 +29,7 @@
     },
     {
       "name": "第一次采集",
+      "desc": "在近郊采下第一份灵草，熟悉山野间的采集之道。",
       "status": "open",
       "trigger": {
         "operation": "explore.gather_outskirts",
@@ -39,6 +42,7 @@
     },
     {
       "name": "第一次生产",
+      "desc": "完成一份炼制订单，迈出将灵材化为成品的第一步。",
       "status": "open",
       "trigger": {
         "operation_group": "production.*",
@@ -51,6 +55,7 @@
     },
     {
       "name": "元婴准备",
+      "desc": "备齐凝结元婴所需的历练与材料，为金丹化婴做好准备。",
       "status": "open",
       "trigger": {"operation": "progression.prepare_nascent_soul", "result": "success"},
       "reward_key": "reward.quest.prepare_nascent_soul",
@@ -60,6 +65,7 @@
     },
     {
       "name": "化神许可",
+      "desc": "完成远古洞天、材料委托与三界历练，取得冲击化神境的资格。",
       "status": "open",
       "trigger": {"operation": "quest.domain_material_commission", "result": "success"},
       "requirements": ["quest.domain_material_commission", "quest.ancient_domain_line", "event.cross_realm_victory"],
@@ -70,6 +76,7 @@
     },
     {
       "name": "炼虚许可",
+      "desc": "完成界壁试炼并取得虚空档案，获得踏入炼虚境的资格。",
       "status": "open",
       "trigger": {"operation": "quest.break_void", "result": "success"},
       "requirements": ["void_wall_trial_count>=3", "item.void_archive>=1"],
@@ -80,6 +87,7 @@
     },
     {
       "name": "合道许可",
+      "desc": "走完三界主线、完成道心挑战并交付大师作品，取得合道资格。",
       "status": "open",
       "trigger": {"operation": "quest.dao_union", "result": "success"},
       "requirements": ["three_realms.mainline", "dao_union.challenge", "dao_union.masterwork"],
@@ -90,6 +98,7 @@
     },
     {
       "name": "守界防御",
+      "desc": "参与守界防御，协助抵御边界异动，积累守望三界的功绩。",
       "status": "open",
       "requirements": ["realm.dao_union.layer1", "defense_count>=3"],
       "reward": {"dao_fruit_progress": 150, "ascension_merit": 150},
@@ -99,6 +108,7 @@
     },
     {
       "name": "留界建设",
+      "desc": "投身公共建设，修缮道场与边界设施，为众生留下安身之所。",
       "status": "open",
       "requirements": ["realm.dao_union.layer1", "building_count>=3"],
       "reward": {"dao_fruit_progress": 160, "ascension_merit": 150},
@@ -108,6 +118,7 @@
     },
     {
       "name": "道统传承",
+      "desc": "将修行经验传授给后来者，让所学之道得以延续。",
       "status": "open",
       "requirements": ["realm.dao_union.layer1", "teaching_count>=3"],
       "reward": {"dao_fruit_progress": 160, "ascension_merit": 150},

@@ -143,6 +143,7 @@ class WorldApplication:
             "consume_pass_on_arrival": definition.consume_pass_on_arrival,
             "required_faction": definition.required_faction,
             "required_faction_reputation": definition.required_faction_reputation,
+            "requires_selected_domain": definition.requires_selected_domain,
         })
 
     async def start_travel(self, context: CommandContext, destination: str | None = None) -> CommandResult:
@@ -181,6 +182,14 @@ class WorldApplication:
                 operation_id,
             )
         except LocationRequirementError:
+            if resolved == "xuantian.domain_front":
+                return CommandResult(
+                    False,
+                    "DOMAIN_FRONT_REQUIREMENT_MISSING",
+                    "需达到化神 L1、已选择领域，并从玄天城镇、宗门山门、阵堂、战场或界隙抵达；本次未扣除资源。",
+                    context.request_id,
+                    operation_id,
+                )
             if resolved == "dao.origin_gate":
                 return CommandResult(
                     False,
@@ -304,7 +313,7 @@ class WorldApplication:
                 operation_id=operation_id,
             )
         except CloudRouteLockedError:
-            return CommandResult(False, "CLOUD_ROUTE_LOCKED", "当前境界、任务或版本条件不满足这条云舟航线，未扣除资源。", context.request_id, operation_id)
+            return CommandResult(False, "CLOUD_ROUTE_LOCKED", "当前境界、任务或机缘条件不满足这条云舟航线，未扣除资源。", context.request_id, operation_id)
         except LocationRequirementError:
             return CommandResult(False, "CLOUD_ROUTE_LOCKED", "请先抵达玄天界·云城或对应云舟终点，未扣除资源。", context.request_id, operation_id)
         except AdvancedCavePassMissingError:
@@ -328,7 +337,7 @@ class WorldApplication:
         return CommandResult(
             True,
             "CLOUD_BOAT_STARTED",
-            f"## {definition.label}已起航\n\n- **耗时**：{definition.duration_seconds // 60} 分钟\n- **体力**：-{record.stamina_cost}\n- **灵石**：-{record.currency_cost}\n- **凭证**：{pass_label} ×{record.pass_quantity if record.pass_key else 0}\n\n> 抵达后发送 `结算云舟`。航线版本和费用已冻结，重复请求不会重复扣费。",
+            f"## {definition.label}已起航\n\n- **耗时**：{definition.duration_seconds // 60} 分钟\n- **体力**：-{record.stamina_cost}\n- **灵石**：-{record.currency_cost}\n- **凭证**：{pass_label} ×{record.pass_quantity if record.pass_key else 0}\n\n> 抵达后发送 `结算云舟`。航线与费用已冻结，重复请求不会重复扣费。",
             context.request_id,
             operation_id,
             data={"session_id": record.session_id, "route_key": record.route_key, "destination": record.destination, "status": record.status, "ends_at": record.ends_at, "idempotent_replay": record.already_completed},

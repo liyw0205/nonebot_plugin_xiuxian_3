@@ -22,8 +22,8 @@ HEAVEN_ECHO_NODE_ALIASES = {
     **{str(index + 1): key for index, key in enumerate(HEAVEN_ECHO_NODES)},
 }
 HEAVEN_ECHO_EXPIRY_SECONDS = 60 * 60
-HEAVEN_ECHO_CONTENT_VERSION = "content-0.6"
-HEAVEN_ECHO_RULE_VERSION = "adventures-0.6.0"
+HEAVEN_ECHO_CONTENT_VERSION = ""
+HEAVEN_ECHO_RULE_VERSION = ""
 HEAVEN_ECHO_STORY_FLAG = "story.heaven_echo"
 
 

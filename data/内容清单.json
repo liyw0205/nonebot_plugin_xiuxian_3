@@ -1,10 +1,10 @@
 {
   "schema": "xiuxian.content",
   "status": "active",
-  "metadata": "内容版本.json",
   "files": [
     "事件/事件.json",
     "任务/任务.json",
+    "任务/悬赏.json",
     "地图/地点.json",
     "境界/境界.json",
     "奖励/奖励.json",
@@ -16,47 +16,26 @@
     "生产/配方.json",
     "生活/生活.json",
     "养成/体质.json",
+    "养成/规则.json",
     "养成/道脉.json",
     "养成/神通.json",
     "装备/工具.json",
+    "装备/成长.json",
     "装备/法器.json",
     "装备/防具.json",
+    "装备/饰品.json",
+    "装备/词条.json",
+    "经济/资源.json",
     "道具/丹药.json",
     "道具/凭证.json",
     "道具/功法.json",
     "道具/材料.json",
+    "社交/玩家互动.json",
     "道途/道途.json",
-    "阵法/阵法.json"
-  ],
-  "pending_references": [
-    {
-      "source": "beast.gear.sack_small",
-      "label": "生产配方",
-      "reason": "companions v0.1 只声明生产来源，生产配方表尚未给出稳定 recipe_key"
-    },
-    {
-      "source": "demon.abyss_gate",
-      "label": "未来版本任务",
-      "reason": "quest.demon_intro 属于后续跨界内容，魔界深渊入口保持 locked；妖界万兽山已由 v0.3 运行时切片接管"
-    }
-  ],
-  "open_realms": [
-    "mortal",
-    "qi_sensing",
-    "qi_gathering",
-    "foundation",
-    "golden_core",
-    "nascent_soul",
-    "soul_transformation",
-    "void_refining",
-    "dao_union",
-    "tribulation"
-  ],
-  "placeholder_realms": [],
-  "review_notes": [
-    "v0.1 的 recipe.pill.qi_guard 与 recipe.pill.foundation_guard 使用 production-0.1.1；v0.2 宗门兑换已接入每日建设/捐献贡献和宗门原料/灵石补给库存，绑定丹药不可直接捐入。",
-    "item.pill.foundation_guard 仅用于 v0.1 筑基失败保护；v0.2 使用 item.pill.golden_core_guard。",
-    "item.token.constitution_reset 仅管理员测试可用，不进入普通掉落。",
-    "content-0.6 开放合道、渡劫和三次非战斗试炼状态机；终局战斗与结局选择仍按后续切片锁定。"
+    "阵法/阵法.json",
+    "图鉴/分类.json",
+    "图鉴/解锁.json",
+    "图鉴/里程碑.json",
+    "图鉴/条目.json"
   ]
 }

@@ -11,8 +11,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import enemy_definition
 from nonebot_plugin_xiuxian_3.xiuxian.specials.three_realms_tower_rules import (
     CONTENT_VERSION,
     MAX_FLOOR,
-    RULE_VERSION,
     V03_MAX_FLOOR,
+    RULE_VERSION,
     enemy_key_for,
     floor_definition,
     rebuild_reputation_total,
@@ -59,13 +59,13 @@ def _make_eligible(runtime, adapter: str, user: str, faction: str) -> None:
 def test_three_realms_tower_rules_are_versioned_and_faction_specific() -> None:
     assert MAX_FLOOR == 40
     assert V03_MAX_FLOOR == 20
-    assert (CONTENT_VERSION, RULE_VERSION) == ("content-0.4", "specials-0.4.0")
+    assert (CONTENT_VERSION, RULE_VERSION) == ("current", "current")
     assert floor_definition(1).stamina_cost == 12
     assert floor_definition(20).weekly_limit == 2
     assert floor_definition(21).required_realm == "soul_transformation"
     assert floor_definition(40).required_realm == "soul_transformation"
-    assert versions_for_floor(20) == ("content-0.3", "specials-0.3.0")
-    assert versions_for_floor(21) == ("content-0.4", "specials-0.4.0")
+    assert versions_for_floor(20) == ("current", "current")
+    assert versions_for_floor(21) == ("current", "current")
     assert rebuild_reputation_total(
         {"local.domain_refuge": 200, "local.abyss_outpost": 200, "local.ancestral_habitat": 100}
     ) == 500
@@ -81,7 +81,7 @@ def test_three_realms_tower_rules_are_versioned_and_faction_specific() -> None:
             assert enemy.required_realm == "mortal"
             assert enemy.reward == {}
             if floor_no > V03_MAX_FLOOR:
-                assert enemy.random_pool.endswith("v0.4")
+                assert enemy.random_pool == f"battle.{enemy.key}"
         assert enemy_key_for(10, faction) == f"enemy.three_realms_tower.{faction}.floor_10_boss"
         assert enemy_key_for(20, faction) == f"enemy.three_realms_tower.{faction}.floor_20_boss"
         assert enemy_key_for(21, faction).endswith(".domain_vanguard")
@@ -225,12 +225,9 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                             ).fetchone()[0]
                         snapshot = json.loads(snapshot_json)
                         assert snapshot["enemy"]["key"] == enemy_key_for(floor_no, faction)
-                        assert (snapshot["content_version"], snapshot["rule_version"]) == (
-                            "content-0.4",
-                            "combat-0.4.0",
-                        )
-                        assert snapshot["tower_context"]["content_version"] == "content-0.4"
-                        assert snapshot["tower_context"]["rule_version"] == "specials-0.4.0"
+                        assert (snapshot["content_version"], snapshot["rule_version"]) == ("current", "current")
+                        assert snapshot["tower_context"]["content_version"] == "current"
+                        assert snapshot["tower_context"]["rule_version"] == "current"
                         assert snapshot["tower_context"]["faction"] == faction
                         assert snapshot["tower_context"]["pollution"] == 17
                         assert snapshot["tower_context"]["bloodline_stability"] == 61
@@ -258,14 +255,15 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                         story_entry = f"codex.story.three_realms.{story_kind}_{faction}"
                         with sqlite3.connect(runtime.settings.database_path) as db:
                             entry = db.execute(
-                                "SELECT c.payload_json,c.content_version,c.rule_version FROM codex_entries c "
+                                "SELECT c.payload_json FROM codex_entries c "
                                 "JOIN players p ON p.id=c.player_id WHERE p.platform=? AND p.platform_user_id=? "
                                 "AND c.entry_key=?",
                                 (adapter, user, story_entry),
                             ).fetchone()
                         assert entry is not None
                         assert json.loads(entry[0])["faction"] == faction
-                        assert (entry[1], entry[2]) == ("content-0.4", "specials-0.4.0")
+                        assert "rule_version" not in json.loads(entry[0])
+                        assert "content_version" not in json.loads(entry[0])
 
                     if floor_no == 21 and adapter == "qq.official":
                         practice = await _send(
@@ -299,7 +297,7 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                     v04_floors = db.execute(
                         "SELECT COUNT(*) FROM tower_reward_claims c JOIN players p ON p.id=c.player_id "
                         "WHERE p.platform=? AND p.platform_user_id=? AND c.floor_no BETWEEN 21 AND 40 "
-                        "AND c.content_version='content-0.4' AND c.rule_version='specials-0.4.0'",
+                        "AND c.content_version='current' AND c.rule_version='current'",
                         (adapter, user),
                     ).fetchone()[0]
                     battles_with_rewards = db.execute(
@@ -371,10 +369,7 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                         assert snapshot["tower_context"]["pollution"] == 17
                         assert snapshot["tower_context"]["bloodline_stability"] == 61
                         assert snapshot["tower_context"]["local_reputation"]["local.xuantian.new_town"] == 23
-                        assert (snapshot["content_version"], snapshot["rule_version"]) == (
-                            "content-0.3",
-                            "combat-0.3.0",
-                        )
+                        assert (snapshot["content_version"], snapshot["rule_version"]) == ("current", "current")
                         with sqlite3.connect(runtime.settings.database_path) as db:
                             settled = db.execute(
                                 "SELECT t.result_json,e.payload_json FROM tower_runs t "
@@ -405,7 +400,7 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                         story_entry = f"codex.story.three_realms.faction_{faction}"
                         with sqlite3.connect(runtime.settings.database_path) as db:
                             entry = db.execute(
-                                "SELECT c.payload_json,c.content_version,c.rule_version FROM codex_entries c "
+                                "SELECT c.payload_json FROM codex_entries c "
                                 "JOIN players p ON p.id=c.player_id WHERE p.platform=? AND p.platform_user_id=? "
                                 "AND c.entry_key=?",
                                 (adapter, user, story_entry),
@@ -414,7 +409,8 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                         assert json.loads(entry[0])["faction"] == faction
                         assert json.loads(entry[0])["pollution"] == 17
                         assert json.loads(entry[0])["bloodline_stability"] == 61
-                        assert (entry[1], entry[2]) == versions_for_floor(floor_no)
+                        assert "rule_version" not in json.loads(entry[0])
+                        assert "content_version" not in json.loads(entry[0])
 
                     if floor_no == 1:
                         replay = await _send(

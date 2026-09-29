@@ -12,13 +12,12 @@ def ensure_codex_schema(connection: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             player_id INTEGER NOT NULL REFERENCES players(id),
             milestone_key TEXT NOT NULL,
-            content_version TEXT NOT NULL,
             operation_id TEXT NOT NULL UNIQUE,
             snapshot_json TEXT NOT NULL,
             reward_json TEXT NOT NULL,
             unlocks_json TEXT NOT NULL,
             claimed_at TEXT NOT NULL,
-            UNIQUE (player_id, milestone_key, content_version)
+            UNIQUE (player_id, milestone_key)
         )
         """
     )

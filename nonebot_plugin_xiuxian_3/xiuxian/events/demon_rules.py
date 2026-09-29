@@ -6,8 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 
 DEMON_EVENT_KEY = "event.demon_invasion"
-DEMON_EVENT_CONTENT_VERSION = "content-0.3"
-DEMON_EVENT_RULE_VERSION = "events-0.3.0"
+DEMON_EVENT_CONTENT_VERSION = ""
+DEMON_EVENT_RULE_VERSION = ""
 DEMON_EVENT_LOCATION = "xuantian.war_front"
 DEMON_EVENT_TARGET = 1000
 DEMON_EVENT_DURATION_SECONDS = 3 * 60 * 60

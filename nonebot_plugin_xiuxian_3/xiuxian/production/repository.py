@@ -13,6 +13,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
+from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..config import XiuxianSettings
 from ..player.models import (
     CultivationRecord,
@@ -37,6 +38,8 @@ from ..production.models import (
     ProductionPreviewRecord,
     ProductionSettlementRecord,
 )
+from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
+from ..utils.equipment import create_equipment_instances
 from ..progression.breakthrough.models import (
     BreakthroughSettlementRecord,
     BreakthroughSessionRecord,
@@ -59,46 +62,6 @@ from ..advancement.rules import (
     retreat_definition,
     retreat_reward,
 )
-from ..advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
-    constitution_definition,
-)
-from ..advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
-    talent_node_for_reference,
-    talent_tree_nodes,
-    tree_definition,
-)
-from ..advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
-    available_skill_keys,
-    effective_skill_effect,
-    skill_cost,
-    skill_definition,
-)
-from ..advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
-    EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
-    equipment_definition,
-    refinement_affix,
-    refinement_roll_bp,
-    temper_cost,
-    temper_roll_bp,
-    temper_success_bp,
-)
 from ..livelihood.models import ResidenceRecord
 from ..livelihood.rules import residence_definition
 from ..world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
@@ -113,7 +76,7 @@ from ..world.void_rules import (
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
-from ..world.rules import destination_definition, meets_realm, RULE_VERSION
+from ..world.rules import destination_definition, meets_realm
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     battle_roll_bp,
@@ -129,11 +92,9 @@ from ..adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ..adventures.mainline import (
-    MAINLINE_CONTENT_VERSION,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
     mainline_definition,
@@ -166,12 +127,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -180,10 +139,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -192,18 +149,13 @@ from ..routine.gacha import (
 )
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -444,8 +396,6 @@ class ProductionRepositoryMixin:
             snapshot = {
                 "recipe_key": recipe.key,
                 "recipe_name": recipe.name,
-                "content_version": recipe.content_version,
-                "rule_version": recipe.rule_version,
                 "realm_key": row["realm_key"],
                 "realm_layer": int(row["realm_layer"]),
                 "path_key": row["path_key"],
@@ -472,6 +422,7 @@ class ProductionRepositoryMixin:
                 "duration_seconds": duration_seconds,
                 "facility_slot_key": facility_slot["slot_key"] if facility_slot is not None else None,
                 "facility_slot_id": int(facility_slot["id"]) if facility_slot is not None else None,
+                "constitution_effect": constitution_effect_snapshot(connection, int(row["id"])),
             }
             connection.execute(
                 """
@@ -667,32 +618,23 @@ class ProductionRepositoryMixin:
                     ).items():
                         outputs[item_key] = outputs.get(item_key, 0) + quantity
                 for item_key, quantity in outputs.items():
-                    inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
-                if recipe.key == "recipe.weapon.wood_sword":
-                    durability["item.weapon.wood_sword"] = max(8000, min(10000, 8000 + quality // 5))
-                elif recipe.key == "recipe.weapon.cloud_sword":
-                    durability["item.weapon.cloud_sword"] = max(8500, min(10000, 8500 + quality // 10))
-                    # New equipment is an instance, while the legacy durability
-                    # projection remains for old profile readers and migrations.
-                    sword_quantity = int(outputs.get("item.weapon.cloud_sword", 0))
-                    inventory.pop("item.weapon.cloud_sword", None)
-                    for _ in range(sword_quantity):
-                        connection.execute(
-                            """
-                            INSERT INTO equipment_instances(
-                                instance_id, player_id, item_key, label, slot, status,
-                                durability_bp, temper_level, max_temper_level, affixes_json,
-                                refinement_failure_streak, created_at, updated_at
-                            ) VALUES (?, ?, 'item.weapon.cloud_sword', '云纹剑', 'weapon', 'active', ?, 0, 3, '{}', 0, ?, ?)
-                            """,
-                            (
-                                uuid4().hex,
-                                row["id"],
-                                durability["item.weapon.cloud_sword"],
-                                now_text,
-                                now_text,
-                            ),
-                        )
+                    try:
+                        equipment = equipment_definition(item_key, self.content)
+                    except ValueError:
+                        inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
+                        continue
+                    durability_bp = equipment_initial_durability_bp(quality, equipment)
+                    durability[item_key] = durability_bp
+                    if not create_equipment_instances(
+                        connection,
+                        player_id=int(row["id"]),
+                        item_key=item_key,
+                        quantity=quantity,
+                        now_text=now_text,
+                        content=self.content,
+                        durability_bp=durability_bp,
+                    ):
+                        raise RuntimeError(f"equipment definition disappeared: {item_key}")
             else:
                 refund_bp = snapshot.get("failure_refund_bp")
                 if refund_bp is not None:
@@ -847,6 +789,12 @@ class ProductionRepositoryMixin:
             tool_durability_bp=int(snapshot.get("tool_durability_before", 0) or 0),
             random_quality_bp_value=int(snapshot.get("random_quality_bp", 0)),
         ) + int(snapshot.get("location_quality_bonus_bp", 0))
+        constitution_effect = snapshot.get("constitution_effect", {})
+        if isinstance(constitution_effect, dict) and constitution_effect.get("type") == "production_quality_bp":
+            bonus = constitution_effect.get("value")
+            if isinstance(bonus, bool) or not isinstance(bonus, int) or bonus < 0:
+                raise ValueError("production snapshot has an invalid constitution effect")
+            value += bonus
         return max(0, min(10000, value))
     @staticmethod
     def _production_order_from_payload(payload: dict[str, Any], *, replay: bool) -> ProductionOrderRecord:

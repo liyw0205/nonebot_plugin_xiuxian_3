@@ -1,0 +1,227 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "equipment_growth",
+  "records": [
+    {
+      "key": "equipment.growth.common",
+      "name": "凡品祭炼",
+      "desc": "适用于凡品装备的祭炼、重铸与锻造耐久规则。",
+      "status": "active",
+      "growth": {
+        "craft_durability": {"base_bp": 8000, "quality_divisor": 5, "minimum_bp": 8000, "maximum_bp": 10000},
+        "temper": {
+          "max_level": 3,
+          "costs": {
+            "1": {"item.ore.ironstone": 1, "currency.spirit_stone": 20},
+            "2": {"item.ore.ironstone": 2, "currency.spirit_stone": 40},
+            "3": {"item.ore.ironstone": 3, "currency.spirit_stone": 80}
+          },
+          "success_bp": {"1": 10000, "2": 9000, "3": 7500},
+          "failure": "keep_level"
+        },
+        "refinement": {
+          "cost": {"item.ore.ironstone": 2, "currency.spirit_stone": 30},
+          "success_bp": 7500,
+          "affix_pool": [
+            {"key": "damage", "value": 1},
+            {"key": "hp", "value": 5},
+            {"key": "initiative", "value": 1},
+            {"key": "crit_chance", "value": 80},
+            {"key": "accuracy", "value": 100},
+            {"key": "evasion", "value": 80},
+            {"key": "hp_regen", "value": 1},
+            {"key": "mana_regen", "value": 1}
+          ],
+          "failure": "keep_affixes",
+          "pity_failures": 3
+        }
+      }
+    },
+    {
+      "key": "equipment.growth.uncommon",
+      "name": "良品祭炼",
+      "desc": "适用于良品装备的祭炼、重铸与锻造耐久规则。",
+      "status": "active",
+      "growth": {
+        "craft_durability": {"base_bp": 8200, "quality_divisor": 5, "minimum_bp": 8200, "maximum_bp": 10000},
+        "temper": {
+          "max_level": 4,
+          "costs": {
+            "1": {"item.ore.ironstone": 2, "currency.spirit_stone": 40},
+            "2": {"item.ore.ironstone": 3, "currency.spirit_stone": 80},
+            "3": {"item.ore.ironstone": 5, "currency.spirit_stone": 150},
+            "4": {"item.ore.ironstone": 7, "currency.spirit_stone": 250}
+          },
+          "success_bp": {"1": 9800, "2": 9200, "3": 8200, "4": 7000},
+          "failure": "keep_level"
+        },
+        "refinement": {
+          "cost": {"item.ore.ironstone": 3, "currency.spirit_stone": 60},
+          "success_bp": 8000,
+          "affix_pool": [
+            {"key": "damage", "value": 2, "weight": 5},
+            {"key": "hp", "value": 12, "weight": 3},
+            {"key": "initiative", "value": 1, "weight": 2},
+            {"key": "damage_reduction", "value": 140, "weight": 2},
+            {"key": "crit_chance", "value": 160, "weight": 2},
+            {"key": "crit_damage", "value": 220, "weight": 2},
+            {"key": "accuracy", "value": 180, "weight": 2},
+            {"key": "evasion", "value": 150, "weight": 2},
+            {"key": "reflection", "value": 120, "weight": 1},
+            {"key": "lifesteal", "value": 100, "weight": 1},
+            {"key": "anti_crit", "value": 140, "weight": 1},
+            {"key": "mana_leech", "value": 100, "weight": 1},
+            {"key": "healing_reduction", "value": 120, "weight": 1},
+            {"key": "recovery_reduction", "value": 120, "weight": 1},
+            {"key": "hp_regen", "value": 2, "weight": 1},
+            {"key": "max_mana", "value": 12, "weight": 1},
+            {"key": "mana_regen", "value": 2, "weight": 1}
+          ],
+          "failure": "keep_affixes",
+          "pity_failures": 3
+        }
+      }
+    },
+    {
+      "key": "equipment.growth.rare",
+      "name": "珍品祭炼",
+      "desc": "适用于珍品装备的祭炼、重铸与锻造耐久规则。",
+      "status": "active",
+      "growth": {
+        "craft_durability": {"base_bp": 8500, "quality_divisor": 10, "minimum_bp": 8500, "maximum_bp": 10000},
+        "temper": {
+          "max_level": 5,
+          "costs": {
+            "1": {"item.material.cloud_iron": 2, "currency.spirit_stone": 100},
+            "2": {"item.material.cloud_iron": 3, "currency.spirit_stone": 180},
+            "3": {"item.material.cloud_iron": 4, "currency.spirit_stone": 300},
+            "4": {"item.material.cloud_iron": 6, "currency.spirit_stone": 500},
+            "5": {"item.material.cloud_iron": 8, "currency.spirit_stone": 800}
+          },
+          "success_bp": {"1": 9500, "2": 8800, "3": 7600, "4": 5800, "5": 3500},
+          "failure": "keep_level"
+        },
+        "refinement": {
+          "cost": {"item.material.cloud_iron": 4, "currency.spirit_stone": 200},
+          "success_bp": 7000,
+          "affix_pool": [
+            {"key": "damage", "value": 4, "weight": 5},
+            {"key": "hp", "value": 30, "weight": 3},
+            {"key": "initiative", "value": 2, "weight": 2},
+            {"key": "damage_reduction", "value": 300, "weight": 2},
+            {"key": "crit_chance", "value": 320, "weight": 2},
+            {"key": "crit_damage", "value": 500, "weight": 2},
+            {"key": "accuracy", "value": 360, "weight": 2},
+            {"key": "evasion", "value": 300, "weight": 2},
+            {"key": "reflection", "value": 280, "weight": 1},
+            {"key": "lifesteal", "value": 240, "weight": 1},
+            {"key": "anti_crit", "value": 320, "weight": 1},
+            {"key": "mana_leech", "value": 220, "weight": 1},
+            {"key": "healing_reduction", "value": 260, "weight": 1},
+            {"key": "recovery_reduction", "value": 260, "weight": 1},
+            {"key": "hp_regen", "value": 4, "weight": 1},
+            {"key": "max_mana", "value": 36, "weight": 1},
+            {"key": "mana_regen", "value": 4, "weight": 1}
+          ],
+          "failure": "keep_affixes",
+          "pity_failures": 4
+        }
+      }
+    },
+    {
+      "key": "equipment.growth.heaven",
+      "name": "天品祭炼",
+      "desc": "适用于天品装备的祭炼、重铸与锻造耐久规则。",
+      "status": "active",
+      "growth": {
+        "craft_durability": {"base_bp": 9000, "quality_divisor": 20, "minimum_bp": 9000, "maximum_bp": 10000},
+        "temper": {
+          "max_level": 6,
+          "costs": {
+            "1": {"item.soul_crystal": 1, "currency.spirit_stone": 600},
+            "2": {"item.soul_crystal": 2, "currency.spirit_stone": 1200},
+            "3": {"item.soul_crystal": 3, "currency.spirit_stone": 2200},
+            "4": {"item.soul_crystal": 4, "currency.spirit_stone": 3600},
+            "5": {"item.soul_crystal": 6, "currency.spirit_stone": 5500},
+            "6": {"item.soul_crystal": 8, "currency.spirit_stone": 8000}
+          },
+          "success_bp": {"1": 9000, "2": 8200, "3": 7000, "4": 5200, "5": 3500, "6": 2200},
+          "failure": "keep_level"
+        },
+        "refinement": {
+          "cost": {"item.soul_crystal": 2, "currency.spirit_stone": 1500},
+          "success_bp": 6000,
+          "affix_pool": [
+            {"key": "damage", "value": 8, "weight": 5},
+            {"key": "hp", "value": 100, "weight": 3},
+            {"key": "initiative", "value": 5, "weight": 2},
+            {"key": "damage_reduction", "value": 620, "weight": 2},
+            {"key": "crit_chance", "value": 680, "weight": 2},
+            {"key": "crit_damage", "value": 980, "weight": 2},
+            {"key": "accuracy", "value": 720, "weight": 2},
+            {"key": "evasion", "value": 620, "weight": 2},
+            {"key": "reflection", "value": 580, "weight": 1},
+            {"key": "lifesteal", "value": 520, "weight": 1},
+            {"key": "anti_crit", "value": 650, "weight": 1},
+            {"key": "mana_leech", "value": 480, "weight": 1},
+            {"key": "healing_reduction", "value": 580, "weight": 1},
+            {"key": "recovery_reduction", "value": 580, "weight": 1},
+            {"key": "hp_regen", "value": 8, "weight": 1},
+            {"key": "max_mana", "value": 100, "weight": 1},
+            {"key": "mana_regen", "value": 9, "weight": 1}
+          ],
+          "failure": "keep_affixes",
+          "pity_failures": 5
+        }
+      }
+    },
+    {
+      "key": "equipment.growth.mythic",
+      "name": "仙品祭炼",
+      "desc": "适用于仙品装备的祭炼、重铸与锻造耐久规则。",
+      "status": "active",
+      "growth": {
+        "craft_durability": {"base_bp": 9500, "quality_divisor": 25, "minimum_bp": 9500, "maximum_bp": 10000},
+        "temper": {
+          "max_level": 7,
+          "costs": {
+            "1": {"item.void_crystal": 1, "currency.spirit_stone": 2500},
+            "2": {"item.void_crystal": 2, "currency.spirit_stone": 5000},
+            "3": {"item.void_crystal": 3, "currency.spirit_stone": 9000},
+            "4": {"item.void_crystal": 4, "currency.spirit_stone": 15000},
+            "5": {"item.void_crystal": 6, "currency.spirit_stone": 24000},
+            "6": {"item.void_crystal": 8, "currency.spirit_stone": 36000},
+            "7": {"item.void_crystal": 12, "currency.spirit_stone": 52000}
+          },
+          "success_bp": {"1": 8500, "2": 7600, "3": 6400, "4": 4800, "5": 3200, "6": 1800, "7": 900},
+          "failure": "keep_level"
+        },
+        "refinement": {
+          "cost": {"item.void_crystal": 3, "currency.spirit_stone": 6000},
+          "success_bp": 5000,
+          "affix_pool": [
+            {"key": "damage", "value": 16, "weight": 5},
+            {"key": "hp", "value": 300, "weight": 3},
+            {"key": "initiative", "value": 8, "weight": 2},
+            {"key": "damage_reduction", "value": 1000, "weight": 2},
+            {"key": "crit_chance", "value": 1100, "weight": 2},
+            {"key": "crit_damage", "value": 1600, "weight": 2},
+            {"key": "accuracy", "value": 1200, "weight": 2},
+            {"key": "evasion", "value": 1000, "weight": 2},
+            {"key": "reflection", "value": 1000, "weight": 1},
+            {"key": "lifesteal", "value": 900, "weight": 1},
+            {"key": "anti_crit", "value": 1000, "weight": 1},
+            {"key": "mana_leech", "value": 800, "weight": 1},
+            {"key": "healing_reduction", "value": 1000, "weight": 1},
+            {"key": "recovery_reduction", "value": 1000, "weight": 1},
+            {"key": "hp_regen", "value": 18, "weight": 1},
+            {"key": "max_mana", "value": 300, "weight": 1},
+            {"key": "mana_regen", "value": 18, "weight": 1}
+          ],
+          "failure": "keep_affixes",
+          "pity_failures": 6
+        }
+      }
+    }
+  ]
+}

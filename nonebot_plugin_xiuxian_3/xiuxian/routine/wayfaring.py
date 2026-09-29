@@ -12,9 +12,9 @@ from datetime import date, datetime, timedelta
 from typing import Mapping
 
 
-WAYFARING_PASS_KEY = "pass.wayfaring.v0.1"
-WAYFARING_CONTENT_VERSION = "content-0.1"
-WAYFARING_RULE_VERSION = "wayfaring-0.1.0"
+WAYFARING_PASS_KEY = "pass.wayfaring"
+WAYFARING_CONTENT_VERSION = ""
+WAYFARING_RULE_VERSION = ""
 WAYFARING_CYCLE_DAYS = 28
 WAYFARING_MAX_LEVEL = 30
 WAYFARING_LEVEL_COUNT = WAYFARING_MAX_LEVEL

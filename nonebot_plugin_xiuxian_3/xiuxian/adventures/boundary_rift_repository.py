@@ -213,7 +213,7 @@ class BoundaryRiftRepositoryMixin:
                 "first_clear_by_player": {str(key): value for key, value in first_clear_by_player.items()},
                 "content_version": BOUNDARY_RIFT_CONTENT_VERSION,
                 "rule_version": BOUNDARY_RIFT_RULE_VERSION,
-                "combat_rule_version": "combat-0.3.0",
+                "combat_rule_version": "",
                 "entry_cost": {
                     "stamina_each": BOUNDARY_RIFT_STAMINA_COST,
                     "ticket": {BOUNDARY_RIFT_TICKET: BOUNDARY_RIFT_TICKET_COST},
@@ -481,8 +481,6 @@ class BoundaryRiftRepositoryMixin:
                         operation_id=f"{operation_id}:codex:{member['player_id']}",
                         occurred_at=now,
                         snapshot={"run_id": str(run["run_id"]), "instance_key": BOUNDARY_RIFT_KEY},
-                        content_version=BOUNDARY_RIFT_CONTENT_VERSION,
-                        rule_version=BOUNDARY_RIFT_RULE_VERSION,
                     )
                 intro["flags"] = sorted(flags)
                 connection.execute(

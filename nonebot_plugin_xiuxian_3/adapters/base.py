@@ -401,6 +401,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("允许竞技场练习", application.grant_arena_practice_consent, aliases=("同意竞技场练习",))
     router.register("竞技场回放", application.replay_arena, aliases=("查看竞技场回放",))
     router.register("领取竞技场结果", application.claim_arena_result, aliases=("确认竞技场结果",))
+    router.register("切磋", application.spar_players)
     router.register("挂机预览", application.preview_idle, aliases=("查看挂机",))
     router.register("开始挂机", application.start_idle)
     router.register("领取挂机", application.claim_idle)

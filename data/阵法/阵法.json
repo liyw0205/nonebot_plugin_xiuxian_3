@@ -3,6 +3,8 @@
   "records": [
     {
       "name": "基础聚灵阵",
+      "desc": "引导周边灵气汇入生产流程，缩短绑定订单的耗时。",
+      "aliases": [],
       "item_type": "array",
       "quality": "common",
       "stack_limit": 1,
@@ -23,6 +25,8 @@
     },
     {
       "name": "迷雾屏障阵",
+      "desc": "在雾隐洞天二层展开屏障，降低探索途中遭遇风险。",
+      "aliases": ["迷雾屏障"],
       "item_type": "array",
       "quality": "rare",
       "stack_limit": 1,

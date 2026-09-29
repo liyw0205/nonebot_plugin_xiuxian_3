@@ -1,0 +1,1427 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "codex_entry",
+  "records": [
+    {
+      "key": "codex.place.new_town",
+      "name": "青石镇",
+      "desc": "亲自抵达后，此地的行程见闻会收入图鉴。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.outskirts",
+      "name": "玄天近郊",
+      "desc": "亲自抵达后，此地的行程见闻会收入图鉴。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.spirit_field",
+      "name": "灵泉谷",
+      "desc": "亲自抵达后，此地的行程见闻会收入图鉴。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.blood_grass",
+      "name": "止血草",
+      "desc": "首次获得后，材料来路与用途线索会收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.spirit_leaf",
+      "name": "灵叶",
+      "desc": "首次获得后，材料来路与用途线索会收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.ironstone",
+      "name": "铁石",
+      "desc": "首次获得后，材料来路与用途线索会收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.wood",
+      "name": "木材",
+      "desc": "首次获得后，材料来路与用途线索会收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.array_sand",
+      "name": "阵砂",
+      "desc": "首次获得后，材料来路与用途线索会收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.creature.wood_rat",
+      "name": "木鼠",
+      "desc": "经已结算的战斗确认踪迹后，相关记录才会补全。",
+      "category": "creature",
+      "status": "active"
+    },
+    {
+      "key": "codex.creature.iron_boar",
+      "name": "铁背野猪",
+      "desc": "经已结算的战斗确认踪迹后，相关记录才会补全。",
+      "category": "creature",
+      "status": "active"
+    },
+    {
+      "key": "codex.creature.mist_guardian",
+      "name": "雾隐守卫",
+      "desc": "经已结算的战斗确认踪迹后，相关记录才会补全。",
+      "category": "creature",
+      "status": "active"
+    },
+    {
+      "key": "codex.route.town_road",
+      "name": "青石镇商路",
+      "desc": "完成真实行程后，路线风险与沿途见闻会收入图鉴。",
+      "category": "route",
+      "status": "active"
+    },
+    {
+      "key": "codex.route.boundary",
+      "name": "界隙裂隙路线",
+      "desc": "完成真实行程后，路线风险与沿途见闻会收入图鉴。",
+      "category": "route",
+      "status": "active"
+    },
+    {
+      "key": "codex.dispatch.herb_search",
+      "name": "药材搜寻",
+      "desc": "派遣成功结算后，相关线索才会收入图鉴。",
+      "category": "dispatch",
+      "status": "active"
+    },
+    {
+      "key": "codex.instance.mist_grotto",
+      "name": "雾隐洞天",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.instance.cloud_boat",
+      "name": "云舟秘境",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.ancient_domain",
+      "name": "远古洞天秘境",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.mountain_body",
+      "name": "山岳真身",
+      "desc": "确认体修领域后，关于山岳真身的领域见闻会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.elemental_sea",
+      "name": "元素之海",
+      "desc": "确认法修领域后，关于元素之海的领域见闻会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.machine_city",
+      "name": "机关天城",
+      "desc": "确认器修领域后，关于机关天城的领域见闻会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.abyss_shadow",
+      "name": "深渊暗影",
+      "desc": "确认魔修领域后，关于深渊暗影的领域见闻会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.ancestral_wild",
+      "name": "祖灵荒野",
+      "desc": "确认妖修领域后，关于祖灵荒野的领域见闻会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.artisan_realm",
+      "name": "百艺天工",
+      "desc": "确认辅修领域后，关于百艺天工的领域见闻会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.frontline",
+      "name": "领域前线战事",
+      "desc": "达到个人贡献门槛并领取轮次奖励后，前线战况会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.domain_front",
+      "name": "领域前线",
+      "desc": "亲自抵达后，此地的行程见闻会收入图鉴。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.domain.ancestral_hall",
+      "name": "祖灵殿守灵",
+      "desc": "完成祖灵殿秘境首通后，守灵见闻会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.void.route_ruins",
+      "name": "虚空遗迹航道",
+      "desc": "完成真实行程后，路线风险与沿途见闻会收入图鉴。",
+      "category": "route",
+      "status": "active"
+    },
+    {
+      "key": "codex.dao.service_origin",
+      "name": "道源服务篇章",
+      "desc": "完成对应服务篇章后，相关记录才会收入图鉴。",
+      "category": "service",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_service_origin",
+      "name": "道统服务缘起",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_5",
+      "name": "雾隐试炼塔五层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_10",
+      "name": "雾隐试炼塔十层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dispatch_demon_relief",
+      "name": "魔界救援线索",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dispatch_beast_relocation",
+      "name": "妖界迁徙线索",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.beast_habitat",
+      "name": "万兽栖地保护记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_1",
+      "name": "雾隐试炼塔第 1 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_2",
+      "name": "雾隐试炼塔第 2 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_3",
+      "name": "雾隐试炼塔第 3 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_4",
+      "name": "雾隐试炼塔第 4 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_6",
+      "name": "雾隐试炼塔第 6 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_7",
+      "name": "雾隐试炼塔第 7 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_8",
+      "name": "雾隐试炼塔第 8 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_9",
+      "name": "雾隐试炼塔第 9 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_11",
+      "name": "雾隐试炼塔第 11 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_12",
+      "name": "雾隐试炼塔第 12 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_13",
+      "name": "雾隐试炼塔第 13 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_14",
+      "name": "雾隐试炼塔第 14 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_15",
+      "name": "雾隐试炼塔第 15 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_16",
+      "name": "雾隐试炼塔第 16 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_17",
+      "name": "雾隐试炼塔第 17 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_18",
+      "name": "雾隐试炼塔第 18 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_19",
+      "name": "雾隐试炼塔第 19 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_20",
+      "name": "雾隐试炼塔第 20 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_21",
+      "name": "雾隐试炼塔第 21 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_22",
+      "name": "雾隐试炼塔第 22 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_23",
+      "name": "雾隐试炼塔第 23 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_24",
+      "name": "雾隐试炼塔第 24 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_25",
+      "name": "雾隐试炼塔第 25 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_26",
+      "name": "雾隐试炼塔第 26 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_27",
+      "name": "雾隐试炼塔第 27 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_28",
+      "name": "雾隐试炼塔第 28 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_29",
+      "name": "雾隐试炼塔第 29 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_30",
+      "name": "雾隐试炼塔第 30 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_31",
+      "name": "雾隐试炼塔第 31 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_32",
+      "name": "雾隐试炼塔第 32 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_33",
+      "name": "雾隐试炼塔第 33 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_34",
+      "name": "雾隐试炼塔第 34 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_35",
+      "name": "雾隐试炼塔第 35 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_36",
+      "name": "雾隐试炼塔第 36 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_37",
+      "name": "雾隐试炼塔第 37 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_38",
+      "name": "雾隐试炼塔第 38 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_39",
+      "name": "雾隐试炼塔第 39 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_40",
+      "name": "雾隐试炼塔第 40 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_41",
+      "name": "雾隐试炼塔第 41 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_42",
+      "name": "雾隐试炼塔第 42 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_43",
+      "name": "雾隐试炼塔第 43 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_44",
+      "name": "雾隐试炼塔第 44 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.mist_trial.floor_45",
+      "name": "雾隐试炼塔第 45 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_1",
+      "name": "三界塔第 1 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_2",
+      "name": "三界塔第 2 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_3",
+      "name": "三界塔第 3 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_4",
+      "name": "三界塔第 4 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_5",
+      "name": "三界塔第 5 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_6",
+      "name": "三界塔第 6 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_7",
+      "name": "三界塔第 7 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_8",
+      "name": "三界塔第 8 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_9",
+      "name": "三界塔第 9 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_10",
+      "name": "三界塔第 10 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_11",
+      "name": "三界塔第 11 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_12",
+      "name": "三界塔第 12 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_13",
+      "name": "三界塔第 13 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_14",
+      "name": "三界塔第 14 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_15",
+      "name": "三界塔第 15 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_16",
+      "name": "三界塔第 16 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_17",
+      "name": "三界塔第 17 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_18",
+      "name": "三界塔第 18 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_19",
+      "name": "三界塔第 19 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_20",
+      "name": "三界塔第 20 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_21",
+      "name": "三界塔第 21 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_22",
+      "name": "三界塔第 22 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_23",
+      "name": "三界塔第 23 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_24",
+      "name": "三界塔第 24 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_25",
+      "name": "三界塔第 25 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_26",
+      "name": "三界塔第 26 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_27",
+      "name": "三界塔第 27 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_28",
+      "name": "三界塔第 28 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_29",
+      "name": "三界塔第 29 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_30",
+      "name": "三界塔第 30 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_31",
+      "name": "三界塔第 31 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_32",
+      "name": "三界塔第 32 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_33",
+      "name": "三界塔第 33 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_34",
+      "name": "三界塔第 34 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_35",
+      "name": "三界塔第 35 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_36",
+      "name": "三界塔第 36 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_37",
+      "name": "三界塔第 37 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_38",
+      "name": "三界塔第 38 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_39",
+      "name": "三界塔第 39 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.three_realms.floor_40",
+      "name": "三界塔第 40 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_1",
+      "name": "虚空塔第 1 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_2",
+      "name": "虚空塔第 2 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_3",
+      "name": "虚空塔第 3 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_4",
+      "name": "虚空塔第 4 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_5",
+      "name": "虚空塔第 5 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_6",
+      "name": "虚空塔第 6 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_7",
+      "name": "虚空塔第 7 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_8",
+      "name": "虚空塔第 8 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_9",
+      "name": "虚空塔第 9 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_10",
+      "name": "虚空塔第 10 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_11",
+      "name": "虚空塔第 11 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_12",
+      "name": "虚空塔第 12 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_13",
+      "name": "虚空塔第 13 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_14",
+      "name": "虚空塔第 14 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_15",
+      "name": "虚空塔第 15 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_16",
+      "name": "虚空塔第 16 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_17",
+      "name": "虚空塔第 17 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_18",
+      "name": "虚空塔第 18 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_19",
+      "name": "虚空塔第 19 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_20",
+      "name": "虚空塔第 20 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_21",
+      "name": "虚空塔第 21 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_22",
+      "name": "虚空塔第 22 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_23",
+      "name": "虚空塔第 23 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_24",
+      "name": "虚空塔第 24 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_25",
+      "name": "虚空塔第 25 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_26",
+      "name": "虚空塔第 26 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_27",
+      "name": "虚空塔第 27 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_28",
+      "name": "虚空塔第 28 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_29",
+      "name": "虚空塔第 29 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_30",
+      "name": "虚空塔第 30 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_31",
+      "name": "虚空塔第 31 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_32",
+      "name": "虚空塔第 32 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_33",
+      "name": "虚空塔第 33 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_34",
+      "name": "虚空塔第 34 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_35",
+      "name": "虚空塔第 35 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_36",
+      "name": "虚空塔第 36 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_37",
+      "name": "虚空塔第 37 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_38",
+      "name": "虚空塔第 38 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_39",
+      "name": "虚空塔第 39 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_40",
+      "name": "虚空塔第 40 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_41",
+      "name": "虚空塔第 41 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_42",
+      "name": "虚空塔第 42 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_43",
+      "name": "虚空塔第 43 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_44",
+      "name": "虚空塔第 44 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_45",
+      "name": "虚空塔第 45 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_46",
+      "name": "虚空塔第 46 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_47",
+      "name": "虚空塔第 47 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_48",
+      "name": "虚空塔第 48 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_49",
+      "name": "虚空塔第 49 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_50",
+      "name": "虚空塔第 50 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_51",
+      "name": "虚空塔第 51 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_52",
+      "name": "虚空塔第 52 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_53",
+      "name": "虚空塔第 53 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_54",
+      "name": "虚空塔第 54 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_55",
+      "name": "虚空塔第 55 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_56",
+      "name": "虚空塔第 56 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_57",
+      "name": "虚空塔第 57 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_58",
+      "name": "虚空塔第 58 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_59",
+      "name": "虚空塔第 59 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.void_spire.floor_60",
+      "name": "虚空塔第 60 层",
+      "desc": "挑战结算后，探索记录会收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.void.route_spire_storm",
+      "name": "虚空塔风暴路线",
+      "desc": "完成真实行程后，路线风险与沿途见闻会收入图鉴。",
+      "category": "route",
+      "status": "active"
+    },
+    {
+      "key": "codex.void.route_spire_echo",
+      "name": "虚空塔回响路线",
+      "desc": "完成真实行程后，路线风险与沿途见闻会收入图鉴。",
+      "category": "route",
+      "status": "active"
+    },
+    {
+      "key": "codex.void.route_spire_inscription",
+      "name": "虚空塔碑铭路线",
+      "desc": "完成真实行程后，路线风险与沿途见闻会收入图鉴。",
+      "category": "route",
+      "status": "active"
+    },
+    {
+      "key": "codex.void.route_spire_witness",
+      "name": "虚空塔见证路线",
+      "desc": "完成真实行程后，路线风险与沿途见闻会收入图鉴。",
+      "category": "route",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.void_spire.inscription",
+      "name": "虚空碑铭记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.void_spire.witness",
+      "name": "虚空见证记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.faction_xuantian",
+      "name": "三界塔玄天阵营记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.reconstruction_xuantian",
+      "name": "三界塔玄天重建记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.domain_xuantian",
+      "name": "三界塔玄天领域记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.faction_demon",
+      "name": "三界塔魔界阵营记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.reconstruction_demon",
+      "name": "三界塔魔界重建记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.domain_demon",
+      "name": "三界塔魔界领域记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.faction_beast",
+      "name": "三界塔妖界阵营记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.reconstruction_beast",
+      "name": "三界塔妖界重建记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.three_realms.domain_beast",
+      "name": "三界塔妖界领域记录",
+      "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.path.body",
+      "name": "体修道途",
+      "desc": "亲自踏上此道后，相关修行见闻会收入图鉴。",
+      "category": "path",
+      "status": "active"
+    },
+    {
+      "key": "codex.path.spell",
+      "name": "法修道途",
+      "desc": "亲自踏上此道后，相关修行见闻会收入图鉴。",
+      "category": "path",
+      "status": "active"
+    },
+    {
+      "key": "codex.path.device",
+      "name": "器修道途",
+      "desc": "亲自踏上此道后，相关修行见闻会收入图鉴。",
+      "category": "path",
+      "status": "active"
+    },
+    {
+      "key": "codex.path.demonic",
+      "name": "魔修道途",
+      "desc": "亲自踏上此道后，相关修行见闻会收入图鉴。",
+      "category": "path",
+      "status": "active"
+    },
+    {
+      "key": "codex.path.beast",
+      "name": "妖修道途",
+      "desc": "亲自踏上此道后，相关修行见闻会收入图鉴。",
+      "category": "path",
+      "status": "active"
+    },
+    {
+      "key": "codex.path.support",
+      "name": "辅修道途",
+      "desc": "亲自踏上此道后，相关修行见闻会收入图鉴。",
+      "category": "path",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.cloud_city",
+      "name": "云城",
+      "desc": "云海间往来商旅汇聚之处，抵达后可见商会、矿区与云舟的往来脉络。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.cloud_iron",
+      "name": "云铁",
+      "desc": "伴云脉而生的灵铁，质地轻韧，是云城器坊与阵堂常用的材料。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.creature.cloud_beast",
+      "name": "云铁矿兽",
+      "desc": "栖居矿脉深处，以铁砂护体；战斗结算确认踪迹后，矿区异兽记录方可点亮。",
+      "category": "creature",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.demon_market",
+      "name": "魔渊集市",
+      "desc": "魔渊边缘的隐秘市集，往来修士以稀有材料和未公开的消息换取所需。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.beast_hills",
+      "name": "万兽山",
+      "desc": "妖界群山连绵，兽迹与药香交错；抵达后方能辨认山中栖地与旧日灵脉。",
+      "category": "place",
+      "status": "active"
+    }
+  ]
+}

@@ -3,6 +3,8 @@
   "records": [
     {
       "name": "体修",
+      "talent_tree_label": "体修道脉",
+      "desc": "以锤炼筋骨为根本，在近身搏杀中磨砺不屈战意。",
       "passive": {
         "key": "trait.body_temper",
         "effect": {
@@ -12,6 +14,7 @@
         }
       },
       "active_skill": "skill.body.heavy_strike",
+      "entry_item_rewards": [{"item_key": "item.manual.basic_qi", "quantity": 1}],
       "state": {
         "key": "battle_spirit",
         "max": 100,
@@ -20,10 +23,13 @@
       "key": "body",
       "fruit_key": "fruit.immortal_body",
       "domain_key": "domain.mountain_body",
+      "codex_entry_key": "codex.domain.mountain_body",
       "status": "active"
     },
     {
       "name": "法修",
+      "talent_tree_label": "法修道脉",
+      "desc": "以灵力驾驭术法，讲求心神专注与出手时机。",
       "passive": {
         "key": "trait.spell.spirit_focus",
         "effect": {
@@ -33,6 +39,7 @@
         }
       },
       "active_skill": "skill.spell.water_bolt",
+      "entry_item_rewards": [{"item_key": "item.manual.basic_qi", "quantity": 1}],
       "state": {
         "key": "spell_cooldown",
         "default_rounds": 1
@@ -40,10 +47,13 @@
       "key": "spell",
       "fruit_key": "fruit.origin_spell",
       "domain_key": "domain.elemental_sea",
+      "codex_entry_key": "codex.domain.elemental_sea",
       "status": "active"
     },
     {
       "name": "器修",
+      "talent_tree_label": "器修道脉",
+      "desc": "借机关与法器开拓战法，善于以器物弥补攻守间隙。",
       "passive": {
         "key": "trait.device.maintenance",
         "effect": {
@@ -53,6 +63,10 @@
         }
       },
       "active_skill": "skill.device.scout_doll",
+      "entry_item_rewards": [
+        {"item_key": "item.manual.basic_qi", "quantity": 1},
+        {"item_key": "item.tool.basic_hammer", "quantity": 1}
+      ],
       "state": {
         "key": "device_control",
         "max": 1
@@ -60,10 +74,13 @@
       "key": "device",
       "fruit_key": "fruit.machine_heaven",
       "domain_key": "domain.machine_city",
+      "codex_entry_key": "codex.domain.machine_city",
       "status": "active"
     },
     {
       "name": "魔修",
+      "talent_tree_label": "魔修道脉",
+      "desc": "行于险途，以意志驾驭魔息，在绝境中换取更强力量。",
       "passive": {
         "key": "trait.demonic.blood_contract",
         "effect": {
@@ -73,6 +90,7 @@
         }
       },
       "active_skill": "skill.demonic.pain_exchange",
+      "entry_item_rewards": [{"item_key": "item.manual.basic_qi", "quantity": 1}],
       "state": {
         "key": "corruption",
         "per_use": 12
@@ -80,10 +98,13 @@
       "key": "demonic",
       "fruit_key": "fruit.free_demon",
       "domain_key": "domain.abyss_shadow",
+      "codex_entry_key": "codex.domain.abyss_shadow",
       "status": "active"
     },
     {
       "name": "妖修",
+      "talent_tree_label": "妖修道脉",
+      "desc": "感应万灵血脉与山野气息，善于寻迹、察险并顺势而行。",
       "passive": {
         "key": "trait.beast.wild_sense",
         "effect": {
@@ -93,6 +114,7 @@
         }
       },
       "active_skill": "skill.beast.partial_transform",
+      "entry_item_rewards": [{"item_key": "item.manual.basic_qi", "quantity": 1}],
       "state": {
         "key": "shapeshift_stability",
         "per_use": -5
@@ -100,10 +122,13 @@
       "key": "beast",
       "fruit_key": "fruit.ancestral_king",
       "domain_key": "domain.ancestral_wild",
+      "codex_entry_key": "codex.domain.ancestral_wild",
       "status": "active"
     },
     {
       "name": "辅修",
+      "talent_tree_label": "辅修道脉",
+      "desc": "专研炼制与布阵等技艺，以扎实手艺支撑漫长修行。",
       "passive": {
         "key": "trait.support.craft_memory",
         "effect": {
@@ -113,6 +138,12 @@
         }
       },
       "active_skill": "skill.support.quick_assessment",
+      "entry_item_rewards": [{"item_key": "item.manual.basic_qi", "quantity": 1}],
+      "subprofession_item_rewards": {
+        "alchemy": [{"item_key": "item.tool.basic_furnace", "quantity": 1}],
+        "artifice": [{"item_key": "item.tool.basic_hammer", "quantity": 1}],
+        "formation": [{"item_key": "item.mat.array_sand", "quantity": 3}]
+      },
       "state": {
         "key": "daily_energy_extra_cost",
         "per_use": 2
@@ -120,6 +151,7 @@
       "key": "support",
       "fruit_key": "fruit.allcraft",
       "domain_key": "domain.artisan_realm",
+      "codex_entry_key": "codex.domain.artisan_realm",
       "status": "active"
     }
   ],

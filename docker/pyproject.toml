@@ -1,6 +1,15 @@
+[project]
+name = "xiuxian3-docker-host"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
 [tool.nonebot]
 plugin_dirs = []
 builtin_plugins = []
+
+[tool.nonebot.adapters]
+"@local" = []
 
 [tool.nonebot.plugins]
 "@local" = ["nonebot_plugin_xiuxian_3"]

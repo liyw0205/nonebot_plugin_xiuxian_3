@@ -111,12 +111,18 @@ def test_ancestral_hall_complete_and_idempotent_on_both_adapters(adapter: str) -
                     (adapter, user),
                 ).fetchone()
                 battle_record = connection.execute(
-                    "SELECT enemy_key, content_version, rule_version, reward_status FROM battle_sessions WHERE battle_type='pve.secret_realm.ancestral_hall'"
+                    "SELECT enemy_key, reward_status FROM battle_sessions WHERE battle_type='pve.secret_realm.ancestral_hall'"
                 ).fetchone()
             assert player[0] == 75
             assert player[1] == 50
             assert json.loads(player[2])["flags"].count("story.ancestral_hall") == 1
-            assert battle_record == ("enemy.ancestral_spirit", "content-0.4", "combat-0.4.1", "none")
+            assert battle_record == ("enemy.ancestral_spirit", "none")
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                codex_count = connection.execute(
+                    "SELECT COUNT(*) FROM codex_entries WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND entry_key='codex.domain.ancestral_hall'",
+                    (adapter, user),
+                ).fetchone()[0]
+            assert codex_count == 1
 
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
@@ -125,6 +131,12 @@ def test_ancestral_hall_complete_and_idempotent_on_both_adapters(adapter: str) -
             # The first-clear story flag remains unique after the weekly quota rolls over.
             second = await _win(runtime, adapter, user, "repeat")
             assert second[1].data["story_flag_written"] is False
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                codex_count = connection.execute(
+                    "SELECT COUNT(*) FROM codex_entries WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND entry_key='codex.domain.ancestral_hall'",
+                    (adapter, user),
+                ).fetchone()[0]
+            assert codex_count == 1
             await runtime.close()
 
     asyncio.run(run())
@@ -208,6 +220,11 @@ def test_ancestral_hall_failure_expiry_and_system_compensation() -> None:
             assert player[0] == 75
             assert player[1] == 50
             assert "story.ancestral_hall" not in json.loads(player[2]).get("flags", [])
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM codex_entries WHERE player_id=(SELECT id FROM players WHERE platform_user_id=?) AND entry_key='codex.domain.ancestral_hall'",
+                    (loser,),
+                ).fetchone()[0] == 0
 
             expired_user = "ancestral-expired"
             await _player(runtime, "qq.official", expired_user)
@@ -285,7 +302,7 @@ def test_ancestral_spirit_summon_clear_and_timeout_recovery_are_persisted() -> N
                     (battle_id,),
                 ).fetchone()[0]
             assert shadow_state["bloodline_shadow"] is True
-            assert summon == "strategy.ancestral_spirit.bloodline_call.v0.4.1"
+            assert summon == "strategy.ancestral_spirit.bloodline_call"
 
             clock.advance(seconds=61)
             timeout = await runtime.repository.run_battle_turn(battle_id=battle_id, expected_round=5)
@@ -298,10 +315,10 @@ def test_ancestral_spirit_summon_clear_and_timeout_recovery_are_persisted() -> N
                 state = json.loads(connection.execute(
                     "SELECT state_json FROM battle_sessions WHERE battle_id=?", (battle_id,)
                 ).fetchone()[0])
-            recovery = next(json.loads(row[2]) for row in rows if row[0] == "strategy.ancestral_spirit.bloodline_recovery.v0.4.1")
+                recovery = next(json.loads(row[2]) for row in rows if row[0] == "strategy.ancestral_spirit.bloodline_recovery")
             assert recovery["recovery"] == 800
             assert state["bloodline_shadow"] is False
-            assert any(row[0] == "strategy.timeout_defend.v0.1" for row in rows)
+            assert any(row[0] == "strategy.timeout_defend" for row in rows)
 
             for round_no in range(6, 9):
                 assert (await runtime.repository.run_battle_turn(battle_id=battle_id, expected_round=round_no)).status == "running"
@@ -315,7 +332,7 @@ def test_ancestral_spirit_summon_clear_and_timeout_recovery_are_persisted() -> N
                 battle_status = connection.execute(
                     "SELECT status FROM battle_sessions WHERE battle_id=?", (battle_id,)
                 ).fetchone()[0]
-            assert clear_strategy == "strategy.ancestral_spirit.clear_shadow.v0.4.1"
+            assert clear_strategy == "strategy.ancestral_spirit.clear_shadow"
             assert battle_status == "running"
 
             compensated = await runtime.repository.compensate_ancestral_hall_system_failure(

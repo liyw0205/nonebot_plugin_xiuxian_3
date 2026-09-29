@@ -22,18 +22,18 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/install.sh" --help
 fi
 case "${1:-}" in
-    install|update|uninstall|start|pause|resume|stop|restart|status)
+    install|update|uninstall|start|pause|resume|stop|restart|status|login)
         ACTION=$1
         shift
         ;;
 esac
-TARGET="${1:-$HOME/nonebot-bot}"
+TARGET="${1:-$HOME/xiu3}"
 if (($# > 0)) && [[ "$1" != -* ]]; then
     shift
 fi
 
 missing=()
-for command_name in python git clang; do
+for command_name in python git clang curl; do
     command -v "$command_name" >/dev/null 2>&1 || missing+=("$command_name")
 done
 if ((${#missing[@]})); then

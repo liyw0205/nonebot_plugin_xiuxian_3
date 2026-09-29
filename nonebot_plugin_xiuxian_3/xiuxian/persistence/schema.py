@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS players (
     stage TEXT NOT NULL CHECK (stage IN ('new_user', 'mortal', 'seeker', 'cultivator', 'suspended')),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'deleted')),
     location_key TEXT NOT NULL DEFAULT 'xuantian.new_town',
-    rule_version TEXT NOT NULL DEFAULT 'player-onboarding-v0.1.0',
     path_key TEXT,
     subprofession_key TEXT,
     qualification_json TEXT NOT NULL DEFAULT '{}',
@@ -63,6 +62,7 @@ CREATE TABLE IF NOT EXISTS players (
     exploration_efficiency_bp INTEGER NOT NULL DEFAULT 0 CHECK (exploration_efficiency_bp >= 0),
     domain_key TEXT,
     domain_power INTEGER NOT NULL DEFAULT 0 CHECK (domain_power >= 0),
+    domain_level INTEGER NOT NULL DEFAULT 0 CHECK (domain_level >= 0),
     realm_resistance_bp INTEGER NOT NULL DEFAULT 0 CHECK (realm_resistance_bp >= 0),
     domain_crack_until TEXT,
     initiative INTEGER NOT NULL DEFAULT 0 CHECK (initiative >= 0),
@@ -126,8 +126,6 @@ CREATE TABLE IF NOT EXISTS endgame_endings (
     fruit_key TEXT,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     operation_id TEXT NOT NULL UNIQUE,
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 
@@ -161,8 +159,6 @@ CREATE TABLE IF NOT EXISTS progression_milestones (
     status TEXT NOT NULL CHECK (status IN ('unlocked')),
     source_operation_id TEXT NOT NULL,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     unlocked_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE (player_id, milestone_key)
@@ -497,8 +493,6 @@ CREATE TABLE IF NOT EXISTS sect_war_federation_snapshots (
     roster_size INTEGER NOT NULL CHECK (roster_size BETWEEN 1 AND 15),
     status TEXT NOT NULL CHECK (status IN ('frozen', 'revoked')),
     snapshot_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     frozen_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -518,8 +512,6 @@ CREATE TABLE IF NOT EXISTS sect_war_federation_results (
     winner INTEGER NOT NULL CHECK (winner IN (0, 1)),
     source_operation_id TEXT NOT NULL UNIQUE,
     result_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     imported_at TEXT NOT NULL,
     UNIQUE (round_id, shard_key, sect_id)
 );
@@ -535,8 +527,6 @@ CREATE TABLE IF NOT EXISTS sect_void_fortresses (
     build_ends_at TEXT,
     maintenance_due_at TEXT,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -551,8 +541,6 @@ CREATE TABLE IF NOT EXISTS sect_void_beacons (
     build_ends_at TEXT,
     maintenance_due_at TEXT,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -820,8 +808,6 @@ CREATE TABLE IF NOT EXISTS parties (
     confirmation_deadline TEXT NOT NULL,
     current_session_id TEXT,
     distribution_key TEXT NOT NULL DEFAULT 'contribution',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -865,8 +851,6 @@ CREATE TABLE IF NOT EXISTS party_battle_sessions (
     snapshot_json TEXT NOT NULL,
     state_json TEXT NOT NULL,
     result_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -981,7 +965,7 @@ CREATE TABLE IF NOT EXISTS talent_node_states (
     operation_id TEXT NOT NULL UNIQUE,
     node_key TEXT NOT NULL,
     tree_key TEXT NOT NULL,
-    tier INTEGER NOT NULL CHECK (tier BETWEEN 1 AND 5),
+    tier INTEGER NOT NULL CHECK (tier >= 1),
     status TEXT NOT NULL CHECK (status IN ('learned')),
     cost_points INTEGER NOT NULL CHECK (cost_points >= 0),
     snapshot_json TEXT NOT NULL DEFAULT '{}',
@@ -1005,8 +989,6 @@ CREATE TABLE IF NOT EXISTS talent_point_events (
     balance_before INTEGER NOT NULL CHECK (balance_before >= 0),
     balance_after INTEGER NOT NULL CHECK (balance_after >= 0),
     reason TEXT NOT NULL,
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 
@@ -1019,9 +1001,7 @@ CREATE TABLE IF NOT EXISTS skill_masteries (
     player_id INTEGER NOT NULL REFERENCES players(id),
     operation_id TEXT NOT NULL UNIQUE,
     skill_key TEXT NOT NULL,
-    path_key TEXT,
-    level INTEGER NOT NULL CHECK (level BETWEEN 1 AND 3),
-    max_level INTEGER NOT NULL CHECK (max_level = 3),
+    level INTEGER NOT NULL CHECK (level > 0),
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     trained_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -1032,22 +1012,22 @@ CREATE TABLE IF NOT EXISTS skill_masteries (
 CREATE INDEX IF NOT EXISTS idx_skill_masteries_player
     ON skill_masteries(player_id, skill_key);
 
-CREATE TABLE IF NOT EXISTS skill_insight_events (
+CREATE TABLE IF NOT EXISTS skill_resource_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id TEXT NOT NULL UNIQUE,
     player_id INTEGER NOT NULL REFERENCES players(id),
-    operation_id TEXT NOT NULL UNIQUE,
+    operation_id TEXT NOT NULL,
+    resource_key TEXT NOT NULL,
     delta INTEGER NOT NULL CHECK (delta <> 0),
     balance_before INTEGER NOT NULL CHECK (balance_before >= 0),
     balance_after INTEGER NOT NULL CHECK (balance_after >= 0),
     reason TEXT NOT NULL,
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    UNIQUE (operation_id, resource_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_skill_insight_events_player
-    ON skill_insight_events(player_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_skill_resource_events_player
+    ON skill_resource_events(player_id, created_at);
 
 CREATE TABLE IF NOT EXISTS equipment_instances (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1058,8 +1038,8 @@ CREATE TABLE IF NOT EXISTS equipment_instances (
     slot TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('active', 'broken', 'archived')),
     durability_bp INTEGER NOT NULL CHECK (durability_bp >= 0),
-    temper_level INTEGER NOT NULL CHECK (temper_level BETWEEN 0 AND 3),
-    max_temper_level INTEGER NOT NULL CHECK (max_temper_level = 3),
+    temper_level INTEGER NOT NULL CHECK (temper_level >= 0 AND temper_level <= max_temper_level),
+    max_temper_level INTEGER NOT NULL CHECK (max_temper_level > 0),
     affixes_json TEXT NOT NULL DEFAULT '{}',
     refinement_failure_streak INTEGER NOT NULL DEFAULT 0 CHECK (refinement_failure_streak >= 0),
     created_at TEXT NOT NULL,
@@ -1459,8 +1439,6 @@ CREATE TABLE IF NOT EXISTS codex_entries (
     first_seen_operation_id TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     payload_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
     UNIQUE (player_id, entry_key)
 );
@@ -1740,8 +1718,6 @@ CREATE TABLE IF NOT EXISTS fate_pools (
     pool_key TEXT NOT NULL,
     pity_count INTEGER NOT NULL DEFAULT 0 CHECK (pity_count >= 0 AND pity_count < 10),
     total_draws INTEGER NOT NULL DEFAULT 0 CHECK (total_draws >= 0),
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     PRIMARY KEY (player_id, pool_key)
 );
@@ -1759,8 +1735,6 @@ CREATE TABLE IF NOT EXISTS fate_rolls (
     seed_hash TEXT NOT NULL,
     reward_json TEXT NOT NULL DEFAULT '{}',
     draws_json TEXT NOT NULL DEFAULT '[]',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 
@@ -1965,8 +1939,6 @@ CREATE TABLE IF NOT EXISTS final_battle_sessions (
     snapshot_json TEXT NOT NULL,
     state_json TEXT NOT NULL DEFAULT '{}',
     result_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -2584,8 +2556,6 @@ CREATE TABLE IF NOT EXISTS battle_sessions (
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     state_json TEXT NOT NULL DEFAULT '{}',
     result_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -2664,6 +2634,5 @@ CREATE TABLE IF NOT EXISTS quest_events (
 
 CREATE INDEX IF NOT EXISTS idx_quest_events_player
     ON quest_events(player_id, quest_key, component_key, created_at);
-
 
 """

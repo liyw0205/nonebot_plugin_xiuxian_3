@@ -26,7 +26,7 @@ data/
   奖励/奖励.json
   生活/生活.json
   灵兽/灵兽.json
-  装备/{法器,防具,工具}.json
+  装备/{法器,防具,饰品,成长,词条,工具}.json
   道具/{材料,丹药,功法,凭证}.json
   阵法/阵法.json
 ```
@@ -88,6 +88,25 @@ data/
 | `item.clue.manual_basic` | 基础功法线索 | 99 | 绑定；仅用于线索展示 |
 | `item.token.spirit_tree_water` | 灵木水分券 | 99 | 绑定；仅用于灵木浇灌 |
 
+当前开放功法共 18 部。除表中的 `item.manual.basic_qi` 外，还包括：
+`item.manual.sunrise_breath`、`item.manual.cycle_qi`、`item.manual.river_circulation`、
+`item.manual.purple_mansion`、`item.manual.earth_root`、`item.manual.cave_mystery`、
+`item.manual.starry_core`、`item.manual.nascent_spirit_return`、`item.manual.lotus_soul`、
+`item.manual.heaven_observation`、`item.manual.clear_mind`、`item.manual.void_journey`、
+`item.manual.void_heart`、`item.manual.dao_union_mysteries`、`item.manual.myriad_return`、
+`item.manual.transcendence_tribulation`、`item.manual.ascension_inquiry`。每个开放境界有两
+部，配置修行准入和突破加成，并由突破预览/结算及分阶段悬赏消费。
+
+法器和防具各有 447 件，其中各有 15 件通用基准、432 件覆盖六大道途与九个开放境界（每个组合八件）；饰品 108 件，每个道途/境界组合各有两种选择。装备使用 `path_key` 标记构筑取向，并复用品质成长模板；其效果由装备合同和战斗快照结算。除上表和下方版本清单所列基准装备外，本轮新增：
+
+| 类型 | 新增内容键 |
+|:--|:--|
+| 法器 | 已有 15 件，以及 `data/装备/法器.json` 中按 `item.weapon.<path>.<key>` 注册的 432 件道途/境界装备 |
+| 防具 | 已有 15 件，以及 `data/装备/防具.json` 中按 `item.armor.<path>.<key>` 注册的 432 件道途/境界装备 |
+| 饰品 | `data/装备/饰品.json` 中按 `item.accessory.<path>.<key>` 注册；攻击、防御、续航、命中闪避、会心与恢复压制等方向各有差异 |
+
+新增装备均配置品质成长模板和战斗属性；悬赏奖池按品质抽取饰品，并按领取者的道途与境界筛选，领取时直接创建装备实例。
+
 另外，`foundation/advancement/content-v0.1.md` 使用
 `item.token.constitution_reset` 作为管理员测试用物品。它不应进入普通掉落池，
 但内容校验仍需要将它注册为 `admin_only`，或者在 manifest 中明确声明为测试键。
@@ -142,8 +161,8 @@ data/
 |:--|:--|:--|
 | `境界/境界.json` | 境界键、中文名、开放状态、L1–L10 阈值、跨境门槛 | `foundation/progression/layers.md`、`content-v0.1.md` |
 | `道途/道途.json` | 六大道途、被动、主动技能和状态资源 | `foundation/paths/content-v0.1.md` |
-| `技能/技能.json` | 基础攻击、六条道途技能、敌方技能，以及天劫三阶段技能 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/workflow.md` |
-| `战斗/实体.json` | 召唤机关等独立战斗实体 | `gameplay/combat/content-v0.1.md` |
+| `技能/技能.json` | 基础攻击、六大道途在九境各自的稳定攻势与战术备选（108 条）、敌方技能及天劫阶段技能；技能名按招式意象命名，战斗消费器结算爆发、辅御、持续、削弱、蓄力、中毒、灼烧和反伤，高阶备选要求悬赏可得的传承残卷 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/workflow.md` |
+| `战斗/实体.json` | 独立战斗实体注册；未接入消费器的召唤机关保持锁定 | `gameplay/combat/content-v0.1.md` |
 | `引导/引导.json` | 凡人世界阅读、教学采集和生产教学 | `foundation/player/content-v0.1.md` |
 | `地图/地点.json` | 玄天起步区、洞天地点、准入、移动成本 | `gameplay/world/content-v0.1.md` |
 | `战斗/敌人.json` | 五个首版敌人和 `enemy.tribulation_heaven` 的阶段配置 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/model.md` |

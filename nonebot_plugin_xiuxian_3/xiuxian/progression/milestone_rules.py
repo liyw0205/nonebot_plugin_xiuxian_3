@@ -1,4 +1,4 @@
-"""Versioned rules for progression milestone qualifications."""
+"""Rules for progression milestone qualifications."""
 
 from __future__ import annotations
 
@@ -15,8 +15,6 @@ class ProgressionMilestoneDefinition:
     required_realm: str
     required_layer: int
     required_total_cultivation: int
-    content_version: str
-    rule_version: str
     required_max_faction_reputation: int = 0
     required_domain_level: int = 0
     required_void_route_count: int = 0
@@ -51,8 +49,6 @@ FOUNDATION_LATE_MILESTONE = ProgressionMilestoneDefinition(
     required_realm="foundation",
     required_layer=9,
     required_total_cultivation=10_000,
-    content_version="content-0.2",
-    rule_version="progression-0.2.0",
 )
 
 NASCENT_SOUL_LATE_MILESTONE = ProgressionMilestoneDefinition(
@@ -63,8 +59,6 @@ NASCENT_SOUL_LATE_MILESTONE = ProgressionMilestoneDefinition(
     required_layer=9,
     required_total_cultivation=210_000,
     required_max_faction_reputation=1_000,
-    content_version="content-0.3",
-    rule_version="progression-0.3.0",
 )
 
 SOUL_TRANSFORMATION_LATE_MILESTONE = ProgressionMilestoneDefinition(
@@ -75,8 +69,6 @@ SOUL_TRANSFORMATION_LATE_MILESTONE = ProgressionMilestoneDefinition(
     required_layer=9,
     required_total_cultivation=720_000,
     required_domain_level=3,
-    content_version="content-0.4",
-    rule_version="progression-0.4.0",
 )
 
 VOID_REFINING_LATE_MILESTONE = ProgressionMilestoneDefinition(
@@ -87,8 +79,6 @@ VOID_REFINING_LATE_MILESTONE = ProgressionMilestoneDefinition(
     required_layer=9,
     required_total_cultivation=2_500_000,
     required_void_route_count=3,
-    content_version="content-0.5",
-    rule_version="progression-0.5.1",
 )
 
 MILESTONE_DEFINITIONS = (

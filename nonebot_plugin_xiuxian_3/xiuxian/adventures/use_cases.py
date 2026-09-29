@@ -19,16 +19,7 @@ from ..repository import (
     RepositoryBusyError,
     SQLitePlayerRepository,
 )
-from .rules import resolve_bounty
-
-
-ITEM_LABELS = {
-    "item.pill.focus_low": "焦点丹",
-    "item.material.cloud_iron": "云铁",
-    "item.cave_pass_advanced": "雾隐洞天二层凭证",
-    "item.food.coarse_spirit_rice": "粗糙灵米",
-    "faction_reputation.demon": "魔界声望",
-}
+from .rules import bounty_definition, default_content_bundle, resolve_bounty
 
 STATUS_LABELS = {
     "available": "可接取",
@@ -66,8 +57,7 @@ class AdventuresApplication:
             .replace("~", "\\~")
         )
 
-    @staticmethod
-    def _reward_text(rewards: dict[str, int]) -> str:
+    def _reward_text(self, rewards: dict[str, int], bounty_key: str | None = None) -> str:
         labels = {
             "spirit_stones": "灵石",
             "cultivation": "修为",
@@ -75,11 +65,20 @@ class AdventuresApplication:
             "local_reputation": "城镇名望",
             "service_reputation": "服务信誉",
         }
+        content = self.repository.content or default_content_bundle()
+        configured_labels = {}
+        if bounty_key is not None:
+            configured_labels = bounty_definition(bounty_key, content).reward_labels
         parts: list[str] = []
         for key, quantity in rewards.items():
             if not quantity:
                 continue
-            label = ITEM_LABELS.get(key, labels.get(key, "悬赏奖励"))
+            label = configured_labels.get(key) or labels.get(key)
+            if label is None and key.startswith("item."):
+                label = content.label("item", key, fallback=key)
+            if label is None and key.startswith("faction_reputation."):
+                label = f"{key.removeprefix('faction_reputation.')}声望"
+            label = label or "悬赏奖励"
             parts.append(f"{label} +{quantity}")
         return "、".join(parts) or "无"
 
@@ -94,11 +93,12 @@ class AdventuresApplication:
             return f"约 {seconds // 3600} 小时后"
         return f"约 {max(1, seconds // 60)} 分钟后"
 
-    @staticmethod
-    def _bounty_args(args: tuple[str, ...]) -> str | None:
+    def _bounty_args(self, args: tuple[str, ...]) -> tuple[bool, str | None]:
+        if not args:
+            return True, None
         if len(args) != 1:
-            return None
-        return resolve_bounty(args[0])
+            return False, None
+        return True, resolve_bounty(args[0], self.repository.content)
 
     async def list_bounties(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -128,7 +128,7 @@ class AdventuresApplication:
                 [
                     f"### {offer.label} · {status}",
                     f"- **目标**：{offer.description}（{progress}）",
-                    f"- **奖励**：{self._reward_text(offer.reward)}{expires}",
+                    f"- **奖励**：{self._reward_text(offer.reward, offer.key)}{expires}",
                     "",
                 ]
             )
@@ -153,9 +153,9 @@ class AdventuresApplication:
         )
 
     async def accept_bounty(self, context: CommandContext) -> CommandResult:
-        bounty_key = self._bounty_args(context.command_args)
-        if bounty_key is None:
-            return CommandResult(False, "INVALID_BOUNTY_COMMAND", "请发送 `接取悬赏 <名称>`，名称须来自悬赏榜。", context.request_id)
+        valid, bounty_key = self._bounty_args(context.command_args)
+        if not valid:
+            return CommandResult(False, "INVALID_BOUNTY_COMMAND", "请发送 `接取悬赏` 随机领取，或指定悬赏名称。", context.request_id)
         operation_id = self._operation_id(context, "bounty.accept")
         try:
             record = await self.repository.accept_bounty(
@@ -235,7 +235,7 @@ class AdventuresApplication:
             (
                 f"## 悬赏奖励已领取\n\n**{self._display_name(record.player)}**完成了 **{record.label}**。\n\n"
                 f"- **进度**：{record.progress}/{record.target}\n"
-                f"- **奖励**：{self._reward_text(record.rewards)}\n\n"
+                f"- **奖励**：{self._reward_text(record.rewards, record.bounty_key)}\n\n"
                 "> 奖励已写入角色资产，重复领取不会再次发放。"
             ),
             context.request_id,

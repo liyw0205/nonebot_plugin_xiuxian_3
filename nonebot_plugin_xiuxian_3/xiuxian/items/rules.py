@@ -2,73 +2,86 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from ..content import ContentBundle
+from ..content import ContentBundle, ContentError, bundled_content
 
 
 # Kept as a compatibility export for old snapshots; new operations read the
 # active content manifest rather than a documentation release number.
-CONTENT_VERSION = module_content_version(__name__, fallback="current")
-RULE_VERSION = module_rule_version(__name__)
-MIST_BARRIER_RISK_REDUCTION_BP = 500
-MIST_BARRIER_DURATION_SECONDS = 12 * 60 * 60
-CLOUD_TEA_STATE_BP_BONUS = 500
+CONTENT_VERSION = ""
+RULE_VERSION = ""
+_SUPPORTED_EFFECTS = frozenset(
+    {"next_cultivation_state_bonus_bp", "exploration_risk_reduction_bp"}
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ItemDefinition:
     key: str
     name: str
-    kind: str
+    effect_type: str
+    effect_value: int
+    duration_seconds: int | None
     tradeable: bool
-
-
-_FALLBACK_ITEM_DEFINITIONS = {
-    "item.array.mist_barrier": ItemDefinition(
-        "item.array.mist_barrier", "迷雾屏障阵", "mist_barrier", False
-    ),
-    "item.food.cloud_tea": ItemDefinition(
-        "item.food.cloud_tea", "云灵茶", "cloud_tea", True
-    ),
-}
+    aliases: tuple[str, ...]
 
 
 def _content_item_definitions() -> dict[str, ItemDefinition]:
-    bundle = ContentBundle.load_optional(Path(__file__).resolve().parents[3] / "data")
-    if bundle is None:
-        return dict(_FALLBACK_ITEM_DEFINITIONS)
+    bundle = bundled_content()
     result: dict[str, ItemDefinition] = {}
     for row in bundle.list("item", include_locked=False):
+        effects = row.get("effects")
+        if not isinstance(effects, list) or any(
+            not isinstance(effect, dict) or not isinstance(effect.get("type"), str)
+            for effect in effects
+        ):
+            raise ContentError(f"item {row.get('key')} effects must be a list")
+        supported = [effect for effect in effects if effect.get("type") in _SUPPORTED_EFFECTS]
+        if not supported:
+            continue
         key = row.get("key")
-        if not isinstance(key, str):
-            continue
-        if key not in _FALLBACK_ITEM_DEFINITIONS and row.get("item_type") not in {"food", "array"}:
-            continue
-        fallback = _FALLBACK_ITEM_DEFINITIONS.get(key)
+        name = row.get("name")
+        if not isinstance(key, str) or not isinstance(name, str) or not name.strip():
+            raise ContentError(f"usable item requires key and name: {row!r}")
+        if len(supported) != 1:
+            raise ContentError(f"usable item {key} must define exactly one supported active effect")
+        configured_effect = supported[0]
+        value = configured_effect.get("value")
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ContentError(f"usable item {key} effect value must be a positive integer")
+        duration = row.get("bind_duration_seconds")
+        if duration is not None and (not isinstance(duration, int) or isinstance(duration, bool) or duration <= 0):
+            raise ContentError(f"usable item {key} bind_duration_seconds must be positive")
+        effect_type = str(configured_effect["type"])
+        if effect_type == "exploration_risk_reduction_bp" and duration is None:
+            raise ContentError(f"usable item {key} requires bind_duration_seconds")
+        aliases = row.get("aliases", [])
+        if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
+            raise ContentError(f"usable item {key} aliases must be non-empty strings")
+        if not isinstance(row.get("tradeable"), bool):
+            raise ContentError(f"usable item {key} tradeable must be boolean")
         result[key] = ItemDefinition(
             key=key,
-            name=str(row.get("name") or (fallback.name if fallback else key)),
-            kind=fallback.kind if fallback else str(row.get("item_type") or "item"),
-            tradeable=bool(row.get("tradeable", fallback.tradeable if fallback else False)),
+            name=name.strip(),
+            effect_type=effect_type,
+            effect_value=value,
+            duration_seconds=duration,
+            tradeable=row["tradeable"],
+            aliases=tuple(aliases),
         )
-    for key, definition in _FALLBACK_ITEM_DEFINITIONS.items():
-        result.setdefault(key, definition)
     return result
 
 
 ITEM_DEFINITIONS = _content_item_definitions()
 
-ITEM_ALIASES = {
-    **{key: key for key in ITEM_DEFINITIONS},
-    "迷雾屏障阵": "item.array.mist_barrier",
-    "迷雾屏障": "item.array.mist_barrier",
-    "云灵茶": "item.food.cloud_tea",
-    "云茶": "item.food.cloud_tea",
-}
+ITEM_ALIASES: dict[str, str] = {}
+for _key, _definition in ITEM_DEFINITIONS.items():
+    for _alias in (_key, _definition.name, *_definition.aliases):
+        if _alias in ITEM_ALIASES:
+            raise ContentError(f"duplicate usable item alias: {_alias}")
+        ITEM_ALIASES[_alias] = _key
 ITEM_LABELS = {key: definition.name for key, definition in ITEM_DEFINITIONS.items()}
 
 
@@ -81,13 +94,10 @@ def resolve_item(value: str) -> ItemDefinition:
 
 
 __all__ = [
-    "CLOUD_TEA_STATE_BP_BONUS",
     "CONTENT_VERSION",
     "ITEM_ALIASES",
     "ITEM_DEFINITIONS",
     "ITEM_LABELS",
-    "MIST_BARRIER_DURATION_SECONDS",
-    "MIST_BARRIER_RISK_REDUCTION_BP",
     "RULE_VERSION",
     "ItemDefinition",
     "resolve_item",

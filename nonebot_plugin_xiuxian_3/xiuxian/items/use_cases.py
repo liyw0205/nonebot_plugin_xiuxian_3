@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
     ItemEffectAlreadyActiveError,
@@ -28,6 +30,13 @@ class ItemApplication:
             return context.operation_id
         request_key = context.message_id or context.request_id
         return f"items.use:{context.adapter}:{context.user_id}:{request_key}"
+
+    @staticmethod
+    def _percent(value_bp: int) -> str:
+        whole, fraction = divmod(value_bp, 100)
+        if fraction == 0:
+            return str(whole)
+        return f"{whole}.{fraction:02d}".rstrip("0")
 
     async def use_item(self, context: CommandContext) -> CommandResult:
         if not 1 <= len(context.command_args) <= 2:
@@ -66,10 +75,19 @@ class ItemApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        if record.item_key == "item.food.cloud_tea":
-            message = "## 云灵茶已饮用\n\n下一次修炼会话获得 **状态 +500 bp**；效果已冻结，开始修炼时自动消耗。"
+        if record.effect.get("type") == "next_cultivation_state_bonus_bp":
+            message = (
+                f"## {record.item_name}已饮尽\n\n一缕清灵仍在经脉间流转，"
+                f"下一次修炼所得修为提高 **{self._percent(int(record.effect['state_bp_bonus']))}%**。"
+            )
         else:
-            message = f"## {record.item_name}已布置\n\n绑定地点：**雾隐洞天二层**\n风险降低：**{record.effect.get('risk_reduction_bp', 0)} bp**\n有效至：{record.effect.get('expires_at', '未知')}。"
+            expires_at = datetime.fromisoformat(str(record.effect["expires_at"]))
+            expires_label = expires_at.astimezone().strftime("%Y年%m月%d日 %H:%M")
+            message = (
+                f"## {record.item_name}已布下\n\n屏障笼罩雾隐洞天二层，探索途中遭遇战斗的机会"
+                f"降低 **{self._percent(int(record.effect['risk_reduction_bp']))}%**，"
+                f"将持续到 {expires_label}。"
+            )
         return CommandResult(True, "ITEM_USED", message, context.request_id, operation_id, data={"item_key": record.item_key, "item_name": record.item_name, "quantity": record.quantity, "effect": record.effect, "inventory": record.player.inventory, "idempotent_replay": record.already_completed})
 
 

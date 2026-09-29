@@ -204,8 +204,6 @@ def test_retreat_snapshot_keeps_item_cost_structured() -> None:
                     (started.data["session_id"],),
                 ).fetchone()[0]
             payload = json.loads(snapshot)
-            assert payload["content_version"] == "content-0.1"
-            assert payload["rule_version"] == "advancement-0.1.0"
             assert payload["item_cost"] == {"item.food.coarse_spirit_rice": 1}
             await runtime.close()
 

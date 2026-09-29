@@ -149,8 +149,8 @@ class PartyRepositoryMixin:
                 INSERT INTO parties(
                     party_id, party_type, status, leader_id, location_key,
                     confirmation_deadline, current_session_id, distribution_key,
-                    content_version, rule_version, created_at, updated_at
-                ) VALUES (?, ?, 'forming', ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                    created_at, updated_at
+                ) VALUES (?, ?, 'forming', ?, ?, ?, NULL, ?, ?, ?)
                 """,
                 (
                     party_id,
@@ -159,8 +159,6 @@ class PartyRepositoryMixin:
                     str(player["location_key"]),
                     serialize_datetime(deadline),
                     definition.distribution_key,
-                    definition.content_version,
-                    definition.rule_version,
                     now_text,
                     now_text,
                 ),

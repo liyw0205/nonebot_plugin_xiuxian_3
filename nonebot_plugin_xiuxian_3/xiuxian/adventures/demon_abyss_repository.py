@@ -22,7 +22,6 @@ from ..persistence.errors import (
 )
 from .demon_abyss_models import DemonAbyssRunRecord
 from .demon_abyss_rules import (
-    DEMON_ABYSS_CONTENT_VERSION,
     DEMON_ABYSS_ENEMIES,
     DEMON_ABYSS_EXPIRY_SECONDS,
     DEMON_ABYSS_FIRST_REWARD,
@@ -35,7 +34,6 @@ from .demon_abyss_rules import (
     DEMON_ABYSS_REQUIRED_FLAG,
     DEMON_ABYSS_RISK_BASE_BP,
     DEMON_ABYSS_RISK_MODIFIER_BP,
-    DEMON_ABYSS_RULE_VERSION,
     DEMON_ABYSS_STAMINA_COST,
     demon_abyss_risk_applies,
     demon_abyss_risk_roll_bp,
@@ -229,8 +227,6 @@ class DemonAbyssRepositoryMixin:
                 "random_seed": uuid4().hex,
                 "node_keys": list(DEMON_ABYSS_NODES),
                 "first_clear": self._is_first_clear(connection, int(player["id"]), DEMON_ABYSS_KEY),
-                "content_version": DEMON_ABYSS_CONTENT_VERSION,
-                "rule_version": DEMON_ABYSS_RULE_VERSION,
             }
             expires_at = serialize_datetime(now + timedelta(seconds=DEMON_ABYSS_EXPIRY_SECONDS))
             connection.execute(
@@ -242,13 +238,13 @@ class DemonAbyssRepositoryMixin:
                 INSERT INTO secret_realm_runs(
                     run_id, player_id, instance_key, status, node_index, starts_at, expires_at,
                     quota_period, quota_key, ticket_key, ticket_locked, stamina_locked,
-                    snapshot_json, result_json, content_version, rule_version, created_at, updated_at
-                ) VALUES (?, ?, ?, 'routing', 0, ?, ?, 'week', ?, NULL, 0, ?, ?, '{}', ?, ?, ?, ?)
+                    snapshot_json, result_json, created_at, updated_at
+                ) VALUES (?, ?, ?, 'routing', 0, ?, ?, 'week', ?, NULL, 0, ?, ?, '{}', ?, ?)
                 """,
                 (
                     run_id, player["id"], DEMON_ABYSS_KEY, now_text, expires_at, quota_key,
                     DEMON_ABYSS_STAMINA_COST, json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                    DEMON_ABYSS_CONTENT_VERSION, DEMON_ABYSS_RULE_VERSION, now_text, now_text,
+                    now_text, now_text,
                 ),
             )
             run = connection.execute("SELECT * FROM secret_realm_runs WHERE run_id=?", (run_id,)).fetchone()

@@ -13,26 +13,7 @@ from ..persistence.errors import (
     RepositoryBusyError,
 )
 from .codex_repository import CodexRepositoryMixin
-from .codex_rules import MILESTONES
-
-
-_CATEGORY_LABELS = {
-    "place": "地点",
-    "material": "材料",
-    "creature": "异兽",
-    "path": "道途",
-    "route": "路线",
-    "dispatch": "派遣",
-    "challenge": "挑战",
-    "story": "故事",
-}
-_UNLOCK_LABELS = {
-    "commission.town.extra_offer": "城镇委托展示额外条目",
-    "hint.herb_route": "药圃路线提示",
-    "display.codex_creature_badge": "异兽收集徽记",
-    "hint.tower_route": "试炼塔路线提示",
-    "encyclopedia.paths_6": "六道途百科页",
-}
+from .codex_rules import category_labels, codex_milestones, unlock_label
 
 
 class CodexApplication:
@@ -49,13 +30,13 @@ class CodexApplication:
     @staticmethod
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
         errors = {
-            PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
-            PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能查看或领取图鉴。"),
-            CodexMilestoneNotFoundError: ("CODEX_MILESTONE_NOT_FOUND", "没有找到这项图鉴里程碑。"),
-            CodexMilestoneNotReadyError: ("CODEX_MILESTONE_NOT_READY", "图鉴条目尚未收录齐全。"),
-            CodexMilestoneAlreadyClaimedError: ("CODEX_MILESTONE_ALREADY_CLAIMED", "这项图鉴里程碑已经领取。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他图鉴操作。"),
-            RepositoryBusyError: ("PERSISTENCE_BUSY", "图鉴暂时繁忙，请稍后再试。"),
+            PlayerNotFoundError: ("PLAYER_NOT_FOUND", "尚未结成仙缘，请先开始修仙。"),
+            PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能查看或领取见闻。"),
+            CodexMilestoneNotFoundError: ("CODEX_MILESTONE_NOT_FOUND", "未曾听闻这份见闻之赏。"),
+            CodexMilestoneNotReadyError: ("CODEX_MILESTONE_NOT_READY", "所需见闻尚未齐全。"),
+            CodexMilestoneAlreadyClaimedError: ("CODEX_MILESTONE_ALREADY_CLAIMED", "这份见闻之赏已收入囊中。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此番所求与先前不同，请另择一赏。"),
+            RepositoryBusyError: ("PERSISTENCE_BUSY", "灵识未能通达，稍后再试。"),
         }
         for error_type, (code, message) in errors.items():
             if isinstance(exc, error_type):
@@ -70,7 +51,7 @@ class CodexApplication:
         return CommandResult(
             False,
             "PERSISTENCE_ERROR",
-            "图鉴暂时不可用，请稍后再试。",
+            "图卷暂不可阅，稍后再试。",
             context.request_id,
             operation_id or None,
             retryable=True,
@@ -88,8 +69,9 @@ class CodexApplication:
             return self._error(context, "", exc)
 
         filter_value = context.command_args[0].strip() if context.command_args else ""
+        labels = category_labels(self.repository.content)
         normalized_category = next(
-            (key for key, label in _CATEGORY_LABELS.items() if filter_value in {key, label}),
+            (key for key, label in labels.items() if filter_value in {key, label}),
             None,
         )
         entries = tuple(
@@ -101,19 +83,21 @@ class CodexApplication:
         lines = ["## 修行图鉴", ""]
         if entries:
             for item in entries:
-                lines.append(f"- **{item.label}** · {_CATEGORY_LABELS.get(item.category, item.category)} · 首见 {item.first_seen_at[:10]}")
+                lines.append(f"- **{item.label}** · {labels.get(item.category, item.category)} · 首见 {item.first_seen_at[:10]}")
         else:
-            lines.append("尚无符合条件的已发现条目。")
-        lines.extend(["", "### 集合里程碑", ""])
+            lines.append("尚无相符的见闻。")
+        lines.extend(["", "### 见闻收录", ""])
         milestones: list[dict[str, object]] = []
         for index, item in enumerate(record.milestones, start=1):
             if item.claimed:
-                status = "已领取"
+                status = "已得"
             elif item.ready:
                 status = "可领取"
             else:
                 status = f"收录 {item.discovered_count}/{item.required_count}"
             lines.append(f"- **{index}. {item.label}**：{status}")
+            if item.claimed and item.unlocks:
+                lines.append(f"  - 得：{'、'.join(unlock_label(key, self.repository.content) for key in item.unlocks)}")
             milestones.append(
                 {
                     "index": index,
@@ -123,7 +107,8 @@ class CodexApplication:
                     "required_count": item.required_count,
                     "ready": item.ready,
                     "claimed": item.claimed,
-                    "reward": {"local_reputation": item.reputation_reward} if item.reputation_reward else {},
+                    "reward": ({item.reputation_key: item.reputation_reward}
+                               if item.reputation_key and item.reputation_reward else {}),
                     "unlocks": list(item.unlocks),
                 }
             )
@@ -151,11 +136,11 @@ class CodexApplication:
             return CommandResult(
                 False,
                 "INVALID_CODEX_COMMAND",
-                "请使用 `领取图鉴里程碑 <序号>`，序号可在 `我的图鉴` 中查看。",
+                "请说出要领取的见闻序号或名称。",
                 context.request_id,
             )
         value = context.command_args[0].strip()
-        definitions = tuple(MILESTONES.values())
+        definitions = tuple(codex_milestones(self.repository.content).values())
         if value.isdecimal() and 1 <= int(value) <= len(definitions):
             milestone_key = definitions[int(value) - 1].key
         else:
@@ -170,14 +155,18 @@ class CodexApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        definition = MILESTONES[record.milestone_key]
-        reward = "、".join(f"{key} +{amount}" for key, amount in record.reward.items()) or "无数值奖励"
-        unlocks = "、".join(_UNLOCK_LABELS.get(key, key) for key in record.unlocks)
-        replay_text = "（请求已回放）" if record.already_completed else ""
+        definition = codex_milestones(self.repository.content)[record.milestone_key]
+        reward = "、".join(
+            f"{definition.reputation_name} +{amount}"
+            for amount in record.reward.values()
+        )
+        unlocks = "、".join(unlock_label(key, self.repository.content) for key in record.unlocks)
+        replay_text = "（此赏此前已领取）" if record.already_completed else ""
+        benefits = "、".join(value for value in (reward, unlocks) if value)
         return CommandResult(
             True,
             "CODEX_MILESTONE_CLAIMED",
-            f"已领取 **{definition.label}**：{reward}；解锁：{unlocks}。{replay_text}",
+            f"已领取 **{definition.label}**。所得：{benefits}。{replay_text}",
             context.request_id,
             operation_id,
             data={

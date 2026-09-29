@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 import hashlib
 from datetime import datetime, timedelta, timezone
 
 
 SEASON_KEY = "season.three_realms"
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 SEASON_DAYS = 28
 CLAIM_DAYS = 7
 SEASON_ANCHOR = datetime(2025, 1, 1, tzinfo=timezone.utc)

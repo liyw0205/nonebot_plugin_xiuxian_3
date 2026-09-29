@@ -17,7 +17,12 @@ from ..repository import (
     ResourceInsufficientError,
     SQLitePlayerRepository,
 )
-from .constitution_rules import constitution_definition, constitution_options
+from .constitution_rules import (
+    constitution_definition,
+    constitution_options,
+    constitution_reshape_rules,
+    default_content_bundle,
+)
 
 
 class ConstitutionApplication:
@@ -45,23 +50,43 @@ class ConstitutionApplication:
         )
 
     @staticmethod
-    def _resolve_key(args: tuple[str, ...]) -> str | None:
+    def _effect_value(effect: dict) -> str:
+        value = effect["value"]
+        if str(effect["type"]).endswith("_bp"):
+            return f"+{int(value) / 100:g}%"
+        return f"+{value}"
+
+    @staticmethod
+    def _duration(seconds: int) -> str:
+        if seconds % 86_400 == 0:
+            return f"{seconds // 86_400} 天"
+        if seconds % 3_600 == 0:
+            return f"{seconds // 3_600} 小时"
+        if seconds % 60 == 0:
+            return f"{seconds // 60} 分钟"
+        return f"{seconds} 秒"
+
+    def _resolve_key(self, args: tuple[str, ...]) -> str | None:
         if len(args) != 1:
             return None
         try:
-            return constitution_definition(args[0]).key
+            return constitution_definition(args[0], self.repository.content).key
         except ValueError:
             return None
 
     async def preview(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_CONSTITUTION_COMMAND", "体质预览无需附加参数。", context.request_id)
-        lines = ["## 体质根性", "", "入道后可选择一项主质，重塑需要体质重塑令：", ""]
-        for definition in constitution_options():
-            effect = definition.effect
-            suffix = f"（{effect['value']} bp）" if str(effect["type"]).endswith("_bp") else f"（+{effect['value']}）"
+        reshape_rules = constitution_reshape_rules(self.repository.content)
+        cooldown = int(reshape_rules["cooldown_seconds"])
+        content = self.repository.content or default_content_bundle()
+        item_key = str(reshape_rules["reset_item_key"])
+        item_name = content.label("item", item_key)
+        lines = ["## 体质根性", "", f"入道后可选择一项主质，重塑需持有 **{item_name}**：", ""]
+        for definition in constitution_options(content):
+            suffix = self._effect_value(definition.effect)
             lines.append(f"- **{definition.label}**：{definition.description}{suffix}")
-        lines.extend(["", "> 首次选择不消耗道具；重塑冷却 30 天，且不会返还天赋点。"])
+        lines.extend(["", f"> 首次选择不消耗道具；重塑间隔 {self._duration(cooldown)}，且不会返还已用天赋点。"])
         return CommandResult(True, "CONSTITUTION_PREVIEW", "\n".join(lines), context.request_id)
 
     async def select(self, context: CommandContext) -> CommandResult:
@@ -97,7 +122,7 @@ class ConstitutionApplication:
     async def reshape(self, context: CommandContext) -> CommandResult:
         key = self._resolve_key(context.command_args)
         if key is None:
-            return CommandResult(False, "INVALID_CONSTITUTION", "请指定要重塑的体质，例如 `重塑体质 灵根`。", context.request_id)
+            return CommandResult(False, "INVALID_CONSTITUTION", "请指定要重塑的体质，例如 `重塑体质 风行`。", context.request_id)
         operation_id = self._operation_id(context, "constitution.reshape")
         try:
             record = await self.repository.reshape_constitution(
@@ -109,11 +134,12 @@ class ConstitutionApplication:
         except ConstitutionNotFoundError:
             return CommandResult(False, "CONSTITUTION_NOT_SELECTED", "你还没有主质，请先发送 `选择体质 <选项>`。", context.request_id, operation_id)
         except ConstitutionCooldownError:
-            return CommandResult(False, "CONSTITUTION_COOLDOWN", "体质重塑仍在冷却中，请 30 天后再试。", context.request_id, operation_id)
+            cooldown = int(constitution_reshape_rules(self.repository.content)["cooldown_seconds"])
+            return CommandResult(False, "CONSTITUTION_COOLDOWN", f"体质重塑间隔未满，请 {self._duration(cooldown)}后再试。", context.request_id, operation_id)
         except ConstitutionSameError:
             return CommandResult(False, "CONSTITUTION_SAME", "当前主质已经是这一项，无需重塑。", context.request_id, operation_id)
         except ResourceInsufficientError:
-            return CommandResult(False, "RESOURCE_INSUFFICIENT", "缺少体质重塑令，无法重塑。", context.request_id, operation_id)
+            return CommandResult(False, "RESOURCE_INSUFFICIENT", "缺少重塑所需凭证，无法改变主质。", context.request_id, operation_id)
         except ConstitutionBusyError:
             return CommandResult(False, "CONSTITUTION_BUSY", "当前有其他长时会话进行中，请先完成结算。", context.request_id, operation_id)
         except PlayerNotFoundError:
@@ -146,8 +172,7 @@ class ConstitutionApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看体质。", context.request_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
-        effect = record.effect
-        effect_value = f"{effect.get('value', 0)} bp" if str(effect.get("type", "")).endswith("_bp") else f"+{effect.get('value', 0)}"
+        effect_value = self._effect_value(record.effect)
         return CommandResult(
             True,
             "CONSTITUTION_PROFILE",
@@ -167,12 +192,11 @@ class ConstitutionApplication:
 
     @classmethod
     def _success_result(cls, context: CommandContext, record, operation_id: str, *, title: str) -> CommandResult:
-        effect = record.effect
-        effect_value = f"{effect.get('value', 0)} bp" if str(effect.get("type", "")).endswith("_bp") else f"+{effect.get('value', 0)}"
+        effect_value = cls._effect_value(record.effect)
         return CommandResult(
             True,
             "CONSTITUTION_SELECTED" if title == "体质已定" else "CONSTITUTION_RESHAPED",
-            f"## {title}\n\n**{cls._display_name(record.player)}**选择了 **{record.label}**。\n\n- **效果**：{record.description}（{effect_value}）\n- **重塑次数**：{record.reshape_count}\n\n> 体质效果已写入构筑快照，后续结算按快照执行。",
+            f"## {title}\n\n**{cls._display_name(record.player)}**选择了 **{record.label}**。\n\n- **效果**：{record.description}（{effect_value}）\n- **重塑次数**：{record.reshape_count}\n\n> 新的体质将伴你继续修行。",
             context.request_id,
             operation_id,
             data={

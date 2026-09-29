@@ -23,8 +23,8 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 
 
-RECOVERY_RULE_VERSION = "arena-recovery-0.1.0"
-RECOVERY_CONTENT_VERSION = "content-0.6"
+RECOVERY_RULE_VERSION = ""
+RECOVERY_CONTENT_VERSION = ""
 _ARTIFACT_KEY = re.compile(r"^[a-z0-9-]{1,48}$")
 _ARENA_TABLES = (
     "arena_matches",

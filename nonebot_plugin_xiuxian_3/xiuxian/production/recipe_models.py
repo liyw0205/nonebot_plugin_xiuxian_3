@@ -29,8 +29,6 @@ class RecipeDefinition:
     required_path: str | None = None
     required_paths: tuple[str, ...] = ()
     required_subprofession: tuple[str, ...] = ()
-    content_version: str = "content-0.1"
-    rule_version: str = "production-0.1.0"
     success_threshold_bp: int = 4500
     high_quality_threshold_bp: int = 8000
     facility_kind: str | None = None

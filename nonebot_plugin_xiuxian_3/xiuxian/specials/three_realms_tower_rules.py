@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 import hashlib
 from dataclasses import dataclass
 from datetime import timedelta
 
 
-V03_CONTENT_VERSION = "content-0.3"
-V03_RULE_VERSION = "specials-0.3.0"
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 TOWER_KEY = "tower.three_realms"
 V03_MAX_FLOOR = 20
 MAX_FLOOR = 40
@@ -44,13 +41,6 @@ def floor_definition(floor_no: int) -> ThreeRealmsTowerFloorDefinition:
         stamina_cost=12,
         weekly_limit=WEEKLY_ATTEMPT_LIMIT,
     )
-
-
-def versions_for_floor(floor_no: int) -> tuple[str, str]:
-    floor_definition(floor_no)
-    if floor_no <= V03_MAX_FLOOR:
-        return V03_CONTENT_VERSION, V03_RULE_VERSION
-    return CONTENT_VERSION, RULE_VERSION
 
 
 def rebuild_reputation_total(values: dict[str, object]) -> int:
@@ -106,14 +96,11 @@ __all__ = [
     "RULE_VERSION",
     "TOWER_KEY",
     "WEEKLY_ATTEMPT_LIMIT",
-    "V03_CONTENT_VERSION",
     "V03_MAX_FLOOR",
-    "V03_RULE_VERSION",
     "ThreeRealmsTowerFloorDefinition",
     "enemy_key_for",
     "floor_definition",
     "rebuild_reputation_total",
     "reward_for",
-    "versions_for_floor",
     "week_start",
 ]

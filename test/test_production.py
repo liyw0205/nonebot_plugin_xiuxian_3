@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -139,6 +140,54 @@ def test_production_failure_refunds_inputs_and_expired_recovery() -> None:
             )
             assert replay.data["idempotent_replay"] is True
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_modified_constitution_json_changes_frozen_production_quality(tmp_path: Path) -> None:
+    content_dir = tmp_path / "content"
+    shutil.copytree(Path(__file__).parents[1] / "data", content_dir)
+    constitution_path = content_dir / "养成" / "体质.json"
+    constitution_data = json.loads(constitution_path.read_text(encoding="utf-8"))
+    craft_hand = next(
+        row for row in constitution_data["records"] if row["key"] == "constitution.craft_hand"
+    )
+    craft_hand["effect"]["value"] = 1_750
+    constitution_path.write_text(
+        json.dumps(constitution_data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    async def run() -> None:
+        runtime = create_runtime(data_dir=content_dir)
+        user = "production-constitution-config"
+        await _enter_alchemy(runtime, user)
+        selected = await runtime.dispatch(_context(user, "constitution"), "选择体质 巧手")
+        assert selected.ok
+        started = await runtime.dispatch(
+            _context(user, "start", operation_id="constitution-production-start"),
+            "开始生产 疗伤丹",
+        )
+        assert started.code == "PRODUCTION_STARTED"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            raw_snapshot = connection.execute(
+                "SELECT snapshot_json FROM production_orders WHERE order_id = ?",
+                (started.data["order_id"],),
+            ).fetchone()[0]
+        snapshot = json.loads(raw_snapshot)
+        assert snapshot["constitution_effect"] == {
+            "type": "production_quality_bp",
+            "value": 1_750,
+        }
+        base_snapshot = {**snapshot, "constitution_effect": {}}
+        expected_quality = min(
+            10_000,
+            runtime.repository._production_quality_from_snapshot(base_snapshot) + 1_750,
+        )
+        _finish_order(runtime, started.data["order_id"])
+        settled = await runtime.dispatch(_context(user, "complete"), "领取生产")
+        assert settled.code == "PRODUCTION_COMPLETED"
+        assert settled.data["quality_bp"] == expected_quality
+        await runtime.close()
 
     asyncio.run(run())
 

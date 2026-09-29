@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 PERMIT_DURATION_SECONDS = 7 * 24 * 60 * 60
 PERMIT_COST = 500
 

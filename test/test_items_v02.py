@@ -59,6 +59,8 @@ def test_cloud_tea_is_consumed_once_and_frozen_into_qq_onebot_cultivation() -> N
                     "使用 云灵茶",
                 )
                 assert used.code == "ITEM_USED"
+                assert "提高 **5%**" in used.message
+                assert "bp" not in used.message
                 replay = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "tea-replay", "tea-use-op"),
@@ -110,6 +112,8 @@ def test_mist_barrier_reduces_risk_once_and_expires_for_qq_onebot() -> None:
                     "使用 迷雾屏障阵 雾隐洞天二层",
                 )
                 assert used.code == "ITEM_USED"
+                assert "降低 **5%**" in used.message
+                assert "bp" not in used.message
                 replay = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "barrier-replay", "barrier-op"),

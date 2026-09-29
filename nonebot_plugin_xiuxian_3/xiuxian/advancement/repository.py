@@ -13,6 +13,9 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
+from ..content import ContentError
+from ..content import bundled_content
+from ..items.manual_rules import manual_grants_permission
 from ..config import XiuxianSettings
 from ..player.models import (
     CultivationRecord,
@@ -60,41 +63,32 @@ from ..advancement.rules import (
     retreat_reward,
 )
 from ..advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
     constitution_definition,
+    constitution_reshape_rules,
 )
 from ..advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
     talent_node_for_reference,
     talent_tree_nodes,
     tree_definition,
 )
 from ..advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
     available_skill_keys,
     effective_skill_effect,
     skill_cost,
     skill_definition,
+    skill_mastery_rules,
+    skill_resource_definition,
 )
 from ..advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
     EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
     equipment_definition,
+    equipment_meets_path,
+    equipment_meets_realm,
     refinement_affix,
+    refinement_cost,
+    refinement_pity_failures,
     refinement_roll_bp,
+    refinement_success_bp,
     temper_cost,
     temper_roll_bp,
     temper_success_bp,
@@ -111,7 +105,7 @@ from ..world.void_rules import (
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
-from ..world.rules import destination_definition, meets_realm, RULE_VERSION
+from ..world.rules import destination_definition, meets_realm
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     battle_roll_bp,
@@ -127,11 +121,9 @@ from ..adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ..adventures.mainline import (
-    MAINLINE_CONTENT_VERSION,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
     mainline_definition,
@@ -164,12 +156,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -178,10 +168,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -190,18 +178,13 @@ from ..routine.gacha import (
 )
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -274,8 +257,6 @@ class AdvancementRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "retreat_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             },
         )
         now = self._now()
@@ -324,8 +305,16 @@ class AdvancementRepositoryMixin:
 
             inventory = self._json_object(row["inventory_json"], {})
             item_cost = definition.item_cost_map()
-            if definition.required_item and int(inventory.get(definition.required_item, 0)) < 1:
-                raise ResourceInsufficientError("retreat required manual is missing")
+            if definition.required_item:
+                content = self.content or bundled_content()
+                manual = content.require("item", definition.required_item, include_locked=False)
+                permissions = [
+                    effect.get("target")
+                    for effect in manual.get("effects", [])
+                    if isinstance(effect, dict) and effect.get("type") == "cultivation_permission"
+                ]
+                if not permissions or not manual_grants_permission(inventory, str(permissions[0]), content):
+                    raise ResourceInsufficientError("retreat cultivation manual is missing")
             for item_key, quantity in item_cost.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise ResourceInsufficientError("retreat item is insufficient")
@@ -333,11 +322,9 @@ class AdvancementRepositoryMixin:
                 raise ResourceInsufficientError("energy is insufficient")
             for item_key, quantity in item_cost.items():
                 inventory[item_key] = int(inventory.get(item_key, 0)) - quantity
-            seed = f"{definition.random_pool or definition.key}:{definition.rule_version}:{operation_id}"
+            seed = f"{definition.random_pool or definition.key}:{operation_id}"
             snapshot = {
                 "retreat_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "random_pool": definition.random_pool,
                 "random_seed": seed,
                 "realm_key": str(row["realm_key"]),
@@ -563,14 +550,14 @@ class AdvancementRepositoryMixin:
             already_completed=replay,
         )
 
-    @staticmethod
     def _constitution_from_row(
+        self,
         player_row: sqlite3.Row,
         profile_row: sqlite3.Row,
         *,
         replay: bool = False,
     ) -> ConstitutionRecord:
-        definition = constitution_definition(str(profile_row["constitution_key"]))
+        definition = constitution_definition(str(profile_row["constitution_key"]), self.content)
         return ConstitutionRecord(
             player=SQLitePlayerRepository._row_to_player(player_row),
             constitution_key=definition.key,
@@ -639,7 +626,7 @@ class AdvancementRepositoryMixin:
         operation_id: str,
     ) -> ConstitutionRecord:
         try:
-            definition = constitution_definition(constitution_key)
+            definition = constitution_definition(constitution_key, self.content)
         except ValueError as exc:
             raise ValueError("unsupported constitution") from exc
         operation_name = "constitution.select"
@@ -649,8 +636,6 @@ class AdvancementRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "constitution_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -679,8 +664,6 @@ class AdvancementRepositoryMixin:
 
             snapshot = {
                 "constitution_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "effect": dict(definition.effect),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "path_key": row["path_key"],
@@ -803,7 +786,7 @@ class AdvancementRepositoryMixin:
         operation_id: str,
     ) -> ConstitutionRecord:
         try:
-            definition = constitution_definition(constitution_key)
+            definition = constitution_definition(constitution_key, self.content)
         except ValueError as exc:
             raise ValueError("unsupported constitution") from exc
         operation_name = "constitution.reshape"
@@ -813,8 +796,6 @@ class AdvancementRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "constitution_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             },
         )
         now = self._now()
@@ -845,18 +826,18 @@ class AdvancementRepositoryMixin:
                 raise ConstitutionSameError("constitution target is already active")
             if profile["last_reshaped_at"]:
                 last_reshaped_at = datetime.fromisoformat(str(profile["last_reshaped_at"]))
-                if now < last_reshaped_at + timedelta(seconds=RESHAPE_COOLDOWN_SECONDS):
+                reshape_rules = constitution_reshape_rules(self.content)
+                if now < last_reshaped_at + timedelta(seconds=int(reshape_rules["cooldown_seconds"])):
                     raise ConstitutionCooldownError("constitution reshape cooldown is active")
             inventory = self._json_object(row["inventory_json"], {})
-            if int(inventory.get(CONSTITUTION_RESET_ITEM, 0)) < 1:
+            reset_item_key = str(constitution_reshape_rules(self.content)["reset_item_key"])
+            if int(inventory.get(reset_item_key, 0)) < 1:
                 raise ResourceInsufficientError("constitution reset token is missing")
-            inventory[CONSTITUTION_RESET_ITEM] = int(inventory[CONSTITUTION_RESET_ITEM]) - 1
-            if inventory[CONSTITUTION_RESET_ITEM] <= 0:
-                inventory.pop(CONSTITUTION_RESET_ITEM, None)
+            inventory[reset_item_key] = int(inventory[reset_item_key]) - 1
+            if inventory[reset_item_key] <= 0:
+                inventory.pop(reset_item_key, None)
             snapshot = {
                 "constitution_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "effect": dict(definition.effect),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "path_key": row["path_key"],
@@ -931,11 +912,10 @@ class AdvancementRepositoryMixin:
             player=(SQLitePlayerRepository._row_to_player(payload["player"]) if payload.get("player") else None),
         )
 
-    @staticmethod
     def _talent_node_from_row(
-        node_row: sqlite3.Row, *, replay: bool = False
+        self, node_row: sqlite3.Row, *, replay: bool = False
     ) -> TalentNodeRecord:
-        definition = talent_node_for_reference(str(node_row["node_key"]))
+        definition = talent_node_for_reference(str(node_row["node_key"]), content=self.content)
         return TalentNodeRecord(
             node_key=definition.key,
             tree_key=definition.tree_key,
@@ -972,7 +952,7 @@ class AdvancementRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id, writable=False)
             if str(row["stage"]) != "cultivator" or not row["path_key"]:
                 raise PlayerStageConflictError("talent profile requires entry into cultivation")
-            tree_key, tree_label = tree_definition(str(row["path_key"]))
+            tree_key, tree_label = tree_definition(str(row["path_key"]), self.content)
             node_rows = connection.execute(
                 "SELECT * FROM talent_node_states WHERE player_id = ? AND tree_key = ? ORDER BY tier",
                 (row["id"], tree_key),
@@ -1046,8 +1026,6 @@ class AdvancementRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "node_reference": normalized_reference,
-                "content_version": TALENT_CONTENT_VERSION,
-                "rule_version": TALENT_RULE_VERSION,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -1065,13 +1043,17 @@ class AdvancementRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if str(row["stage"]) != "cultivator" or not row["path_key"]:
                 raise PlayerStageConflictError("talent requires entry into cultivation")
-            tree_key, _ = tree_definition(str(row["path_key"]))
+            tree_key, _ = tree_definition(str(row["path_key"]), self.content)
             if normalized_reference.startswith("talent.tree."):
-                definition = talent_node_for_reference(normalized_reference)
+                definition = talent_node_for_reference(normalized_reference, content=self.content)
                 if definition.tree_key != tree_key:
                     raise TalentPathMismatchError("talent tree does not match primary path")
             else:
-                definition = talent_node_for_reference(normalized_reference, tree_key=tree_key)
+                definition = talent_node_for_reference(
+                    normalized_reference,
+                    tree_key=tree_key,
+                    content=self.content,
+                )
             if self._has_active_long_action(connection, int(row["id"])):
                 raise TalentBusyError("another long action is active")
             existing_node = connection.execute(
@@ -1080,14 +1062,13 @@ class AdvancementRepositoryMixin:
             ).fetchone()
             if existing_node is not None:
                 raise TalentNodeAlreadyLearnedError("talent node is already learned")
-            if definition.tier > 1:
-                prerequisite_key = f"talent.tree.{tree_key}.tier{definition.tier - 1}"
+            for prerequisite_key in definition.prerequisites:
                 prerequisite = connection.execute(
                     "SELECT 1 FROM talent_node_states WHERE player_id = ? AND node_key = ? LIMIT 1",
                     (row["id"], prerequisite_key),
                 ).fetchone()
                 if prerequisite is None:
-                    raise TalentPrerequisiteError("previous talent tier is not learned")
+                    raise TalentPrerequisiteError("talent prerequisites are not learned")
 
             points_before = int(row["talent_points"])
             if points_before < definition.cost_points:
@@ -1102,8 +1083,6 @@ class AdvancementRepositoryMixin:
                 "tree_key": definition.tree_key,
                 "tier": definition.tier,
                 "effect": dict(definition.effect),
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
@@ -1143,8 +1122,8 @@ class AdvancementRepositoryMixin:
                     """
                     INSERT INTO talent_point_events(
                         event_id, player_id, operation_id, delta, balance_before,
-                        balance_after, reason, content_version, rule_version, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        balance_after, reason, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         uuid4().hex,
@@ -1154,8 +1133,6 @@ class AdvancementRepositoryMixin:
                         points_before,
                         points_after,
                         f"unlock:{definition.key}",
-                        definition.content_version,
-                        definition.rule_version,
                         now_text,
                     ),
                 )
@@ -1199,28 +1176,29 @@ class AdvancementRepositoryMixin:
             label=str(payload["label"]),
             path_key=payload.get("path_key"),
             level=int(payload["level"]),
-            max_level=int(payload.get("max_level", MAX_SKILL_LEVEL)),
+            max_level=int(payload["max_level"]),
             base_effect={str(key): value for key, value in dict(payload.get("base_effect", {})).items()},
             effective_effect={str(key): value for key, value in dict(payload.get("effective_effect", {})).items()},
-            insight_cost=int(payload.get("insight_cost", 0)),
-            spirit_stone_cost=int(payload.get("spirit_stone_cost", 0)),
+            resource_costs={str(key): int(value) for key, value in dict(payload["resource_costs"]).items()},
             trained_at=str(payload.get("trained_at", "")),
             already_completed=replay,
         )
 
-    @staticmethod
     def _skill_mastery_from_row(
-        mastery_row: sqlite3.Row, *, replay: bool = False
+        self,
+        mastery_row: sqlite3.Row,
+        *,
+        replay: bool = False,
     ) -> SkillMasteryRecord:
-        definition = skill_definition(str(mastery_row["skill_key"]))
+        definition = skill_definition(str(mastery_row["skill_key"]), self.content)
         snapshot = SQLitePlayerRepository._json_object(mastery_row["snapshot_json"], {})
         return SkillMasteryRecord(
             player=None,
             skill_key=str(mastery_row["skill_key"]),
             label=definition.label,
-            path_key=mastery_row["path_key"],
+            path_key=definition.path_key,
             level=int(mastery_row["level"]),
-            max_level=int(mastery_row["max_level"]),
+            max_level=definition.max_level,
             base_effect={str(key): value for key, value in dict(snapshot.get("base_effect", definition.effect)).items()},
             effective_effect={
                 str(key): value
@@ -1247,7 +1225,7 @@ class AdvancementRepositoryMixin:
             status=str(payload.get("status", "active")),
             durability_bp=int(payload.get("durability_bp", 10000)),
             temper_level=int(payload.get("temper_level", 0)),
-            max_temper_level=int(payload.get("max_temper_level", MAX_TEMPER_LEVEL)),
+            max_temper_level=int(payload["max_temper_level"]),
             affixes={str(key): int(value) for key, value in dict(payload.get("affixes", {})).items()},
             refinement_failure_streak=int(payload.get("refinement_failure_streak", 0)),
         )
@@ -1283,9 +1261,7 @@ class AdvancementRepositoryMixin:
             success=bool(payload["success"]),
             roll_bp=int(payload["roll_bp"]),
             success_bp=int(payload["success_bp"]),
-            material_key=str(payload["material_key"]),
-            material_spent=int(payload["material_spent"]),
-            spirit_stones_spent=int(payload["spirit_stones_spent"]),
+            costs_spent={str(key): int(value) for key, value in dict(payload["costs_spent"]).items()},
             already_completed=replay,
         )
 
@@ -1301,9 +1277,7 @@ class AdvancementRepositoryMixin:
             success=bool(payload["success"]),
             roll_bp=int(payload["roll_bp"]),
             success_bp=int(payload["success_bp"]),
-            material_key=str(payload["material_key"]),
-            material_spent=int(payload["material_spent"]),
-            spirit_stones_spent=int(payload["spirit_stones_spent"]),
+            costs_spent={str(key): int(value) for key, value in dict(payload["costs_spent"]).items()},
             failure_streak_before=int(payload["failure_streak_before"]),
             failure_streak_after=int(payload["failure_streak_after"]),
             already_completed=replay,
@@ -1368,7 +1342,7 @@ class AdvancementRepositoryMixin:
         equipment_reference: str,
         now_text: str,
     ) -> sqlite3.Row:
-        definition = equipment_definition(equipment_reference)
+        definition = equipment_definition(equipment_reference, self.content)
         self._materialize_equipment(connection, player, definition, now_text)
         rows = connection.execute(
             "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id",
@@ -1394,6 +1368,34 @@ class AdvancementRepositoryMixin:
             return True
         inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
         return int(inventory.get(definition.key, 0)) > 0
+
+    @staticmethod
+    def _consume_equipment_costs(
+        player: sqlite3.Row,
+        inventory: dict[str, Any],
+        costs: dict[str, int],
+    ) -> tuple[dict[str, Any], int, str, int, int]:
+        remaining_inventory = dict(inventory)
+        remaining_stones = int(player["spirit_stones"])
+        item_keys = sorted(key for key in costs if key.startswith("item."))
+        item_total = sum(int(costs[key]) for key in item_keys)
+        stones_spent = int(costs.get("currency.spirit_stone", 0))
+
+        for resource_key, quantity in costs.items():
+            if resource_key.startswith("item."):
+                available = int(remaining_inventory.get(resource_key, 0))
+                if available < quantity:
+                    raise ResourceInsufficientError("equipment materials are insufficient")
+                remaining_inventory[resource_key] = available - quantity
+            elif resource_key == "currency.spirit_stone":
+                if remaining_stones < quantity:
+                    raise ResourceInsufficientError("spirit stones are insufficient")
+                remaining_stones -= quantity
+            else:
+                raise RuntimeError(f"unsupported configured equipment resource: {resource_key}")
+
+        material_key = item_keys[0] if item_keys else ""
+        return remaining_inventory, remaining_stones, material_key, item_total, stones_spent
 
     async def temper_equipment(
         self,
@@ -1440,7 +1442,7 @@ class AdvancementRepositoryMixin:
         equipment_reference: str,
         operation_id: str,
     ) -> TemperingRecord:
-        definition = equipment_definition(equipment_reference)
+        definition = equipment_definition(equipment_reference, self.content)
         operation_name = "item.tempering"
         request_hash = self._request_hash(
             operation_name,
@@ -1449,8 +1451,6 @@ class AdvancementRepositoryMixin:
                 "platform_user_id": platform_user_id,
                 "equipment_reference": equipment_reference.strip(),
                 "item_key": definition.key,
-                "content_version": EQUIPMENT_CONTENT_VERSION,
-                "rule_version": EQUIPMENT_RULE_VERSION,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -1467,6 +1467,15 @@ class AdvancementRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["stage"]) != "cultivator":
                 raise PlayerStageConflictError("equipment tempering requires entry into cultivation")
+            if not equipment_meets_path(definition, player["path_key"]):
+                raise EquipmentRequirementError("equipment is restricted to another path")
+            if not equipment_meets_realm(
+                definition,
+                str(player["realm_key"]),
+                int(player["realm_layer"]),
+                self.content,
+            ):
+                raise EquipmentRequirementError("player realm does not meet equipment requirement")
             if self._has_active_long_action(connection, int(player["id"])):
                 raise EquipmentBusyError("another long action is active")
             if not self._equipment_source_exists(connection, player, definition):
@@ -1483,23 +1492,22 @@ class AdvancementRepositoryMixin:
             if from_level >= max_level:
                 raise EquipmentTemperingMaxedError("equipment has reached maximum temper level")
             target_level = from_level + 1
-            material_spent, stones_spent = temper_cost(target_level)
-            inventory = self._json_object(player["inventory_json"], {})
-            if int(inventory.get(TEMPER_MATERIAL, 0)) < material_spent or int(player["spirit_stones"]) < stones_spent:
-                raise ResourceInsufficientError("tempering resources are insufficient")
+            costs = temper_cost(target_level, definition)
             equipment = self._resolve_equipment(connection, player, equipment_reference, now_text)
             player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if player is None:
                 raise PlayerNotFoundError("player disappeared during equipment resolution")
             inventory = self._json_object(player["inventory_json"], {})
-            inventory[TEMPER_MATERIAL] = int(inventory.get(TEMPER_MATERIAL, 0)) - material_spent
+            inventory, stones_after, material_key, material_spent, stones_spent = self._consume_equipment_costs(
+                player, inventory, costs
+            )
             roll_bp = temper_roll_bp(f"{operation_id}:{equipment['instance_id']}:{target_level}")
-            success_bp = temper_success_bp(target_level)
+            success_bp = temper_success_bp(target_level, definition)
             success = roll_bp < success_bp
             level_after = target_level if success else from_level
             connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones_spent, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (stones_after, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
             )
             connection.execute(
                 "UPDATE equipment_instances SET temper_level = ?, updated_at = ? WHERE id = ?",
@@ -1513,11 +1521,10 @@ class AdvancementRepositoryMixin:
                 "success": success,
                 "roll_bp": roll_bp,
                 "success_bp": success_bp,
-                "material_key": TEMPER_MATERIAL,
+                "costs_spent": costs,
+                "material_key": material_key,
                 "material_spent": material_spent,
                 "spirit_stones_spent": stones_spent,
-                "content_version": EQUIPMENT_CONTENT_VERSION,
-                "rule_version": EQUIPMENT_RULE_VERSION,
             }
             connection.execute(
                 """
@@ -1537,7 +1544,7 @@ class AdvancementRepositoryMixin:
                     int(success),
                     roll_bp,
                     success_bp,
-                    TEMPER_MATERIAL,
+                    material_key,
                     material_spent,
                     stones_spent,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
@@ -1567,9 +1574,7 @@ class AdvancementRepositoryMixin:
                 "success": success,
                 "roll_bp": roll_bp,
                 "success_bp": success_bp,
-                "material_key": TEMPER_MATERIAL,
-                "material_spent": material_spent,
-                "spirit_stones_spent": stones_spent,
+                "costs_spent": costs,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1622,7 +1627,7 @@ class AdvancementRepositoryMixin:
         equipment_reference: str,
         operation_id: str,
     ) -> RefinementRecord:
-        definition = equipment_definition(equipment_reference)
+        definition = equipment_definition(equipment_reference, self.content)
         operation_name = "item.refinement"
         request_hash = self._request_hash(
             operation_name,
@@ -1631,8 +1636,6 @@ class AdvancementRepositoryMixin:
                 "platform_user_id": platform_user_id,
                 "equipment_reference": equipment_reference.strip(),
                 "item_key": definition.key,
-                "content_version": EQUIPMENT_CONTENT_VERSION,
-                "rule_version": EQUIPMENT_RULE_VERSION,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -1649,36 +1652,47 @@ class AdvancementRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["stage"]) != "cultivator":
                 raise PlayerStageConflictError("equipment refinement requires entry into cultivation")
+            if not equipment_meets_path(definition, player["path_key"]):
+                raise EquipmentRequirementError("equipment is restricted to another path")
+            if not equipment_meets_realm(
+                definition,
+                str(player["realm_key"]),
+                int(player["realm_layer"]),
+                self.content,
+            ):
+                raise EquipmentRequirementError("player realm does not meet equipment requirement")
             if self._has_active_long_action(connection, int(player["id"])):
                 raise EquipmentBusyError("another long action is active")
             if not self._equipment_source_exists(connection, player, definition):
                 raise EquipmentNotOwnedError("equipment is not owned")
-            material_spent, stones_spent = 2, 30
-            inventory = self._json_object(player["inventory_json"], {})
-            if int(inventory.get(REFINEMENT_MATERIAL, 0)) < material_spent or int(player["spirit_stones"]) < stones_spent:
-                raise ResourceInsufficientError("refinement resources are insufficient")
+            costs = refinement_cost(definition)
             equipment = self._resolve_equipment(connection, player, equipment_reference, now_text)
             player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if player is None:
                 raise PlayerNotFoundError("player disappeared during equipment resolution")
             inventory = self._json_object(player["inventory_json"], {})
-            inventory[REFINEMENT_MATERIAL] = int(inventory.get(REFINEMENT_MATERIAL, 0)) - material_spent
+            inventory, stones_after, material_key, material_spent, stones_spent = self._consume_equipment_costs(
+                player, inventory, costs
+            )
             old_affixes = {
                 str(key): int(value)
                 for key, value in self._json_object(equipment["affixes_json"], {}).items()
             }
             streak_before = int(equipment["refinement_failure_streak"])
             roll_bp = refinement_roll_bp(f"{operation_id}:{equipment['instance_id']}:{streak_before}")
-            success_bp = REFINEMENT_SUCCESS_BP
-            success = streak_before >= REFINEMENT_PITY_FAILURES or roll_bp < success_bp
+            success_bp = refinement_success_bp(definition)
+            pity_failures = refinement_pity_failures(definition)
+            success = streak_before >= pity_failures or roll_bp < success_bp
             new_affixes = dict(old_affixes)
             if success:
-                affix_key, affix_value = refinement_affix(f"{operation_id}:{equipment['instance_id']}:{streak_before}")
+                affix_key, affix_value = refinement_affix(
+                    f"{operation_id}:{equipment['instance_id']}:{streak_before}", definition
+                )
                 new_affixes = {affix_key: affix_value}
             streak_after = 0 if success else streak_before + 1
             connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones_spent, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (stones_after, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
             )
             connection.execute(
                 "UPDATE equipment_instances SET affixes_json = ?, refinement_failure_streak = ?, updated_at = ? WHERE id = ?",
@@ -1693,8 +1707,7 @@ class AdvancementRepositoryMixin:
                 "success_bp": success_bp,
                 "failure_streak_before": streak_before,
                 "failure_streak_after": streak_after,
-                "content_version": EQUIPMENT_CONTENT_VERSION,
-                "rule_version": EQUIPMENT_RULE_VERSION,
+                "costs_spent": costs,
             }
             connection.execute(
                 """
@@ -1712,8 +1725,8 @@ class AdvancementRepositoryMixin:
                     operation_id,
                     int(success),
                     roll_bp,
-                    10000 if streak_before >= REFINEMENT_PITY_FAILURES else success_bp,
-                    REFINEMENT_MATERIAL,
+                    10000 if streak_before >= pity_failures else success_bp,
+                    material_key,
                     material_spent,
                     stones_spent,
                     json.dumps(old_affixes, ensure_ascii=False, sort_keys=True),
@@ -1728,7 +1741,7 @@ class AdvancementRepositoryMixin:
             updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if updated_equipment is None or updated_player is None:
                 raise RuntimeError("equipment refinement returned no state")
-            actual_success_bp = 10000 if streak_before >= REFINEMENT_PITY_FAILURES else success_bp
+            actual_success_bp = 10000 if streak_before >= pity_failures else success_bp
             payload = {
                 "player": self._player_payload(self._row_to_player(updated_player)),
                 "equipment": {
@@ -1748,9 +1761,7 @@ class AdvancementRepositoryMixin:
                 "success": success,
                 "roll_bp": roll_bp,
                 "success_bp": actual_success_bp,
-                "material_key": REFINEMENT_MATERIAL,
-                "material_spent": material_spent,
-                "spirit_stones_spent": stones_spent,
+                "costs_spent": costs,
                 "failure_streak_before": streak_before,
                 "failure_streak_after": streak_after,
             }
@@ -1787,10 +1798,15 @@ class AdvancementRepositoryMixin:
                 "SELECT * FROM skill_masteries WHERE player_id = ? ORDER BY skill_key",
                 (row["id"],),
             ).fetchall()
+            insight_rules = skill_mastery_rules(self.content)
+            insight_resource = skill_resource_definition(insight_rules["insight_resource_key"], self.content)
+            insight_storage = str(insight_resource["storage"])
+            if insight_storage not in row.keys():
+                raise ContentError(f"skill insight storage column is missing: {insight_storage}")
             return SkillProfileRecord(
                 player=self._row_to_player(row),
                 skills=tuple(self._skill_mastery_from_row(item) for item in mastery_rows),
-                skill_insights=int(row["skill_insights"]),
+                insight_balance=int(row[insight_storage]),
             )
 
     async def train_skill(
@@ -1843,7 +1859,7 @@ class AdvancementRepositoryMixin:
         skill_reference: str,
         operation_id: str,
     ) -> SkillMasteryRecord:
-        definition = skill_definition(skill_reference)
+        definition = skill_definition(skill_reference, self.content)
         normalized_reference = skill_reference.strip()
         operation_name = "skill.train"
         request_hash = self._request_hash(
@@ -1853,8 +1869,6 @@ class AdvancementRepositoryMixin:
                 "platform_user_id": platform_user_id,
                 "skill_reference": normalized_reference,
                 "skill_key": definition.key,
-                "content_version": SKILL_CONTENT_VERSION,
-                "rule_version": SKILL_RULE_VERSION,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -1872,8 +1886,6 @@ class AdvancementRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if str(row["stage"]) != "cultivator" or not row["path_key"]:
                 raise PlayerStageConflictError("skill training requires entry into cultivation")
-            if definition.key not in available_skill_keys(str(row["path_key"])):
-                raise SkillNotAvailableError("skill does not belong to the primary path")
             if self._has_active_long_action(connection, int(row["id"])):
                 raise SkillBusyError("another long action is active")
 
@@ -1881,27 +1893,56 @@ class AdvancementRepositoryMixin:
                 "SELECT * FROM skill_masteries WHERE player_id = ? AND skill_key = ? LIMIT 1",
                 (row["id"], definition.key),
             ).fetchone()
+            inventory = self._json_object(row["inventory_json"], {})
+            if definition.key not in available_skill_keys(
+                str(row["path_key"]),
+                self.content,
+                realm_key=str(row["realm_key"]),
+                realm_layer=int(row["realm_layer"]),
+                inventory=inventory,
+                mastered_keys=(definition.key,) if mastery is not None else (),
+            ):
+                raise SkillNotAvailableError("skill is outside the current path, realm or acquisition requirements")
+            inventory_after = dict(inventory)
+            if mastery is None and definition.acquisition_item_key:
+                quantity = int(inventory_after.get(definition.acquisition_item_key, 0))
+                if quantity <= 0:
+                    raise SkillNotAvailableError("skill inheritance item is missing")
+                if quantity == 1:
+                    inventory_after.pop(definition.acquisition_item_key, None)
+                else:
+                    inventory_after[definition.acquisition_item_key] = quantity - 1
             current_level = int(mastery["level"]) if mastery is not None else 0
-            if current_level >= MAX_SKILL_LEVEL:
+            if current_level >= definition.max_level:
                 raise SkillAlreadyMaxedError("skill is already at maximum level")
             target_level = current_level + 1
-            insight_cost, stone_cost = skill_cost(target_level)
-            insights_before = int(row["skill_insights"])
-            stones_before = int(row["spirit_stones"])
-            if insights_before < insight_cost or stones_before < stone_cost:
-                raise ResourceInsufficientError("skill resources are insufficient")
-            insights_after = insights_before - insight_cost
-            stones_after = stones_before - stone_cost
+            resource_costs = skill_cost(target_level, definition)
+            resource_balances: dict[str, tuple[str, int, int]] = {}
+            available_columns = set(row.keys())
+            used_storage: set[str] = set()
+            for resource_key, amount in resource_costs.items():
+                resource = skill_resource_definition(resource_key, self.content)
+                storage = str(resource["storage"])
+                if storage not in available_columns:
+                    raise ContentError(f"resource {resource_key} storage column is missing: {storage}")
+                if storage in used_storage:
+                    raise ContentError(f"multiple skill resources use the same storage column: {storage}")
+                used_storage.add(storage)
+                balance_before = int(row[storage])
+                if balance_before < amount:
+                    raise ResourceInsufficientError("skill resources are insufficient")
+                resource_balances[resource_key] = (storage, balance_before, balance_before - amount)
             effective_effect = effective_skill_effect(definition, target_level)
             snapshot = {
                 "skill_key": definition.key,
-                "path_key": definition.path_key,
                 "level": target_level,
-                "max_level": MAX_SKILL_LEVEL,
                 "base_effect": dict(definition.effect),
                 "effective_effect": dict(effective_effect),
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
+                "combat_style": {
+                    "key": definition.style_key,
+                    "effect": definition.combat_effect or {},
+                },
+                "acquisition_item_key": definition.acquisition_item_key,
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "realm_key": row["realm_key"],
                 "realm_layer": int(row["realm_layer"]),
@@ -1912,18 +1953,16 @@ class AdvancementRepositoryMixin:
                 connection.execute(
                     """
                     INSERT INTO skill_masteries(
-                        mastery_id, player_id, operation_id, skill_key, path_key, level,
-                        max_level, snapshot_json, trained_at, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        mastery_id, player_id, operation_id, skill_key, level,
+                        snapshot_json, trained_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         uuid4().hex,
                         row["id"],
                         operation_id,
                         definition.key,
-                        definition.path_key,
                         target_level,
-                        MAX_SKILL_LEVEL,
                         snapshot_json,
                         now_text,
                         now_text,
@@ -1939,30 +1978,39 @@ class AdvancementRepositoryMixin:
                     """,
                     (operation_id, target_level, snapshot_json, now_text, now_text, mastery["id"]),
                 )
-            connection.execute(
-                "UPDATE players SET skill_insights = ?, spirit_stones = ?, updated_at = ? WHERE id = ?",
-                (insights_after, stones_after, now_text, row["id"]),
-            )
-            connection.execute(
-                """
-                INSERT INTO skill_insight_events(
-                    event_id, player_id, operation_id, delta, balance_before,
-                    balance_after, reason, content_version, rule_version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    uuid4().hex,
-                    row["id"],
-                    f"{operation_id}:skill-insight",
-                    -insight_cost,
-                    insights_before,
-                    insights_after,
-                    f"train:{definition.key}",
-                    SKILL_CONTENT_VERSION,
-                    SKILL_RULE_VERSION,
-                    now_text,
-                ),
-            )
+            assignments = [f'"{storage}" = ?' for storage, _, _ in resource_balances.values()]
+            values = [after for _, _, after in resource_balances.values()]
+            if mastery is None and definition.acquisition_item_key:
+                assignments.append('"inventory_json" = ?')
+                values.append(json.dumps(inventory_after, ensure_ascii=False, sort_keys=True))
+            if assignments:
+                connection.execute(
+                    f"UPDATE players SET {', '.join(assignments)}, updated_at = ? WHERE id = ?",
+                    (*values, now_text, row["id"]),
+                )
+            for resource_key, (storage, balance_before, balance_after) in resource_balances.items():
+                amount = resource_costs[resource_key]
+                if amount == 0:
+                    continue
+                connection.execute(
+                    """
+                    INSERT INTO skill_resource_events(
+                        event_id, player_id, operation_id, resource_key, delta,
+                        balance_before, balance_after, reason, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        uuid4().hex,
+                        row["id"],
+                        operation_id,
+                        resource_key,
+                        -amount,
+                        balance_before,
+                        balance_after,
+                        f"train:{definition.key}",
+                        now_text,
+                    ),
+                )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
                 raise RuntimeError("skill training returned no player")
@@ -1972,11 +2020,10 @@ class AdvancementRepositoryMixin:
                 "label": definition.label,
                 "path_key": definition.path_key,
                 "level": target_level,
-                "max_level": MAX_SKILL_LEVEL,
+                "max_level": definition.max_level,
                 "base_effect": dict(definition.effect),
                 "effective_effect": dict(effective_effect),
-                "insight_cost": insight_cost,
-                "spirit_stone_cost": stone_cost,
+                "resource_costs": resource_costs,
                 "trained_at": now_text,
             }
             connection.execute(

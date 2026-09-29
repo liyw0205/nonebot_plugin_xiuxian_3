@@ -7,13 +7,11 @@
 | `bounty_key` | 开放/目标 | 时限/上限 | 奖励 | 失败 |
 |:--|:--|:--|:--|:--|
 | `bounty.herb_supply` | 凡人；交付止血草 5 | 30m；每日 1 | 灵石 30、地方名望 +2 | 过期无奖励，不回收草 |
-| `bounty.training_dummy` | 感气 L1；胜训练傀儡 2 | 1h；每日 1 | 修为 120、`item.pill.focus_low` 1 | 过期无奖励 |
 | `bounty.craft_order` | 完成任意生产订单 1 | 2h；每日 1 | 精力 10、服务信誉 +2 | 过期无奖励 |
 
 每日 00:00 创建 `bounty.daily.<date>`；角色最多接 1 条。接取时冻结目标/奖励/截止时间；同一已结算事件只推进一次；领取键为 `bounty_key:date:player`。
 
-运行时状态：`bounty.herb_supply`、`bounty.training_dummy` 与 `bounty.craft_order` 已开放。
-训练傀儡以已结算的 `pve.training` 胜场为唯一进度来源，接取时冻结胜场基线，不接受客户端提交结果；
+运行时状态：`bounty.herb_supply` 与 `bounty.craft_order` 已开放。
 草药进度以接取时背包数量为基线，生产进度以接取时已完成订单数为基线；领取成功
 同时更新灵石/精力/物品与地方名望或服务信誉，重复领取只回放原 operation。
 

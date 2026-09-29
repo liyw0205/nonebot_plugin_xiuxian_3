@@ -15,6 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..persistence.errors import (
     OperationConflictError,
     PartyBattleBusyError,
@@ -33,10 +34,8 @@ from ..persistence.errors import (
 )
 from .party_models import PartyBattleReplayRecord, PartyBattleResolutionRecord, PartyBattleStartRecord
 from .party_rules import (
-    PARTY_BATTLE_CONTENT_VERSION,
     PARTY_BATTLE_MAX_TURNS,
     PARTY_BATTLE_REWARD,
-    PARTY_BATTLE_RULE_VERSION,
     PARTY_BATTLE_TYPE,
     BOUNDARY_REALM_LOCATION,
     BOUNDARY_REALM_REWARD,
@@ -53,7 +52,8 @@ from .party_rules import (
     DEMON_REALM_STAMINA_COST,
     party_enemy_for_location,
 )
-from .rules import V051_RULE_VERSION, TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot, enemy_definition
+from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot, enemy_definition
+from .skill_effects import prepare_skill_action
 from ..social.party_rules import (
     party_definition_for,
     PARTY_TYPE_BOUNDARY_REALM,
@@ -462,6 +462,11 @@ class PartyCombatRepositoryMixin:
                     connection, int(row["database_player_id"]), str(row["path_key"] or "")
                 )
                 qualification = dict(entry_snapshot["qualification"]) if entry_snapshot else self._json_object(row["qualification_json"], {})
+                constitution_effect = (
+                    dict(entry_snapshot.get("constitution_effect", {}))
+                    if entry_snapshot
+                    else constitution_effect_snapshot(connection, int(row["database_player_id"]))
+                )
                 inventory = self._json_object(row["inventory_json"], {})
                 if boundary_party and row["database_player_id"] == leader["id"]:
                     leader_ticket_inventory = inventory
@@ -470,6 +475,7 @@ class PartyCombatRepositoryMixin:
                     max_hp=int(row["max_hp"]),
                     initiative=int(row["initiative"]),
                     equipment=equipment,
+                    constitution_effect=constitution_effect,
                 )
                 cross_realm_snapshot = {
                     "pollution": int(entry_snapshot.get("pollution", row["pollution"]) if entry_snapshot else row["pollution"]),
@@ -477,8 +483,6 @@ class PartyCombatRepositoryMixin:
                     "cross_realm_penalty_bp": int(entry_snapshot.get("cross_realm_penalty_bp", row["cross_realm_penalty_bp"]) if entry_snapshot else row["cross_realm_penalty_bp"]),
                     "faction_reputation": dict(entry_snapshot.get("faction_reputation", {}) if entry_snapshot else self._json_object(row["faction_reputation_json"], {})),
                     "alliance_key": entry_snapshot.get("alliance_key") if entry_snapshot else self._alliance_key_from_row(row),
-                    "content_version": str(party["content_version"]),
-                    "rule_version": str(party["rule_version"]),
                 }
                 snapshots.append(
                     {
@@ -490,6 +494,7 @@ class PartyCombatRepositoryMixin:
                         "path_key": entry_snapshot.get("path_key", row["path_key"]) if entry_snapshot else row["path_key"],
                         "qualification": qualification,
                         "stats": stats,
+                        "constitution_effect": constitution_effect,
                         "equipment": list(equipment),
                         "skills": skills,
                         "soul_power": int(entry_snapshot.get("soul_power", row["soul_power"]) if entry_snapshot else row["soul_power"]),
@@ -551,22 +556,6 @@ class PartyCombatRepositoryMixin:
                 if tower_duo_party
                 else PARTY_BATTLE_REWARD
             )
-            dungeon_content_version = (
-                str(tower_duo_run["content_version"])
-                if tower_duo_party
-                else "content-0.5" if (void_ruins_party or time_fort_party)
-                else "content-0.4" if ancient_domain_party
-                else "content-0.3" if (boundary_rift_combat or demon_party or beast_party)
-                else PARTY_BATTLE_CONTENT_VERSION
-            )
-            dungeon_rule_version = (
-                str(tower_duo_run["rule_version"])
-                if tower_duo_party
-                else V051_RULE_VERSION if (void_ruins_party or time_fort_party)
-                else "combat-0.4.0" if ancient_domain_party
-                else "combat-0.3.0" if (boundary_rift_combat or demon_party or beast_party)
-                else PARTY_BATTLE_RULE_VERSION
-            )
             battle_id = f"party-battle-{uuid4().hex}"
             snapshot = {
                 "battle_type": PARTY_BATTLE_TYPE,
@@ -608,12 +597,11 @@ class PartyCombatRepositoryMixin:
                     ),
                     "ticket": {BOUNDARY_REALM_TICKET: BOUNDARY_REALM_TICKET_COST} if boundary_party else {},
                 },
-                "content_version": dungeon_content_version,
-                "rule_version": dungeon_rule_version,
             }
             state = {
                 "round_no": 0,
                 "member_hp": {member["player_id"]: member["stats"]["max_hp"] for member in snapshots},
+                "member_mana": {member["player_id"]: member["stats"]["max_mana"] for member in snapshots},
                 "member_status": {member["player_id"]: "active" for member in snapshots},
                 "member_soul_power": {member["player_id"]: int(member.get("soul_power", 0)) for member in snapshots},
                 "member_domain_energy": {member["player_id"]: int(member.get("domain_charge", 0)) for member in snapshots},
@@ -631,8 +619,8 @@ class PartyCombatRepositoryMixin:
             }
             deadline = serialize_datetime(now + timedelta(seconds=TURN_TIMEOUT_SECONDS))
             connection.execute(
-                "INSERT INTO party_battle_sessions(battle_id, party_id, start_operation_id, battle_type, enemy_key, location_key, status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, 'created', 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO party_battle_sessions(battle_id, party_id, start_operation_id, battle_type, enemy_key, location_key, status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, 'created', 0, 0, ?, ?, ?, ?, ?, ?)",
                 (
                     battle_id,
                     resolved_party_id,
@@ -644,8 +632,6 @@ class PartyCombatRepositoryMixin:
                     deadline,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(state, ensure_ascii=False, sort_keys=True),
-                    dungeon_content_version,
-                    dungeon_rule_version,
                     now_text,
                     now_text,
                 ),
@@ -719,7 +705,7 @@ class PartyCombatRepositoryMixin:
             raise ValueError("party battle round is invalid")
         operation_id = f"party-battle.turn:{battle_id}:{expected_round}"
         operation_name = "battle.party.turn"
-        request_hash = self._request_hash(operation_name, {"battle_id": battle_id, "expected_round": expected_round, "rule_version": PARTY_BATTLE_RULE_VERSION})
+        request_hash = self._request_hash(operation_name, {"battle_id": battle_id, "expected_round": expected_round})
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -757,6 +743,14 @@ class PartyCombatRepositoryMixin:
             state = self._json_object(session["state_json"], {})
             enemy = snapshot["enemy"]
             member_hp = {str(key): int(value) for key, value in dict(state.get("member_hp", {})).items()}
+            member_mana = {str(key): int(value) for key, value in dict(state.get("member_mana", {})).items()}
+            member_mana.update(
+                {
+                    str(member["player_id"]): int(member["stats"].get("max_mana", 0))
+                    for member in snapshot.get("members", [])
+                    if str(member["player_id"]) not in member_mana
+                }
+            )
             member_status = {
                 str(key): str(value)
                 for key, value in dict(state.get("member_status", {})).items()
@@ -889,17 +883,45 @@ class PartyCombatRepositoryMixin:
                         }
                     )
                     continue
-                selected_skill = self._select_battle_skill(list(member.get("skills", [])))
-                roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:player")
-                hit_bp = hit_chance_bp(
-                    attacker_initiative=int(member["stats"]["initiative"]),
-                    defender_agility=int(enemy["agility"]),
+                selected_skill = self._select_battle_skill(
+                    list(member.get("skills", [])),
+                    available_mana=member_mana.get(player_id, 0),
                 )
-                multiplier = self._skill_damage_multiplier(selected_skill)
-                damage = int(member["stats"]["attack"]) * multiplier // 10_000 if roll < hit_bp else 0
+                damage_multiplier_bp, skill_hit_bonus_bp, charging = prepare_skill_action(
+                    selected_skill, state, expected_round
+                )
+                if not charging:
+                    mana_cost = int(selected_skill.get("mana_cost", 0))
+                    if mana_cost > 0:
+                        member_mana[player_id] = max(0, member_mana.get(player_id, 0) - mana_cost)
+                roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:player")
+                stats = member["stats"]
+                hit_bp = 0 if charging else hit_chance_bp(
+                    attacker_initiative=int(stats["initiative"]),
+                    defender_agility=int(enemy["agility"]),
+                    skill_hit_bp=skill_hit_bonus_bp,
+                    accuracy_bp=int(stats.get("accuracy_bp", 0)),
+                )
+                crit_roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:player:crit")
+                critical = roll < hit_bp and crit_roll < int(stats.get("crit_chance_bp", 0))
+                damage = int(stats["attack"]) * damage_multiplier_bp // 10_000 if roll < hit_bp else 0
+                if critical:
+                    damage = damage * (15_000 + int(stats.get("crit_damage_bp", 0))) // 10_000
                 damage = min(enemy_hp, max(0, damage))
                 enemy_hp = max(0, enemy_hp - damage)
                 contribution[player_id] += damage
+                recovery = min(
+                    max(0, int(stats.get("max_hp", 0)) - member_hp[player_id]),
+                    damage * int(stats.get("lifesteal_bp", 0)) // 10_000
+                    + int(stats.get("hp_regen", 0)),
+                ) if not charging else 0
+                member_hp[player_id] += recovery
+                mana_recovery = min(
+                    max(0, int(stats.get("max_mana", 0)) - member_mana[player_id]),
+                    max(0, int(stats.get("mana_regen", 0)))
+                    + damage * int(stats.get("mana_leech_bp", 0)) // 10_000,
+                ) if not charging else 0
+                member_mana[player_id] += mana_recovery
                 actions.append(
                     {
                         "sequence_no": sequence,
@@ -909,6 +931,8 @@ class PartyCombatRepositoryMixin:
                         "target_key": "enemy",
                         "hit_roll_bp": roll,
                         "damage": damage,
+                        "critical": critical,
+                        "recovery": {"hp": recovery, "mana": mana_recovery},
                     }
                 )
             alive = [
@@ -921,18 +945,35 @@ class PartyCombatRepositoryMixin:
                 target_index %= len(alive)
                 target = alive[target_index]
                 target_id = str(target["player_id"])
+                target_stats = target["stats"]
                 sequence += 1
                 roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:enemy")
-                hit_bp = hit_chance_bp(attacker_initiative=int(enemy["initiative"]), defender_agility=int(target["stats"]["agility"]))
+                hit_bp = hit_chance_bp(
+                    attacker_initiative=int(enemy["initiative"]),
+                    defender_agility=int(target_stats["agility"]),
+                    evasion_bp=int(target_stats.get("evasion_bp", 0)),
+                )
                 damage = int(enemy["attack"]) if roll < hit_bp else 0
+                crit_roll = battle_roll_bp(f"{session['battle_id']}:{expected_round}:{sequence}:enemy:crit")
+                critical = roll < hit_bp and crit_roll < max(
+                    0, int(enemy.get("crit_chance_bp", 0)) - int(target_stats.get("anti_crit_bp", 0))
+                )
+                if critical:
+                    damage = damage * 15_000 // 10_000
                 if beast_party and summon_count > 0:
                     damage = damage * 12_000 // 10_000
                 if len(timeline_defenders) >= 2 and expected_round in {5, 10}:
                     damage = damage * 8_000 // 10_000
+                damage = damage * (
+                    10_000 - min(7_000, int(target_stats.get("damage_reduction_bp", 0)))
+                ) // 10_000
+                damage = min(member_hp[target_id], damage)
+                reflected = damage * int(target_stats.get("damage_reflection_bp", 0)) // 10_000
+                enemy_hp = max(0, enemy_hp - reflected)
                 member_hp[target_id] = max(0, member_hp[target_id] - damage)
                 if member_hp[target_id] <= 0:
                     member_status[target_id] = "downed"
-                actions.append({"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.auto", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage})
+                actions.append({"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.auto", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage, "critical": critical, "reflected_damage": reflected})
                 target_index += 1
             storm = dict(snapshot.get("time_storm", {}))
             if time_fort_party and storm.get("enabled") and expected_round % int(storm.get("interval_rounds", TIME_FORT_STORM_INTERVAL)) == 0:
@@ -1118,6 +1159,7 @@ class PartyCombatRepositoryMixin:
             for action in actions:
                 state_after = {
                     "member_hp": member_hp,
+                    "member_mana": member_mana,
                     "member_status": member_status,
                     "member_soul_power": member_soul_power,
                     "member_domain_energy": member_domain_energy,
@@ -1127,9 +1169,13 @@ class PartyCombatRepositoryMixin:
                     "contribution": contribution,
                     "enemy_hp": enemy_hp,
                 }
-                for metadata_key in ("soul_power_cost", "soul_power_loss", "pollution_gain", "summon_count", "domain_energy_loss"):
+                for metadata_key in ("soul_power_cost", "soul_power_loss", "pollution_gain", "summon_count", "domain_energy_loss", "critical", "recovery", "reflected_damage"):
                     if metadata_key in action:
-                        state_after[metadata_key] = int(action[metadata_key])
+                        state_after[metadata_key] = (
+                            action[metadata_key]
+                            if metadata_key in {"critical", "recovery"}
+                            else int(action[metadata_key])
+                        )
                 connection.execute(
                     "INSERT INTO party_battle_actions(action_id, battle_id, sequence_no, round_no, actor_key, strategy_key, skill_key, target_key, hit_roll_bp, damage, state_json, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (uuid4().hex, battle_id, action["sequence_no"], expected_round, action["actor_key"], action["strategy_key"], action["skill_key"], action["target_key"], action["hit_roll_bp"], action["damage"], json.dumps(state_after, ensure_ascii=False, sort_keys=True), f"{operation_id}:{action['sequence_no']}", now_text),
@@ -1152,6 +1198,7 @@ class PartyCombatRepositoryMixin:
                 {
                     "round_no": expected_round,
                     "member_hp": member_hp,
+                    "member_mana": member_mana,
                     "member_status": member_status,
                     "member_soul_power": member_soul_power,
                     "member_domain_energy": member_domain_energy,
@@ -1359,7 +1406,7 @@ class PartyCombatRepositoryMixin:
 
     @staticmethod
     def _boundary_mainline_ready(connection: sqlite3.Connection, row: Any) -> bool:
-        """Accept either the explicit v0.3 quest row or its projected access flag."""
+        """Accept either the explicit quest row or its projected access flag."""
 
         try:
             intro = json.loads(str(row["intro_json"] or "{}"))

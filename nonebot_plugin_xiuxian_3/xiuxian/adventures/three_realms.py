@@ -6,8 +6,8 @@ from dataclasses import dataclass
 
 
 THREE_REALMS_STORY_KEY = "story.mainline.three_realms"
-THREE_REALMS_CONTENT_VERSION = "content-0.3"
-THREE_REALMS_RULE_VERSION = "adventures-0.3.0"
+THREE_REALMS_CONTENT_VERSION = ""
+THREE_REALMS_RULE_VERSION = ""
 THREE_REALMS_LANES = ("mediation", "contract", "symbiosis")
 THREE_REALMS_LANE_LABELS = {
     "mediation": "调停",
@@ -55,7 +55,7 @@ _STORY = {
         ("核对旧约", "你逐条核对三界旧约，标出仍然有效与已经失效的条款。"),
         ("交换信物", "各方自愿交换可撤回的信物，确认契约不会转移私人资产。"),
         ("校验责任", "你把履约责任分配给签约方，并为违约留下可追溯证据。"),
-        ("公开条款", "契约条款向三界公开，任何一方都能复核同一份版本。"),
+        ("公开条款", "契约条款向三界公开，任何一方都能复核同一份约文。"),
         ("完成签印", "三界完成最终签印，正式开放界隙主线通行资格。"),
     ),
     "symbiosis": (

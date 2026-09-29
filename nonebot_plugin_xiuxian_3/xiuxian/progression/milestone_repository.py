@@ -59,16 +59,14 @@ def record_due_milestones(
             """
             INSERT OR IGNORE INTO progression_milestones(
                 player_id, milestone_key, status, source_operation_id, snapshot_json,
-                content_version, rule_version, unlocked_at, created_at
-            ) VALUES (?, ?, 'unlocked', ?, ?, ?, ?, ?, ?)
+                unlocked_at, created_at
+            ) VALUES (?, ?, 'unlocked', ?, ?, ?, ?)
             """,
             (
                 player_id,
                 definition.key,
                 source_operation_id,
                 json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                definition.content_version,
-                definition.rule_version,
                 now_text,
                 now_text,
             ),

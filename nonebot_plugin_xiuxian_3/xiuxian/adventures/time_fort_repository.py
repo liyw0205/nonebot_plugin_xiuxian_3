@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
@@ -176,14 +177,19 @@ class TimeFortRepositoryMixin:
                     raise TimeFortQuotaError("a member already used this UTC week")
                 equipment = self._battle_equipment_snapshot(connection, player_id)
                 qualification = self._json_object(row["qualification_json"], {})
+                constitution_effect = constitution_effect_snapshot(connection, player_id)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
-                stats = self._battle_stats_for_snapshot(qualification, int(row["max_hp"]), int(row["initiative"]), equipment)
+                stats = self._battle_stats_for_snapshot(
+                    qualification, int(row["max_hp"]), int(row["initiative"]), equipment,
+                    constitution_effect,
+                )
                 first_clear[player_id] = connection.execute("SELECT 1 FROM time_fort_members WHERE player_id=? AND status='settled' LIMIT 1", (player_id,)).fetchone() is None
                 combat_snapshots.append({
                     "database_id": player_id, "player_id": str(row["player_id"]), "platform": str(row["platform"]),
                     "platform_user_id": str(row["platform_user_id"]), "role": str(row["role"]),
                     "realm_key": str(row["realm_key"]), "realm_layer": int(row["realm_layer"]), "location_key": str(row["location_key"]),
                     "path_key": row["path_key"], "qualification": qualification, "stats": stats,
+                    "constitution_effect": constitution_effect,
                     "equipment": list(equipment), "skills": skills,
                 })
             run_id = f"time-fort-{uuid4().hex}"
@@ -213,9 +219,15 @@ class TimeFortRepositoryMixin:
             self._time_fort_store_operation(connection, operation_id, operation_name, int(leader["id"]), request_hash, payload, now_text)
             return self._time_fort_record(payload)
 
-    def _battle_stats_for_snapshot(self, qualification: dict[str, Any], max_hp: int, initiative: int, equipment):
+    def _battle_stats_for_snapshot(
+        self, qualification: dict[str, Any], max_hp: int, initiative: int,
+        equipment, constitution_effect: dict[str, Any] | None = None,
+    ):
         from ..combat.rules import player_stat_snapshot
-        return player_stat_snapshot(qualification, max_hp=max_hp, initiative=initiative, equipment=equipment)
+        return player_stat_snapshot(
+            qualification, max_hp=max_hp, initiative=initiative,
+            equipment=equipment, constitution_effect=constitution_effect,
+        )
 
     async def choose_time_fort_node(self, *, platform: str, platform_user_id: str, node_key: str, operation_id: str) -> TimeFortRunRecord:
         await self.initialize()

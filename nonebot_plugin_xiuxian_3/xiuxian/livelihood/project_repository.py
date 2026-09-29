@@ -44,11 +44,11 @@ class ProjectRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             self._ensure_project(connection, week, now)
-            # Authority-gated v0.4 projects are independent rows in the same
-            # weekly ledger.  They are created only for eligible players, so
-            # legacy users retain the original one-project view and rotation.
+            # Authority-gated reconstruction projects are independent rows in
+            # the same weekly ledger and are materialized only for eligible
+            # players.
             for definition in PUBLIC_PROJECT_DEFINITIONS.values():
-                if definition.content_version != "content-0.4":
+                if not (definition.required_faction or definition.required_sect_level):
                     continue
                 if self._project_available(connection, player, definition):
                     self._ensure_project(connection, week, now, definition.key, player=player)
@@ -135,7 +135,7 @@ class ProjectRepositoryMixin:
             if definition is not None and definition.key != str(project["project_key"]):
                 raise ProjectContentClosedError("project is not in this week's rotation")
             definition = project_definition(str(project["project_key"]))
-            if definition.content_version == "content-0.4":
+            if definition.required_faction or definition.required_sect_level:
                 self._require_project_day_quota(connection, project, player, now, points)
             self._refresh_status(project, connection, now, now_text)
             project = connection.execute("SELECT * FROM livelihood_projects WHERE id = ?", (project["id"],)).fetchone()
@@ -333,7 +333,7 @@ class ProjectRepositoryMixin:
     ) -> Any:
         key = weekly_project_key(week) if project_key is None else project_key
         definition = project_definition(key)
-        if definition.content_version == "content-0.4":
+        if definition.required_faction or definition.required_sect_level:
             if player is None or not self._project_available(connection, player, definition):
                 raise ProjectContentClosedError("project authority is not available")
         row = connection.execute(
@@ -343,7 +343,11 @@ class ProjectRepositoryMixin:
         if row is not None:
             return row
         now_text = serialize_datetime(now)
-        project_prefix = "project.new_town" if definition.content_version != "content-0.4" else "project.reconstruction"
+        project_prefix = (
+            "project.reconstruction"
+            if definition.required_faction or definition.required_sect_level
+            else "project.new_town"
+        )
         project_id = f"{project_prefix}.{week}.{definition.key.rsplit('.', 1)[-1]}"
         requirements = dict(definition.requirements)
         progress = {key: 0 for key in requirements}
@@ -372,7 +376,7 @@ class ProjectRepositoryMixin:
 
     @staticmethod
     def _project_available(connection: Any, player: Any, definition: PublicProjectDefinition) -> bool:
-        """Check the v0.4 project authority without granting it implicitly."""
+        """Check project authority without granting it implicitly."""
 
         if definition.required_faction:
             faction = ProjectRepositoryMixin._json_object(player["faction_reputation_json"], {})
@@ -406,7 +410,7 @@ class ProjectRepositoryMixin:
         now: datetime,
         requested_points: int,
     ) -> None:
-        """v0.4 caps each player's same-project contribution at 30 points/day."""
+        """Cap each player's same-project contribution at 30 points/day."""
 
         day = now.date().isoformat()
         row = connection.execute(
@@ -418,7 +422,7 @@ class ProjectRepositoryMixin:
             (project["project_id"], player["id"], day),
         ).fetchone()
         if int(row["points"] if row else 0) + int(requested_points) > 30:
-            raise ProjectContributionLimitError("v0.4 project daily contribution cap reached")
+            raise ProjectContributionLimitError("本项目今日贡献已达上限")
 
     @staticmethod
     def _refresh_status(project: Any, connection: Any, now: datetime, now_text: str) -> None:

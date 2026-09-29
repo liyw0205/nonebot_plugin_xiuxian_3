@@ -1,40 +1,188 @@
 # 安装文档
 
-本仓库就是一个 NoneBot 2 插件，不是独立的 Web 服务。运行时需要一个宿主项目注册适配器，再加载 `nonebot_plugin_xiuxian_3`。仓库提供最小宿主模板、内容文件复制逻辑和四个平台入口。
+本仓库提供 NoneBot 2 插件和独立宿主模板。宿主使用 `nb run` 启动；不是独立 Web 服务，也不能作为其他插件的子插件加载。一键安装会创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境，默认通过清华源安装依赖。
 
-## Linux
+## Linux 一键安装
 
-在插件仓库根目录执行：
+直接在终端运行，不需要先克隆仓库：
 
 ```bash
-bash scripts/install.sh install "$HOME/nonebot-bot"
-cd "$HOME/nonebot-bot"
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh | bash -s -- install
+```
+
+安装器会检查 Python 3.11+、Git、curl、Python venv 和编译工具。Debian/Ubuntu 使用 `apt`，Fedora 使用 `dnf`/`yum`，Arch 使用 `pacman`，Alpine 使用 `apk`；需要 root 或 `sudo`。随后选择 GitHub 直连、代理组测速选优或自定义 Git 地址，创建宿主并检查依赖和 JSON 文件。
+
+GitHub 访问较慢时，可代理下载引导脚本：
+
+```bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh | bash -s -- install
+```
+
+引导脚本也可从 `ghproxy.net`、`ghfast.top`、`ghproxy.vip` 或 `gh-proxy.org` 获取；引导器运行后会对完整代理组测速并选择延迟最低的可用仓库源。
+
+也可用参数指定仓库下载方式和目录：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh | bash -s -- install --mirror accelerated --target "$HOME/xiu3" --source "$HOME/.local/share/xiuxian3/source"
+```
+
+支持 `--mirror direct|accelerated|custom`、`--mirror-url URL`、`--index-url URL`、`--venv PATH`。选择 `accelerated` 会测试 `gh-proxy.com`、`ghproxy.net`、`ghfast.top`、`ghproxy.vip` 和 `gh-proxy.org` 的 Git refs 响应延迟，使用最快的可用代理；若克隆失败会依次尝试其他代理，代理组均不可用时回退直连。更新/卸载入口分别是：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh | bash -s -- update
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh | bash -s -- uninstall --yes
+```
+
+卸载会删除宿主目录及 SQLite 数据，不删除共享虚拟环境或下载的源码；执行前先备份。
+
+安装完成后配置 `$HOME/xiu3/.env` 并启动：
+
+```bash
+cd "$HOME/xiu3"
 xiu3 start
 ```
 
-脚本会创建或复用 Python 3.11+ 的 `$HOME/myenv`，安装 NoneBot CLI、OneBot V11、QQ 适配器和本插件，生成 `bot.py`、`pyproject.toml`、`.env`，并把 JSON 内容复制到宿主 `data/`。已有文件和已有内容不会覆盖。
+如果公共命令目录不在 `PATH`，运行宿主内的 `./xiu3 start`。`xiu3` 还支持 `status`、`pause`、`resume`、`restart`、`stop`、`update`、`login`、`uninstall --yes`。
 
-安装完成后统一使用控制命令：
-
-```bash
-xiu3 start                 # 启动 nb run
-xiu3 pause                 # 暂停进程
-xiu3 resume                # 恢复进程
-xiu3 status                # 查看 PID 和日志
-xiu3 restart               # 重启
-xiu3 update                # 更新插件和依赖
-xiu3 uninstall --yes       # 删除宿主目录（不删除共享虚拟环境）
-```
-
-也可以再次执行 `scripts/install.sh update "$HOME/nonebot-bot"` 修复安装。安装器会检测 Python、venv、pip 和 JSON 内容，网络失败会自动重试三次，并在失败时保留现场和打印可定位的命令。
-
-已有 NoneBot 宿主可以只安装插件：
+官方 QQ 机器人可以直接扫码绑定，不需要手动复制 Secret：
 
 ```bash
-"$HOME/myenv/bin/python" -m pip install '/path/to/nonebot_plugin_xiuxian_3[nonebot,onebot,qq]'
+xiu3 login
 ```
 
-然后在宿主入口注册适配器，并在宿主 `pyproject.toml` 中显式列出这个独立插件：
+命令会显示授权链接并轮询 QQ 绑定状态，成功后备份 `.env` 为 `.env.bak`，更新 `QQ_BOTS`；若宿主正在运行会自动重启。Windows 使用 `& .\xiu3.ps1 login`。授权链接过期或网络中断时重新执行即可。
+
+## Windows 一键安装
+
+PowerShell 下载并运行引导器：
+
+```powershell
+$installer = Join-Path $env:TEMP 'xiuxian3-onekey.ps1'
+Invoke-WebRequest 'https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey_windows.ps1' -OutFile $installer
+powershell -NoProfile -ExecutionPolicy Bypass -File $installer install
+```
+
+脚本在缺少 Python 3.11+ 或 Git 时尝试通过 `winget` 安装 Python 3.12 和 Git，并提供 GitHub 直连、代理组测速选优和自定义地址选择。若 GitHub 访问较慢，可把下载 URL 中 `raw.githubusercontent.com/` 前加以下任一域名：`gh-proxy.com`、`ghproxy.net`、`ghfast.top`、`ghproxy.vip`、`gh-proxy.org`。没有 `winget` 时需先手动安装 Python 3.11+、Git 和 Windows App Installer。
+
+编辑宿主 `.env` 后运行：
+
+```powershell
+Set-Location "$HOME\xiu3"
+& .\xiu3.ps1 start
+& .\xiu3.ps1 login
+```
+
+更新和卸载：
+
+```powershell
+& .\xiu3.ps1 update
+& .\xiu3.ps1 uninstall --yes
+```
+
+也可以从已下载的仓库根目录运行 `scripts\install_windows.ps1 install "$HOME\xiu3"`。
+
+## Termux 一键安装
+
+Termux 需先有 `curl` 才能获取远程引导脚本：
+
+```bash
+pkg update -y
+pkg install -y curl
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh | bash -s -- install
+```
+
+引导器使用 `pkg` 安装 Python、Git、curl 和编译工具；虚拟环境使用 Termux 自带二进制依赖。启动前可执行 `termux-wake-lock`，再运行 `xiu3 start`。使用 `proot-distro` 时请在 Linux 容器内单独安装依赖和虚拟环境。
+
+## Docker
+
+在已取得的仓库目录中执行：
+
+```bash
+cp -n docker/env.example docker/.env
+# 编辑 docker/.env，填入机器人配置
+docker compose build
+docker compose up -d
+docker compose logs -f
+```
+
+容器入口通过 `nb run` 启动。`./data` 挂载到 `/app/data` 保存内容文件和 SQLite，`./runtime` 挂载到 `/app/runtime` 保存运行状态。不要将 QQ token 或其他凭据提交到 Git。
+
+## 手动安装
+
+### 独立宿主
+
+手动安装需先取得仓库源码。下面示例使用 Linux；Termux 可将 `python3` 替换为 `python`，Windows 使用 `py -3` 创建虚拟环境。
+
+```bash
+git clone https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git
+cd nonebot_plugin_xiuxian_3
+python3 -m venv "$HOME/myenv"
+export PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+"$HOME/myenv/bin/python" -m pip config --site set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+"$HOME/myenv/bin/python" -m pip install -r requirements.txt
+mkdir -p "$HOME/xiu3"
+cp examples/nonebot/bot.py examples/nonebot/pyproject.toml "$HOME/xiu3/"
+cp examples/nonebot/.env.example "$HOME/xiu3/.env"
+cp -R data "$HOME/xiu3/"
+"$HOME/myenv/bin/nb" --cwd "$HOME/xiu3" --python "$HOME/myenv/bin/python" adapter install --no-restrict-version QQ
+"$HOME/myenv/bin/nb" --cwd "$HOME/xiu3" --python "$HOME/myenv/bin/python" adapter install --no-restrict-version "OneBot V11"
+"$HOME/myenv/bin/nb" --cwd "$HOME/xiu3" --python "$HOME/myenv/bin/python" driver install FastAPI
+"$HOME/myenv/bin/nb" --cwd "$HOME/xiu3" --python "$HOME/myenv/bin/python" driver install HTTPX
+"$HOME/myenv/bin/nb" --cwd "$HOME/xiu3" --python "$HOME/myenv/bin/python" driver install websockets
+"$HOME/myenv/bin/nb" --cwd "$HOME/xiu3" --python "$HOME/myenv/bin/python" driver install AIOHTTP
+"$HOME/myenv/bin/python" -m pip install --no-deps .
+cd "$HOME/xiu3"
+"$HOME/myenv/bin/nb" run
+```
+
+Windows PowerShell：
+
+```powershell
+git clone https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git
+Set-Location nonebot_plugin_xiuxian_3
+py -3 -m venv "$HOME\myenv"
+$env:PIP_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple"
+& "$HOME\myenv\Scripts\python.exe" -m pip config --site set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+& "$HOME\myenv\Scripts\python.exe" -m pip install -r requirements.txt
+New-Item -ItemType Directory -Force "$HOME\xiu3" | Out-Null
+Copy-Item examples\nonebot\bot.py, examples\nonebot\pyproject.toml "$HOME\xiu3\"
+Copy-Item examples\nonebot\.env.example "$HOME\xiu3\.env"
+Copy-Item data "$HOME\xiu3\data" -Recurse
+& "$HOME\myenv\Scripts\nb.exe" --cwd "$HOME\xiu3" --python "$HOME\myenv\Scripts\python.exe" adapter install --no-restrict-version QQ
+& "$HOME\myenv\Scripts\nb.exe" --cwd "$HOME\xiu3" --python "$HOME\myenv\Scripts\python.exe" adapter install --no-restrict-version "OneBot V11"
+& "$HOME\myenv\Scripts\nb.exe" --cwd "$HOME\xiu3" --python "$HOME\myenv\Scripts\python.exe" driver install FastAPI
+& "$HOME\myenv\Scripts\nb.exe" --cwd "$HOME\xiu3" --python "$HOME\myenv\Scripts\python.exe" driver install HTTPX
+& "$HOME\myenv\Scripts\nb.exe" --cwd "$HOME\xiu3" --python "$HOME\myenv\Scripts\python.exe" driver install websockets
+& "$HOME\myenv\Scripts\nb.exe" --cwd "$HOME\xiu3" --python "$HOME\myenv\Scripts\python.exe" driver install AIOHTTP
+& "$HOME\myenv\Scripts\python.exe" -m pip install --no-deps .
+Set-Location "$HOME\xiu3"
+& "$HOME\myenv\Scripts\nb.exe" run
+```
+
+`requirements.txt` 只安装 `nb-cli==1.5.0`。适配器及驱动通过 `nb adapter install` / `nb driver install` 安装，插件以 `--no-deps` 安装，避免 pip 重复解析宿主依赖。宿主模板注册适配器并显式加载 `nonebot_plugin_xiuxian_3`。
+
+### 已有 NoneBot 宿主
+
+只安装插件本身及适配器依赖：
+
+```bash
+export PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+"$HOME/myenv/bin/python" -m pip install -r /path/to/nonebot_plugin_xiuxian_3/requirements.txt
+"$HOME/myenv/bin/nb" --cwd /path/to/host --python "$HOME/myenv/bin/python" adapter install --no-restrict-version QQ
+"$HOME/myenv/bin/nb" --cwd /path/to/host --python "$HOME/myenv/bin/python" adapter install --no-restrict-version "OneBot V11"
+"$HOME/myenv/bin/nb" --cwd /path/to/host --python "$HOME/myenv/bin/python" driver install FastAPI
+"$HOME/myenv/bin/nb" --cwd /path/to/host --python "$HOME/myenv/bin/python" driver install HTTPX
+"$HOME/myenv/bin/nb" --cwd /path/to/host --python "$HOME/myenv/bin/python" driver install websockets
+"$HOME/myenv/bin/nb" --cwd /path/to/host --python "$HOME/myenv/bin/python" driver install AIOHTTP
+"$HOME/myenv/bin/python" -m pip install --no-deps /path/to/nonebot_plugin_xiuxian_3
+```
+
+已有宿主请勿覆盖原有 `bot.py`、`pyproject.toml` 或 `.env`。确保入口注册正在使用的适配器，并在宿主 `pyproject.toml` 中将插件作为独立插件加载：
+
+```toml
+[tool.nonebot.plugins]
+"@local" = ["nonebot_plugin_xiuxian_3"]
+```
 
 ```python
 import nonebot
@@ -48,130 +196,24 @@ driver.register_adapter(QQAdapter)
 nonebot.load_from_toml("pyproject.toml")
 ```
 
-宿主 `pyproject.toml` 的插件段：
-
-```toml
-[tool.nonebot.plugins]
-"@local" = ["nonebot_plugin_xiuxian_3"]
-```
-
-宿主目录内由 `xiu3` 控制 `nb run`，不直接运行插件模块。若 `$HOME/.local/bin` 不在 `PATH`，使用安装输出的完整路径或把它加入 `PATH`。
-
-## Windows
-
-在 PowerShell 中执行：
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-& .\scripts\install_windows.ps1 install "$HOME\nonebot-bot"
-Set-Location "$HOME\nonebot-bot"
-& .\xiu3.ps1 start
-```
-
-也可以在命令提示符运行：
-
-```bat
-scripts\install_windows.bat install %USERPROFILE%\nonebot-bot
-```
-
-脚本使用 `py -3` 创建 `$HOME\myenv`，保留已有宿主文件和 JSON 内容。
-
-## Docker
-
-项目根目录包含 `Dockerfile`、`docker-compose.yml` 和 `docker/` 宿主入口：
-
-```bash
-cp docker/env.example docker/.env
-# 按需编辑 docker/.env 中的 QQ_BOTS、OneBot 地址和端口
-docker compose build
-docker compose up -d
-docker compose logs -f
-```
-
-容器入口使用 `nb run`。`./data` 挂载到 `/app/data`，`./runtime` 挂载到 `/app/runtime`。空的 data 卷会在首次启动时自动补齐 JSON 内容，SQLite 数据也会保存在该目录。不要把 QQ token 或 OneBot 密钥提交到 Git。
-
-## Termux
-
-先安装基础工具：
-
-```bash
-pkg update
-pkg install -y python git clang
-```
-
-在插件仓库根目录执行：
-
-```bash
-bash scripts/install_termux.sh install "$HOME/nonebot-bot"
-cd "$HOME/nonebot-bot"
-termux-wake-lock
-xiu3 start
-```
-
-原生 Termux 使用 `$HOME/myenv`。如果在 `proot-distro` 中运行，请在容器内按 Linux 步骤重新创建虚拟环境，不要混用两套 Python。
-
-## 手动安装
-
-不使用一键脚本时，先在插件仓库根目录准备宿主目录，并把 `examples/nonebot/bot.py`、`examples/nonebot/pyproject.toml` 和 `examples/nonebot/.env.example` 分别复制为宿主的 `bot.py`、`pyproject.toml` 和 `.env`。宿主是独立的 NoneBot 项目，插件通过 `nonebot.load_from_toml` 显式加载，不放进其他插件目录。
-
-Linux：
-
-```bash
-mkdir -p "$HOME/nonebot-bot/data"
-python3 -m venv "$HOME/myenv"
-"$HOME/myenv/bin/python" -m pip install -U pip
-"$HOME/myenv/bin/python" -m pip install '/path/to/nonebot_plugin_xiuxian_3[nonebot,onebot,qq]'
-cp examples/nonebot/bot.py examples/nonebot/pyproject.toml "$HOME/nonebot-bot/"
-cp examples/nonebot/.env.example "$HOME/nonebot-bot/.env"
-find data -type f -name '*.json' -exec sh -c 'mkdir -p "$HOME/nonebot-bot/data/$(dirname "${1#data/}")"; test -e "$HOME/nonebot-bot/data/${1#data/}" || cp "$1" "$HOME/nonebot-bot/data/${1#data/}"' _ {} \;
-cd "$HOME/nonebot-bot" && "$HOME/myenv/bin/nb" run
-```
-
-Windows：
-
-```powershell
-New-Item -ItemType Directory -Force "$HOME\nonebot-bot\data" | Out-Null
-py -3 -m venv "$HOME\myenv"
-& "$HOME\myenv\Scripts\python.exe" -m pip install -U pip
-& "$HOME\myenv\Scripts\python.exe" -m pip install "C:\path\to\nonebot_plugin_xiuxian_3[nonebot,onebot,qq]"
-Copy-Item examples\nonebot\bot.py, examples\nonebot\pyproject.toml "$HOME\nonebot-bot\"
-Copy-Item examples\nonebot\.env.example "$HOME\nonebot-bot\.env"
-Set-Location "$HOME\nonebot-bot"
-& "$HOME\myenv\Scripts\nb.exe" run
-```
-
-Termux：
-
-```bash
-mkdir -p "$HOME/nonebot-bot/data"
-python -m venv "$HOME/myenv"
-"$HOME/myenv/bin/python" -m pip install -U pip
-"$HOME/myenv/bin/python" -m pip install '/path/to/nonebot_plugin_xiuxian_3[nonebot,onebot,qq]'
-cp examples/nonebot/bot.py examples/nonebot/pyproject.toml "$HOME/nonebot-bot/"
-cp examples/nonebot/.env.example "$HOME/nonebot-bot/.env"
-cd "$HOME/nonebot-bot" && "$HOME/myenv/bin/nb" run
-```
-
-手动安装不会自动生成控制命令；可将 `scripts/control_windows.ps1`（Windows）或 `scripts/control.sh`（Linux/Termux）复制到宿主的 `.xiuxian3/`，再按安装器生成的参数调用。使用一键安装时会自动生成 `xiu3`/`xiu3.ps1`，并且只复制 `data/` 下的 JSON，不复制 SQLite、日志或缓存。
+在宿主目录启动 `nb run`。OneBot V11 使用 `.env` 中 `HOST` / `PORT` 监听，不配置 `ONEBOT_V11_WS_URLS`。
 
 ## 配置与验证
 
-安装脚本生成的 `.env` 至少包含：
+宿主 `.env` 基础配置：
 
 ```dotenv
 DRIVER=~fastapi+~httpx+~websockets+~aiohttp
 HOST=0.0.0.0
 PORT=8080
+QQ_BOTS=[]
 XIUXIAN3_DATA_DIR=./data
 ```
 
-QQ 官方适配器的 `QQ_BOTS` 按适配器格式填写。OneBot V11 使用宿主 `.env` 的 `HOST` 和 `PORT`，由 `nb run` 启动 HTTP/WebSocket 入口，不需要额外的 WS 地址变量。插件只负责统一命令和业务处理：QQ 保留 Markdown、蓝字和按键，OneBot V11 自动降级为纯文本/合并转发。
+QQ 官方适配器按其配置格式填写 `QQ_BOTS`。QQ 支持 Markdown、蓝字和按键；OneBot V11 会降级为纯文本或合并转发。
 
-离线验证：
+安装脚本会检查宿主入口、Python 包、`nb` 命令及 JSON 内容。开发环境可运行：
 
 ```bash
-"$HOME/myenv/bin/python" -m nonebot_plugin_xiuxian_3 --data-dir ./data
-"$HOME/myenv/bin/python" -m pytest -q test/test_messaging.py test/test_content.py test/test_adapter_simulation.py
+"$HOME/myenv/bin/python" -m pytest -q test/test_documentation.py test/test_content.py test/test_messaging.py test/test_adapter_simulation.py
 ```
-
-wheel 应包含 `nonebot_plugin_xiuxian_3/data/内容清单.json` 及其引用的所有 JSON 文件。

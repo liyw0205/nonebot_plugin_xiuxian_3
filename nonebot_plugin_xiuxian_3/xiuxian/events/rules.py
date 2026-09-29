@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 EVENT_KEY = "event.spirit_spring"
 EVENT_LOCATION = "xuantian.spirit_field"
-EVENT_RULE_VERSION = "events-0.1.0"
+EVENT_RULE_VERSION = ""
 EVENT_TARGET = 100
 PERSONAL_CONTRIBUTION_CAP = 30
 PERSONAL_REWARD_THRESHOLD = 10

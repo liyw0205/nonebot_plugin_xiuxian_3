@@ -39,16 +39,17 @@ try {
     $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
     $Action = "install"
     $Arguments = @($args)
-    if ($Arguments.Count -gt 0 -and $Arguments[0] -in @("install", "update", "uninstall", "start", "pause", "resume", "stop", "restart", "status")) {
+    if ($Arguments.Count -gt 0 -and $Arguments[0] -in @("install", "update", "uninstall", "start", "pause", "resume", "stop", "restart", "status", "login")) {
         $Action = $Arguments[0]
         $Arguments = if ($Arguments.Count -gt 1) { $Arguments[1..($Arguments.Count - 1)] } else { @() }
     }
     $Target = $null
     $SystemPython = if ($env:PYTHON_BIN) { $env:PYTHON_BIN } else { "py" }
     $SystemPythonArgs = if ([IO.Path]::GetFileNameWithoutExtension($SystemPython) -ieq "py") { @("-3") } else { @() }
+    $CustomSystemPython = [bool]$env:PYTHON_BIN
     $Venv = if ($env:VENV_PATH) { $env:VENV_PATH } else { Join-Path $HOME "myenv" }
     $Start = $false
-    $IndexUrl = $null
+    $IndexUrl = if ($env:PIP_INDEX_URL) { $env:PIP_INDEX_URL } else { "https://pypi.tuna.tsinghua.edu.cn/simple" }
     $Yes = $false
 
     for ($i = 0; $i -lt $Arguments.Count; $i++) {
@@ -57,6 +58,7 @@ try {
                 if ($i + 1 -ge $Arguments.Count) { Stop-Install "--python 需要一个路径" }
                 $SystemPython = $Arguments[++$i]
                 $SystemPythonArgs = @()
+                $CustomSystemPython = $true
             }
             "--venv" {
                 if ($i + 1 -ge $Arguments.Count) { Stop-Install "--venv 需要一个路径" }
@@ -78,7 +80,7 @@ try {
         }
     }
 
-    if ($null -eq $Target) { $Target = Join-Path $Root "nonebot-bot" }
+    if ($null -eq $Target) { $Target = Join-Path $Root "xiu3" }
     $Target = [IO.Path]::GetFullPath($Target)
     $Venv = [IO.Path]::GetFullPath($Venv)
     if ($Action -eq "update" -and -not (Test-Path $Target)) { Stop-Install "更新目标不存在：$Target" }
@@ -90,13 +92,49 @@ try {
         if ($Yes) { & $Control $Target $Venv $Root $Action -Yes } else { & $Control $Target $Venv $Root $Action }
         exit $LASTEXITCODE
     }
-    if (-not (Get-Command $SystemPython -ErrorAction SilentlyContinue)) {
-        Stop-Install "找不到 $SystemPython。请安装 Python 3.11+，或使用 --python 指定路径。"
+    if (-not (Get-Command git -ErrorAction SilentlyContinue) -and (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Host "[xiuxian3] 通过 winget 安装 Git"
+        & winget install --id Git.Git --exact --silent --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -ne 0) { Stop-Install "Git 安装失败，请手动安装 Git 后重试。" }
+        $env:Path = "C:\Program Files\Git\cmd;$env:Path"
     }
-    $PythonVersion = (& $SystemPython @SystemPythonArgs -c "import sys; print('.'.join(map(str, sys.version_info[:3])))").Trim()
-    $VersionParts = $PythonVersion.Split('.') | ForEach-Object { [int]$_ }
-    if ($VersionParts[0] -lt 3 -or ($VersionParts[0] -eq 3 -and $VersionParts[1] -lt 11)) {
-        Stop-Install "需要 Python 3.11 或更高版本；当前为 $PythonVersion"
+    $Candidates = @()
+    if ($CustomSystemPython) {
+        $Candidates = @([PSCustomObject]@{ Command = $SystemPython; Arguments = $SystemPythonArgs })
+    } else {
+        $Candidates = @(
+            [PSCustomObject]@{ Command = "py"; Arguments = @("-3.12") },
+            [PSCustomObject]@{ Command = "py"; Arguments = @("-3.11") },
+            [PSCustomObject]@{ Command = "py"; Arguments = @("-3") },
+            [PSCustomObject]@{ Command = "python3"; Arguments = @() },
+            [PSCustomObject]@{ Command = "python"; Arguments = @() }
+        )
+    }
+    $PythonVersion = $null
+    foreach ($Candidate in $Candidates) {
+        if (-not (Get-Command $Candidate.Command -ErrorAction SilentlyContinue)) { continue }
+        $CandidateArgs = @($Candidate.Arguments)
+        $CandidateVersion = (& $Candidate.Command @CandidateArgs -c "import sys; print('.'.join(map(str, sys.version_info[:3])))" 2>$null)
+        if ($LASTEXITCODE -ne 0) { continue }
+        $VersionParts = $CandidateVersion.Trim().Split('.') | ForEach-Object { [int]$_ }
+        if ($VersionParts[0] -gt 3 -or ($VersionParts[0] -eq 3 -and $VersionParts[1] -ge 11)) {
+            $SystemPython = $Candidate.Command
+            $SystemPythonArgs = $CandidateArgs
+            $PythonVersion = $CandidateVersion.Trim()
+            break
+        }
+    }
+    if (-not $PythonVersion -and -not $CustomSystemPython -and (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Host "[xiuxian3] 通过 winget 安装 Python 3.12"
+        & winget install --id Python.Python.3.12 --exact --silent --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -ne 0) { Stop-Install "Python 安装失败，请手动安装 Python 3.11+。" }
+        $SystemPython = "py"
+        $SystemPythonArgs = @("-3.12")
+        $PythonVersion = (& $SystemPython @SystemPythonArgs -c "import sys; print('.'.join(map(str, sys.version_info[:3])))").Trim()
+        if ($LASTEXITCODE -ne 0) { $PythonVersion = $null }
+    }
+    if (-not $PythonVersion) {
+        Stop-Install "需要 Python 3.11 或更高版本；请安装 Python 3.11+，或用 --python 指定可用路径。"
     }
 
     $VenvPython = Join-Path $Venv "Scripts\python.exe"
@@ -116,13 +154,13 @@ try {
     if ($LASTEXITCODE -ne 0) { Stop-Install "虚拟环境没有 pip，请确认 Python 安装包含 ensurepip。" }
 
     Write-Host "[xiuxian3] 升级 pip、setuptools 和 wheel"
-    Invoke-Retry { & $VenvPython -m pip install --upgrade pip setuptools wheel } "pip 基础工具安装"
+    Invoke-Retry { & $VenvPython -m pip install --index-url $IndexUrl --upgrade pip setuptools wheel } "pip 基础工具安装"
 
-    Write-Host "[xiuxian3] 安装 NoneBot、适配器和本插件（普通 wheel 安装）"
-    $ProjectPipArgs = @("--no-build-isolation")
-    if ($Action -eq "update") { $ProjectPipArgs = @("--upgrade", "--upgrade-strategy", "eager", "--no-build-isolation") }
-    Invoke-Retry { & $VenvPython -m pip install @ProjectPipArgs "$Root[nonebot,onebot,qq]" } "项目依赖安装"
+    Write-Host "[xiuxian3] 配置虚拟环境使用 pip 镜像：$IndexUrl"
+    & $VenvPython -m pip config --site set global.index-url $IndexUrl *> $null
+    if ($LASTEXITCODE -ne 0) { Write-Warning "无法写入虚拟环境 pip 配置；本次安装仍使用指定镜像。" }
 
+    if (-not (Test-Path (Join-Path $Root "requirements.txt"))) { Stop-Install "找不到项目 requirements.txt：$Root" }
     function Copy-IfMissing([string]$Source, [string]$Destination) {
         if (-not (Test-Path $Destination)) {
             New-Item -ItemType Directory -Force -Path (Split-Path $Destination) | Out-Null
@@ -137,6 +175,36 @@ try {
     Copy-IfMissing (Join-Path $Root "examples\nonebot\pyproject.toml") (Join-Path $Target "pyproject.toml")
     Copy-IfMissing (Join-Path $Root "examples\nonebot\.env.example") (Join-Path $Target ".env")
 
+    Write-Host "[xiuxian3] 从 requirements.txt 安装 nb-cli==1.5.0"
+    Invoke-Retry { & $VenvPython -m pip install --upgrade --index-url $IndexUrl -r (Join-Path $Root "requirements.txt") } "nb-cli 安装"
+    $env:PIP_INDEX_URL = $IndexUrl
+
+    $ComponentAction = if ($Action -eq "update") { "update" } else { "install" }
+    $Components = @(
+        @{ Group = "adapter"; Name = "QQ" },
+        @{ Group = "adapter"; Name = "OneBot V11" },
+        @{ Group = "driver"; Name = "FastAPI" },
+        @{ Group = "driver"; Name = "HTTPX" },
+        @{ Group = "driver"; Name = "websockets" },
+        @{ Group = "driver"; Name = "AIOHTTP" }
+    )
+    foreach ($Component in $Components) {
+        $Description = "nb $($Component.Group) $ComponentAction $($Component.Name)"
+        $InstallArgs = @()
+        if ($ComponentAction -eq "install" -and $Component.Group -eq "adapter") {
+            $InstallArgs = @("--no-restrict-version")
+        }
+        Write-Host "[xiuxian3] 通过 $Description 安装运行依赖"
+        Invoke-Retry {
+            & $VenvNb --cwd $Target --python $VenvPython $Component.Group $ComponentAction @InstallArgs $Component.Name
+        } $Description
+    }
+
+    Write-Host "[xiuxian3] 安装修仙插件本身，不重复解析 CLI 已安装的运行依赖"
+    $ProjectPipArgs = @("--no-build-isolation", "--no-deps", "--index-url", $IndexUrl)
+    if ($Action -eq "update") { $ProjectPipArgs = @("--upgrade") + $ProjectPipArgs }
+    Invoke-Retry { & $VenvPython -m pip install @ProjectPipArgs $Root } "插件安装"
+
     $DataRoot = Join-Path $Root "data"
     Get-ChildItem $DataRoot -Recurse -File -Filter *.json | ForEach-Object {
         $Relative = $_.FullName.Substring($DataRoot.Length).TrimStart("\", "/")
@@ -145,6 +213,7 @@ try {
 
     New-Item -ItemType Directory -Force -Path (Join-Path $Target ".xiuxian3") | Out-Null
     Copy-Item (Join-Path $Root "scripts\control_windows.ps1") (Join-Path $Target ".xiuxian3\control_windows.ps1") -Force
+    Copy-Item (Join-Path $Root "scripts\qq_login.py") (Join-Path $Target ".xiuxian3\qq_login.py") -Force
     $ControlLauncher = Join-Path $Target "xiu3.ps1"
     if (-not (Test-Path $ControlLauncher)) {
         @"
@@ -159,7 +228,7 @@ exit `$LASTEXITCODE
     }
 
     Write-Host "[xiuxian3] 校验已安装包、NoneBot 入口和 JSON 内容"
-    & $VenvPython -c "import nonebot; import nonebot_plugin_xiuxian_3"
+    & $VenvPython -c "import importlib.metadata, nonebot, nonebot.adapters.qq, nonebot.adapters.onebot.v11, nonebot_plugin_xiuxian_3; assert importlib.metadata.version('nb-cli') == '1.5.0'"
     if ($LASTEXITCODE -ne 0) { Stop-Install "插件导入校验失败" }
     & $VenvNb --help *> $null
     if ($LASTEXITCODE -ne 0) { Stop-Install "nb 命令未安装：$VenvNb" }

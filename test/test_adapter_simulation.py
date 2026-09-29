@@ -220,13 +220,13 @@ def test_qq_and_onebot_normalization_reaches_automatic_training_battle() -> None
                 assert (await dispatch(f"{prefix}-path", "选择道途 体修")).code == "CULTIVATION_ENTERED"
                 assert (await dispatch(f"{prefix}-return", "返回新手城")).ok
                 settled = await dispatch(f"{prefix}-battle", normalized.text)
-                assert settled.code == "BATTLE_SETTLED"
-                assert settled.data["outcome"] == "won"
+                assert settled.code == "TRAINING_SPECTATOR"
+                assert settled.data["status"] == "spectator"
+                assert settled.data["actions"]
                 claimed = await dispatch(f"{prefix}-claim", "领取战斗奖励")
-                assert claimed.code == "BATTLE_REWARD_CLAIMED"
+                assert claimed.code == "BATTLE_REWARD_NOT_AVAILABLE"
                 replay = await dispatch(f"{prefix}-replay", "战斗回放")
-                assert replay.code == "BATTLE_REPLAY"
-                assert replay.data["actions"]
+                assert replay.code == "BATTLE_NOT_FOUND"
             await runtime.close()
 
     asyncio.run(run())
@@ -784,12 +784,12 @@ def _seed_story_evidence(
                 connection.execute(
                     "INSERT INTO battle_sessions(battle_id,player_id,start_operation_id,resolved_operation_id,"
                     "battle_type,enemy_key,location_key,status,reward_status,starts_at,turn_deadline,result_json,"
-                    "content_version,rule_version,created_at,updated_at) "
-                    "VALUES(?,?,?,?,'pve','enemy.story.test','xuantian.new_town','settled','none',?,?,?,?,?,?,?)",
+                    "created_at,updated_at) "
+                    "VALUES(?,?,?,?,'pve','enemy.story.test','xuantian.new_town','settled','none',?,?,?,?,?)",
                     (
                         f"story-test-battle-{adapter}-{user}-{index}", player_id,
                         f"battle-start-{operation_id}", operation_id, now, now,
-                        json.dumps({"outcome": "won"}), "combat-0.1", "combat-0.1", now, now,
+                        json.dumps({"outcome": "won"}), now, now,
                     ),
                 )
         elif via_harvest:
@@ -909,8 +909,8 @@ def test_story_endings_run_through_qq_and_onebot_v11_adapters() -> None:
                             "WHERE p.platform=? AND p.platform_user_id=?",
                             (adapter, user),
                         ).fetchone()[0] == 1
-                        snapshot_json, reward_json, content_version, rule_version = connection.execute(
-                            "SELECT c.snapshot_json,c.reward_json,c.content_version,c.rule_version "
+                        snapshot_json, reward_json = connection.execute(
+                            "SELECT c.snapshot_json,c.reward_json "
                             "FROM story_ending_claims c JOIN players p ON p.id=c.player_id "
                             "WHERE p.platform=? AND p.platform_user_id=?",
                             (adapter, user),
@@ -919,8 +919,12 @@ def test_story_endings_run_through_qq_and_onebot_v11_adapters() -> None:
                         assert ending_snapshot["choice"]["source_operation_ids"] == list(reversed(evidence_ids))
                         assert later_evidence[0] not in ending_snapshot["choice"]["source_operation_ids"]
                         assert json.loads(reward_json) == {"local_reputation": 10}
-                        assert content_version == "content-0.1"
-                        assert rule_version == "specials-0.1.3"
+                        assert "content_version" not in ending_snapshot["choice"]
+                        assert "rule_version" not in ending_snapshot["choice"]
+                        story_columns = {
+                            row[1] for row in connection.execute("PRAGMA table_info(story_ending_claims)")
+                        }
+                        assert not {"content_version", "rule_version"} & story_columns
                         assert connection.execute(
                             "SELECT COUNT(*) FROM codex_entries c JOIN players p ON p.id=c.player_id "
                             "WHERE p.platform=? AND p.platform_user_id=? AND c.entry_key=?",

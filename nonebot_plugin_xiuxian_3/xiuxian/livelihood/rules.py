@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 import hashlib
 from dataclasses import dataclass
+from functools import lru_cache
+
+from ..content import ContentBundle, ContentError, bundled_content
 
 
 TOWN_ROOM = "residence.town_room"
 COURTYARD = "residence.courtyard"
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +67,7 @@ def residence_definition(value: str | None = None) -> ResidenceDefinition:
 
 BLOOD_GRASS = "crop.blood_grass"
 SPIRIT_LEAF = "crop.spirit_leaf"
-SPIRIT_LEAF_HARVEST_POOL = "livelihood.harvest.v0.1"
+SPIRIT_LEAF_HARVEST_POOL = "livelihood.harvest"
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +96,13 @@ class TownCommissionDefinition:
     local_reputation: int
     service_reputation: int
     stock: int
+    local_reputation_key: str = "local.xuantian.new_town"
     duration_seconds: int = 12 * 60 * 60
+    aliases: tuple[str, ...] = ()
+    unlock_key: str | None = None
+    requirements_any: tuple[dict[str, object], ...] = ()
+    stock_bonus_key: str | None = None
+    reward_bonus_key: str | None = None
     content_version: str = CONTENT_VERSION
     rule_version: str = RULE_VERSION
 
@@ -152,66 +160,130 @@ def spirit_leaf_array_sand_roll(operation_id: str) -> int:
     return int.from_bytes(digest, "big") % 2
 
 
-COMMISSION_HERB_SUPPLY = "town_commission.herb_supply"
-COMMISSION_REPAIR_TOOLS = "town_commission.repair_tools"
-COMMISSION_MEAL_SERVICE = "town_commission.meal_service"
-COMMISSION_SPIRIT_LEAF = "town_commission.spirit_leaf"
-
-TOWN_COMMISSION_DEFINITIONS = {
-    COMMISSION_HERB_SUPPLY: TownCommissionDefinition(
-        key=COMMISSION_HERB_SUPPLY,
-        label="止血草供应",
-        inputs={"item.herb.blood_grass": 3},
-        reward_stones=18,
-        local_reputation=3,
-        service_reputation=1,
-        stock=200,
-    ),
-    COMMISSION_REPAIR_TOOLS: TownCommissionDefinition(
-        key=COMMISSION_REPAIR_TOOLS,
-        label="工具修缮",
-        inputs={"item.mat.wood": 2, "item.ore.ironstone": 1},
-        reward_stones=25,
-        local_reputation=4,
-        service_reputation=1,
-        stock=120,
-    ),
-    COMMISSION_MEAL_SERVICE: TownCommissionDefinition(
-        key=COMMISSION_MEAL_SERVICE,
-        label="灵米饭供应",
-        inputs={"item.food.spirit_rice": 2},
-        reward_stones=20,
-        local_reputation=3,
-        service_reputation=1,
-        stock=150,
-    ),
-    COMMISSION_SPIRIT_LEAF: TownCommissionDefinition(
-        key=COMMISSION_SPIRIT_LEAF,
-        label="灵泉谷灵叶收集",
-        inputs={"item.herb.spirit_leaf": 1},
-        reward_stones=30,
-        local_reputation=4,
-        service_reputation=2,
-        stock=80,
-    ),
-}
-
-COMMISSION_ALIASES = {
-    "止血草供应": COMMISSION_HERB_SUPPLY,
-    "草药供应": COMMISSION_HERB_SUPPLY,
-    "工具修缮": COMMISSION_REPAIR_TOOLS,
-    "灵米饭供应": COMMISSION_MEAL_SERVICE,
-    "灵米饭": COMMISSION_MEAL_SERVICE,
-    "灵泉谷灵叶收集": COMMISSION_SPIRIT_LEAF,
-}
+@lru_cache(maxsize=1)
+def _default_commission_content() -> ContentBundle:
+    return bundled_content()
 
 
-def commission_definition(value: str | None = None) -> TownCommissionDefinition:
-    key = COMMISSION_ALIASES.get((value or "").strip(), (value or "").strip())
-    try:
-        return TOWN_COMMISSION_DEFINITIONS[key]
-    except KeyError as exc:
-        raise ValueError(f"unsupported commission key: {value}") from exc
+def town_commission_definitions(
+    content: ContentBundle | None = None,
+) -> dict[str, TownCommissionDefinition]:
+    bundle = content if content is not None else _default_commission_content()
+    realms = {str(row["key"]) for row in bundle.list("realm", include_locked=False)}
+    result: dict[str, TownCommissionDefinition] = {}
+    selectors: set[str] = set()
+    for row in bundle.list("livelihood", include_locked=False):
+        if row.get("record_type") != "commission":
+            continue
+        key, label = row.get("key"), row.get("name")
+        if not isinstance(key, str) or not key or not isinstance(label, str) or not label.strip():
+            raise ContentError(f"commission requires key and name: {key!r}")
+        inputs = row.get("inputs")
+        if (
+            not isinstance(inputs, list)
+            or not inputs
+            or any(
+                not isinstance(item, dict)
+                or not isinstance(item.get("item_key"), str)
+                or not item["item_key"]
+                or isinstance(item.get("quantity"), bool)
+                or not isinstance(item.get("quantity"), int)
+                or item["quantity"] <= 0
+                for item in inputs
+            )
+        ):
+            raise ContentError(f"commission {key} has invalid inputs")
+        reward = row.get("reward")
+        if not isinstance(reward, dict) or reward.get("currency_key") != "currency.spirit_stone":
+            raise ContentError(f"commission {key} has an unsupported reward currency")
+        amount = reward.get("amount")
+        stock = row.get("stock")
+        duration = row.get("duration_seconds", 12 * 60 * 60)
+        local_reputation = reward.get("reputation", 0)
+        service_reputation = reward.get("service_reputation", 0)
+        numbers = (amount, stock, duration, local_reputation, service_reputation)
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in numbers):
+            raise ContentError(f"commission {key} has invalid numeric values")
+        if amount < 0 or stock <= 0 or duration <= 0 or local_reputation < 0 or service_reputation < 0:
+            raise ContentError(f"commission {key} has out-of-range numeric values")
+        reputation_key = reward.get("reputation_key", "local.xuantian.new_town")
+        if not isinstance(reputation_key, str) or not reputation_key:
+            raise ContentError(f"commission {key} has an invalid reputation key")
+        aliases = row.get("aliases", [])
+        if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
+            raise ContentError(f"commission {key} aliases must be non-empty strings")
+        unlock_key = row.get("unlock_key")
+        if unlock_key is not None and (
+            not isinstance(unlock_key, str)
+            or not bundle.has("codex_unlock", unlock_key, include_locked=False)
+        ):
+            raise ContentError(f"commission {key} references an unknown codex unlock")
+        requirements_any = row.get("requirements_any", [])
+        if not isinstance(requirements_any, list):
+            raise ContentError(f"commission {key} requirements_any must be a list")
+        for requirement in requirements_any:
+            if not isinstance(requirement, dict):
+                raise ContentError(f"commission {key} has an invalid requirement")
+            if requirement.get("type") == "realm":
+                realm_key, layer = requirement.get("realm_key"), requirement.get("min_layer")
+                if (
+                    realm_key not in realms
+                    or isinstance(layer, bool)
+                    or not isinstance(layer, int)
+                    or layer < 1
+                ):
+                    raise ContentError(f"commission {key} has an invalid realm requirement")
+            elif requirement.get("type") == "local_reputation":
+                rep_key, minimum = requirement.get("reputation_key"), requirement.get("minimum")
+                if (
+                    not isinstance(rep_key, str)
+                    or not rep_key
+                    or isinstance(minimum, bool)
+                    or not isinstance(minimum, int)
+                    or minimum <= 0
+                ):
+                    raise ContentError(f"commission {key} has an invalid reputation requirement")
+            else:
+                raise ContentError(f"commission {key} has an unsupported requirement")
+        stock_bonus_key = row.get("stock_bonus_key")
+        reward_bonus_key = row.get("reward_bonus_key")
+        if any(
+            value is not None and (not isinstance(value, str) or not value)
+            for value in (stock_bonus_key, reward_bonus_key)
+        ):
+            raise ContentError(f"commission {key} has an invalid public-project bonus key")
+        selectors_for_row = {key, label.strip(), *(alias.strip() for alias in aliases)}
+        if selectors & selectors_for_row:
+            raise ContentError(f"commission {key} has a duplicate name or alias")
+        selectors.update(selectors_for_row)
+        result[key] = TownCommissionDefinition(
+            key=key,
+            label=label.strip(),
+            inputs={str(item["item_key"]): int(item["quantity"]) for item in inputs},
+            reward_stones=amount,
+            local_reputation=local_reputation,
+            service_reputation=service_reputation,
+            stock=stock,
+            local_reputation_key=reputation_key,
+            duration_seconds=duration,
+            aliases=tuple(alias.strip() for alias in aliases),
+            unlock_key=unlock_key,
+            requirements_any=tuple(dict(requirement) for requirement in requirements_any),
+            stock_bonus_key=stock_bonus_key,
+            reward_bonus_key=reward_bonus_key,
+        )
+    return result
+
+
+def commission_definition(
+    value: str | None = None,
+    content: ContentBundle | None = None,
+) -> TownCommissionDefinition:
+    normalized = (value or "").strip()
+    for definition in town_commission_definitions(content).values():
+        if normalized in {definition.key, definition.label, *definition.aliases}:
+            return definition
+    raise ValueError(f"unsupported commission key: {value}")
 
 
 PROJECT_TOWN_WELL = "project.town_well"
@@ -220,10 +292,10 @@ PROJECT_HERB_GARDEN = "project.herb_garden"
 PROJECT_DOMAIN_REFUGE = "project.domain_refuge"
 PROJECT_ABYSS_PURIFICATION = "project.abyss_purification"
 PROJECT_ANCESTRAL_HABITAT = "project.ancestral_habitat"
-PROJECT_CONTENT_VERSION = "content-0.2"
-PROJECT_RULE_VERSION = "livelihood-0.2.0"
-PROJECT_V04_CONTENT_VERSION = "content-0.4"
-PROJECT_V04_RULE_VERSION = "livelihood-0.4.0"
+PROJECT_CONTENT_VERSION = ""
+PROJECT_RULE_VERSION = ""
+PROJECT_V04_CONTENT_VERSION = ""
+PROJECT_V04_RULE_VERSION = ""
 TRANSPORT_TICKET = "item.token.transport_coupon"
 HERB_SEED_BUNDLE = "item.seed.herb_bundle"
 CONSTRUCTION_COUPON = "item.token.construction_coupon"
@@ -270,8 +342,8 @@ PUBLIC_PROJECT_DEFINITIONS = {
         effect_key="town_commission.herb_reward_bonus",
         reward={"item": HERB_SEED_BUNDLE},
     ),
-    # v0.4 projects are materialized on demand after their authority gate is met;
-    # the legacy weekly rotation remains limited to the three v0.2 projects.
+    # Authority-gated projects are materialized on demand; the weekly rotation
+    # remains limited to the original three projects.
     PROJECT_DOMAIN_REFUGE: PublicProjectDefinition(
         key=PROJECT_DOMAIN_REFUGE,
         label="领域避难所",
@@ -353,7 +425,7 @@ def weekly_project_key(week_key: str) -> str:
     import hashlib
 
     digest = hashlib.blake2b(week_key.encode("utf-8"), digest_size=2).digest()
-    # v0.4 reconstruction projects are authority-gated and materialized
+    # Reconstruction projects are authority-gated and materialized
     # separately; changing this legacy pool would rewrite historical rotations.
     keys = (PROJECT_TOWN_WELL, PROJECT_MARKET_ROAD, PROJECT_HERB_GARDEN)
     return keys[int.from_bytes(digest, "big") % len(keys)]
@@ -367,12 +439,7 @@ __all__ = [
     "COURTYARD",
     "CROP_DEFINITIONS",
     "CROP_ALIASES",
-    "COMMISSION_ALIASES",
-    "COMMISSION_HERB_SUPPLY",
-    "COMMISSION_MEAL_SERVICE",
-    "COMMISSION_REPAIR_TOOLS",
     "RULE_VERSION",
-    "TOWN_COMMISSION_DEFINITIONS",
     "TownCommissionDefinition",
     "TOWN_ROOM",
     "CropDefinition",
@@ -380,6 +447,7 @@ __all__ = [
     "crop_definition",
     "spirit_leaf_array_sand_roll",
     "commission_definition",
+    "town_commission_definitions",
     "residence_definition",
     "HERB_SEED_BUNDLE",
     "PROJECT_ALIASES",

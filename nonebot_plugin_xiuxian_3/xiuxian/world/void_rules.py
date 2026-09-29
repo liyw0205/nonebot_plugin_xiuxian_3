@@ -2,24 +2,23 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 import math
 from hashlib import blake2b
 
 from .void_models import VoidRouteDefinition
 
-RULE_VERSION = module_rule_version(__name__)
-CONTENT_VERSION = module_content_version(__name__)
+RULE_VERSION = ""
+CONTENT_VERSION = ""
 VOID_ROUTE_DURATION_SECONDS = 30 * 60
 VOID_ROUTE_STORM_CHANCE_BP = 1500
 VOID_INSTABILITY_SECONDS = 48 * 60 * 60
 
 ROUTES = {
-    "void.first_route": VoidRouteDefinition("void.first_route", "虚空第一航道", VOID_ROUTE_DURATION_SECONDS, 35, 3, "void.route.void.first_route.v0.5"),
-    "void.archive_ruins": VoidRouteDefinition("void.archive_ruins", "虚空档案遗迹", 45 * 60, 40, 4, "void.route.void.archive_ruins.v0.5"),
-    "void.sect_fortress": VoidRouteDefinition("void.sect_fortress", "虚空堡垒", VOID_ROUTE_DURATION_SECONDS, 20, 2, "void.route.void.sect_fortress.v0.5"),
-    "void.void_market": VoidRouteDefinition("void.void_market", "虚空集市", VOID_ROUTE_DURATION_SECONDS, 10, 2, "void.route.void_market.v0.5"),
+    "void.first_route": VoidRouteDefinition("void.first_route", "虚空第一航道", VOID_ROUTE_DURATION_SECONDS, 35, 3, "void.route.void.first_route"),
+    "void.archive_ruins": VoidRouteDefinition("void.archive_ruins", "虚空档案遗迹", 45 * 60, 40, 4, "void.route.void.archive_ruins"),
+    "void.sect_fortress": VoidRouteDefinition("void.sect_fortress", "虚空堡垒", VOID_ROUTE_DURATION_SECONDS, 20, 2, "void.route.void.sect_fortress"),
+    "void.void_market": VoidRouteDefinition("void.void_market", "虚空集市", VOID_ROUTE_DURATION_SECONDS, 10, 2, "void.route.void_market"),
 }
 
 ALIASES = {

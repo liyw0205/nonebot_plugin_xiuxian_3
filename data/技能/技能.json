@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "基础攻击",
+      "desc": "以基础招式造成物理伤害。",
       "owner_type": "player",
       "target": "single_enemy",
       "effect": {
@@ -12,10 +13,16 @@
       "cost": {},
       "cooldown_rounds": 0,
       "key": "skill.basic_attack",
-      "status": "active"
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
     },
     {
       "name": "雷劫",
+      "desc": "第一重天劫以雷霆攻势检验渡劫者。",
       "owner_type": "enemy",
       "target": "single_player",
       "effect": {
@@ -31,6 +38,7 @@
     },
     {
       "name": "心劫",
+      "desc": "心魔化作攻势，扰乱渡劫者心神。",
       "owner_type": "enemy",
       "target": "single_player",
       "effect": {
@@ -47,6 +55,7 @@
     },
     {
       "name": "道劫",
+      "desc": "终重道劫汇聚前两劫之势，考验修行根基。",
       "owner_type": "enemy",
       "target": "single_player",
       "effect": {
@@ -63,6 +72,7 @@
     },
     {
       "name": "重击",
+      "desc": "借体魄发力，强化近身一击。",
       "owner_type": "player",
       "path_key": "body",
       "target": "single_enemy",
@@ -77,10 +87,16 @@
       },
       "cooldown_rounds": 1,
       "key": "skill.body.heavy_strike",
-      "status": "active"
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
     },
     {
       "name": "水箭",
+      "desc": "凝水成箭，强化术法伤害。",
       "owner_type": "player",
       "path_key": "spell",
       "target": "single_enemy",
@@ -95,18 +111,22 @@
       },
       "cooldown_rounds": 1,
       "key": "skill.spell.water_bolt",
-      "status": "active"
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
     },
     {
-      "name": "侦查机关",
+      "name": "机弩穿云",
+      "desc": "催动机簧吐出灵矢，直取对手要害。",
       "owner_type": "player",
       "path_key": "device",
-      "target": "self",
+      "target": "single_enemy",
       "effect": {
-        "type": "summon",
-        "entity_key": "device.scout_doll",
-        "attack_multiplier_bp": 5000,
-        "duration_rounds": 3
+        "type": "physical_damage_multiplier_bp",
+        "value": 13500
       },
       "cost": {
         "resource_key": "mana",
@@ -115,10 +135,16 @@
       "cooldown_rounds": 0,
       "uses_per_battle": 1,
       "key": "skill.device.scout_doll",
-      "status": "active"
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
     },
     {
       "name": "痛苦交换",
+      "desc": "以气血代价换取伤害增幅。",
       "owner_type": "player",
       "path_key": "demonic",
       "target": "single_enemy",
@@ -138,39 +164,45 @@
         }
       ],
       "key": "skill.demonic.pain_exchange",
-      "status": "active"
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
     },
     {
-      "name": "半化形",
+      "name": "血脉裂爪",
+      "desc": "借血脉显化兽爪，骤然撕开敌方护体灵光。",
       "owner_type": "player",
       "path_key": "beast",
-      "target": "self",
+      "target": "single_enemy",
       "effect": {
-        "type": "stat_bonus_bp",
-        "stat": "agility",
-        "value": 2000,
-        "duration_rounds": 3
+        "type": "physical_damage_multiplier_bp",
+        "value": 13000
       },
       "cost": {
         "resource_key": "beast_power",
         "amount": 5
       },
       "cooldown_rounds": 3,
-      "side_effect": {
-        "state_key": "shapeshift_stability",
-        "delta": -5
-      },
       "key": "skill.beast.partial_transform",
-      "status": "active"
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
     },
     {
-      "name": "快速鉴定",
+      "name": "灵符贯光",
+      "desc": "凝出灵符激射一道灵光，破开敌方护体气机。",
       "owner_type": "player",
       "path_key": "support",
-      "target": "self",
+      "target": "single_enemy",
       "effect": {
-        "type": "next_item_or_device_effect_bp",
-        "value": 1000
+        "type": "spell_damage_multiplier_bp",
+        "value": 13000
       },
       "cost": {
         "resource_key": "energy",
@@ -179,10 +211,1087 @@
       "cooldown_rounds": 0,
       "uses_per_battle": 1,
       "key": "skill.support.quick_assessment",
-      "status": "active"
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "崩山掌",
+      "desc": "凝聚战意击出重掌，震荡敌方气血与护体灵力。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 16500,
+        "scaling_stat": "body"
+      },
+      "cost": {
+        "resource_key": "battle_spirit",
+        "amount": 16
+      },
+      "cooldown_rounds": 2,
+      "key": "skill.body.mountain_palm",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "镇岳拳",
+      "desc": "借山岳之势贯入拳锋，攻势沉厚，足以撼动坚甲。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 19500,
+        "scaling_stat": "body"
+      },
+      "cost": {
+        "resource_key": "battle_spirit",
+        "amount": 24
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.body.mountain_fist",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "寒潮术",
+      "desc": "凝水成霜，寒潮沿经脉侵袭，使术法攻势更为凌厉。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 17000,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "mana",
+        "amount": 26
+      },
+      "cooldown_rounds": 2,
+      "key": "skill.spell.cold_tide",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "赤莲焚心",
+      "desc": "引赤莲真火灼烧敌手，火势随灵力奔涌而开。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 20500,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "mana",
+        "amount": 38
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.spell.red_lotus",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "穿云弩机",
+      "desc": "驱动机关弩机连发灵矢，借精准机括穿透敌方防御。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 16000,
+        "scaling_stat": "physical_damage"
+      },
+      "cost": {
+        "resource_key": "mana",
+        "amount": 22
+      },
+      "cooldown_rounds": 2,
+      "key": "skill.device.piercing_bolt",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "雷枢傀儡",
+      "desc": "以雷纹驱动傀儡核心，令机关攻势附着震荡灵流。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 19000,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "mana",
+        "amount": 34
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.device.thunder_core",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "血刃诀",
+      "desc": "催动血气凝作锋刃，以迅猛攻势压制强敌。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 17500,
+        "scaling_stat": "physical_damage"
+      },
+      "cost": {
+        "resource_key": "hp_percent_bp",
+        "amount": 500
+      },
+      "cooldown_rounds": 2,
+      "key": "skill.demonic.blood_blade",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "幽冥破",
+      "desc": "引幽冥魔息贯穿敌手，在一击之间爆发凶险威势。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 6500
+      },
+      "cost": {
+        "resource_key": "hp_percent_bp",
+        "amount": 800
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.demonic.nether_break",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "裂风爪",
+      "desc": "借血脉之力挥出利爪，迅疾撕开敌方防线。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 17000,
+        "scaling_stat": "physical_damage"
+      },
+      "cost": {
+        "resource_key": "beast_power",
+        "amount": 8
+      },
+      "cooldown_rounds": 2,
+      "key": "skill.beast.rending_claw",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "祖灵啸月",
+      "desc": "唤起血脉深处的祖灵回响，以威压与妖力撼动敌手。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 20000,
+        "scaling_stat": "physical_damage"
+      },
+      "cost": {
+        "resource_key": "beast_power",
+        "amount": 14
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.beast.ancestral_howl",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "缚灵符",
+      "desc": "凝聚符箓灵力化作束缚锋芒，截断敌方行气节奏。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 15500,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "energy",
+        "amount": 4
+      },
+      "cooldown_rounds": 2,
+      "key": "skill.support.binding_talisman",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "阵枢震荡",
+      "desc": "催动阵枢汇聚四方灵力，在阵纹交错间爆发强劲冲击。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 18500,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "energy",
+        "amount": 6
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.support.array_pulse",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "崩岳摧城",
+      "desc": "将周身气血与山岳劲力合于一掌，掌落之处罡风裂地。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 24000,
+        "scaling_stat": "body"
+      },
+      "cost": {
+        "resource_key": "battle_spirit",
+        "amount": 36
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.body.mountain_collapse",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "紫霄神雷",
+      "desc": "引紫霄雷意入诀，雷光贯穿敌阵，余威震荡灵台。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 26000,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "mana",
+        "amount": 58
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.spell.purple_sky_thunder",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "虚空穿云弩",
+      "desc": "机关弩机锁定灵机破绽，弩矢穿过虚空折影直取要害。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 25000,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "mana",
+        "amount": 52
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.device.void_piercer",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "九幽噬魂斩",
+      "desc": "以精血催动幽冥刀意，斩击附着侵蚀神魂的阴寒之力。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 8000
+      },
+      "cost": {
+        "resource_key": "hp_percent_bp",
+        "amount": 1400
+      },
+      "cooldown_rounds": 3,
+      "requirements": [
+        {
+          "type": "hp_percent_bp_min",
+          "value": 2500
+        }
+      ],
+      "key": "skill.demonic.soul_devouring_slash",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "万兽真形",
+      "desc": "显化血脉深处的古兽真形，扑击撕开敌方护体气机。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 25000
+      },
+      "cost": {
+        "resource_key": "beast_power",
+        "amount": 12
+      },
+      "cooldown_rounds": 4,
+      "key": "skill.beast.true_form",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "万象封灵阵",
+      "desc": "阵纹铺展封锁四方灵机，使目标难以借势反击。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 23000,
+        "scaling_stat": "spirit"
+      },
+      "cost": {
+        "resource_key": "energy",
+        "amount": 10
+      },
+      "cooldown_rounds": 3,
+      "key": "skill.support.sealing_array",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "金阙震岳拳",
+      "desc": "金丹真元贯入拳势，沉厚罡劲直撼山岳之势。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 28500
+      },
+      "key": "skill.body.golden_core_shaking_fist",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "寒渊封灵诀",
+      "desc": "凝寒意为锁，霜华沿灵脉铺展，术法落处寒潮倒卷。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 29500
+      },
+      "key": "skill.spell.golden_core_frost_seal",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "霆枢贯日枪",
+      "desc": "机关雷枪纳金丹灵力为弩心，一线雷芒贯穿护体罡气。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 28000
+      },
+      "key": "skill.device.golden_core_thunder_lance",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "血魄裂甲斩",
+      "desc": "以精血催动锋芒，刀光越过甲胄，直取敌手气机。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 9500
+      },
+      "key": "skill.demonic.golden_core_blood_sunder",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "祖脉裂空爪",
+      "desc": "古兽血脉应声而醒，爪锋交错间撕开迎面气浪。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 29000
+      },
+      "key": "skill.beast.golden_core_ancestral_claw",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "七星破障阵",
+      "desc": "七道阵枢次第亮起，星力汇于阵眼，化作破障一击。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 27000
+      },
+      "key": "skill.support.golden_core_star_array",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "战神炼体诀",
+      "desc": "气血与罡元相合，拳锋落下时如战鼓震彻四野。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 33500
+      },
+      "key": "skill.body.soul_transform_war_god",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "法则潮生",
+      "desc": "引天地法则化作层叠潮汐，潮声未歇，灵光已至。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 34500
+      },
+      "key": "skill.spell.soul_transform_tidal_law",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "元神追魂弩",
+      "desc": "弩机锁定神魂波动，机关矢循着一缕气息破空而至。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 33000
+      },
+      "key": "skill.device.soul_transform_soulseeker",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "万魂焚心刃",
+      "desc": "幽焰依附刀锋而行，所过之处焚尽敌手护身灵机。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 11500
+      },
+      "key": "skill.demonic.soul_transform_soulflame",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "太古裂天爪",
+      "desc": "血脉深处传来古老回响，五道爪痕交叠成裂天之势。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 34000
+      },
+      "key": "skill.beast.soul_transform_ancient_claw",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "四象镇魔阵",
+      "desc": "四象阵旗遥相呼应，阵势收束为一道镇压邪祟的灵光。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 31500
+      },
+      "key": "skill.support.soul_transform_four_symbols",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "破界震天拳",
+      "desc": "拳势压过虚空乱流，层层劲力汇成破界一击。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 39000
+      },
+      "key": "skill.body.void_refining_worldbreaker",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "九霄雷瀑",
+      "desc": "引九霄雷意倾泻而下，雷瀑奔涌，照彻虚空深处。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 40500
+      },
+      "key": "skill.spell.void_refining_thunderfall",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "裂空神弩",
+      "desc": "弩矢穿行于虚实夹层，在敌手察觉前已洞穿护体灵光。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 38500
+      },
+      "key": "skill.device.void_refining_rift_crossbow",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "深渊灭神诀",
+      "desc": "幽冥魔息化作无声刃潮，穿过界隙斩向敌手神魂。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 14000
+      },
+      "key": "skill.demonic.void_refining_abyss_sunder",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "万灵吞月击",
+      "desc": "百兽灵影汇于一爪，月华与血气交织，势不可挡。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 39500
+      },
+      "key": "skill.beast.void_refining_moonrend",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "天罗封界阵",
+      "desc": "阵纹织成天罗，封住周遭虚空，将阵中灵力尽数收束。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 36500
+      },
+      "key": "skill.support.void_refining_heavenly_net",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "万岳归元掌",
+      "desc": "万重山势归于掌心，掌风既出，四方灵机随之震荡。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 45500
+      },
+      "key": "skill.body.dao_union_mountain_return",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "太初演星诀",
+      "desc": "推演群星初生之象，星轨交汇处落下一道开天灵光。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 47500
+      },
+      "key": "skill.spell.dao_union_star_origin",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "周天万机阵",
+      "desc": "万枚机关循周天运转，阵势合拢时化作贯穿云霄的锋芒。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 44500
+      },
+      "key": "skill.device.dao_union_zhou_tian_array",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "万劫血河斩",
+      "desc": "血河奔涌不息，刀意承载万劫之重，直斩前方强敌。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 16500
+      },
+      "key": "skill.demonic.dao_union_blood_river",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "祖灵撼界爪",
+      "desc": "祖灵虚影踏破山河，爪锋携万灵之力撼动天地界壁。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 46000
+      },
+      "key": "skill.beast.dao_union_ancestral_breaker",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "三才归一阵",
+      "desc": "天地人三才灵机合而为一，阵心吐纳间迸发归一之力。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 43000
+      },
+      "key": "skill.support.dao_union_three_talents",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "玄武不坏身",
+      "desc": "以不灭道体承接天劫余威，转守为攻，拳锋直贯云霄。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 53500
+      },
+      "key": "skill.body.tribulation_immortal_frame",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "三界天雷引",
+      "desc": "牵引三界雷脉汇于一念，万千雷光循劫云轰然落下。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 56500
+      },
+      "key": "skill.spell.tribulation_three_realms_thunder",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "开天造物机",
+      "desc": "机关核心纳入造化之力，灵机齐鸣，炮光贯穿重重劫云。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 52500
+      },
+      "key": "skill.device.tribulation_creation_cannon",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "众生劫火斩",
+      "desc": "将劫火炼入刀意，刀光如河，斩断前路万般阻碍。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 20000
+      },
+      "key": "skill.demonic.tribulation_living_flame",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "太初真灵啸",
+      "desc": "真灵长啸应和天劫，万灵血脉凝成震荡九霄的一击。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 54500
+      },
+      "key": "skill.beast.tribulation_true_spirit_roar",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
+    },
+    {
+      "name": "万法合劫阵",
+      "desc": "万法循阵而行，三劫之力在阵眼交汇，化作一束清明灵光。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 51000
+      },
+      "key": "skill.support.tribulation_myriad_law_array",
+      "status": "active",
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      }
     },
     {
       "name": "木桩轻击",
+      "desc": "训练傀儡以轻击测试修士基础防御。",
       "owner_type": "enemy",
       "target": "single_player",
       "effect": {
@@ -196,6 +1305,7 @@
     },
     {
       "name": "抓挠",
+      "desc": "野兽以利爪进行快速攻击。",
       "owner_type": "enemy",
       "target": "single_player",
       "effect": {
@@ -210,6 +1320,7 @@
     },
     {
       "name": "冲撞",
+      "desc": "野兽蓄力后向目标发起冲撞。",
       "owner_type": "enemy",
       "target": "single_player",
       "effect": {
@@ -223,6 +1334,7 @@
     },
     {
       "name": "刀波",
+      "desc": "挥出刀波并造成持续创伤。",
       "owner_type": "enemy",
       "target": "single_player",
       "effect": {
@@ -240,6 +1352,7 @@
     },
     {
       "name": "雾盾",
+      "desc": "凝聚雾气屏障，短暂吸收伤害。",
       "owner_type": "enemy",
       "target": "self",
       "effect": {
@@ -251,6 +1364,1274 @@
       "cooldown_rounds": 0,
       "key": "enemy_skill.mist_shield",
       "status": "active"
+    },
+    {
+      "key": "skill.body.qi_sensing.variant",
+      "name": "断碑寸劲",
+      "desc": "以筋骨与战意为引，将真元压入一瞬的杀招，威力更盛，命中却更难。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "qi_sensing",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "body",
+        "value": 15200
+      },
+      "combat_style": {
+        "key": "burst",
+        "name": "爆发",
+        "effect": {
+          "hit_penalty_bp": 900
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.spell.qi_sensing.variant",
+      "name": "霜河映月",
+      "desc": "引灵潮化作术式，招式余势凝成护幕，短暂削减接下来承受的伤害。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "qi_sensing",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 13400
+      },
+      "combat_style": {
+        "key": "support",
+        "name": "辅御",
+        "effect": {
+          "damage_reduction_bp": 1100,
+          "duration_rounds": 1
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.device.qi_sensing.variant",
+      "name": "鸢虎机簧",
+      "desc": "催动机关与灵枢，命中后留下灵息烙痕，后续回合仍会侵蚀对手。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "qi_sensing",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 11800
+      },
+      "combat_style": {
+        "key": "sustained",
+        "name": "持续",
+        "effect": {
+          "damage_over_time_bp": 1100,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.demonic.qi_sensing.variant",
+      "name": "蚀骨咒印",
+      "desc": "煞印入脉后持续侵蚀气血，并使中毒者的攻势渐弱。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "qi_sensing",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 10500
+      },
+      "combat_style": {
+        "key": "poison",
+        "name": "中毒",
+        "effect": {
+          "damage_over_time_bp": 900,
+          "enemy_attack_reduction_bp": 1000,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.beast.qi_sensing.variant",
+      "name": "青猊踏影",
+      "desc": "唤醒血脉中的古灵之力，先凝势一回合，再释放强化攻击；蓄势期间仍会承受攻击。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "qi_sensing",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 10500
+      },
+      "combat_style": {
+        "key": "charge",
+        "name": "蓄力",
+        "effect": {
+          "charge_multiplier_bp": 17500
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.support.qi_sensing.variant",
+      "name": "六甲锁灵符",
+      "desc": "将符箓与阵纹合为一势，不追求极端爆发，兼顾命中与伤害，适合稳扎稳打。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "qi_sensing",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 13450
+      },
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.body.qi_gathering.variant",
+      "name": "伏龙铁肘",
+      "desc": "沉肩递肘震荡筋脉，拳劲留下的暗伤会在后续回合发作。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "body",
+        "value": 14900
+      },
+      "combat_style": {
+        "key": "sustained",
+        "name": "持续",
+        "effect": {
+          "damage_over_time_bp": 1220,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.spell.qi_gathering.variant",
+      "name": "流霞归潮",
+      "desc": "引灵潮化作术式，命中后留下灵息烙痕，后续回合仍会侵蚀对手。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 15300
+      },
+      "combat_style": {
+        "key": "sustained",
+        "name": "持续",
+        "effect": {
+          "damage_over_time_bp": 1200,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.device.qi_gathering.variant",
+      "name": "磁砂飞轮",
+      "desc": "催动机关与灵枢，扰乱对手气机，数回合内削弱其攻击。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "physical_damage",
+        "value": 14100
+      },
+      "combat_style": {
+        "key": "negative",
+        "name": "削弱",
+        "effect": {
+          "enemy_attack_reduction_bp": 1220,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.demonic.qi_gathering.variant",
+      "name": "夺魄血契",
+      "desc": "以幽冥煞气侵入战局，先凝势一回合，再释放强化攻击；蓄势期间仍会承受攻击。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "physical_damage",
+        "value": 13200
+      },
+      "combat_style": {
+        "key": "charge",
+        "name": "蓄力",
+        "effect": {
+          "charge_multiplier_bp": 17750
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.beast.qi_gathering.variant",
+      "name": "玄蛟摆尾",
+      "desc": "蛟尾扫过留下毒鳞，毒息发作时也会扰乱敌手发力。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "physical_damage",
+        "value": 17450
+      },
+      "combat_style": {
+        "key": "poison",
+        "name": "中毒",
+        "effect": {
+          "damage_over_time_bp": 1250,
+          "enemy_attack_reduction_bp": 800,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.support.qi_gathering.variant",
+      "name": "两仪回风阵",
+      "desc": "将符箓与阵纹合为一势，将真元压入一瞬的杀招，威力更盛，命中却更难。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "qi_gathering",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 16820
+      },
+      "combat_style": {
+        "key": "burst",
+        "name": "爆发",
+        "effect": {
+          "hit_penalty_bp": 970
+        }
+      },
+      "status": "active"
+    },
+    {
+      "key": "skill.body.foundation.variant",
+      "name": "金身裂石",
+      "desc": "金身硬撼来招，将部分冲击沿拳劲反震回去。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "body",
+        "value": 17800
+      },
+      "combat_style": {
+        "key": "reflect",
+        "name": "反伤",
+        "effect": {
+          "damage_reflection_bp": 3200,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.spell.foundation.variant",
+      "name": "寒泉封脉",
+      "desc": "引灵潮化作术式，扰乱对手气机，数回合内削弱其攻击。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 18600
+      },
+      "combat_style": {
+        "key": "negative",
+        "name": "削弱",
+        "effect": {
+          "enemy_attack_reduction_bp": 1340,
+          "duration_rounds": 1
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.device.foundation.variant",
+      "name": "百炼追魂机",
+      "desc": "催动机关与灵枢，先凝势一回合，再释放强化攻击；蓄势期间仍会承受攻击。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 14700
+      },
+      "combat_style": {
+        "key": "charge",
+        "name": "蓄力",
+        "effect": {
+          "charge_multiplier_bp": 18000
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.demonic.foundation.variant",
+      "name": "赤魇噬心",
+      "desc": "以幽冥煞气侵入战局，不追求极端爆发，兼顾命中与伤害，适合稳扎稳打。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 6950
+      },
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.beast.foundation.variant",
+      "name": "苍狼逐日",
+      "desc": "唤醒血脉中的古灵之力，将真元压入一瞬的杀招，威力更盛，命中却更难。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "physical_damage",
+        "value": 21440
+      },
+      "combat_style": {
+        "key": "burst",
+        "name": "爆发",
+        "effect": {
+          "hit_penalty_bp": 1040
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.support.foundation.variant",
+      "name": "四象护元箓",
+      "desc": "四象符环护住周身，来袭之力会被阵纹折返。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "foundation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 16900
+      },
+      "combat_style": {
+        "key": "reflect",
+        "name": "反伤",
+        "effect": {
+          "damage_reflection_bp": 2600,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.body.golden_core.variant",
+      "name": "崩星震脉",
+      "desc": "以筋骨与战意为引，扰乱对手气机，数回合内削弱其攻击。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 26600
+      },
+      "combat_style": {
+        "key": "negative",
+        "name": "削弱",
+        "effect": {
+          "enemy_attack_reduction_bp": 1460,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.spell.golden_core.variant",
+      "name": "雷池落九霄",
+      "desc": "引雷池倾落九霄，命中后余焰灼烧敌手数回合。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 25200
+      },
+      "combat_style": {
+        "key": "burn",
+        "name": "灼烧",
+        "effect": {
+          "damage_over_time_bp": 1500,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.device.golden_core.variant",
+      "name": "灵枢贯日",
+      "desc": "催动机关与灵枢，不追求极端爆发，兼顾命中与伤害，适合稳扎稳打。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 28450
+      },
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.demonic.golden_core.variant",
+      "name": "血河剥甲",
+      "desc": "血煞附着伤口持续蚀骨，并压低敌手后续攻势。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 11060
+      },
+      "combat_style": {
+        "key": "poison",
+        "name": "中毒",
+        "effect": {
+          "damage_over_time_bp": 1450,
+          "enemy_attack_reduction_bp": 1300,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.beast.golden_core.variant",
+      "name": "白泽裂空",
+      "desc": "唤醒血脉中的古灵之力，招式余势凝成护幕，短暂削减接下来承受的伤害。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 27400
+      },
+      "combat_style": {
+        "key": "support",
+        "name": "辅御",
+        "effect": {
+          "damage_reduction_bp": 1460,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.support.golden_core.variant",
+      "name": "七星转魁阵",
+      "desc": "将符箓与阵纹合为一势，命中后留下灵息烙痕，后续回合仍会侵蚀对手。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "golden_core",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 25300
+      },
+      "combat_style": {
+        "key": "sustained",
+        "name": "持续",
+        "effect": {
+          "damage_over_time_bp": 1400,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.body.nascent_soul.variant",
+      "name": "伏魔真躯",
+      "desc": "以筋骨与战意为引，先凝势一回合，再释放强化攻击；蓄势期间仍会承受攻击。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "body",
+        "value": 19700
+      },
+      "combat_style": {
+        "key": "charge",
+        "name": "蓄力",
+        "effect": {
+          "charge_multiplier_bp": 18500
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.spell.nascent_soul.variant",
+      "name": "玄冰照魄",
+      "desc": "引灵潮化作术式，不追求极端爆发，兼顾命中与伤害，适合稳扎稳打。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 26450
+      },
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.device.nascent_soul.variant",
+      "name": "追魂连弩",
+      "desc": "催动机关与灵枢，将真元压入一瞬的杀招，威力更盛，命中却更难。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 26680
+      },
+      "combat_style": {
+        "key": "burst",
+        "name": "爆发",
+        "effect": {
+          "hit_penalty_bp": 1180
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.demonic.nascent_soul.variant",
+      "name": "九幽引魂幡",
+      "desc": "以幽冥煞气侵入战局，招式余势凝成护幕，短暂削减接下来承受的伤害。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 10500
+      },
+      "combat_style": {
+        "key": "support",
+        "name": "辅御",
+        "effect": {
+          "damage_reduction_bp": 1580,
+          "duration_rounds": 1
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.beast.nascent_soul.variant",
+      "name": "狻猊镇岳",
+      "desc": "唤醒血脉中的古灵之力，命中后留下灵息烙痕，后续回合仍会侵蚀对手。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 23300
+      },
+      "combat_style": {
+        "key": "sustained",
+        "name": "持续",
+        "effect": {
+          "damage_over_time_bp": 1500,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.support.nascent_soul.variant",
+      "name": "太乙缚妖索",
+      "desc": "将符箓与阵纹合为一势，扰乱对手气机，数回合内削弱其攻击。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "nascent_soul",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "scaling_stat": "spirit",
+        "value": 21100
+      },
+      "combat_style": {
+        "key": "negative",
+        "name": "削弱",
+        "effect": {
+          "enemy_attack_reduction_bp": 1580,
+          "duration_rounds": 1
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.body.soul_transformation.variant",
+      "name": "百劫金身",
+      "desc": "以筋骨与战意为引，不追求极端爆发，兼顾命中与伤害，适合稳扎稳打。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 33950
+      },
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.spell.soul_transformation.variant",
+      "name": "潮生万象",
+      "desc": "引灵潮化作术式，将真元压入一瞬的杀招，威力更盛，命中却更难。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 36300
+      },
+      "combat_style": {
+        "key": "burst",
+        "name": "爆发",
+        "effect": {
+          "hit_penalty_bp": 1250
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.device.soul_transformation.variant",
+      "name": "斩念神机",
+      "desc": "催动机关与灵枢，招式余势凝成护幕，短暂削减接下来承受的伤害。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 31400
+      },
+      "combat_style": {
+        "key": "support",
+        "name": "辅御",
+        "effect": {
+          "damage_reduction_bp": 1700,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.demonic.soul_transformation.variant",
+      "name": "幽焰断魂",
+      "desc": "以幽冥煞气侵入战局，命中后留下灵息烙痕，后续回合仍会侵蚀对手。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 10500
+      },
+      "combat_style": {
+        "key": "sustained",
+        "name": "持续",
+        "effect": {
+          "damage_over_time_bp": 1600,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.beast.soul_transformation.variant",
+      "name": "饕餮吞月",
+      "desc": "唤醒血脉中的古灵之力，扰乱对手气机，数回合内削弱其攻击。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 32100
+      },
+      "combat_style": {
+        "key": "negative",
+        "name": "削弱",
+        "effect": {
+          "enemy_attack_reduction_bp": 1700,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.support.soul_transformation.variant",
+      "name": "四象归墟阵",
+      "desc": "将符箓与阵纹合为一势，先凝势一回合，再释放强化攻击；蓄势期间仍会承受攻击。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "soul_transformation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 27200
+      },
+      "combat_style": {
+        "key": "charge",
+        "name": "蓄力",
+        "effect": {
+          "charge_multiplier_bp": 18750
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.body.void_refining.variant",
+      "name": "破界沉山",
+      "desc": "以筋骨与战意为引，将真元压入一瞬的杀招，威力更盛，命中却更难。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 40920
+      },
+      "combat_style": {
+        "key": "burst",
+        "name": "爆发",
+        "effect": {
+          "hit_penalty_bp": 1320
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.spell.void_refining.variant",
+      "name": "星陨天河",
+      "desc": "引星火拖曳长尾坠入敌阵，余焰会灼烧命中之处。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 38900
+      },
+      "combat_style": {
+        "key": "burn",
+        "name": "灼烧",
+        "effect": {
+          "damage_over_time_bp": 2000,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.device.void_refining.variant",
+      "name": "穿界梭矢",
+      "desc": "穿界梭矢在创口留下蚀毒，毒发时扰乱敌手运劲。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 36800
+      },
+      "combat_style": {
+        "key": "poison",
+        "name": "中毒",
+        "effect": {
+          "damage_over_time_bp": 1550,
+          "enemy_attack_reduction_bp": 1400,
+          "duration_rounds": 3
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.demonic.void_refining.variant",
+      "name": "无间血狱",
+      "desc": "以幽冥煞气侵入战局，扰乱对手气机，数回合内削弱其攻击。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 12100
+      },
+      "combat_style": {
+        "key": "negative",
+        "name": "削弱",
+        "effect": {
+          "enemy_attack_reduction_bp": 1820,
+          "duration_rounds": 1
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.beast.void_refining.variant",
+      "name": "烛龙蚀日",
+      "desc": "唤醒血脉中的古灵之力，先凝势一回合，再释放强化攻击；蓄势期间仍会承受攻击。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 35200
+      },
+      "combat_style": {
+        "key": "charge",
+        "name": "蓄力",
+        "effect": {
+          "charge_multiplier_bp": 19000
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.support.void_refining.variant",
+      "name": "天幕封域图",
+      "desc": "将符箓与阵纹合为一势，不追求极端爆发，兼顾命中与伤害，适合稳扎稳打。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "void_refining",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 36950
+      },
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.body.dao_union.variant",
+      "name": "山河挪岳手",
+      "desc": "移山卸力承下强攻，再借山河反势将部分冲击送还。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 43900
+      },
+      "combat_style": {
+        "key": "reflect",
+        "name": "反伤",
+        "effect": {
+          "damage_reflection_bp": 3900,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.spell.dao_union.variant",
+      "name": "太初星轨",
+      "desc": "引灵潮化作术式，命中后留下灵息烙痕，后续回合仍会侵蚀对手。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 45800
+      },
+      "combat_style": {
+        "key": "sustained",
+        "name": "持续",
+        "effect": {
+          "damage_over_time_bp": 1800,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.device.dao_union.variant",
+      "name": "周天星斗机",
+      "desc": "催动机关与灵枢，扰乱对手气机，数回合内削弱其攻击。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 42600
+      },
+      "combat_style": {
+        "key": "negative",
+        "name": "削弱",
+        "effect": {
+          "enemy_attack_reduction_bp": 1940,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.demonic.dao_union.variant",
+      "name": "血海无生刀",
+      "desc": "以幽冥煞气侵入战局，先凝势一回合，再释放强化攻击；蓄势期间仍会承受攻击。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 12200
+      },
+      "combat_style": {
+        "key": "charge",
+        "name": "蓄力",
+        "effect": {
+          "charge_multiplier_bp": 19250
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.beast.dao_union.variant",
+      "name": "万灵归巢",
+      "desc": "唤醒血脉中的古灵之力，不追求极端爆发，兼顾命中与伤害，适合稳扎稳打。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 46450
+      },
+      "combat_style": {
+        "key": "attack",
+        "name": "攻势",
+        "effect": {}
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.support.dao_union.variant",
+      "name": "三才定鼎图",
+      "desc": "将符箓与阵纹合为一势，将真元压入一瞬的杀招，威力更盛，命中却更难。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "dao_union",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 45040
+      },
+      "combat_style": {
+        "key": "burst",
+        "name": "爆发",
+        "effect": {
+          "hit_penalty_bp": 1390
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.body.tribulation.variant",
+      "name": "不坏劫骨",
+      "desc": "以筋骨与战意为引，命中后留下灵息烙痕，后续回合仍会侵蚀对手。",
+      "owner_type": "player",
+      "path_key": "body",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 51800
+      },
+      "combat_style": {
+        "key": "sustained",
+        "name": "持续",
+        "effect": {
+          "damage_over_time_bp": 1900,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.spell.tribulation.variant",
+      "name": "九曜焚天",
+      "desc": "九曜真火连绵落下，命中后灼穿护体灵力。",
+      "owner_type": "player",
+      "path_key": "spell",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 54600
+      },
+      "combat_style": {
+        "key": "burn",
+        "name": "灼烧",
+        "effect": {
+          "damage_over_time_bp": 2300,
+          "duration_rounds": 3
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.device.tribulation.variant",
+      "name": "开天神工",
+      "desc": "催动机关与灵枢，先凝势一回合，再释放强化攻击；蓄势期间仍会承受攻击。",
+      "owner_type": "player",
+      "path_key": "device",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 48200
+      },
+      "combat_style": {
+        "key": "charge",
+        "name": "蓄力",
+        "effect": {
+          "charge_multiplier_bp": 19500
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.demonic.tribulation.variant",
+      "name": "众生同烬",
+      "desc": "将煞火引入敌身，火势沿伤口蔓延并持续灼烧。",
+      "owner_type": "player",
+      "path_key": "demonic",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "damage_bonus_bp",
+        "value": 20450
+      },
+      "combat_style": {
+        "key": "burn",
+        "name": "灼烧",
+        "effect": {
+          "damage_over_time_bp": 1800,
+          "duration_rounds": 3
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.beast.tribulation.variant",
+      "name": "应劫真吼",
+      "desc": "唤醒血脉中的古灵之力，将真元压入一瞬的杀招，威力更盛，命中却更难。",
+      "owner_type": "player",
+      "path_key": "beast",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "physical_damage_multiplier_bp",
+        "value": 56660
+      },
+      "combat_style": {
+        "key": "burst",
+        "name": "爆发",
+        "effect": {
+          "hit_penalty_bp": 1460
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "skill.support.tribulation.variant",
+      "name": "万法归寂符",
+      "desc": "万法符界折返来招，将护身阵势积蓄的冲击反震回敌手。",
+      "owner_type": "player",
+      "path_key": "support",
+      "min_realm_key": "tribulation",
+      "min_layer": 1,
+      "target": "single_enemy",
+      "effect": {
+        "type": "spell_damage_multiplier_bp",
+        "value": 49400
+      },
+      "combat_style": {
+        "key": "reflect",
+        "name": "反伤",
+        "effect": {
+          "damage_reflection_bp": 4300,
+          "duration_rounds": 2
+        }
+      },
+      "status": "active",
+      "acquisition_item_key": "item.manual.skill_legacy"
     }
   ],
   "schema": "xiuxian.content"

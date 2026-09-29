@@ -11,7 +11,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from .codex_projection import record_codex_discovery
 from .story_models import StoryBranchView, StoryRecord
-from .story_rules import BRANCHES, CONTENT_VERSION, RULE_VERSION, STORY_KEY, completed_nodes
+from .story_rules import BRANCHES, STORY_KEY, completed_nodes
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -57,8 +57,6 @@ class StoryRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "story_key": STORY_KEY,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -81,8 +79,8 @@ class StoryRepositoryMixin:
                     """
                     INSERT INTO story_runs(
                         story_run_id,player_id,story_key,status,current_node,start_operation_id,
-                        snapshot_json,content_version,rule_version,created_at,updated_at
-                    ) VALUES(?,?,?,'active','node.arrival',?,?,?,?,?,?)
+                        snapshot_json,created_at,updated_at
+                    ) VALUES(?,?,?,'active','node.arrival',?,?,?,?)
                     """,
                     (
                         run_id,
@@ -90,8 +88,6 @@ class StoryRepositoryMixin:
                         STORY_KEY,
                         operation_id,
                         json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                        CONTENT_VERSION,
-                        RULE_VERSION,
                         now_text,
                         now_text,
                     ),
@@ -133,8 +129,6 @@ class StoryRepositoryMixin:
                 "platform_user_id": platform_user_id,
                 "story_key": STORY_KEY,
                 "route_key": route_key,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             },
         )
         now = self._now()
@@ -168,8 +162,6 @@ class StoryRepositoryMixin:
                     "source_operation_ids": branch_evidence,
                     "completed_nodes": list(nodes),
                     "selected_at": now_text,
-                    "content_version": str(run["content_version"]),
-                    "rule_version": str(run["rule_version"]),
                 }
                 connection.execute(
                     """
@@ -218,8 +210,6 @@ class StoryRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "story_key": STORY_KEY,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             },
         )
         now = self._now()
@@ -286,16 +276,14 @@ class StoryRepositoryMixin:
                     "route_key": route_key,
                     "story_run_id": str(run["story_run_id"]),
                     "source_operation_ids": snapshot.get("choice", {}).get("source_operation_ids", []),
-                    "content_version": str(run["content_version"]),
-                    "rule_version": str(run["rule_version"]),
                 },
             )
             connection.execute(
                 """
                 INSERT INTO story_ending_claims(
                     story_run_id,player_id,story_key,ending_key,route_key,operation_id,
-                    snapshot_json,reward_json,content_version,rule_version,claimed_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                    snapshot_json,reward_json,claimed_at
+                ) VALUES(?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     run["story_run_id"],
@@ -306,8 +294,6 @@ class StoryRepositoryMixin:
                     operation_id,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(reward, ensure_ascii=False, sort_keys=True),
-                    run["content_version"],
-                    run["rule_version"],
                     now_text,
                 ),
             )

@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
 from ..persistence.errors import (
     CommissionAlreadyAcceptedError,
     CommissionAlreadyDeliveredError,
@@ -16,16 +17,16 @@ from ..persistence.errors import (
     CommissionMaterialInsufficientError,
     CommissionNotAcceptedError,
     CommissionNotFoundError,
+    CommissionRequirementError,
     CommissionQuotaError,
     CommissionStockExhaustedError,
     OperationConflictError,
 )
 from .models import TownCommissionRecord, TownCommissionView
 from .rules import (
-    COMMISSION_SPIRIT_LEAF,
     TownCommissionDefinition,
     commission_definition,
-    TOWN_COMMISSION_DEFINITIONS,
+    town_commission_definitions,
 )
 
 
@@ -57,13 +58,15 @@ class CommissionRepositoryMixin:
                 """,
                 (player["id"], business_date),
             ).fetchall()
-            has_codex_unlock = self._has_codex_unlock(
-                connection, int(player["id"]), "commission.town.extra_offer"
-            )
+            definitions = town_commission_definitions(self.content)
             return tuple(
                 self._commission_view(row)
                 for row in rows
-                if str(row["commission_key"]) != COMMISSION_SPIRIT_LEAF or has_codex_unlock
+                if (definition := definitions.get(str(row["commission_key"]))) is not None
+                and (
+                    not definition.unlock_key
+                    or self._has_codex_unlock(connection, int(player["id"]), definition.unlock_key)
+                )
             )
 
     async def accept_commission(
@@ -92,7 +95,7 @@ class CommissionRepositoryMixin:
         operation_id: str,
     ) -> TownCommissionRecord:
         try:
-            definition = commission_definition(commission_key)
+            definition = commission_definition(commission_key, self.content)
         except ValueError as exc:
             raise CommissionNotFoundError("unsupported commission") from exc
         operation_name = "livelihood.accept_commission"
@@ -114,10 +117,12 @@ class CommissionRepositoryMixin:
             if existing is not None:
                 return self._record_from_payload(existing, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
-            if definition.key == COMMISSION_SPIRIT_LEAF and not self._has_codex_unlock(
-                connection, int(player["id"]), "commission.town.extra_offer"
+            if definition.unlock_key and not self._has_codex_unlock(
+                connection, int(player["id"]), definition.unlock_key
             ):
                 raise CommissionNotFoundError("codex milestone has not unlocked this commission")
+            if not self._commission_requirements_met(connection, player, definition):
+                raise CommissionRequirementError("commission prerequisites are not met")
             self._ensure_commissions(connection, business_date, now)
             self._expire_commissions(connection, business_date, now, now_text)
             offer = connection.execute(
@@ -216,7 +221,7 @@ class CommissionRepositoryMixin:
         normalized_key = ""
         if commission_key:
             try:
-                normalized_key = commission_definition(commission_key).key
+                normalized_key = commission_definition(commission_key, self.content).key
             except ValueError as exc:
                 raise CommissionNotFoundError("unsupported commission") from exc
         operation_name = "livelihood.deliver_commission"
@@ -284,7 +289,7 @@ class CommissionRepositoryMixin:
             ).fetchone()
             local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
             service_before = int(reputation["service_reputation"]) if reputation is not None else 0
-            local_key = "local.xuantian.new_town"
+            local_key = str(snapshot["local_reputation_key"])
             local_before = int(local.get(local_key, 0))
             local_after = min(1000, local_before + local_delta)
             service_after = min(100, service_before + service_delta)
@@ -338,21 +343,20 @@ class CommissionRepositoryMixin:
         day_start = datetime(now.year, now.month, now.day, tzinfo=now.tzinfo)
         starts_at = serialize_datetime(day_start)
         effects = self._public_project_effects(connection, now)
-        stock_multiplier = 120 if "town_commission.stock_bonus" in effects else 100
-        herb_reward_multiplier = 110 if "town_commission.herb_reward_bonus" in effects else 100
-        for definition in TOWN_COMMISSION_DEFINITIONS.values():
+        for definition in town_commission_definitions(self.content).values():
+            stock_multiplier = 120 if definition.stock_bonus_key in effects else 100
+            reward_multiplier = 110 if definition.reward_bonus_key in effects else 100
             expires = day_start + timedelta(seconds=definition.duration_seconds)
             status = "published" if now < expires else "expired"
             commission_id = f"town.new_town.{business_date}.{definition.key.rsplit('.', 1)[-1]}"
             stock = definition.stock * stock_multiplier // 100
-            reward_stones = definition.reward_stones
-            if definition.key == "town_commission.herb_supply":
-                reward_stones = reward_stones * herb_reward_multiplier // 100
+            reward_stones = definition.reward_stones * reward_multiplier // 100
             snapshot = {
                 "label": definition.label,
                 "inputs": definition.inputs,
                 "reward_stones": reward_stones,
                 "local_reputation": definition.local_reputation,
+                "local_reputation_key": definition.local_reputation_key,
                 "service_reputation": definition.service_reputation,
                 "content_version": definition.content_version,
                 "rule_version": definition.rule_version,
@@ -378,7 +382,7 @@ class CommissionRepositoryMixin:
                     starts_at,
                 ),
             )
-            if stock_multiplier > 100 or herb_reward_multiplier > 100:
+            if stock_multiplier > 100 or reward_multiplier > 100:
                 current = connection.execute(
                     "SELECT id, stock_total, stock_remaining, snapshot_json FROM town_commissions WHERE commission_id = ?",
                     (commission_id,),
@@ -387,7 +391,7 @@ class CommissionRepositoryMixin:
                     continue
                 additional_stock = max(0, stock - int(current["stock_total"]))
                 current_snapshot = self._json_object(current["snapshot_json"], {})
-                if definition.key == "town_commission.herb_supply":
+                if reward_multiplier > 100:
                     current_snapshot["reward_stones"] = reward_stones
                 connection.execute(
                     """
@@ -427,10 +431,48 @@ class CommissionRepositoryMixin:
                 return True
         return False
 
+    def _commission_requirements_met(
+        self,
+        connection: Any,
+        player: Any,
+        definition: TownCommissionDefinition,
+    ) -> bool:
+        if not definition.requirements_any:
+            return True
+        realm_order = {
+            str(row["key"]): index
+            for index, row in enumerate(
+                (self.content or bundled_content()).list("realm", include_locked=False)
+            )
+        }
+        local_reputation: dict[str, Any] = {}
+        for requirement in definition.requirements_any:
+            if requirement.get("type") == "realm":
+                current_rank = realm_order.get(str(player["realm_key"]), -1)
+                required_rank = realm_order.get(str(requirement["realm_key"]), -1)
+                if (current_rank, int(player["realm_layer"])) >= (
+                    required_rank,
+                    int(requirement["min_layer"]),
+                ):
+                    return True
+            elif requirement.get("type") == "local_reputation":
+                if not local_reputation:
+                    row = connection.execute(
+                        "SELECT local_json FROM player_reputations WHERE player_id = ?",
+                        (player["id"],),
+                    ).fetchone()
+                    local_reputation = self._json_object(row["local_json"], {}) if row else {}
+                if int(local_reputation.get(str(requirement["reputation_key"]), 0)) >= int(
+                    requirement["minimum"]
+                ):
+                    return True
+        return False
+
     @staticmethod
     def _snapshot(definition: TownCommissionDefinition, offer: Any, now_text: str) -> dict[str, Any]:
         snapshot = CommissionRepositoryMixin._json_object(offer["snapshot_json"], {})
         snapshot["commission_key"] = definition.key
+        snapshot["local_reputation_key"] = definition.local_reputation_key
         snapshot["accepted_at"] = now_text
         snapshot["expires_at"] = str(offer["expires_at"])
         return snapshot

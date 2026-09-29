@@ -261,8 +261,6 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             if replay is not None:
                 return self._action_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
-            # This compatibility path represents the pre-v0.5 permit source;
-            #炼虚 characters must use the real archive route and guard battle.
             if str(player["realm_key"]) != "soul_transformation" or int(player["realm_layer"]) < 1:
                 raise QuestRequirementError("archive ruins require soul transformation")
             if self._event_count(connection, int(player["id"]), VOID_QUEST, "archive_source") >= 1:

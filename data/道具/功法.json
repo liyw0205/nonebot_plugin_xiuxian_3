@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "基础引气诀",
+      "desc": "入门吐纳法门，引导天地灵气入体，助凡人踏上修行之路。",
       "item_type": "manual",
       "quality": "common",
       "stack_limit": 1,
@@ -13,11 +14,590 @@
         {
           "type": "cultivation_permission",
           "target": "qi_sensing"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "foundation",
+          "value": 300
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "golden_core",
+          "value": 300
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "nascent_soul",
+          "value": 300
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 250
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 150,
+          "stat": "attack"
         }
       ],
       "requirements": [],
       "status": "active",
       "key": "item.manual.basic_qi"
+    },
+    {
+      "name": "聚气周天诀",
+      "desc": "以周天行气之法稳固丹田气海，助修士凝结金丹时贯通经脉。",
+      "item_type": "manual",
+      "quality": "uncommon",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "qi_gathering"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "golden_core",
+          "value": 450
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 450
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 250,
+          "stat": "attack"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.cycle_qi"
+    },
+    {
+      "name": "紫府筑基篇",
+      "desc": "详述紫府开辟与神魂归一之法，为元婴凝形留下稳固根基。",
+      "item_type": "manual",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "foundation"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "nascent_soul",
+          "value": 500
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 650
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 500,
+          "stat": "max_hp"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.purple_mansion"
+    },
+    {
+      "name": "洞玄金丹经",
+      "desc": "以金丹映照神识，推演领域初成时的内外变化。",
+      "item_type": "manual",
+      "quality": "heaven",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "golden_core"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "soul_transformation",
+          "value": 600
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 900
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 600,
+          "stat": "attack"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.cave_mystery"
+    },
+    {
+      "name": "太虚行道录",
+      "desc": "记载神念锚定虚空、循界而行的法门，可助修士稳渡炼虚之劫。",
+      "item_type": "manual",
+      "quality": "mythic",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "void_refining"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "void_refining",
+          "value": 800
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 1200
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 900,
+          "stat": "attack"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.void_journey"
+    },
+    {
+      "name": "元婴归神诀",
+      "desc": "以元婴为炉、神魂为引，稳固出窍后的灵台，推演化神之机。",
+      "item_type": "manual",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "nascent_soul"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "soul_transformation",
+          "value": 650
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 650
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 450,
+          "stat": "initiative"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.nascent_spirit_return"
+    },
+    {
+      "name": "化神观天篇",
+      "desc": "观天地法则流转，以神识照见虚实边界，助修士凝炼化身。",
+      "item_type": "manual",
+      "quality": "heaven",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "soul_transformation"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "void_refining",
+          "value": 750
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 900
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 650,
+          "stat": "initiative"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.heaven_observation"
+    },
+    {
+      "name": "合道参玄录",
+      "desc": "以万法归一印证自身道途，记录合道修士贯通天地的修行法门。",
+      "item_type": "manual",
+      "quality": "mythic",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "dao_union"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "tribulation",
+          "value": 900
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 1200
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 1000,
+          "stat": "initiative"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.dao_union_mysteries"
+    },
+    {
+      "name": "渡厄飞升经",
+      "desc": "记载身心道三劫的调和之法，为渡过天劫、择定飞升之路作准备。",
+      "item_type": "manual",
+      "quality": "mythic",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "tribulation"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "tribulation",
+          "value": 1100
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 1200
+        },
+        {
+          "type": "damage_reflection_bp",
+          "value": 2200
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.transcendence_tribulation"
+    },
+    {
+      "name": "朝阳吐纳篇",
+      "desc": "循朝阳初升时的清气吐纳，引灵入脉，稳固初学者的气息。",
+      "item_type": "manual",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "qi_sensing"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "qi_gathering",
+          "value": 250
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 250
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 250,
+          "stat": "initiative"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.sunrise_breath"
+    },
+    {
+      "name": "百川行气诀",
+      "desc": "借百川归海之意贯通周天，让灵气沿经脉往复不息。",
+      "item_type": "manual",
+      "quality": "uncommon",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "qi_gathering"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "foundation",
+          "value": 400
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 450
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 350,
+          "stat": "max_hp"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.river_circulation"
+    },
+    {
+      "name": "厚土归元篇",
+      "desc": "以厚土承载灵台，沉心凝息，为开辟紫府积蓄根基。",
+      "item_type": "manual",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "foundation"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "golden_core",
+          "value": 500
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 650
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 800,
+          "stat": "max_hp"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.earth_root"
+    },
+    {
+      "name": "星府凝丹诀",
+      "desc": "引星辉映照丹田，以周天灵机淬炼金丹雏形。",
+      "item_type": "manual",
+      "quality": "heaven",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "golden_core"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "nascent_soul",
+          "value": 600
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 900
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 800,
+          "stat": "agility"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.starry_core"
+    },
+    {
+      "name": "莲台养神录",
+      "desc": "观想莲台护持元婴，收束神识，使出窍之念不散。",
+      "item_type": "manual",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "nascent_soul"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "soul_transformation",
+          "value": 700
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 650
+        },
+        {
+          "type": "damage_reflection_bp",
+          "value": 1000
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.lotus_soul"
+    },
+    {
+      "name": "明心照世经",
+      "desc": "以澄明心境映照天地法则，令神识由内而外渐成化身。",
+      "item_type": "manual",
+      "quality": "heaven",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "soul_transformation"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "void_refining",
+          "value": 800
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 900
+        },
+        {
+          "type": "damage_reflection_bp",
+          "value": 1500
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.clear_mind"
+    },
+    {
+      "name": "虚心定界诀",
+      "desc": "锚定心神而后观虚，辨清界壁流转中的裂隙与归路。",
+      "item_type": "manual",
+      "quality": "mythic",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "void_refining"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "dao_union",
+          "value": 950
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 1200
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 1100,
+          "stat": "max_hp"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.void_heart"
+    },
+    {
+      "name": "万象同归篇",
+      "desc": "观万法各循其理而终归一源，借此印证自身道途。",
+      "item_type": "manual",
+      "quality": "mythic",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "dao_union"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "tribulation",
+          "value": 1050
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 1200
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 1000,
+          "stat": "agility"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.myriad_return"
+    },
+    {
+      "name": "登天问道篇",
+      "desc": "汇身、心、道三关所得，记下渡过天劫后继续求索的法门。",
+      "item_type": "manual",
+      "quality": "mythic",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "cultivation_permission",
+          "target": "tribulation"
+        },
+        {
+          "type": "breakthrough_bonus_bp",
+          "target_realm": "tribulation",
+          "value": 1250
+        },
+        {
+          "type": "cultivation_gain_bp",
+          "value": 1200
+        },
+        {
+          "type": "combat_stat_bonus_bp",
+          "value": 700,
+          "stat": "attack"
+        }
+      ],
+      "status": "active",
+      "key": "item.manual.ascension_inquiry"
+    },
+    {
+      "key": "item.manual.skill_legacy",
+      "name": "战技传承残卷",
+      "desc": "记载旧时代战技的一页残卷，首次参悟一门高阶战技时消耗。",
+      "item_type": "manual",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active"
     }
   ],
   "category": "功法",

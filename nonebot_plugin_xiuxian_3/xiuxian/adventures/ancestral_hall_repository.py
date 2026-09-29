@@ -9,6 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
+from ..specials.codex_projection import record_codex_discovery
 from ..persistence.errors import (
     AncestralHallBusyError,
     AncestralHallNodeError,
@@ -31,6 +33,7 @@ from .ancestral_hall_rules import (
     ANCESTRAL_HALL_RULE_VERSION,
     ANCESTRAL_HALL_STAMINA_COST,
     ANCESTRAL_HALL_STORY_FLAG,
+    ANCESTRAL_HALL_CODEX_ENTRY,
 )
 from .secret_realm_rules import realm_at_least
 
@@ -469,6 +472,17 @@ class AncestralHallRepositoryMixin:
                     connection.execute(
                         "UPDATE players SET intro_json=?, updated_at=? WHERE id=?",
                         (json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    )
+                    content = self.content or bundled_content()
+                    content.require("codex_entry", ANCESTRAL_HALL_CODEX_ENTRY, include_locked=False)
+                    record_codex_discovery(
+                        connection,
+                        player_id=int(player["id"]),
+                        entry_key=ANCESTRAL_HALL_CODEX_ENTRY,
+                        operation_id=operation_id,
+                        occurred_at=now_text,
+                        snapshot={"run_id": str(run["run_id"]), "location_key": ANCESTRAL_HALL_LOCATION},
+                        content=content,
                     )
                 result.update({"outcome": "won", "first_clear": first_clear, "story_flag_written": first_clear})
                 status = "settled"

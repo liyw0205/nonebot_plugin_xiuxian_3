@@ -21,8 +21,6 @@ def ensure_story_schema(connection: sqlite3.Connection) -> None:
             claim_operation_id TEXT UNIQUE,
             snapshot_json TEXT NOT NULL DEFAULT '{}',
             result_json TEXT NOT NULL DEFAULT '{}',
-            content_version TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE (player_id, story_key)
@@ -39,8 +37,6 @@ def ensure_story_schema(connection: sqlite3.Connection) -> None:
             operation_id TEXT NOT NULL UNIQUE,
             snapshot_json TEXT NOT NULL,
             reward_json TEXT NOT NULL,
-            content_version TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
             claimed_at TEXT NOT NULL,
             UNIQUE (player_id, story_key)
         );

@@ -18,6 +18,7 @@ from ..persistence.errors import (
     PlayerSuspendedError,
     RepositoryBusyError,
 )
+from ..utils.text import escape_markdown
 from .repository import CombatRepositoryMixin
 
 
@@ -36,14 +37,7 @@ class CombatApplication:
 
     @staticmethod
     def _display_name(player) -> str:
-        value = player.dao_name or "未命名"
-        return (
-            value.replace("\\", "\\\\")
-            .replace("`", "\\`")
-            .replace("*", "\\*")
-            .replace("_", "\\_")
-            .replace("~", "\\~")
-        )
+        return escape_markdown(player.dao_name or "未命名")
 
     @staticmethod
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
@@ -58,8 +52,8 @@ class CombatApplication:
             BattleAlreadySettledError: ("BATTLE_ALREADY_SETTLED", "这场战斗已经结算。"),
             BattleRewardNotAvailableError: ("BATTLE_REWARD_NOT_AVAILABLE", "当前没有待领取的战斗奖励。"),
             BattleRewardAlreadyClaimedError: ("BATTLE_REWARD_ALREADY_CLAIMED", "这场战斗奖励已经领取。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于不同的战斗操作，请重新发起。"),
-            RepositoryBusyError: ("PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此番请求与先前的斗法不同，请另行发起。"),
+            RepositoryBusyError: ("PERSISTENCE_BUSY", "演武场中人影纷乱，稍后再来。"),
         }
         for error_type, (code, message) in errors.items():
             if isinstance(exc, error_type):
@@ -85,44 +79,49 @@ class CombatApplication:
             return CommandResult(
                 False,
                 "INVALID_BATTLE_COMMAND",
-                "开始训练战不接受技能、目标、伤害或其他参数。",
+                "傀儡演武自有章法，无需指定招式与胜负。",
                 context.request_id,
             )
-        operation_id = self._operation_id(context, "battle.start")
         try:
-            started = await self.repository.start_training_battle(
+            preview = await self.repository.preview_training_dummy(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                operation_id=operation_id,
             )
-            resolved = await self._run_to_resolution(started.battle_id, started.round_no)
         except Exception as exc:
-            return self._error(context, operation_id, exc)
-        reward_text = "待领取" if resolved.reward_status == "pending" else "无"
-        outcome_text = "胜利" if resolved.outcome == "won" else "落败"
+            return self._error(context, "", exc)
+        snapshots = preview.snapshots
+        player_name = escape_markdown(str(snapshots.get("player", {}).get("display_name", "修士")))
+        enemy_name = escape_markdown(str(snapshots.get("enemy", {}).get("display_name", "训练傀儡")))
+        actions = [dict(action) for action in preview.actions]
+        action_lines = []
+        for action in actions:
+            actor = player_name if action["actor_key"] == "player" else enemy_name
+            target = enemy_name if action["target_key"] == "enemy" else player_name
+            exchange = (
+                f"{actor} 招势命中 {target}，气血损去 {action['damage']}"
+                if action.get("hit")
+                else f"{actor} 一招落空"
+            )
+            action_lines.append(f"- 第 {action['round_no']} 合：{exchange}")
         return CommandResult(
             True,
-            "BATTLE_SETTLED",
+            "TRAINING_SPECTATOR",
             (
-                "## 训练战结束\n\n"
-                f"**{self._display_name(resolved.player)}**与训练傀儡的自动斗法已结束。\n\n"
-                f"- **结果**：{outcome_text}\n"
-                f"- **回合**：{resolved.round_no}/{20}\n"
-                f"- **奖励**：{reward_text}\n\n"
-                "> 服务器已记录完整行动回放；胜利后发送 `领取战斗奖励`。"
+                "## 演武旁观\n\n"
+                f"**{player_name}**与**{enemy_name}**交手一场，招式尽显。\n\n"
+                f"- **结果**：{ {'challenger_won': '你技高一筹', 'defender_won': '训练傀儡略胜一筹', 'draw': '双方势均力敌'}.get(preview.outcome, '演武已毕') }\n"
+                f"- **交手合数**：{preview.rounds}\n\n"
+                "### 招式往来\n"
+                + "\n".join(action_lines)
+                + "\n\n> 此番只为观招，不入斗法功业；随身资粮与法器皆无损。"
             ),
             context.request_id,
-            operation_id,
             data={
-                "battle_id": resolved.battle_id,
-                "enemy_key": resolved.enemy_key,
-                "status": resolved.status,
-                "outcome": resolved.outcome,
-                "reason": resolved.reason,
-                "round_no": resolved.round_no,
-                "reward": resolved.reward,
-                "reward_status": resolved.reward_status,
-                "idempotent_replay": started.already_completed or resolved.already_completed,
+                "status": "spectator",
+                "outcome": preview.outcome,
+                "rounds": preview.rounds,
+                "snapshots": snapshots,
+                "actions": actions,
             },
         )
 

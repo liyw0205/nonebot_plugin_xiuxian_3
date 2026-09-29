@@ -8,7 +8,12 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp, settlement_result
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
+    battle_roll_bp,
+    settlement_result,
+    weighted_value,
+    weighted_value_with_item_bonus,
+)
 
 
 def _context(user_id: str, request_id: str, *, operation_id: str = "") -> CommandContext:
@@ -130,15 +135,29 @@ def test_exploration_modes_settle_rewards_and_replay_once() -> None:
     asyncio.run(run())
 
 
-def test_outskirts_wood_rule_revision_preserves_running_v010_sessions() -> None:
-    old_result = settlement_result(
-        "explore.gather_outskirts", "frozen-old-session", rule_version="exploration-0.1.0"
+def test_outskirts_settlement_uses_stable_business_rules() -> None:
+    result = settlement_result("explore.gather_outskirts", "stable-session")
+    assert "item.mat.wood" not in result
+    assert set(result) == {"item.herb.blood_grass", "item.ore.ironstone"}
+
+
+def test_drop_weight_bonus_changes_optional_exploration_rewards() -> None:
+    seeds = (f"fortune-{index}" for index in range(2_000))
+    base_drops = sum(
+        weighted_value(seed, (0, 1, 2, 3), (45, 30, 15, 10)) in {0, 2}
+        for seed in seeds
     )
-    new_result = settlement_result(
-        "explore.gather_outskirts", "new-session", rule_version="exploration-0.1.1"
+    boosted_drops = sum(
+        weighted_value_with_item_bonus(
+            f"fortune-{index}", (0, 1, 2, 3), (45, 30, 15, 10),
+            item_values=frozenset({0, 2}), bonus_bp=10_000,
+        ) in {0, 2}
+        for index in range(2_000)
     )
-    assert "item.mat.wood" not in old_result
-    assert new_result["item.mat.wood"] in (0, 1)
+    assert boosted_drops > base_drops
+    assert settlement_result("explore.beast_hunt", "fortune-2") != settlement_result(
+        "explore.beast_hunt", "fortune-2", drop_weight_bp=100_000
+    )
 
 
 def test_exploration_ready_cancel_quota_and_resource_guards() -> None:

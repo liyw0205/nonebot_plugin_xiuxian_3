@@ -49,8 +49,6 @@ def _connection() -> sqlite3.Connection:
             first_seen_operation_id TEXT NOT NULL,
             first_seen_at TEXT NOT NULL,
             payload_json TEXT NOT NULL,
-            content_version TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
             last_seen_at TEXT NOT NULL,
             UNIQUE (player_id, entry_key)
         );

@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "青石镇客房",
+      "desc": "镇中简洁安稳的落脚处，可供歇息、存放少量行李并打理一方小田。",
       "requirements": [
         {
           "type": "stage_min",
@@ -25,6 +26,7 @@
     },
     {
       "name": "小院",
+      "desc": "带有数间静室与小片灵田的独门院落，适合长期修整和栽种灵植。",
       "requirements": [
         {
           "type": "reputation",
@@ -48,6 +50,7 @@
     },
     {
       "name": "止血草",
+      "desc": "容易照料的常见药草，成熟后可采下止血草供炼药使用。",
       "requirements": [
         {
           "type": "residence_plot",
@@ -82,6 +85,7 @@
     },
     {
       "name": "灵叶",
+      "desc": "喜受灵气滋养的灵植，悉心照料后可收获灵叶与少量阵材。",
       "requirements": [
         {
           "type": "residence_key",
@@ -123,6 +127,7 @@
     },
     {
       "name": "止血草供应",
+      "desc": "药铺收购新鲜止血草，按约交货可换取灵石与青石镇的认可。",
       "inputs": [
         {
           "item_key": "item.herb.blood_grass",
@@ -137,6 +142,9 @@
         "service_reputation": 1
       },
       "stock": 200,
+      "aliases": ["草药供应"],
+      "stock_bonus_key": "town_commission.stock_bonus",
+      "reward_bonus_key": "town_commission.herb_reward_bonus",
       "duration_seconds": 43200,
       "key": "town_commission.herb_supply",
       "record_type": "commission",
@@ -144,6 +152,7 @@
     },
     {
       "name": "工具修缮",
+      "desc": "镇中工匠收购木材与铁石，用以修补日常生产工具。",
       "inputs": [
         {
           "item_key": "item.mat.wood",
@@ -162,6 +171,7 @@
         "service_reputation": 1
       },
       "stock": 120,
+      "stock_bonus_key": "town_commission.stock_bonus",
       "duration_seconds": 43200,
       "key": "town_commission.repair_tools",
       "record_type": "commission",
@@ -169,6 +179,7 @@
     },
     {
       "name": "灵米饭供应",
+      "desc": "食肆收购现做的灵米饭，为往来修士备下充饥餐食。",
       "inputs": [
         {
           "item_key": "item.food.spirit_rice",
@@ -183,13 +194,75 @@
         "service_reputation": 1
       },
       "stock": 150,
+      "stock_bonus_key": "town_commission.stock_bonus",
       "duration_seconds": 43200,
       "key": "town_commission.meal_service",
       "record_type": "commission",
       "status": "active"
     },
     {
+      "name": "灵泉谷灵叶收集",
+      "desc": "灵泉谷商户收购灵叶，用于调制灵植养护药露。",
+      "inputs": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 1
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 30,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 4,
+        "service_reputation": 2
+      },
+      "stock": 80,
+      "stock_bonus_key": "town_commission.stock_bonus",
+      "duration_seconds": 43200,
+      "unlock_key": "commission.town.extra_offer",
+      "key": "town_commission.spirit_leaf",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "云城商会·云铁供应",
+      "desc": "云城商会收购云铁，供器坊与阵堂补充日常炼制所需。",
+      "aliases": ["云铁供应", "云铁供货"],
+      "inputs": [
+        {
+          "item_key": "item.material.cloud_iron",
+          "quantity": 5
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 180,
+        "reputation_key": "local.xuantian.cloud_city",
+        "reputation": 6,
+        "service_reputation": 2
+      },
+      "stock": 80,
+      "duration_seconds": 86400,
+      "unlock_key": "commission.cloud_city.extra_order",
+      "requirements_any": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 1
+        },
+        {
+          "type": "local_reputation",
+          "reputation_key": "local.xuantian.cloud_city",
+          "minimum": 150
+        }
+      ],
+      "key": "guild.cloud_iron_supply",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
       "name": "教学采集协助",
+      "desc": "协助初学者熟悉近郊采集，可获得少量报酬。",
       "requirements": [
         {
           "type": "service_reputation",
@@ -210,6 +283,7 @@
     },
     {
       "name": "烹饪服务",
+      "desc": "备好粗糙灵米，为镇中食肆烹制灵米饭并领取酬劳。",
       "requirements": [
         {
           "type": "teaching",
@@ -238,6 +312,7 @@
     },
     {
       "name": "青石镇至近郊短途运输",
+      "desc": "将镇中货物运往近郊，途中可能遇上天气或山路耽搁。",
       "requirements": [
         {
           "type": "stage_min",

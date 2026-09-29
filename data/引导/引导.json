@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "阅读世界说明",
+      "desc": "了解玄天界的来历与修行常识，再决定如何开启自己的仙途。",
       "status": "active",
       "operation": "guide.read_world",
       "requirements": [
@@ -21,6 +22,7 @@
     },
     {
       "name": "教学采集止血草",
+      "desc": "前往近郊寻找止血草，练习辨认草木与安全采集。",
       "status": "active",
       "operation": "guide.gather_blood_grass",
       "requirements": [
@@ -42,7 +44,7 @@
         "amount": 1
       },
       "repeatable": false,
-      "random_pool": "gather.v0.1",
+      "random_pool": "gather",
       "output": {
         "item_key": "item.herb.blood_grass",
         "quantity_range": [
@@ -54,6 +56,7 @@
     },
     {
       "name": "选择生产教学",
+      "desc": "从炼丹、炼器或布阵中选择一门入门技艺，学习如何处理灵材。",
       "status": "active",
       "operation": "guide.choose_service",
       "requirements": [

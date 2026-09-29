@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 import hashlib
 from datetime import datetime, timedelta, timezone
 
 
 EVENT_KEY = "event.domain_front"
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 LOCATION_KEY = "xuantian.domain_front"
 ACTIVITY_HOURS = 4
 ROUND_MINUTES = 30

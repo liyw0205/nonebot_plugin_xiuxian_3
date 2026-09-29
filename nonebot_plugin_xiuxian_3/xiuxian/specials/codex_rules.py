@@ -1,16 +1,11 @@
-"""Versioned rules for the v0.1 discovery codex."""
+"""Validated content definitions for discovery entries and milestones."""
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
-
 from dataclasses import dataclass
+from functools import lru_cache
 
-from ..player.path_rules import PATH_LABELS
-
-
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+from ..content import ContentBundle, ContentError, bundled_content
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,165 +13,150 @@ class CodexEntryDefinition:
     key: str
     category: str
     label: str
+    desc: str
 
 
 @dataclass(frozen=True, slots=True)
 class CodexMilestoneDefinition:
     key: str
     label: str
+    desc: str
     entry_keys: tuple[str, ...]
-    reputation_reward: int = 0
-    unlocks: tuple[str, ...] = ()
+    reputation_key: str | None
+    reputation_name: str | None
+    reputation_reward: int
+    unlocks: tuple[str, ...]
 
 
-_ENTRY_LABELS = {
-    "codex.place.new_town": ("place", "青石镇"),
-    "codex.place.outskirts": ("place", "玄天近郊"),
-    "codex.place.spirit_field": ("place", "灵泉谷"),
-    "codex.material.blood_grass": ("material", "止血草"),
-    "codex.material.spirit_leaf": ("material", "灵叶"),
-    "codex.material.ironstone": ("material", "铁石"),
-    "codex.material.wood": ("material", "木材"),
-    "codex.material.array_sand": ("material", "阵砂"),
-    "codex.creature.wood_rat": ("creature", "木鼠"),
-    "codex.creature.iron_boar": ("creature", "铁背野猪"),
-    "codex.creature.mist_guardian": ("creature", "雾隐守卫"),
-    "codex.route.town_road": ("route", "青石镇商路"),
-    "codex.route.boundary": ("route", "界隙裂隙路线"),
-    "codex.dispatch.herb_search": ("dispatch", "药材搜寻"),
-    "codex.instance.mist_grotto": ("challenge", "雾隐洞天"),
-    "codex.instance.cloud_boat": ("challenge", "云舟秘境"),
-    "codex.domain.ancient_domain": ("challenge", "远古洞天秘境"),
-    "codex.void.route_ruins": ("route", "虚空遗迹航道"),
-    "codex.dao.service_origin": ("service", "道源服务篇章"),
-    "codex.story.dao_service_origin": ("story", "道统服务缘起"),
-    "codex.challenge.mist_trial.floor_5": ("challenge", "雾隐试炼塔五层"),
-    "codex.challenge.mist_trial.floor_10": ("challenge", "雾隐试炼塔十层"),
-    "codex.story.dispatch_demon_relief": ("story", "魔界救援线索"),
-    "codex.story.dispatch_beast_relocation": ("story", "妖界迁徙线索"),
-    "codex.story.beast_habitat": ("story", "万兽栖地保护记录"),
-}
-for _floor_no in range(1, 46):
-    _ENTRY_LABELS.setdefault(
-        f"codex.challenge.mist_trial.floor_{_floor_no}",
-        ("challenge", f"雾隐试炼塔第 {_floor_no} 层"),
-    )
-for _floor_no in range(1, 41):
-    _ENTRY_LABELS.setdefault(
-        f"codex.challenge.three_realms.floor_{_floor_no}",
-        ("challenge", f"三界塔第 {_floor_no} 层"),
-    )
-for _floor_no in range(1, 61):
-    _ENTRY_LABELS.setdefault(
-        f"codex.challenge.void_spire.floor_{_floor_no}",
-        ("challenge", f"虚空塔第 {_floor_no} 层"),
-    )
-_ENTRY_LABELS.setdefault("codex.void.route_spire_storm", ("route", "虚空塔风暴路线"))
-_ENTRY_LABELS.setdefault("codex.void.route_spire_echo", ("route", "虚空塔回响路线"))
-_ENTRY_LABELS.setdefault("codex.void.route_spire_inscription", ("route", "虚空塔碑铭路线"))
-_ENTRY_LABELS.setdefault("codex.void.route_spire_witness", ("route", "虚空塔见证路线"))
-_ENTRY_LABELS.setdefault("codex.story.void_spire.inscription", ("story", "虚空碑铭记录"))
-_ENTRY_LABELS.setdefault("codex.story.void_spire.witness", ("story", "虚空见证记录"))
-for _faction, _label in (("xuantian", "玄天"), ("demon", "魔界"), ("beast", "妖界")):
-    _ENTRY_LABELS.setdefault(
-        f"codex.story.three_realms.faction_{_faction}",
-        ("story", f"三界塔{_label}阵营记录"),
-    )
-    _ENTRY_LABELS.setdefault(
-        f"codex.story.three_realms.reconstruction_{_faction}",
-        ("story", f"三界塔{_label}重建记录"),
-    )
-    _ENTRY_LABELS.setdefault(
-        f"codex.story.three_realms.domain_{_faction}",
-        ("story", f"三界塔{_label}领域记录"),
-    )
+@lru_cache(maxsize=1)
+def _default_content() -> ContentBundle:
+    return bundled_content()
 
-ENTRY_DEFINITIONS: dict[str, CodexEntryDefinition] = {
-    key: CodexEntryDefinition(key, category, label)
-    for key, (category, label) in _ENTRY_LABELS.items()
-}
-ENTRY_DEFINITIONS.update(
-    {
-        f"codex.path.{path_key}": CodexEntryDefinition(
-            f"codex.path.{path_key}", "path", f"{label}道途"
+
+def _content(content: ContentBundle | None) -> ContentBundle:
+    return content if content is not None else _default_content()
+
+
+def codex_entry_definitions(content: ContentBundle | None = None) -> dict[str, CodexEntryDefinition]:
+    bundle = _content(content)
+    categories = {row["key"] for row in bundle.list("codex_category", include_locked=False)}
+    result: dict[str, CodexEntryDefinition] = {}
+    for row in bundle.list("codex_entry", include_locked=False):
+        key = row.get("key")
+        category = row.get("category")
+        name = row.get("name")
+        desc = row.get("desc")
+        if not isinstance(key, str) or not isinstance(category, str) or category not in categories:
+            raise ContentError(f"codex entry has an invalid category: {key!r}")
+        if not isinstance(name, str) or not name.strip() or not isinstance(desc, str) or not desc.strip():
+            raise ContentError(f"codex entry {key} requires name and desc")
+        result[key] = CodexEntryDefinition(key, category, name.strip(), desc.strip())
+    return result
+
+
+def codex_milestones(content: ContentBundle | None = None) -> dict[str, CodexMilestoneDefinition]:
+    bundle = _content(content)
+    entries = codex_entry_definitions(bundle)
+    unlock_keys = {row["key"] for row in bundle.list("codex_unlock", include_locked=False)}
+    result: dict[str, CodexMilestoneDefinition] = {}
+    for row in bundle.list("codex_milestone", include_locked=False):
+        key = row.get("key")
+        name = row.get("name")
+        desc = row.get("desc")
+        entry_keys = row.get("entry_keys")
+        unlocks = row.get("unlocks", [])
+        reward = row.get("reward", {})
+        if not isinstance(key, str) or not isinstance(name, str) or not name.strip():
+            raise ContentError(f"codex milestone requires key and name: {key!r}")
+        if not isinstance(desc, str) or not desc.strip():
+            raise ContentError(f"codex milestone {key} requires desc")
+        if (
+            not isinstance(entry_keys, list)
+            or not entry_keys
+            or any(not isinstance(entry_key, str) or entry_key not in entries for entry_key in entry_keys)
+            or len(set(entry_keys)) != len(entry_keys)
+        ):
+            raise ContentError(f"codex milestone {key} has invalid entry_keys")
+        if not isinstance(unlocks, list) or any(
+            not isinstance(unlock, str) or unlock not in unlock_keys for unlock in unlocks
+        ):
+            raise ContentError(f"codex milestone {key} has invalid unlocks")
+        reputation_key: str | None = None
+        reputation_name: str | None = None
+        reputation_reward = 0
+        if reward:
+            if (
+                not isinstance(reward, dict)
+                or reward.get("type") != "local_reputation"
+                or not isinstance(reward.get("reputation_key"), str)
+                or not isinstance(reward.get("name"), str)
+                or not reward["name"].strip()
+                or isinstance(reward.get("amount"), bool)
+                or not isinstance(reward.get("amount"), int)
+                or reward["amount"] <= 0
+            ):
+                raise ContentError(f"codex milestone {key} has an invalid reward")
+            reputation_key = reward["reputation_key"]
+            reputation_name = reward["name"].strip()
+            reputation_reward = reward["amount"]
+        if not reward and not unlocks:
+            raise ContentError(f"codex milestone {key} has no reward")
+        result[key] = CodexMilestoneDefinition(
+            key=key,
+            label=name.strip(),
+            desc=desc.strip(),
+            entry_keys=tuple(entry_keys),
+            reputation_key=reputation_key,
+            reputation_name=reputation_name,
+            reputation_reward=reputation_reward,
+            unlocks=tuple(unlocks),
         )
-        for path_key, label in PATH_LABELS.items()
+    return result
+
+
+def category_labels(content: ContentBundle | None = None) -> dict[str, str]:
+    return {
+        str(row["key"]): str(row["name"])
+        for row in _content(content).list("codex_category", include_locked=False)
     }
-)
-PLACE_KEYS = tuple(key for key, value in ENTRY_DEFINITIONS.items() if value.category == "place")
-MATERIAL_KEYS = tuple(key for key, value in ENTRY_DEFINITIONS.items() if value.category == "material")
-CREATURE_KEYS = tuple(key for key, value in ENTRY_DEFINITIONS.items() if value.category == "creature")
-PATH_KEYS = tuple(key for key, value in ENTRY_DEFINITIONS.items() if value.category == "path")
-
-MILESTONES: dict[str, CodexMilestoneDefinition] = {
-    "codex.xuantian.place_3": CodexMilestoneDefinition(
-        "codex.xuantian.place_3",
-        "玄天地点三览",
-        PLACE_KEYS,
-        reputation_reward=5,
-        unlocks=("commission.town.extra_offer",),
-    ),
-    "codex.xuantian.materials_5": CodexMilestoneDefinition(
-        "codex.xuantian.materials_5",
-        "玄天材料五录",
-        MATERIAL_KEYS,
-        reputation_reward=5,
-        unlocks=("hint.herb_route",),
-    ),
-    "codex.xuantian.creature_3": CodexMilestoneDefinition(
-        "codex.xuantian.creature_3",
-        "近郊异兽三录",
-        CREATURE_KEYS,
-        unlocks=("display.codex_creature_badge", "hint.tower_route"),
-    ),
-    "codex.paths_6": CodexMilestoneDefinition(
-        "codex.paths_6",
-        "六道途百科",
-        PATH_KEYS,
-        unlocks=("encyclopedia.paths_6",),
-    ),
-}
 
 
-def category_for_entry(entry_key: str) -> str | None:
-    definition = ENTRY_DEFINITIONS.get(entry_key)
+def unlock_label(unlock_key: str, content: ContentBundle | None = None) -> str:
+    row = _content(content).get("codex_unlock", unlock_key, include_locked=False)
+    if row is None:
+        return unlock_key
+    return str(row["name"])
+
+
+def category_for_entry(entry_key: str, content: ContentBundle | None = None) -> str | None:
+    definition = codex_entry_definitions(content).get(entry_key)
     if definition is not None:
         return definition.category
-    if entry_key.startswith("codex.challenge."):
+    if entry_key.startswith(("codex.challenge.", "codex.domain.")):
         return "challenge"
-    if entry_key.startswith("codex.domain."):
-        return "challenge"
-    if entry_key.startswith("codex.story."):
+    if entry_key.startswith("codex.story.") or entry_key.startswith("codex.void.archive_"):
         return "story"
-    if entry_key.startswith("codex.route."):
+    if entry_key.startswith("codex.route.") or entry_key.startswith("codex.void.route_"):
         return "route"
-    if entry_key.startswith("codex.void.route_"):
-        return "route"
-    if entry_key.startswith("codex.void.archive_"):
-        return "story"
     if entry_key.startswith("codex.dao.service_"):
         return "service"
     return None
 
 
-def label_for_entry(entry_key: str) -> str:
-    definition = ENTRY_DEFINITIONS.get(entry_key)
+def label_for_entry(entry_key: str, content: ContentBundle | None = None) -> str:
+    definition = codex_entry_definitions(content).get(entry_key)
     if definition is not None:
         return definition.label
     return entry_key.rsplit(".", 1)[-1].replace("_", " ")
 
 
 __all__ = [
-    "CONTENT_VERSION",
-    "CREATURE_KEYS",
-    "ENTRY_DEFINITIONS",
-    "MATERIAL_KEYS",
-    "MILESTONES",
-    "PATH_KEYS",
-    "PLACE_KEYS",
-    "RULE_VERSION",
     "CodexEntryDefinition",
     "CodexMilestoneDefinition",
     "category_for_entry",
+    "category_labels",
+    "codex_entry_definitions",
+    "codex_milestones",
     "label_for_entry",
+    "unlock_label",
 ]

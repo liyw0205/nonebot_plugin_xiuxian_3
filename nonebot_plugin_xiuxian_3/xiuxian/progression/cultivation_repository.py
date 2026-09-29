@@ -60,46 +60,6 @@ from ..advancement.rules import (
     retreat_definition,
     retreat_reward,
 )
-from ..advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
-    constitution_definition,
-)
-from ..advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
-    talent_node_for_reference,
-    talent_tree_nodes,
-    tree_definition,
-)
-from ..advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
-    available_skill_keys,
-    effective_skill_effect,
-    skill_cost,
-    skill_definition,
-)
-from ..advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
-    EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
-    equipment_definition,
-    refinement_affix,
-    refinement_roll_bp,
-    temper_cost,
-    temper_roll_bp,
-    temper_success_bp,
-)
 from ..livelihood.models import ResidenceRecord
 from ..livelihood.rules import residence_definition
 from ..world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
@@ -181,10 +141,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -316,7 +274,7 @@ class CultivationRepositoryMixin:
                 raise SubprofessionRequiredError("support path needs a sub-profession")
 
             inventory = self._json_object(row["inventory_json"], {})
-            for item_key, quantity in reward_items(path_key, subprofession_key):
+            for item_key, quantity in reward_items(path_key, subprofession_key, self.content):
                 inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
             connection.execute(
                 """
@@ -367,7 +325,10 @@ class CultivationRepositoryMixin:
                 player_id=int(row["id"]),
                 operation_id=operation_id,
                 occurred_at=now,
-                reward={key: quantity for key, quantity in reward_items(path_key, subprofession_key)},
+                reward={
+                    key: quantity
+                    for key, quantity in reward_items(path_key, subprofession_key, self.content)
+                },
                 snapshot={"source": "player.enter_cultivation", "path_key": path_key},
             )
             return CultivationRecord(
@@ -427,6 +388,7 @@ class CultivationRepositoryMixin:
             SOUL_REFINEMENT_SOUL_POWER_MAX,
             cultivation_mode,
         )
+        from ..items.manual_rules import manual_effect_totals
 
         operation_payload = {
             "platform": platform,
@@ -565,12 +527,14 @@ class CultivationRepositoryMixin:
             if cloud_tea_effect_bp > 0:
                 state_bp += cloud_tea_effect_bp
                 item_effects = {}
+            manual_effects = manual_effect_totals(
+                self._json_object(row["inventory_json"], {}), self.content
+            )
             snapshot = {
                 "realm_key": row["realm_key"],
                 "realm_layer": int(row["realm_layer"]),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "location_key": row["location_key"],
-                "rule_version": mode.rule_version,
                 "mode_key": mode.key,
                 "stamina_cost": mode.stamina_cost,
                 "energy_cost": mode.energy_cost,
@@ -578,6 +542,7 @@ class CultivationRepositoryMixin:
                 "cloud_tea_effect_bp": cloud_tea_effect_bp,
                 "base_cultivation": mode.base_cultivation,
                 "environment_bp": mode.environment_bp,
+                "manual_cultivation_gain_bp": int(manual_effects["cultivation_gain_bp"]),
                 "soul_power_gain": mode.soul_power_gain,
             }
             connection.execute(
@@ -766,6 +731,7 @@ class CultivationRepositoryMixin:
                 qualification,
                 environment_bp=int(snapshot.get("environment_bp", 10000)),
                 state_bp=int(snapshot.get("state_bp", 10000)),
+                manual_bonus_bp=int(snapshot.get("manual_cultivation_gain_bp", 0)),
             )
             soul_power_gain = int(snapshot.get("soul_power_gain", 0))
             connection.execute(
@@ -903,6 +869,7 @@ class CultivationRepositoryMixin:
                 qualification,
                 environment_bp=int(snapshot.get("environment_bp", 10000)),
                 state_bp=int(snapshot.get("state_bp", 10000)),
+                manual_bonus_bp=int(snapshot.get("manual_cultivation_gain_bp", 0)),
             )
             soul_power_gain = int(snapshot.get("soul_power_gain", 0))
             connection.execute(

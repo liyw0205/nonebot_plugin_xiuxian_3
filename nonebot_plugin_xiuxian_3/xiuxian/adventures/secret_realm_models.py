@@ -23,8 +23,6 @@ class SecretRealmDefinition:
     repeat_reward: dict[str, int]
     quota_period: str
     quota_limit: int
-    rule_version: str
-    content_version: str
     expiry_seconds: int = 3600
 
 

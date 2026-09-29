@@ -19,7 +19,6 @@ from .tower_rules import (
     floor_definition,
     practice_week_start,
     reward_for,
-    versions_for_floor,
 )
 from ..persistence.errors import (
     OperationConflictError,
@@ -111,7 +110,8 @@ class TowerRepositoryMixin:
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
         operation_name = "specials.start_tower"
-        content_version, rule_version = versions_for_floor(floor_no)
+        content_version = ""
+        rule_version = ""
         payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,

@@ -1,15 +1,9 @@
-"""Pure, versioned rules for v0.1 secret realms."""
+"""Pure rules for the available secret realms."""
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from .secret_realm_models import SecretRealmDefinition
-
-RULE_VERSION = module_rule_version(__name__)
-CONTENT_VERSION = module_content_version(__name__)
-V02_RULE_VERSION = "adventures-0.2.0"
-V02_CONTENT_VERSION = "content-0.2"
 
 MIST_GROTTO = SecretRealmDefinition(
     key="instance.secret_realm.mist_grotto",
@@ -26,8 +20,6 @@ MIST_GROTTO = SecretRealmDefinition(
     repeat_reward={"item.material.mist_core": 1},
     quota_period="week",
     quota_limit=2,
-    rule_version=RULE_VERSION,
-    content_version=CONTENT_VERSION,
 )
 
 SPRING_PATH = SecretRealmDefinition(
@@ -45,8 +37,6 @@ SPRING_PATH = SecretRealmDefinition(
     repeat_reward={"item.herb.spirit_leaf": 1},
     quota_period="day",
     quota_limit=1,
-    rule_version=RULE_VERSION,
-    content_version=CONTENT_VERSION,
 )
 
 MIST_DEPTH_2 = SecretRealmDefinition(
@@ -64,8 +54,6 @@ MIST_DEPTH_2 = SecretRealmDefinition(
     repeat_reward={"item.material.cloud_iron": 1},
     quota_period="week",
     quota_limit=1,
-    rule_version=V02_RULE_VERSION,
-    content_version=V02_CONTENT_VERSION,
 )
 
 CLOUD_BOAT = SecretRealmDefinition(
@@ -83,8 +71,6 @@ CLOUD_BOAT = SecretRealmDefinition(
     repeat_reward={"item.ticket.cloud_boat_fragment": 1},
     quota_period="week",
     quota_limit=2,
-    rule_version=V02_RULE_VERSION,
-    content_version=V02_CONTENT_VERSION,
 )
 
 DEFINITIONS = {item.key: item for item in (MIST_GROTTO, SPRING_PATH, MIST_DEPTH_2, CLOUD_BOAT)}
@@ -163,12 +149,8 @@ def realm_at_least(realm_key: str, layer: int, required_realm: str, required_lay
 
 __all__ = [
     "ALIASES",
-    "CONTENT_VERSION",
     "DEFINITIONS",
     "NODE_ALIASES",
-    "RULE_VERSION",
-    "V02_CONTENT_VERSION",
-    "V02_RULE_VERSION",
     "realm_at_least",
     "resolve_node",
     "resolve_secret_realm",

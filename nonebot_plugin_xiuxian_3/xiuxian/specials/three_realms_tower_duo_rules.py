@@ -11,14 +11,13 @@ from .three_realms_tower_rules import (
     floor_definition,
     rebuild_reputation_total,
     reward_for,
-    versions_for_floor,
     week_start,
 )
 
 
 PARTY_TYPE_THREE_REALMS_TOWER_DUO = "three_realms_tower_duo"
-TOWER_DUO_CONTENT_VERSION = CONTENT_VERSION
-TOWER_DUO_RULE_VERSION = "specials-0.4.1"
+TOWER_DUO_CONTENT_VERSION = ""
+TOWER_DUO_RULE_VERSION = ""
 TOWER_DUO_STAMINA_COST = 12
 
 __all__ = [
@@ -34,6 +33,5 @@ __all__ = [
     "floor_definition",
     "rebuild_reputation_total",
     "reward_for",
-    "versions_for_floor",
     "week_start",
 ]

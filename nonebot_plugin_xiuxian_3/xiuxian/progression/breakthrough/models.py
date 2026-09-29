@@ -30,7 +30,6 @@ class BreakthroughDefinition:
     protection_key: str
     protection_retention_bp: int
     protection_weakness_seconds: int
-    rule_version: str
     random_pool: str
     reward_currency: int = 0
     reward_stamina: int = 0
@@ -38,7 +37,6 @@ class BreakthroughDefinition:
     reward_local_reputation: int = 0
     reward_items: dict[str, int] | None = None
     source_cultivation_cap: int = 0
-    content_version: str = "content-0.1"
     required_foundation_quality: int = 0
     location_bonus_bp: int = 0
     support_bonus_bp: int = 0

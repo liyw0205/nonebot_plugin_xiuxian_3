@@ -23,7 +23,7 @@ from ..persistence.errors import (
     TowerStartFailedError,
 )
 from .void_spire_repository import VoidSpireRepositoryMixin
-from .codex_rules import ENTRY_DEFINITIONS
+from .codex_rules import codex_entry_definitions
 from .void_spire_rules import DESIGN_MAX_FLOOR, MAX_FLOOR
 
 
@@ -196,8 +196,9 @@ class VoidSpireApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
+        entry_definitions = codex_entry_definitions()
         discoveries = "、".join(
-            ENTRY_DEFINITIONS[key].label for key in record.discoveries if key in ENTRY_DEFINITIONS
+            entry_definitions[key].label for key in record.discoveries if key in entry_definitions
         ) or "无"
         title = next(
             (

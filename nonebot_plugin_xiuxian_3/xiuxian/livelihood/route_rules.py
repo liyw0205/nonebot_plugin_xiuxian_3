@@ -44,7 +44,7 @@ ROUTE_DEFINITIONS = {
         delay_chance_bp=1000,
         delay_seconds=10 * 60,
         max_cargo_value=100,
-        random_pool="route.town.v0.1",
+        random_pool="route.town",
     ),
 }
 

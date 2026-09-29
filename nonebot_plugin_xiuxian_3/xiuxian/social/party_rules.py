@@ -1,4 +1,4 @@
-"""Pure, versioned rules for social party state machines."""
+"""Pure rules for social party state machines."""
 
 from __future__ import annotations
 
@@ -23,8 +23,6 @@ ARENA_TRIO_MAX_MEMBERS = 3
 BOUNDARY_REALM_MIN_MEMBERS = 2
 BOUNDARY_REALM_MAX_MEMBERS = 5
 PARTY_CONFIRMATION_TTL_SECONDS = 5 * 60
-PARTY_CONTENT_VERSION = "content-0.1"
-PARTY_RULE_VERSION = "social-0.1.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,8 +33,6 @@ class PartyDefinition:
     confirmation_ttl_seconds: int = PARTY_CONFIRMATION_TTL_SECONDS
     distribution_key: str = "contribution"
     required_location: str | None = None
-    content_version: str = PARTY_CONTENT_VERSION
-    rule_version: str = PARTY_RULE_VERSION
 
 
 PARTY_DEFINITION = PartyDefinition()
@@ -45,8 +41,6 @@ ARENA_TRIO_DEFINITION = PartyDefinition(
     min_members=ARENA_TRIO_MAX_MEMBERS,
     max_members=ARENA_TRIO_MAX_MEMBERS,
     distribution_key="arena_rating",
-    content_version="content-0.6",
-    rule_version="social-0.6.0",
 )
 BOUNDARY_REALM_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_BOUNDARY_REALM,
@@ -54,8 +48,6 @@ BOUNDARY_REALM_DEFINITION = PartyDefinition(
     max_members=BOUNDARY_REALM_MAX_MEMBERS,
     required_location="cave.boundary_realm",
     distribution_key="contribution",
-    content_version="content-0.3",
-    rule_version="social-0.3.0",
 )
 SECRET_REALM_BOUNDARY_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_SECRET_REALM_BOUNDARY,
@@ -63,8 +55,6 @@ SECRET_REALM_BOUNDARY_DEFINITION = PartyDefinition(
     max_members=BOUNDARY_REALM_MAX_MEMBERS,
     required_location="cave.boundary_realm",
     distribution_key="contribution",
-    content_version="content-0.3",
-    rule_version="social-0.3.1",
 )
 SECRET_REALM_ANCIENT_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_SECRET_REALM_ANCIENT,
@@ -72,8 +62,6 @@ SECRET_REALM_ANCIENT_DEFINITION = PartyDefinition(
     max_members=3,
     required_location="cave.ancient_domain",
     distribution_key="contribution",
-    content_version="content-0.4",
-    rule_version="social-0.4.0",
 )
 SECRET_REALM_VOID_RUINS_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_SECRET_REALM_VOID_RUINS,
@@ -81,8 +69,6 @@ SECRET_REALM_VOID_RUINS_DEFINITION = PartyDefinition(
     max_members=5,
     required_location="void.archive_ruins",
     distribution_key="contribution",
-    content_version="content-0.5",
-    rule_version="social-0.5.0",
 )
 SECRET_REALM_TIME_FORT_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_SECRET_REALM_TIME_FORT,
@@ -90,8 +76,6 @@ SECRET_REALM_TIME_FORT_DEFINITION = PartyDefinition(
     max_members=5,
     required_location="void.archive_ruins",
     distribution_key="contribution",
-    content_version="content-0.5",
-    rule_version="social-0.5.0",
 )
 DEMON_REALM_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_DEMON_REALM,
@@ -99,8 +83,6 @@ DEMON_REALM_DEFINITION = PartyDefinition(
     max_members=5,
     required_location="demon.fallen_ruins",
     distribution_key="contribution",
-    content_version="content-0.3",
-    rule_version="social-0.3.1",
 )
 BEAST_REALM_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_BEAST_REALM,
@@ -108,8 +90,6 @@ BEAST_REALM_DEFINITION = PartyDefinition(
     max_members=5,
     required_location="beast.ten_thousand_hills",
     distribution_key="contribution",
-    content_version="content-0.3",
-    rule_version="social-0.3.1",
 )
 STANDARD_PVE_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_STANDARD_PVE,
@@ -117,8 +97,6 @@ STANDARD_PVE_DEFINITION = PartyDefinition(
     max_members=5,
     required_location=None,
     distribution_key="contribution",
-    content_version="content-0.3",
-    rule_version="social-0.3.2",
 )
 THREE_REALMS_TOWER_DUO_DEFINITION = PartyDefinition(
     party_type=PARTY_TYPE_THREE_REALMS_TOWER_DUO,
@@ -126,8 +104,6 @@ THREE_REALMS_TOWER_DUO_DEFINITION = PartyDefinition(
     max_members=2,
     required_location=None,
     distribution_key="tower_duo",
-    content_version="content-0.4",
-    rule_version="social-0.4.1",
 )
 
 
@@ -165,12 +141,10 @@ __all__ = [
     "DEMON_REALM_DEFINITION",
     "BOUNDARY_REALM_MAX_MEMBERS",
     "BOUNDARY_REALM_MIN_MEMBERS",
-    "PARTY_CONTENT_VERSION",
     "PARTY_DEFINITION",
     "ARENA_TRIO_DEFINITION",
     "ARENA_TRIO_MAX_MEMBERS",
     "PARTY_MAX_MEMBERS",
-    "PARTY_RULE_VERSION",
     "PARTY_TYPE_EXPLORATION_PAIR",
     "PARTY_TYPE_ARENA_TRIO",
     "PARTY_TYPE_BOUNDARY_REALM",

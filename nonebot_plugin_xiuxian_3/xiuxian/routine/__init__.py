@@ -22,15 +22,9 @@ from .models import (
     SevenDayStatusRecord,
     SpiritTreeRecord,
 )
-from .rules import RULE_VERSION
-from .wayfaring import (
-    WAYFARING_CONTENT_VERSION,
-    WAYFARING_RULE_VERSION,
-    WAYFARING_PASS_KEY,
-)
+from .wayfaring import WAYFARING_PASS_KEY
 
 __all__ = [
-    "RULE_VERSION",
     "AchievementClaimRecord",
     "AchievementView",
     "HonorStatusRecord",
@@ -42,8 +36,6 @@ __all__ = [
     "DaoContractView",
     "FateDrawView",
     "FateRollRecord",
-    "WAYFARING_CONTENT_VERSION",
-    "WAYFARING_RULE_VERSION",
     "WAYFARING_PASS_KEY",
     "WayfaringClaimRecord",
     "WayfaringLevelView",

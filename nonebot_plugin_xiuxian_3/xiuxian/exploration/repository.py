@@ -18,6 +18,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
+from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..config import XiuxianSettings
 from ..specials.codex_projection import record_material_discoveries
 from ..player.models import (
@@ -65,46 +66,6 @@ from ..advancement.rules import (
     retreat_definition,
     retreat_reward,
 )
-from ..advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
-    constitution_definition,
-)
-from ..advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
-    talent_node_for_reference,
-    talent_tree_nodes,
-    tree_definition,
-)
-from ..advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
-    available_skill_keys,
-    effective_skill_effect,
-    skill_cost,
-    skill_definition,
-)
-from ..advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
-    EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
-    equipment_definition,
-    refinement_affix,
-    refinement_roll_bp,
-    temper_cost,
-    temper_roll_bp,
-    temper_success_bp,
-)
 from ..livelihood.models import ResidenceRecord
 from ..livelihood.rules import residence_definition
 from ..world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
@@ -119,7 +80,7 @@ from ..world.void_rules import (
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
-from ..world.rules import destination_definition, meets_realm, RULE_VERSION
+from ..world.rules import destination_definition, meets_realm
 from ..world.cloud_rules import DEMON_INTRO_FLAG
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
@@ -127,7 +88,6 @@ from ..exploration.rules import (
     CLOUD_BOAT_STORM_CHOICES,
     CLOUD_BOAT_STORM_PAY_COST,
     CLOUD_BOAT_STORM_WAIT_SECONDS,
-    RULE_VERSION as EXPLORATION_RULE_VERSION,
     cloud_boat_storm_roll_bp,
     has_cloud_mine_access,
     battle_roll_bp,
@@ -135,7 +95,6 @@ from ..exploration.rules import (
     meets_realm as exploration_meets_realm,
     settlement_result,
 )
-from ..items.rules import MIST_BARRIER_RISK_REDUCTION_BP
 from ..adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from ..adventures.mainline_models import (
     MainlineClaimRecord,
@@ -144,11 +103,9 @@ from ..adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ..adventures.mainline import (
-    MAINLINE_CONTENT_VERSION,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
     mainline_definition,
@@ -181,12 +138,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -195,10 +150,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -207,18 +160,13 @@ from ..routine.gacha import (
 )
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -405,9 +353,7 @@ class ExplorationRepositoryMixin:
             barrier_risk_reduction_bp = 0
             if active_barrier is not None:
                 barrier_risk_reduction_bp = int(
-                    self._json_object(active_barrier["snapshot_json"], {}).get(
-                        "risk_reduction_bp", MIST_BARRIER_RISK_REDUCTION_BP
-                    )
+                    self._json_object(active_barrier["snapshot_json"], {})["risk_reduction_bp"]
                 )
             battle_chance_bp = max(0, definition.battle_chance_bp - barrier_risk_reduction_bp)
             snapshot = {
@@ -422,7 +368,6 @@ class ExplorationRepositoryMixin:
                 "bloodline_stability_before": bloodline_stability_before,
                 "bloodline_stability_after": bloodline_stability_after,
                 "cross_realm_penalty_bp": cross_realm_penalty_bp,
-                "rule_version": definition.rule_version,
                 "random_pool": definition.random_pool,
                 "random_seed": operation_id,
                 "battle_chance_bp": battle_chance_bp,
@@ -432,7 +377,6 @@ class ExplorationRepositoryMixin:
                 "business_date": business_date,
                 "stamina_cost": definition.stamina_cost,
                 "energy_cost": definition.energy_cost,
-                "content_version": definition.content_version,
                 "storm_chance_bp": (
                     CLOUD_BOAT_STORM_CHANCE_BP if definition.key == "explore.cloud_boat_trial" else 0
                 ),
@@ -441,6 +385,7 @@ class ExplorationRepositoryMixin:
                 ),
                 "max_hp": int(row["max_hp"]),
                 "initiative": int(row["initiative"]),
+                "constitution_effect": constitution_effect_snapshot(connection, player_id),
                 "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
             }
             connection.execute(
@@ -483,7 +428,6 @@ class ExplorationRepositoryMixin:
                 "ends_at": ends_at,
                 "stamina_cost": definition.stamina_cost,
                 "energy_cost": definition.energy_cost,
-                "content_version": definition.content_version,
                 "daily_limit": definition.daily_limit,
                 "risk_reduction_bp": barrier_risk_reduction_bp,
                 "pollution_before": pollution_before,
@@ -646,7 +590,6 @@ class ExplorationRepositoryMixin:
                     "expired": str(session["status"]) == "expired",
                     "stamina_cost": int(session["stamina_cost"]),
                     "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
-                    "content_version": self._json_object(session["snapshot_json"], {}).get("content_version", "content-0.1"),
                     "battle_id": stored.get("battle_id"),
                     "battle_outcome": stored.get("battle_outcome"),
                 }
@@ -735,7 +678,6 @@ class ExplorationRepositoryMixin:
                 "expired": False,
                 "stamina_cost": int(session["stamina_cost"]),
                 "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
-                "content_version": self._json_object(session["snapshot_json"], {}).get("content_version", "content-0.1"),
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
                 "pollution_before": int(self._json_object(session["snapshot_json"], {}).get("pollution_before", 0)),
@@ -750,6 +692,19 @@ class ExplorationRepositoryMixin:
                 (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
             )
             self._bind_exploration_rewards(connection, int(row["id"]), operation_id, result, now)
+            record_material_discoveries(
+                connection,
+                player_id=int(row["id"]),
+                operation_id=operation_id,
+                occurred_at=now,
+                reward=result,
+                snapshot={
+                    "source": operation_name,
+                    "mode_key": str(session["mode_key"]),
+                    "location_key": str(session["location_key"]),
+                },
+                content=self.content,
+            )
             return self._exploration_settlement_from_payload(payload)
 
     def _settle_exploration_sync(self, platform: str, platform_user_id: str, operation_id: str) -> ExplorationSettlementRecord:
@@ -806,7 +761,6 @@ class ExplorationRepositoryMixin:
                     "expired": False,
                     "stamina_cost": int(session["stamina_cost"]),
                     "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
-                    "content_version": self._json_object(session["snapshot_json"], {}).get("content_version", "content-0.1"),
                     "battle_id": stored_result.get("battle_id"),
                     "battle_outcome": stored_result.get("battle_outcome"),
                 }
@@ -845,7 +799,6 @@ class ExplorationRepositoryMixin:
                         "expired": False,
                         "stamina_cost": int(session["stamina_cost"]),
                         "energy_cost": int(snapshot.get("energy_cost", 0)),
-                        "content_version": snapshot.get("content_version", "content-0.1"),
                         "storm_pending": True,
                         "storm_options": list(CLOUD_BOAT_STORM_CHOICES),
                         "storm_deadline": stored_result["storm_deadline"],
@@ -882,7 +835,6 @@ class ExplorationRepositoryMixin:
                     "expired": False,
                     "stamina_cost": int(session["stamina_cost"]),
                     "energy_cost": int(snapshot.get("energy_cost", 0)),
-                    "content_version": snapshot.get("content_version", "content-0.1"),
                     "storm_pending": False,
                     "storm_options": [],
                     "storm_deadline": serialize_datetime(new_ends_at),
@@ -903,10 +855,17 @@ class ExplorationRepositoryMixin:
             if not expired:
                 seed = str(snapshot.get("random_seed", session["operation_id"]))
                 battle_pending = battle_roll_bp(seed + ":battle") < int(snapshot.get("battle_chance_bp", 0))
+                constitution_effect = snapshot.get("constitution_effect", {})
+                drop_weight_bp = (
+                    int(constitution_effect.get("value", 0))
+                    if isinstance(constitution_effect, dict)
+                    and constitution_effect.get("type") == "drop_weight_bp"
+                    else 0
+                )
                 result = settlement_result(
                     str(session["mode_key"]),
                     seed,
-                    rule_version=str(snapshot.get("rule_version", EXPLORATION_RULE_VERSION)),
+                    drop_weight_bp=drop_weight_bp,
                 )
                 storm_hit = (
                     str(session["mode_key"]) == "explore.cloud_boat_trial"
@@ -923,7 +882,6 @@ class ExplorationRepositoryMixin:
                         "storm_options": list(CLOUD_BOAT_STORM_CHOICES),
                         "storm_deadline": storm_deadline,
                         "energy_cost": int(snapshot.get("energy_cost", 0)),
-                        "content_version": snapshot.get("content_version", "content-0.1"),
                     }
                     connection.execute(
                         "UPDATE exploration_sessions SET result_json = ?, updated_at = ? WHERE id = ? AND status IN ('created', 'running')",
@@ -941,7 +899,6 @@ class ExplorationRepositoryMixin:
                         "expired": False,
                         "stamina_cost": int(session["stamina_cost"]),
                         "energy_cost": int(snapshot.get("energy_cost", 0)),
-                        "content_version": snapshot.get("content_version", "content-0.1"),
                         "storm_pending": True,
                         "storm_options": list(CLOUD_BOAT_STORM_CHOICES),
                         "storm_deadline": storm_deadline,
@@ -999,7 +956,6 @@ class ExplorationRepositoryMixin:
                 "storm_pending": False,
                 "storm_choice": stored_result.get("storm_choice"),
                 "energy_cost": int(snapshot.get("energy_cost", 0)),
-                "content_version": snapshot.get("content_version", "content-0.1"),
                 "pollution_before": int(snapshot.get("pollution_before", 0)),
                 "pollution_after": int(snapshot.get("pollution_after", 0)),
                 "bloodline_stability_before": int(snapshot.get("bloodline_stability_before", 0)),
@@ -1031,7 +987,6 @@ class ExplorationRepositoryMixin:
                 "expired": expired,
                 "stamina_cost": int(session["stamina_cost"]),
                 "energy_cost": int(snapshot.get("energy_cost", 0)),
-                "content_version": snapshot.get("content_version", "content-0.1"),
                 "battle_id": result_json.get("battle_id"),
                 "battle_outcome": result_json.get("battle_outcome"),
                 "storm_pending": False,
@@ -1068,8 +1023,8 @@ class ExplorationRepositoryMixin:
                         "source": operation_name,
                         "mode_key": str(session["mode_key"]),
                         "location_key": str(session["location_key"]),
-                        "content_version": snapshot.get("content_version", "content-0.1"),
                     },
+                    content=self.content,
                 )
             return self._exploration_settlement_from_payload(payload)
 
@@ -1101,7 +1056,6 @@ class ExplorationRepositoryMixin:
             expired=bool(payload.get("expired", False)),
             stamina_cost=int(payload.get("stamina_cost", 0)),
             energy_cost=int(payload.get("energy_cost", 0)),
-            content_version=str(payload.get("content_version", "content-0.1")),
             battle_id=str(payload["battle_id"]) if payload.get("battle_id") else None,
             battle_outcome=str(payload["battle_outcome"]) if payload.get("battle_outcome") else None,
             storm_pending=bool(payload.get("storm_pending", False)),
@@ -1275,7 +1229,6 @@ class ExplorationRepositoryMixin:
                 "expired": False,
                 "stamina_cost": int(session["stamina_cost"]),
                 "energy_cost": int(snapshot.get("energy_cost", 0)),
-                "content_version": snapshot.get("content_version", "content-0.1"),
                 "storm_pending": False,
                 "storm_options": [],
                 "storm_deadline": ends_at if effective_choice == "wait" else None,
@@ -1344,7 +1297,6 @@ class ExplorationRepositoryMixin:
                 "expired": False,
                 "stamina_cost": int(session["stamina_cost"]),
                 "energy_cost": energy_refund,
-                "content_version": snapshot.get("content_version", "content-0.1"),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",

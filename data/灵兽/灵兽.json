@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "木鼠",
+      "desc": "常见于林间的灵性小兽，嗅觉敏锐，能察觉附近的细微动静。",
       "kind": "beast",
       "source": [
         "xuantian.outskirts",
@@ -25,6 +26,7 @@
     },
     {
       "name": "竹鹿",
+      "desc": "生于竹林的温驯灵鹿，熟悉山路，适合陪伴主人长途跋涉。",
       "kind": "mount",
       "source": [
         "story.mainline.xuantian"
@@ -45,6 +47,7 @@
     },
     {
       "name": "小型灵兽行囊",
+      "desc": "可挂在灵兽身上的轻便行囊，能替主人携带少量行旅物资。",
       "kind": "beast_gear",
       "source": [
         "production"
@@ -61,6 +64,7 @@
     },
     {
       "name": "竹鹿鞍具",
+      "desc": "为竹鹿量身制作的鞍具，让山路上的骑行更稳当省力。",
       "kind": "mount_tack",
       "source": [
         "story.mainline.xuantian",

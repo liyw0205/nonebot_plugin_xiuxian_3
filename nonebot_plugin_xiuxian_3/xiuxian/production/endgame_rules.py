@@ -1,15 +1,12 @@
-"""Versioned definitions for personal v0.6 endgame recipes."""
+"""Definitions for personal endgame recipes."""
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from dataclasses import dataclass
 from hashlib import blake2b
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
 SUCCESS_THRESHOLD_BP = 8_000
 DAO_FRUIT_PROGRESS_CAP = 1_300
 ASCENSION_CERTIFICATE_KEY = "item.ascension_certificate"
@@ -83,12 +80,10 @@ def recipe_roll_bp(operation_id: str) -> int:
 
 __all__ = [
     "ASCENSION_CERTIFICATE_KEY",
-    "CONTENT_VERSION",
     "DAO_FRUIT_PROGRESS_CAP",
     "ENDGAME_RECIPES",
     "EndgameRecipeDefinition",
     "RECIPE_ALIASES",
-    "RULE_VERSION",
     "SUCCESS_THRESHOLD_BP",
     "endgame_recipe",
     "recipe_roll_bp",

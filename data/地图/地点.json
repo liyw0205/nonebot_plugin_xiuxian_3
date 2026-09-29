@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "青石镇",
+      "desc": "依山而建的安宁小镇，商铺、药铺与修行者的旅舍都聚于此。",
       "world": "玄天界",
       "status": "open",
       "requirements": [
@@ -27,10 +28,12 @@
         "visit",
         "return"
       ],
+      "codex_entry_key": "codex.place.new_town",
       "key": "xuantian.new_town"
     },
     {
       "name": "玄天近郊",
+      "desc": "青石镇外的山野地带，草木与小兽常见，也是初入仙途者历练之处。",
       "world": "玄天界",
       "status": "open",
       "requirements": [
@@ -53,10 +56,12 @@
         "battle.training_dummy",
         "battle.wood_rat"
       ],
+      "codex_entry_key": "codex.place.outskirts",
       "key": "xuantian.outskirts"
     },
     {
       "name": "玄天宗山门",
+      "desc": "玄天宗弟子往来之地，山门之后是宗门传承与修行洞府。",
       "world": "玄天界",
       "status": "open",
       "requirements": [
@@ -91,6 +96,7 @@
     },
     {
       "name": "灵泉谷",
+      "desc": "山谷深处有清泉涌动，灵气润泽草木，是静心修炼的好去处。",
       "world": "玄天界",
       "status": "open",
       "requirements": [
@@ -117,10 +123,12 @@
         "progression.cultivate.spirit_spring",
         "production.teaching"
       ],
+      "codex_entry_key": "codex.place.spirit_field",
       "key": "xuantian.spirit_field"
     },
     {
       "name": "雾隐洞天一层",
+      "desc": "薄雾笼罩的洞天入口，石径蜿蜒，偶有灵草与守洞妖兽出没。",
       "world": "洞天",
       "status": "open",
       "requirements": [
@@ -154,6 +162,7 @@
     },
     {
       "name": "魔渊入口",
+      "desc": "通向魔界深处的险峻关隘，四周魔气翻涌，寻常修士难以久留。",
       "world": "魔界",
       "status": "locked",
       "requirements": [
@@ -181,6 +190,7 @@
     },
     {
       "name": "万兽山入口",
+      "desc": "妖界群山的门户，山风中夹着兽鸣与草木清香。",
       "world": "妖界",
       "status": "open",
       "requirements": [
@@ -207,10 +217,12 @@
         "explore.beast_hunt",
         "production.beast_contract"
       ],
+      "codex_entry_key": "codex.place.beast_hills",
       "key": "beast.ten_thousand_hills"
     },
     {
       "name": "魔渊集市",
+      "desc": "建在魔渊边缘的交易之地，各方修士在此交换稀有材料与消息。",
       "world": "魔界",
       "status": "open",
       "requirements": [
@@ -238,10 +250,12 @@
         "economy.trade.xuantian_to_demon",
         "production.demon_contract"
       ],
+      "codex_entry_key": "codex.place.demon_market",
       "key": "demon.abyss_market"
     },
     {
       "name": "三界贸易口",
+      "desc": "连接三界商路的渡口，行商与使者常在此核验货物、交换物资。",
       "world": "妖界",
       "status": "open",
       "requirements": [
@@ -272,6 +286,7 @@
     },
     {
       "name": "玄天界·云城",
+      "desc": "浮云环绕的玄天城池，高阶修士与远道而来的访客在此汇聚。",
       "world": "玄天界",
       "status": "locked",
       "requirements": [
@@ -291,10 +306,12 @@
       "actions": [
         "read_entry_requirements"
       ],
+      "codex_entry_key": "codex.place.cloud_city",
       "key": "xuantian.cloud_city"
     },
     {
       "name": "玄天阵堂",
+      "desc": "玄天宗研习阵法之地，殿内阵纹流转，守护着往来弟子。",
       "world": "玄天界",
       "status": "locked",
       "requirements": [
@@ -318,6 +335,7 @@
     },
     {
       "name": "远古洞天",
+      "desc": "沉睡于旧日遗迹中的洞天，残存的灵力与古老禁制仍未散去。",
       "world": "洞天",
       "status": "locked",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "item", "item_key": "item.domain_core", "quantity": 1}],
@@ -326,6 +344,7 @@
     },
     {
       "name": "魔渊深层",
+      "desc": "魔渊中罕有人至的深处，魔气沉重，只有做好准备的修士才能深入。",
       "world": "魔界",
       "status": "locked",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "faction_reputation", "faction": "demon", "min": 3000}],
@@ -334,6 +353,7 @@
     },
     {
       "name": "祖灵湖",
+      "desc": "万兽山深处的静谧湖泊，湖水映照着群山，也流传着远古血脉的传说。",
       "world": "妖界",
       "status": "locked",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "faction_reputation", "faction": "beast", "min": 3000}],
@@ -342,14 +362,17 @@
     },
     {
       "name": "领域前线",
+      "desc": "天地裂痕附近的交锋之地，各方修士在此守望疆界、抵御异动。",
       "world": "玄天界",
-      "status": "locked",
+      "status": "active",
+      "codex_entry_key": "codex.place.domain_front",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, "domain_selected"],
       "actions": ["event.domain_front", "progression.recover_domain_crack"],
       "key": "xuantian.domain_front"
     },
     {
       "name": "虚空门户",
+      "desc": "通往无垠虚空的古老门户，门后道路莫测，须凭实力与机缘踏入。",
       "world": "虚空",
       "status": "locked",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, "quest.break_void_intro"],
@@ -358,6 +381,7 @@
     },
     {
       "name": "虚空第一航道",
+      "desc": "炼虚修士开辟的第一段虚空航路，沿途风暴与奇遇并存。",
       "world": "虚空",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
@@ -367,6 +391,7 @@
     },
     {
       "name": "虚空档案遗迹",
+      "desc": "散落在虚空中的古代遗址，石壁与残卷记录着被遗忘的旅程。",
       "world": "虚空",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
@@ -376,6 +401,7 @@
     },
     {
       "name": "时序福地",
+      "desc": "时光流转与外界不同的隐秘福地，灵气与岁月都在此留下独特痕迹。",
       "world": "虚空",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],

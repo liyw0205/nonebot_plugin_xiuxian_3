@@ -14,6 +14,8 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
+from ..specials.codex_projection import record_codex_discovery
 from ..persistence.errors import (
     DomainCrackActiveError,
     DomainCoreRedeemAlreadyUsedError,
@@ -286,7 +288,7 @@ class DomainFrontRepositoryMixin:
                 raise DomainEventRoundNotActiveError("domain-front round is not settled")
             if now >= datetime.fromisoformat(str(event["claim_expires_at"])):
                 raise DomainEventRoundNotActiveError("domain-front claim window closed")
-            participant = connection.execute("SELECT contribution FROM domain_front_participants WHERE round_id=? AND player_id=?", (round_id, player["id"])).fetchone()
+            participant = connection.execute("SELECT contribution, domain_key FROM domain_front_participants WHERE round_id=? AND player_id=?", (round_id, player["id"])).fetchone()
             if participant is None or int(participant["contribution"]) < PERSONAL_THRESHOLD:
                 raise DomainEventRewardNotEligibleError("domain-front personal contribution is insufficient")
             if connection.execute("SELECT 1 FROM domain_front_claims WHERE round_id=? AND player_id=?", (round_id, player["id"])).fetchone() is not None:
@@ -296,6 +298,25 @@ class DomainFrontRepositoryMixin:
             inventory["item.domain_core_fragment"] = int(inventory.get("item.domain_core_fragment", 0)) + 5
             connection.execute("UPDATE players SET inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?", (json.dumps(inventory, sort_keys=True), reward["world_merit"], now_text, player["id"]))
             connection.execute("INSERT INTO domain_front_claims(round_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (round_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
+            content = self.content or bundled_content()
+            event_definition = content.require("event", EVENT_KEY)
+            codex_entry_key = event_definition.get("codex_entry_key")
+            if not isinstance(codex_entry_key, str):
+                raise ValueError(f"event {EVENT_KEY} has no configured codex entry")
+            record_codex_discovery(
+                connection,
+                player_id=int(player["id"]),
+                entry_key=codex_entry_key,
+                operation_id=operation_id,
+                occurred_at=now_text,
+                snapshot={
+                    "round_id": round_id,
+                    "domain_key": participant["domain_key"],
+                    "contribution": int(participant["contribution"]),
+                    "result": self._json_object(event["result_json"], {}),
+                },
+                content=content,
+            )
             payload = {"round_id": round_id, "reward": reward}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return DomainFrontClaimRecord(round_id, reward)

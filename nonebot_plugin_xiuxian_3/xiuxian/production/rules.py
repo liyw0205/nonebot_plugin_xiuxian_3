@@ -12,7 +12,6 @@ from .endgame_work_rules import (
 from .recipe_models import RecipeDefinition
 
 
-RECIPE_RULE_VERSION = "production-0.1.1"
 QUALITY_SUCCESS_THRESHOLD_BP = 4500
 HIGH_QUALITY_THRESHOLD_BP = 8000
 TOOL_MAX_DURABILITY_BP = 2000
@@ -36,8 +35,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         min_realm_layer=1,
         required_realm="qi_sensing",
         teaching_allowed=True,
-        content_version="content-0.1",
-        rule_version="production-0.1.0",
     ),
     "recipe.pill.qi_guard": RecipeDefinition(
         key="recipe.pill.qi_guard",
@@ -62,8 +59,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         min_realm_layer=1,
         required_realm="qi_sensing",
         proficiency_bp=2000,
-        content_version="content-0.1",
-        rule_version="production-0.1.1",
     ),
     "recipe.pill.healing_low": RecipeDefinition(
         key="recipe.pill.healing_low",
@@ -108,8 +103,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         min_realm_layer=1,
         required_realm="qi_gathering",
         proficiency_bp=3000,
-        content_version="content-0.1",
-        rule_version="production-0.1.0",
     ),
     "recipe.pill.foundation_guard": RecipeDefinition(
         key="recipe.pill.foundation_guard",
@@ -136,8 +129,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         min_realm_layer=1,
         required_realm="qi_gathering",
         proficiency_bp=3000,
-        content_version="content-0.1",
-        rule_version="production-0.1.1",
     ),
     "recipe.weapon.wood_sword": RecipeDefinition(
         key="recipe.weapon.wood_sword",
@@ -192,8 +183,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         required_realm="golden_core",
         proficiency_bp=4000,
         required_location=("xuantian.array_hall", "cave.mist_grotto_2"),
-        content_version="content-0.2",
-        rule_version="production-0.2.0",
         success_threshold_bp=6000,
         high_quality_threshold_bp=8000,
         facility_kind="array",
@@ -224,8 +213,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         required_realm="golden_core",
         proficiency_bp=4000,
         required_location=("cave.mist_grotto_2",),
-        content_version="content-0.2",
-        rule_version="production-0.2.0",
         success_threshold_bp=6000,
         high_quality_threshold_bp=8000,
         facility_kind="alchemy",
@@ -256,8 +243,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         required_realm="foundation",
         additional_realms=("golden_core",),
         proficiency_bp=5000,
-        content_version="content-0.2",
-        rule_version="production-0.2.1",
         success_threshold_bp=6000,
         high_quality_threshold_bp=8000,
         facility_kind="alchemy",
@@ -279,8 +264,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         min_realm_layer=1,
         required_realm="golden_core",
         proficiency_bp=5000,
-        content_version="content-0.3",
-        rule_version="production-0.3.1",
         success_threshold_bp=6000,
         facility_kind="alchemy",
     ),
@@ -302,8 +285,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         required_realm="nascent_soul",
         proficiency_bp=5000,
         required_location=("cave.mist_grotto_2",),
-        content_version="content-0.3",
-        rule_version="production-0.3.0",
         facility_kind="alchemy",
         success_threshold_bp=1,
         high_quality_threshold_bp=10001,
@@ -334,8 +315,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         required_realm="golden_core",
         proficiency_bp=4000,
         required_location=("cave.mist_grotto_2",),
-        content_version="content-0.2",
-        rule_version="production-0.2.0",
         success_threshold_bp=6000,
         high_quality_threshold_bp=8000,
         facility_kind="artifice",
@@ -359,8 +338,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         proficiency_bp=3000,
         required_location=("xuantian.spirit_field",),
         teaching_allowed=True,
-        content_version="content-0.2",
-        rule_version="production-0.2.0",
         success_threshold_bp=4500,
         high_quality_threshold_bp=8000,
     ),
@@ -383,8 +360,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         required_path="beast",
         required_paths=("beast", "demonic"),
         required_location=("beast.ten_thousand_hills", "demon.abyss_market"),
-        content_version="content-0.3",
-        rule_version="production-0.3.0",
         success_threshold_bp=4500,
         high_quality_threshold_bp=8000,
         failure_refund_bp=6000,
@@ -409,8 +384,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         failure_refunds={"item.void_crystal": 2, "item.void_anchor": 1},
         min_realm_layer=1,
         required_realm="void_refining",
-        content_version="content-0.5",
-        rule_version="production-0.5.0",
         success_threshold_bp=1,
         high_quality_threshold_bp=10001,
     ),
@@ -431,8 +404,6 @@ RECIPES: dict[str, RecipeDefinition] = {
         min_realm_layer=1,
         required_realm="soul_transformation",
         required_location=("beast.ancestral_lake",),
-        content_version="content-0.4",
-        rule_version="production-0.4.0",
         success_threshold_bp=1,
         high_quality_threshold_bp=10001,
     ),
@@ -567,7 +538,6 @@ def production_quality(
 __all__ = [
     "HIGH_QUALITY_THRESHOLD_BP",
     "QUALITY_SUCCESS_THRESHOLD_BP",
-    "RECIPE_RULE_VERSION",
     "TOOL_MAX_DURABILITY_BP",
     "RecipeDefinition",
     "production_quality",

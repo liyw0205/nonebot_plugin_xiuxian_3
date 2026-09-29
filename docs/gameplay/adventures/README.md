@@ -2,14 +2,12 @@
 
 本域把已有的悬赏、秘境与战斗日志正规化，并新增主线关卡。它复用探索/战斗域的快照与结算，不复制第二套战斗引擎。
 
-当前开放草药补给、训练傀儡、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境、`instance.secret_realm.heaven_echo` 天劫回音，以及 `instance.legacy.demon_reliquary` 和 `instance.legacy.demon_abyss_echo` 两条线索驱动遗府。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。遗府使用遗府专属仓储和稳定键隔离，现无已登记且规则闭合的后续副本待办。斗法记录分享和尚未定义合同的后续内容仍保持锁定；世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
+当前开放草药补给、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境、`instance.secret_realm.heaven_echo` 天劫回音，以及 `instance.legacy.demon_reliquary` 和 `instance.legacy.demon_abyss_echo` 两条线索驱动遗府。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。遗府使用遗府专属仓储和稳定键隔离，现无已登记且规则闭合的后续副本待办。斗法记录分享和尚未定义合同的后续内容仍保持锁定；世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，以及 v0.3 的
 `bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
 接取时冻结目标、奖励和背包/生产基线，领取时按服务端进度在一个事务中发奖。每个业务日每名
-角色最多接取一条悬赏，重复 operation 只回放原结果。训练傀儡悬赏使用已结算的 `pve.training`
-胜场作为服务端进度来源，接取时冻结胜场基线，完成 2 次后
-领取修为和焦点丹；战斗域已有的训练战奖励仍由战斗奖励命令独立领取，不与悬赏奖励重复结算。
+角色最多接取一条悬赏，重复 operation 只回放原结果。
 
 元婴 L1 可通过 `三界主线` 查看 `story.mainline.three_realms`，使用
 `开始三界主线 调停|契约|共生 序号` 和 `领取三界主线奖励 调停|契约|共生 序号` 完成一条路线。

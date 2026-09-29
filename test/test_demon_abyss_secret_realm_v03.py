@@ -127,7 +127,7 @@ def test_demon_abyss_first_clear_and_weekly_quota_on_both_adapters(adapter: str)
                     (adapter, user),
                 ).fetchone()
                 battles = connection.execute(
-                    "SELECT enemy_key, content_version, rule_version, reward_status FROM battle_sessions "
+                    "SELECT enemy_key, reward_status FROM battle_sessions "
                     "WHERE battle_type='pve.secret_realm.demon_abyss' ORDER BY id"
                 ).fetchall()
             assert player[0] == 80
@@ -135,7 +135,7 @@ def test_demon_abyss_first_clear_and_weekly_quota_on_both_adapters(adapter: str)
             assert json.loads(player[2])["item.clue.demon_abyss_echo"] == 1
             assert "story.demon_abyss_echo" in json.loads(player[3])["flags"]
             assert [row[0] for row in battles] == ["enemy.demon_abyss_echo_guardian", "enemy.demon_abyss_heart"]
-            assert all(row[1:] == ("content-0.3", "combat-0.3.2", "none") for row in battles)
+            assert all(row[1:] == ("none",) for row in battles)
             assert result["outcome"] == "won"
             await runtime.close()
 

@@ -3,8 +3,9 @@
   "records": [
     {
       "name": "侦查机关",
+      "desc": "器修操控的小型机关，能在短时间内侦察战场并牵制对手。",
       "entity_type": "summoned_device",
-      "status": "active",
+      "status": "locked",
       "owner_path_key": "device",
       "max_instances": 1,
       "combat": {

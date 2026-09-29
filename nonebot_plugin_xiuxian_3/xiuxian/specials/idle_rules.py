@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 import hashlib
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 MAX_CLAIM_EXTENSION_SECONDS = 24 * 60 * 60
 ABSOLUTE_MAX_SECONDS = 48 * 60 * 60
 CANCEL_WINDOW_SECONDS = 60
@@ -53,7 +52,7 @@ ROUTES: dict[str, IdleRouteDefinition] = {
         stamina_cost=0,
         energy_cost=0,
         daily_limit=2,
-        pool_key="idle.town.v0.1",
+        pool_key="idle.town",
         required_location="xuantian.new_town",
         full_reward_bounds=(("spirit_stones", 16, 24),),
         fallback_reward=(("spirit_stones", 8),),
@@ -68,7 +67,7 @@ ROUTES: dict[str, IdleRouteDefinition] = {
         stamina_cost=0,
         energy_cost=1,
         daily_limit=1,
-        pool_key="idle.herb.v0.1",
+        pool_key="idle.herb",
         required_residence=True,
         full_reward_bounds=(
             ("item.herb.blood_grass", 2, 4),
@@ -83,7 +82,7 @@ ROUTES: dict[str, IdleRouteDefinition] = {
         stamina_cost=0,
         energy_cost=0,
         daily_limit=1,
-        pool_key="idle.workshop.v0.1",
+        pool_key="idle.workshop",
         required_tool_keys=("item.tool.basic_furnace", "item.tool.basic_hammer"),
         facility_kind="artifice",
         full_reward_bounds=(
@@ -100,7 +99,7 @@ ROUTES: dict[str, IdleRouteDefinition] = {
         stamina_cost=2,
         energy_cost=0,
         daily_limit=1,
-        pool_key="idle.route.v0.1",
+        pool_key="idle.route",
         required_reputation=20,
         full_reward_bounds=(("spirit_stones", 25, 40), ("codex.route.town_road", 1, 1)),
         fallback_reward=(("spirit_stones", 12),),

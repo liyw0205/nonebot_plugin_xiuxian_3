@@ -195,7 +195,7 @@ class FinalHeavenSeasonRepositoryMixin:
                 source_operation_id = f"season.final_heaven:{season_id}:{board_key}:{player['id']}"
                 connection.execute(
                     "INSERT OR IGNORE INTO honor_titles(player_id, title_key, source_operation_id, acquired_at, content_version, rule_version) "
-                    "VALUES (?, ?, ?, ?, 'content-0.6', ?)",
+                    "VALUES (?, ?, ?, ?, '', ?)",
                     (player["id"], title_key, source_operation_id, now_text, FINAL_HEAVEN_RULE_VERSION),
                 )
                 title_event_operation = f"{operation_id}:{board_key}:title"
@@ -504,7 +504,7 @@ class FinalHeavenSeasonRepositoryMixin:
             )
             connection.execute(
                 "INSERT OR IGNORE INTO honor_titles(player_id, title_key, source_operation_id, acquired_at, content_version, rule_version) "
-                "VALUES (?, ?, ?, ?, 'content-0.6', ?)",
+                "VALUES (?, ?, ?, ?, '', ?)",
                 (player_id, title_key, source_operation_id, now_text, FINAL_HEAVEN_RULE_VERSION),
             )
             connection.execute(

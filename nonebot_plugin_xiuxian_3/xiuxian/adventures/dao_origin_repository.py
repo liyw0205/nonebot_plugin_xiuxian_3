@@ -271,7 +271,7 @@ class DaoOriginRepositoryMixin:
                     story_written = True
                 codex_written = False
                 if first_clear:
-                    codex_written = record_codex_discovery(connection, player_id=int(player["id"]), entry_key=DAO_ORIGIN_CODEX, operation_id=f"{operation_id}:codex", occurred_at=now, snapshot={"run_id": str(run["run_id"]), "instance_key": DAO_ORIGIN_KEY}, content_version=DAO_ORIGIN_CONTENT_VERSION, rule_version=DAO_ORIGIN_RULE_VERSION)
+                    codex_written = record_codex_discovery(connection, player_id=int(player["id"]), entry_key=DAO_ORIGIN_CODEX, operation_id=f"{operation_id}:codex", occurred_at=now, snapshot={"run_id": str(run["run_id"]), "instance_key": DAO_ORIGIN_KEY})
                 result.update({"outcome": "won", "first_clear": first_clear, "story_flag_written": story_written, "codex_written": codex_written})
                 status = "settled"
             elif status in {"expired", "failed", "system_aborted"}:

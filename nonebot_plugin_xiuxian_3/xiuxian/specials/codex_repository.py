@@ -21,7 +21,10 @@ from .codex_models import (
     CodexMilestoneRecord,
     CodexOverviewRecord,
 )
-from .codex_rules import CONTENT_VERSION, MILESTONES, RULE_VERSION, label_for_entry
+from .codex_rules import (
+    codex_milestones,
+    label_for_entry,
+)
 
 
 class CodexRepositoryMixin:
@@ -33,6 +36,7 @@ class CodexRepositoryMixin:
             return await asyncio.to_thread(self._get_codex_once, platform, platform_user_id)
 
     def _get_codex_once(self, platform: str, platform_user_id: str) -> CodexOverviewRecord:
+        milestones = codex_milestones(self.content)
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             entries = connection.execute(
@@ -43,9 +47,9 @@ class CodexRepositoryMixin:
             claims = {
                 str(row["milestone_key"])
                 for row in connection.execute(
-                    "SELECT milestone_key FROM codex_milestone_claims "
-                    "WHERE player_id = ? AND content_version = ?",
-                    (player["id"], CONTENT_VERSION),
+                "SELECT milestone_key FROM codex_milestone_claims "
+                    "WHERE player_id = ?",
+                    (player["id"],),
                 ).fetchall()
             }
             discovered = {str(row["entry_key"]) for row in entries}
@@ -54,7 +58,7 @@ class CodexRepositoryMixin:
                     CodexEntryRecord(
                         entry_key=str(row["entry_key"]),
                         category=str(row["category"]),
-                        label=label_for_entry(str(row["entry_key"])),
+                        label=label_for_entry(str(row["entry_key"]), self.content),
                         first_seen_at=str(row["first_seen_at"]),
                     )
                     for row in entries
@@ -67,10 +71,11 @@ class CodexRepositoryMixin:
                         required_count=len(definition.entry_keys),
                         ready=all(key in discovered for key in definition.entry_keys),
                         claimed=definition.key in claims,
+                        reputation_key=definition.reputation_key,
                         reputation_reward=definition.reputation_reward,
                         unlocks=definition.unlocks,
                     )
-                    for definition in MILESTONES.values()
+                    for definition in milestones.values()
                 ),
             )
 
@@ -99,7 +104,7 @@ class CodexRepositoryMixin:
         milestone_key: str,
         operation_id: str,
     ) -> CodexMilestoneClaimRecord:
-        definition = MILESTONES.get(milestone_key)
+        definition = codex_milestones(self.content).get(milestone_key)
         if definition is None:
             raise CodexMilestoneNotFoundError("unsupported codex milestone")
         operation_name = "specials.claim_codex_milestone"
@@ -107,7 +112,6 @@ class CodexRepositoryMixin:
             "platform": platform,
             "platform_user_id": platform_user_id,
             "milestone_key": milestone_key,
-            "content_version": CONTENT_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
@@ -128,8 +132,8 @@ class CodexRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             prior = connection.execute(
                 "SELECT 1 FROM codex_milestone_claims "
-                "WHERE player_id = ? AND milestone_key = ? AND content_version = ?",
-                (player["id"], milestone_key, CONTENT_VERSION),
+                "WHERE player_id = ? AND milestone_key = ?",
+                (player["id"], milestone_key),
             ).fetchone()
             if prior is not None:
                 raise CodexMilestoneAlreadyClaimedError("codex milestone is already claimed")
@@ -144,8 +148,8 @@ class CodexRepositoryMixin:
                 raise CodexMilestoneNotReadyError("codex milestone requirements are incomplete")
 
             reward = (
-                {"local.xuantian.new_town": definition.reputation_reward}
-                if definition.reputation_reward
+                {definition.reputation_key: definition.reputation_reward}
+                if definition.reputation_key is not None and definition.reputation_reward
                 else {}
             )
             if reward:
@@ -171,20 +175,17 @@ class CodexRepositoryMixin:
             snapshot = {
                 "entry_keys": list(entry_keys),
                 "milestone_key": milestone_key,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             }
             connection.execute(
                 """
                 INSERT INTO codex_milestone_claims(
-                    player_id, milestone_key, content_version, operation_id,
+                    player_id, milestone_key, operation_id,
                     snapshot_json, reward_json, unlocks_json, claimed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     player["id"],
                     milestone_key,
-                    CONTENT_VERSION,
                     operation_id,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(reward, ensure_ascii=False, sort_keys=True),

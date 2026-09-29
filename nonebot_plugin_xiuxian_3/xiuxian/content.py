@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
+from .utils.json_cache import DuplicateJSONKeyError, read_json_cached
+
 
 class ContentError(ValueError):
     """Raised when the runtime content configuration is malformed."""
@@ -20,19 +22,10 @@ class ContentBundle:
     root: Path
     manifest: Mapping[str, Any]
     _records: Mapping[tuple[str, str], Mapping[str, Any]]
-    _metadata: Mapping[str, Any]
-
-    @property
-    def content_version(self) -> str:
-        return str(self._metadata.get("release", "current"))
-
-    @property
-    def rule_version(self) -> str:
-        return "current"
 
     @classmethod
     def load(cls, data_dir: str | Path) -> "ContentBundle":
-        root = Path(data_dir).expanduser()
+        root = Path(data_dir).expanduser().resolve()
         manifest_path = root / "内容清单.json"
         manifest = _read_object(manifest_path)
         if manifest.get("schema") != "xiuxian.content":
@@ -40,8 +33,9 @@ class ContentBundle:
         files = manifest.get("files")
         if not isinstance(files, list) or not files or any(not isinstance(item, str) for item in files):
             raise ContentError(f"manifest files must be a non-empty string list: {manifest_path}")
+        if len(set(files)) != len(files):
+            raise ContentError(f"manifest contains duplicate file entries: {manifest_path}")
 
-        metadata = _read_metadata(root / str(manifest.get("metadata", "内容版本.json")))
         records: dict[tuple[str, str], Mapping[str, Any]] = {}
         for relative_path in files:
             file_path = _safe_child(root, relative_path)
@@ -60,19 +54,12 @@ class ContentBundle:
                 identity = (kind, row["key"])
                 if identity in records:
                     raise ContentError(f"duplicate content key {kind}:{row['key']}")
-                normalized = copy.deepcopy(row)
-                normalized.setdefault("content_version", metadata.get("release", "current"))
-                normalized.setdefault(
-                    "rule_version",
-                    metadata.get("rules", {}).get(kind, "current"),
-                )
-                records[identity] = normalized
+                records[identity] = copy.deepcopy(row)
 
         return cls(
             root=root,
             manifest=copy.deepcopy(manifest),
             _records=records,
-            _metadata=copy.deepcopy(metadata),
         )
 
     @classmethod
@@ -120,33 +107,17 @@ class ContentBundle:
             raise KeyError(f"content label not found: {kind}:{key}")
         return row["name"].strip()
 
-    def versions(self, kind: str, key: str) -> tuple[str, str]:
-        """Return content/rule versions declared by one record."""
-
-        row = self.require(kind, key)
-        return str(row.get("content_version", self.content_version)), str(
-            row.get("rule_version", self.rule_version)
-        )
-
-
 def _read_object(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = read_json_cached(path)
     except FileNotFoundError as exc:
         raise ContentError(f"content file not found: {path}") from exc
     except json.JSONDecodeError as exc:
         raise ContentError(f"invalid JSON: {path}: {exc.msg}") from exc
+    except DuplicateJSONKeyError as exc:
+        raise ContentError(f"invalid JSON: {path}: {exc}") from exc
     if not isinstance(value, dict):
         raise ContentError(f"content document must be an object: {path}")
-    return value
-
-
-def _read_metadata(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {"release": "current", "rules": {}}
-    value = _read_object(path)
-    if not isinstance(value.get("release"), str) or not isinstance(value.get("rules", {}), dict):
-        raise ContentError(f"invalid content metadata: {path}")
     return value
 
 
@@ -160,4 +131,20 @@ def _safe_child(root: Path, relative_path: str) -> Path:
     return candidate
 
 
-__all__ = ["ContentBundle", "ContentError"]
+def bundled_content(data_dir: str | Path | None = None) -> ContentBundle:
+    """Load the packaged content, or the source-tree data while developing."""
+
+    if data_dir is not None:
+        return ContentBundle.load(data_dir)
+
+    package_data = Path(__file__).resolve().parents[1] / "data"
+    source_data = Path(__file__).resolve().parents[2] / "data"
+    for root in (package_data, source_data):
+        if (root / "内容清单.json").is_file():
+            return ContentBundle.load(root)
+    raise FileNotFoundError(
+        f"content manifest not found in {package_data} or {source_data}"
+    )
+
+
+__all__ = ["ContentBundle", "ContentError", "bundled_content"]

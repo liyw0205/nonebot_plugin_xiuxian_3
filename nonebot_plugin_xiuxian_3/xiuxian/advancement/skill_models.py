@@ -17,8 +17,7 @@ class SkillMasteryRecord:
     max_level: int
     base_effect: dict[str, int | str] = field(default_factory=dict)
     effective_effect: dict[str, int | str] = field(default_factory=dict)
-    insight_cost: int = 0
-    spirit_stone_cost: int = 0
+    resource_costs: dict[str, int] = field(default_factory=dict)
     trained_at: str = ""
     already_completed: bool = False
 
@@ -27,7 +26,7 @@ class SkillMasteryRecord:
 class SkillProfileRecord:
     player: PlayerView
     skills: tuple[SkillMasteryRecord, ...] = ()
-    skill_insights: int = 0
+    insight_balance: int = 0
 
 
 __all__ = ["SkillMasteryRecord", "SkillProfileRecord"]

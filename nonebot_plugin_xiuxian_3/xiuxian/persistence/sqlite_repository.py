@@ -98,6 +98,7 @@ from ..economy.purchase_order_repository import PurchaseOrderRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
 from .errors import *  # noqa: F401,F403
 from .schema import SCHEMA
+from ..utils.database import connect_sqlite
 from ..adventures.secret_realm_migration import ensure_secret_realm_schema
 from ..adventures.boundary_rift_migration import ensure_boundary_rift_schema
 from ..adventures.ancient_domain_migration import ensure_ancient_domain_schema
@@ -229,18 +230,7 @@ class SQLitePlayerRepository(
             self._initialized = True
 
     def _connect(self) -> sqlite3.Connection:
-        self.settings.data_dir.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(
-            self.settings.database_path,
-            timeout=self.settings.busy_timeout_ms / 1000,
-            isolation_level=None,
-        )
-        connection.row_factory = sqlite3.Row
-        connection.execute(f"PRAGMA busy_timeout = {self.settings.busy_timeout_ms}")
-        connection.execute("PRAGMA journal_mode = WAL")
-        connection.execute("PRAGMA synchronous = NORMAL")
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        return connect_sqlite(self.settings.database_path, busy_timeout_ms=self.settings.busy_timeout_ms)
 
     @staticmethod
     def _require_player(
@@ -282,9 +272,7 @@ class SQLitePlayerRepository(
     def _initialize_sync(self) -> None:
         with self._connect() as connection:
             connection.executescript(SCHEMA)
-            self._migrate_legacy_schema(connection)
             self._migrate_arena_mode_schema(connection)
-            self._migrate_party_type_schema(connection)
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
             self._migrate_facility_schema(connection)
@@ -318,68 +306,68 @@ class SQLitePlayerRepository(
             )
             if connection.execute(
                 "SELECT 1 FROM schema_migrations WHERE migration_key=?",
-                ("world.void_route_discoveries.v0.5.2",),
+                ("world.void_route_discoveries",),
             ).fetchone() is None:
                 self._migrate_void_route_discovery_count(connection)
                 connection.execute(
                     "INSERT INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                    ("world.void_route_discoveries.v0.5.2", serialize_datetime(self._now())),
+                    ("world.void_route_discoveries", serialize_datetime(self._now())),
                 )
             if connection.execute(
                 "SELECT 1 FROM schema_migrations WHERE migration_key=?",
-                ("progression.foundation_quality.v0.1.6",),
+                ("progression.foundation_quality",),
             ).fetchone() is None:
                 connection.execute(
                     "UPDATE players SET foundation_quality=5500 WHERE realm_key='foundation' AND foundation_quality=0"
                 )
                 connection.execute(
                     "INSERT INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                    ("progression.foundation_quality.v0.1.6", serialize_datetime(self._now())),
+                    ("progression.foundation_quality", serialize_datetime(self._now())),
                 )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("routine.v0.1", serialize_datetime(self._now())),
+                ("routine", serialize_datetime(self._now())),
             )
             self._materialize_redemption_codes(connection, serialize_datetime(self._now()))
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("routine.redemption.v0.1", serialize_datetime(self._now())),
+                ("routine.redemption", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("routine.wayfaring.v0.1", serialize_datetime(self._now())),
+                ("routine.wayfaring", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("events.final_heaven.v0.6", serialize_datetime(self._now())),
+                ("events.final_heaven", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("production.contract.v0.3", serialize_datetime(self._now())),
+                ("production.contract", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("events.heart_demon.v0.3", serialize_datetime(self._now())),
+                ("events.heart_demon", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("social.alliance_beacon.v0.5", serialize_datetime(self._now())),
+                ("social.alliance_beacon", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("social.cross_server_recovery.v0.5", serialize_datetime(self._now())),
+                ("social.cross_server_recovery", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("events.cross_realm.v0.3.1", serialize_datetime(self._now())),
+                ("events.cross_realm", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("economy.auction.v0.3", serialize_datetime(self._now())),
+                ("economy.auction", serialize_datetime(self._now())),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
-                ("economy.purchase_order.v0.3", serialize_datetime(self._now())),
+                ("economy.purchase_order", serialize_datetime(self._now())),
             )
             connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
@@ -432,14 +420,14 @@ class SQLitePlayerRepository(
 
     @staticmethod
     def _migrate_sect_alliance_schema(connection: sqlite3.Connection) -> None:
-        """Keep the v0.5 alliance/beacon tables available on existing DBs."""
+        """Keep alliance and beacon indexes available."""
 
         connection.execute("CREATE INDEX IF NOT EXISTS idx_sect_void_beacons_status ON sect_void_beacons(status, maintenance_due_at)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_sect_alliance_contracts_sect ON sect_alliance_contracts(sect_a_id, sect_b_id, status, ends_at)")
 
     @staticmethod
     def _migrate_heart_demon_event_schema(connection: sqlite3.Connection) -> None:
-        """Backfill the event read model for sessions created before v0.3."""
+        """Backfill the event read model for existing sessions."""
 
         connection.execute(
             """
@@ -483,7 +471,7 @@ class SQLitePlayerRepository(
         )
 
     def _migrate_facility_schema(self, connection: sqlite3.Connection) -> None:
-        """Add v0.2 facility ownership fields to databases created earlier."""
+        """Add facility ownership fields when they are missing."""
 
         sect_columns = {row["name"] for row in connection.execute("PRAGMA table_info(sects)")}
         if "spirit_stones" not in sect_columns:
@@ -644,134 +632,6 @@ class SQLitePlayerRepository(
             "CREATE INDEX idx_arena_matches_defender_snapshot ON arena_matches(challenger_id, defender_snapshot_id, created_at)"
         )
         connection.execute("PRAGMA foreign_keys = ON")
-
-    @staticmethod
-    def _migrate_party_type_schema(connection: sqlite3.Connection) -> None:
-        """Keep old party tables readable while adding v0.3 boundary parties."""
-
-        table = connection.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'parties'"
-        ).fetchone()
-        schema_sql = str(table[0]) if table and table[0] else ""
-        if all(value in schema_sql for value in ("'boundary_realm'", "'party_boundary'", "'demon_realm'", "'beast_realm'", "'standard_pve'", "'secret_realm_boundary'", "'secret_realm_ancient'", "'secret_realm_void_ruins'", "'secret_realm_time_fort'", "'three_realms_tower_duo'")):
-            return
-        connection.execute("PRAGMA foreign_keys = OFF")
-        connection.execute("DROP INDEX IF EXISTS idx_parties_leader")
-        connection.execute("DROP INDEX IF EXISTS idx_parties_status")
-        connection.execute(
-            """
-            CREATE TABLE parties_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                party_id TEXT NOT NULL UNIQUE,
-                party_type TEXT NOT NULL CHECK (party_type IN ('exploration_pair', 'arena_trio', 'boundary_realm', 'party_boundary', 'demon_realm', 'beast_realm', 'standard_pve', 'secret_realm_boundary', 'secret_realm_ancient', 'secret_realm_void_ruins', 'secret_realm_time_fort', 'three_realms_tower_duo')),
-                status TEXT NOT NULL CHECK (status IN ('forming', 'ready', 'disbanded', 'expired')),
-                leader_id INTEGER NOT NULL REFERENCES players(id),
-                location_key TEXT NOT NULL,
-                confirmation_deadline TEXT NOT NULL,
-                current_session_id TEXT,
-                distribution_key TEXT NOT NULL DEFAULT 'contribution',
-                content_version TEXT NOT NULL,
-                rule_version TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute("INSERT INTO parties_new SELECT * FROM parties")
-        connection.execute("DROP TABLE parties")
-        connection.execute("ALTER TABLE parties_new RENAME TO parties")
-        connection.execute("CREATE INDEX idx_parties_leader ON parties(leader_id, status, created_at)")
-        connection.execute("CREATE INDEX idx_parties_status ON parties(status, confirmation_deadline)")
-        connection.execute("PRAGMA foreign_keys = ON")
-
-    @staticmethod
-    def _migrate_legacy_schema(connection: sqlite3.Connection) -> None:
-        """Add P3.1 identity fields without rewriting existing player rows."""
-
-        player_columns = {row["name"] for row in connection.execute("PRAGMA table_info(players)")}
-        if "player_id" not in player_columns:
-            connection.execute("ALTER TABLE players ADD COLUMN player_id TEXT")
-            connection.execute(
-                "UPDATE players SET player_id = 'legacy-' || id WHERE player_id IS NULL"
-            )
-            connection.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_player_id ON players(player_id)"
-            )
-        for column, definition in (
-            ("dao_name", "TEXT NOT NULL DEFAULT ''"),
-            ("status", "TEXT NOT NULL DEFAULT 'active'"),
-            ("location_key", "TEXT NOT NULL DEFAULT 'xuantian.new_town'"),
-            ("rule_version", "TEXT NOT NULL DEFAULT 'player-onboarding-v0.1.0'"),
-            ("path_key", "TEXT"),
-            ("subprofession_key", "TEXT"),
-            ("stamina", "INTEGER NOT NULL DEFAULT 0"),
-            ("stamina_max", "INTEGER NOT NULL DEFAULT 0"),
-            ("energy", "INTEGER NOT NULL DEFAULT 0"),
-            ("energy_max", "INTEGER NOT NULL DEFAULT 0"),
-            ("inventory_json", "TEXT NOT NULL DEFAULT '{}'"),
-            ("durability_json", "TEXT NOT NULL DEFAULT '{}'"),
-            ("item_effects_json", "TEXT NOT NULL DEFAULT '{}'"),
-            ("intro_json", "TEXT NOT NULL DEFAULT '{}'"),
-            ("selected_service", "TEXT"),
-            ("realm_key", "TEXT NOT NULL DEFAULT 'mortal'"),
-            ("realm_layer", "INTEGER NOT NULL DEFAULT 0"),
-            ("cultivation", "INTEGER NOT NULL DEFAULT 0"),
-            ("total_cultivation", "INTEGER NOT NULL DEFAULT 0"),
-            ("foundation_quality", "INTEGER NOT NULL DEFAULT 0"),
-            ("world_merit", "INTEGER NOT NULL DEFAULT 0"),
-            ("void_merit", "INTEGER NOT NULL DEFAULT 0"),
-            ("arena_rating", "INTEGER NOT NULL DEFAULT 1000"),
-            ("arena_wins", "INTEGER NOT NULL DEFAULT 0"),
-            ("arena_losses", "INTEGER NOT NULL DEFAULT 0"),
-            ("arena_draws", "INTEGER NOT NULL DEFAULT 0"),
-            ("talent_points", "INTEGER NOT NULL DEFAULT 0"),
-            ("skill_insights", "INTEGER NOT NULL DEFAULT 0"),
-            ("weakness_until", "TEXT"),
-            ("battle_defeat_until", "TEXT"),
-            ("breakthrough_pity_bp", "INTEGER NOT NULL DEFAULT 0"),
-            ("soul_power", "INTEGER NOT NULL DEFAULT 0"),
-            ("soul_power_max", "INTEGER NOT NULL DEFAULT 0"),
-            ("domain_charge", "INTEGER NOT NULL DEFAULT 0"),
-            ("domain_charge_max", "INTEGER NOT NULL DEFAULT 0"),
-            ("pollution", "INTEGER NOT NULL DEFAULT 0"),
-            ("bloodline_stability", "INTEGER NOT NULL DEFAULT 0"),
-            ("cross_realm_penalty_bp", "INTEGER NOT NULL DEFAULT 0"),
-            ("soul_fatigue_until", "TEXT"),
-            ("heart_demon_bonus_bp", "INTEGER NOT NULL DEFAULT 0"),
-            ("max_hp", "INTEGER NOT NULL DEFAULT 0"),
-            ("max_mp", "INTEGER NOT NULL DEFAULT 0"),
-            ("carry_capacity", "INTEGER NOT NULL DEFAULT 0"),
-            ("exploration_efficiency_bp", "INTEGER NOT NULL DEFAULT 0"),
-            ("domain_key", "TEXT"),
-            ("domain_power", "INTEGER NOT NULL DEFAULT 0"),
-            ("realm_resistance_bp", "INTEGER NOT NULL DEFAULT 0"),
-            ("domain_crack_until", "TEXT"),
-            ("initiative", "INTEGER NOT NULL DEFAULT 0"),
-            ("faction_reputation_json", "TEXT NOT NULL DEFAULT '{}'"),
-            ("domain_level", "INTEGER NOT NULL DEFAULT 0"),
-            ("domain_charge_reset_date", "TEXT"),
-            ("void_power", "INTEGER NOT NULL DEFAULT 0"),
-            ("void_power_max", "INTEGER NOT NULL DEFAULT 0"),
-            ("space_resistance_bp", "INTEGER NOT NULL DEFAULT 0"),
-            ("void_instability_until", "TEXT"),
-            ("void_route_count", "INTEGER NOT NULL DEFAULT 0"),
-            ("void_anchor_capacity", "INTEGER NOT NULL DEFAULT 0"),
-            ("void_power_reset_date", "TEXT"),
-            ("dao_fruit_progress", "INTEGER NOT NULL DEFAULT 0"),
-            ("ascension_merit", "INTEGER NOT NULL DEFAULT 0"),
-            ("tribulation_debt", "INTEGER NOT NULL DEFAULT 0"),
-            ("dao_fruit_key", "TEXT"),
-            ("endgame_status", "TEXT NOT NULL DEFAULT 'none'"),
-            ("ending_key", "TEXT"),
-            ("sect_join_cooldown_until", "TEXT"),
-        ):
-            if column not in player_columns:
-                connection.execute(f"ALTER TABLE players ADD COLUMN {column} {definition}")
-        operation_columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(operations)")
-        }
-        if "request_hash" not in operation_columns:
-            connection.execute("ALTER TABLE operations ADD COLUMN request_hash TEXT NOT NULL DEFAULT ''")
 
     @staticmethod
     def _migrate_cultivation_session_status(connection: sqlite3.Connection) -> None:

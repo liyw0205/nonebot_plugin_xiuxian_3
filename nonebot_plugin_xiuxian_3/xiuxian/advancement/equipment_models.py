@@ -30,9 +30,7 @@ class TemperingRecord:
     success: bool
     roll_bp: int
     success_bp: int
-    material_key: str
-    material_spent: int
-    spirit_stones_spent: int
+    costs_spent: dict[str, int] = field(default_factory=dict)
     already_completed: bool = False
 
 
@@ -45,9 +43,7 @@ class RefinementRecord:
     success: bool
     roll_bp: int
     success_bp: int
-    material_key: str
-    material_spent: int
-    spirit_stones_spent: int
+    costs_spent: dict[str, int]
     failure_streak_before: int
     failure_streak_after: int
     already_completed: bool = False

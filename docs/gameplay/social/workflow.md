@@ -4,6 +4,7 @@
 application -> accepted/rejected/expired
 member -> active -> left/kicked
 mentor -> invited -> active -> graduated/rejected/expired
+partner -> invited -> active -> dissolution_pending -> dissolved
 party -> forming -> ready -> disbanded
 party_battle -> created -> running -> won/lost/expired -> settled
 service -> created -> accepted -> locked -> processing -> delivered -> settled
@@ -17,6 +18,8 @@ sect_war -> scheduled -> open -> running -> settled
 轮次结束由查询、贡献或领奖请求推进为 `settled`，按宗门总贡献固定排序并只给胜方宗门增加 100 宗门功勋。
 实际出战成员贡献达到 20 可在 24 小时内领取 30 点世界功勋；窗口结束时恢复流程自动发放合格未领奖奖励，
 所有状态变化和奖励均有独立 operation/claim 记录。
+
+玩家间切磋只读取双方当下的公开角色战斗状态并即时观战，不建立邀请、关系或斗法记录；不会消耗资源、改变状态、发放奖励或记录图鉴。训练傀儡同为只读演武。真实 PvP/PvE 则依各自会话正常结算。
 
 当前运行时开放 `forming -> ready -> disbanded/expired` 的双人探索队伍、普通 4–5 人副本队伍、三人竞技队伍、界隙/魔渊/万兽 2–5 人队伍和界隙裂隙秘境专用队伍状态机，
 以及独立的 `party_battle` 自动 PVE 会话；队伍自身不伪装成单人战斗会话。邀请和全员确认窗口为 5 分钟，
@@ -42,3 +45,5 @@ sect_war -> scheduled -> open -> running -> settled
 
 师徒邀请保存 24 小时截止时间并在接受/拒绝时清理过期状态。毕业由师傅发起，要求徒弟已入道、
 达到聚气 L3 且存在已完成生产或已交付常驻经营服务；毕业关系 ID 作为唯一结算键。
+
+上图中的 `partner` 仍是待开发目标。直接切磋是读取双方当前状态的即时观战，不创建状态锁、战斗会话或持久记录；不复用竞技场积分。道侣解除需要双方确认。详细准入和资产边界见[玩家互动开发说明](player-interactions.md)。

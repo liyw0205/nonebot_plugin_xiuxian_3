@@ -34,7 +34,6 @@ class CultivationMode:
     base_cultivation: int
     environment_bp: int
     daily_limit: int | None
-    rule_version: str
     required_location: str | None = None
     required_realm: str | None = None
     required_layer: int = 0

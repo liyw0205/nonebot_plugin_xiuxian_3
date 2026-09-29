@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..persistence.errors import (
     FinalBattleBusyError,
     FinalBattleCooldownError,
@@ -20,7 +21,7 @@ from ..persistence.errors import (
     FinalBattleRequirementError,
     OperationConflictError,
 )
-from ..combat.rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp
+from ..combat.rules import apply_constitution_combat_effect, TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp
 from ..combat.tribulation_rules import stat_snapshot
 from .endgame_models import (
     FinalBattleReplayRecord,
@@ -30,7 +31,6 @@ from .endgame_models import (
 from .endgame_rules import (
     ASCENSION_CERTIFICATE_KEY,
     ASCENSION_READY_STATUS,
-    CONTENT_VERSION,
     FINAL_BATTLE_ASSIST_MERIT_CAP,
     FINAL_BATTLE_ASSIST_MERIT_PER_DAMAGE,
     FINAL_BATTLE_COOLDOWN_SECONDS,
@@ -44,11 +44,9 @@ from .endgame_rules import (
     FINAL_BATTLE_MAX_TURNS,
     FINAL_BATTLE_MIN_MERIT,
     FINAL_BATTLE_MIN_PROGRESS,
-    RULE_VERSION,
     TRIAL_ORDER,
 )
 
-FINAL_BATTLE_RULE_VERSION = "combat-final-0.1.0"
 FINAL_BATTLE_LOCATION = "tribulation.sky_terrace"
 
 
@@ -229,8 +227,6 @@ class FinalBattleRepositoryMixin:
                 },
                 "certificate_escrow": {"item_key": ASCENSION_CERTIFICATE_KEY, "quantity": 1},
                 "random_seed": operation_id,
-                "content_version": CONTENT_VERSION,
-                "rule_version": FINAL_BATTLE_RULE_VERSION,
             }
             expires_at = serialize_datetime(now + timedelta(seconds=FINAL_BATTLE_LOBBY_SECONDS))
             connection.execute(
@@ -238,9 +234,9 @@ class FinalBattleRepositoryMixin:
                 (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
             )
             connection.execute(
-                "INSERT INTO final_battle_sessions(battle_id, initiator_id, create_operation_id, status, round_no, action_sequence, starts_at, expires_at, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, ?, 'lobby', 0, 0, ?, ?, ?, '{}', '{}', ?, ?, ?, ?)",
-                (battle_id, player["id"], operation_id, now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), CONTENT_VERSION, FINAL_BATTLE_RULE_VERSION, now_text, now_text),
+                "INSERT INTO final_battle_sessions(battle_id, initiator_id, create_operation_id, status, round_no, action_sequence, starts_at, expires_at, snapshot_json, state_json, result_json, created_at, updated_at) "
+                "VALUES (?, ?, ?, 'lobby', 0, 0, ?, ?, ?, '{}', '{}', ?, ?)",
+                (battle_id, player["id"], operation_id, now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), now_text, now_text),
             )
             self._insert_final_battle_member(connection, battle_id, player, initiator_snapshot, now_text)
             payload = {
@@ -341,7 +337,7 @@ class FinalBattleRepositoryMixin:
             raise ValueError("final battle round is invalid")
         operation_id = f"final-battle.turn:{battle_id}:{expected_round}"
         operation_name = "ascension.final_battle.turn"
-        request_hash = self._request_hash(operation_name, {"battle_id": battle_id, "expected_round": expected_round, "rule_version": FINAL_BATTLE_RULE_VERSION})
+        request_hash = self._request_hash(operation_name, {"battle_id": battle_id, "expected_round": expected_round})
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -384,10 +380,29 @@ class FinalBattleRepositoryMixin:
                     continue
                 sequence += 1
                 roll = battle_roll_bp(f"{battle_seed}:{expected_round}:{sequence}:player")
-                hit_bp = hit_chance_bp(attacker_initiative=int(member["stats"]["initiative"]), defender_agility=int(enemy["agility"]))
-                damage = int(member["stats"]["attack"]) if roll < hit_bp else 0
+                stats = member["stats"]
+                hit_bp = hit_chance_bp(
+                    attacker_initiative=int(stats["initiative"]),
+                    defender_agility=int(enemy["agility"]),
+                    accuracy_bp=int(stats.get("accuracy_bp", 0)),
+                )
+                crit_roll = battle_roll_bp(f"{battle_seed}:{expected_round}:{sequence}:player:crit")
+                critical = roll < hit_bp and crit_roll < int(stats.get("crit_chance_bp", 0))
+                damage = int(stats["attack"]) if roll < hit_bp else 0
+                if critical:
+                    damage = damage * (15_000 + int(stats.get("crit_damage_bp", 0))) // 10_000
+                damage = min(enemy_hp, damage)
                 enemy_hp = max(0, enemy_hp - damage)
+                recovery = min(
+                    max(0, int(stats["max_hp"]) - hp[player_id]),
+                    damage * int(stats.get("lifesteal_bp", 0)) // 10_000
+                    + int(stats.get("hp_regen", 0)),
+                )
+                hp[player_id] += recovery
                 actions.append({"sequence_no": sequence, "actor_key": f"member:{player_id}", "strategy_key": "final.basic_attack", "skill_key": "skill.basic_attack", "target_key": "enemy", "hit_roll_bp": roll, "damage": damage})
+                actions[-1]["critical"] = critical
+                if recovery:
+                    actions[-1]["recovery"] = recovery
                 if damage:
                     connection.execute("UPDATE final_battle_members SET contribution_damage=contribution_damage+?, updated_at=? WHERE battle_id=? AND player_id=(SELECT id FROM players WHERE player_id=?)", (damage, now_text, battle_id, player_id))
             alive = [member for member in members if hp.get(str(member["player_id"]), 0) > 0]
@@ -397,14 +412,37 @@ class FinalBattleRepositoryMixin:
                 target_id = str(target["player_id"])
                 sequence += 1
                 roll = battle_roll_bp(f"{battle_seed}:{expected_round}:{sequence}:enemy")
-                hit_bp = hit_chance_bp(attacker_initiative=int(enemy["initiative"]), defender_agility=int(target["stats"]["agility"]))
+                target_stats = target["stats"]
+                hit_bp = hit_chance_bp(
+                    attacker_initiative=int(enemy["initiative"]),
+                    defender_agility=int(target_stats["agility"]),
+                    evasion_bp=int(target_stats.get("evasion_bp", 0)),
+                )
                 damage = int(enemy["attack"]) if roll < hit_bp else 0
+                crit_roll = battle_roll_bp(f"{battle_seed}:{expected_round}:{sequence}:enemy:crit")
+                critical = roll < hit_bp and crit_roll < max(
+                    0, int(enemy.get("crit_chance_bp", 0)) - int(target_stats.get("anti_crit_bp", 0))
+                )
+                if critical:
+                    damage = damage * 15_000 // 10_000
+                damage = damage * (
+                    10_000 - min(7_000, int(target_stats.get("damage_reduction_bp", 0)))
+                ) // 10_000
+                damage = min(hp[target_id], damage)
+                reflected = damage * int(target_stats.get("damage_reflection_bp", 0)) // 10_000
+                enemy_hp = max(0, enemy_hp - reflected)
                 hp[target_id] = max(0, hp[target_id] - damage)
                 actions.append({"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.ascension_guardian", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage})
+                actions[-1]["critical"] = critical
+                if reflected:
+                    actions[-1]["reflected_damage"] = reflected
                 target_index += 1
             phase = "temptation" if enemy_hp * 2 <= int(enemy["max_hp"]) and not state.get("temptation_choice") else "guardian"
             for action in actions:
                 state_after = {"member_hp": hp, "enemy_hp": enemy_hp, "phase": phase}
+                for key in ("critical", "recovery", "reflected_damage"):
+                    if key in action:
+                        state_after[key] = action[key]
                 connection.execute(
                     "INSERT INTO final_battle_actions(action_id, battle_id, sequence_no, round_no, actor_key, strategy_key, skill_key, target_key, hit_roll_bp, damage, state_json, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (uuid4().hex, battle_id, action["sequence_no"], expected_round, action["actor_key"], action["strategy_key"], action["skill_key"], action["target_key"], action["hit_roll_bp"], action["damage"], json.dumps(state_after, ensure_ascii=False, sort_keys=True), f"{operation_id}:{action['sequence_no']}", now_text),
@@ -655,7 +693,11 @@ class FinalBattleRepositoryMixin:
     def _final_battle_member_snapshot(self, connection: sqlite3.Connection, player: sqlite3.Row, *, role: str) -> dict[str, Any]:
         equipment = self._battle_equipment_snapshot(connection, int(player["id"]))
         qualification = self._json_object(player["qualification_json"], {})
-        stats = stat_snapshot(qualification, realm_layer=int(player["realm_layer"]), equipment=equipment)
+        constitution_effect = constitution_effect_snapshot(connection, int(player["id"]))
+        stats = apply_constitution_combat_effect(
+            stat_snapshot(qualification, realm_layer=int(player["realm_layer"]), equipment=equipment),
+            constitution_effect,
+        )
         return {
             "player_id": str(player["player_id"]),
             "database_id": int(player["id"]),
@@ -665,6 +707,7 @@ class FinalBattleRepositoryMixin:
             "path_key": player["path_key"],
             "qualification": qualification,
             "stats": stats,
+            "constitution_effect": constitution_effect,
             "equipment": list(equipment),
         }
 
@@ -707,4 +750,4 @@ class FinalBattleRepositoryMixin:
         return FinalBattleResolutionRecord(str(payload["battle_id"]), str(payload["status"]), str(payload["outcome"]), int(payload["round_no"]), int(payload.get("debt_delta", 0)), payload.get("cooldown_until"), {str(player): {str(key): int(value) for key, value in dict(reward).items()} for player, reward in dict(payload.get("rewards", {})).items()}, replay)
 
 
-__all__ = ["FINAL_BATTLE_RULE_VERSION", "FinalBattleRepositoryMixin"]
+__all__ = ["FinalBattleRepositoryMixin"]

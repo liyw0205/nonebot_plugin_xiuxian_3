@@ -36,7 +36,6 @@ from .void_spire_rules import (
     quota_floor_range,
     reward_for,
     story_codex_for_floor,
-    versions_for_floor,
     week_start,
 )
 
@@ -120,7 +119,8 @@ class VoidSpireRepositoryMixin:
             definition = floor_definition(floor_no)
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
-        content_version, rule_version = versions_for_floor(floor_no)
+        content_version = ""
+        rule_version = ""
         operation_name = "specials.start_void_spire"
         request_payload = {
             "platform": platform,
@@ -397,8 +397,6 @@ class VoidSpireRepositoryMixin:
                         operation_id=operation_id,
                         occurred_at=now,
                         snapshot=snapshot,
-                        content_version=str(run["content_version"]),
-                        rule_version=str(run["rule_version"]),
                     )
             connection.execute(
                 "INSERT INTO void_spire_reward_claims(run_id,player_id,floor_no,route_key,first_clear,operation_id,reward_json,content_version,rule_version,claimed_at) VALUES (?,?,?,?,?,?,?,?,?,?)",

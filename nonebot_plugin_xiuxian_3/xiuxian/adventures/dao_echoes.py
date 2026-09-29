@@ -6,8 +6,8 @@ from dataclasses import dataclass
 
 
 DAO_ECHOES_STORY_KEY = "story.mainline.dao_echoes"
-DAO_ECHOES_CONTENT_VERSION = "content-0.6"
-DAO_ECHOES_RULE_VERSION = "adventures-0.6.0"
+DAO_ECHOES_CONTENT_VERSION = ""
+DAO_ECHOES_RULE_VERSION = ""
 DAO_ECHOES_LANES = ("builder", "witness", "traveler")
 DAO_ECHOES_LANE_LABELS = {
     "builder": "建设者",

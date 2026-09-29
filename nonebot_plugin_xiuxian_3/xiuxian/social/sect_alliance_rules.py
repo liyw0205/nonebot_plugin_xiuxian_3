@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 
-ALLIANCE_CONTENT_VERSION = "content-0.5"
-ALLIANCE_RULE_VERSION = "social-0.5.0"
+ALLIANCE_CONTENT_VERSION = ""
+ALLIANCE_RULE_VERSION = ""
 ALLIANCE_MIN_SECT_LEVEL = 5
 ALLIANCE_CONFIRMATION_SECONDS = 24 * 60 * 60
 ALLIANCE_DURATION_SECONDS = 7 * 24 * 60 * 60

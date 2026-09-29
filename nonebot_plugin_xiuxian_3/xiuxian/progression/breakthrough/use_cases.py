@@ -41,6 +41,7 @@ from ...repository import (
 from .rules import breakthrough_definition, success_bp
 from ...paths.rules import domain_definition, resolve_domain
 from ...player.rules import REALM_LABELS, realm_display_name
+from ...items.manual_rules import manual_breakthrough_bonus
 
 
 ITEM_LABELS = {
@@ -131,18 +132,17 @@ class BreakthroughApplication:
                 return None
         return target, protection
 
-    @staticmethod
-    def _preparation_bp(player, definition) -> int:
+    def _preparation_bp(self, player, definition) -> int:
         quality = 0
         if definition.quality_bonus_divisor:
             quality = min(
                 definition.quality_bonus_cap_bp,
                 player.foundation_quality // definition.quality_bonus_divisor,
             )
-        technique = (
-            definition.technique_bonus_bp
-            if definition.technique_bonus_bp and player.inventory.get("item.manual.basic_qi", 0) > 0
-            else 0
+        technique = manual_breakthrough_bonus(
+            player.inventory,
+            definition.target_realm,
+            self.repository.content,
         )
         formation = (
             definition.formation_bonus_bp
@@ -162,7 +162,8 @@ class BreakthroughApplication:
         if definition.target_realm == "nascent_soul":
             flags = set(player.intro_flags)
             preparation = 0
-            if player.inventory.get("item.manual.basic_qi", 0) > 0 or "preparation.nascent_soul.technique" in flags:
+            preparation += technique
+            if "preparation.nascent_soul.technique" in flags:
                 preparation += 300
             world = player.location_key.split(".", 1)[0]
             if f"alliance.{world}" in flags:
@@ -394,7 +395,7 @@ class BreakthroughApplication:
                 f"- **消耗灵石**：{record.currency_spent}\n"
                 f"- **入境奖励**：{'、'.join(reward_lines) or '无'}\n"
                 f"- **当前境内修为**：{player.cultivation}\n\n"
-                f"> {target_label}阶段的新内容将按开发顺序逐步开放。"
+                f"> {target_label}阶段的机缘尚未开启。"
             )
         else:
             if record.heart_demon_pending:
@@ -542,7 +543,7 @@ class BreakthroughApplication:
         except DomainCrackActiveError:
             return CommandResult(False, "DOMAIN_CRACK_ACTIVE", "领域裂痕尚未恢复，暂时不能选择领域。", context.request_id, operation_id)
         except DomainAlreadySelectedError:
-            return CommandResult(False, "DOMAIN_ALREADY_SELECTED", "你已经选择过领域，当前版本不能普通重选。", context.request_id, operation_id)
+            return CommandResult(False, "DOMAIN_ALREADY_SELECTED", "你已经选择过领域，不能再次更改。", context.request_id, operation_id)
         except DomainSelectionBusyError:
             return CommandResult(False, "DOMAIN_SELECTION_PENDING", "已有待确认的领域选择，请发送 `确认领域`。", context.request_id, operation_id)
         except DomainNotEligibleError:
@@ -567,7 +568,7 @@ class BreakthroughApplication:
         except DomainCrackActiveError:
             return CommandResult(False, "DOMAIN_CRACK_ACTIVE", "领域裂痕尚未恢复，暂时不能确认领域。", context.request_id, operation_id)
         except DomainAlreadySelectedError:
-            return CommandResult(False, "DOMAIN_ALREADY_SELECTED", "你已经选择过领域，当前版本不能普通重选。", context.request_id, operation_id)
+            return CommandResult(False, "DOMAIN_ALREADY_SELECTED", "你已经选择过领域，不能再次更改。", context.request_id, operation_id)
         except DomainNotEligibleError:
             return CommandResult(False, "DOMAIN_NOT_ELIGIBLE", "没有有效的待确认领域选择，或确认已超时。", context.request_id, operation_id)
         except MaterialInsufficientError:

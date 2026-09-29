@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..persistence.errors import (
     AncientDomainBusyError,
     AncientDomainNodeError,
@@ -164,12 +165,14 @@ class AncientDomainRepositoryMixin:
 
                 equipment = self._battle_equipment_snapshot(connection, player_id)
                 qualification = self._ancient_json(row["qualification_json"])
+                constitution_effect = constitution_effect_snapshot(connection, player_id)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
                 stats = player_stat_snapshot(
                     qualification,
                     max_hp=int(row["max_hp"]),
                     initiative=int(row["initiative"]),
                     equipment=equipment,
+                    constitution_effect=constitution_effect,
                 )
                 first_clear[player_id] = connection.execute(
                     "SELECT 1 FROM ancient_domain_members WHERE player_id=? AND status='cleared' LIMIT 1",
@@ -187,6 +190,7 @@ class AncientDomainRepositoryMixin:
                     "path_key": row["path_key"],
                     "qualification": qualification,
                     "stats": stats,
+                    "constitution_effect": constitution_effect,
                     "equipment": list(equipment),
                     "skills": skills,
                     "soul_power": int(row["soul_power"]),
@@ -415,8 +419,6 @@ class AncientDomainRepositoryMixin:
                         operation_id=f"{operation_id}:codex:{member['player_id']}",
                         occurred_at=now,
                         snapshot={"run_id": str(run["run_id"]), "instance_key": ANCIENT_DOMAIN_KEY},
-                        content_version=ANCIENT_DOMAIN_CONTENT_VERSION,
-                        rule_version=ANCIENT_DOMAIN_RULE_VERSION,
                     )
                 connection.execute(
                     "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",

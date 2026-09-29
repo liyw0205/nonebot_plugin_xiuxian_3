@@ -55,12 +55,41 @@ def test_domain_front_round_and_season_are_playable_on_qq_and_onebot() -> None:
                 created = await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")
                 assert created.ok
                 _prepare_player(runtime, adapter, user, f"sect-{adapter}")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET location_key='xuantian.new_town' WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                preview = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "travel-preview"), "移动预览 领域前线"
+                )
+                assert preview.data["ready"] is True
+                travel = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "travel", "domain-front-travel"), "前往 领域前线"
+                )
+                assert travel.code == "TRAVEL_STARTED"
+                clock.advance(minutes=5)
+                arrival = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "arrival", "domain-front-arrival"), "结算移动"
+                )
+                assert arrival.code == "TRAVEL_COMPLETED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    place_codex = connection.execute(
+                        "SELECT entry_key, first_seen_operation_id FROM codex_entries WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND entry_key='codex.place.domain_front'",
+                        (adapter, user),
+                    ).fetchone()
+                assert place_codex == ("codex.place.domain_front", "domain-front-arrival")
 
                 status = await runtime.adapters.dispatch(adapter, _context(adapter, user, "status"), "领域前线")
                 assert status.code == "DOMAIN_EVENT_STATUS"
                 round_id = status.data["round_id"]
                 joined = await runtime.adapters.dispatch(adapter, _context(adapter, user, "join", "domain-join"), "加入领域前线")
                 assert joined.code == "DOMAIN_EVENT_JOINED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM codex_entries WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND entry_key='codex.domain.frontline'",
+                        (adapter, user),
+                    ).fetchone()[0] == 0
                 battle = await runtime.adapters.dispatch(adapter, _context(adapter, user, "battle", "domain-battle"), "开始领域战")
                 assert battle.code == "DOMAIN_BATTLE_SETTLED"
                 contributed = await runtime.adapters.dispatch(adapter, _context(adapter, user, "contribute", "domain-contribution"), "贡献领域前线 战斗")
@@ -122,6 +151,11 @@ def test_domain_front_round_and_season_are_playable_on_qq_and_onebot() -> None:
                 assert json.loads(inventory)["item.domain_core_fragment"] == 5
                 assert json.loads(inventory)["item.domain_core"] == 1
                 assert merit == 100
+                codex = connection.execute(
+                    "SELECT entry_key, first_seen_operation_id FROM codex_entries WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND entry_key='codex.domain.frontline'",
+                    (adapter, user),
+                ).fetchone()
+                assert codex == ("codex.domain.frontline", "domain-claim")
                 await runtime.close()
 
     asyncio.run(run())
@@ -151,6 +185,45 @@ def test_domain_front_rejects_crack_and_sect_cap_without_spending_stamina() -> N
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 stamina = connection.execute("SELECT stamina FROM players WHERE platform_user_id=?", (first,)).fetchone()[0]
             assert stamina == 100
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_domain_front_travel_requires_a_selected_domain_without_spending_resources() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=Path(data_dir))
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"domain-front-no-domain-{adapter}"
+                await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, f"{adapter}-create"), "开始修仙"
+                )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='soul_transformation', realm_layer=1, "
+                        "location_key='xuantian.new_town', stamina=50, spirit_stones=250 "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                preview = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "preview"), "移动预览 领域前线"
+                )
+                assert preview.data["ready"] is False
+                assert "已选择领域" in preview.data["missing"]
+                denied = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "start", f"{adapter}-no-domain-travel"),
+                    "前往 领域前线",
+                )
+                assert denied.code == "DOMAIN_FRONT_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT location_key, stamina, spirit_stones FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert state == ("xuantian.new_town", 50, 250)
             await runtime.close()
 
     asyncio.run(run())

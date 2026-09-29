@@ -6,7 +6,6 @@ import hashlib
 from dataclasses import dataclass
 from datetime import timedelta
 
-from ..versions import module_versions
 
 
 TOWER_KEY = "tower.void_spire"
@@ -84,11 +83,6 @@ def floor_definition(floor_no: int) -> VoidSpireFloorDefinition:
     )
 
 
-def versions_for_floor(floor_no: int) -> tuple[str, str]:
-    floor_definition(floor_no)
-    return module_versions(__name__ if floor_no <= LEGACY_MAX_FLOOR else f"{__name__}.upper")
-
-
 def quota_floor_range(floor_no: int) -> tuple[int, int]:
     floor_definition(floor_no)
     return (1, LEGACY_MAX_FLOOR) if floor_no <= LEGACY_MAX_FLOOR else (LEGACY_MAX_FLOOR + 1, MAX_FLOOR)
@@ -138,6 +132,5 @@ __all__ = [
     "quota_floor_range",
     "reward_for",
     "story_codex_for_floor",
-    "versions_for_floor",
     "week_start",
 ]

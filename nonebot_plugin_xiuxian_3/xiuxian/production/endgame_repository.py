@@ -20,10 +20,8 @@ from ..persistence.errors import (
 )
 from .endgame_models import EndgameRecipeRecord
 from .endgame_rules import (
-    CONTENT_VERSION,
     DAO_FRUIT_PROGRESS_CAP,
     ENDGAME_RECIPES,
-    RULE_VERSION,
     SUCCESS_THRESHOLD_BP,
     endgame_recipe,
     recipe_roll_bp,
@@ -163,8 +161,6 @@ class EndgameProductionRepositoryMixin:
                 "endgame_status": current_endgame_status,
                 "progress_before": int(player["dao_fruit_progress"]),
                 "roll_bp": roll_bp,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             }
             connection.execute(
                 "UPDATE players SET inventory_json = ?, world_merit = world_merit - ?, updated_at = ? WHERE id = ?",

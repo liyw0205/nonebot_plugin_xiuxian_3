@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from collections.abc import Mapping
-from pathlib import Path
 
-from ..content import ContentBundle
+from ..content import ContentBundle, ContentError, bundled_content
 from .models import CultivationMode, LayerUnlock
 
 
@@ -24,65 +22,51 @@ MODE_BREATHING = "cultivate.breathing"
 MODE_SPIRIT_SPRING = "cultivate.spirit_spring"
 MODE_SECLUSION = "cultivate.seclusion"
 MODE_SOUL_REFINEMENT = "cultivate.soul_refinement"
-RULE_VERSION = module_rule_version(__name__)
-SPIRIT_SPRING_RULE_VERSION = "progression-0.1.2"
-SECLUSION_RULE_VERSION = "progression-0.1.5"
-SOUL_REFINEMENT_RULE_VERSION = "progression-0.4.1"
 
-# Index zero represents the L1 entry point. Values are the minimum realm
-# cultivation required for each layer in the content-0.1 snapshot.
-_FALLBACK_THRESHOLDS = {
-    REALM_QI_SENSING: (0, 80, 170, 280, 410, 560, 730, 920, 1130, 1360),
-    REALM_QI_GATHERING: (0, 180, 380, 620, 900, 1220, 1580, 1980, 2420, 2900),
-    REALM_FOUNDATION: (0, 420, 900, 1480, 2180, 3000, 3950, 5050, 6300, 7700),
-    REALM_GOLDEN_CORE: (0, 2300, 5000, 8200, 12000, 17000, 23000, 30000, 38000, 47000),
-    REALM_NASCENT_SOUL: (0, 9000, 19000, 32000, 48000, 68000, 92000, 120000, 153000, 190000),
-    REALM_SOUL_TRANSFORMATION: (0, 28000, 60000, 100000, 150000, 210000, 285000, 375000, 480000, 600000),
-    REALM_VOID_REFINING: (0, 90000, 200000, 340000, 520000, 740000, 1000000, 1320000, 1700000, 2150000),
-    REALM_DAO_UNION: (0, 280000, 600000, 1000000, 1500000, 2100000, 2850000, 3750000, 4800000, 6000000),
-    REALM_TRIBULATION: (0, 100000, 220000, 380000, 600000, 850000, 1150000, 1500000, 1900000, 2400000),
-}
-
-
-def _content_thresholds() -> dict[str, tuple[int, ...]]:
-    bundle = ContentBundle.load_optional(Path(__file__).resolve().parents[3] / "data")
-    result = dict(_FALLBACK_THRESHOLDS)
-    if bundle is None:
-        return result
-    for realm_key in result:
-        row = bundle.get("realm", realm_key, include_locked=False)
-        values = row.get("layer_thresholds") if row else None
-        if not isinstance(values, dict):
-            continue
-        try:
-            ordered = tuple(int(values[str(layer)]) for layer in range(1, 11))
-        except (KeyError, TypeError, ValueError):
-            continue
-        result[realm_key] = ordered
-    return result
+def _content_thresholds(
+    content: ContentBundle | None = None,
+) -> tuple[dict[str, tuple[int, ...]], dict[str, int]]:
+    bundle = content or bundled_content()
+    thresholds: dict[str, tuple[int, ...]] = {}
+    max_layers: dict[str, int] = {}
+    for row in bundle.list("realm", include_locked=False):
+        key = row["key"]
+        minimum = row.get("layer_min")
+        maximum = row.get("layer_max")
+        values = row.get("layer_thresholds")
+        if (
+            not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or not isinstance(maximum, int)
+            or isinstance(maximum, bool)
+            or minimum < 0
+            or maximum < minimum
+            or not isinstance(values, dict)
+        ):
+            raise ContentError(f"realm {key} has invalid layer range or thresholds")
+        expected = {str(layer) for layer in range(minimum, maximum + 1)}
+        if set(values) != expected:
+            raise ContentError(f"realm {key} must configure thresholds for layers {sorted(expected)}")
+        ordered = tuple(values[str(layer)] for layer in range(minimum, maximum + 1))
+        if any(not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in ordered):
+            raise ContentError(f"realm {key} thresholds must be non-negative integers")
+        thresholds[key] = ordered
+        max_layers[key] = maximum
+    if not thresholds:
+        raise ContentError("content has no active realm records")
+    return thresholds, max_layers
 
 
-_CONTENT_THRESHOLDS = _content_thresholds()
-QI_SENSING_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_QI_SENSING]
-QI_GATHERING_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_QI_GATHERING]
-FOUNDATION_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_FOUNDATION]
-GOLDEN_CORE_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_GOLDEN_CORE]
-NASCENT_SOUL_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_NASCENT_SOUL]
-SOUL_TRANSFORMATION_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_SOUL_TRANSFORMATION]
-VOID_REFINING_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_VOID_REFINING]
-DAO_UNION_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_DAO_UNION]
-TRIBULATION_THRESHOLDS = _CONTENT_THRESHOLDS[REALM_TRIBULATION]
-REALM_THRESHOLDS = {
-    REALM_QI_SENSING: QI_SENSING_THRESHOLDS,
-    REALM_QI_GATHERING: QI_GATHERING_THRESHOLDS,
-    REALM_FOUNDATION: FOUNDATION_THRESHOLDS,
-    REALM_GOLDEN_CORE: GOLDEN_CORE_THRESHOLDS,
-    REALM_NASCENT_SOUL: NASCENT_SOUL_THRESHOLDS,
-    REALM_SOUL_TRANSFORMATION: SOUL_TRANSFORMATION_THRESHOLDS,
-    REALM_VOID_REFINING: VOID_REFINING_THRESHOLDS,
-    REALM_DAO_UNION: DAO_UNION_THRESHOLDS,
-    REALM_TRIBULATION: TRIBULATION_THRESHOLDS,
-}
+REALM_THRESHOLDS, REALM_MAX_LAYERS = _content_thresholds()
+QI_SENSING_THRESHOLDS = REALM_THRESHOLDS[REALM_QI_SENSING]
+QI_GATHERING_THRESHOLDS = REALM_THRESHOLDS[REALM_QI_GATHERING]
+FOUNDATION_THRESHOLDS = REALM_THRESHOLDS[REALM_FOUNDATION]
+GOLDEN_CORE_THRESHOLDS = REALM_THRESHOLDS[REALM_GOLDEN_CORE]
+NASCENT_SOUL_THRESHOLDS = REALM_THRESHOLDS[REALM_NASCENT_SOUL]
+SOUL_TRANSFORMATION_THRESHOLDS = REALM_THRESHOLDS[REALM_SOUL_TRANSFORMATION]
+VOID_REFINING_THRESHOLDS = REALM_THRESHOLDS[REALM_VOID_REFINING]
+DAO_UNION_THRESHOLDS = REALM_THRESHOLDS[REALM_DAO_UNION]
+TRIBULATION_THRESHOLDS = REALM_THRESHOLDS[REALM_TRIBULATION]
 FORMAL_REALMS = frozenset(REALM_THRESHOLDS)
 BREATHING_STAMINA_COST = 2
 BREATHING_DURATION_SECONDS = 10 * 60
@@ -169,12 +153,13 @@ QI_SENSING_LAYER_UNLOCKS: dict[int, tuple[LayerUnlock, ...]] = {
 
 def next_layer_threshold(realm_key: str, layer: int) -> int | None:
     thresholds = REALM_THRESHOLDS.get(realm_key)
-    if thresholds is None or layer < 1:
+    if thresholds is None or layer < 0:
         return None
     next_layer = layer + 1
-    if next_layer > 10:
+    if next_layer > REALM_MAX_LAYERS[realm_key]:
         return None
-    return thresholds[next_layer - 1]
+    minimum_layer = REALM_MAX_LAYERS[realm_key] - len(thresholds) + 1
+    return thresholds[next_layer - minimum_layer]
 
 
 def cultivation_mode(mode_key: str) -> CultivationMode:
@@ -188,7 +173,6 @@ def cultivation_mode(mode_key: str) -> CultivationMode:
             base_cultivation=BREATHING_BASE_CULTIVATION,
             environment_bp=10000,
             daily_limit=None,
-            rule_version=RULE_VERSION,
             required_realm=REALM_QI_SENSING,
             required_layer=1,
         )
@@ -202,7 +186,6 @@ def cultivation_mode(mode_key: str) -> CultivationMode:
             base_cultivation=SPIRIT_SPRING_BASE_CULTIVATION,
             environment_bp=SPIRIT_SPRING_ENVIRONMENT_BP,
             daily_limit=SPIRIT_SPRING_DAILY_LIMIT,
-            rule_version=SPIRIT_SPRING_RULE_VERSION,
             required_location=SPIRIT_FIELD_LOCATION,
             required_realm=REALM_QI_SENSING,
             required_layer=2,
@@ -217,7 +200,6 @@ def cultivation_mode(mode_key: str) -> CultivationMode:
             base_cultivation=SECLUSION_BASE_CULTIVATION,
             environment_bp=10000,
             daily_limit=SECLUSION_DAILY_LIMIT,
-            rule_version=SECLUSION_RULE_VERSION,
             required_realm=REALM_QI_GATHERING,
             required_layer=1,
             requires_solitude=True,
@@ -232,7 +214,6 @@ def cultivation_mode(mode_key: str) -> CultivationMode:
             base_cultivation=SOUL_REFINEMENT_BASE_CULTIVATION,
             environment_bp=10000,
             daily_limit=SOUL_REFINEMENT_DAILY_LIMIT,
-            rule_version=SOUL_REFINEMENT_RULE_VERSION,
             required_realm=REALM_NASCENT_SOUL,
             required_layer=1,
             requires_solitude=True,
@@ -251,13 +232,17 @@ def cultivation_gain(
     *,
     environment_bp: int = 10000,
     state_bp: int = 10000,
+    manual_bonus_bp: int = 0,
 ) -> int:
-    """Apply insight, environment and state multipliers using integer bp."""
+    """Apply insight, environment, state and manual multipliers using integer bp."""
 
     insight = max(0, int(qualification.get("insight", 0)))
     environment = max(0, int(environment_bp))
     state = max(0, int(state_bp))
-    return (base * (200 + insight) * environment * state) // (200 * 10000 * 10000)
+    manual = max(0, 10_000 + int(manual_bonus_bp))
+    return (base * (200 + insight) * environment * state * manual) // (
+        200 * 10_000 * 10_000 * 10_000
+    )
 
 
 def can_advance_layer(realm_key: str, layer: int, cultivation: int) -> bool:

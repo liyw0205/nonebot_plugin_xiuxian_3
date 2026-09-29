@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..repository import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -61,6 +62,7 @@ class AdvancementApplication:
         if key is None:
             return CommandResult(False, "INVALID_RETREAT_MODE", "可用 `闭关预览`、`闭关预览 基础` 或 `闭关预览 静养`。", context.request_id)
         definition = retreat_definition(key)
+        content = self.repository.content or bundled_content()
         lines = [
             f"## {definition.label}预览",
             "",
@@ -70,7 +72,11 @@ class AdvancementApplication:
             f"- **每日次数**：{definition.daily_limit}",
         ]
         if definition.required_item:
-            lines.append("- **消耗**：粗糙灵米 ×1、基础引气诀权限")
+            item_cost = "、".join(
+                f"{content.label('item', item_key)} ×{quantity}"
+                for item_key, quantity in definition.item_cost
+            ) or "无"
+            lines.append(f"- **消耗**：{item_cost}；需持有可修炼功法")
             lines.append("- **收益**：境内修为 80–120（25% / 50% / 25%）")
         else:
             lines.append("- **前置**：有效居所")

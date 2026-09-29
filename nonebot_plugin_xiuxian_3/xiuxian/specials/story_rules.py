@@ -1,14 +1,10 @@
-"""Versioned v0.1 branching story rules."""
+"""Branching story rules."""
 
 from __future__ import annotations
-
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
 STORY_KEY = "story.xuantian.road"
 ENDING_REPUTATION = 10
 
@@ -89,9 +85,7 @@ def completed_nodes(branch_key: str, evidence_count: int) -> tuple[str, ...]:
 
 __all__ = [
     "BRANCHES",
-    "CONTENT_VERSION",
     "ENDING_REPUTATION",
-    "RULE_VERSION",
     "STORY_KEY",
     "StoryBranchDefinition",
     "completed_nodes",

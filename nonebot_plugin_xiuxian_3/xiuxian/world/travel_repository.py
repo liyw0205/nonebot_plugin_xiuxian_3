@@ -59,46 +59,6 @@ from ..advancement.rules import (
     retreat_definition,
     retreat_reward,
 )
-from ..advancement.constitution_rules import (
-    CONSTITUTION_RESET_ITEM,
-    RESHAPE_COOLDOWN_SECONDS,
-    constitution_definition,
-)
-from ..advancement.talent_rules import (
-    CONTENT_VERSION as TALENT_CONTENT_VERSION,
-    RULE_VERSION as TALENT_RULE_VERSION,
-    TALENT_POINT_RESOURCE,
-    talent_node_for_reference,
-    talent_tree_nodes,
-    tree_definition,
-)
-from ..advancement.skill_rules import (
-    CONTENT_VERSION as SKILL_CONTENT_VERSION,
-    MAX_SKILL_LEVEL,
-    RULE_VERSION as SKILL_RULE_VERSION,
-    SKILL_INSIGHT_RESOURCE,
-    available_skill_keys,
-    effective_skill_effect,
-    skill_cost,
-    skill_definition,
-)
-from ..advancement.equipment_rules import (
-    CONTENT_VERSION as EQUIPMENT_CONTENT_VERSION,
-    EQUIPMENT_DEFINITIONS,
-    EQUIPMENT_ALIASES,
-    MAX_TEMPER_LEVEL,
-    REFINEMENT_MATERIAL,
-    REFINEMENT_PITY_FAILURES,
-    REFINEMENT_SUCCESS_BP,
-    RULE_VERSION as EQUIPMENT_RULE_VERSION,
-    TEMPER_MATERIAL,
-    equipment_definition,
-    refinement_affix,
-    refinement_roll_bp,
-    temper_cost,
-    temper_roll_bp,
-    temper_success_bp,
-)
 from ..livelihood.models import ResidenceRecord
 from ..livelihood.rules import residence_definition
 from ..world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
@@ -113,7 +73,7 @@ from ..world.void_rules import (
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.rules import beast_hills_entry_allowed, destination_definition, meets_realm
-from ..specials.codex_projection import record_codex_discovery
+from ..specials.codex_projection import record_location_discovery
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     battle_roll_bp,
@@ -180,10 +140,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_CONTENT_VERSION,
     FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_RULE_VERSION,
     FATE_SINGLE_COST,
     FATE_TEN_COST,
     FATE_TICKET,
@@ -238,6 +196,8 @@ class TravelRepositoryMixin:
         if not meets_realm(player.realm_key, player.realm_layer, definition.required_realm, definition.required_layer):
             required = f"{definition.required_realm} L{definition.required_layer}"
             missing.append(f"境界要求（{required}）")
+        if definition.requires_selected_domain and not player.domain_key:
+            missing.append("已选择领域")
         if definition.required_faction and definition.required_faction_reputation:
             current_reputation = int(player.faction_reputation.get(definition.required_faction, 0))
             has_beast_hills_access = destination == "beast.ten_thousand_hills" and beast_hills_entry_allowed(
@@ -414,6 +374,8 @@ class TravelRepositoryMixin:
                     raise LocationRequirementError("destination quest permission is missing")
             if not meets_realm(str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer):
                 raise LocationRequirementError("realm requirement is not met")
+            if definition.requires_selected_domain and not row["domain_key"]:
+                raise LocationRequirementError("a selected domain is required")
             reputation = self._json_object(row["faction_reputation_json"], {})
             current_reputation = int(reputation.get(definition.required_faction or "", 0))
             if definition.required_faction and current_reputation < definition.required_faction_reputation:
@@ -524,6 +486,8 @@ class TravelRepositoryMixin:
                 "consume_pass_on_arrival": definition.consume_pass_on_arrival,
                 "required_faction": definition.required_faction,
                 "required_faction_reputation": definition.required_faction_reputation,
+                "requires_selected_domain": definition.requires_selected_domain,
+                "domain_key": str(row["domain_key"]) if definition.requires_selected_domain else None,
                 "faction_reputation": current_reputation,
             }
             if destination == "beast.ten_thousand_hills":
@@ -666,13 +630,14 @@ class TravelRepositoryMixin:
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), serialize_datetime(now)),
             )
-            record_codex_discovery(
+            record_location_discovery(
                 connection,
                 player_id=int(row["id"]),
-                entry_key=f"codex.place.{str(session['destination']).rsplit('.', 1)[-1]}",
+                location_key=str(session["destination"]),
                 operation_id=operation_id,
                 occurred_at=now,
                 snapshot={"source": operation_name, "destination": str(session["destination"])},
+                content=self.content,
             )
             return self._travel_settlement_from_payload(payload)
 

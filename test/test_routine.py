@@ -256,14 +256,14 @@ def test_routine_schema_is_safe_to_initialize_twice() -> None:
                     )
                 }
                 migration = connection.execute(
-                    "SELECT migration_key FROM schema_migrations WHERE migration_key = 'routine.v0.1'"
+                    "SELECT migration_key FROM schema_migrations WHERE migration_key = 'routine'"
                 ).fetchone()
                 redemption_migration = connection.execute(
-                    "SELECT migration_key FROM schema_migrations WHERE migration_key = 'routine.redemption.v0.1'"
+                    "SELECT migration_key FROM schema_migrations WHERE migration_key = 'routine.redemption'"
                 ).fetchone()
             assert {"routine_checkins", "spirit_trees", "spirit_tree_waterings", "spirit_tree_harvests"} <= tables
-            assert migration == ("routine.v0.1",)
-            assert redemption_migration == ("routine.redemption.v0.1",)
+            assert migration == ("routine",)
+            assert redemption_migration == ("routine.redemption",)
             await first.close()
             await second.close()
 

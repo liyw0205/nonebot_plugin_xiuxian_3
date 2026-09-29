@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 
 
-SOCIAL_RECOVERY_RULE_VERSION = "social-recovery-0.1.0"
-SOCIAL_RECOVERY_CONTENT_VERSION = "content-0.5"
+SOCIAL_RECOVERY_RULE_VERSION = ""
+SOCIAL_RECOVERY_CONTENT_VERSION = ""
 SOCIAL_RECOVERY_ARTIFACT_ROOT = "backups/social"
 SOCIAL_RECOVERY_ARTIFACT_KEY = re.compile(r"^[a-z0-9-]{1,48}$")
 

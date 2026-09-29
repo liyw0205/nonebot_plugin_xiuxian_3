@@ -1,0 +1,17 @@
+{
+  "kind": "social_interaction",
+  "records": [
+    {
+      "key": "social.spar",
+      "name": "玩家直接切磋",
+      "desc": "直接使用双方当前角色快照进行中性场景自动战，只展示回放，不计竞技积分且不改变玩家状态。",
+      "status": "active",
+      "max_rounds": 15,
+      "environment": {
+        "key": "spar.neutral",
+        "relation": "neutral"
+      }
+    }
+  ],
+  "schema": "xiuxian.content"
+}

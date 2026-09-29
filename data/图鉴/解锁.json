@@ -1,0 +1,54 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "codex_unlock",
+  "records": [
+    {
+      "key": "commission.town.extra_offer",
+      "name": "城镇委托额外展示条目",
+      "desc": "图鉴里程碑解锁：城镇委托额外展示条目。",
+      "status": "active"
+    },
+    {
+      "key": "hint.herb_route",
+      "name": "药圃路线提示",
+      "desc": "图鉴里程碑解锁：药圃路线提示。",
+      "status": "active"
+    },
+    {
+      "key": "display.codex_creature_badge",
+      "name": "异兽收集徽记",
+      "desc": "图鉴里程碑解锁：异兽收集徽记。",
+      "status": "active"
+    },
+    {
+      "key": "hint.tower_route",
+      "name": "试炼塔路线提示",
+      "desc": "图鉴里程碑解锁：试炼塔路线提示。",
+      "status": "active"
+    },
+    {
+      "key": "encyclopedia.paths_6",
+      "name": "六道途百科页",
+      "desc": "图鉴里程碑解锁：六道途百科页。",
+      "status": "active"
+    },
+    {
+      "key": "commission.cloud_city.extra_order",
+      "name": "云城商会订单",
+      "desc": "图鉴里程碑解锁：云城商会订单。",
+      "status": "active"
+    },
+    {
+      "key": "encyclopedia.domain_tactics",
+      "name": "六域战策",
+      "desc": "参悟六大道域见闻后，方可阅览其中的战法传承。",
+      "status": "active"
+    },
+    {
+      "key": "display.domain_observatory",
+      "name": "观域居所陈设",
+      "desc": "亲历远古洞天、祖灵殿与领域前线后，所得的居所雅饰。",
+      "status": "active"
+    }
+  ]
+}

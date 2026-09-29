@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from nonebot_plugin_xiuxian_3.xiuxian.versions import module_content_version, module_rule_version
 
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = module_content_version(__name__)
-RULE_VERSION = module_rule_version(__name__)
+CONTENT_VERSION = ""
+RULE_VERSION = ""
 DEMON_INTRO_QUEST = "quest.demon_intro"
 DEMON_INTRO_FLAG = "access.demon_abyss_gate"
 BEAST_INTRO_QUEST = "quest.beast_intro"

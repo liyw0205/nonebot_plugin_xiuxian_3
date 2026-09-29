@@ -131,10 +131,12 @@ result = await runtime.dispatch(
 
 ```text
 体质预览
-选择体质 铁骨|灵根|风行|巧手|御兽|福缘
+选择体质 <当前开放体质>
 我的体质
 重塑体质 <体质>
 ```
+
+可选名称以 `体质预览` 当前列出的项目为准。
 
 每名角色只能保留一个主质，选择时冻结资质、道途、境界和地点快照；重塑必须持有
 `item.token.constitution_reset`，每次消耗一枚并进入 30 天冷却。体质效果以稳定键和
@@ -220,8 +222,7 @@ result = await runtime.dispatch(
 `接取悬赏 草药补给` 或 `接取悬赏 生产订单` 冻结服务端目标和进度基线，完成后发送
 `领取悬赏`。每业务日每角色最多接取一条；领取在同一 SQLite 事务中发放灵石、精力、
 物品并更新地方名望/服务信誉，失败、过期、重复 operation 和不同输入冲突均不会重复发奖。
-训练傀儡悬赏读取已结算 `pve.training` 胜场作为进度；战斗域的训练会话与悬赏域隔离，悬赏入口不会创建战斗会话，
-也不会代领训练战奖励。
+训练傀儡观战只写入战斗快照和回放，不产生奖励或其他角色状态。
 
 主线道途 v0.1 的首三关使用独立 `mainline_runs` 记录：`开始主线 1|2|3` 创建运行
 快照，`领取主线奖励 1|2|3` 在同一事务内结算首通或重试奖励。近郊/灵泉谷/秘境资格和
@@ -300,7 +301,7 @@ Clock。
 - `adapters/message/onebot.py`：OneBot V11 普通消息与合并转发消息；Markdown/蓝字/按键统一降级为纯文本。
 - `adapters/message/router.py`：按 bot/event 类型选择发送器；`adapters/messaging.py` 仅保留兼容导出。
 
-NoneBot 依赖按需安装：`pip install '.[nonebot,onebot,qq]'`。使用普通 wheel 安装，避免
+宿主运行依赖通过 `nb adapter install` 和 `nb driver install` 管理；插件包使用普通 wheel 安装，避免
 editable finder 绕过 NoneBot 的插件注册流程。OneBot/QQ
 角色命令共用一个 matcher，按平台事件归一化，不会重复注册命令。
 NoneBot 项目通过 `nonebot.load_plugin("nonebot_plugin_xiuxian_3")` 加载插件包；

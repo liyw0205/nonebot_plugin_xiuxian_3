@@ -38,7 +38,6 @@ from .three_realms_tower_rules import (
     floor_definition,
     rebuild_reputation_total,
     reward_for,
-    versions_for_floor,
     week_start,
 )
 
@@ -125,7 +124,8 @@ class ThreeRealmsTowerRepositoryMixin:
             definition = floor_definition(floor_no)
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
-        content_version, rule_version = versions_for_floor(floor_no)
+        content_version = ""
+        rule_version = ""
         operation_name = "specials.start_three_realms_tower"
         payload = {
             "platform": platform,
@@ -495,8 +495,6 @@ class ThreeRealmsTowerRepositoryMixin:
                 operation_id=operation_id,
                 occurred_at=now,
                 snapshot=codex_snapshot,
-                content_version=content_version,
-                rule_version=rule_version,
             )
             faction = str(tower_context.get("faction", ""))
             story_entry = None
@@ -520,8 +518,6 @@ class ThreeRealmsTowerRepositoryMixin:
                     operation_id=operation_id,
                     occurred_at=now,
                     snapshot=codex_snapshot,
-                    content_version=content_version,
-                    rule_version=rule_version,
                 )
             connection.execute(
                 "INSERT INTO tower_reward_claims(run_id,player_id,floor_no,first_clear,operation_id,reward_json,"
