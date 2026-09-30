@@ -2630,6 +2630,8 @@ CREATE TABLE IF NOT EXISTS companion_instances (
     experience INTEGER NOT NULL DEFAULT 0 CHECK (experience >= 0),
     affinity INTEGER NOT NULL DEFAULT 0 CHECK (affinity >= 0),
     stamina INTEGER NOT NULL DEFAULT 0 CHECK (stamina >= 0),
+    evolution_stage TEXT NOT NULL DEFAULT 'base',
+    skill_slots INTEGER NOT NULL DEFAULT 0 CHECK (skill_slots >= 0),
     deployed INTEGER NOT NULL DEFAULT 0 CHECK (deployed IN (0, 1)),
     injury_until TEXT,
     snapshot_json TEXT NOT NULL DEFAULT '{}',

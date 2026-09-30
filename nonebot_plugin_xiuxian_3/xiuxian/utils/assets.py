@@ -106,14 +106,12 @@ def grant_player_assets(
     player_values: Mapping[str, Any] | None = None,
 ) -> AssetState:
     """Grant currency and stackable items, then persist them atomically."""
-
-    current = _player_asset_state(row, preserve_zero=preserve_zero)
-    next_assets = assets_grant(current.currency, current.inventory, rewards)
-    return write_player_assets(
+    return apply_player_assets(
         connection,
-        int(row["id"]),
-        next_assets,
+        row,
+        rewards,
         updated_at,
+        mode="grant",
         preserve_zero=preserve_zero,
         player_values=player_values,
     )
@@ -129,19 +127,12 @@ def spend_player_assets(
     player_values: Mapping[str, Any] | None = None,
 ) -> AssetState:
     """Spend currency and stackable items, then persist them atomically."""
-
-    current = _player_asset_state(row, preserve_zero=preserve_zero)
-    next_assets = assets_spend(
-        current.currency,
-        current.inventory,
-        costs,
-        preserve_zero=preserve_zero,
-    )
-    return write_player_assets(
+    return apply_player_assets(
         connection,
-        int(row["id"]),
-        next_assets,
+        row,
+        costs,
         updated_at,
+        mode="spend",
         preserve_zero=preserve_zero,
         player_values=player_values,
     )
@@ -157,13 +148,49 @@ def change_player_assets(
     player_values: Mapping[str, Any] | None = None,
 ) -> AssetState:
     """Apply one signed asset delta and persist it in the current transaction."""
+    return apply_player_assets(
+        connection,
+        row,
+        delta,
+        updated_at,
+        mode="delta",
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+    )
+
+
+def apply_player_assets(
+    connection: Any,
+    row: Any,
+    values: Mapping[str, Any],
+    updated_at: str,
+    *,
+    mode: str = "delta",
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+) -> AssetState:
+    """Apply one asset operation and persist it in the current transaction.
+
+    ``mode`` selects the domain rule for the same transaction boundary:
+    ``grant`` accepts only positive rewards, ``spend`` checks every cost before
+    writing, and ``delta`` applies signed changes.  Keeping this dispatch in one
+    place prevents callers from drifting in their inventory/currency handling.
+    """
 
     current = _player_asset_state(row, preserve_zero=preserve_zero)
-    next_assets = assets_with_delta(
-        current.currency,
-        current.inventory,
-        delta,
-    )
+    if mode == "grant":
+        next_assets = assets_grant(current.currency, current.inventory, values)
+    elif mode == "spend":
+        next_assets = assets_spend(
+            current.currency,
+            current.inventory,
+            values,
+            preserve_zero=preserve_zero,
+        )
+    elif mode == "delta":
+        next_assets = assets_with_delta(current.currency, current.inventory, values)
+    else:
+        raise ValueError(f"unsupported asset operation: {mode!r}")
     return write_player_assets(
         connection,
         int(row["id"]),
@@ -426,6 +453,7 @@ def currency_spend(balance: Any, amount: Any) -> int:
 __all__ = [
     "AssetState",
     "AssetDeltaError",
+    "apply_player_assets",
     "assets_grant",
     "assets_spend",
     "assets_with_delta",

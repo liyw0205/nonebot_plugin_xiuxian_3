@@ -22,6 +22,7 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
+from ..utils.assets import AssetState, write_player_assets
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .void_spire_models import VoidSpirePreviewRecord, VoidSpireRewardRecord, VoidSpireRunRecord
 from .void_spire_rules import (
@@ -355,10 +356,7 @@ class VoidSpireRepositoryMixin:
                     "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,updated_at=excluded.updated_at",
                     (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
                 )
-            connection.execute(
-                "UPDATE players SET spirit_stones=?,inventory_json=?,updated_at=? WHERE id=?",
-                (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
-            )
+            write_player_assets(connection, int(player["id"]), AssetState(stones, inventory), now_text)
             snapshot = {
                 "source": TOWER_KEY,
                 "floor_no": int(run["floor_no"]),

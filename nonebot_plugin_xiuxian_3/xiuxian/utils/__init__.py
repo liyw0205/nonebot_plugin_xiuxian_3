@@ -4,10 +4,13 @@ from .database import connect_sqlite
 from .json_cache import DuplicateJSONKeyError, clear_json_cache, read_json_cached
 from .json import json_object
 from .player import (
+    PLAYER_RESOURCE_FIELDS,
     player_field,
     player_integer,
+    player_numeric_values,
     player_object,
     player_inventory,
+    player_resource_values,
     player_qualification,
     player_intro_flags,
     player_combat_values,
@@ -17,6 +20,7 @@ from .player import (
 from .assets import (
     AssetState,
     AssetDeltaError,
+    apply_player_assets,
     assets_grant,
     assets_spend,
     assets_with_delta,
@@ -41,6 +45,8 @@ from .assets import (
 __all__ = [
     "AssetDeltaError",
     "AssetState",
+    "PLAYER_RESOURCE_FIELDS",
+    "apply_player_assets",
     "assets_grant",
     "assets_spend",
     "assets_with_delta",
@@ -63,12 +69,14 @@ __all__ = [
     "json_object",
     "player_field",
     "player_integer",
+    "player_numeric_values",
     "player_object",
     "player_inventory",
     "player_qualification",
     "player_intro_flags",
     "player_combat_values",
     "player_reputation",
+    "player_resource_values",
     "player_values",
     "read_json_cached",
     "spend_player_assets",

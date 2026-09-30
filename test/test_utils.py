@@ -9,6 +9,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.database import connect_sqlite
 from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     AssetState,
     AssetDeltaError,
+    apply_player_assets,
     assets_grant,
     assets_spend,
     assets_with_delta,
@@ -42,6 +43,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_combat_values,
     player_reputation,
     player_values,
+    player_numeric_values,
+    player_resource_values,
 )
 
 
@@ -182,6 +185,27 @@ def test_player_asset_mutations_share_transactional_persistence() -> None:
     connection.close()
 
 
+def test_player_asset_operation_dispatch_keeps_one_transaction_kernel() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, updated_at) VALUES (1, 10, ?, 'before')",
+        ('{"item.herb": 1}',),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    assert apply_player_assets(connection, row, {"spirit_stones": 5}, "after-grant", mode="grant").currency == 15
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    assert apply_player_assets(connection, row, {"item.herb": 1}, "after-spend", mode="spend").inventory == {}
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    assert apply_player_assets(connection, row, {"spirit_stones": -3}, "after-delta", mode="delta").currency == 12
+    with pytest.raises(ValueError, match="unsupported asset operation"):
+        apply_player_assets(connection, row, {}, "after-invalid", mode="unknown")
+    connection.close()
+
+
 def test_player_asset_mutation_can_commit_other_player_values_atomically() -> None:
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
@@ -271,3 +295,12 @@ def test_player_state_helpers_share_json_and_inventory_normalization() -> None:
     assert player_qualification(row) == {"body": 12, "mind": 8}
     assert player_intro_flags(row) == ("story.one", "2")
     assert player_reputation(row) == {"demon": 20, "beast": 5}
+
+
+def test_player_resource_projection_is_shared_by_profile_and_combat_reads() -> None:
+    row = {"spirit_stones": "12", "stamina": "8", "energy": 4, "world_merit": "2"}
+    resources = player_resource_values(row)
+    assert resources["spirit_stones"] == 12
+    assert resources["stamina"] == 8
+    assert player_numeric_values(row, ("energy", "world_merit")) == {"energy": 4, "world_merit": 2}
+    assert player_values(row)["spirit_stones"] == resources["spirit_stones"]

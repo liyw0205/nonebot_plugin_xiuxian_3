@@ -19,6 +19,8 @@ class CompanionView:
     stamina: int
     status: str
     deployed: bool
+    evolution_stage: str = "base"
+    skill_slots: int = 0
     gear: tuple[dict[str, object], ...] = ()
 
 
@@ -35,6 +37,8 @@ class CompanionMutationRecord:
     changed: bool
     already_completed: bool = False
     spent: dict[str, int] = field(default_factory=dict)
+    outcome: str = "changed"
+    evolution_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

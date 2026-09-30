@@ -50,6 +50,10 @@ class CompanionApplication:
             "travelling": "随行中",
         }.get(value, "已结缘")
 
+    @staticmethod
+    def _evolution_text(value: str) -> str:
+        return {"base": "本相", "evolved": "已蜕变", "failed": "蜕变受阻"}.get(value, "本相")
+
     async def status(self, context: CommandContext) -> CommandResult:
         try:
             record = await self.repository.list_companions(
@@ -70,7 +74,8 @@ class CompanionApplication:
             lines.append(
                 f"- **{companion.name}**（{kind}）\n"
                 f"  - 等级 {companion.level}；经验 {companion.experience}\n"
-                f"  - 状态：{self._status(companion.status)}；{state}；耐力 {companion.stamina}"
+                f"  - 状态：{self._status(companion.status)}；{state}；耐力 {companion.stamina}\n"
+                f"  - 血脉：{self._evolution_text(companion.evolution_stage)}；灵窍 {companion.skill_slots}"
             )
             for gear in companion.gear:
                 gear_key = str(gear.get("gear_key", ""))
@@ -92,6 +97,8 @@ class CompanionApplication:
                         "stamina": item.stamina,
                         "status": item.status,
                         "deployed": item.deployed,
+                        "evolution_stage": item.evolution_stage,
+                        "skill_slots": item.skill_slots,
                         "gear": [dict(gear) for gear in item.gear],
                     }
                     for item in record.companions
@@ -133,7 +140,7 @@ class CompanionApplication:
 
     async def feed(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
-            return CommandResult(False, "INVALID_COMPANION_COMMAND", "请指定要喂养的灵兽实体编号或稳定键。", context.request_id)
+            return CommandResult(False, "INVALID_COMPANION_COMMAND", "请指定要喂养的灵兽名称或编号。", context.request_id)
         operation_id = self._operation_id(context, "companion.feed")
         try:
             record = await self.repository.feed_companion(
@@ -167,7 +174,7 @@ class CompanionApplication:
 
     async def rest(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
-            return CommandResult(False, "INVALID_COMPANION_COMMAND", "请指定要休养的灵兽实体编号或稳定键。", context.request_id)
+            return CommandResult(False, "INVALID_COMPANION_COMMAND", "请指定要休养的灵兽名称或编号。", context.request_id)
         operation_id = self._operation_id(context, "companion.rest")
         try:
             record = await self.repository.rest_companion(
@@ -190,7 +197,7 @@ class CompanionApplication:
 
     async def equip(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 2:
-            return CommandResult(False, "INVALID_COMPANION_COMMAND", "请依次指定灵兽实体编号和灵具名称。", context.request_id)
+            return CommandResult(False, "INVALID_COMPANION_COMMAND", "请依次指定灵兽名称或编号和灵具名称。", context.request_id)
         operation_id = self._operation_id(context, "companion.equip_gear")
         try:
             record = await self.repository.equip_companion_gear(
@@ -213,6 +220,49 @@ class CompanionApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         return CommandResult(True, "COMPANION_GEAR_EQUIPPED", f"## 灵具相合\n\n**{record.companion.name}**已装备灵具。", context.request_id, operation_id, data={"instance_id": record.companion.instance_id, "gear": [dict(item) for item in record.companion.gear], "spent": record.spent, "idempotent_replay": record.already_completed})
+
+    async def evolve(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_COMPANION_COMMAND", "请指定要蜕变的灵兽名称或编号。", context.request_id)
+        operation_id = self._operation_id(context, "companion.evolve")
+        try:
+            record = await self.repository.evolve_companion(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                companion_ref=context.command_args[0],
+                operation_id=operation_id,
+            )
+        except CompanionNotFoundError:
+            return CommandResult(False, "COMPANION_NOT_FOUND", "没有找到这只灵兽。", context.request_id, operation_id)
+        except CompanionInjuredError:
+            return CommandResult(False, "COMPANION_RESTING", "灵兽正在休养，暂不能蜕变。", context.request_id, operation_id)
+        except CompanionRequirementError:
+            return CommandResult(False, "COMPANION_EVOLUTION_REQUIREMENT", "这只灵兽尚未满足蜕变所需的修为与亲和。", context.request_id, operation_id)
+        except ResourceInsufficientError:
+            return CommandResult(False, "COMPANION_EVOLUTION_INSUFFICIENT", "蜕变所需的灵材或灵石不足，灵兽未有变化。", context.request_id, operation_id)
+        except (PlayerNotFoundError, PlayerSuspendedError):
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有可用的修仙角色。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次蜕变请求已用于其他操作，请重新发起。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if record.outcome == "failed":
+            return CommandResult(
+                True,
+                "COMPANION_EVOLUTION_FAILED",
+                f"## 蜕变未成\n\n**{record.companion.name}**暂未跨过血脉关隘，已保留原身。",
+                context.request_id,
+                operation_id,
+                data={"instance_id": record.companion.instance_id, "outcome": record.outcome, "spent": record.spent, "idempotent_replay": record.already_completed},
+            )
+        return CommandResult(
+            True,
+            "COMPANION_EVOLVED",
+            f"## 蜕变有成\n\n**{record.companion.name}**血脉新生，灵窍增至 {record.companion.skill_slots} 道。",
+            context.request_id,
+            operation_id,
+            data={"instance_id": record.companion.instance_id, "companion_key": record.companion.companion_key, "evolution_stage": record.companion.evolution_stage, "skill_slots": record.companion.skill_slots, "spent": record.spent, "idempotent_replay": record.already_completed},
+        )
 
 
 __all__ = ["CompanionApplication"]

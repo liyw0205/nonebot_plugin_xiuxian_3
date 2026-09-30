@@ -9,6 +9,26 @@ from .assets import inventory_value
 from .json import json_object
 
 
+PLAYER_RESOURCE_FIELDS = (
+    "spirit_stones",
+    "stamina",
+    "stamina_max",
+    "energy",
+    "energy_max",
+    "cultivation",
+    "total_cultivation",
+    "world_merit",
+    "void_merit",
+    "alliance_points",
+    "talent_points",
+    "skill_insights",
+    "soul_power",
+    "soul_power_max",
+    "pollution",
+    "bloodline_stability",
+)
+
+
 def player_field(row: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
     """Read a player column from either a mapping or a SQLite row."""
 
@@ -29,6 +49,21 @@ def player_integer(row: Mapping[str, Any] | Any, key: str, default: int = 0) -> 
     if isinstance(raw, bool):
         raise ValueError(f"player field {key!r} must be an integer")
     return int(raw)
+
+
+def player_numeric_values(
+    row: Mapping[str, Any] | Any,
+    fields: tuple[str, ...] = PLAYER_RESOURCE_FIELDS,
+) -> dict[str, int]:
+    """Read a consistent set of non-negative player numeric projections."""
+
+    return {field: player_integer(row, field) for field in fields}
+
+
+def player_resource_values(row: Mapping[str, Any] | Any) -> dict[str, int]:
+    """Return the shared resource projection used by views and transactions."""
+
+    return player_numeric_values(row)
 
 
 def player_object(
@@ -84,6 +119,7 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     qualification = player_qualification(row)
     inventory = player_inventory(row)
     intro = player_object(row, "intro_json")
+    resources = player_resource_values(row)
     return {
         "player_id": str(player_field(row, "player_id", player_field(row, "id", ""))),
         "platform": str(player_field(row, "platform", "") or ""),
@@ -107,31 +143,16 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
             if intro.get("selected_service") is not None
             else player_field(row, "selected_service")
         ),
-        "spirit_stones": player_integer(row, "spirit_stones"),
-        "stamina": player_integer(row, "stamina"),
-        "stamina_max": player_integer(row, "stamina_max"),
-        "energy": player_integer(row, "energy"),
-        "energy_max": player_integer(row, "energy_max"),
-        "cultivation": player_integer(row, "cultivation"),
-        "total_cultivation": player_integer(row, "total_cultivation"),
+        **resources,
         "foundation_quality": player_integer(row, "foundation_quality"),
-        "world_merit": player_integer(row, "world_merit"),
-        "void_merit": player_integer(row, "void_merit"),
-        "alliance_points": player_integer(row, "alliance_points"),
         "arena_rating": player_integer(row, "arena_rating", 1000),
         "arena_wins": player_integer(row, "arena_wins"),
         "arena_losses": player_integer(row, "arena_losses"),
         "arena_draws": player_integer(row, "arena_draws"),
-        "talent_points": player_integer(row, "talent_points"),
-        "skill_insights": player_integer(row, "skill_insights"),
         "max_hp": player_integer(row, "max_hp"),
         "max_mp": player_integer(row, "max_mp"),
         "carry_capacity": player_integer(row, "carry_capacity"),
         "initiative": player_integer(row, "initiative"),
-        "soul_power": player_integer(row, "soul_power"),
-        "soul_power_max": player_integer(row, "soul_power_max"),
-        "pollution": player_integer(row, "pollution"),
-        "bloodline_stability": player_integer(row, "bloodline_stability"),
         "cross_realm_penalty_bp": player_integer(row, "cross_realm_penalty_bp"),
         "realm_resistance_bp": player_integer(row, "realm_resistance_bp"),
         "exploration_efficiency_bp": player_integer(row, "exploration_efficiency_bp"),
@@ -188,10 +209,13 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
 
 
 __all__ = [
+    "PLAYER_RESOURCE_FIELDS",
     "player_field",
     "player_integer",
+    "player_numeric_values",
     "player_object",
     "player_inventory",
+    "player_resource_values",
     "player_qualification",
     "player_intro_flags",
     "player_reputation",

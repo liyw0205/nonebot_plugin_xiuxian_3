@@ -1239,6 +1239,9 @@ class XiuxianApplication:
     async def equip_companion_gear(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.companions.equip(context), write_message="当前事件不允许装备灵具。")
 
+    async def evolve_companion(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.companions.evolve(context), write_message="当前事件不允许蜕变灵兽。")
+
     async def claim_daily(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

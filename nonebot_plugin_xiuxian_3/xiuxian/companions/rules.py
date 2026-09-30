@@ -27,6 +27,20 @@ class CompanionDefinition:
     durability_bp: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class CompanionEvolutionDefinition:
+    key: str
+    source_key: str
+    target_key: str
+    kind: str
+    required_level: int
+    required_affinity: int
+    costs: dict[str, int]
+    success_bp: int
+    failure_recovery_seconds: int
+    skill_slots: int
+
+
 def _bundle(content: ContentBundle | None) -> ContentBundle:
     return content or bundled_content()
 
@@ -91,6 +105,74 @@ def companion_definition(value: str, content: ContentBundle | None = None) -> Co
         raise ValueError(f"unsupported companion: {value}") from exc
 
 
+def companion_evolution_definitions(
+    content: ContentBundle | None = None,
+) -> dict[str, CompanionEvolutionDefinition]:
+    bundle = _bundle(content)
+    companions = companion_definitions(bundle)
+    result: dict[str, CompanionEvolutionDefinition] = {}
+    for row in bundle.list("companion_evolution", include_locked=False):
+        key = row.get("key")
+        source_key = row.get("source_key")
+        target_key = row.get("target_key")
+        kind = row.get("kind")
+        costs = row.get("costs", {})
+        if (
+            not isinstance(key, str)
+            or not isinstance(source_key, str)
+            or not isinstance(target_key, str)
+            or kind not in {"beast", "mount"}
+            or not isinstance(costs, dict)
+        ):
+            raise ValueError(f"灵兽蜕变内容记录无效: {row!r}")
+        if source_key not in companions or target_key not in companions:
+            raise ValueError(f"灵兽蜕变引用了未知品种: {key}")
+        if companions[source_key].kind != kind or companions[target_key].kind != kind:
+            raise ValueError(f"灵兽蜕变品种不一致: {key}")
+        normalized_costs: dict[str, int] = {}
+        for raw_cost_key, raw_amount in costs.items():
+            if isinstance(raw_amount, bool) or not isinstance(raw_amount, int) or raw_amount < 0:
+                raise ValueError(f"灵兽蜕变消耗无效: {key}")
+            normalized_costs[str(raw_cost_key)] = raw_amount
+        required_level = row.get("required_level")
+        required_affinity = row.get("required_affinity", 0)
+        success_bp = row.get("success_bp", 10000)
+        failure_recovery_seconds = row.get("failure_recovery_seconds", 0)
+        skill_slots = row.get("skill_slots", 0)
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in (required_level, required_affinity, success_bp, failure_recovery_seconds, skill_slots)
+        ) or success_bp > 10000:
+            raise ValueError(f"灵兽蜕变门槛无效: {key}")
+        result[key] = CompanionEvolutionDefinition(
+            key=key,
+            source_key=source_key,
+            target_key=target_key,
+            kind=kind,
+            required_level=required_level,
+            required_affinity=required_affinity,
+            costs=normalized_costs,
+            success_bp=success_bp,
+            failure_recovery_seconds=failure_recovery_seconds,
+            skill_slots=skill_slots,
+        )
+    return result
+
+
+def companion_evolution_definition(
+    value: str,
+    content: ContentBundle | None = None,
+) -> CompanionEvolutionDefinition:
+    definitions = companion_evolution_definitions(content)
+    normalized = str(value or "").strip()
+    if normalized in definitions:
+        return definitions[normalized]
+    for definition in definitions.values():
+        if definition.source_key == normalized:
+            return definition
+    raise ValueError(f"unsupported companion evolution: {value}")
+
+
 def level_after_experience(definition: CompanionDefinition, experience: int) -> int:
     exp = max(0, int(experience))
     if definition.kind == "mount":
@@ -105,7 +187,10 @@ def level_after_experience(definition: CompanionDefinition, experience: int) -> 
 
 __all__ = [
     "CompanionDefinition",
+    "CompanionEvolutionDefinition",
     "companion_definition",
     "companion_definitions",
+    "companion_evolution_definition",
+    "companion_evolution_definitions",
     "level_after_experience",
 ]

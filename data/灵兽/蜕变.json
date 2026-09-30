@@ -1,0 +1,22 @@
+{
+  "kind": "companion_evolution",
+  "records": [
+    {
+      "key": "beast.evolution.wood_rat_1",
+      "status": "active",
+      "source_key": "beast.wood_rat",
+      "target_key": "beast.iron_rat",
+      "kind": "beast",
+      "required_level": 10,
+      "required_affinity": 40,
+      "costs": {
+        "item.ancient_fruit": 3,
+        "currency.spirit_stone": 300
+      },
+      "success_bp": 10000,
+      "failure_recovery_seconds": 0,
+      "skill_slots": 1
+    }
+  ],
+  "schema": "xiuxian.content"
+}

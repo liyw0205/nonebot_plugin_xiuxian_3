@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
+from ..utils.assets import AssetState, write_player_assets
 from .secret_realm_models import SecretRealmPreviewRecord, SecretRealmRunRecord
 from .secret_realm_rules import (
     DEFINITIONS,
@@ -543,7 +544,7 @@ class SecretRealmRepositoryMixin:
                     raise RuntimeError(f"equipment definition disappeared: {key}")
             else:
                 inventory[key] = int(inventory.get(key, 0)) + int(value)
-        connection.execute("UPDATE players SET spirit_stones=?, inventory_json=?, updated_at=? WHERE id=?", (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]))
+        write_player_assets(connection, int(player["id"]), AssetState(stones, inventory), now_text)
 
     def _run_payload(self, player: sqlite3.Row, definition, *, run_id: str, status: str, node_index: int, snapshot: dict[str, Any], battle_id: str | None = None, reward: dict[str, int] | None = None, first_clear: bool | None = None, ticket_locked: int = 0, stamina_locked: int = 0) -> dict[str, Any]:
         nodes = tuple(str(item) for item in snapshot.get("node_keys", definition.node_keys))

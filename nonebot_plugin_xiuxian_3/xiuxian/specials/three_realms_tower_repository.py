@@ -22,6 +22,7 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
+from ..utils.assets import AssetState, write_player_assets
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .three_realms_arena_rules import player_faction
 from .three_realms_tower_models import (
@@ -450,10 +451,7 @@ class ThreeRealmsTowerRepositoryMixin:
                 "item.mat.array_sand", 0
             )
             stones = int(player["spirit_stones"]) + reward.get("spirit_stones", 0)
-            connection.execute(
-                "UPDATE players SET spirit_stones=?, inventory_json=?, updated_at=? WHERE id=?",
-                (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
-            )
+            write_player_assets(connection, int(player["id"]), AssetState(stones, inventory), now_text)
             result = self._json_object(run["result_json"], {})
             tower_context = self._json_object(result.get("tower_context", {}), {})
             codex_snapshot = {

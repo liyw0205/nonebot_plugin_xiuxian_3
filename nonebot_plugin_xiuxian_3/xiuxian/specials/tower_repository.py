@@ -33,6 +33,7 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
+from ..utils.assets import AssetState, write_player_assets
 
 
 class TowerRepositoryMixin:
@@ -328,10 +329,7 @@ class TowerRepositoryMixin:
                     "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) VALUES (?,?,?,?) ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,service_reputation=excluded.service_reputation,updated_at=excluded.updated_at",
                     (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
                 )
-            connection.execute(
-                "UPDATE players SET spirit_stones=?, inventory_json=?, updated_at=? WHERE id=?",
-                (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
-            )
+            write_player_assets(connection, int(player["id"]), AssetState(stones, inventory), now_text)
             record_material_discoveries(
                 connection, player_id=int(player["id"]), operation_id=operation_id,
                 occurred_at=now, reward=reward, snapshot={"source": TOWER_KEY, "floor_no": int(run["floor_no"])},

@@ -328,6 +328,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("喂养灵兽", application.feed_companion, aliases=("喂灵兽",))
     router.register("休养灵兽", application.rest_companion)
     router.register("装备灵具", application.equip_companion_gear)
+    router.register("蜕变灵兽", application.evolve_companion, aliases=("灵兽蜕变",))
     router.register("道历问安", application.claim_daily, aliases=("每日问安", "签到"))
     router.register("补录道历", application.makeup_daily, aliases=("补签到",))
     router.register("浇灌灵木", application.water_spirit_tree, aliases=("灵木浇灌", "浇水"))

@@ -25,6 +25,28 @@
       "status": "active"
     },
     {
+      "name": "铁背鼠",
+      "desc": "木鼠蜕变后的坚韧灵兽，背甲如铁，能够守护主人的行旅。",
+      "kind": "beast",
+      "source": [
+        "companion.evolution"
+      ],
+      "level_range": [
+        1,
+        20
+      ],
+      "feed_item_key": "item.food.coarse_spirit_rice",
+      "feed_experience": 10,
+      "effect": {
+        "type": "exploration_discovery_bp",
+        "value": 350,
+        "cap": 10000
+      },
+      "capacity_per_player": 3,
+      "key": "beast.iron_rat",
+      "status": "active"
+    },
+    {
       "name": "竹鹿",
       "desc": "生于竹林的温驯灵鹿，熟悉山路，适合陪伴主人长途跋涉。",
       "kind": "mount",

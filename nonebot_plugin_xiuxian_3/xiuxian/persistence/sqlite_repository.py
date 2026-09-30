@@ -278,6 +278,7 @@ class SQLitePlayerRepository(
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
             self._migrate_facility_schema(connection)
+            self._migrate_companion_schema(connection)
             self._migrate_sect_war_schema(connection)
             self._migrate_sect_alliance_schema(connection)
             ensure_social_recovery_schema(connection)
@@ -419,6 +420,20 @@ class SQLitePlayerRepository(
             connection.execute("ALTER TABLE sects ADD COLUMN sect_merit INTEGER NOT NULL DEFAULT 0 CHECK (sect_merit >= 0)")
         if "warehouse_json" not in columns:
             connection.execute("ALTER TABLE sects ADD COLUMN warehouse_json TEXT NOT NULL DEFAULT '{}'")
+
+    @staticmethod
+    def _migrate_companion_schema(connection: sqlite3.Connection) -> None:
+        """Add persistent fields required by companion evolution."""
+
+        columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(companion_instances)")}
+        if "evolution_stage" not in columns:
+            connection.execute(
+                "ALTER TABLE companion_instances ADD COLUMN evolution_stage TEXT NOT NULL DEFAULT 'base'"
+            )
+        if "skill_slots" not in columns:
+            connection.execute(
+                "ALTER TABLE companion_instances ADD COLUMN skill_slots INTEGER NOT NULL DEFAULT 0 CHECK (skill_slots >= 0)"
+            )
 
     @staticmethod
     def _migrate_sect_alliance_schema(connection: sqlite3.Connection) -> None:

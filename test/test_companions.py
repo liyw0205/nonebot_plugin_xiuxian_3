@@ -106,3 +106,111 @@ def test_companion_battle_snapshot_is_detached_and_read_only() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_companion_evolution_is_atomic_idempotent_and_shared_by_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            await _prepare(runtime, adapter="qq.official", user="evolve-qq")
+            await _prepare(runtime, adapter="onebot.v11", user="evolve-ob")
+            for adapter, user in (("qq.official", "evolve-qq"), ("onebot.v11", "evolve-ob")):
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE players SET spirit_stones=500, inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.ancient_fruit": 3}), adapter, user),
+                    )
+            bonded = await runtime.dispatch(
+                _context("qq.official", "evolve-qq", "evolve-bond", "bond"),
+                "结缘灵兽 beast.wood_rat",
+            )
+            instance_id = bonded.data["instance_id"]
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE companion_instances SET level=10, affinity=40 WHERE instance_id=?",
+                    (instance_id,),
+                )
+            evolved = await runtime.dispatch(
+                _context("qq.official", "evolve-qq", "evolve-op", "evolve"),
+                f"蜕变灵兽 {instance_id}",
+            )
+            assert evolved.code == "COMPANION_EVOLVED"
+            assert evolved.data["companion_key"] == "beast.iron_rat"
+            replay = await runtime.dispatch(
+                _context("qq.official", "evolve-qq", "evolve-op", "evolve-retry"),
+                f"蜕变灵兽 {instance_id}",
+            )
+            assert replay.code == "COMPANION_EVOLVED"
+            assert replay.data["idempotent_replay"] is True
+            with runtime.repository._connect() as connection:
+                stored = connection.execute(
+                    "SELECT spirit_stones, inventory_json, companion_key, evolution_stage, skill_slots FROM players JOIN companion_instances ON companion_instances.player_id=players.id WHERE companion_instances.instance_id=?",
+                    (instance_id,),
+                ).fetchone()
+            assert stored[0] == 200
+            assert json.loads(stored[1]) == {}
+            assert tuple(stored[2:]) == ("beast.iron_rat", "evolved", 1)
+            conflict = await runtime.dispatch(
+                _context("qq.official", "evolve-qq", "evolve-op", "evolve-conflict"),
+                "蜕变灵兽 missing-companion",
+            )
+            assert conflict.code == "OPERATION_CONFLICT"
+            ob_bond = await runtime.dispatch(
+                _context("onebot.v11", "evolve-ob", "ob-bond", "bond"),
+                "结缘灵兽 beast.wood_rat",
+            )
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE companion_instances SET level=10, affinity=40 WHERE instance_id=?",
+                    (ob_bond.data["instance_id"],),
+                )
+            ob_evolved = await runtime.dispatch(
+                _context("onebot.v11", "evolve-ob", "ob-evolve", "evolve"),
+                f"灵兽蜕变 {ob_bond.data['instance_id']}",
+            )
+            assert ob_evolved.code == "COMPANION_EVOLVED"
+            await runtime.close()
+            runtime = create_runtime(data_dir=data_dir)
+            restored = await runtime.dispatch(
+                _context("onebot.v11", "evolve-ob", "ob-status", "status"), "灵兽状态"
+            )
+            assert restored.code == "COMPANION_STATUS"
+            assert restored.data["companions"][0]["companion_key"] == "beast.iron_rat"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_companion_evolution_rejects_missing_assets_without_partial_changes() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            await _prepare(runtime, adapter="qq.official", user="evolve-poor")
+            bonded = await runtime.dispatch(
+                _context("qq.official", "evolve-poor", "poor-bond", "bond"),
+                "结缘灵兽 beast.wood_rat",
+            )
+            instance_id = bonded.data["instance_id"]
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE companion_instances SET level=10, affinity=40 WHERE instance_id=?",
+                    (instance_id,),
+                )
+                before = connection.execute(
+                    "SELECT spirit_stones, inventory_json, companion_key FROM players JOIN companion_instances ON companion_instances.player_id=players.id WHERE companion_instances.instance_id=?",
+                    (instance_id,),
+                ).fetchone()
+            result = await runtime.dispatch(
+                _context("qq.official", "evolve-poor", "poor-evolve", "evolve"),
+                f"蜕变灵兽 {instance_id}",
+            )
+            assert result.code == "COMPANION_EVOLUTION_INSUFFICIENT"
+            with runtime.repository._connect() as connection:
+                after = connection.execute(
+                    "SELECT spirit_stones, inventory_json, companion_key FROM players JOIN companion_instances ON companion_instances.player_id=players.id WHERE companion_instances.instance_id=?",
+                    (instance_id,),
+                ).fetchone()
+            assert tuple(after) == tuple(before)
+            await runtime.close()
+
+    asyncio.run(run())

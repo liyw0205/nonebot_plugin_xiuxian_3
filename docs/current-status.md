@@ -79,7 +79,7 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 | 魔界 v0.3 单人与跨界副本切片 | `partial` | 元婴 L1 玩家可完成堕落遗迹单人探索、魔渊队伍副本和魔界主线；魔渊队伍要求遗迹权限、污染低于 80、2–5 人和每人 20 体力，奖励冻结魔核/魔界声望/世界功勋；魔渊集市、首条妖兽契约、心魔事件和 `event.demon_invasion` 也已接入，其他跨界配方与副本仍关闭 |
 | 1v1/多方 PvP | `open`/`partial` | 开放异步 `arena.spar`、`arena.practice`、`arena.rank`、元婴/许可门槛的 `arena.three_realms` 和 2v2/3v3/2v3 `arena.team`；服务端自动选行动，客户端不得提交攻击、技能、目标或结果；跨服仍关闭 |
 | 其他 v0.3 以后秘境、遗府、高阶试炼塔、后续图鉴和后续剧情 | `partial` | `instance.secret_realm.boundary_rift`、`instance.secret_realm.demon_abyss`、`instance.secret_realm.ancient_domain`、`instance.secret_realm.ancestral_hall`、`instance.secret_realm.void_ruins`、`instance.secret_realm.time_fort`、`instance.secret_realm.dao_origin` 与 `instance.secret_realm.heaven_echo` 已开放；`instance.legacy.demon_reliquary` 与 `instance.legacy.demon_abyss_echo` 两条线索驱动遗府已开放，线索均为非消耗准入且结算只写故事旗标。道源秘境覆盖八节点、一次性准入、重启续战、过期与系统补偿；天劫回音覆盖三节点、渡劫 L1/非最终战准入、无资源成本、过期和终局资源隔离。三界塔 v0.4 单人 21–40 层已开放；虚空塔 1–60 层及道统服务名望生产者已开放；虚空塔 61–90 层及下方列出的后续剧情和图鉴仍待独立切片 |
-| 灵兽与灵骑 | `partial` | 已接入结缘、状态、喂养、灵具绑定、休养和战斗开始快照；蜕变、运输生命周期和受伤来源仍待补齐 |
+| 灵兽与灵骑 | `partial` | 已接入结缘、状态、喂养、灵具绑定、休养、木鼠首阶蜕变和战斗开始快照；运输生命周期和受伤来源仍待补齐 |
 | 完整跨阵营匹配和宗门战扩展 | `partial`/`open` | 本地 `arena.three_realms` 已开放同阵营/跨阵营匹配、阵营战术快照和双适配器验收；跨服宗门战堡垒准入、30/15 名额、自动战争机关、积分反刷、公共奖励箱、周奖励和恢复已开放；仍不开放跨服匹配、身份合并或玩家间资产转移；赛季临时积分实时来源投影已开放；界隙 2–5 人队伍、状态机、锁定和恢复已开放 |
 | 高阶境界与终局 | `open` | 新角色公开命令链已由 QQ/OneBot 双适配器从新手推进至渡劫 L10，完成三试炼、飞升凭证、终局战和飞升结局；道源任务共同历史赛季门槛、天劫台制证地点与终局状态均已走通 |
 | Web 写操作、外部支付正式接入 | `locked` | 先完成权限、审计、备份恢复和 billing adapter 合同 |
@@ -140,7 +140,7 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 
 1. **冒险合同与副本**：v0.3 许可、派遣与妖界栖地悬赏、`instance.secret_realm.boundary_rift`、`instance.secret_realm.demon_abyss`、v0.4 `instance.secret_realm.ancient_domain` 和 `instance.secret_realm.ancestral_hall`、v0.5 `instance.secret_realm.void_ruins` 与 `instance.secret_realm.time_fort`、v0.6 `instance.secret_realm.dao_origin`、`instance.secret_realm.heaven_echo`、`instance.legacy.demon_reliquary` 和后续 `instance.legacy.demon_abyss_echo` 均已开放并通过双适配器验收。冒险域当前无已登记且合同闭合的副本待办；继续开发前需先为其他后续内容定义稳定键与规则。`cave.boundary_realm` 队伍战不替代界隙裂隙秘境，也不与其奖励混用。
 2. **高阶塔、剧情与图鉴**：`tower.mist_trial` 1–45 层、`tower.three_realms` 单人/双人 1–40 层及 `tower.void_spire` 单人 1–60 层已开放；道统服务派遣可补足高层准入名望，虚空塔 61–90 层的完整规则仍待确定。下一步补 `story.mainline.xuantian.chapter_2` 后续关卡、`story.mainline.domain_frontier`、`story.mainline.void_archive`；`story.mainline.three_realms` 与 `story.mainline.dao_echoes` 已接入。云城见闻与商会、魔渊集市与万兽山地点见闻，以及六大道域、远古洞天、祖灵殿和领域前线见闻均已由实际经历收入图鉴；集齐远古洞天、祖灵殿和领域前线三则见闻后，可领取「六域战策」与「观域居所陈设」。虚空档案、道统服务其余见闻和公开结局图鉴仍待后续补全。界隙路线和虚空塔 1–60 层见闻已开放，玄天之路三分支也已开放。
-3. **灵兽与灵骑**：当前为 `partial`；结缘、状态、喂养、灵具绑定、休养、归属边界和战斗开始快照已接入并完成双适配器路径，蜕变、运输生命周期和受伤来源仍待补齐。
+3. **灵兽与灵骑**：当前为 `partial`；结缘、状态、喂养、灵具绑定、休养、木鼠首阶蜕变、归属边界和战斗开始快照已接入并完成双适配器路径，运输生命周期和受伤来源仍待补齐。
 4. **跨服能力边界**：跨服匹配、身份合并、玩家间资产转移和跨服交易继续关闭，待身份路由、权限、审计、恢复和隔离合同全部通过后再评估开放。
 5. **运营扩展**：Web 写操作和外部支付仍锁定；先完成权限、CSRF、审计、备份恢复与 billing adapter 合同。
 

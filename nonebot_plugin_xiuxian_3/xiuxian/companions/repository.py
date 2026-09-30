@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -22,10 +23,15 @@ from ..persistence.errors import (
     PlayerSuspendedError,
     ResourceInsufficientError,
 )
-from ..utils.assets import spend_player_assets
-from ..utils.player import player_field, player_values
+from ..utils.assets import AssetDeltaError, spend_player_assets
+from ..utils.player import player_field
 from .models import CompanionMutationRecord, CompanionSnapshot, CompanionStatusRecord, CompanionView
-from .rules import CompanionDefinition, companion_definition, level_after_experience
+from .rules import (
+    CompanionDefinition,
+    companion_definition,
+    companion_evolution_definition,
+    level_after_experience,
+)
 
 
 class CompanionRepositoryMixin:
@@ -110,6 +116,24 @@ class CompanionRepositoryMixin:
                 operation_id,
             )
 
+    async def evolve_companion(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        companion_ref: str,
+        operation_id: str,
+    ) -> CompanionMutationRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._evolve_companion_sync,
+                platform,
+                platform_user_id,
+                companion_ref,
+                operation_id,
+            )
+
     def companion_battle_snapshot(
         self, connection: sqlite3.Connection, player_id: int
     ) -> CompanionSnapshot:
@@ -131,6 +155,8 @@ class CompanionRepositoryMixin:
                     "level": int(row["level"]),
                     "experience": int(row["experience"]),
                     "affinity": int(row["affinity"]),
+                    "evolution_stage": str(player_field(row, "evolution_stage", "base")),
+                    "skill_slots": int(player_field(row, "skill_slots", 0) or 0),
                     "effect": dict(definition.effect or {}),
                     "gear": gear,
                 }
@@ -213,7 +239,7 @@ class CompanionRepositoryMixin:
                 raise CompanionInjuredError("companion is resting")
             spent = {definition.feed_item_key: 1}
             try:
-                next_assets = spend_player_assets(connection, player, spent, now_text)
+                spend_player_assets(connection, player, spent, now_text)
             except ValueError as exc:
                 raise ResourceInsufficientError("feed item is insufficient") from exc
             experience = int(instance["experience"]) + definition.feed_experience
@@ -292,7 +318,7 @@ class CompanionRepositoryMixin:
             if str(instance["kind"]) != expected_kind:
                 raise CompanionGearError("gear does not fit this entity")
             try:
-                next_assets = spend_player_assets(
+                spend_player_assets(
                     connection,
                     player,
                     {str(gear["key"]): 1},
@@ -313,6 +339,114 @@ class CompanionRepositoryMixin:
             )
             return self._store_companion_operation(
                 connection, operation_id, operation_name, request_hash, player, str(instance["instance_id"]), now_text, spent={str(gear["key"]): 1}
+            )
+
+    def _evolve_companion_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        companion_ref: str,
+        operation_id: str,
+    ) -> CompanionMutationRecord:
+        operation_name = "companion.evolve"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "companion_ref": companion_ref,
+            },
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            replay = self._companion_operation(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._mutation_from_payload(replay, replay=True)
+            player = self._require_player(connection, platform, platform_user_id)
+            instance = self._find_instance(connection, player["id"], companion_ref)
+            try:
+                evolution = companion_evolution_definition(
+                    str(instance["companion_key"]), getattr(self, "content", None)
+                )
+            except ValueError as exc:
+                raise CompanionRequirementError("companion has no available evolution") from exc
+            source = companion_definition(str(instance["companion_key"]), getattr(self, "content", None))
+            if evolution.kind != source.kind:
+                raise CompanionRequirementError("evolution kind does not match companion")
+            if str(instance["status"]) in {"resting", "injured", "retired"}:
+                raise CompanionInjuredError("companion is resting")
+            if str(player_field(instance, "evolution_stage", "base")) == "evolved":
+                raise CompanionRequirementError("companion has already evolved")
+            if int(instance["level"]) < evolution.required_level:
+                raise CompanionRequirementError("companion level is insufficient")
+            if int(instance["affinity"]) < evolution.required_affinity:
+                raise CompanionRequirementError("companion affinity is insufficient")
+            try:
+                spend_player_assets(connection, player, evolution.costs, now_text)
+            except AssetDeltaError as exc:
+                raise ResourceInsufficientError("evolution materials are insufficient") from exc
+
+            roll = int.from_bytes(
+                hashlib.sha256(f"{operation_id}:evolution".encode("utf-8")).digest()[:4],
+                "big",
+            ) % 10_000
+            success = roll < evolution.success_bp
+            snapshot = {
+                "operation_id": operation_id,
+                "evolution_key": evolution.key,
+                "source_key": evolution.source_key,
+                "target_key": evolution.target_key,
+                "level": int(instance["level"]),
+                "affinity": int(instance["affinity"]),
+                "costs": dict(evolution.costs),
+                "success_bp": evolution.success_bp,
+                "roll_bp": roll,
+            }
+            if success:
+                target = companion_definition(evolution.target_key, getattr(self, "content", None))
+                if target.kind != evolution.kind:
+                    raise CompanionRequirementError("evolution target kind does not match companion")
+                connection.execute(
+                    "UPDATE companion_instances SET companion_key = ?, evolution_stage = 'evolved', skill_slots = ?, snapshot_json = ?, updated_at = ? WHERE id = ?",
+                    (
+                        target.key,
+                        evolution.skill_slots,
+                        json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                        instance["id"],
+                    ),
+                )
+                outcome = "evolved"
+            else:
+                injury_until = (
+                    now + timedelta(seconds=evolution.failure_recovery_seconds)
+                    if evolution.failure_recovery_seconds
+                    else None
+                )
+                connection.execute(
+                    "UPDATE companion_instances SET evolution_stage = 'failed', status = ?, injury_until = ?, snapshot_json = ?, updated_at = ? WHERE id = ?",
+                    (
+                        "injured" if injury_until is not None else str(instance["status"]),
+                        serialize_datetime(injury_until) if injury_until is not None else None,
+                        json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                        now_text,
+                        instance["id"],
+                    ),
+                )
+                outcome = "failed"
+            return self._store_companion_operation(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player,
+                str(instance["instance_id"]),
+                now_text,
+                spent=dict(evolution.costs),
+                outcome=outcome,
+                evolution_key=evolution.key,
             )
 
     def _source_available(self, connection: sqlite3.Connection, player: sqlite3.Row, definition: CompanionDefinition) -> bool:
@@ -356,6 +490,8 @@ class CompanionRepositoryMixin:
                     stamina=int(row["stamina"]),
                     status=str(row["status"]),
                     deployed=bool(row["deployed"]),
+                    evolution_stage=str(player_field(row, "evolution_stage", "base")),
+                    skill_slots=int(player_field(row, "skill_slots", 0) or 0),
                     gear=tuple(self._gear_snapshot(connection, int(row["id"]))),
                 )
             )
@@ -389,7 +525,8 @@ class CompanionRepositoryMixin:
 
     def _store_companion_operation(
         self, connection: sqlite3.Connection, operation_id: str, operation_name: str, request_hash: str,
-        player: sqlite3.Row, instance_id: str, now_text: str, *, spent: dict[str, int]
+        player: sqlite3.Row, instance_id: str, now_text: str, *, spent: dict[str, int],
+        outcome: str = "changed", evolution_key: str | None = None,
     ) -> CompanionMutationRecord:
         updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
         instance = connection.execute("SELECT * FROM companion_instances WHERE instance_id = ?", (instance_id,)).fetchone()
@@ -403,12 +540,22 @@ class CompanionRepositoryMixin:
             "companion": self._companion_payload(companion),
             "changed": True,
             "spent": spent,
+            "outcome": outcome,
+            "evolution_key": evolution_key,
         }
         connection.execute(
             "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (operation_id, operation_name, updated["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
         )
-        return CompanionMutationRecord(self._row_to_player(updated), companion, True, False, dict(spent))
+        return CompanionMutationRecord(
+            self._row_to_player(updated),
+            companion,
+            True,
+            False,
+            dict(spent),
+            outcome,
+            evolution_key,
+        )
 
     def _mutation_from_payload(self, payload: dict[str, Any], *, replay: bool) -> CompanionMutationRecord:
         return CompanionMutationRecord(
@@ -417,6 +564,8 @@ class CompanionRepositoryMixin:
             changed=bool(payload.get("changed", True)),
             already_completed=replay,
             spent={str(key): int(value) for key, value in payload.get("spent", {}).items()},
+            outcome=str(payload.get("outcome", "changed")),
+            evolution_key=(str(payload["evolution_key"]) if payload.get("evolution_key") else None),
         )
 
     @staticmethod
@@ -432,6 +581,8 @@ class CompanionRepositoryMixin:
             "stamina": view.stamina,
             "status": view.status,
             "deployed": view.deployed,
+            "evolution_stage": view.evolution_stage,
+            "skill_slots": view.skill_slots,
             "gear": [dict(item) for item in view.gear],
         }
 
@@ -448,6 +599,8 @@ class CompanionRepositoryMixin:
             stamina=int(payload["stamina"]),
             status=str(payload["status"]),
             deployed=bool(payload.get("deployed", False)),
+            evolution_stage=str(payload.get("evolution_stage", "base")),
+            skill_slots=int(payload.get("skill_slots", 0)),
             gear=tuple(dict(item) for item in payload.get("gear", [])),
         )
 
