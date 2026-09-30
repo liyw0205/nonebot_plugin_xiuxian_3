@@ -6,8 +6,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 BEAST_TRADE_EVENT_KEY = "event.beast_trade"
 BEAST_TRADE_LOCATION = "beast.three_realms_trade_port"
 BEAST_TRADE_DURATION_SECONDS = 7 * 24 * 60 * 60
@@ -67,9 +65,7 @@ __all__ = [
     "BOUNDARY_RIFT_REWARD",
     "BOUNDARY_RIFT_TARGET",
     "BOUNDARY_RIFT_THRESHOLD",
-    "CONTENT_VERSION",
     "EVENT_DEFINITIONS",
-    "RULE_VERSION",
     "beast_trade_window",
     "boundary_rift_window",
 ]

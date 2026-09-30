@@ -8,6 +8,7 @@ import sqlite3
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
     OperationConflictError,
@@ -265,11 +266,12 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 raise QuestRequirementError("archive ruins require soul transformation")
             if self._event_count(connection, int(player["id"]), VOID_QUEST, "archive_source") >= 1:
                 raise QuestAlreadyCompletedError("archive source is already claimed")
-            inventory = self._json_object(player["inventory_json"], {})
-            inventory["item.void_archive"] = int(inventory.get("item.void_archive", 0)) + 1
+            inventory = inventory_grant(
+                inventory_value(player["inventory_json"]), {"item.void_archive": 1}
+            )
             connection.execute(
                 "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                (inventory_json(inventory), now_text, player["id"]),
             )
             self._insert_quest_event(
                 connection,
@@ -314,15 +316,13 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             player = self._require_player(connection, platform, platform_user_id)
             if self._event_count(connection, int(player["id"]), VOID_QUEST, VOID_WALL_TRIAL) < VOID_TRIAL_TARGET:
                 raise QuestNotCompletedError("three wall trials are required")
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             if int(inventory.get("item.void_archive", 0)) < 1:
                 raise QuestResourceInsufficientError("void archive is missing")
-            inventory["item.void_archive"] = int(inventory["item.void_archive"]) - 1
-            if not inventory["item.void_archive"]:
-                inventory.pop("item.void_archive")
+            inventory = inventory_spend(inventory, {"item.void_archive": 1})
             connection.execute(
                 "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                (inventory_json(inventory), now_text, player["id"]),
             )
             self._insert_quest_event(
                 connection,
@@ -501,27 +501,23 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 for key, amount in final_material_cost.items():
                     material_cost[key] = int(material_cost.get(key, 0)) + int(amount)
             if material_cost:
-                inventory = self._json_object(player["inventory_json"], {})
+                inventory = inventory_value(player["inventory_json"])
                 missing = [key for key, amount in material_cost.items() if int(inventory.get(key, 0)) < amount]
                 if missing:
                     raise QuestResourceInsufficientError("quest material is missing")
-                for key, amount in material_cost.items():
-                    inventory[key] = int(inventory[key]) - amount
-                    if not inventory[key]:
-                        inventory.pop(key)
+                inventory = inventory_spend(inventory, material_cost)
             else:
-                inventory = self._json_object(player["inventory_json"], {})
+                inventory = inventory_value(player["inventory_json"])
             count += 1
             reward = dict(reward_per_event or {})
             if count >= target:
                 for key, amount in dict(reward_on_target or {}).items():
                     reward[key] = int(reward.get(key, 0)) + int(amount)
-            for key, amount in reward.items():
-                inventory[key] = int(inventory.get(key, 0)) + int(amount)
+            inventory = inventory_grant(inventory, reward)
             if material_cost or reward:
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    (inventory_json(inventory), now_text, player["id"]),
                 )
             self._insert_quest_event(
                 connection,

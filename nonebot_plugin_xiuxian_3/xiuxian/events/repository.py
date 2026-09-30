@@ -19,7 +19,6 @@ from .models import SpiritSpringEventRecord
 from .rules import (
     EVENT_KEY,
     EVENT_LOCATION,
-    EVENT_RULE_VERSION,
     EVENT_TARGET,
     PERSONAL_CONTRIBUTION_CAP,
     PERSONAL_REWARD_THRESHOLD,
@@ -247,8 +246,8 @@ class EventsRepositoryMixin:
             INSERT OR IGNORE INTO world_event_rounds(
                 round_id, event_key, location_key, status, starts_at, ends_at,
                 claim_expires_at, target_quantity, total_contribution, result_json,
-                rule_version, created_at, updated_at
-            ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, '{}', ?, ?, ?)
+                created_at, updated_at
+            ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, '{}', ?, ?)
             """,
             (
                 round_id,
@@ -258,7 +257,6 @@ class EventsRepositoryMixin:
                 serialize_datetime(ends_at),
                 serialize_datetime(claim_expires_at),
                 EVENT_TARGET,
-                EVENT_RULE_VERSION,
                 serialize_datetime(start),
                 serialize_datetime(start),
             ),

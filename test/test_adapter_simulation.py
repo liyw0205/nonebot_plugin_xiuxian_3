@@ -529,8 +529,8 @@ def test_qq_and_onebot_normalization_reaches_void_refining_late_milestone() -> N
                         INSERT INTO sects(
                             sect_id, name, name_key, leader_id, status, level, max_members,
                             warehouse_capacity, construction, spirit_stones, sect_merit,
-                            warehouse_json, created_at, updated_at, content_version, rule_version
-                        ) VALUES (?, ?, ?, ?, 'active', 5, 120, 100, 0, 0, 0, '{}', ?, ?, '', '')
+                            warehouse_json, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, 'active', 5, 120, 100, 0, 0, 0, '{}', ?, ?)
                         """,
                         (sect_id, f"{prefix} test sect", f"{prefix}-test-sect", player_id, created_at, created_at),
                     )

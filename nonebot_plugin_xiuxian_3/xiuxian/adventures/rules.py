@@ -43,8 +43,6 @@ class BountyDefinition:
     aliases: tuple[str, ...]
     access_any: tuple[Mapping[str, Any], ...]
     reward_labels: Mapping[str, str]
-    content_version: str
-    rule_version: str
 
 
 def _content(content: ContentBundle | None) -> ContentBundle:
@@ -122,8 +120,6 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
                 aliases=aliases,
                 access_any=tuple(access_any),
                 reward_labels=dict(reward_labels),
-                content_version=str(row.get("content_version", "")),
-                rule_version=str(row.get("rule_version", "")),
             )
         )
     return tuple(definitions)

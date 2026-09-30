@@ -80,7 +80,7 @@ def test_three_realms_freeze_claim_and_binding_across_adapters() -> None:
                 for index, user_id in enumerate(("qq-season-player", "onebot-season-player", "third-season-player"), start=1):
                     player_id = player_ids[user_id]
                     connection.execute(
-                        "INSERT INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,rule_version,created_at,updated_at) VALUES (?, 'event.beast_trade', 'beast.three_realms_trade_port', 'settled', ?, ?, ?, 1, ?, '{}', '', ?, ?)",
+                        "INSERT INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES (?, 'event.beast_trade', 'beast.three_realms_trade_port', 'settled', ?, ?, ?, 1, ?, '{}', ?, ?)",
                         (f"season-event-{index}", starts_at.isoformat(), ends_at.isoformat(), ends_at.isoformat(), 100 - index * 10, event_time, event_time),
                     )
                     connection.execute(
@@ -88,15 +88,15 @@ def test_three_realms_freeze_claim_and_binding_across_adapters() -> None:
                         (f"season-event-{index}", player_id, f"season-source-{index}", 100 - index * 10, 100 - index * 10, event_time),
                     )
                     connection.execute(
-                        "INSERT INTO parties(party_id,party_type,status,leader_id,location_key,confirmation_deadline,content_version,rule_version,created_at,updated_at) VALUES (?, 'beast_realm', 'disbanded', ?, 'beast.beast_hills', ?, '', '', ?, ?)",
+                        "INSERT INTO parties(party_id,party_type,status,leader_id,location_key,confirmation_deadline,created_at,updated_at) VALUES (?, 'beast_realm', 'disbanded', ?, 'beast.beast_hills', ?, ?, ?)",
                         (f"season-party-{index}", player_id, ends_at.isoformat(), event_time, event_time),
                     )
                     connection.execute(
-                        "INSERT INTO party_battle_sessions(battle_id,party_id,start_operation_id,battle_type,enemy_key,location_key,status,round_no,action_sequence,starts_at,turn_deadline,snapshot_json,state_json,result_json,content_version,rule_version,created_at,updated_at) VALUES (?, ?, ?, 'pve.party', 'enemy.test', 'beast.beast_hills', 'settled', 10, 10, ?, ?, '{}', '{}', ?, '', '', ?, ?)",
+                        "INSERT INTO party_battle_sessions(battle_id,party_id,start_operation_id,battle_type,enemy_key,location_key,status,round_no,action_sequence,starts_at,turn_deadline,snapshot_json,state_json,result_json,created_at,updated_at) VALUES (?, ?, ?, 'pve.party', 'enemy.test', 'beast.beast_hills', 'settled', 10, 10, ?, ?, '{}', '{}', ?, ?, ?)",
                         (f"season-battle-{index}", f"season-party-{index}", f"season-battle-op-{index}", event_time, ends_at.isoformat(), json.dumps({"contribution": {str(player_id): 100 - index * 10}}), event_time, event_time),
                     )
                 connection.execute(
-                    "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,max_members,warehouse_capacity,construction,spirit_stones,created_at,updated_at,content_version,rule_version) VALUES ('season-sect','三界宗','season-sect','', ?, 'active', 10, 10, 0, 0, ?, ?, '', '')",
+                        "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,max_members,warehouse_capacity,construction,spirit_stones,created_at,updated_at) VALUES ('season-sect','三界宗','season-sect','', ?, 'active', 10, 10, 0, 0, ?, ?)",
                     (player_ids["qq-season-player"], event_time, event_time),
                 )
                 for index, user_id in enumerate(("qq-season-player", "onebot-season-player", "third-season-player"), start=1):
@@ -165,7 +165,7 @@ def test_three_realms_season_projects_new_sources_before_freeze_across_adapters(
                 player_ids = dict(connection.execute("SELECT platform_user_id,id FROM players").fetchall())
                 for index, (user_id, score) in enumerate((("projection-qq", 7), ("projection-ob", 3)), start=1):
                     connection.execute(
-                        "INSERT INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,rule_version,created_at,updated_at) VALUES (?, 'event.beast_trade', 'beast.three_realms_trade_port', 'settled', ?, ?, ?, 1, ?, '{}', '', ?, ?)",
+                        "INSERT INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES (?, 'event.beast_trade', 'beast.three_realms_trade_port', 'settled', ?, ?, ?, 1, ?, '{}', ?, ?)",
                         (f"projection-round-{index}", starts_at.isoformat(), ends_at.isoformat(), ends_at.isoformat(), score, event_time, event_time),
                     )
                     connection.execute(
@@ -182,7 +182,7 @@ def test_three_realms_season_projects_new_sources_before_freeze_across_adapters(
                 assert connection.execute("SELECT COUNT(*) FROM three_realms_season_score_events WHERE season_id=?", (season_id,)).fetchone()[0] == 2
                 player_id = player_ids["projection-qq"]
                 connection.execute(
-                        "INSERT INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,rule_version,created_at,updated_at) VALUES ('projection-round-3', 'event.beast_trade', 'beast.three_realms_trade_port', 'settled', ?, ?, ?, 1, 5, '{}', '', ?, ?)",
+                        "INSERT INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES ('projection-round-3', 'event.beast_trade', 'beast.three_realms_trade_port', 'settled', ?, ?, ?, 1, 5, '{}', ?, ?)",
                     (starts_at.isoformat(), ends_at.isoformat(), ends_at.isoformat(), event_time, event_time),
                 )
                 connection.execute(

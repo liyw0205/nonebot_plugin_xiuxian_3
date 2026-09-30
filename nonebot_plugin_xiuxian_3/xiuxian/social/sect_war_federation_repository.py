@@ -16,8 +16,6 @@ from ..persistence.errors import OperationConflictError, SectNotFoundError, Sect
 from .sect_war_federation_models import SectWarFederationResultRecord, SectWarFederationSnapshotRecord
 from .sect_war_federation_rules import (
     CROSS_SERVER_ROSTER_CAP,
-    CROSS_SERVER_SECT_WAR_CONTENT_VERSION,
-    CROSS_SERVER_SECT_WAR_RULE_VERSION,
     federation_snapshot_id,
 )
 
@@ -146,8 +144,8 @@ class SectWarFederationRepositoryMixin:
                 "source_registration_operation_id": str(registration["operation_id"]),
             }
             connection.execute(
-                "INSERT INTO sect_war_federation_snapshots(snapshot_id,round_id,shard_key,sect_id,roster_size,status,snapshot_json,content_version,rule_version,frozen_at,created_at,updated_at) "
-                "VALUES (?, ?, ?, ?, ?, 'frozen', ?, ?, ?, ?, ?, ?) "
+                "INSERT INTO sect_war_federation_snapshots(snapshot_id,round_id,shard_key,sect_id,roster_size,status,snapshot_json,frozen_at,created_at,updated_at) "
+                "VALUES (?, ?, ?, ?, ?, 'frozen', ?, ?, ?, ?) "
                 "ON CONFLICT(round_id,shard_key,sect_id) DO UPDATE SET status='frozen', snapshot_json=excluded.snapshot_json, roster_size=excluded.roster_size, frozen_at=excluded.frozen_at, updated_at=excluded.updated_at",
                 (
                     snapshot_id,
@@ -156,8 +154,6 @@ class SectWarFederationRepositoryMixin:
                     sect["sect_id"],
                     len(members),
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                    CROSS_SERVER_SECT_WAR_CONTENT_VERSION,
-                    CROSS_SERVER_SECT_WAR_RULE_VERSION,
                     now_text,
                     now_text,
                     now_text,
@@ -238,7 +234,7 @@ class SectWarFederationRepositoryMixin:
                 "imported_at": now_text,
             }
             connection.execute(
-                "INSERT INTO sect_war_federation_results(result_id,round_id,shard_key,sect_id,score,winner,source_operation_id,result_json,content_version,rule_version,imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO sect_war_federation_results(result_id,round_id,shard_key,sect_id,score,winner,source_operation_id,result_json,imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     result_id,
                     round_id,
@@ -248,8 +244,6 @@ class SectWarFederationRepositoryMixin:
                     1 if winner else 0,
                     source_operation_id,
                     json.dumps(payload, ensure_ascii=False, sort_keys=True),
-                    CROSS_SERVER_SECT_WAR_CONTENT_VERSION,
-                    CROSS_SERVER_SECT_WAR_RULE_VERSION,
                     now_text,
                 ),
             )

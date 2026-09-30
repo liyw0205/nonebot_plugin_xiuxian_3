@@ -167,9 +167,9 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import currency_grant, inventory_grant, inventory_json, inventory_value
+from ..utils.assets import assets_grant, inventory_grant, inventory_json, inventory_value
 from ..utils.json import json_object
-from ..utils.player import player_values
+from ..utils.player import player_field, player_reputation, player_values
 
 
 class PlayerRepositoryMixin:
@@ -419,6 +419,15 @@ class PlayerRepositoryMixin:
             created = row["stage"] == STAGE_NEW_USER
             if created:
                 qualification = qualification_for(platform, platform_user_id)
+                starting_assets = assets_grant(
+                    row["spirit_stones"],
+                    {},
+                    {
+                        "spirit_stones": 100,
+                        "item.food.coarse_spirit_rice": 3,
+                        "item.herb.blood_grass": 3,
+                    },
+                )
                 connection.execute(
                     """
                     UPDATE players
@@ -431,13 +440,8 @@ class PlayerRepositoryMixin:
                     (
                         STAGE_MORTAL,
                         json.dumps(qualification, ensure_ascii=False, sort_keys=True),
-                        currency_grant(row["spirit_stones"], 100),
-                        inventory_json(
-                            {
-                                "item.food.coarse_spirit_rice": 3,
-                                "item.herb.blood_grass": 3,
-                            },
-                        ),
+                        starting_assets.currency,
+                        inventory_json(starting_assets.inventory),
                         serialize_datetime(now),
                         row["id"],
                         STAGE_NEW_USER,
@@ -1011,14 +1015,6 @@ class PlayerRepositoryMixin:
 
     @staticmethod
     def _row_to_player(row: sqlite3.Row | dict[str, Any]) -> PlayerView:
-        def value(name: str, default: Any = None) -> Any:
-            if isinstance(row, dict):
-                return row.get(name, default)
-            try:
-                return row[name]
-            except (IndexError, KeyError):
-                return default
-
         normalized = player_values(row)
         qualification = normalized["qualification"]
         inventory = normalized["inventory"]
@@ -1033,12 +1029,12 @@ class PlayerRepositoryMixin:
             stage=normalized["stage"] or STAGE_NEW_USER,
             spirit_stones=normalized["spirit_stones"],
             qualification={str(key): int(value) for key, value in qualification.items()},
-            created_at=datetime.fromisoformat(str(value("created_at"))),
-            updated_at=datetime.fromisoformat(str(value("updated_at"))),
+            created_at=datetime.fromisoformat(str(player_field(row, "created_at"))),
+            updated_at=datetime.fromisoformat(str(player_field(row, "updated_at"))),
             status=normalized["status"],
             location_key=normalized["location_key"],
-            path_key=value("path_key"),
-            subprofession_key=value("subprofession_key"),
+            path_key=player_field(row, "path_key"),
+            subprofession_key=player_field(row, "subprofession_key"),
             stamina=normalized["stamina"],
             stamina_max=normalized["stamina_max"],
             energy=normalized["energy"],
@@ -1046,7 +1042,7 @@ class PlayerRepositoryMixin:
             inventory={str(key): int(item) for key, item in inventory.items()},
             durability={
                 str(key): int(item)
-                for key, item in json_object(value("durability_json", "{}"), {}).items()
+                for key, item in json_object(player_field(row, "durability_json", "{}"), {}).items()
             },
             intro_flags=tuple(str(item) for item in intro_state.get("flags", [])),
             selected_service=normalized["selected_service"],
@@ -1065,13 +1061,13 @@ class PlayerRepositoryMixin:
             talent_points=normalized["talent_points"],
             skill_insights=normalized["skill_insights"],
             weakness_until=(
-                datetime.fromisoformat(str(value("weakness_until")))
-                if value("weakness_until")
+                datetime.fromisoformat(str(player_field(row, "weakness_until")))
+                if player_field(row, "weakness_until")
                 else None
             ),
             battle_defeat_until=(
-                datetime.fromisoformat(str(value("battle_defeat_until")))
-                if value("battle_defeat_until")
+                datetime.fromisoformat(str(player_field(row, "battle_defeat_until")))
+                if player_field(row, "battle_defeat_until")
                 else None
             ),
             breakthrough_pity_bp=normalized["breakthrough_pity_bp"],
@@ -1083,8 +1079,8 @@ class PlayerRepositoryMixin:
             bloodline_stability=normalized["bloodline_stability"],
             cross_realm_penalty_bp=normalized["cross_realm_penalty_bp"],
             soul_fatigue_until=(
-                datetime.fromisoformat(str(value("soul_fatigue_until")))
-                if value("soul_fatigue_until")
+                datetime.fromisoformat(str(player_field(row, "soul_fatigue_until")))
+                if player_field(row, "soul_fatigue_until")
                 else None
             ),
             heart_demon_bonus_bp=normalized["heart_demon_bonus_bp"],
@@ -1096,21 +1092,18 @@ class PlayerRepositoryMixin:
             domain_power=normalized["domain_power"],
             realm_resistance_bp=normalized["realm_resistance_bp"],
             domain_crack_until=(
-                datetime.fromisoformat(str(value("domain_crack_until")))
-                if value("domain_crack_until") else None
+                datetime.fromisoformat(str(player_field(row, "domain_crack_until")))
+                if player_field(row, "domain_crack_until") else None
             ),
             initiative=normalized["initiative"],
-            faction_reputation={
-                str(key): int(item)
-                for key, item in SQLitePlayerRepository._json_object(value("faction_reputation_json", "{}"), {}).items()
-            },
+            faction_reputation=player_reputation(row),
             domain_level=normalized["domain_level"],
             void_power=normalized["void_power"],
             void_power_max=normalized["void_power_max"],
             space_resistance_bp=normalized["space_resistance_bp"],
             void_instability_until=(
-                datetime.fromisoformat(str(value("void_instability_until")))
-                if value("void_instability_until") else None
+                datetime.fromisoformat(str(player_field(row, "void_instability_until")))
+                if player_field(row, "void_instability_until") else None
             ),
             void_route_count=normalized["void_route_count"],
             void_anchor_capacity=normalized["void_anchor_capacity"],

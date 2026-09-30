@@ -37,6 +37,7 @@ from .idle_rules import (
     resolve_route,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
+from ..utils.assets import inventory_value
 
 
 class IdleRepositoryMixin:
@@ -494,8 +495,7 @@ class IdleRepositoryMixin:
     def _idle_select_tool(connection: sqlite3.Connection, player: sqlite3.Row, definition: IdleRouteDefinition, requested: str | None) -> dict[str, object] | None:
         if not definition.required_tool_keys:
             return None
-        raw_inventory = json.loads(player["inventory_json"]) if isinstance(player["inventory_json"], str) else player["inventory_json"]
-        inventory = dict(raw_inventory) if isinstance(raw_inventory, dict) else {}
+        inventory = inventory_value(player["inventory_json"])
         if requested and requested.startswith("facility."):
             return None
         if requested and requested not in definition.required_tool_keys:

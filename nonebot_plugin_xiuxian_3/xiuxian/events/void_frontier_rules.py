@@ -7,8 +7,6 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 
 SEASON_KEY = "season.void_frontier"
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 SEASON_DAYS = 28
 CLAIM_DAYS = 7
 WEEKLY_CAP = 5
@@ -72,9 +70,7 @@ def reward_for_rank(rank: int) -> dict[str, int]:
 
 __all__ = [
     "CLAIM_DAYS",
-    "CONTENT_VERSION",
     "RANKED_PLACES",
-    "RULE_VERSION",
     "SCORE_VALUES",
     "SEASON_DAYS",
     "SEASON_KEY",

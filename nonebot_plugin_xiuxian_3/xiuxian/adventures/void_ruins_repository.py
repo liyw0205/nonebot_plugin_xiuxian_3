@@ -23,6 +23,7 @@ from ..persistence.errors import (
 )
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_VOID_RUINS
 from ..specials.codex_projection import record_codex_discovery
+from ..utils.assets import inventory_value
 from .secret_realm_rules import realm_at_least
 from .void_ruins_models import VoidRuinsRunRecord
 from .void_ruins_rules import (
@@ -682,7 +683,7 @@ class VoidRuinsRepositoryMixin:
             (run_id,),
         ).fetchall()
         for member in members:
-            inventory = json.loads(member["inventory_json"]) if isinstance(member["inventory_json"], str) else {}
+            inventory = inventory_value(member["inventory_json"])
             inventory = dict(inventory) if isinstance(inventory, dict) else {}
             inventory["item.void_anchor"] = int(inventory.get("item.void_anchor", 0)) + VOID_RUINS_ANCHOR_LOCK
             connection.execute(

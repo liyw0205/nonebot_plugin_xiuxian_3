@@ -95,11 +95,9 @@ from ..adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ..adventures.mainline import (
-    MAINLINE_CONTENT_VERSION,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
     mainline_definition,
@@ -180,6 +178,7 @@ from ..routine.rules import (
     tree_status,
 )
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.assets import assets_grant, assets_spend, inventory_json, inventory_value
 
 
 class RoutineRepositoryMixin:
@@ -272,8 +271,18 @@ class RoutineRepositoryMixin:
                 cursor -= timedelta(days=1)
             streak_after = streak_before + 1
             requested_reward = checkin_reward(streak_after)
-            inventory = self._json_object(row["inventory_json"], {})
-            stones = int(row["spirit_stones"]) + int(requested_reward.get("spirit_stones", 0))
+            inventory = inventory_value(row["inventory_json"])
+            balances = assets_grant(
+                row["spirit_stones"],
+                inventory,
+                {
+                    key: quantity
+                    for key, quantity in requested_reward.items()
+                    if key != "energy"
+                },
+            )
+            stones = balances.currency
+            inventory = balances.inventory
             current_energy = int(row["energy"])
             energy_gain = min(
                 int(requested_reward.get("energy", 0)),
@@ -285,12 +294,11 @@ class RoutineRepositoryMixin:
             for key, quantity in requested_reward.items():
                 if key in {"spirit_stones", "energy"}:
                     continue
-                inventory[key] = int(inventory.get(key, 0)) + int(quantity)
                 applied_reward[key] = int(quantity)
 
             connection.execute(
                 "UPDATE players SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones, energy, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                (stones, energy, inventory_json(inventory), now_text, row["id"]),
             )
             connection.execute(
                 """
@@ -713,8 +721,18 @@ class RoutineRepositoryMixin:
             digest = hashlib.blake2b(
                 f"tree.harvest:{operation_id}".encode("utf-8"), digest_size=16
             ).hexdigest()
-            inventory = self._json_object(row["inventory_json"], {})
-            stones = int(row["spirit_stones"]) + int(reward.get("spirit_stones", 0))
+            inventory = inventory_value(row["inventory_json"])
+            balances = assets_grant(
+                row["spirit_stones"],
+                inventory,
+                {
+                    key: quantity
+                    for key, quantity in reward.items()
+                    if key != "local_reputation"
+                },
+            )
+            stones = balances.currency
+            inventory = balances.inventory
             actual_reward: dict[str, int] = {}
             for key, quantity in reward.items():
                 quantity = int(quantity)
@@ -723,7 +741,6 @@ class RoutineRepositoryMixin:
                 elif key == "local_reputation":
                     actual_reward[key] = quantity
                 else:
-                    inventory[key] = int(inventory.get(key, 0)) + quantity
                     actual_reward[key] = quantity
             reputation = connection.execute(
                 "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
@@ -745,7 +762,7 @@ class RoutineRepositoryMixin:
             cooldown_text = serialize_datetime(cooldown)
             connection.execute(
                 "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                (stones, inventory_json(inventory), now_text, row["id"]),
             )
             result = {
                 "pool_key": "tree.harvest",
@@ -1108,16 +1125,22 @@ class RoutineRepositoryMixin:
             if source_operation_id is None:
                 raise SevenDayGoalNotCompletedError("seven-day goal is not completed")
             reward = seven_day_reward(definition)
-            inventory = self._json_object(row["inventory_json"], {})
-            stones = int(row["spirit_stones"])
+            inventory = inventory_value(row["inventory_json"])
+            balances = assets_grant(
+                row["spirit_stones"],
+                inventory,
+                {
+                    key: quantity
+                    for key, quantity in reward.items()
+                    if key != "local_reputation"
+                },
+            )
+            stones = balances.currency
+            inventory = balances.inventory
             local_reputation = 0
             for key, quantity in reward.items():
-                if key == "spirit_stones":
-                    stones += int(quantity)
-                elif key == "local_reputation":
+                if key == "local_reputation":
                     local_reputation += int(quantity)
-                else:
-                    inventory[key] = int(inventory.get(key, 0)) + int(quantity)
             reputation = connection.execute(
                 "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
                 (row["id"],),
@@ -1137,7 +1160,7 @@ class RoutineRepositoryMixin:
                 )
             connection.execute(
                 "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                (stones, inventory_json(inventory), now_text, row["id"]),
             )
             connection.execute(
                 """
@@ -1284,17 +1307,14 @@ class RoutineRepositoryMixin:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO honor_titles(
-                    player_id, title_key, source_operation_id, acquired_at,
-                    content_version, rule_version
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    player_id, title_key, source_operation_id, acquired_at
+                ) VALUES (?, ?, ?, ?)
                 """,
                 (
                     player_id,
                     definition.key,
                     source_operation_id,
                     now_text,
-                    ROUTINE_CONTENT_VERSION,
-                    HONOR_RULE_VERSION,
                 ),
             )
 
@@ -1492,13 +1512,11 @@ class RoutineRepositoryMixin:
                 connection.execute(
                     """
                     INSERT OR IGNORE INTO honor_titles(
-                        player_id, title_key, source_operation_id, acquired_at,
-                        content_version, rule_version
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        player_id, title_key, source_operation_id, acquired_at
+                    ) VALUES (?, ?, ?, ?)
                     """,
                     (
                         row["id"], str(title_key), source_operation_id, now_text,
-                        ROUTINE_CONTENT_VERSION, HONOR_RULE_VERSION,
                     ),
                 )
                 del title_definition
@@ -1727,8 +1745,18 @@ class RoutineRepositoryMixin:
                 raise RedemptionCodeExhaustedError("redemption code has no remaining claims")
 
             reward = self._json_object(code_row["reward_json"], {})
-            inventory = self._json_object(row["inventory_json"], {})
-            stones = int(row["spirit_stones"])
+            inventory = inventory_value(row["inventory_json"])
+            balances = assets_grant(
+                row["spirit_stones"],
+                inventory,
+                {
+                    key: quantity
+                    for key, quantity in reward.items()
+                    if key not in {"energy", "local_reputation", "service_reputation"}
+                },
+            )
+            stones = balances.currency
+            inventory = balances.inventory
             energy = int(row["energy"])
             actual_reward: dict[str, int] = {}
             local_reputation = 0
@@ -1736,7 +1764,6 @@ class RoutineRepositoryMixin:
             for key, raw_quantity in reward.items():
                 quantity = int(raw_quantity)
                 if key == "spirit_stones":
-                    stones += quantity
                     actual_reward[key] = quantity
                 elif key == "energy":
                     gained = min(quantity, max(0, int(row["energy_max"]) - energy))
@@ -1748,8 +1775,7 @@ class RoutineRepositoryMixin:
                 elif key == "service_reputation":
                     service_reputation += quantity
                     actual_reward[key] = quantity
-                else:
-                    inventory[key] = int(inventory.get(key, 0)) + quantity
+                elif key != "spirit_stones":
                     actual_reward[key] = quantity
 
             if local_reputation or service_reputation:
@@ -1776,7 +1802,7 @@ class RoutineRepositoryMixin:
                 SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
-                (stones, energy, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                (stones, energy, inventory_json(inventory), now_text, row["id"]),
             )
             connection.execute(
                 """
@@ -1886,22 +1912,21 @@ class RoutineRepositoryMixin:
             if pity_before < 0 or pity_before >= FATE_PITY_LIMIT:
                 raise FatePoolNotOpenError("fate pity state is invalid")
 
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             stones = int(row["spirit_stones"])
             if draw_count == 1 and int(inventory.get(FATE_TICKET, 0)) > 0:
                 cost_kind = "ticket"
                 cost_quantity = 1
-                remaining_ticket = int(inventory[FATE_TICKET]) - 1
-                if remaining_ticket:
-                    inventory[FATE_TICKET] = remaining_ticket
-                else:
-                    inventory.pop(FATE_TICKET, None)
+                balances = assets_spend(stones, inventory, {FATE_TICKET: 1})
+                stones, inventory = balances.currency, balances.inventory
             else:
                 cost_kind = "spirit_stones"
                 cost_quantity = FATE_SINGLE_COST if draw_count == 1 else FATE_TEN_COST
-                if stones < cost_quantity:
-                    raise FateDrawInsufficientError("fate draw cost is insufficient")
-                stones -= cost_quantity
+                try:
+                    balances = assets_spend(stones, inventory, {"spirit_stones": cost_quantity})
+                except ValueError as exc:
+                    raise FateDrawInsufficientError("fate draw cost is insufficient") from exc
+                stones, inventory = balances.currency, balances.inventory
 
             draws, pity_after, seed_hash = roll_fate_pool(
                 operation_id,
@@ -1909,11 +1934,8 @@ class RoutineRepositoryMixin:
                 pity_before=pity_before,
             )
             reward = reward_totals(draws)
-            for key, quantity in reward.items():
-                if key == "spirit_stones":
-                    stones += quantity
-                else:
-                    inventory[key] = int(inventory.get(key, 0)) + quantity
+            balances = assets_grant(stones, inventory, reward)
+            stones, inventory = balances.currency, balances.inventory
             connection.execute(
                 """
                 UPDATE players
@@ -1922,7 +1944,7 @@ class RoutineRepositoryMixin:
                 """,
                 (
                     stones,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     now_text,
                     row["id"],
                 ),
@@ -2501,8 +2523,18 @@ class RoutineRepositoryMixin:
         reward: dict[str, int],
         now_text: str,
     ) -> dict[str, int]:
-        inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
-        stones = int(player["spirit_stones"])
+        inventory = inventory_value(player["inventory_json"])
+        balances = assets_grant(
+            player["spirit_stones"],
+            inventory,
+            {
+                key: value
+                for key, value in reward.items()
+                if key not in {"energy", "local_reputation", "service_reputation"}
+            },
+        )
+        stones = balances.currency
+        inventory = balances.inventory
         energy = int(player["energy"])
         actual: dict[str, int] = {}
         local_reputation = 0
@@ -2510,7 +2542,6 @@ class RoutineRepositoryMixin:
         for key, raw_quantity in reward.items():
             quantity = int(raw_quantity)
             if key == "spirit_stones":
-                stones += quantity
                 actual[key] = quantity
             elif key == "energy":
                 gained = min(quantity, max(0, int(player["energy_max"]) - energy))
@@ -2522,8 +2553,7 @@ class RoutineRepositoryMixin:
             elif key == "service_reputation":
                 service_reputation += quantity
                 actual[key] = quantity
-            else:
-                inventory[key] = int(inventory.get(key, 0)) + quantity
+            elif key != "spirit_stones":
                 actual[key] = quantity
         if local_reputation or service_reputation:
             reputation = connection.execute(
@@ -2549,7 +2579,7 @@ class RoutineRepositoryMixin:
             SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ?
             WHERE id = ?
             """,
-            (stones, energy, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            (stones, energy, inventory_json(inventory), now_text, player["id"]),
         )
         return actual
 

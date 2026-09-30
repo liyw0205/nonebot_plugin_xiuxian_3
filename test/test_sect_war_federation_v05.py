@@ -34,7 +34,7 @@ def test_cross_server_sect_war_freezes_roster_and_imports_audited_result_without
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 players = dict(connection.execute("SELECT platform_user_id,id FROM players").fetchall())
                 connection.execute(
-                    "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,created_at,updated_at,content_version,rule_version) VALUES ('federation-sect','跨服测试宗','federation-sect','', ?, 'active', 5, 120, 100, 0, 5000, 0, ?, ?, '', '')",
+                    "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,created_at,updated_at) VALUES ('federation-sect','跨服测试宗','federation-sect','', ?, 'active', 5, 120, 100, 0, 5000, 0, ?, ?)",
                     (players["federation-qq"], now_text, now_text),
                 )
                 connection.execute(

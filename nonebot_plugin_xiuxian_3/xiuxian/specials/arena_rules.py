@@ -9,8 +9,6 @@ from typing import Mapping
 from ..combat.spectator_rules import battle_roll_bp, simulate_spectator_match
 from .three_realms_arena_rules import THREE_REALMS_ARENA_MODE_KEY
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 ARENA_MODE_KEY = "arena.spar"
 ARENA_RANK_MODE_KEY = "arena.rank"
 ARENA_PRACTICE_MODE_KEY = "arena.practice"
@@ -123,12 +121,10 @@ __all__ = [
     "ARENA_PRACTICE_MODE_KEY",
     "ARENA_RANK_MODE_KEY",
     "THREE_REALMS_ARENA_MODE_KEY",
-    "CONTENT_VERSION",
     "DAILY_CHALLENGE_LIMIT",
     "DAILY_COUNTED_OPPONENT_LIMIT",
     "DAILY_PRACTICE_LIMIT",
     "MAX_ROUNDS",
-    "RULE_VERSION",
     "SNAPSHOT_MATCH_DELAY_SECONDS",
     "SNAPSHOT_VALID_DAYS",
     "WEEKLY_RANK_LIMIT",

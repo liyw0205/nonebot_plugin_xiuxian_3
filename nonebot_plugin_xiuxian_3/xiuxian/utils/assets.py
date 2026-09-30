@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 import json
 from typing import Any
 
@@ -13,7 +14,87 @@ class AssetDeltaError(ValueError):
     """Raised when an asset balance or delta is invalid."""
 
 
-def inventory_value(raw: Any, default: Mapping[str, Any] | None = None) -> dict[str, int]:
+@dataclass(frozen=True, slots=True)
+class AssetState:
+    """A detached player balance containing currency and stackable items."""
+
+    currency: int
+    inventory: dict[str, int]
+
+
+def _asset_delta_parts(
+    delta: Mapping[str, Any], *, currency_key: str
+) -> tuple[Any, dict[str, Any]]:
+    currency_delta: Any = 0
+    item_delta: dict[str, Any] = {}
+    for raw_key, raw_value in delta.items():
+        key = str(raw_key)
+        if key == currency_key:
+            currency_delta = raw_value
+        else:
+            item_delta[key] = raw_value
+    return currency_delta, item_delta
+
+
+def assets_with_delta(
+    currency: Any,
+    inventory: Mapping[str, Any],
+    delta: Mapping[str, Any],
+    *,
+    currency_key: str = "spirit_stones",
+) -> AssetState:
+    """Apply one signed change map to currency and inventory atomically.
+
+    The function is pure: both returned values are detached from the inputs,
+    and validation happens before a caller persists either value.
+    """
+
+    currency_delta, item_delta = _asset_delta_parts(delta, currency_key=currency_key)
+    return AssetState(
+        currency=currency_with_delta(currency, currency_delta),
+        inventory=inventory_with_delta(inventory, item_delta),
+    )
+
+
+def assets_grant(
+    currency: Any,
+    inventory: Mapping[str, Any],
+    rewards: Mapping[str, Any],
+    *,
+    currency_key: str = "spirit_stones",
+) -> AssetState:
+    """Grant non-negative currency and item quantities in one operation."""
+
+    currency_amount, item_rewards = _asset_delta_parts(rewards, currency_key=currency_key)
+    return AssetState(
+        currency=currency_grant(currency, currency_amount),
+        inventory=inventory_grant(inventory, item_rewards),
+    )
+
+
+def assets_spend(
+    currency: Any,
+    inventory: Mapping[str, Any],
+    costs: Mapping[str, Any],
+    *,
+    currency_key: str = "spirit_stones",
+    preserve_zero: bool = False,
+) -> AssetState:
+    """Spend non-negative currency and item quantities in one operation."""
+
+    currency_amount, item_costs = _asset_delta_parts(costs, currency_key=currency_key)
+    return AssetState(
+        currency=currency_spend(currency, currency_amount),
+        inventory=inventory_spend(inventory, item_costs, preserve_zero=preserve_zero),
+    )
+
+
+def inventory_value(
+    raw: Any,
+    default: Mapping[str, Any] | None = None,
+    *,
+    keep_zero: bool = False,
+) -> dict[str, int]:
     """Decode and validate an inventory stored as JSON or a mapping."""
 
     decoded = json_object(raw, default)
@@ -21,15 +102,21 @@ def inventory_value(raw: Any, default: Mapping[str, Any] | None = None) -> dict[
     for raw_key, raw_quantity in decoded.items():
         key = str(raw_key)
         quantity = inventory_amount({key: raw_quantity}, key)
-        if quantity:
+        if quantity or keep_zero:
             result[key] = quantity
     return result
 
 
-def inventory_json(inventory: Mapping[str, Any]) -> str:
+def inventory_json(inventory: Mapping[str, Any], *, keep_zero: bool = False) -> str:
     """Serialize a normalized inventory for a player row."""
 
-    return json.dumps(inventory_value(inventory), ensure_ascii=False, sort_keys=True)
+    normalized: dict[str, int] = {}
+    for raw_key, raw_quantity in inventory.items():
+        key = str(raw_key)
+        quantity = inventory_amount({key: raw_quantity}, key)
+        if quantity or keep_zero:
+            normalized[key] = quantity
+    return json.dumps(normalized, ensure_ascii=False, sort_keys=True)
 
 
 def inventory_amount(inventory: Mapping[str, Any], key: str) -> int:
@@ -70,7 +157,7 @@ def inventory_missing(
 
 
 def inventory_with_delta(
-    inventory: Mapping[str, Any], delta: Mapping[str, Any]
+    inventory: Mapping[str, Any], delta: Mapping[str, Any], *, preserve_zero: bool = False
 ) -> dict[str, int]:
     """Return a detached inventory after applying signed item deltas."""
 
@@ -93,6 +180,8 @@ def inventory_with_delta(
             raise AssetDeltaError(f"inventory quantity for {key!r} cannot be negative")
         if next_quantity:
             result[key] = next_quantity
+        elif preserve_zero:
+            result[key] = 0
         else:
             result.pop(key, None)
     return result
@@ -114,7 +203,12 @@ def inventory_grant(inventory: Mapping[str, Any], rewards: Mapping[str, Any]) ->
     return inventory_with_delta(inventory, rewards)
 
 
-def inventory_spend(inventory: Mapping[str, Any], requirements: Mapping[str, Any]) -> dict[str, int]:
+def inventory_spend(
+    inventory: Mapping[str, Any],
+    requirements: Mapping[str, Any],
+    *,
+    preserve_zero: bool = False,
+) -> dict[str, int]:
     """Return an inventory after spending required item quantities."""
 
     missing = inventory_missing(inventory, requirements)
@@ -123,6 +217,7 @@ def inventory_spend(inventory: Mapping[str, Any], requirements: Mapping[str, Any
     return inventory_with_delta(
         inventory,
         {str(key): -int(quantity) for key, quantity in requirements.items()},
+        preserve_zero=preserve_zero,
     )
 
 
@@ -171,7 +266,11 @@ def currency_spend(balance: Any, amount: Any) -> int:
 
 
 __all__ = [
+    "AssetState",
     "AssetDeltaError",
+    "assets_grant",
+    "assets_spend",
+    "assets_with_delta",
     "currency_grant",
     "currency_spend",
     "currency_with_delta",

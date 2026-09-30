@@ -8,8 +8,6 @@ from datetime import datetime, timedelta, timezone
 
 
 EVENT_KEY = "event.domain_front"
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 LOCATION_KEY = "xuantian.domain_front"
 ACTIVITY_HOURS = 4
 ROUND_MINUTES = 30
@@ -128,7 +126,6 @@ __all__ = [
     "ACTIVITY_HOURS",
     "BATTLE_CONTRIBUTION",
     "CLAIM_DAYS",
-    "CONTENT_VERSION",
     "EVENT_KEY",
     "EVENT_TARGET",
     "JOIN_STAMINA_COST",
@@ -137,7 +134,6 @@ __all__ = [
     "PERSONAL_THRESHOLD",
     "POINT_CONTRIBUTION_PER_MINUTE",
     "ROUND_MINUTES",
-    "RULE_VERSION",
     "SEASON_CLAIM_DAYS",
     "SEASON_DAYS",
     "SEASON_KEY",

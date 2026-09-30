@@ -1,4 +1,4 @@
-"""Versioned content for the v0.6 three-realm dao echoes mainline."""
+"""Content for the three-realm dao echoes mainline."""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ from dataclasses import dataclass
 
 
 DAO_ECHOES_STORY_KEY = "story.mainline.dao_echoes"
-DAO_ECHOES_CONTENT_VERSION = ""
-DAO_ECHOES_RULE_VERSION = ""
 DAO_ECHOES_LANES = ("builder", "witness", "traveler")
 DAO_ECHOES_LANE_LABELS = {
     "builder": "建设者",
@@ -33,8 +31,6 @@ class DaoEchoesStage:
     description: str
     codex_flag: str
     prerequisites: tuple[str, ...] = ()
-    content_version: str = DAO_ECHOES_CONTENT_VERSION
-    rule_version: str = DAO_ECHOES_RULE_VERSION
     runtime_status: str = "open"
 
 
@@ -119,11 +115,9 @@ def dao_echoes_definition(lane: str, stage: int | str) -> DaoEchoesStage:
 
 
 __all__ = [
-    "DAO_ECHOES_CONTENT_VERSION",
     "DAO_ECHOES_DEFINITIONS",
     "DAO_ECHOES_LANES",
     "DAO_ECHOES_LANE_LABELS",
-    "DAO_ECHOES_RULE_VERSION",
     "DAO_ECHOES_STAGES",
     "DAO_ECHOES_STORY_KEY",
     "DaoEchoesStage",

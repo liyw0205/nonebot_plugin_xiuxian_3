@@ -24,11 +24,9 @@ from .sect_alliance_models import AllianceResearchRecord, SectAllianceRecord
 from .sect_alliance_rules import (
     ALLIANCE_BREACH_FEE,
     ALLIANCE_CONFIRMATION_SECONDS,
-    ALLIANCE_CONTENT_VERSION,
     ALLIANCE_DURATION_SECONDS,
     ALLIANCE_MIN_SECT_LEVEL,
     ALLIANCE_RESEARCH_WEEKLY_CAP,
-    ALLIANCE_RULE_VERSION,
     SECT_ALLIANCE_COOLDOWN_SECONDS,
     alliance_week_id,
 )
@@ -97,8 +95,8 @@ class SectAllianceRepositoryMixin:
             confirmation_expires = now + timedelta(seconds=ALLIANCE_CONFIRMATION_SECONDS)
             snapshot = {"min_sect_level": ALLIANCE_MIN_SECT_LEVEL, "duration_seconds": ALLIANCE_DURATION_SECONDS, "research_weekly_cap": ALLIANCE_RESEARCH_WEEKLY_CAP}
             connection.execute(
-                "INSERT INTO sect_alliance_contracts(alliance_id,sect_a_id,sect_b_id,proposer_sect_id,proposer_player_id,status,sect_a_confirmed,sect_b_confirmed,confirmation_expires_at,starts_at,ends_at, snapshot_json,content_version,rule_version,created_at,updated_at) VALUES (?, ?, ?, ?, ?, 'pending', 1, 0, ?, NULL, NULL, ?, ?, ?, ?, ?)",
-                (alliance_id, source["sect_id"], target["sect_id"], source["sect_id"], player["id"], serialize_datetime(confirmation_expires), json.dumps(snapshot, sort_keys=True), ALLIANCE_CONTENT_VERSION, ALLIANCE_RULE_VERSION, now_text, now_text),
+                "INSERT INTO sect_alliance_contracts(alliance_id,sect_a_id,sect_b_id,proposer_sect_id,proposer_player_id,status,sect_a_confirmed,sect_b_confirmed,confirmation_expires_at,starts_at,ends_at,snapshot_json,created_at,updated_at) VALUES (?, ?, ?, ?, ?, 'pending', 1, 0, ?, NULL, NULL, ?, ?, ?)",
+                (alliance_id, source["sect_id"], target["sect_id"], source["sect_id"], player["id"], serialize_datetime(confirmation_expires), json.dumps(snapshot, sort_keys=True), now_text, now_text),
             )
             row = connection.execute("SELECT * FROM sect_alliance_contracts WHERE alliance_id=?", (alliance_id,)).fetchone()
             payload = self._alliance_payload(connection, row, viewer_sect_id=str(source["sect_id"]))

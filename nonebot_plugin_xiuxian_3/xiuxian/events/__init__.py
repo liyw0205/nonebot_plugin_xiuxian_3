@@ -32,7 +32,6 @@ from .void_frontier_use_cases import VoidFrontierApplication
 from .rules import (
     EVENT_KEY,
     EVENT_LOCATION,
-    EVENT_RULE_VERSION,
     EVENT_TARGET,
     PERSONAL_CONTRIBUTION_CAP,
     PERSONAL_REWARD_THRESHOLD,
@@ -42,7 +41,6 @@ from .use_cases import EventsApplication
 __all__ = [
     "EVENT_KEY",
     "EVENT_LOCATION",
-    "EVENT_RULE_VERSION",
     "EVENT_TARGET",
     "EventsApplication",
     "EventsRepositoryMixin",

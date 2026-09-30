@@ -1,4 +1,4 @@
-"""Pure, versioned rules for the v0.1 Xuantian mainline.
+"""Pure rules for the Xuantian mainline.
 
 This module describes the v0.1 story contract.  Chapter one contains the
 open runtime stages; the documented chapter-two town commission remains
@@ -14,10 +14,6 @@ from typing import Iterable, Mapping
 
 
 MAINLINE_STORY_KEY = "story.mainline.xuantian"
-MAINLINE_CONTENT_VERSION = ""
-MAINLINE_RULE_VERSION = ""
-RULE_VERSION = ""
-CONTENT_VERSION = ""
 
 MAINLINE_LOCKED = "locked"
 MAINLINE_AVAILABLE = "available"
@@ -50,8 +46,6 @@ class MainlineStageDefinition:
     first_clear_reward: tuple[tuple[str, int | str], ...] = ()
     repeat_reward: tuple[tuple[str, int | str], ...] = ()
     runtime_status: str = "open"
-    content_version: str = MAINLINE_CONTENT_VERSION
-    rule_version: str = MAINLINE_RULE_VERSION
 
     def first_clear_reward_map(self) -> dict[str, int | str]:
         return {str(key): value if isinstance(value, str) else int(value) for key, value in self.first_clear_reward}
@@ -365,18 +359,15 @@ mainline_prerequisite_met = mainline_prerequisites_met
 
 
 __all__ = [
-    "CONTENT_VERSION",
     "DEFINITIONS",
     "MAINLINE_ALIASES",
     "MAINLINE_AVAILABLE",
     "MAINLINE_CLAIMED",
     "MAINLINE_CLEARED",
-    "MAINLINE_CONTENT_VERSION",
     "MAINLINE_DEFINITIONS",
     "MAINLINE_FORBIDDEN_REWARD_KEYS",
     "MAINLINE_LOCKED",
     "MAINLINE_REWARD_PENDING",
-    "MAINLINE_RULE_VERSION",
     "MAINLINE_RUNNING",
     "MAINLINE_STATUSES",
     "MAINLINE_STAGES",
@@ -384,7 +375,6 @@ __all__ = [
     "MAINLINE_STORY_KEY",
     "MainlineDefinition",
     "MainlineStageDefinition",
-    "RULE_VERSION",
     "mainline_definition",
     "mainline_first_clear_key",
     "mainline_first_clear_reward",

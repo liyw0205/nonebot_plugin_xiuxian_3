@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from .cloud_rules import ARRAY_HALL_INVITE_FLAG
+from ..utils.player import player_intro_flags
 
 
 def array_hall_permission(connection: Any, player: Any) -> str | None:
@@ -22,11 +22,7 @@ def array_hall_permission(connection: Any, player: Any) -> str | None:
     ).fetchone()
     if membership is not None:
         return "sect_member"
-    try:
-        intro = json.loads(str(player["intro_json"] or "{}"))
-    except (TypeError, ValueError):
-        intro = {}
-    flags = {str(item) for item in intro.get("flags", [])} if isinstance(intro, dict) else set()
+    flags = set(player_intro_flags(player))
     if {ARRAY_HALL_INVITE_FLAG, "array_hall_invite"} & flags:
         return "teaching_invite"
     return None

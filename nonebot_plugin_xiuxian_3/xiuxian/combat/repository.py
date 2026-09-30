@@ -65,7 +65,7 @@ from .spectator_rules import (
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.assets import currency_grant, inventory_grant, inventory_json, inventory_value
+from ..utils.assets import assets_grant, inventory_json, inventory_value
 from ..utils.player import player_values
 
 
@@ -1253,14 +1253,12 @@ class CombatRepositoryMixin:
             stones = int(player["spirit_stones"])
             cultivation = int(player["cultivation"])
             total_cultivation = int(player["total_cultivation"])
-            for key, quantity in reward.items():
-                if key == "spirit_stones":
-                    stones = currency_grant(stones, quantity)
-                elif key == "cultivation":
-                    cultivation += quantity
-                    total_cultivation += quantity
-                else:
-                    inventory = inventory_grant(inventory, {key: quantity})
+            asset_reward = {key: quantity for key, quantity in reward.items() if key != "cultivation"}
+            balances = assets_grant(stones, inventory, asset_reward)
+            stones = balances.currency
+            inventory = balances.inventory
+            cultivation += int(reward.get("cultivation", 0))
+            total_cultivation += int(reward.get("cultivation", 0))
             record_material_discoveries(
                 connection,
                 player_id=int(player["id"]),

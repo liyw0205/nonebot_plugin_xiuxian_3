@@ -8,6 +8,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_json, inventory_spend, inventory_value
 from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
@@ -24,9 +25,7 @@ from .sect_exchange_rules import (
     SECT_DONATION_ITEMS,
     SECT_EXCHANGE_OFFERS,
     SECT_SUPPLY_RECIPES,
-    SECT_SUPPLY_RULE_VERSION,
 )
-from .sect_rules import SECT_CONTENT_VERSION
 
 
 class SectSupplyRepositoryMixin:
@@ -135,8 +134,7 @@ class SectSupplyRepositoryMixin:
             payload = {
                 "sect_id": str(sect["sect_id"]), "contribution": int(member["contribution"]) + 5,
                 "construction": int(sect["construction"]) + 1, "source_operations": sources[:3],
-                "business_date": now.date().isoformat(), "content_version": SECT_CONTENT_VERSION,
-                "rule_version": SECT_SUPPLY_RULE_VERSION,
+                "business_date": now.date().isoformat(),
             }
             return self._supply_record(connection, operation_id, name, int(player["id"]), str(sect["sect_id"]), request_hash, payload, now_text)
 
@@ -169,16 +167,14 @@ class SectSupplyRepositoryMixin:
                 connection.execute("UPDATE sects SET spirit_stones=spirit_stones+?,updated_at=? WHERE sect_id=?", (quantity, now_text, sect["sect_id"]))
                 balance = int(sect["spirit_stones"]) + quantity
             else:
-                inventory = self._json_map(player["inventory_json"])
+                inventory = inventory_value(player["inventory_json"])
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise ResourceInsufficientError("not enough items")
                 if item_key not in warehouse and len(warehouse) >= int(sect["warehouse_capacity"]):
                     raise SectWarehouseFullError("warehouse has no free slots")
-                inventory[item_key] = int(inventory[item_key]) - quantity
-                if not inventory[item_key]:
-                    inventory.pop(item_key)
+                inventory = inventory_spend(inventory, {item_key: quantity})
                 warehouse[item_key] = int(warehouse.get(item_key, 0)) + quantity
-                connection.execute("UPDATE players SET inventory_json=?,updated_at=? WHERE id=?", (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]))
+                connection.execute("UPDATE players SET inventory_json=?,updated_at=? WHERE id=?", (inventory_json(inventory), now_text, player["id"]))
                 connection.execute("UPDATE sects SET warehouse_json=?,updated_at=? WHERE sect_id=?", (json.dumps(warehouse, ensure_ascii=False, sort_keys=True), now_text, sect["sect_id"]))
                 balance = int(warehouse[item_key])
             connection.execute("UPDATE sect_members SET contribution=contribution+?,last_action_at=?,updated_at=? WHERE id=?", (contribution_gain, now_text, now_text, member["id"]))
@@ -189,8 +185,7 @@ class SectSupplyRepositoryMixin:
             payload = {
                 "sect_id": str(sect["sect_id"]), "item_key": item_key, "quantity": quantity,
                 "warehouse_balance": balance, "contribution": int(member["contribution"]) + contribution_gain,
-                "contribution_gain": contribution_gain, "content_version": SECT_CONTENT_VERSION,
-                "rule_version": SECT_SUPPLY_RULE_VERSION,
+                "contribution_gain": contribution_gain,
             }
             return self._supply_record(connection, operation_id, name, int(player["id"]), str(sect["sect_id"]), request_hash, payload, now_text, "donate_stones" if item_key == "spirit_stones" else "donate_item")
 
@@ -236,8 +231,7 @@ class SectSupplyRepositoryMixin:
             payload = {
                 "sect_id": str(sect["sect_id"]), "offer_key": offer.key, "item_key": offer.item_key,
                 "warehouse_balance": int(warehouse[offer.item_key]), "input_items": inputs,
-                "spirit_stones_spent": price, "content_version": SECT_CONTENT_VERSION,
-                "rule_version": SECT_SUPPLY_RULE_VERSION,
+                "spirit_stones_spent": price,
             }
             return self._supply_record(connection, operation_id, name, int(player["id"]), str(sect["sect_id"]), request_hash, payload, now_text, "procure")
 

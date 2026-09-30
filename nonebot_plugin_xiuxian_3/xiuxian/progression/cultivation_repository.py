@@ -90,11 +90,9 @@ from ..adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ..adventures.mainline import (
-    MAINLINE_CONTENT_VERSION,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
     mainline_definition,
@@ -176,6 +174,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.assets import assets_grant, inventory_json, inventory_value
 
 
 class CultivationRepositoryMixin:
@@ -273,21 +272,28 @@ class CultivationRepositoryMixin:
             if path_key == "support" and not subprofession_key:
                 raise SubprofessionRequiredError("support path needs a sub-profession")
 
-            inventory = self._json_object(row["inventory_json"], {})
-            for item_key, quantity in reward_items(path_key, subprofession_key, self.content):
-                inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
+            inventory = inventory_value(row["inventory_json"])
+            reward = {
+                "spirit_stones": 200,
+                **{
+                    item_key: quantity
+                    for item_key, quantity in reward_items(path_key, subprofession_key, self.content)
+                },
+            }
+            assets = assets_grant(row["spirit_stones"], inventory, reward)
             connection.execute(
                 """
                 UPDATE players
                 SET stage = 'cultivator', path_key = ?, subprofession_key = ?,
                     realm_key = 'qi_sensing', realm_layer = 1, cultivation = 0, total_cultivation = 0,
-                    spirit_stones = spirit_stones + 200, inventory_json = ?, updated_at = ?
+                    spirit_stones = ?, inventory_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
                     path_key,
                     subprofession_key,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    assets.currency,
+                    inventory_json(assets.inventory),
                     serialize_datetime(now),
                     row["id"],
                 ),

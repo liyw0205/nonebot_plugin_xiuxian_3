@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..content import bundled_content
+from ..utils.assets import assets_grant, assets_spend, inventory_json, inventory_value
 from ..specials.codex_projection import record_codex_discovery
 from ..persistence.errors import (
     DomainCrackActiveError,
@@ -47,7 +48,6 @@ from .domain_front_rules import (
     ACTION_VALUES,
     BATTLE_CONTRIBUTION,
     CLAIM_DAYS,
-    CONTENT_VERSION,
     EVENT_KEY,
     EVENT_TARGET,
     JOIN_STAMINA_COST,
@@ -55,7 +55,6 @@ from .domain_front_rules import (
     PARTICIPANT_CAP,
     PERSONAL_THRESHOLD,
     POINT_CONTRIBUTION_PER_MINUTE,
-    RULE_VERSION,
     anonymous_label,
     claim_expiry,
     meets_domain_front_realm,
@@ -175,8 +174,6 @@ class DomainFrontRepositoryMixin:
                 "domain_power": int(player["domain_power"]),
                 "sect_id": str(sect["sect_id"]),
                 "sect_level": int(sect["level"]),
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO domain_front_participants(round_id,player_id,sect_id,domain_key,stamina_cost,contribution,status,snapshot_json,joined_at) VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?)",
@@ -294,9 +291,12 @@ class DomainFrontRepositoryMixin:
             if connection.execute("SELECT 1 FROM domain_front_claims WHERE round_id=? AND player_id=?", (round_id, player["id"])).fetchone() is not None:
                 raise DomainEventRewardAlreadyClaimedError("domain-front reward already claimed")
             reward = {"item.domain_core_fragment": 5, "world_merit": 100}
-            inventory = self._json_object(player["inventory_json"], {})
-            inventory["item.domain_core_fragment"] = int(inventory.get("item.domain_core_fragment", 0)) + 5
-            connection.execute("UPDATE players SET inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?", (json.dumps(inventory, sort_keys=True), reward["world_merit"], now_text, player["id"]))
+            assets = assets_grant(
+                player["spirit_stones"],
+                inventory_value(player["inventory_json"]),
+                {"item.domain_core_fragment": reward["item.domain_core_fragment"]},
+            )
+            connection.execute("UPDATE players SET spirit_stones=?, inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?", (assets.currency, inventory_json(assets.inventory), reward["world_merit"], now_text, player["id"]))
             connection.execute("INSERT INTO domain_front_claims(round_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (round_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
             content = self.content or bundled_content()
             event_definition = content.require("event", EVENT_KEY)
@@ -362,11 +362,16 @@ class DomainFrontRepositoryMixin:
             if connection.execute("SELECT 1 FROM domain_war_claims WHERE season_id=? AND player_id=?", (canonical_id, player["id"])).fetchone() is not None:
                 raise DomainSeasonRewardAlreadyClaimedError("domain-war reward already claimed")
             reward = {str(k): int(v) for k, v in self._json_object(standing["reward_json"], {}).items()}
-            inventory = self._json_object(player["inventory_json"], {})
-            for key, value in reward.items():
-                if key.startswith("item."):
-                    inventory[key] = int(inventory.get(key, 0)) + value
-            connection.execute("UPDATE players SET inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?", (json.dumps(inventory, sort_keys=True), reward.get("world_merit", 0), now_text, player["id"]))
+            assets = assets_grant(
+                player["spirit_stones"],
+                inventory_value(player["inventory_json"]),
+                {
+                    key: value
+                    for key, value in reward.items()
+                    if key == "spirit_stones" or key.startswith("item.")
+                },
+            )
+            connection.execute("UPDATE players SET spirit_stones=?, inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?", (assets.currency, inventory_json(assets.inventory), reward.get("world_merit", 0), now_text, player["id"]))
             connection.execute("INSERT INTO domain_war_claims(season_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (canonical_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
             payload = {"season_id": canonical_id, "rank": int(standing["rank"]), "reward": reward}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -392,14 +397,18 @@ class DomainFrontRepositoryMixin:
                 raise DomainCoreRedeemRequirementError("domain core redemption requires a closed season")
             if connection.execute("SELECT 1 FROM domain_core_redemptions WHERE season_id=? AND player_id=?", (canonical_id, player["id"])).fetchone() is not None:
                 raise DomainCoreRedeemAlreadyUsedError("domain core already redeemed")
-            inventory = self._json_object(player["inventory_json"], {})
-            if int(inventory.get("item.domain_core_fragment", 0)) < 20:
-                raise DomainCoreFragmentInsufficientError("domain core fragments are insufficient")
-            inventory["item.domain_core_fragment"] = int(inventory["item.domain_core_fragment"]) - 20
-            if inventory["item.domain_core_fragment"] <= 0:
-                inventory.pop("item.domain_core_fragment", None)
-            inventory["item.domain_core"] = int(inventory.get("item.domain_core", 0)) + 1
-            connection.execute("UPDATE players SET inventory_json=?, updated_at=? WHERE id=?", (json.dumps(inventory, sort_keys=True), now_text, player["id"]))
+            try:
+                inventory = assets_spend(
+                    player["spirit_stones"],
+                    inventory_value(player["inventory_json"]),
+                    {"item.domain_core_fragment": 20},
+                ).inventory
+            except ValueError as exc:
+                raise DomainCoreFragmentInsufficientError("domain core fragments are insufficient") from exc
+            inventory = assets_grant(
+                player["spirit_stones"], inventory, {"item.domain_core": 1}
+            ).inventory
+            connection.execute("UPDATE players SET inventory_json=?, updated_at=? WHERE id=?", (inventory_json(inventory), now_text, player["id"]))
             connection.execute("INSERT INTO domain_core_redemptions(season_id,player_id,operation_id,redeemed_at) VALUES (?, ?, ?, ?)", (canonical_id, player["id"], operation_id, now_text))
             payload = {"season_id": canonical_id, "item_key": "item.domain_core", "quantity": 1}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -411,8 +420,8 @@ class DomainFrontRepositoryMixin:
         rid, activity_id, activity_start, activity_end, starts_at, ends_at = round_window(now)
         now_text = serialize_datetime(now)
         connection.execute(
-            "INSERT OR IGNORE INTO domain_front_rounds(round_id,activity_id,location_key,status,activity_starts_at,activity_ends_at,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,rule_version,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
-            (rid, activity_id, LOCATION_KEY, serialize_datetime(activity_start), serialize_datetime(activity_end), serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(ends_at + timedelta(days=CLAIM_DAYS)), EVENT_TARGET, json.dumps({"content_version": CONTENT_VERSION, "success": False}, sort_keys=True), RULE_VERSION, now_text, now_text),
+            "INSERT OR IGNORE INTO domain_front_rounds(round_id,activity_id,location_key,status,activity_starts_at,activity_ends_at,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+            (rid, activity_id, LOCATION_KEY, serialize_datetime(activity_start), serialize_datetime(activity_end), serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(ends_at + timedelta(days=CLAIM_DAYS)), EVENT_TARGET, json.dumps({"success": False}, sort_keys=True), now_text, now_text),
         )
         return connection.execute("SELECT * FROM domain_front_rounds WHERE round_id=?", (rid,)).fetchone()
 
@@ -423,7 +432,7 @@ class DomainFrontRepositoryMixin:
             total = int(connection.execute("SELECT COALESCE(SUM(quantity),0) AS total FROM domain_front_contributions WHERE round_id=?", (event["round_id"],)).fetchone()["total"])
             winner = connection.execute("SELECT domain_key, SUM(quantity) AS score FROM domain_front_contributions WHERE round_id=? GROUP BY domain_key ORDER BY score DESC, domain_key ASC LIMIT 1", (event["round_id"],)).fetchone()
             result = self._json_object(event["result_json"], {})
-            result.update({"content_version": CONTENT_VERSION, "success": total >= int(event["target_quantity"]), "winner_domain": winner["domain_key"] if winner else None, "settled_at": serialize_datetime(now)})
+            result.update({"success": total >= int(event["target_quantity"]), "winner_domain": winner["domain_key"] if winner else None, "settled_at": serialize_datetime(now)})
             connection.execute("UPDATE domain_front_rounds SET status='settled', total_contribution=?, result_json=?, updated_at=? WHERE round_id=? AND status IN ('open','running')", (total, json.dumps(result, sort_keys=True), serialize_datetime(now), event["round_id"]))
             event = connection.execute("SELECT * FROM domain_front_rounds WHERE round_id=?", (event["round_id"],)).fetchone()
         return event
@@ -507,7 +516,7 @@ class DomainFrontRepositoryMixin:
 
     def _domain_get_or_create_season(self, connection: Any, season_id: str, starts_at: datetime, ends_at: datetime, now: datetime) -> Any:
         now_text = serialize_datetime(now)
-        connection.execute("INSERT OR IGNORE INTO domain_war_seasons(season_id,starts_at,ends_at,claim_expires_at,status,frozen_at,snapshot_json,rule_version,created_at,updated_at) VALUES (?, ?, ?, ?, 'collecting', NULL, '{}', ?, ?, ?)", (season_id, serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(claim_expiry(ends_at)), RULE_VERSION, now_text, now_text))
+        connection.execute("INSERT OR IGNORE INTO domain_war_seasons(season_id,starts_at,ends_at,claim_expires_at,status,frozen_at,snapshot_json,created_at,updated_at) VALUES (?, ?, ?, ?, 'collecting', NULL, '{}', ?, ?)", (season_id, serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(claim_expiry(ends_at)), now_text, now_text))
         return connection.execute("SELECT * FROM domain_war_seasons WHERE season_id=?", (season_id,)).fetchone()
 
     def _domain_freeze_season(self, connection: Any, season: Any, now: datetime) -> None:

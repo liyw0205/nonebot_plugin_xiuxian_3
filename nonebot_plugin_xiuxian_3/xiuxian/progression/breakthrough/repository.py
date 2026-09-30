@@ -531,7 +531,7 @@ class BreakthroughRepositoryMixin:
             material_costs = {str(key): int(value) for key, value in definition.materials.items()}
             if alternative_material:
                 material_costs[alternative_material] = material_costs.get(alternative_material, 0) + 2
-            inventory = inventory_spend(inventory, material_costs)
+            inventory = inventory_spend(inventory, material_costs, preserve_zero=is_void_refining)
             session_materials = dict(definition.materials)
             if alternative_material:
                 session_materials[alternative_material] = 2
@@ -588,7 +588,7 @@ class BreakthroughRepositoryMixin:
             connection.execute(
                 "UPDATE players SET inventory_json = ?, spirit_stones = ?, world_merit = world_merit - ?, heart_demon_bonus_bp = CASE WHEN ? = 1 THEN 0 ELSE heart_demon_bonus_bp END, updated_at = ? WHERE id = ?",
                 (
-                    inventory_json(inventory),
+                    inventory_json(inventory, keep_zero=is_void_refining),
                     currency_spend(row["spirit_stones"], definition.currency_cost),
                     100 if is_nascent else (500 if is_soul_transformation or is_void_refining else 0),
                     1 if is_nascent else 0,
@@ -942,7 +942,7 @@ class BreakthroughRepositoryMixin:
             is_soul_transformation = str(snapshot.get("target_realm", session["target_realm"])) == "soul_transformation"
             is_void_refining = str(snapshot.get("target_realm", session["target_realm"])) == "void_refining"
             protection_key = str(snapshot.get("protection_key") or definition.protection_key)
-            inventory = inventory_value(row["inventory_json"])
+            inventory = inventory_value(row["inventory_json"], keep_zero=is_void_refining)
             protection_consumed = bool(
                 (not success)
                 and not is_nascent
@@ -970,7 +970,7 @@ class BreakthroughRepositoryMixin:
                             currency_grant(row["spirit_stones"], definition.reward_currency),
                             stamina_after,
                             definition.reward_world_merit,
-                            inventory_json(inventory),
+                            inventory_json(inventory, keep_zero=is_void_refining),
                             0 if str(row["location_key"]).startswith("xuantian.") else 1000,
                             now_text,
                             row["id"],
@@ -984,7 +984,7 @@ class BreakthroughRepositoryMixin:
                             currency_grant(row["spirit_stones"], definition.reward_currency),
                             stamina_after,
                             definition.reward_world_merit,
-                            inventory_json(inventory),
+                            inventory_json(inventory, keep_zero=is_void_refining),
                             now.date().isoformat(),
                             now_text,
                             row["id"],
@@ -998,7 +998,7 @@ class BreakthroughRepositoryMixin:
                             currency_grant(row["spirit_stones"], definition.reward_currency),
                             stamina_after,
                             definition.reward_world_merit,
-                            inventory_json(inventory),
+                            inventory_json(inventory, keep_zero=is_void_refining),
                             now.date().isoformat(),
                             now_text,
                             row["id"],
@@ -1012,7 +1012,7 @@ class BreakthroughRepositoryMixin:
                             currency_grant(row["spirit_stones"], definition.reward_currency),
                             stamina_after,
                             definition.reward_world_merit,
-                            inventory_json(inventory),
+                            inventory_json(inventory, keep_zero=is_void_refining),
                             now_text,
                             row["id"],
                         ),
@@ -1082,7 +1082,7 @@ class BreakthroughRepositoryMixin:
                         (
                             cultivation_after,
                             pity_after,
-                            inventory_json(inventory),
+                            inventory_json(inventory, keep_zero=True),
                             weakness_until,
                             now_text,
                             row["id"],

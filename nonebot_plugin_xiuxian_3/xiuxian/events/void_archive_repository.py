@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_grant, inventory_json, inventory_value
 from ..persistence.errors import (
     OperationConflictError,
     VoidArchiveGuardAlreadySettledError,
@@ -28,8 +29,6 @@ from .void_archive_rules import (
     ARCHIVE_REWARD,
     ARCHIVE_ROUTE_KEY,
     ARCHIVE_WEEKLY_CAP,
-    CONTENT_VERSION,
-    RULE_VERSION,
     TASK_REWARDS,
     TASKS,
     TASK_VOID_MERIT,
@@ -217,12 +216,12 @@ class VoidArchiveRepositoryMixin:
                     reward = dict(ARCHIVE_REWARD)
                 else:
                     reward = dict(ARCHIVE_CONVERSION_REWARD)
-                inventory = self._json_object(player["inventory_json"], {})
-                for key, amount in reward.items():
-                    inventory[key] = int(inventory.get(key, 0)) + int(amount)
+                inventory = inventory_grant(
+                    inventory_value(player["inventory_json"]), reward
+                )
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    (inventory_json(inventory), now_text, player["id"]),
                 )
             run_id = uuid4().hex
             snapshot = {
@@ -230,8 +229,6 @@ class VoidArchiveRepositoryMixin:
                 "enemy_key": "enemy.archive_keeper",
                 "route_session_id": route["session_id"],
                 "week_id": week_id,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO void_archive_runs(run_id, player_id, week_id, route_session_id, battle_id, operation_id, outcome, reward_json, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -307,12 +304,12 @@ class VoidArchiveRepositoryMixin:
             if progress < target:
                 raise VoidArchiveTaskNotCompleteError("archive task evidence is incomplete")
             reward = dict(TASK_REWARDS[task_key])
-            inventory = self._json_object(player["inventory_json"], {})
-            for key, amount in reward.items():
-                inventory[key] = int(inventory.get(key, 0)) + int(amount)
+            inventory = inventory_grant(
+                inventory_value(player["inventory_json"]), reward
+            )
             connection.execute(
                 "UPDATE players SET inventory_json = ?, void_merit = void_merit + ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), TASK_VOID_MERIT, now_text, player["id"]),
+                (inventory_json(inventory), TASK_VOID_MERIT, now_text, player["id"]),
             )
             connection.execute(
                 "INSERT INTO void_archive_tasks(player_id, week_id, task_key, status, progress, target, reward_json, operation_id, claimed_at) VALUES (?, ?, ?, 'claimed', ?, ?, ?, ?, ?)",

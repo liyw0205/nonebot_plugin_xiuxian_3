@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import assets_spend, assets_with_delta, inventory_json, inventory_value
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
     VOID_INSTABILITY_SECONDS,
@@ -134,17 +135,26 @@ class WorldRepositoryMixin:
                 raise VoidTravelBusyError("void travel is busy")
             if self._has_active_long_action(connection, int(row["id"])):
                 raise VoidTravelBusyError("another long action is active")
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
+            available_anchor = int(inventory.get("item.void_anchor", 0))
             anchor_cost = navigation_anchor_cost(definition.anchor_cost, int(row["space_resistance_bp"]), unstable)
             beacon_discount = 0
             if route_key == "void.sect_fortress":
                 beacon_discount = int(self._active_void_beacon_discount(connection, int(row["id"]), now))
                 anchor_cost = max(1, anchor_cost - beacon_discount)
-            if int(inventory.get("item.void_anchor", 0)) < anchor_cost:
+            if available_anchor < anchor_cost:
                 raise VoidAnchorInsufficientError("void anchors are insufficient")
             if int(row["stamina"]) < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
-            inventory["item.void_anchor"] = int(inventory.get("item.void_anchor", 0)) - anchor_cost
+            try:
+                inventory = assets_spend(
+                    row["spirit_stones"],
+                    inventory,
+                    {"item.void_anchor": anchor_cost},
+                    preserve_zero=True,
+                ).inventory
+            except ValueError as exc:
+                raise VoidAnchorInsufficientError("void anchors are insufficient") from exc
             storm_roll = void_route_roll_bp(operation_id)
             session_id = uuid4().hex
             ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
@@ -161,7 +171,7 @@ class WorldRepositoryMixin:
             connection.execute(
                 "UPDATE players SET inventory_json = ?, stamina = stamina - ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
                 (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory, keep_zero=True),
                     definition.stamina_cost,
                     instability_until,
                     now_text,
@@ -251,14 +261,19 @@ class WorldRepositoryMixin:
                 raise VoidRouteNotReadyError("void route is not ready")
             snapshot = self._json_object(session["snapshot_json"], {})
             storm = int(snapshot.get("storm_roll_bp", 0)) < VOID_ROUTE_STORM_CHANCE_BP
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             extra_anchor_lost = 0
             if storm:
                 extra_anchor_lost = min(1, int(inventory.get("item.void_anchor", 0)))
-                inventory["item.void_anchor"] = int(inventory.get("item.void_anchor", 0)) - extra_anchor_lost
             reward = {"item.void_crystal": 1}
-            for key, amount in reward.items():
-                inventory[key] = int(inventory.get(key, 0)) + amount
+            inventory = assets_with_delta(
+                row["spirit_stones"],
+                inventory,
+                {
+                    "item.void_anchor": -extra_anchor_lost,
+                    **reward,
+                },
+            ).inventory
             instability_until = (
                 serialize_datetime(now + timedelta(seconds=VOID_INSTABILITY_SECONDS))
                 if storm
@@ -276,7 +291,7 @@ class WorldRepositoryMixin:
                 "UPDATE players SET location_key = ?, inventory_json = ?, void_route_count = void_route_count + ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
                 (
                     arrival_location,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     0 if discovered_route is not None else 1,
                     instability_until,
                     now_text,

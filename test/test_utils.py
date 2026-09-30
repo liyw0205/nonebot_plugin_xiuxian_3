@@ -8,6 +8,9 @@ import pytest
 from nonebot_plugin_xiuxian_3.xiuxian.utils.database import connect_sqlite
 from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     AssetDeltaError,
+    assets_grant,
+    assets_spend,
+    assets_with_delta,
     currency_grant,
     currency_spend,
     currency_with_delta,
@@ -24,7 +27,16 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
     clear_json_cache,
     read_json_cached,
 )
-from nonebot_plugin_xiuxian_3.xiuxian.utils.player import player_values
+from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
+    player_field,
+    player_integer,
+    player_object,
+    player_inventory,
+    player_qualification,
+    player_intro_flags,
+    player_reputation,
+    player_values,
+)
 
 
 def test_json_cache_returns_copies_and_invalidates_changed_files(tmp_path) -> None:
@@ -96,7 +108,12 @@ def test_asset_helpers_share_inventory_and_currency_accounting() -> None:
     }
     assert inventory == {"item.herb": 2, "item.sand": 1}
     assert inventory_value('{"item.herb": "2", "item.empty": 0}') == {"item.herb": 2}
+    assert inventory_value('{"item.herb": "2", "item.empty": 0}', keep_zero=True) == {
+        "item.herb": 2,
+        "item.empty": 0,
+    }
     assert inventory_json({"item.sand": 0, "item.herb": 2}) == '{"item.herb": 2}'
+    assert inventory_json({"item.sand": 0, "item.herb": 2}, keep_zero=True) == '{"item.herb": 2, "item.sand": 0}'
     assert currency_grant(100, 40) == 140
     assert currency_spend(100, 40) == 60
     assert currency_with_delta(100, -40) == 60
@@ -105,6 +122,25 @@ def test_asset_helpers_share_inventory_and_currency_accounting() -> None:
         inventory_spend(inventory, {"item.herb": 3})
     with pytest.raises(AssetDeltaError):
         currency_with_delta(0, -1)
+
+
+def test_asset_state_applies_currency_and_items_together() -> None:
+    inventory = {"item.herb": 2}
+
+    granted = assets_grant(100, inventory, {"spirit_stones": 40, "item.herb": 3})
+    assert granted.currency == 140
+    assert granted.inventory == {"item.herb": 5}
+
+    spent = assets_spend(granted.currency, granted.inventory, {"spirit_stones": 20, "item.herb": 2})
+    assert spent.currency == 120
+    assert spent.inventory == {"item.herb": 3}
+    assert assets_with_delta(120, spent.inventory, {"spirit_stones": -20, "item.herb": -1}).inventory == {"item.herb": 2}
+    assert inventory == {"item.herb": 2}
+
+    with pytest.raises(AssetDeltaError):
+        assets_spend(0, {}, {"spirit_stones": 1})
+    with pytest.raises(AssetDeltaError):
+        assets_grant(0, {}, {"spirit_stones": -1})
 
 
 def test_player_values_normalizes_full_and_partial_rows() -> None:
@@ -133,3 +169,22 @@ def test_player_values_normalizes_full_and_partial_rows() -> None:
     partial = player_values({"player_id": "p2", "qualification_json": "{}"})
     assert partial["realm_key"] == "mortal"
     assert partial["spirit_stones"] == 0
+    assert player_field(row, "realm_key") == "foundation"
+    assert player_field(row, "missing", "fallback") == "fallback"
+    assert player_integer(row, "realm_layer") == 3
+    with pytest.raises(ValueError):
+        player_integer({"realm_layer": True}, "realm_layer")
+
+
+def test_player_state_helpers_share_json_and_inventory_normalization() -> None:
+    row = {
+        "qualification_json": '{"body": "12", "mind": 8}',
+        "inventory_json": '{"item.herb": "2", "item.empty": 0}',
+        "intro_json": '{"flags": ["story.one", 2]}',
+        "faction_reputation_json": '{"demon": "20", "beast": 5}',
+    }
+    assert player_object(row, "intro_json") == {"flags": ["story.one", 2]}
+    assert player_inventory(row) == {"item.herb": 2}
+    assert player_qualification(row) == {"body": 12, "mind": 8}
+    assert player_intro_flags(row) == ("story.one", "2")
+    assert player_reputation(row) == {"demon": 20, "beast": 5}

@@ -21,7 +21,6 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
             target_quantity INTEGER NOT NULL CHECK (target_quantity >= 0),
             total_contribution INTEGER NOT NULL DEFAULT 0 CHECK (total_contribution >= 0),
             result_json TEXT NOT NULL DEFAULT '{}',
-            rule_version TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -94,7 +93,6 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
             status TEXT NOT NULL CHECK (status IN ('collecting', 'frozen')),
             frozen_at TEXT,
             snapshot_json TEXT NOT NULL DEFAULT '{}',
-            rule_version TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );

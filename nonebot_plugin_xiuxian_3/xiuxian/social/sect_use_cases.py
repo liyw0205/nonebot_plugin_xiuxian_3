@@ -334,8 +334,6 @@ class SectApplication:
                 "member_contribution": record.member_contribution,
                 "warehouse_quantity": record.warehouse_quantity,
                 "inventory_quantity": record.inventory_quantity,
-                "content_version": record.content_version,
-                "rule_version": record.rule_version,
                 "idempotent_replay": record.already_completed,
             },
         )

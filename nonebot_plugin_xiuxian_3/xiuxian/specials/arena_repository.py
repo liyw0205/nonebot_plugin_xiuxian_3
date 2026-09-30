@@ -40,10 +40,8 @@ from .arena_rules import (
     ARENA_MODE_KEY,
     ARENA_PRACTICE_MODE_KEY,
     ARENA_RANK_MODE_KEY,
-    CONTENT_VERSION,
     DAILY_CHALLENGE_LIMIT,
     DAILY_COUNTED_OPPONENT_LIMIT,
-    RULE_VERSION,
     SNAPSHOT_MATCH_DELAY_SECONDS,
     SNAPSHOT_VALID_DAYS,
     compatible_rating,
@@ -56,8 +54,6 @@ from .arena_rules import (
     THREE_REALMS_ARENA_MODE_KEY,
 )
 from .three_realms_arena_rules import (
-    THREE_REALMS_ARENA_CONTENT_VERSION,
-    THREE_REALMS_ARENA_RULE_VERSION,
     has_three_realms_permit,
     meets_three_realms_gate,
     player_faction,
@@ -248,8 +244,6 @@ class ArenaRepositoryMixin:
             "platform": platform,
             "platform_user_id": platform_user_id,
             "arena_mode_key": mode_key,
-            "content_version": THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
-            "rule_version": THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
@@ -285,8 +279,8 @@ class ArenaRepositoryMixin:
             connection.execute(
                 "INSERT INTO arena_snapshots("
                 "snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, "
-                "snapshot_json, public_json, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, 'published', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "snapshot_json, public_json, created_at, updated_at) "
+                "VALUES (?, ?, 'published', ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     snapshot_id,
                     player["id"],
@@ -296,8 +290,6 @@ class ArenaRepositoryMixin:
                     serialize_datetime(expires_at),
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(summary, ensure_ascii=False, sort_keys=True),
-                    THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
-                    THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
                     now_text,
                     now_text,
                 ),
@@ -399,8 +391,6 @@ class ArenaRepositoryMixin:
             "platform_user_id": platform_user_id,
             "snapshot_id": requested_snapshot_id,
             "arena_mode_key": mode_key,
-            "content_version": THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
-            "rule_version": THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
@@ -498,8 +488,6 @@ class ArenaRepositoryMixin:
                 "challenger": challenger_snapshot,
                 "defender": defender_snapshot_data,
                 "arena_mode_key": mode_key,
-                "content_version": THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
-                "rule_version": THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
                 "tactical_environment": environment,
             }
             result = {
@@ -514,13 +502,11 @@ class ArenaRepositoryMixin:
                 "opponent_summary": self._json_map(defender_snapshot["public_json"]),
                 "request_id": request_id,
                 "operation_id": operation_id,
-                "content_version": THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
-                "rule_version": THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
                 "tactical_environment": environment,
             }
             connection.execute(
-                "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, snapshot_json, public_json, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, 'expired', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, snapshot_json, public_json, created_at, updated_at) "
+                "VALUES (?, ?, 'expired', ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     challenger_snapshot_id,
                     challenger_id,
@@ -530,8 +516,6 @@ class ArenaRepositoryMixin:
                     now_text,
                     json.dumps(challenger_snapshot, ensure_ascii=False, sort_keys=True),
                     json.dumps(public_summary(challenger_snapshot, snapshot_id=challenger_snapshot_id, rating=int(challenger["arena_rating"]), created_at=now_text), ensure_ascii=False, sort_keys=True),
-                    THREE_REALMS_ARENA_CONTENT_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else CONTENT_VERSION,
-                    THREE_REALMS_ARENA_RULE_VERSION if mode_key == THREE_REALMS_ARENA_MODE_KEY else RULE_VERSION,
                     now_text,
                     now_text,
                 ),

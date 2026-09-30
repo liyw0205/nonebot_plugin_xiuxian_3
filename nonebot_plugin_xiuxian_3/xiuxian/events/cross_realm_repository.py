@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.assets import assets_grant, assets_spend, inventory_json, inventory_value
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -20,9 +21,7 @@ from .cross_realm_models import CrossRealmEventRecord
 from .cross_realm_rules import (
     BEAST_TRADE_EVENT_KEY,
     BOUNDARY_RIFT_EVENT_KEY,
-    CONTENT_VERSION,
     EVENT_DEFINITIONS,
-    RULE_VERSION,
     beast_trade_window,
     boundary_rift_window,
 )
@@ -155,16 +154,18 @@ class CrossRealmEventRepositoryMixin:
             ).fetchone() is not None:
                 raise EventSourceNotEligibleError("source operation already contributed")
             if source.get("consume_item"):
-                inventory = self._json_object(player["inventory_json"], {})
                 item_key = str(source["consume_item"])
-                if int(inventory.get(item_key, 0)) < 1:
-                    raise EventSourceNotEligibleError("required event item is missing")
-                inventory[item_key] = int(inventory[item_key]) - 1
-                if inventory[item_key] <= 0:
-                    inventory.pop(item_key, None)
+                try:
+                    inventory = assets_spend(
+                        player["spirit_stones"],
+                        inventory_value(player["inventory_json"]),
+                        {item_key: 1},
+                    ).inventory
+                except ValueError as exc:
+                    raise EventSourceNotEligibleError("required event item is missing") from exc
                 connection.execute(
                     "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    (inventory_json(inventory), now_text, player["id"]),
                 )
             quantity = int(source["quantity"])
             connection.execute(
@@ -197,7 +198,7 @@ class CrossRealmEventRepositoryMixin:
                 ).fetchone()["total"]
             )
             result = self._json_object(event["result_json"], {})
-            result.update({"content_version": CONTENT_VERSION, "success": total >= int(event["target_quantity"])})
+            result.update({"success": total >= int(event["target_quantity"])})
             connection.execute(
                 "UPDATE world_event_rounds SET status='running', total_contribution=?, result_json=?, updated_at=? WHERE round_id=? AND status IN ('open','running')",
                 (total, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, event["round_id"]),
@@ -245,18 +246,25 @@ class CrossRealmEventRepositoryMixin:
             ).fetchone() is not None:
                 raise EventRewardAlreadyClaimedError("cross-realm event reward already claimed")
             reward = {str(key): int(value) for key, value in dict(definition["reward"]).items()}
-            inventory = self._json_object(player["inventory_json"], {})
+            assets = assets_grant(
+                player["spirit_stones"],
+                inventory_value(player["inventory_json"]),
+                {
+                    key: value
+                    for key, value in reward.items()
+                    if key == "spirit_stones" or key.startswith("item.")
+                },
+            )
             faction = self._json_object(player["faction_reputation_json"], {})
             for key, value in reward.items():
-                if key.startswith("item."):
-                    inventory[key] = int(inventory.get(key, 0)) + value
-                elif key.startswith("faction_reputation."):
+                if key.startswith("faction_reputation."):
                     faction_key = key.removeprefix("faction_reputation.")
                     faction[faction_key] = int(faction.get(faction_key, 0)) + value
             connection.execute(
-                "UPDATE players SET inventory_json=?, faction_reputation_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?",
+                "UPDATE players SET spirit_stones=?, inventory_json=?, faction_reputation_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?",
                 (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    assets.currency,
+                    inventory_json(assets.inventory),
                     json.dumps(faction, ensure_ascii=False, sort_keys=True),
                     int(reward.get("world_merit", 0)),
                     now_text,
@@ -329,7 +337,7 @@ class CrossRealmEventRepositoryMixin:
         definition = EVENT_DEFINITIONS[event_key]
         now_text = serialize_datetime(now)
         connection.execute(
-            "INSERT OR IGNORE INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,rule_version,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, ?, ?, ?)",
             (
                 current_id,
                 event_key,
@@ -338,8 +346,7 @@ class CrossRealmEventRepositoryMixin:
                 serialize_datetime(ends_at),
                 serialize_datetime(claim_expires_at),
                 int(definition["target"]),
-                json.dumps({"content_version": CONTENT_VERSION, "success": False}, ensure_ascii=False, sort_keys=True),
-                RULE_VERSION,
+                json.dumps({"success": False}, ensure_ascii=False, sort_keys=True),
                 now_text,
                 now_text,
             ),
@@ -355,7 +362,7 @@ class CrossRealmEventRepositoryMixin:
                 ).fetchone()["total"]
             )
             result = self._json_object(event["result_json"], {})
-            result.update({"content_version": CONTENT_VERSION, "success": total >= int(event["target_quantity"]), "settled_at": serialize_datetime(now)})
+            result.update({"success": total >= int(event["target_quantity"]), "settled_at": serialize_datetime(now)})
             connection.execute(
                 "UPDATE world_event_rounds SET status='settled', total_contribution=?, result_json=?, updated_at=? WHERE round_id=? AND status IN ('open','running')",
                 (total, json.dumps(result, ensure_ascii=False, sort_keys=True), serialize_datetime(now), event["round_id"]),

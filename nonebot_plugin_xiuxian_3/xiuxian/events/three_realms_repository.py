@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.assets import assets_grant, inventory_json, inventory_value
 from ..persistence.errors import (
     OperationConflictError,
     ThreeRealmsRankingNotFinalizedError,
@@ -17,9 +18,7 @@ from ..persistence.errors import (
 from .three_realms_models import ThreeRealmsClaimRecord, ThreeRealmsSeasonRecord, ThreeRealmsStanding
 from .three_realms_rules import (
     BOARDS,
-    CONTENT_VERSION,
     RANKED_PLACES,
-    RULE_VERSION,
     claim_expiry,
     reward_for_rank,
     season_window,
@@ -91,13 +90,18 @@ class ThreeRealmsSeasonRepositoryMixin:
                 boards.append(str(row["board_key"]))
                 for key, value in reward_for_rank(int(row["rank"])).items():
                     reward[key] = reward.get(key, 0) + value
-            inventory = self._json_object(player["inventory_json"], {})
-            for key, value in reward.items():
-                if key.startswith("item."):
-                    inventory[key] = int(inventory.get(key, 0)) + value
+            assets = assets_grant(
+                player["spirit_stones"],
+                inventory_value(player["inventory_json"]),
+                {
+                    key: value
+                    for key, value in reward.items()
+                    if key == "spirit_stones" or key.startswith("item.")
+                },
+            )
             connection.execute(
-                "UPDATE players SET inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), reward.get("world_merit", 0), now_text, player["id"]),
+                "UPDATE players SET spirit_stones=?, inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?",
+                (assets.currency, inventory_json(assets.inventory), reward.get("world_merit", 0), now_text, player["id"]),
             )
             binding_until = "9999-12-31T23:59:59+00:00"
             for item_key, value in reward.items():
@@ -119,8 +123,8 @@ class ThreeRealmsSeasonRepositoryMixin:
     @staticmethod
     def _three_realms_ensure(connection: Any, season_id: str, starts_at: datetime, ends_at: datetime, claim_until: datetime, now_text: str) -> None:
         connection.execute(
-            "INSERT OR IGNORE INTO three_realms_seasons(season_id, starts_at, ends_at, claim_expires_at, status, snapshot_json, rule_version, created_at, updated_at) VALUES (?, ?, ?, ?, 'collecting', '{}', ?, ?, ?)",
-            (season_id, serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(claim_until), RULE_VERSION, now_text, now_text),
+            "INSERT OR IGNORE INTO three_realms_seasons(season_id, starts_at, ends_at, claim_expires_at, status, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'collecting', '{}', ?, ?)",
+            (season_id, serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(claim_until), now_text, now_text),
         )
 
     def _three_realms_materialize(self, connection: Any, now: datetime, now_text: str) -> None:

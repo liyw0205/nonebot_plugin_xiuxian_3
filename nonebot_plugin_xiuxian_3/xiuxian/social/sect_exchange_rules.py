@@ -6,9 +6,6 @@ from dataclasses import dataclass
 
 
 SECT_EXCHANGE_DAILY_CAP = 5
-SECT_EXCHANGE_CONTENT_VERSION = ""
-SECT_EXCHANGE_RULE_VERSION = ""
-SECT_SUPPLY_RULE_VERSION = ""
 SECT_DONATION_ITEMS = frozenset({
     "item.herb.spirit_leaf", "item.herb.blood_grass",
     "item.mat.array_sand", "item.material.cloud_iron",
@@ -90,11 +87,8 @@ def resolve_sect_exchange_offer(value: str) -> SectExchangeOffer | None:
 
 __all__ = [
     "SECT_EXCHANGE_ALIASES",
-    "SECT_EXCHANGE_CONTENT_VERSION",
     "SECT_EXCHANGE_DAILY_CAP",
     "SECT_EXCHANGE_OFFERS",
-    "SECT_EXCHANGE_RULE_VERSION",
-    "SECT_SUPPLY_RULE_VERSION",
     "SECT_DONATION_ITEMS",
     "SECT_DONATION_ALIASES",
     "SECT_SUPPLY_RECIPES",

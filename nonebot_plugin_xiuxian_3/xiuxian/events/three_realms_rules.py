@@ -8,8 +8,6 @@ from datetime import datetime, timedelta, timezone
 
 
 SEASON_KEY = "season.three_realms"
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 SEASON_DAYS = 28
 CLAIM_DAYS = 7
 SEASON_ANCHOR = datetime(2025, 1, 1, tzinfo=timezone.utc)
@@ -64,9 +62,7 @@ def reward_for_rank(rank: int) -> dict[str, int]:
 __all__ = [
     "BOARDS",
     "CLAIM_DAYS",
-    "CONTENT_VERSION",
     "RANKED_PLACES",
-    "RULE_VERSION",
     "SEASON_DAYS",
     "SEASON_KEY",
     "claim_expiry",

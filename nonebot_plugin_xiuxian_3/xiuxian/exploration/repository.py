@@ -180,7 +180,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import currency_grant, currency_spend, inventory_grant, inventory_json, inventory_value
+from ..utils.assets import assets_grant, assets_spend, assets_with_delta, inventory_json, inventory_value
 
 
 class ExplorationRepositoryMixin:
@@ -621,17 +621,23 @@ class ExplorationRepositoryMixin:
             soul_fatigue_until = row["soul_fatigue_until"]
             snapshot = self._json_object(session["snapshot_json"], {})
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
+            balances = assets_grant(
+                stones,
+                inventory,
+                {
+                    key: quantity
+                    for key, quantity in result.items()
+                    if key != "cultivation" and not key.startswith("faction_reputation.")
+                },
+            )
+            stones, inventory = balances.currency, balances.inventory
+            cultivation_gain = int(result.get("cultivation", 0))
+            cultivation += cultivation_gain
+            total_cultivation += cultivation_gain
             for key, quantity in result.items():
-                if key == "spirit_stones":
-                    stones = currency_grant(stones, quantity)
-                elif key == "cultivation":
-                    cultivation += quantity
-                    total_cultivation += quantity
-                elif key.startswith("faction_reputation."):
+                if key.startswith("faction_reputation."):
                     faction_key = key.removeprefix("faction_reputation.")
                     faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + quantity
-                else:
-                    inventory = inventory_grant(inventory, {key: quantity})
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, int(row["soul_power"]))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
@@ -920,17 +926,23 @@ class ExplorationRepositoryMixin:
             total_cultivation = int(row["total_cultivation"])
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             if status == "settled":
+                balances = assets_grant(
+                    stones,
+                    inventory,
+                    {
+                        key: quantity
+                        for key, quantity in result.items()
+                        if key != "cultivation" and not key.startswith("faction_reputation.")
+                    },
+                )
+                stones, inventory = balances.currency, balances.inventory
+                cultivation_gain = int(result.get("cultivation", 0))
+                cultivation += cultivation_gain
+                total_cultivation += cultivation_gain
                 for key, quantity in result.items():
-                    if key == "spirit_stones":
-                        stones = currency_grant(stones, quantity)
-                    elif key == "cultivation":
-                        cultivation += int(quantity)
-                        total_cultivation += int(quantity)
-                    elif key.startswith("faction_reputation."):
+                    if key.startswith("faction_reputation."):
                         faction_key = key.removeprefix("faction_reputation.")
                         faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + int(quantity)
-                    else:
-                        inventory = inventory_grant(inventory, {key: quantity})
                 connection.execute(
                     """
                     UPDATE players
@@ -1176,18 +1188,25 @@ class ExplorationRepositoryMixin:
             elif effective_choice == "pay":
                 if stones < CLOUD_BOAT_STORM_PAY_COST:
                     raise CurrencyInsufficientError("cloud boat storm payment requires spirit stones")
-                stones = currency_spend(stones, CLOUD_BOAT_STORM_PAY_COST)
                 result = dict(frozen_result)
                 result["cultivation"] = int(result.get("cultivation", 0)) + 200
                 status = "settled"
-                for key, quantity in result.items():
-                    if key == "cultivation":
-                        cultivation += int(quantity)
-                        total_cultivation += int(quantity)
-                    elif key == "spirit_stones":
-                        stones = currency_grant(stones, quantity)
-                    else:
-                        inventory = inventory_grant(inventory, {key: quantity})
+                balances = assets_with_delta(
+                    stones,
+                    inventory,
+                    {
+                        "spirit_stones": -CLOUD_BOAT_STORM_PAY_COST,
+                        **{
+                            key: quantity
+                            for key, quantity in result.items()
+                            if key != "cultivation"
+                        },
+                    },
+                )
+                stones, inventory = balances.currency, balances.inventory
+                cultivation_gain = int(result.get("cultivation", 0))
+                cultivation += cultivation_gain
+                total_cultivation += cultivation_gain
                 result_json = {
                     **stored,
                     "status": status,

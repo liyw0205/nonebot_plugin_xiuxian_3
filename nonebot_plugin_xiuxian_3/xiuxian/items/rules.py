@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.2 production item effects."""
+"""Rules for consumable production item effects."""
 
 from __future__ import annotations
 
@@ -8,10 +8,6 @@ from dataclasses import dataclass
 from ..content import ContentBundle, ContentError, bundled_content
 
 
-# Kept as a compatibility export for old snapshots; new operations read the
-# active content manifest rather than a documentation release number.
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 _SUPPORTED_EFFECTS = frozenset(
     {"next_cultivation_state_bonus_bp", "exploration_risk_reduction_bp"}
 )
@@ -94,11 +90,9 @@ def resolve_item(value: str) -> ItemDefinition:
 
 
 __all__ = [
-    "CONTENT_VERSION",
     "ITEM_ALIASES",
     "ITEM_DEFINITIONS",
     "ITEM_LABELS",
-    "RULE_VERSION",
     "ItemDefinition",
     "resolve_item",
 ]

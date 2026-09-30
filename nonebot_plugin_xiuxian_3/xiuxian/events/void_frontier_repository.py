@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Any, Mapping
 
 from ...contracts import serialize_datetime
+from ..utils.assets import assets_grant, inventory_json, inventory_value
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -32,9 +33,7 @@ from .void_frontier_models import (
 )
 from .void_frontier_rules import (
     CLAIM_DAYS,
-    CONTENT_VERSION,
     RANKED_PLACES,
-    RULE_VERSION,
     SCORE_VALUES,
     SEASON_KEY,
     WEEKLY_CAP,
@@ -210,11 +209,18 @@ class VoidFrontierRepositoryMixin:
                 raise VoidFrontierRewardAlreadyClaimedError("void-frontier reward already claimed")
             rank = int(ranking["rank"])
             reward = reward_for_rank(rank)
-            inventory = json_object(player["inventory_json"], {})
-            inventory["item.void_crystal"] = int(inventory.get("item.void_crystal", 0)) + int(reward.get("item.void_crystal", 0))
+            assets = assets_grant(
+                player["spirit_stones"],
+                inventory_value(player["inventory_json"]),
+                {
+                    key: value
+                    for key, value in reward.items()
+                    if key == "spirit_stones" or key.startswith("item.")
+                },
+            )
             connection.execute(
-                "UPDATE players SET inventory_json=?, void_merit=void_merit+?, updated_at=? WHERE id=?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), int(reward.get("void_merit", 0)), now_text, player["id"]),
+                "UPDATE players SET spirit_stones=?, inventory_json=?, void_merit=void_merit+?, updated_at=? WHERE id=?",
+                (assets.currency, inventory_json(assets.inventory), int(reward.get("void_merit", 0)), now_text, player["id"]),
             )
             connection.execute(
                 "INSERT INTO void_frontier_claims(season_id,player_id,operation_id,reward_json,rank,claimed_at) VALUES (?,?,?,?,?,?)",
@@ -233,8 +239,8 @@ class VoidFrontierRepositoryMixin:
         if row is None:
             now_text = serialize_datetime(now)
             connection.execute(
-                "INSERT INTO void_frontier_seasons(season_id,starts_at,ends_at,claim_expires_at,status,frozen_at,snapshot_json,content_version,rule_version,created_at,updated_at) VALUES (?,?,?,?, 'collecting',NULL,'{}',?,?,?,?)",
-                (season_id, serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(claim_expiry(ends_at)), CONTENT_VERSION, RULE_VERSION, now_text, now_text),
+                "INSERT INTO void_frontier_seasons(season_id,starts_at,ends_at,claim_expires_at,status,frozen_at,snapshot_json,created_at,updated_at) VALUES (?,?,?,?, 'collecting',NULL,'{}',?,?)",
+                (season_id, serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(claim_expiry(ends_at)), now_text, now_text),
             )
             row = connection.execute("SELECT * FROM void_frontier_seasons WHERE season_id=?", (season_id,)).fetchone()
         return row
@@ -366,7 +372,7 @@ class VoidFrontierRepositoryMixin:
                 )
         connection.execute(
             "UPDATE void_frontier_seasons SET status='frozen',frozen_at=?,snapshot_json=?,updated_at=? WHERE season_id=? AND status='collecting'",
-            (now_text, json.dumps({"score_events": len(player_rows), "rule_version": RULE_VERSION}, sort_keys=True), now_text, season_id),
+            (now_text, json.dumps({"score_events": len(player_rows)}, sort_keys=True), now_text, season_id),
         )
 
     def _vf_convert_expired(self, connection: Any, now: datetime) -> None:

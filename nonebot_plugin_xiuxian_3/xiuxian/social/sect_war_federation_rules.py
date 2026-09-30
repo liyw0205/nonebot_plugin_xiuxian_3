@@ -6,8 +6,6 @@ from hashlib import sha256
 
 
 CROSS_SERVER_SECT_WAR_KEY = "sect_war.cross_server"
-CROSS_SERVER_SECT_WAR_CONTENT_VERSION = ""
-CROSS_SERVER_SECT_WAR_RULE_VERSION = ""
 CROSS_SERVER_ROSTER_CAP = 15
 
 
@@ -20,8 +18,6 @@ def federation_snapshot_id(round_id: str, shard_key: str, sect_id: str) -> str:
 
 __all__ = [
     "CROSS_SERVER_ROSTER_CAP",
-    "CROSS_SERVER_SECT_WAR_CONTENT_VERSION",
     "CROSS_SERVER_SECT_WAR_KEY",
-    "CROSS_SERVER_SECT_WAR_RULE_VERSION",
     "federation_snapshot_id",
 ]

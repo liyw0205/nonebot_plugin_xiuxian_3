@@ -19,8 +19,6 @@ def ensure_void_frontier_schema(connection: sqlite3.Connection) -> None:
             status TEXT NOT NULL CHECK (status IN ('collecting', 'frozen')),
             frozen_at TEXT,
             snapshot_json TEXT NOT NULL DEFAULT '{}',
-            content_version TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );

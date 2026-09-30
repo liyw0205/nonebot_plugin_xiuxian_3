@@ -81,8 +81,8 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_DAMAGE_BP,
     TIME_FORT_STORM_INTERVAL,
 )
-from ..utils.player import player_values
-from ..utils.assets import currency_grant, inventory_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.player import player_intro_flags, player_object, player_reputation, player_values
+from ..utils.assets import assets_grant, inventory_json, inventory_spend, inventory_value
 
 
 class PartyCombatRepositoryMixin:
@@ -1321,7 +1321,15 @@ class PartyCombatRepositoryMixin:
                     inventory = inventory_value(player["inventory_json"])
                     cultivation = int(player["cultivation"]) + int(reward.get("cultivation", 0))
                     total_cultivation = int(player["total_cultivation"]) + int(reward.get("cultivation", 0))
-                    spirit_stones = currency_grant(player["spirit_stones"], reward.get("spirit_stones", 0))
+                    asset_reward = {
+                        key: value
+                        for key, value in reward.items()
+                        if key not in {"cultivation", "world_merit", "soul_power"}
+                        and not key.startswith("faction_reputation.")
+                    }
+                    balances = assets_grant(player["spirit_stones"], inventory, asset_reward)
+                    spirit_stones = balances.currency
+                    inventory = balances.inventory
                     world_merit = int(player["world_merit"]) + int(reward.get("world_merit", 0))
                     soul_power_max = max(
                         int(player["soul_power_max"]),
@@ -1334,9 +1342,7 @@ class PartyCombatRepositoryMixin:
                     )
                     faction = self._json_object(player["faction_reputation_json"], {})
                     for item_key, quantity in reward.items():
-                        if item_key.startswith("item."):
-                            inventory = inventory_grant(inventory, {item_key: int(quantity)})
-                        elif item_key.startswith("faction_reputation."):
+                        if item_key.startswith("faction_reputation."):
                             faction_key = item_key.removeprefix("faction_reputation.")
                             faction[faction_key] = int(faction.get(faction_key, 0)) + int(quantity)
                     connection.execute(
@@ -1390,16 +1396,8 @@ class PartyCombatRepositoryMixin:
 
     @staticmethod
     def _alliance_key_from_row(row: Any) -> str | None:
-        try:
-            qualification = json.loads(str(row["qualification_json"] or "{}"))
-        except (TypeError, json.JSONDecodeError):
-            qualification = {}
-        try:
-            intro = json.loads(str(row["intro_json"] or "{}"))
-        except (TypeError, json.JSONDecodeError):
-            intro = {}
-        qualification = qualification if isinstance(qualification, dict) else {}
-        intro = intro if isinstance(intro, dict) else {}
+        qualification = player_object(row, "qualification_json")
+        intro = player_object(row, "intro_json")
         for source in (qualification, intro):
             for key in ("cross_realm_alliance", "alliance_key", "alliance", "盟约"):
                 value = source.get(key)
@@ -1411,12 +1409,7 @@ class PartyCombatRepositoryMixin:
     def _boundary_mainline_ready(connection: sqlite3.Connection, row: Any) -> bool:
         """Accept either the explicit quest row or its projected access flag."""
 
-        try:
-            intro = json.loads(str(row["intro_json"] or "{}"))
-        except (TypeError, json.JSONDecodeError):
-            intro = {}
-        intro = intro if isinstance(intro, dict) else {}
-        if "story.mainline.three_realms" in {str(item) for item in intro.get("flags", [])}:
+        if "story.mainline.three_realms" in set(player_intro_flags(row)):
             return True
         progress = connection.execute(
             "SELECT status FROM quest_progress WHERE player_id = ? AND quest_key = ?",
@@ -1426,22 +1419,11 @@ class PartyCombatRepositoryMixin:
 
     @staticmethod
     def _intro_flag(row: Any, flag: str) -> bool:
-        try:
-            intro = json.loads(str(row["intro_json"] or "{}"))
-        except (TypeError, json.JSONDecodeError):
-            intro = {}
-        if not isinstance(intro, dict):
-            return False
-        flags = intro.get("flags", [])
-        return flag in flags if isinstance(flags, list) else False
+        return flag in set(player_intro_flags(row))
 
     @staticmethod
     def _faction_reputation(row: Any, faction: str) -> int:
-        try:
-            reputation = json.loads(str(row["faction_reputation_json"] or "{}"))
-        except (TypeError, json.JSONDecodeError):
-            reputation = {}
-        return int(reputation.get(faction, 0)) if isinstance(reputation, dict) else 0
+        return player_reputation(row).get(faction, 0)
 
     @staticmethod
     def _party_battle_record_operation(connection: sqlite3.Connection, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:

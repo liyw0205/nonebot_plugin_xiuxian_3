@@ -20,6 +20,8 @@ from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
 )
+from ..utils.assets import inventory_grant, inventory_json, inventory_value
+from ..utils.player import player_intro_flags, player_object, player_reputation
 from .demon_abyss_models import DemonAbyssRunRecord
 from .demon_abyss_rules import (
     DEMON_ABYSS_ENEMIES,
@@ -542,22 +544,22 @@ class DemonAbyssRepositoryMixin:
 
     @staticmethod
     def _demon_apply_reward(connection, player, reward: dict[str, int], now_text: str) -> None:
-        inventory = json.loads(player["inventory_json"] or "{}")
-        intro = json.loads(player["intro_json"] or "{}")
-        faction = json.loads(player["faction_reputation_json"] or "{}")
-        flags = list(intro.get("flags", []))
+        inventory = inventory_value(player["inventory_json"])
+        intro = player_object(player, "intro_json")
+        faction = player_reputation(player)
+        flags = list(player_intro_flags(player))
         for key, quantity in reward.items():
             if key == "faction_reputation.demon":
                 faction["demon"] = int(faction.get("demon", 0)) + int(quantity)
             elif key.startswith("item."):
-                inventory[key] = int(inventory.get(key, 0)) + int(quantity)
+                inventory = inventory_grant(inventory, {key: quantity})
             elif key.startswith("story.") and key not in flags:
                 flags.append(key)
         intro["flags"] = flags
         connection.execute(
             "UPDATE players SET inventory_json=?, intro_json=?, faction_reputation_json=?, updated_at=? WHERE id=?",
             (
-                json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                inventory_json(inventory),
                 json.dumps(intro, ensure_ascii=False, sort_keys=True),
                 json.dumps(faction, ensure_ascii=False, sort_keys=True),
                 now_text,

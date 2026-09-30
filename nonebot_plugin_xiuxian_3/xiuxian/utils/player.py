@@ -9,6 +9,71 @@ from .assets import inventory_value
 from .json import json_object
 
 
+def player_field(row: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
+    """Read a player column from either a mapping or a SQLite row."""
+
+    if isinstance(row, Mapping):
+        return row.get(key, default)
+    try:
+        return row[key]
+    except (IndexError, KeyError):
+        return default
+
+
+def player_integer(row: Mapping[str, Any] | Any, key: str, default: int = 0) -> int:
+    """Read a player numeric column with the shared neutral default."""
+
+    raw = player_field(row, key, default)
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        raise ValueError(f"player field {key!r} must be an integer")
+    return int(raw)
+
+
+def player_object(
+    row: Mapping[str, Any] | Any,
+    key: str,
+    default: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Read one JSON object column from a player row without sharing defaults."""
+
+    fallback = dict(default or {})
+    value = json_object(player_field(row, key, fallback), fallback)
+    return {str(name): item for name, item in value.items()}
+
+
+def player_inventory(row: Mapping[str, Any] | Any) -> dict[str, int]:
+    """Read the normalized item inventory shared by displays and battles."""
+
+    return inventory_value(player_field(row, "inventory_json", {}))
+
+
+def player_qualification(row: Mapping[str, Any] | Any) -> dict[str, int]:
+    """Read normalized qualification values from a player row."""
+
+    return {
+        key: player_integer({key: value}, key)
+        for key, value in player_object(row, "qualification_json").items()
+    }
+
+
+def player_intro_flags(row: Mapping[str, Any] | Any) -> tuple[str, ...]:
+    """Read the immutable-style onboarding flags used by access checks."""
+
+    flags = player_object(row, "intro_json").get("flags", [])
+    if not isinstance(flags, (list, tuple)):
+        return ()
+    return tuple(str(flag) for flag in flags)
+
+
+def player_reputation(row: Mapping[str, Any] | Any) -> dict[str, int]:
+    """Read normalized local faction reputation values."""
+
+    values = player_object(row, "faction_reputation_json")
+    return {str(key): player_integer({"value": value}, "value") for key, value in values.items()}
+
+
 def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     """Return normalized identity, resources and combat inputs from a player row.
 
@@ -16,92 +81,87 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     member join), so missing values use the same neutral defaults everywhere.
     """
 
-    def value(key: str, default: Any = None) -> Any:
-        if isinstance(row, Mapping):
-            return row.get(key, default)
-        try:
-            return row[key]
-        except (IndexError, KeyError):
-            return default
-
-    def integer(key: str, default: int = 0) -> int:
-        raw = value(key, default)
-        if raw is None:
-            return default
-        return int(raw)
-
-    qualification = json_object(value("qualification_json", {}), {})
-    inventory = inventory_value(value("inventory_json", {}))
-    intro = json_object(value("intro_json", {}), {})
+    qualification = player_qualification(row)
+    inventory = player_inventory(row)
+    intro = player_object(row, "intro_json")
     return {
-        "player_id": str(value("player_id", value("id", ""))),
-        "platform": str(value("platform", "") or ""),
-        "platform_user_id": str(value("platform_user_id", "") or ""),
-        "scene_id": str(value("scene_id", "") or ""),
-        "nickname": str(value("nickname", "") or ""),
-        "stage": str(value("stage", "new_user") or "new_user"),
-        "status": str(value("status", "active") or "active"),
-        "dao_name": str(value("dao_name", "") or ""),
-        "path_key": value("path_key"),
-        "subprofession_key": value("subprofession_key"),
-        "location_key": str(value("location_key", "xuantian.new_town")),
-        "realm_key": str(value("realm_key", "mortal")),
-        "realm_layer": integer("realm_layer"),
-        "qualification": {str(key): int(item) for key, item in qualification.items()},
-        "inventory": {str(key): int(item) for key, item in inventory.items()},
-        "intro_flags": tuple(str(item) for item in intro.get("flags", [])),
+        "player_id": str(player_field(row, "player_id", player_field(row, "id", ""))),
+        "platform": str(player_field(row, "platform", "") or ""),
+        "platform_user_id": str(player_field(row, "platform_user_id", "") or ""),
+        "scene_id": str(player_field(row, "scene_id", "") or ""),
+        "nickname": str(player_field(row, "nickname", "") or ""),
+        "stage": str(player_field(row, "stage", "new_user") or "new_user"),
+        "status": str(player_field(row, "status", "active") or "active"),
+        "dao_name": str(player_field(row, "dao_name", "") or ""),
+        "path_key": player_field(row, "path_key"),
+        "subprofession_key": player_field(row, "subprofession_key"),
+        "location_key": str(player_field(row, "location_key", "xuantian.new_town")),
+        "realm_key": str(player_field(row, "realm_key", "mortal")),
+        "realm_layer": player_integer(row, "realm_layer"),
+        "qualification": qualification,
+        "inventory": inventory,
+        "intro_flags": player_intro_flags(row),
         "selected_service": (
             str(intro["selected_service"])
             if intro.get("selected_service") is not None
-            else value("selected_service")
+            else player_field(row, "selected_service")
         ),
-        "spirit_stones": integer("spirit_stones"),
-        "stamina": integer("stamina"),
-        "stamina_max": integer("stamina_max"),
-        "energy": integer("energy"),
-        "energy_max": integer("energy_max"),
-        "cultivation": integer("cultivation"),
-        "total_cultivation": integer("total_cultivation"),
-        "foundation_quality": integer("foundation_quality"),
-        "world_merit": integer("world_merit"),
-        "void_merit": integer("void_merit"),
-        "alliance_points": integer("alliance_points"),
-        "arena_rating": integer("arena_rating", 1000),
-        "arena_wins": integer("arena_wins"),
-        "arena_losses": integer("arena_losses"),
-        "arena_draws": integer("arena_draws"),
-        "talent_points": integer("talent_points"),
-        "skill_insights": integer("skill_insights"),
-        "max_hp": integer("max_hp"),
-        "max_mp": integer("max_mp"),
-        "carry_capacity": integer("carry_capacity"),
-        "initiative": integer("initiative"),
-        "soul_power": integer("soul_power"),
-        "soul_power_max": integer("soul_power_max"),
-        "pollution": integer("pollution"),
-        "bloodline_stability": integer("bloodline_stability"),
-        "cross_realm_penalty_bp": integer("cross_realm_penalty_bp"),
-        "realm_resistance_bp": integer("realm_resistance_bp"),
-        "exploration_efficiency_bp": integer("exploration_efficiency_bp"),
-        "heart_demon_bonus_bp": integer("heart_demon_bonus_bp"),
-        "breakthrough_pity_bp": integer("breakthrough_pity_bp"),
-        "domain_key": value("domain_key"),
-        "domain_level": integer("domain_level"),
-        "domain_charge": integer("domain_charge"),
-        "domain_charge_max": integer("domain_charge_max"),
-        "domain_power": integer("domain_power"),
-        "void_power": integer("void_power"),
-        "void_power_max": integer("void_power_max"),
-        "space_resistance_bp": integer("space_resistance_bp"),
-        "void_route_count": integer("void_route_count"),
-        "void_anchor_capacity": integer("void_anchor_capacity"),
-        "dao_fruit_progress": integer("dao_fruit_progress"),
-        "ascension_merit": integer("ascension_merit"),
-        "tribulation_debt": integer("tribulation_debt"),
-        "dao_fruit_key": value("dao_fruit_key"),
-        "endgame_status": str(value("endgame_status", "none") or "none"),
-        "ending_key": value("ending_key"),
+        "spirit_stones": player_integer(row, "spirit_stones"),
+        "stamina": player_integer(row, "stamina"),
+        "stamina_max": player_integer(row, "stamina_max"),
+        "energy": player_integer(row, "energy"),
+        "energy_max": player_integer(row, "energy_max"),
+        "cultivation": player_integer(row, "cultivation"),
+        "total_cultivation": player_integer(row, "total_cultivation"),
+        "foundation_quality": player_integer(row, "foundation_quality"),
+        "world_merit": player_integer(row, "world_merit"),
+        "void_merit": player_integer(row, "void_merit"),
+        "alliance_points": player_integer(row, "alliance_points"),
+        "arena_rating": player_integer(row, "arena_rating", 1000),
+        "arena_wins": player_integer(row, "arena_wins"),
+        "arena_losses": player_integer(row, "arena_losses"),
+        "arena_draws": player_integer(row, "arena_draws"),
+        "talent_points": player_integer(row, "talent_points"),
+        "skill_insights": player_integer(row, "skill_insights"),
+        "max_hp": player_integer(row, "max_hp"),
+        "max_mp": player_integer(row, "max_mp"),
+        "carry_capacity": player_integer(row, "carry_capacity"),
+        "initiative": player_integer(row, "initiative"),
+        "soul_power": player_integer(row, "soul_power"),
+        "soul_power_max": player_integer(row, "soul_power_max"),
+        "pollution": player_integer(row, "pollution"),
+        "bloodline_stability": player_integer(row, "bloodline_stability"),
+        "cross_realm_penalty_bp": player_integer(row, "cross_realm_penalty_bp"),
+        "realm_resistance_bp": player_integer(row, "realm_resistance_bp"),
+        "exploration_efficiency_bp": player_integer(row, "exploration_efficiency_bp"),
+        "heart_demon_bonus_bp": player_integer(row, "heart_demon_bonus_bp"),
+        "breakthrough_pity_bp": player_integer(row, "breakthrough_pity_bp"),
+        "domain_key": player_field(row, "domain_key"),
+        "domain_level": player_integer(row, "domain_level"),
+        "domain_charge": player_integer(row, "domain_charge"),
+        "domain_charge_max": player_integer(row, "domain_charge_max"),
+        "domain_power": player_integer(row, "domain_power"),
+        "void_power": player_integer(row, "void_power"),
+        "void_power_max": player_integer(row, "void_power_max"),
+        "space_resistance_bp": player_integer(row, "space_resistance_bp"),
+        "void_route_count": player_integer(row, "void_route_count"),
+        "void_anchor_capacity": player_integer(row, "void_anchor_capacity"),
+        "dao_fruit_progress": player_integer(row, "dao_fruit_progress"),
+        "ascension_merit": player_integer(row, "ascension_merit"),
+        "tribulation_debt": player_integer(row, "tribulation_debt"),
+        "dao_fruit_key": player_field(row, "dao_fruit_key"),
+        "endgame_status": str(player_field(row, "endgame_status", "none") or "none"),
+        "ending_key": player_field(row, "ending_key"),
     }
 
 
-__all__ = ["player_values"]
+__all__ = [
+    "player_field",
+    "player_integer",
+    "player_object",
+    "player_inventory",
+    "player_qualification",
+    "player_intro_flags",
+    "player_reputation",
+    "player_values",
+]

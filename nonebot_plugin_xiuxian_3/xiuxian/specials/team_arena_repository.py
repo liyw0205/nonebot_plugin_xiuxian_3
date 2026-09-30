@@ -21,7 +21,6 @@ from ..persistence.errors import (
 from .team_arena_models import TeamArenaMatchRecord, TeamArenaReplayRecord, TeamArenaSnapshotRecord
 from .team_arena_rules import (
     TEAM_ARENA_MODE_KEY,
-    TEAM_ARENA_CONTENT_VERSION,
     TEAM_DAILY_CHALLENGE_LIMIT,
     TEAM_LOSS_RATING_DELTA,
     MAX_TEAM_SIZE,
@@ -29,7 +28,6 @@ from .team_arena_rules import (
     TEAM_SNAPSHOT_MATCH_DELAY_SECONDS,
     TEAM_SNAPSHOT_VALID_DAYS,
     TEAM_WIN_RATING_DELTA,
-    TEAM_ARENA_RULE_VERSION,
     compatible_team_rating,
     simulate_team_match,
     team_public_summary,
@@ -90,8 +88,8 @@ class TeamArenaRepositoryMixin:
             rating = team_rating(snapshot["members"])
             summary = team_public_summary(snapshot, snapshot_id=snapshot_id, rating=rating, created_at=now_text)
             connection.execute(
-                "INSERT INTO arena_team_snapshots(snapshot_id, party_id, leader_id, status, rating, matchable_at, expires_at, snapshot_json, public_json, content_version, rule_version, created_at, updated_at) VALUES (?, ?, ?, 'published', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (snapshot_id, party["party_id"], leader["id"], rating, serialize_datetime(matchable_at), serialize_datetime(expires_at), json.dumps(snapshot, ensure_ascii=False, sort_keys=True), json.dumps(summary, ensure_ascii=False, sort_keys=True), TEAM_ARENA_CONTENT_VERSION, TEAM_ARENA_RULE_VERSION, now_text, now_text),
+                "INSERT INTO arena_team_snapshots(snapshot_id, party_id, leader_id, status, rating, matchable_at, expires_at, snapshot_json, public_json, created_at, updated_at) VALUES (?, ?, ?, 'published', ?, ?, ?, ?, ?, ?, ?)",
+                (snapshot_id, party["party_id"], leader["id"], rating, serialize_datetime(matchable_at), serialize_datetime(expires_at), json.dumps(snapshot, ensure_ascii=False, sort_keys=True), json.dumps(summary, ensure_ascii=False, sort_keys=True), now_text, now_text),
             )
             payload = {"snapshot_id": snapshot_id, "party_id": str(party["party_id"]), "status": "published", "public_summary": summary, "rating": rating, "matchable_at": serialize_datetime(matchable_at), "expires_at": serialize_datetime(expires_at), "replaced_snapshot_ids": [str(item["snapshot_id"]) for item in old]}
             self._team_arena_insert_operation(connection, operation_id, operation_name, int(leader["id"]), request_hash, payload, now_text)
@@ -166,7 +164,7 @@ class TeamArenaRepositoryMixin:
             outcome, rounds, actions = simulate_team_match(challenger_snapshot["members"], defender_members, seed=match_id)
             challenger_delta, defender_delta = self._team_rating_deltas(outcome)
             full_snapshot = {"mode_key": TEAM_ARENA_MODE_KEY, "challenger": challenger_snapshot, "defender": defender_snapshot}
-            result = {"outcome": outcome, "rounds": rounds, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta, "request_id": request_id, "operation_id": operation_id, "content_version": TEAM_ARENA_CONTENT_VERSION, "rule_version": TEAM_ARENA_RULE_VERSION}
+            result = {"outcome": outcome, "rounds": rounds, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta, "request_id": request_id, "operation_id": operation_id}
             connection.execute(
                 "INSERT INTO arena_team_matches(match_id, challenger_leader_id, defender_leader_id, challenger_snapshot_id, defender_snapshot_id, status, outcome, rounds, challenger_rating_delta, defender_rating_delta, snapshot_json, result_json, operation_id, created_at, settled_at) VALUES (?, ?, ?, ?, ?, 'settled', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (match_id, leader["id"], defender["leader_id"], challenger_row["snapshot_id"], defender["snapshot_id"], outcome, rounds, challenger_delta, defender_delta, json.dumps(full_snapshot, ensure_ascii=False, sort_keys=True), json.dumps(result, ensure_ascii=False, sort_keys=True), operation_id, now_text, now_text),

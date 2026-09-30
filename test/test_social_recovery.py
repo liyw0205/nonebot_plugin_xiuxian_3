@@ -27,8 +27,8 @@ def test_qq_onebot_social_recovery_restores_cross_server_inputs_and_replays_oper
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 players = dict(connection.execute("SELECT platform_user_id,id FROM players").fetchall())
                 connection.execute(
-                    "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) "
-                    "VALUES ('social-sect','恢复宗','social-sect',?,'active',5,120,100,0,20000,0,?,?,?,'','')",
+                    "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at) "
+                    "VALUES ('social-sect','恢复宗','social-sect',?,'active',5,120,100,0,20000,0,?,?,?)",
                     (players["social-recovery-qq"], json.dumps({"item.void_anchor": 35, "item.mat.array_sand": 40}), now_text, now_text),
                 )
                 for user, role in (("social-recovery-qq", "leader"), ("social-recovery-onebot", "member")):
@@ -61,13 +61,13 @@ def test_qq_onebot_social_recovery_restores_cross_server_inputs_and_replays_oper
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 leader_id = players["social-recovery-qq"]
                 connection.execute(
-                    "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) "
-                    "VALUES ('social-sect-b','恢复乙宗','social-sect-b',?,'active',5,120,100,0,20000,0,'{}',?,?, '', '')",
+                    "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at) "
+                    "VALUES ('social-sect-b','恢复乙宗','social-sect-b',?,'active',5,120,100,0,20000,0,'{}',?,?)",
                     (players["social-recovery-onebot"], now_text, now_text),
                 )
                 connection.execute(
-                    "INSERT INTO sect_alliance_contracts(alliance_id,sect_a_id,sect_b_id,proposer_sect_id,proposer_player_id,status,sect_a_confirmed,sect_b_confirmed,confirmation_expires_at,starts_at,ends_at,snapshot_json,content_version,rule_version,created_at,updated_at) "
-                        "VALUES ('social-alliance','social-sect','social-sect-b','social-sect',?,'active',1,1,?,?,?,?,'','',?,?)",
+                    "INSERT INTO sect_alliance_contracts(alliance_id,sect_a_id,sect_b_id,proposer_sect_id,proposer_player_id,status,sect_a_confirmed,sect_b_confirmed,confirmation_expires_at,starts_at,ends_at,snapshot_json,created_at,updated_at) "
+                        "VALUES ('social-alliance','social-sect','social-sect-b','social-sect',?,'active',1,1,?,?,?, ?,?,?)",
                     (leader_id, now_text, now_text, now_text, json.dumps({"agreement": "test"}), now_text, now_text),
                 )
 

@@ -8,6 +8,7 @@ from datetime import datetime, time
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_grant, inventory_json, inventory_value
 from ..persistence.errors import (
     PlayerNotFoundError,
     SectContributionInsufficientError,
@@ -18,10 +19,8 @@ from ..persistence.errors import (
 )
 from .sect_exchange_models import SectExchangeRecord
 from .sect_exchange_rules import (
-    SECT_EXCHANGE_CONTENT_VERSION,
     SECT_EXCHANGE_DAILY_CAP,
     SECT_EXCHANGE_OFFERS,
-    SECT_EXCHANGE_RULE_VERSION,
 )
 
 
@@ -98,10 +97,10 @@ class SectExchangeRepositoryMixin:
             warehouse_quantity = int(warehouse.get(offer.item_key, 0))
             if warehouse_quantity < offer.quantity:
                 raise SectStockInsufficientError("sect warehouse stock is insufficient")
-            inventory = self._json_map(player["inventory_json"])
+            inventory = inventory_value(player["inventory_json"])
             inventory_quantity = int(inventory.get(offer.item_key, 0)) + offer.quantity
             warehouse_quantity -= offer.quantity
-            inventory[offer.item_key] = inventory_quantity
+            inventory = inventory_grant(inventory, {offer.item_key: offer.quantity})
             if warehouse_quantity:
                 warehouse[offer.item_key] = warehouse_quantity
             else:
@@ -116,7 +115,7 @@ class SectExchangeRepositoryMixin:
             )
             connection.execute(
                 "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                (inventory_json(inventory), now_text, player["id"]),
             )
             payload = {
                 "offer_key": offer.key,
@@ -128,8 +127,6 @@ class SectExchangeRepositoryMixin:
                 "member_contribution": int(membership["contribution"]) - offer.contribution_cost,
                 "warehouse_quantity": warehouse_quantity,
                 "inventory_quantity": inventory_quantity,
-                "content_version": SECT_EXCHANGE_CONTENT_VERSION,
-                "rule_version": SECT_EXCHANGE_RULE_VERSION,
             }
             self._sect_record_operation(
                 connection,
@@ -162,8 +159,6 @@ class SectExchangeRepositoryMixin:
             member_contribution=int(payload["member_contribution"]),
             warehouse_quantity=int(payload["warehouse_quantity"]),
             inventory_quantity=int(payload["inventory_quantity"]),
-            content_version=str(payload.get("content_version", "")),
-            rule_version=str(payload.get("rule_version", "")),
             already_completed=replay,
         )
 

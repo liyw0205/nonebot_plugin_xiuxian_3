@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
     DaoOriginTaskRequirementError,
@@ -217,15 +218,13 @@ class EndgameQuestRepositoryMixin:
                     "beast": "item.masterwork.beast",
                     "support": "item.masterwork.support",
                 }.get(path_key)
-                inventory = self._json_object(player["inventory_json"], {})
+                inventory = inventory_value(player["inventory_json"])
                 if not work_key or int(inventory.get(work_key, 0)) < 1:
                     raise QuestResourceInsufficientError("profession endgame work is missing")
-                inventory[work_key] = int(inventory[work_key]) - 1
-                if inventory[work_key] == 0:
-                    inventory.pop(work_key)
+                inventory = inventory_spend(inventory, {work_key: 1})
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    (inventory_json(inventory), now_text, player["id"]),
                 )
                 source = {"source": "inventory_delivery", "item_key": work_key, "path_key": path_key}
             elif component_key == DAO_UNION_CHALLENGE:
@@ -328,13 +327,12 @@ class EndgameQuestRepositoryMixin:
                 "content_version": DAO_UNION_CONTENT_VERSION,
                 "rule_version": DAO_UNION_RULE_VERSION,
             }
-            inventory = self._json_object(player["inventory_json"], {})
-            inventory["item.dao_fruit_fragment"] = (
-                int(inventory.get("item.dao_fruit_fragment", 0)) + DAO_UNION_FRAGMENT_REWARD
-            )
-            inventory["item.tribulation_token"] = (
-                int(inventory.get("item.tribulation_token", 0))
-                + DAO_UNION_TRIBULATION_TOKEN_REWARD
+            inventory = inventory_grant(
+                inventory_value(player["inventory_json"]),
+                {
+                    "item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD,
+                    "item.tribulation_token": DAO_UNION_TRIBULATION_TOKEN_REWARD,
+                },
             )
             flags_state = self._json_object(player["intro_json"], {})
             flags = set(str(item) for item in flags_state.get("flags", []))
@@ -343,7 +341,7 @@ class EndgameQuestRepositoryMixin:
             connection.execute(
                 "UPDATE players SET inventory_json = ?, intro_json = ?, updated_at = ? WHERE id = ?",
                 (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
                     now_text,
                     player["id"],
@@ -414,11 +412,12 @@ class EndgameQuestRepositoryMixin:
             count += 1
             reward = dict(DAO_ORIGIN_REWARDS[task_key]) if count == DAO_ORIGIN_TARGET else {}
             world_merit_reward = DAO_ORIGIN_WORLD_MERIT[task_key] if count == DAO_ORIGIN_TARGET else 0
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             token_reward = int(reward.get("item.tribulation_token", 0))
             if token_reward:
-                inventory["item.tribulation_token"] = (
-                    int(inventory.get("item.tribulation_token", 0)) + token_reward
+                inventory = inventory_grant(
+                    inventory,
+                    {"item.tribulation_token": token_reward},
                 )
             connection.execute(
                 "UPDATE players SET dao_fruit_progress = dao_fruit_progress + ?, ascension_merit = ascension_merit + ?, world_merit = world_merit + ?, inventory_json = ?, updated_at = ? WHERE id = ?",
@@ -426,7 +425,7 @@ class EndgameQuestRepositoryMixin:
                     int(reward.get("dao_fruit_progress", 0)),
                     int(reward.get("ascension_merit", 0)),
                     world_merit_reward,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     now_text,
                     player["id"],
                 ),

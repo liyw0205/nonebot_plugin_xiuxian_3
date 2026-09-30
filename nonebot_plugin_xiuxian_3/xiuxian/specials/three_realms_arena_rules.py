@@ -12,8 +12,6 @@ from collections.abc import Mapping
 from typing import Any
 
 THREE_REALMS_ARENA_MODE_KEY = "arena.three_realms"
-THREE_REALMS_ARENA_RULE_VERSION = ""
-THREE_REALMS_ARENA_CONTENT_VERSION = ""
 THREE_REALMS_ARENA_MIN_REALM = "nascent_soul"
 THREE_REALMS_ARENA_MIN_LAYER = 1
 THREE_REALMS_ARENA_PERMIT_KEY = "item.permit.three_realms_arena"
@@ -105,18 +103,15 @@ def tactical_environment(challenger: Mapping[str, Any], defender: Mapping[str, A
         "defender_pollution": int(_value(defender, "pollution", 0)),
         "challenger_bloodline_stability": int(_value(challenger, "bloodline_stability", 0)),
         "defender_bloodline_stability": int(_value(defender, "bloodline_stability", 0)),
-        "rule_version": THREE_REALMS_ARENA_RULE_VERSION,
     }
 
 
 __all__ = [
     "THREE_REALMS",
-    "THREE_REALMS_ARENA_CONTENT_VERSION",
     "THREE_REALMS_ARENA_MODE_KEY",
     "THREE_REALMS_ARENA_MIN_LAYER",
     "THREE_REALMS_ARENA_MIN_REALM",
     "THREE_REALMS_ARENA_PERMIT_KEY",
-    "THREE_REALMS_ARENA_RULE_VERSION",
     "has_three_realms_permit",
     "meets_three_realms_gate",
     "player_faction",

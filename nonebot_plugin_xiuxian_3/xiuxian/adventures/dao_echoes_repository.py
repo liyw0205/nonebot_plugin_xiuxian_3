@@ -178,8 +178,6 @@ class DaoEchoesRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "stage_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -224,8 +222,6 @@ class DaoEchoesRepositoryMixin:
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": int(player["realm_layer"]),
                 "location_key": str(player["location_key"]),
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "repeat_pending": repeat_pending,
             }
             if run is None:
@@ -234,15 +230,14 @@ class DaoEchoesRepositoryMixin:
                     INSERT INTO mainline_runs(
                         player_id, story_key, chapter, stage, stage_key, status,
                         attempt_count, first_clear_claimed, first_clear_key,
-                        start_operation_id, snapshot_json, content_version, rule_version,
+                        start_operation_id, snapshot_json,
                         created_at, updated_at
-                    ) VALUES (?, ?, 1, ?, ?, 'running', 1, 0, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, 1, ?, ?, 'running', 1, 0, ?, ?, ?, ?, ?)
                     """,
                     (
                         player["id"], DAO_ECHOES_STORY_KEY, definition.stage,
                         definition.key, first_clear_key, operation_id,
                         json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                        definition.content_version, definition.rule_version,
                         now_text, now_text,
                     ),
                 )
@@ -273,8 +268,6 @@ class DaoEchoesRepositoryMixin:
                 "first_clear": not repeat_pending,
                 "label": f"{DAO_ECHOES_LANE_LABELS[definition.lane]}·{definition.label}",
                 "description": definition.description,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             self._record_dao_echoes_operation(
                 connection, operation_id, operation_name, player["id"], request_hash,
@@ -316,8 +309,6 @@ class DaoEchoesRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "stage_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -403,8 +394,6 @@ class DaoEchoesRepositoryMixin:
                 "first_clear": first_clear,
                 "label": f"{DAO_ECHOES_LANE_LABELS[definition.lane]}·{definition.label}",
                 "source_operation_id": operation_id,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             self._record_dao_echoes_operation(
                 connection, operation_id, operation_name, player["id"], request_hash,

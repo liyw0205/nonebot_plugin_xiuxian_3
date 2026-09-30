@@ -13,6 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import assets_spend, inventory_json, inventory_value
 from .cloud_models import (
     ArrayHallRecord,
     BeastHistoryRecord,
@@ -100,20 +101,20 @@ class CloudRepositoryMixin:
 
             stamina = int(player["stamina"])
             stones = int(player["spirit_stones"])
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             if stones < definition.currency_cost:
                 raise CloudFareInsufficientError("cloud fare is insufficient")
-            if definition.pass_key and int(inventory.get(definition.pass_key, 0)) < definition.pass_quantity:
-                raise AdvancedCavePassMissingError("advanced cave pass is missing")
-
             if definition.pass_key:
-                remaining = int(inventory.get(definition.pass_key, 0)) - definition.pass_quantity
-                if remaining:
-                    inventory[definition.pass_key] = remaining
-                else:
-                    inventory.pop(definition.pass_key, None)
+                try:
+                    inventory = assets_spend(
+                        stones,
+                        inventory,
+                        {definition.pass_key: definition.pass_quantity},
+                    ).inventory
+                except ValueError as exc:
+                    raise AdvancedCavePassMissingError("advanced cave pass is missing") from exc
             session_id = uuid4().hex
             ends_at = now + timedelta(seconds=definition.duration_seconds)
             snapshot = {
@@ -133,7 +134,7 @@ class CloudRepositoryMixin:
                 (
                     stamina - definition.stamina_cost,
                     stones - definition.currency_cost,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     now_text,
                     player_id,
                 ),

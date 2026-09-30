@@ -30,8 +30,6 @@ class MainlineStatusRecord:
     current_stage: int
     status: str
     stages: tuple[MainlineStageView, ...]
-    content_version: str = ""
-    rule_version: str = ""
     already_completed: bool = False
 
 

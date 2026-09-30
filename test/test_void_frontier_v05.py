@@ -91,7 +91,7 @@ def test_void_frontier_projects_unobserved_alliance_expiry() -> None:
                 players = dict(connection.execute("SELECT platform_user_id,id FROM players").fetchall())
                 for sect_id, name, user_id in (("expiry-sect-a", "到期甲宗", "expiry-qq"), ("expiry-sect-b", "到期乙宗", "expiry-ob")):
                     connection.execute(
-                        "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?,?,?,?, 'active',5,120,100,0,20000,0,'{}',?,?, '', '')",
+                        "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at) VALUES (?,?,?,?, 'active',5,120,100,0,20000,0,'{}',?,?)",
                         (sect_id, name, name.casefold(), players[user_id], now_text, now_text),
                     )
                     connection.execute(

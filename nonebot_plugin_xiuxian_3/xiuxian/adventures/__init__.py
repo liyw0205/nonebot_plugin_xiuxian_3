@@ -1,4 +1,4 @@
-"""Adventure domain services and versioned bounty definitions."""
+"""Adventure domain services and data-backed bounty definitions."""
 
 from .models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from .mainline_models import (
@@ -8,8 +8,6 @@ from .mainline_models import (
     MainlineStatusRecord,
 )
 from .mainline import (
-    MAINLINE_CONTENT_VERSION,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGE_COUNT,
     MAINLINE_STORY_KEY,
     MainlineDefinition,
@@ -42,8 +40,6 @@ __all__ = [
     "MainlineStageView",
     "MainlineStartRecord",
     "MainlineStatusRecord",
-    "MAINLINE_CONTENT_VERSION",
-    "MAINLINE_RULE_VERSION",
     "MAINLINE_STAGE_COUNT",
     "MAINLINE_STORY_KEY",
     "MainlineDefinition",

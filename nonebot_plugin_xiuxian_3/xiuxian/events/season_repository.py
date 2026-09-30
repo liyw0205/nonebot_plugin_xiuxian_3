@@ -20,7 +20,6 @@ from .season_rules import (
     FINAL_HEAVEN_BOARDS,
     FINAL_HEAVEN_CHAPTER_ENTITLEMENT,
     FINAL_HEAVEN_RANKED_PLACES,
-    FINAL_HEAVEN_RULE_VERSION,
     final_heaven_claim_expiry,
     final_heaven_tie_breaker,
     final_heaven_window_for_id,
@@ -194,9 +193,9 @@ class FinalHeavenSeasonRepositoryMixin:
                 honor_title(title_key)
                 source_operation_id = f"season.final_heaven:{season_id}:{board_key}:{player['id']}"
                 connection.execute(
-                    "INSERT OR IGNORE INTO honor_titles(player_id, title_key, source_operation_id, acquired_at, content_version, rule_version) "
-                    "VALUES (?, ?, ?, ?, '', ?)",
-                    (player["id"], title_key, source_operation_id, now_text, FINAL_HEAVEN_RULE_VERSION),
+                    "INSERT OR IGNORE INTO honor_titles(player_id, title_key, source_operation_id, acquired_at) "
+                    "VALUES (?, ?, ?, ?)",
+                    (player["id"], title_key, source_operation_id, now_text),
                 )
                 title_event_operation = f"{operation_id}:{board_key}:title"
                 connection.execute(
@@ -340,14 +339,13 @@ class FinalHeavenSeasonRepositoryMixin:
         now_text: str,
     ) -> None:
         connection.execute(
-            "INSERT OR IGNORE INTO final_heaven_seasons(season_id, starts_at, ends_at, claim_expires_at, status, snapshot_json, rule_version, frozen_at, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, 'collecting', '{}', ?, NULL, ?, ?)",
+            "INSERT OR IGNORE INTO final_heaven_seasons(season_id, starts_at, ends_at, claim_expires_at, status, snapshot_json, frozen_at, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, 'collecting', '{}', NULL, ?, ?)",
             (
                 season_id,
                 serialize_datetime(starts_at),
                 serialize_datetime(ends_at),
                 serialize_datetime(claim_expires_at),
-                FINAL_HEAVEN_RULE_VERSION,
                 now_text,
                 now_text,
             ),
@@ -503,9 +501,9 @@ class FinalHeavenSeasonRepositoryMixin:
                 },
             )
             connection.execute(
-                "INSERT OR IGNORE INTO honor_titles(player_id, title_key, source_operation_id, acquired_at, content_version, rule_version) "
-                "VALUES (?, ?, ?, ?, '', ?)",
-                (player_id, title_key, source_operation_id, now_text, FINAL_HEAVEN_RULE_VERSION),
+                "INSERT OR IGNORE INTO honor_titles(player_id, title_key, source_operation_id, acquired_at) "
+                "VALUES (?, ?, ?, ?)",
+                (player_id, title_key, source_operation_id, now_text),
             )
             connection.execute(
                 "INSERT OR IGNORE INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) "

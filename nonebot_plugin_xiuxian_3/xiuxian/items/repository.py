@@ -11,10 +11,9 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.assets import inventory_json, inventory_spend, inventory_value
 from .models import ItemUseRecord
 from .rules import (
-    CONTENT_VERSION,
-    RULE_VERSION,
     resolve_item,
 )
 
@@ -119,7 +118,7 @@ class ItemRepositoryMixin:
                 return self._item_use_from_payload(json.loads(existing["result_json"]), replay=True)
 
             row = self._require_player(connection, platform, platform_user_id)
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             if int(inventory.get(definition.key, 0)) < 1:
                 raise ItemInsufficientError("item is missing")
 
@@ -128,19 +127,15 @@ class ItemRepositoryMixin:
                 effects = self._json_object(row["item_effects_json"], {})
                 if int(effects.get("cloud_tea_state_bp", 0)) > 0 or effects.get("cloud_tea_operation_id"):
                     raise ItemEffectAlreadyPendingError("cloud tea effect is already pending")
-                inventory[definition.key] = int(inventory[definition.key]) - 1
-                if inventory[definition.key] <= 0:
-                    inventory.pop(definition.key, None)
+                inventory = inventory_spend(inventory, {definition.key: 1})
                 effects = {
                     "cloud_tea_state_bp": definition.effect_value,
                     "cloud_tea_operation_id": operation_id,
-                    "content_version": CONTENT_VERSION,
-                    "rule_version": RULE_VERSION,
                     "consumed_at": now_text,
                 }
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, item_effects_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(effects, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                    (inventory_json(inventory), json.dumps(effects, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
                 )
                 effect = {
                     "type": definition.effect_type,
@@ -163,9 +158,7 @@ class ItemRepositoryMixin:
                 ).fetchone()
                 if active is not None:
                     raise ItemEffectAlreadyActiveError("a mist barrier is already active at this location")
-                inventory[definition.key] = int(inventory[definition.key]) - 1
-                if inventory[definition.key] <= 0:
-                    inventory.pop(definition.key, None)
+                inventory = inventory_spend(inventory, {definition.key: 1})
                 barrier_id = uuid4().hex
                 duration_seconds = definition.duration_seconds
                 if duration_seconds is None:
@@ -173,11 +166,11 @@ class ItemRepositoryMixin:
                 expires_at = serialize_datetime(now + timedelta(seconds=duration_seconds))
                 connection.execute(
                     "INSERT INTO mist_barrier_instances(barrier_id, player_id, operation_id, location_key, status, starts_at, expires_at, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)",
-                    (barrier_id, row["id"], operation_id, target, now_text, expires_at, json.dumps({"risk_reduction_bp": definition.effect_value, "content_version": CONTENT_VERSION, "rule_version": RULE_VERSION}, ensure_ascii=False, sort_keys=True), now_text, now_text),
+                    (barrier_id, row["id"], operation_id, target, now_text, expires_at, json.dumps({"risk_reduction_bp": definition.effect_value}, ensure_ascii=False, sort_keys=True), now_text, now_text),
                 )
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                    (inventory_json(inventory), now_text, row["id"]),
                 )
                 effect = {"type": definition.effect_type, "barrier_id": barrier_id, "location_key": target, "risk_reduction_bp": definition.effect_value, "expires_at": expires_at}
             else:
@@ -192,8 +185,6 @@ class ItemRepositoryMixin:
                 "item_name": definition.name,
                 "quantity": 1,
                 "effect": effect,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",

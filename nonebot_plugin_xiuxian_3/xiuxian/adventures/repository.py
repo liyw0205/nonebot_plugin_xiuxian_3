@@ -89,11 +89,9 @@ from ..adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ..adventures.mainline import (
-    MAINLINE_CONTENT_VERSION,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
-    MAINLINE_RULE_VERSION,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
     mainline_definition,
@@ -491,8 +489,6 @@ class AdventuresRepositoryMixin:
                 ]
             snapshot = {
                 "bounty_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "reward_pool_key": definition.reward_pool_key,
                 "reward": reward_map(
                     definition,
@@ -874,8 +870,6 @@ class AdventuresRepositoryMixin:
             current_stage=current.stage,
             status=overall,
             stages=tuple(views),
-            content_version=MAINLINE_CONTENT_VERSION,
-            rule_version=MAINLINE_RULE_VERSION,
             already_completed=replay,
         )
 
@@ -937,8 +931,6 @@ class AdventuresRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "stage_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -991,8 +983,6 @@ class AdventuresRepositoryMixin:
                 "realm_layer": int(row["realm_layer"]),
                 "location_key": str(row["location_key"]),
                 "intro_flags": list(SQLitePlayerRepository._json_object(row["intro_json"], {}).get("flags", [])),
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             if run is None:
                 connection.execute(
@@ -1000,15 +990,15 @@ class AdventuresRepositoryMixin:
                     INSERT INTO mainline_runs(
                         player_id, story_key, chapter, stage, stage_key, status,
                         attempt_count, first_clear_claimed, first_clear_key,
-                        start_operation_id, snapshot_json, content_version, rule_version,
+                        start_operation_id, snapshot_json,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, 'running', 1, 0, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, 'running', 1, 0, ?, ?, ?, ?)
                     """,
                     (
                         row["id"], MAINLINE_STORY_KEY, definition.chapter, definition.stage,
                         definition.key, first_key, operation_id,
                         json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                        definition.content_version, definition.rule_version, now_text, now_text,
+                        now_text, now_text,
                     ),
                 )
                 first_clear = True
@@ -1042,8 +1032,6 @@ class AdventuresRepositoryMixin:
                 "first_clear": first_clear,
                 "label": definition.label,
                 "description": definition.description,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             connection.execute(
                 """
@@ -1116,8 +1104,6 @@ class AdventuresRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "stage_key": definition.key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -1191,8 +1177,6 @@ class AdventuresRepositoryMixin:
                 "first_clear": first_clear,
                 "label": definition.label,
                 "source_operation_id": operation_id,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             connection.execute(
                 """
@@ -1244,13 +1228,11 @@ class AdventuresRepositoryMixin:
                 connection.execute(
                     """
                     INSERT OR IGNORE INTO honor_titles(
-                        player_id, title_key, source_operation_id, acquired_at,
-                        content_version, rule_version
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        player_id, title_key, source_operation_id, acquired_at
+                    ) VALUES (?, ?, ?, ?)
                     """,
                     (
                         player["id"], title_key, operation_id, now_text,
-                        MAINLINE_CONTENT_VERSION, MAINLINE_RULE_VERSION,
                     ),
                 )
                 actual[key] = title_key

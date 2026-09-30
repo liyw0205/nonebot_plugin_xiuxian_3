@@ -19,10 +19,8 @@ from ..persistence.errors import (
 from .demon_models import DemonInvasionEventRecord
 from .demon_rules import (
     DEMON_ACTION_CONTRIBUTION,
-    DEMON_EVENT_CONTENT_VERSION,
     DEMON_EVENT_KEY,
     DEMON_EVENT_LOCATION,
-    DEMON_EVENT_RULE_VERSION,
     DEMON_EVENT_TARGET,
     DEMON_PERSONAL_REWARD_THRESHOLD,
     demon_event_times,
@@ -165,7 +163,7 @@ class DemonInvasionRepositoryMixin:
                 ).fetchone()["total"]
             )
             result = self._json_object(event["result_json"], {})
-            result.update({"content_version": DEMON_EVENT_CONTENT_VERSION, "success": total >= int(event["target_quantity"])})
+            result.update({"success": total >= int(event["target_quantity"])})
             connection.execute(
                 "UPDATE world_event_rounds SET status='running', total_contribution=?, result_json=?, updated_at=? WHERE round_id=? AND status IN ('open','running')",
                 (total, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, event["round_id"]),
@@ -250,7 +248,7 @@ class DemonInvasionRepositoryMixin:
     def _demon_insert_round(connection: Any, round_id: str, start: datetime) -> None:
         starts_at, ends_at, claim_expires_at = demon_event_times(start)
         connection.execute(
-            "INSERT OR IGNORE INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,rule_version,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, ?, ?, ?)",
             (
                 round_id,
                 DEMON_EVENT_KEY,
@@ -259,8 +257,7 @@ class DemonInvasionRepositoryMixin:
                 serialize_datetime(ends_at),
                 serialize_datetime(claim_expires_at),
                 DEMON_EVENT_TARGET,
-                json.dumps({"content_version": DEMON_EVENT_CONTENT_VERSION, "success": False}, ensure_ascii=False, sort_keys=True),
-                DEMON_EVENT_RULE_VERSION,
+                json.dumps({"success": False}, ensure_ascii=False, sort_keys=True),
                 serialize_datetime(start),
                 serialize_datetime(start),
             ),
@@ -270,7 +267,7 @@ class DemonInvasionRepositoryMixin:
         if str(event["status"]) in {"open", "running"} and now >= datetime.fromisoformat(str(event["ends_at"])):
             total = int(connection.execute("SELECT COALESCE(SUM(contribution),0) AS total FROM world_event_contributions WHERE round_id=?", (event["round_id"],)).fetchone()["total"])
             result = self._json_object(event["result_json"], {})
-            result.update({"content_version": DEMON_EVENT_CONTENT_VERSION, "success": total >= int(event["target_quantity"]), "settled_at": serialize_datetime(now)})
+            result.update({"success": total >= int(event["target_quantity"]), "settled_at": serialize_datetime(now)})
             connection.execute("UPDATE world_event_rounds SET status='settled', total_contribution=?, result_json=?, updated_at=? WHERE round_id=? AND status IN ('open','running')", (total, json.dumps(result, ensure_ascii=False, sort_keys=True), serialize_datetime(now), event["round_id"]))
             event = connection.execute("SELECT * FROM world_event_rounds WHERE round_id=?", (event["round_id"],)).fetchone()
         return event

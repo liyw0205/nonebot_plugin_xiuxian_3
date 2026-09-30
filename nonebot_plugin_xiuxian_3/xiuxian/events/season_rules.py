@@ -8,7 +8,6 @@ import hashlib
 from .rules import FINAL_HEAVEN_SEASON_DAYS, FINAL_HEAVEN_SEASON_KEY, final_heaven_season_window
 
 
-FINAL_HEAVEN_RULE_VERSION = ""
 FINAL_HEAVEN_CLAIM_DAYS = 7
 FINAL_HEAVEN_RANKED_PLACES = 10
 FINAL_HEAVEN_CHAPTER_ENTITLEMENT = "chapter.final_heaven"
@@ -65,7 +64,6 @@ __all__ = [
     "FINAL_HEAVEN_CHAPTER_ENTITLEMENT",
     "FINAL_HEAVEN_CLAIM_DAYS",
     "FINAL_HEAVEN_RANKED_PLACES",
-    "FINAL_HEAVEN_RULE_VERSION",
     "final_heaven_claim_expiry",
     "final_heaven_tie_breaker",
     "final_heaven_window_for_id",

@@ -16,8 +16,6 @@ from .arena_federation import ensure_identity_route, record_settlement_audit
 from .codex_projection import record_codex_discovery
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 ARENA_LOCATION_KEY = "xuantian.new_town"
 ARENA_LOCAL_REPUTATION_KEY = f"local.{ARENA_LOCATION_KEY}"
 
@@ -89,8 +87,6 @@ def project_arena_result(
             "reputation_before": before,
             "reputation_after": after,
             "entry_keys": entry_keys,
-            "content_version": CONTENT_VERSION,
-            "rule_version": RULE_VERSION,
             "request_id": request_id,
             "operation_id": operation_id,
             "match_id": match_id,
@@ -199,8 +195,6 @@ def project_arena_result(
         "match_id": match_id,
         "mode_key": mode_key,
         "participants": projected,
-        "content_version": CONTENT_VERSION,
-        "rule_version": RULE_VERSION,
     }
 
 
@@ -216,7 +210,5 @@ def _json_map(raw: Any) -> dict[str, Any]:
 __all__ = [
     "ARENA_LOCAL_REPUTATION_KEY",
     "ARENA_LOCATION_KEY",
-    "CONTENT_VERSION",
-    "RULE_VERSION",
     "project_arena_result",
 ]

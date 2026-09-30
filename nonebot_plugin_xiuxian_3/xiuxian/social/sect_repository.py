@@ -119,9 +119,8 @@ class SectRepositoryMixin:
                 """
                 INSERT INTO sects(
                     sect_id, name, name_key, motto, leader_id, status, max_members,
-                    warehouse_capacity, construction, created_at, updated_at,
-                    content_version, rule_version
-                ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, 0, ?, ?, ?, ?)
+                    warehouse_capacity, construction, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, 0, ?, ?)
                 """,
                 (
                     sect_id,
@@ -133,8 +132,6 @@ class SectRepositoryMixin:
                     SECT_DEFINITION.warehouse_capacity,
                     now_text,
                     now_text,
-                    SECT_DEFINITION.content_version,
-                    SECT_DEFINITION.rule_version,
                 ),
             )
             connection.execute(

@@ -12,8 +12,6 @@ SECT_MAX_MEMBERS = 20
 SECT_WAREHOUSE_CAPACITY = 50
 SECT_APPLICATION_TTL_SECONDS = 24 * 60 * 60
 SECT_JOIN_COOLDOWN_SECONDS = 24 * 60 * 60
-SECT_CONTENT_VERSION = ""
-SECT_RULE_VERSION = ""
 
 
 class SectRole(StrEnum):
@@ -35,8 +33,6 @@ class SectDefinition:
     warehouse_capacity: int = SECT_WAREHOUSE_CAPACITY
     create_cost: int = SECT_CREATE_COST
     application_ttl_seconds: int = SECT_APPLICATION_TTL_SECONDS
-    content_version: str = SECT_CONTENT_VERSION
-    rule_version: str = SECT_RULE_VERSION
 
 
 SECT_DEFINITION = SectDefinition()
@@ -82,12 +78,10 @@ __all__ = [
     "LEADER_ROLES",
     "MANAGEMENT_ROLES",
     "SECT_APPLICATION_TTL_SECONDS",
-    "SECT_CONTENT_VERSION",
     "SECT_CREATE_COST",
     "SECT_DEFINITION",
     "SECT_JOIN_COOLDOWN_SECONDS",
     "SECT_MAX_MEMBERS",
-    "SECT_RULE_VERSION",
     "SECT_WAREHOUSE_CAPACITY",
     "SectDefinition",
     "SectRole",

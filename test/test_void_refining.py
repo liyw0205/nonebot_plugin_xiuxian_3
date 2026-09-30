@@ -564,7 +564,7 @@ def test_void_refining_world_merit_can_be_replenished_by_public_events_before_re
                         (player_id,),
                     )
                     db.execute(
-                        "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?, '', '')",
+                        "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?)",
                         (f"void-merit-sect-{adapter}", "功勋补给宗", f"void-merit-sect-{adapter}", player_id, now, now),
                     )
                     db.execute(

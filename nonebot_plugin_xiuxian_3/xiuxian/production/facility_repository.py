@@ -9,6 +9,7 @@ from datetime import date
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_amount, inventory_value
 from .facility_models import FacilityMaintenanceRecord, FacilitySlotRecord
 from .facility_rules import FACILITY_DURATION_BONUS_BP, FACILITY_MAINTENANCE_FEE, resolve_facility
 from ..persistence.errors import (
@@ -317,11 +318,8 @@ class FacilityRepositoryMixin:
 
         duration = int(base_seconds if base_seconds is not None else recipe.duration_seconds)
         if getattr(recipe, "facility_kind", None) and str(row["location_key"]) == "cave.mist_grotto_2":
-            raw_inventory = row["inventory_json"]
-            inventory = json.loads(raw_inventory) if isinstance(raw_inventory, str) else raw_inventory
-            if not isinstance(inventory, dict):
-                inventory = {}
-            if int(inventory.get("item.array.gathering_basic", 0)) > 0:
+            inventory = inventory_value(row["inventory_json"])
+            if inventory_amount(inventory, "item.array.gathering_basic") > 0:
                 return max(1, duration * (10000 - FACILITY_DURATION_BONUS_BP) // 10000)
         return duration
 

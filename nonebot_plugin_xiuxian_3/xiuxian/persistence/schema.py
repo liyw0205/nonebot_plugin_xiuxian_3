@@ -396,9 +396,7 @@ CREATE TABLE IF NOT EXISTS sects (
     sect_merit INTEGER NOT NULL DEFAULT 0 CHECK (sect_merit >= 0),
     warehouse_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL
+    updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_sects_status ON sects(status, created_at);
@@ -564,8 +562,6 @@ CREATE TABLE IF NOT EXISTS sect_alliance_contracts (
     termination_requested_at TEXT,
     breach_fee_operation_id TEXT UNIQUE,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     CHECK (sect_a_id <> sect_b_id)
@@ -1367,7 +1363,6 @@ CREATE TABLE IF NOT EXISTS routine_checkins (
     streak_before INTEGER NOT NULL DEFAULT 0 CHECK (streak_before >= 0),
     streak_after INTEGER NOT NULL DEFAULT 0 CHECK (streak_after >= 0),
     content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     settled_at TEXT NOT NULL,
     UNIQUE (player_id, target_date)
@@ -1567,7 +1562,6 @@ CREATE TABLE IF NOT EXISTS world_event_rounds (
     target_quantity INTEGER NOT NULL CHECK (target_quantity >= 0),
     total_contribution INTEGER NOT NULL DEFAULT 0 CHECK (total_contribution >= 0),
     result_json TEXT NOT NULL DEFAULT '{}',
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -1649,8 +1643,6 @@ CREATE TABLE IF NOT EXISTS honor_titles (
     title_key TEXT NOT NULL,
     source_operation_id TEXT NOT NULL,
     acquired_at TEXT NOT NULL,
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     UNIQUE (player_id, title_key),
     UNIQUE (player_id, source_operation_id)
 );
@@ -1850,8 +1842,6 @@ CREATE TABLE IF NOT EXISTS mainline_runs (
     claim_operation_id TEXT,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     result_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (player_id, story_key, stage_key)
@@ -2011,8 +2001,6 @@ CREATE TABLE IF NOT EXISTS arena_snapshots (
     expires_at TEXT NOT NULL,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     public_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     revoked_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -2111,8 +2099,6 @@ CREATE TABLE IF NOT EXISTS arena_team_snapshots (
     expires_at TEXT NOT NULL,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     public_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     revoked_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -2178,7 +2164,6 @@ CREATE TABLE IF NOT EXISTS final_heaven_seasons (
     claim_expires_at TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('collecting', 'frozen')),
     snapshot_json TEXT NOT NULL DEFAULT '{}',
-    rule_version TEXT NOT NULL,
     frozen_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -2233,7 +2218,6 @@ CREATE TABLE IF NOT EXISTS three_realms_seasons (
     claim_expires_at TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('collecting', 'frozen')),
     snapshot_json TEXT NOT NULL DEFAULT '{}',
-    rule_version TEXT NOT NULL,
     frozen_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
