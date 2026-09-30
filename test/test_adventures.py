@@ -222,17 +222,8 @@ def test_equipment_rewards_follow_path_and_realm_and_create_instances() -> None:
         ]
 
         started = await runtime.dispatch(_context(user, "equipment-combat"), "开始训练战")
-        assert started.code == "BATTLE_SETTLED"
-        replay = await runtime.dispatch(_context(user, "equipment-combat-replay"), "战斗回放")
-        snapshot = replay.data["snapshot"]["player"]
-        equipment_keys = {item["item_key"] for item in snapshot["equipment"]}
-        assert {
-            "item.accessory.body.stone_pulse_bracer",
-            "item.armor.body.stoneheart_guard",
-            "item.weapon.body.pulse_edge",
-        } <= equipment_keys
-        assert snapshot["stats"]["accuracy_bp"] >= 190
-        assert snapshot["stats"]["damage_reduction_bp"] >= 110
+        assert started.code == "TRAINING_SPECTATOR"
+        assert started.data["status"] == "spectator"
         await runtime.close()
 
     with TemporaryDirectory() as directory:

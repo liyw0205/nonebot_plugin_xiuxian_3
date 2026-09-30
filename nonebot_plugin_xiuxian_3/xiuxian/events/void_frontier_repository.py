@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Any, Mapping
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -150,7 +151,7 @@ class VoidFrontierRepositoryMixin:
             ).fetchone()
             if pending is None:
                 raise VoidFrontierWeeklyNotAvailableError("no pending void-frontier weekly reward")
-            reward = self._json_object(pending["reward_json"], {"void_merit": 20, "alliance_points": 10})
+            reward = json_object(pending["reward_json"], {"void_merit": 20, "alliance_points": 10})
             connection.execute(
                 "UPDATE players SET void_merit=void_merit+?, alliance_points=alliance_points+?, updated_at=? WHERE id=?",
                 (int(reward.get("void_merit", 20)), int(reward.get("alliance_points", 10)), now_text, player["id"]),
@@ -209,7 +210,7 @@ class VoidFrontierRepositoryMixin:
                 raise VoidFrontierRewardAlreadyClaimedError("void-frontier reward already claimed")
             rank = int(ranking["rank"])
             reward = reward_for_rank(rank)
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = json_object(player["inventory_json"], {})
             inventory["item.void_crystal"] = int(inventory.get("item.void_crystal", 0)) + int(reward.get("item.void_crystal", 0))
             connection.execute(
                 "UPDATE players SET inventory_json=?, void_merit=void_merit+?, updated_at=? WHERE id=?",
@@ -256,8 +257,8 @@ class VoidFrontierRepositoryMixin:
             (starts, ends),
         ).fetchall()
         for row in exploration_rows:
-            result = self._json_object(row["result_json"], {})
-            snapshot = self._json_object(row["snapshot_json"], {})
+            result = json_object(row["result_json"], {})
+            snapshot = json_object(row["snapshot_json"], {})
             storm_event = str(snapshot.get("event_key", "")) == "event.void_storm" or str(snapshot.get("event_pool", "")) == "event.void_storm"
             rescued = bool(result.get("storm_rescued")) or str(result.get("storm_choice", "")) == "rescue"
             if storm_event and rescued:
@@ -268,7 +269,7 @@ class VoidFrontierRepositoryMixin:
             (starts, ends),
         ).fetchall()
         for row in storm_operations:
-            result = self._json_object(row["result_json"], {})
+            result = json_object(row["result_json"], {})
             if str(row["operation_id"]).startswith("event.void_storm") or bool(result.get("storm_rescued")) or bool(result.get("void_storm_rescue")) or str(result.get("storm_choice", "")) == "rescue":
                 self._vf_add_score_event(connection, season_id, int(row["player_id"]), "storm_rescue", str(row["operation_id"]), f"storm:{row['operation_id']}", str(row["created_at"]), now)
 
@@ -374,7 +375,7 @@ class VoidFrontierRepositoryMixin:
         for season in seasons:
             rows = connection.execute("SELECT id,player_id,reward_json FROM void_frontier_weekly_rewards WHERE season_id=? AND status='pending'", (season["season_id"],)).fetchall()
             for row in rows:
-                reward = self._json_object(row["reward_json"], {})
+                reward = json_object(row["reward_json"], {})
                 merit = int(reward.get("void_merit", 20))
                 connection.execute("UPDATE players SET void_merit=void_merit+?,updated_at=? WHERE id=?", (merit, now_text, row["player_id"]))
                 reward["bound"] = True
@@ -413,21 +414,13 @@ class VoidFrontierRepositoryMixin:
         return result
 
     @staticmethod
-    def _json_object(value: Any, default: Mapping[str, object] | None = None) -> dict[str, object]:
-        try:
-            parsed = json.loads(str(value)) if isinstance(value, str) else value
-            return dict(parsed) if isinstance(parsed, dict) else dict(default or {})
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return dict(default or {})
-
-    @staticmethod
     def _vf_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, object] | None:
         existing = connection.execute("SELECT operation_name,request_hash,result_json FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
         if existing is None:
             return None
         if str(existing["operation_name"]) != operation_name or str(existing["request_hash"]) != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return VoidFrontierRepositoryMixin._json_object(existing["result_json"], {})
+        return json_object(existing["result_json"], {})
 
     @staticmethod
     def _vf_insert_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: Mapping[str, object], now_text: str) -> None:

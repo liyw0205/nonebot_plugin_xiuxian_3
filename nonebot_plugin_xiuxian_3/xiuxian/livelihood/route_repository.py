@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
     PlayerStageConflictError,
@@ -68,7 +69,7 @@ class RouteRepositoryMixin:
         business_date = now.date().isoformat()
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
-            inventory = self._route_json_object(player["inventory_json"])
+            inventory = json_object(player["inventory_json"])
             missing: list[str] = []
             if str(player["stage"]) not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 missing.append("入道")
@@ -173,7 +174,7 @@ class RouteRepositoryMixin:
             if used is not None and int(used["count"]) >= definition.daily_limit:
                 raise RouteQuotaError("route daily limit reached")
             self._check_route_busy(connection, int(player["id"]))
-            inventory = self._route_json_object(player["inventory_json"])
+            inventory = json_object(player["inventory_json"])
             if int(inventory.get(cargo_key, 0)) < cargo_quantity:
                 raise RouteCargoRequirementError("cargo is insufficient")
             remaining = int(inventory[cargo_key]) - cargo_quantity
@@ -321,13 +322,13 @@ class RouteRepositoryMixin:
                 raise RouteNotFoundError("route is not awaiting settlement")
             if now < datetime.fromisoformat(str(route["arrives_at"])):
                 raise RouteNotReadyError("route has not arrived")
-            snapshot = self._route_json_object(route["snapshot_json"])
-            cargo = self._route_json_object(route["cargo_json"])
+            snapshot = json_object(route["snapshot_json"])
+            cargo = json_object(route["cargo_json"])
             local_key = "local.xuantian.new_town"
             reputation = connection.execute(
                 "SELECT local_json FROM player_reputations WHERE player_id = ?", (player["id"],)
             ).fetchone()
-            local = self._route_json_object(reputation["local_json"]) if reputation is not None else {}
+            local = json_object(reputation["local_json"]) if reputation is not None else {}
             local_before = int(local.get(local_key, 0))
             local_after = min(1000, local_before + int(snapshot.get("local_reputation", 0)))
             local[local_key] = local_after
@@ -403,11 +404,6 @@ class RouteRepositoryMixin:
         for table, status_clause in checks:
             if connection.execute(f"SELECT 1 FROM {table} WHERE player_id = ? AND {status_clause} LIMIT 1", (player_id,)).fetchone() is not None:
                 raise RouteBusyError("another player session is active")
-
-    @staticmethod
-    def _route_json_object(raw: Any) -> dict[str, Any]:
-        value = json.loads(raw) if isinstance(raw, str) else raw
-        return dict(value) if isinstance(value, dict) else {}
 
     @staticmethod
     def _route_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:

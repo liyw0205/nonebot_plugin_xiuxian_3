@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..persistence.errors import (
     QuestAlreadyCompletedError,
     QuestNotCompletedError,
@@ -70,7 +71,7 @@ class DemonQuestRepositoryMixin:
             if not demon_mainline_realm_ready(str(player["realm_key"]), int(player["realm_layer"])):
                 raise QuestRequirementError("demon mainline requires nascent soul L1")
 
-            reputation = self._json_object(player["faction_reputation_json"], {})
+            reputation = json_object(player["faction_reputation_json"], {})
             demon_reputation = int(reputation.get("demon", 0))
             if demon_reputation < DEMON_MAINLINE_REQUIRED_REPUTATION:
                 raise QuestRequirementError("demon reputation is insufficient")
@@ -91,7 +92,7 @@ class DemonQuestRepositoryMixin:
                 "exploration_ids": [item["exploration_id"] for item in evidence],
             }
 
-            intro = self._json_object(player["intro_json"], {})
+            intro = json_object(player["intro_json"], {})
             flags = {str(item) for item in intro.get("flags", [])}
             flags.update({DEMON_MAINLINE, DEMON_MAINLINE_ACCESS_FLAG})
             intro["flags"] = sorted(flags)
@@ -162,8 +163,8 @@ class DemonQuestRepositoryMixin:
         evidence: list[dict[str, str]] = []
         seen_operations: set[str] = set()
         for row in rows:
-            snapshot = DemonQuestRepositoryMixin._json_object(row["snapshot_json"], {})
-            result = DemonQuestRepositoryMixin._json_object(row["result_json"], {})
+            snapshot = json_object(row["snapshot_json"], {})
+            result = json_object(row["result_json"], {})
             if str(row["location_key"]) != "demon.fallen_ruins":
                 continue
             if result.get("battle_outcome") != "won":
@@ -179,16 +180,5 @@ class DemonQuestRepositoryMixin:
                 }
             )
         return evidence
-
-    @staticmethod
-    def _json_object(value: Any, default: dict[str, object]) -> dict[str, object]:
-        if isinstance(value, dict):
-            return dict(value)
-        try:
-            loaded = json.loads(str(value or "{}"))
-        except (TypeError, json.JSONDecodeError):
-            return dict(default)
-        return dict(loaded) if isinstance(loaded, dict) else dict(default)
-
 
 __all__ = ["DemonQuestRepositoryMixin"]

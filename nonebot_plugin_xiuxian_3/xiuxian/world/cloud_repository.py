@@ -30,6 +30,7 @@ from .cloud_rules import (
     cloud_route_definition,
 )
 from .permissions import array_hall_permission
+from ..utils.json import json_object
 
 
 class CloudRepositoryMixin:
@@ -678,7 +679,7 @@ class CloudRepositoryMixin:
         if progress is not None and str(progress["status"]) in {"completed", "claimed"}:
             return True
         intro = connection.execute("SELECT intro_json FROM players WHERE id = ?", (player_id,)).fetchone()
-        flags = CloudRepositoryMixin._json_object(intro["intro_json"], {}).get("flags", []) if intro else []
+        flags = json_object(intro["intro_json"], {}).get("flags", []) if intro else []
         return quest_key in {str(item) for item in flags}
 
     @staticmethod

@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -164,7 +165,7 @@ class ServiceRepositoryMixin:
             if str(order["status"]) != "published":
                 raise ServiceOrderConflictError("only published service orders can be cancelled")
             definition = service_definition(str(order["service_key"]))
-            snapshot = self._json_object(order["snapshot_json"], {})
+            snapshot = json_object(order["snapshot_json"], {})
             connection.execute(
                 "UPDATE livelihood_service_orders SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'published'",
                 (now_text, order["id"]),
@@ -248,7 +249,7 @@ class ServiceRepositoryMixin:
                 connection.commit()
                 raise ServiceExpiredError("service order has expired")
             definition = service_definition(str(order["service_key"]))
-            snapshot = self._json_object(order["snapshot_json"], {})
+            snapshot = json_object(order["snapshot_json"], {})
             publisher = connection.execute("SELECT * FROM players WHERE id = ?", (order["publisher_id"],)).fetchone()
             if publisher is None:
                 raise PlayerNotFoundError("publisher does not exist")
@@ -262,7 +263,7 @@ class ServiceRepositoryMixin:
                 if current < definition.required_service_reputation:
                     raise ServiceReputationInsufficientError("service reputation is insufficient")
             if definition.required_teaching:
-                intro = self._json_object(provider["intro_json"], {})
+                intro = json_object(provider["intro_json"], {})
                 selected_service = str(intro.get("selected_service") or provider["selected_service"] or "")
                 if (
                     "guide.choose_service" not in {str(item) for item in intro.get("flags", [])}
@@ -272,8 +273,8 @@ class ServiceRepositoryMixin:
             if definition.key == "service.gather_help" and provider["location_key"] != publisher["location_key"]:
                 raise ServiceLocationConflictError("service participants are not at the same location")
             self._check_provider_daily_limit(connection, provider["id"], definition, now)
-            inputs = self._json_object(snapshot.get("provider_inputs", {}), {})
-            inventory = self._json_object(provider["inventory_json"], {})
+            inputs = json_object(snapshot.get("provider_inputs", {}), {})
+            inventory = json_object(provider["inventory_json"], {})
             missing = {
                 key: quantity - int(inventory.get(key, 0))
                 for key, quantity in inputs.items()
@@ -368,7 +369,7 @@ class ServiceRepositoryMixin:
             if str(order["status"]) != "accepted":
                 raise ServiceOrderConflictError("service order is not accepted")
             definition = service_definition(str(order["service_key"]))
-            snapshot = self._json_object(order["snapshot_json"], {})
+            snapshot = json_object(order["snapshot_json"], {})
             publisher = connection.execute("SELECT * FROM players WHERE id = ?", (order["publisher_id"],)).fetchone()
             if publisher is None:
                 raise PlayerNotFoundError("publisher does not exist")
@@ -376,8 +377,8 @@ class ServiceRepositoryMixin:
             same_location = provider["location_key"] == publisher["location_key"]
             successful = not expired and (same_location or definition.key == "service.cook_meal")
             if successful:
-                outputs = self._json_object(snapshot.get("publisher_outputs", {}), {})
-                publisher_inventory = self._json_object(publisher["inventory_json"], {})
+                outputs = json_object(snapshot.get("publisher_outputs", {}), {})
+                publisher_inventory = json_object(publisher["inventory_json"], {})
                 for key, quantity in outputs.items():
                     publisher_inventory[key] = int(publisher_inventory.get(key, 0)) + int(quantity)
                 provider_payment = (int(order["reward_stones"]) * 9800) // 10000
@@ -397,11 +398,11 @@ class ServiceRepositoryMixin:
                 outputs = {}
                 provider_payment = 0
                 publisher_refund = (int(order["reward_stones"]) * 8000) // 10000
-                provider_inventory = self._json_object(provider["inventory_json"], {})
+                provider_inventory = json_object(provider["inventory_json"], {})
                 provider_refunds = (
-                    self._json_object(snapshot.get("provider_inputs", {}), {})
+                    json_object(snapshot.get("provider_inputs", {}), {})
                     if expired
-                    else self._json_object(snapshot.get("failure_provider_refund", {}), {})
+                    else json_object(snapshot.get("failure_provider_refund", {}), {})
                 )
                 for key, quantity in provider_refunds.items():
                     provider_inventory[key] = int(provider_inventory.get(key, 0)) + int(quantity)
@@ -556,11 +557,5 @@ class ServiceRepositoryMixin:
             "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
         )
-
-    @staticmethod
-    def _json_object(raw: Any, default: dict[str, Any] | None = None) -> dict[str, Any]:
-        value = json.loads(raw) if isinstance(raw, str) else raw
-        return dict(value) if isinstance(value, dict) else dict(default or {})
-
 
 __all__ = ["ServiceRepositoryMixin"]

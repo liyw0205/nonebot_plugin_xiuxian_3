@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..content import bundled_content
 from ..persistence.errors import (
     CommissionAlreadyAcceptedError,
@@ -268,8 +269,8 @@ class CommissionRepositoryMixin:
                     (now_text, claim["id"]),
                 )
                 raise CommissionExpiredError("commission has expired")
-            snapshot = self._json_object(claim["snapshot_json"], {})
-            inventory = self._json_object(player["inventory_json"], {})
+            snapshot = json_object(claim["snapshot_json"], {})
+            inventory = json_object(player["inventory_json"], {})
             inputs = {str(key): int(value) for key, value in dict(snapshot.get("inputs", {})).items()}
             missing = {
                 key: quantity - int(inventory.get(key, 0))
@@ -287,7 +288,7 @@ class CommissionRepositoryMixin:
                 "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
                 (player["id"],),
             ).fetchone()
-            local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
+            local = json_object(reputation["local_json"], {}) if reputation is not None else {}
             service_before = int(reputation["service_reputation"]) if reputation is not None else 0
             local_key = str(snapshot["local_reputation_key"])
             local_before = int(local.get(local_key, 0))
@@ -390,7 +391,7 @@ class CommissionRepositoryMixin:
                 if current is None:
                     continue
                 additional_stock = max(0, stock - int(current["stock_total"]))
-                current_snapshot = self._json_object(current["snapshot_json"], {})
+                current_snapshot = json_object(current["snapshot_json"], {})
                 if reward_multiplier > 100:
                     current_snapshot["reward_stones"] = reward_stones
                 connection.execute(
@@ -461,7 +462,7 @@ class CommissionRepositoryMixin:
                         "SELECT local_json FROM player_reputations WHERE player_id = ?",
                         (player["id"],),
                     ).fetchone()
-                    local_reputation = self._json_object(row["local_json"], {}) if row else {}
+                    local_reputation = json_object(row["local_json"], {}) if row else {}
                 if int(local_reputation.get(str(requirement["reputation_key"]), 0)) >= int(
                     requirement["minimum"]
                 ):
@@ -470,7 +471,7 @@ class CommissionRepositoryMixin:
 
     @staticmethod
     def _snapshot(definition: TownCommissionDefinition, offer: Any, now_text: str) -> dict[str, Any]:
-        snapshot = CommissionRepositoryMixin._json_object(offer["snapshot_json"], {})
+        snapshot = json_object(offer["snapshot_json"], {})
         snapshot["commission_key"] = definition.key
         snapshot["local_reputation_key"] = definition.local_reputation_key
         snapshot["accepted_at"] = now_text
@@ -479,7 +480,7 @@ class CommissionRepositoryMixin:
 
     @staticmethod
     def _commission_view(row: Any) -> TownCommissionView:
-        snapshot = CommissionRepositoryMixin._json_object(row["snapshot_json"], {})
+        snapshot = json_object(row["snapshot_json"], {})
         claim_status = str(row["claim_status"]) if row["claim_status"] else ""
         return TownCommissionView(
             commission_id=str(row["commission_id"]),
@@ -552,11 +553,5 @@ class CommissionRepositoryMixin:
             "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
         )
-
-    @staticmethod
-    def _json_object(raw: Any, default: dict[str, Any] | None = None) -> dict[str, Any]:
-        value = json.loads(raw) if isinstance(raw, str) else raw
-        return dict(value) if isinstance(value, dict) else dict(default or {})
-
 
 __all__ = ["CommissionRepositoryMixin"]

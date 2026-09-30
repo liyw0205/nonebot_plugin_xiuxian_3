@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from .secret_realm_models import SecretRealmPreviewRecord, SecretRealmRunRecord
 from .secret_realm_rules import (
     DEFINITIONS,
@@ -32,11 +33,6 @@ from ..persistence.errors import (
 
 class SecretRealmRepositoryMixin:
     """Persist the server-owned route and resource locks for one run."""
-
-    @staticmethod
-    def _json_object(raw: Any, default: dict[str, Any]) -> dict[str, Any]:
-        value = json.loads(raw) if isinstance(raw, str) else raw
-        return dict(value) if isinstance(value, dict) else dict(default)
 
     async def preview_secret_realms(self, *, platform: str, platform_user_id: str) -> SecretRealmPreviewRecord:
         await self.initialize()
@@ -100,7 +96,7 @@ class SecretRealmRepositoryMixin:
             ).fetchone()
             if int(count["count"]) >= definition.quota_limit:
                 raise SecretRealmQuotaError("secret-realm quota is exhausted")
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = json_object(player["inventory_json"], {})
             ticket = int(inventory.get(definition.ticket_key, 0)) if definition.ticket_key else 0
             if definition.ticket_key and ticket < definition.ticket_quantity:
                 raise SecretRealmRequirementError("secret-realm ticket is missing")
@@ -221,7 +217,7 @@ class SecretRealmRepositoryMixin:
             definition = secret_realm_definition(str(run["instance_key"]))
             if self._expired(run):
                 raise SecretRealmNotReadyError("secret realm has expired")
-            snapshot = self._json_object(run["snapshot_json"], {})
+            snapshot = json_object(run["snapshot_json"], {})
             node_index = int(run["node_index"])
             nodes = tuple(str(item) for item in snapshot.get("node_keys", definition.node_keys))
             if str(run["status"]) != "routing" or node_index >= len(nodes) or node_key != nodes[node_index]:
@@ -313,7 +309,7 @@ class SecretRealmRepositoryMixin:
             if run is None:
                 raise SecretRealmNotFoundError("no active secret realm")
             definition = secret_realm_definition(str(run["instance_key"]))
-            snapshot = self._json_object(run["snapshot_json"], {})
+            snapshot = json_object(run["snapshot_json"], {})
             return self._run_from_payload(
                 self._run_payload(
                     player,
@@ -323,7 +319,7 @@ class SecretRealmRepositoryMixin:
                     node_index=int(run["node_index"]),
                     snapshot=snapshot,
                     battle_id=run["battle_id"],
-                    reward=self._json_object(run["result_json"], {}).get("reward", {}),
+                    reward=json_object(run["result_json"], {}).get("reward", {}),
                     first_clear=bool(snapshot.get("first_clear")),
                     ticket_locked=int(run["ticket_locked"]),
                     stamina_locked=int(run["stamina_locked"]),
@@ -379,8 +375,8 @@ class SecretRealmRepositoryMixin:
                 raise SecretRealmNotFoundError("no secret realm run")
             status = str(run["status"])
             definition = secret_realm_definition(str(run["instance_key"]))
-            snapshot = self._json_object(run["snapshot_json"], {})
-            result = self._json_object(run["result_json"], {})
+            snapshot = json_object(run["snapshot_json"], {})
+            result = json_object(run["result_json"], {})
             if status in {"routing", "combat_pending"}:
                 if self._expired(run):
                     status = "expired"
@@ -442,7 +438,7 @@ class SecretRealmRepositoryMixin:
             run = connection.execute("SELECT * FROM secret_realm_runs WHERE run_id=?", (run_id,)).fetchone()
             if run is None or str(run["status"]) != "combat_pending":
                 return
-            snapshot = self._json_object(run["snapshot_json"], {})
+            snapshot = json_object(run["snapshot_json"], {})
             snapshot["encounter_outcome"] = outcome
             snapshot["encounter_won"] = outcome == "won"
             if outcome == "won":
@@ -468,7 +464,7 @@ class SecretRealmRepositoryMixin:
             definition = secret_realm_definition(str(run["instance_key"]))
             payload = self._run_payload(
                 player, definition, run_id=run_id, status=str(run["status"]), node_index=int(run["node_index"]),
-                snapshot=self._json_object(run["snapshot_json"], {}), battle_id=battle_id,
+                snapshot=json_object(run["snapshot_json"], {}), battle_id=battle_id,
                 ticket_locked=int(run["ticket_locked"]), stamina_locked=int(run["stamina_locked"]),
             )
             connection.execute(
@@ -517,20 +513,20 @@ class SecretRealmRepositoryMixin:
         key = run["ticket_key"]
         if not key:
             return
-        inventory = SecretRealmRepositoryMixin._json_object(player["inventory_json"], {})
+        inventory = json_object(player["inventory_json"], {})
         inventory[str(key)] = int(inventory.get(str(key), 0)) + int(run["ticket_locked"])
         connection.execute("UPDATE players SET inventory_json=?, updated_at=? WHERE id=?", (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]))
 
     @staticmethod
     def _apply_reward(connection: sqlite3.Connection, player: sqlite3.Row, reward: dict[str, int], now_text: str) -> None:
-        inventory = SecretRealmRepositoryMixin._json_object(player["inventory_json"], {})
+        inventory = json_object(player["inventory_json"], {})
         stones = int(player["spirit_stones"])
         for key, value in reward.items():
             if key == "spirit_stones":
                 stones += int(value)
             elif key == "local_reputation":
                 rep = connection.execute("SELECT local_json FROM player_reputations WHERE player_id=?", (player["id"],)).fetchone()
-                local = SecretRealmRepositoryMixin._json_object(rep["local_json"], {}) if rep else {}
+                local = json_object(rep["local_json"], {}) if rep else {}
                 local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + int(value)
                 connection.execute("INSERT INTO player_reputations(player_id, local_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json, updated_at=excluded.updated_at", (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), now_text))
             elif key.startswith("item.weapon.") or key.startswith("item.armor.") or key.startswith("item.accessory."):

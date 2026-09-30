@@ -6,6 +6,7 @@ import sqlite3
 import pytest
 
 from nonebot_plugin_xiuxian_3.xiuxian.utils.database import connect_sqlite
+from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_object
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
     DuplicateJSONKeyError,
     clear_json_cache,
@@ -55,3 +56,16 @@ def test_sqlite_connection_uses_shared_pragmas(tmp_path) -> None:
         assert connection.execute("PRAGMA synchronous").fetchone()[0] == 1
     finally:
         connection.close()
+
+
+def test_json_object_normalizes_stored_values_without_sharing_defaults() -> None:
+    default = {"spirit_stones": 3}
+
+    assert json_object('{"spirit_stones": 5}') == {"spirit_stones": 5}
+    assert json_object({"spirit_stones": 7}) == {"spirit_stones": 7}
+    assert json_object("invalid json", default) == default
+    assert json_object([], default) == default
+
+    decoded = json_object(None, default)
+    decoded["spirit_stones"] = 0
+    assert default == {"spirit_stones": 3}

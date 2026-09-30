@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from .codex_projection import record_codex_discovery
 from .story_models import StoryBranchView, StoryRecord
 from .story_rules import BRANCHES, STORY_KEY, completed_nodes
@@ -156,7 +157,7 @@ class StoryRepositoryMixin:
                 if len(branch_evidence) < BRANCHES[route_key].required_source_count:
                     raise StoryChoiceRequirementError("route source requirements are not met")
                 nodes = completed_nodes(route_key, len(branch_evidence))
-                snapshot = self._json_object(run["snapshot_json"], {})
+                snapshot = json_object(run["snapshot_json"], {})
                 snapshot["choice"] = {
                     "route_key": route_key,
                     "source_operation_ids": branch_evidence,
@@ -232,13 +233,13 @@ class StoryRepositoryMixin:
                 raise StoryEndingNotAvailableError("story ending is not ready to claim")
             route_key = str(run["selected_route"])
             branch = BRANCHES[route_key]
-            snapshot = self._json_object(run["snapshot_json"], {})
+            snapshot = json_object(run["snapshot_json"], {})
             reward = {"local_reputation": 10}
             reputation = connection.execute(
                 "SELECT local_json,service_reputation FROM player_reputations WHERE player_id=?",
                 (player["id"],),
             ).fetchone()
-            local = self._json_object(reputation["local_json"], {}) if reputation else {}
+            local = json_object(reputation["local_json"], {}) if reputation else {}
             service_reputation = int(reputation["service_reputation"]) if reputation else 0
             local_key = "local.xuantian.new_town"
             local[local_key] = min(1000, int(local.get(local_key, 0)) + 10)
@@ -256,7 +257,7 @@ class StoryRepositoryMixin:
                     now_text,
                 ),
             )
-            intro = self._json_object(player["intro_json"], {})
+            intro = json_object(player["intro_json"], {})
             flags = set(str(item) for item in intro.get("flags", []))
             flags.update((branch.flag_key, branch.appearance_key))
             intro["flags"] = sorted(flags)
@@ -340,7 +341,7 @@ class StoryRepositoryMixin:
             "ORDER BY id DESC",
             (player_id,),
         ).fetchall():
-            result = self._json_object(row["result_json"], {})
+            result = json_object(row["result_json"], {})
             if result.get("outcome") == "won":
                 battle_ids.append(str(row["resolved_operation_id"]))
                 if len(battle_ids) == BRANCHES["warden"].required_source_count:
@@ -352,7 +353,7 @@ class StoryRepositoryMixin:
             "ORDER BY created_at DESC,rowid DESC LIMIT 20",
             (player_id,),
         ).fetchall():
-            result = self._json_object(row["result_json"], {})
+            result = json_object(row["result_json"], {})
             if result.get("status") == "harvested" and result.get("plot_id"):
                 harvests.append(str(row["operation_id"]))
                 if len(harvests) == BRANCHES["gardener"].required_source_count:
@@ -365,7 +366,7 @@ class StoryRepositoryMixin:
             "ORDER BY id DESC",
             (player_id,),
         ).fetchall():
-            result = self._json_object(row["result_json"], {})
+            result = json_object(row["result_json"], {})
             if result.get("outcome") == "success":
                 dispatches.append(str(row["settle_operation_id"]))
                 if len(dispatches) == BRANCHES["gardener"].required_source_count:
@@ -385,9 +386,9 @@ class StoryRepositoryMixin:
         *,
         replay: bool = False,
     ) -> StoryRecord:
-        snapshot = self._json_object(run["snapshot_json"], {}) if run else {}
+        snapshot = json_object(run["snapshot_json"], {}) if run else {}
         selected = str(run["selected_route"]) if run and run["selected_route"] else None
-        result = self._json_object(run["result_json"], {}) if run else {}
+        result = json_object(run["result_json"], {}) if run else {}
         choice = snapshot.get("choice", {}) if isinstance(snapshot.get("choice", {}), dict) else {}
         nodes = tuple(str(item) for item in choice.get("completed_nodes", ()))
         return StoryRecord(
@@ -506,18 +507,5 @@ class StoryRepositoryMixin:
                 now_text,
             ),
         )
-
-    @staticmethod
-    def _json_object(value: Any, default: dict[str, Any]) -> dict[str, Any]:
-        if isinstance(value, dict):
-            return value
-        if isinstance(value, str):
-            try:
-                parsed = json.loads(value)
-            except (TypeError, ValueError):
-                return default
-            return parsed if isinstance(parsed, dict) else default
-        return default
-
 
 __all__ = ["StoryRepositoryMixin"]

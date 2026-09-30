@@ -167,6 +167,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.json import json_object
 
 
 class PlayerRepositoryMixin:
@@ -1002,8 +1003,7 @@ class PlayerRepositoryMixin:
 
     @staticmethod
     def _json_object(raw: Any, default: dict[str, Any]) -> dict[str, Any]:
-        value = json.loads(raw) if isinstance(raw, str) else raw
-        return dict(value) if isinstance(value, dict) else dict(default)
+        return json_object(raw, default)
 
     @staticmethod
     def _row_to_player(row: sqlite3.Row | dict[str, Any]) -> PlayerView:

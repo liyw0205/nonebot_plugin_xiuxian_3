@@ -19,6 +19,7 @@ from ..persistence.errors import (
     ProjectNotReadyError,
     ResourceInsufficientError,
 )
+from ..utils.json import json_object
 from .project_models import ProjectContributionRecord, ProjectSettlementRecord, PublicProjectView
 from .rules import (
     PUBLIC_PROJECT_DEFINITIONS,
@@ -147,14 +148,14 @@ class ProjectRepositoryMixin:
             if resource not in definition.contribution_resources:
                 raise ProjectContributionRequirementError("resource cannot contribute to this project")
             cost_key, resource_amount = self._resource_cost(resource, points)
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = json_object(player["inventory_json"], {})
             if cost_key == "currency.spirit_stone":
                 available = int(player["spirit_stones"])
             else:
                 available = int(inventory.get(cost_key, 0))
             if available < resource_amount:
                 raise ResourceInsufficientError("project resource is insufficient")
-            progress = self._json_object(project["progress_json"], {})
+            progress = json_object(project["progress_json"], {})
             required = int(definition.requirements.get(cost_key, 0))
             before = int(progress.get(cost_key, 0))
             if before >= required:
@@ -290,7 +291,7 @@ class ProjectRepositoryMixin:
                 (project["project_id"], player["id"]),
             ).fetchone()
             if prior is not None:
-                reward = self._json_object(prior["reward_json"], {})
+                reward = json_object(prior["reward_json"], {})
                 payload = self._settlement_payload(player, project, bool(prior["eligible"]), bool(prior["eligible"]), reward)
                 self._record_project_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
                 return self._project_settlement_from_payload(payload, replay=True)
@@ -367,7 +368,7 @@ class ProjectRepositoryMixin:
                 json.dumps(requirements, ensure_ascii=False, sort_keys=True),
                 json.dumps(progress, ensure_ascii=False, sort_keys=True),
                 definition.effect_key,
-                json.dumps({"label": definition.label, "content_version": definition.content_version, "rule_version": definition.rule_version}, ensure_ascii=False, sort_keys=True),
+                json.dumps({"label": definition.label}, ensure_ascii=False, sort_keys=True),
                 now_text,
                 now_text,
             ),
@@ -379,7 +380,7 @@ class ProjectRepositoryMixin:
         """Check project authority without granting it implicitly."""
 
         if definition.required_faction:
-            faction = ProjectRepositoryMixin._json_object(player["faction_reputation_json"], {})
+            faction = json_object(player["faction_reputation_json"], {})
             if int(faction.get(definition.required_faction, 0)) < definition.required_faction_reputation:
                 return False
         if definition.required_sect_level:
@@ -387,7 +388,7 @@ class ProjectRepositoryMixin:
                 "SELECT local_json FROM player_reputations WHERE player_id = ?",
                 (player["id"],),
             ).fetchone()
-            local = ProjectRepositoryMixin._json_object(reputation["local_json"], {}) if reputation else {}
+            local = json_object(reputation["local_json"], {}) if reputation else {}
             city_authorized = int(local.get("local.domain_refuge_authorized", 0)) > 0
             sect_authorized = connection.execute(
                 """
@@ -479,7 +480,7 @@ class ProjectRepositoryMixin:
         operation_id: str,
     ) -> dict[str, int]:
         reward = {str(key): int(value) for key, value in definition.reward.items() if isinstance(value, int)}
-        inventory = self._json_object(player["inventory_json"], {})
+        inventory = json_object(player["inventory_json"], {})
         item_key = definition.reward.get("item")
         if item_key:
             inventory[str(item_key)] = int(inventory.get(str(item_key), 0)) + 1
@@ -493,7 +494,7 @@ class ProjectRepositoryMixin:
         service_delta = int(reward.get("service_reputation", 0))
         if local_delta or service_delta:
             row = connection.execute("SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?", (player["id"],)).fetchone()
-            local = self._json_object(row["local_json"], {}) if row is not None else {}
+            local = json_object(row["local_json"], {}) if row is not None else {}
             local_key = definition.local_reputation_key
             local[local_key] = min(1000, int(local.get(local_key, 0)) + local_delta)
             service = min(100, int(row["service_reputation"]) + service_delta) if row is not None else service_delta
@@ -510,16 +511,17 @@ class ProjectRepositoryMixin:
 
     @staticmethod
     def _project_payload(row: Any) -> dict[str, Any]:
+        snapshot = json_object(row["snapshot_json"], {})
         return {
             "project_id": str(row["project_id"]),
             "project_key": str(row["project_key"]),
-            "label": str(json.loads(row["snapshot_json"]).get("label", row["project_key"])),
+            "label": str(snapshot.get("label", row["project_key"])),
             "business_week": str(row["business_week"]),
             "status": str(row["status"]),
             "contribution_points": int(row["contribution_points"]),
             "target_points": int(row["target_points"]),
-            "progress": ProjectRepositoryMixin._json_object(row["progress_json"], {}),
-            "requirements": ProjectRepositoryMixin._json_object(row["requirements_json"], {}),
+            "progress": json_object(row["progress_json"], {}),
+            "requirements": json_object(row["requirements_json"], {}),
             "effect_key": str(row["effect_key"]),
             "effect_ends_at": str(row["effect_ends_at"] or ""),
         }
@@ -557,11 +559,6 @@ class ProjectRepositoryMixin:
             reward={str(key): int(value) for key, value in payload.get("reward", {}).items() if isinstance(value, int)},
             already_completed=replay,
         )
-
-    @staticmethod
-    def _json_object(raw: Any, default: dict[str, Any] | None = None) -> dict[str, Any]:
-        value = json.loads(raw) if isinstance(raw, str) else raw
-        return dict(value) if isinstance(value, dict) else dict(default or {})
 
     @staticmethod
     def _project_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
