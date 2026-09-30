@@ -7,6 +7,7 @@ import json
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import grant_player_assets
 from ..persistence.errors import (
     OperationConflictError,
     PartyBattleRequirementError,
@@ -226,9 +227,15 @@ class ThreeRealmsTowerDuoRepositoryMixin:
             if row is None:
                 raise TowerRewardNotAvailableError("no tower duo reward is pending")
             reward = self._json_object(row["reward_json"], {})
-            inventory = self._json_object(player["inventory_json"], {})
-            inventory["item.mat.array_sand"] = int(inventory.get("item.mat.array_sand", 0)) + int(reward.get("item.mat.array_sand", 0))
-            connection.execute("UPDATE players SET spirit_stones=spirit_stones+?,inventory_json=?,updated_at=? WHERE id=?", (int(reward.get("spirit_stones", 0)), json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]))
+            grant_player_assets(
+                connection,
+                player,
+                {
+                    "spirit_stones": int(reward.get("spirit_stones", 0)),
+                    "item.mat.array_sand": int(reward.get("item.mat.array_sand", 0)),
+                },
+                now_text,
+            )
             connection.execute("UPDATE three_realms_tower_duo_member_runs SET status='claimed',claim_operation_id=?,updated_at=? WHERE id=? AND status='reward_pending'", (operation_id, now_text, row["id"]))
             payload = {"duo_run_id": str(row["duo_run_id"]), "run_id": str(row["run_id"]), "player_id": str(player["player_id"]), "floor_no": int(row["floor_no"]), "first_clear": bool(row["first_clear"]), "reward": reward}
             self._insert_duo_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)

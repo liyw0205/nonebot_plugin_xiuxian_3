@@ -24,6 +24,7 @@ from ..world.cloud_repository import CloudRepositoryMixin
 from ..exploration.repository import ExplorationRepositoryMixin
 from ..combat.repository import CombatRepositoryMixin
 from ..combat.party_repository import PartyCombatRepositoryMixin
+from ..companions.repository import CompanionRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.secret_realm_repository import SecretRealmRepositoryMixin
 from ..adventures.demon_abyss_repository import DemonAbyssRepositoryMixin
@@ -121,6 +122,7 @@ class SQLitePlayerRepository(
     ProgressionRepositoryMixin,
     RoutineRepositoryMixin,
     ExplorationRepositoryMixin,
+    CompanionRepositoryMixin,
     CombatRepositoryMixin,
     PartyCombatRepositoryMixin,
     AdventuresRepositoryMixin,

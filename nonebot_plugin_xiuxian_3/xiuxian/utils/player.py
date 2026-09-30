@@ -101,6 +101,7 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
         "qualification": qualification,
         "inventory": inventory,
         "intro_flags": player_intro_flags(row),
+        "faction_reputation": player_reputation(row),
         "selected_service": (
             str(intro["selected_service"])
             if intro.get("selected_service") is not None
@@ -155,6 +156,37 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     }
 
 
+def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
+    """Return the shared immutable player inputs used at battle start.
+
+    Exploration, ordinary PvE and party PvE all use this same projection;
+    companion and equipment modifiers are added by their own snapshot readers.
+    """
+
+    values = player_values(row)
+    return {
+        "player_id": values["player_id"],
+        "dao_name": values["dao_name"],
+        "path_key": values["path_key"],
+        "location_key": values["location_key"],
+        "realm_key": values["realm_key"],
+        "realm_layer": values["realm_layer"],
+        "qualification": dict(values["qualification"]),
+        "inventory": dict(values["inventory"]),
+        "max_hp": values["max_hp"],
+        "initiative": values["initiative"],
+        "pollution": values["pollution"],
+        "bloodline_stability": values["bloodline_stability"],
+        "cross_realm_penalty_bp": values["cross_realm_penalty_bp"],
+        "faction_reputation": dict(values["faction_reputation"]),
+        "soul_power": values["soul_power"],
+        "domain_key": values["domain_key"],
+        "domain_charge": values["domain_charge"],
+        "domain_charge_max": values["domain_charge_max"],
+        "domain_power": values["domain_power"],
+    }
+
+
 __all__ = [
     "player_field",
     "player_integer",
@@ -164,4 +196,5 @@ __all__ = [
     "player_intro_flags",
     "player_reputation",
     "player_values",
+    "player_combat_values",
 ]

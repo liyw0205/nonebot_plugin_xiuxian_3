@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import assets_spend, assets_with_delta, inventory_json, inventory_value
+from ..utils.assets import change_player_assets, inventory_value, spend_player_assets
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
     VOID_INSTABILITY_SECONDS,
@@ -147,12 +147,13 @@ class WorldRepositoryMixin:
             if int(row["stamina"]) < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             try:
-                inventory = assets_spend(
-                    row["spirit_stones"],
-                    inventory,
+                spend_player_assets(
+                    connection,
+                    row,
                     {"item.void_anchor": anchor_cost},
+                    now_text,
                     preserve_zero=True,
-                ).inventory
+                )
             except ValueError as exc:
                 raise VoidAnchorInsufficientError("void anchors are insufficient") from exc
             storm_roll = void_route_roll_bp(operation_id)
@@ -169,14 +170,8 @@ class WorldRepositoryMixin:
                 "stamina_cost": definition.stamina_cost,
             }
             connection.execute(
-                "UPDATE players SET inventory_json = ?, stamina = stamina - ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
-                (
-                    inventory_json(inventory, keep_zero=True),
-                    definition.stamina_cost,
-                    instability_until,
-                    now_text,
-                    row["id"],
-                ),
+                "UPDATE players SET stamina = stamina - ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
+                (definition.stamina_cost, instability_until, now_text, row["id"]),
             )
             connection.execute(
                 "INSERT INTO void_route_sessions(session_id, player_id, operation_id, route_key, status, starts_at, ends_at, anchor_cost, stamina_cost, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)",
@@ -266,14 +261,15 @@ class WorldRepositoryMixin:
             if storm:
                 extra_anchor_lost = min(1, int(inventory.get("item.void_anchor", 0)))
             reward = {"item.void_crystal": 1}
-            inventory = assets_with_delta(
-                row["spirit_stones"],
-                inventory,
+            change_player_assets(
+                connection,
+                row,
                 {
                     "item.void_anchor": -extra_anchor_lost,
                     **reward,
                 },
-            ).inventory
+                now_text,
+            )
             instability_until = (
                 serialize_datetime(now + timedelta(seconds=VOID_INSTABILITY_SECONDS))
                 if storm
@@ -288,10 +284,9 @@ class WorldRepositoryMixin:
                 (row["id"], arrival_location),
             ).fetchone()
             connection.execute(
-                "UPDATE players SET location_key = ?, inventory_json = ?, void_route_count = void_route_count + ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
+                "UPDATE players SET location_key = ?, void_route_count = void_route_count + ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
                 (
                     arrival_location,
-                    inventory_json(inventory),
                     0 if discovered_route is not None else 1,
                     instability_until,
                     now_text,

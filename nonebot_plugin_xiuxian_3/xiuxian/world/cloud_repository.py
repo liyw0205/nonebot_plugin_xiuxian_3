@@ -13,7 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import assets_spend, inventory_json, inventory_value
+from ..utils.assets import spend_player_assets
 from .cloud_models import (
     ArrayHallRecord,
     BeastHistoryRecord,
@@ -100,21 +100,19 @@ class CloudRepositoryMixin:
                 raise CloudBoatBusyError("another long action is active")
 
             stamina = int(player["stamina"])
-            stones = int(player["spirit_stones"])
-            inventory = inventory_value(player["inventory_json"])
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
-            if stones < definition.currency_cost:
+            if int(player["spirit_stones"]) < definition.currency_cost:
                 raise CloudFareInsufficientError("cloud fare is insufficient")
+            asset_costs = {"spirit_stones": definition.currency_cost}
             if definition.pass_key:
-                try:
-                    inventory = assets_spend(
-                        stones,
-                        inventory,
-                        {definition.pass_key: definition.pass_quantity},
-                    ).inventory
-                except ValueError as exc:
+                asset_costs[definition.pass_key] = definition.pass_quantity
+            try:
+                spend_player_assets(connection, player, asset_costs, now_text)
+            except ValueError as exc:
+                if definition.pass_key and "inventory" in str(exc):
                     raise AdvancedCavePassMissingError("advanced cave pass is missing") from exc
+                raise CloudFareInsufficientError("cloud fare is insufficient") from exc
             session_id = uuid4().hex
             ends_at = now + timedelta(seconds=definition.duration_seconds)
             snapshot = {
@@ -130,14 +128,8 @@ class CloudRepositoryMixin:
                 "required_quest": definition.required_quest,
             }
             connection.execute(
-                "UPDATE players SET stamina = ?, spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    stamina - definition.stamina_cost,
-                    stones - definition.currency_cost,
-                    inventory_json(inventory),
-                    now_text,
-                    player_id,
-                ),
+                "UPDATE players SET stamina = ?, updated_at = ? WHERE id = ?",
+                (stamina - definition.stamina_cost, now_text, player_id),
             )
             connection.execute(
                 """

@@ -14,12 +14,14 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     currency_grant,
     currency_spend,
     currency_with_delta,
+    grant_player_assets,
     inventory_grant,
     inventory_json,
     inventory_missing,
     inventory_spend,
     inventory_value,
     inventory_with_delta,
+    spend_player_assets,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_object
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
@@ -34,6 +36,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_inventory,
     player_qualification,
     player_intro_flags,
+    player_combat_values,
     player_reputation,
     player_values,
 )
@@ -143,6 +146,39 @@ def test_asset_state_applies_currency_and_items_together() -> None:
         assets_grant(0, {}, {"spirit_stones": -1})
 
 
+def test_player_asset_mutations_share_transactional_persistence() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, updated_at) VALUES (1, 100, ?, 'before')",
+        ('{"item.herb": 2}',),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+
+    spent = spend_player_assets(
+        connection,
+        row,
+        {"spirit_stones": 25, "item.herb": 1},
+        "spent",
+    )
+    assert spent.currency == 75
+    assert spent.inventory == {"item.herb": 1}
+    granted = grant_player_assets(
+        connection,
+        connection.execute("SELECT * FROM players WHERE id = 1").fetchone(),
+        {"spirit_stones": 10, "item.sand": 3},
+        "granted",
+    )
+    assert granted.currency == 85
+    assert granted.inventory == {"item.herb": 1, "item.sand": 3}
+    stored = connection.execute("SELECT spirit_stones, inventory_json, updated_at FROM players WHERE id = 1").fetchone()
+    assert tuple(stored) == (85, '{"item.herb": 1, "item.sand": 3}', "granted")
+    connection.close()
+
+
 def test_player_values_normalizes_full_and_partial_rows() -> None:
     row = {
         "player_id": "p1",
@@ -166,6 +202,9 @@ def test_player_values_normalizes_full_and_partial_rows() -> None:
     assert values["realm_layer"] == 3
     assert values["max_hp"] == 240
     assert values["initiative"] == 18
+    combat = player_combat_values(row)
+    assert combat["qualification"] == values["qualification"]
+    assert combat["inventory"] == values["inventory"]
     partial = player_values({"player_id": "p2", "qualification_json": "{}"})
     assert partial["realm_key"] == "mortal"
     assert partial["spirit_stones"] == 0

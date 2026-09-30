@@ -22,6 +22,107 @@ class AssetState:
     inventory: dict[str, int]
 
 
+def write_player_assets(
+    connection: Any,
+    player_id: int,
+    assets: AssetState,
+    updated_at: str,
+    *,
+    preserve_zero: bool = False,
+) -> AssetState:
+    """Persist one player's currency and inventory in the current transaction."""
+
+    connection.execute(
+        "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+        (
+            assets.currency,
+            inventory_json(assets.inventory, keep_zero=preserve_zero),
+            updated_at,
+            player_id,
+        ),
+    )
+    return assets
+
+
+def _player_asset_state(row: Any, *, preserve_zero: bool = False) -> AssetState:
+    return AssetState(
+        currency=row["spirit_stones"],
+        inventory=inventory_value(row["inventory_json"], keep_zero=preserve_zero),
+    )
+
+
+def grant_player_assets(
+    connection: Any,
+    row: Any,
+    rewards: Mapping[str, Any],
+    updated_at: str,
+    *,
+    preserve_zero: bool = False,
+) -> AssetState:
+    """Grant currency and stackable items, then persist them atomically."""
+
+    current = _player_asset_state(row, preserve_zero=preserve_zero)
+    next_assets = assets_grant(current.currency, current.inventory, rewards)
+    return write_player_assets(
+        connection,
+        int(row["id"]),
+        next_assets,
+        updated_at,
+        preserve_zero=preserve_zero,
+    )
+
+
+def spend_player_assets(
+    connection: Any,
+    row: Any,
+    costs: Mapping[str, Any],
+    updated_at: str,
+    *,
+    preserve_zero: bool = False,
+) -> AssetState:
+    """Spend currency and stackable items, then persist them atomically."""
+
+    current = _player_asset_state(row, preserve_zero=preserve_zero)
+    next_assets = assets_spend(
+        current.currency,
+        current.inventory,
+        costs,
+        preserve_zero=preserve_zero,
+    )
+    return write_player_assets(
+        connection,
+        int(row["id"]),
+        next_assets,
+        updated_at,
+        preserve_zero=preserve_zero,
+    )
+
+
+def change_player_assets(
+    connection: Any,
+    row: Any,
+    delta: Mapping[str, Any],
+    updated_at: str,
+    *,
+    preserve_zero: bool = False,
+) -> AssetState:
+    """Apply one signed asset delta and persist it in the current transaction."""
+
+    current = _player_asset_state(row, preserve_zero=preserve_zero)
+    next_assets = assets_with_delta(
+        current.currency,
+        current.inventory,
+        delta,
+    )
+    return write_player_assets(
+        connection,
+        int(row["id"]),
+        next_assets,
+        updated_at,
+        preserve_zero=preserve_zero,
+    )
+
+
 def _asset_delta_parts(
     delta: Mapping[str, Any], *, currency_key: str
 ) -> tuple[Any, dict[str, Any]]:
@@ -271,9 +372,11 @@ __all__ = [
     "assets_grant",
     "assets_spend",
     "assets_with_delta",
+    "change_player_assets",
     "currency_grant",
     "currency_spend",
     "currency_with_delta",
+    "grant_player_assets",
     "inventory_amount",
     "inventory_grant",
     "inventory_json",
@@ -281,4 +384,6 @@ __all__ = [
     "inventory_spend",
     "inventory_value",
     "inventory_with_delta",
+    "spend_player_assets",
+    "write_player_assets",
 ]

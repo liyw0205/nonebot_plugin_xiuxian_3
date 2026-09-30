@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_json, inventory_spend, inventory_value
+from ..utils.assets import inventory_value, spend_player_assets
 from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
@@ -163,7 +163,7 @@ class SectSupplyRepositoryMixin:
             if item_key == "spirit_stones":
                 if int(player["spirit_stones"]) < quantity:
                     raise ResourceInsufficientError("not enough spirit stones")
-                connection.execute("UPDATE players SET spirit_stones=spirit_stones-?,updated_at=? WHERE id=?", (quantity, now_text, player["id"]))
+                spend_player_assets(connection, player, {"spirit_stones": quantity}, now_text)
                 connection.execute("UPDATE sects SET spirit_stones=spirit_stones+?,updated_at=? WHERE sect_id=?", (quantity, now_text, sect["sect_id"]))
                 balance = int(sect["spirit_stones"]) + quantity
             else:
@@ -172,9 +172,8 @@ class SectSupplyRepositoryMixin:
                     raise ResourceInsufficientError("not enough items")
                 if item_key not in warehouse and len(warehouse) >= int(sect["warehouse_capacity"]):
                     raise SectWarehouseFullError("warehouse has no free slots")
-                inventory = inventory_spend(inventory, {item_key: quantity})
                 warehouse[item_key] = int(warehouse.get(item_key, 0)) + quantity
-                connection.execute("UPDATE players SET inventory_json=?,updated_at=? WHERE id=?", (inventory_json(inventory), now_text, player["id"]))
+                spend_player_assets(connection, player, {item_key: quantity}, now_text)
                 connection.execute("UPDATE sects SET warehouse_json=?,updated_at=? WHERE sect_id=?", (json.dumps(warehouse, ensure_ascii=False, sort_keys=True), now_text, sect["sect_id"]))
                 balance = int(warehouse[item_key])
             connection.execute("UPDATE sect_members SET contribution=contribution+?,last_action_at=?,updated_at=? WHERE id=?", (contribution_gain, now_text, now_text, member["id"]))

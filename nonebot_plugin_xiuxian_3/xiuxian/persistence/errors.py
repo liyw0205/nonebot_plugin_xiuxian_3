@@ -20,6 +20,30 @@ class PlayerSuspendedError(RuntimeError):
     """A suspended or deleted player cannot perform a write operation."""
 
 
+class CompanionRequirementError(RuntimeError):
+    """The player has not met the source or lifecycle requirement."""
+
+
+class CompanionCapacityError(RuntimeError):
+    """The player has reached the per-kind companion limit."""
+
+
+class CompanionAlreadyBondedError(RuntimeError):
+    """The requested companion bond already exists."""
+
+
+class CompanionNotFoundError(RuntimeError):
+    """The requested companion instance does not exist."""
+
+
+class CompanionInjuredError(RuntimeError):
+    """The companion is still recovering from an injury."""
+
+
+class CompanionGearError(RuntimeError):
+    """The gear cannot be equipped on the requested companion."""
+
+
 class TradePermitRequirementError(RuntimeError):
     """The player lacks a trade permit's quest, faction reputation, or currency."""
 

@@ -2619,4 +2619,43 @@ CREATE TABLE IF NOT EXISTS quest_events (
 CREATE INDEX IF NOT EXISTS idx_quest_events_player
     ON quest_events(player_id, quest_key, component_key, created_at);
 
+CREATE TABLE IF NOT EXISTS companion_instances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instance_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    companion_key TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('beast', 'mount')),
+    status TEXT NOT NULL CHECK (status IN ('egg', 'bonded', 'active', 'resting', 'injured', 'retired', 'contract', 'available', 'travelling')),
+    level INTEGER NOT NULL CHECK (level >= 1),
+    experience INTEGER NOT NULL DEFAULT 0 CHECK (experience >= 0),
+    affinity INTEGER NOT NULL DEFAULT 0 CHECK (affinity >= 0),
+    stamina INTEGER NOT NULL DEFAULT 0 CHECK (stamina >= 0),
+    deployed INTEGER NOT NULL DEFAULT 0 CHECK (deployed IN (0, 1)),
+    injury_until TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_companion_instances_player
+    ON companion_instances(player_id, kind, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_companion_instances_deployed_kind
+    ON companion_instances(player_id, kind) WHERE deployed = 1 AND status IN ('active', 'available');
+
+CREATE TABLE IF NOT EXISTS companion_gear_instances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gear_instance_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    companion_instance_id INTEGER NOT NULL REFERENCES companion_instances(id),
+    gear_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('unbound', 'equipped', 'locked', 'unequipped', 'broken')),
+    durability_bp INTEGER NOT NULL CHECK (durability_bp >= 0),
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_companion_gear_player
+    ON companion_gear_instances(player_id, status, created_at);
+
 """

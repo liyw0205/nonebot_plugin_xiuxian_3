@@ -81,8 +81,8 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_DAMAGE_BP,
     TIME_FORT_STORM_INTERVAL,
 )
-from ..utils.player import player_intro_flags, player_object, player_reputation, player_values
-from ..utils.assets import assets_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.player import player_combat_values, player_intro_flags, player_object, player_reputation
+from ..utils.assets import grant_player_assets, inventory_spend, spend_player_assets
 
 
 class PartyCombatRepositoryMixin:
@@ -396,7 +396,7 @@ class PartyCombatRepositoryMixin:
             beast_party = party_type == PARTY_TYPE_BEAST_REALM
             leader_ticket_inventory: dict[str, int] | None = None
             for row in members:
-                player_state = player_values(row)
+                player_state = player_combat_values(row)
                 entry_snapshot = (
                     ancient_member_snapshots.get(int(row["database_player_id"]))
                     or void_member_snapshots.get(int(row["database_player_id"]))
@@ -464,6 +464,11 @@ class PartyCombatRepositoryMixin:
                 skills = list(entry_snapshot["skills"]) if entry_snapshot else self._battle_skill_snapshot(
                     connection, int(row["database_player_id"]), str(player_state["path_key"] or "")
                 )
+                companions = (
+                    list(entry_snapshot.get("companions", ()))
+                    if entry_snapshot
+                    else [dict(item) for item in self.companion_battle_snapshot(connection, int(row["database_player_id"])).companions]
+                )
                 qualification = dict(entry_snapshot["qualification"]) if entry_snapshot else player_state["qualification"]
                 constitution_effect = (
                     dict(entry_snapshot.get("constitution_effect", {}))
@@ -500,6 +505,7 @@ class PartyCombatRepositoryMixin:
                         "constitution_effect": constitution_effect,
                         "equipment": list(equipment),
                         "skills": skills,
+                        "companions": companions,
                         "soul_power": int(entry_snapshot.get("soul_power", row["soul_power"]) if entry_snapshot else row["soul_power"]),
                         "domain_key": (entry_snapshot.get("domain_key") if entry_snapshot else row["domain_key"]),
                         "domain_charge": int(entry_snapshot.get("domain_charge", row["domain_charge"]) if entry_snapshot else row["domain_charge"]),
@@ -526,9 +532,11 @@ class PartyCombatRepositoryMixin:
                         "UPDATE players SET stamina = stamina - ?, updated_at = ? WHERE id = ?",
                         (BOUNDARY_REALM_STAMINA_COST, now_text, row["database_player_id"]),
                     )
-                connection.execute(
-                    "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (inventory_json(leader_ticket_inventory), now_text, leader["id"]),
+                spend_player_assets(
+                    connection,
+                    leader,
+                    {BOUNDARY_REALM_TICKET: BOUNDARY_REALM_TICKET_COST},
+                    now_text,
                 )
             elif tower_duo_party:
                 # The tower-duo repository debits both members atomically before
@@ -1318,7 +1326,6 @@ class PartyCombatRepositoryMixin:
                 if player is None:
                     raise PartyBattleNotFoundError("party battle member no longer exists")
                 if reward:
-                    inventory = inventory_value(player["inventory_json"])
                     cultivation = int(player["cultivation"]) + int(reward.get("cultivation", 0))
                     total_cultivation = int(player["total_cultivation"]) + int(reward.get("cultivation", 0))
                     asset_reward = {
@@ -1327,9 +1334,7 @@ class PartyCombatRepositoryMixin:
                         if key not in {"cultivation", "world_merit", "soul_power"}
                         and not key.startswith("faction_reputation.")
                     }
-                    balances = assets_grant(player["spirit_stones"], inventory, asset_reward)
-                    spirit_stones = balances.currency
-                    inventory = balances.inventory
+                    grant_player_assets(connection, player, asset_reward, now_text)
                     world_merit = int(player["world_merit"]) + int(reward.get("world_merit", 0))
                     soul_power_max = max(
                         int(player["soul_power_max"]),
@@ -1346,8 +1351,8 @@ class PartyCombatRepositoryMixin:
                             faction_key = item_key.removeprefix("faction_reputation.")
                             faction[faction_key] = int(faction.get(faction_key, 0)) + int(quantity)
                     connection.execute(
-                        "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, world_merit=?, soul_power=?, soul_power_max=?, inventory_json=?, faction_reputation_json=?, updated_at=? WHERE id=?",
-                        (cultivation, total_cultivation, spirit_stones, world_merit, soul_power, soul_power_max, inventory_json(inventory), json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                        "UPDATE players SET cultivation=?, total_cultivation=?, world_merit=?, soul_power=?, soul_power_max=?, faction_reputation_json=?, updated_at=? WHERE id=?",
+                        (cultivation, total_cultivation, world_merit, soul_power, soul_power_max, json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
                     )
                 if fatigue_party and outcome in {"lost", "expired"}:
                     fatigue_until = serialize_datetime(self._now() + timedelta(hours=2))

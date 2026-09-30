@@ -28,6 +28,7 @@ from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
 from .advancement.skill_use_cases import SkillApplication
 from .advancement.equipment_use_cases import EquipmentApplication
+from .companions.use_cases import CompanionApplication
 from .livelihood.use_cases import LivelihoodApplication
 from .livelihood.route_use_cases import RouteApplication
 from .livelihood.service_use_cases import ServiceApplication
@@ -104,6 +105,7 @@ class XiuxianApplication:
         self.talent = TalentApplication(repository)
         self.skill = SkillApplication(repository)
         self.equipment = EquipmentApplication(repository)
+        self.companions = CompanionApplication(repository)
         self.livelihood = LivelihoodApplication(repository)
         self.route = RouteApplication(repository)
         self.service = ServiceApplication(repository)
@@ -1221,6 +1223,21 @@ class XiuxianApplication:
             lambda: self.equipment.refine(context),
             write_message="当前事件不允许重铸法器。",
         )
+
+    async def get_companion_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.companions.status(context), require_write=False)
+
+    async def bond_companion(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.companions.bond(context), write_message="当前事件不允许结缘灵兽。")
+
+    async def feed_companion(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.companions.feed(context), write_message="当前事件不允许喂养灵兽。")
+
+    async def rest_companion(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.companions.rest(context), write_message="当前事件不允许休养灵兽。")
+
+    async def equip_companion_gear(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.companions.equip(context), write_message="当前事件不允许装备灵具。")
 
     async def claim_daily(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

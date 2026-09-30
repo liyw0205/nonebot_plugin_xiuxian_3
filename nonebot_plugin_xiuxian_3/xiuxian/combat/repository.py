@@ -65,8 +65,8 @@ from .spectator_rules import (
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.assets import assets_grant, inventory_json, inventory_value
-from ..utils.player import player_values
+from ..utils.assets import grant_player_assets
+from ..utils.player import player_combat_values
 
 
 class CombatRepositoryMixin:
@@ -301,7 +301,7 @@ class CombatRepositoryMixin:
                     raise EventNotActiveError("demon invasion war front is closed")
 
             player = self._require_player(connection, platform, platform_user_id)
-            player_state = player_values(player)
+            player_state = player_combat_values(player)
             if battle_type == "pve.void_wall_trial":
                 from ..quests.rules import (
                     VOID_QUEST,
@@ -414,6 +414,11 @@ class CombatRepositoryMixin:
                 int(player["id"]),
                 str(player_state["path_key"] or ""),
             )
+            companion_snapshot = (
+                tuple(dict(item) for item in exploration_snapshot.get("companions", ()))
+                if exploration is not None
+                else self.companion_battle_snapshot(connection, int(player["id"])).companions
+            )
             battle_id = uuid4().hex
             snapshot = {
                 "battle_type": battle_type,
@@ -428,6 +433,7 @@ class CombatRepositoryMixin:
                     "manual_effects": manual_effects,
                     "equipment": list(equipment),
                     "skills": skills,
+                    "companions": [dict(item) for item in companion_snapshot],
                     "cross_realm_penalty_bp": int(exploration_snapshot.get("cross_realm_penalty_bp", 0)),
                 },
                 "enemy": {
@@ -607,7 +613,7 @@ class CombatRepositoryMixin:
     def _spectator_player_snapshot(
         self, connection: sqlite3.Connection, player: sqlite3.Row
     ) -> tuple[dict[str, object], str]:
-        player_state = player_values(player)
+        player_state = player_combat_values(player)
         qualification = player_state["qualification"]
         equipment = self._battle_equipment_snapshot(connection, int(player["id"]))
         constitution_effect = constitution_effect_snapshot(connection, int(player["id"]))
@@ -1249,14 +1255,10 @@ class CombatRepositoryMixin:
             reward = {str(key): int(value) for key, value in dict(result.get("reward", {})).items()}
             if not reward:
                 raise BattleRewardNotAvailableError("battle has no claimable reward")
-            inventory = inventory_value(player["inventory_json"])
-            stones = int(player["spirit_stones"])
             cultivation = int(player["cultivation"])
             total_cultivation = int(player["total_cultivation"])
             asset_reward = {key: quantity for key, quantity in reward.items() if key != "cultivation"}
-            balances = assets_grant(stones, inventory, asset_reward)
-            stones = balances.currency
-            inventory = balances.inventory
+            grant_player_assets(connection, player, asset_reward, now_text)
             cultivation += int(reward.get("cultivation", 0))
             total_cultivation += int(reward.get("cultivation", 0))
             record_material_discoveries(
@@ -1270,15 +1272,12 @@ class CombatRepositoryMixin:
             connection.execute(
                 """
                 UPDATE players
-                SET spirit_stones = ?, cultivation = ?, total_cultivation = ?,
-                    inventory_json = ?, updated_at = ?
+                SET cultivation = ?, total_cultivation = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
-                    stones,
                     cultivation,
                     total_cultivation,
-                    inventory_json(inventory),
                     now_text,
                     player["id"],
                 ),

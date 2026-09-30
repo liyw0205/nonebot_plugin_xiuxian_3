@@ -14,7 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.player import player_values
+from ..utils.player import player_combat_values
 from ..persistence.errors import (
     ArenaChallengeCapError,
     ArenaMatchNotFoundError,
@@ -830,7 +830,7 @@ class ArenaRepositoryMixin:
     def _arena_player_snapshot(
         self, connection: sqlite3.Connection, player: sqlite3.Row, snapshot_id: str
     ) -> dict[str, object]:
-        player_state = player_values(player)
+        player_state = player_combat_values(player)
         qualification = player_state["qualification"]
         equipment = []
         attack_bonus = 0
