@@ -9,7 +9,11 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import currency_grant, currency_with_delta, inventory_grant, inventory_json, inventory_value, inventory_with_delta
+from ..utils.assets import (
+    grant_player_assets,
+    inventory_value,
+    spend_player_assets,
+)
 from ..persistence.errors import (
     OperationConflictError,
     ProjectAlreadyCompleteError,
@@ -169,17 +173,14 @@ class ProjectRepositoryMixin:
                 raise ProjectContributionLimitError("one contribution is capped at 30 points")
             if cost_key == "currency.spirit_stone":
                 resource_amount = points * 50
-                remaining_stones = currency_with_delta(player["spirit_stones"], -resource_amount)
-                connection.execute(
-                    "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
-                    (remaining_stones, now_text, player["id"]),
+                spend_player_assets(
+                    connection,
+                    player,
+                    {"spirit_stones": resource_amount},
+                    now_text,
                 )
             else:
-                inventory = inventory_with_delta(inventory, {cost_key: -resource_amount})
-                connection.execute(
-                    "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (inventory_json(inventory), now_text, player["id"]),
-                )
+                spend_player_assets(connection, player, {cost_key: resource_amount}, now_text)
             progress[cost_key] = before + resource_amount
             contribution_points = int(project["contribution_points"]) + points
             target_points = int(project["target_points"])
@@ -478,15 +479,18 @@ class ProjectRepositoryMixin:
         operation_id: str,
     ) -> dict[str, int]:
         reward = {str(key): int(value) for key, value in definition.reward.items() if isinstance(value, int)}
-        inventory = inventory_value(player["inventory_json"])
         item_key = definition.reward.get("item")
         if item_key:
-            inventory = inventory_grant(inventory, {str(item_key): 1})
             reward[str(item_key)] = 1
-        stones = int(reward.get("spirit_stones", 0))
-        connection.execute(
-            "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-            (currency_grant(player["spirit_stones"], stones), inventory_json(inventory), now_text, player["id"]),
+        grant_player_assets(
+            connection,
+            player,
+            {
+                key: value
+                for key, value in reward.items()
+                if key == "spirit_stones" or key.startswith("item.")
+            },
+            now_text,
         )
         local_delta = int(reward.get("local_reputation", 0))
         service_delta = int(reward.get("service_reputation", 0))

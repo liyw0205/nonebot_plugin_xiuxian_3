@@ -7,6 +7,7 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.xiuxian.utils.database import connect_sqlite
 from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
+    AssetState,
     AssetDeltaError,
     assets_grant,
     assets_spend,
@@ -21,7 +22,9 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     inventory_spend,
     inventory_value,
     inventory_with_delta,
+    player_asset_state,
     spend_player_assets,
+    write_player_values,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_object
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
@@ -177,6 +180,47 @@ def test_player_asset_mutations_share_transactional_persistence() -> None:
     stored = connection.execute("SELECT spirit_stones, inventory_json, updated_at FROM players WHERE id = 1").fetchone()
     assert tuple(stored) == (85, '{"item.herb": 1, "item.sand": 3}', "granted")
     connection.close()
+
+
+def test_player_asset_mutation_can_commit_other_player_values_atomically() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, energy INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, energy, updated_at) VALUES (1, 100, ?, 8, 'before')",
+        ('{"item.herb": 2}',),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+
+    changed = spend_player_assets(
+        connection,
+        row,
+        {"spirit_stones": 25, "item.herb": 1},
+        "spent",
+        player_values={"energy": 3},
+    )
+    assert changed == player_asset_state(
+        connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    )
+    stored = connection.execute(
+        "SELECT spirit_stones, inventory_json, energy, updated_at FROM players WHERE id = 1"
+    ).fetchone()
+    assert tuple(stored) == (75, '{"item.herb": 1}', 3, "spent")
+
+    with pytest.raises(ValueError, match="invalid player column"):
+        write_player_values(connection, 1, {"energy; DROP TABLE players": 1}, "bad")
+    connection.close()
+
+
+def test_asset_mutations_accept_the_content_currency_key() -> None:
+    current = assets_spend(
+        500,
+        {"item.herb": 2},
+        {"currency.spirit_stone": 125, "item.herb": 1},
+    )
+    assert current == AssetState(currency=375, inventory={"item.herb": 1})
 
 
 def test_player_values_normalizes_full_and_partial_rows() -> None:

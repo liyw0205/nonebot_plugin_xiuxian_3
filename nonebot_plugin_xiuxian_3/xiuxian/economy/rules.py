@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-ECONOMY_CONTENT_VERSION = ""
-ECONOMY_RULE_VERSION = ""
 MARKET_ORDER_TTL_SECONDS = 24 * 60 * 60
 MARKET_MAX_LISTINGS = 10
 MARKET_MIN_QUANTITY = 1
@@ -114,8 +112,6 @@ def commission_failure_refund(reward: int) -> int:
 
 
 __all__ = [
-    "ECONOMY_CONTENT_VERSION",
-    "ECONOMY_RULE_VERSION",
     "MARKET_BP_DENOMINATOR",
     "MARKET_LISTING_FEE_PER_ITEM",
     "MARKET_MAX_LISTINGS",

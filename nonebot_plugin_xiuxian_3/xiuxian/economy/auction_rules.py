@@ -8,8 +8,6 @@ from datetime import timedelta
 from .rules import NON_TRADEABLE_ITEMS, resolve_market_item
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 AUCTION_SLOT_LIMIT = 20
 AUCTION_DURATION = timedelta(hours=12)
 AUCTION_SETTLEMENT_GRACE = timedelta(minutes=10)
@@ -51,8 +49,6 @@ __all__ = [
     "AUCTION_SETTLEMENT_GRACE",
     "AUCTION_SLOT_LIMIT",
     "BP_DENOMINATOR",
-    "CONTENT_VERSION",
-    "RULE_VERSION",
     "auction_week_start",
     "minimum_next_bid",
     "validate_auction_listing",

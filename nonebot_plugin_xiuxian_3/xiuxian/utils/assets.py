@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 import json
+import re
 from typing import Any
 
 from .json import json_object
@@ -22,6 +23,52 @@ class AssetState:
     inventory: dict[str, int]
 
 
+_PLAYER_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def player_asset_state(row: Any, *, preserve_zero: bool = False) -> AssetState:
+    """Read a detached asset state from a player row or mapping."""
+
+    try:
+        currency = row["spirit_stones"]
+        raw_inventory = row["inventory_json"]
+    except (IndexError, KeyError, TypeError) as exc:
+        raise AssetDeltaError("player row does not contain asset columns") from exc
+    return AssetState(
+        currency=currency_with_delta(currency, 0),
+        inventory=inventory_value(raw_inventory, keep_zero=preserve_zero),
+    )
+
+
+def write_player_values(
+    connection: Any,
+    player_id: int,
+    values: Mapping[str, Any],
+    updated_at: str,
+) -> None:
+    """Write validated player columns in the current transaction.
+
+    Callers provide already calculated values.  The helper only handles SQL
+    identifier validation and deterministic parameter binding so asset and
+    non-asset fields can be committed together.
+    """
+
+    if not values:
+        raise ValueError("player update cannot be empty")
+    assignments: dict[str, Any] = {}
+    for raw_key, value in values.items():
+        key = str(raw_key)
+        if key == "id" or not _PLAYER_COLUMN.fullmatch(key):
+            raise ValueError(f"invalid player column: {key!r}")
+        assignments[key] = value
+    assignments["updated_at"] = updated_at
+    columns = sorted(assignments)
+    connection.execute(
+        f"UPDATE players SET {', '.join(f'{column} = ?' for column in columns)} WHERE id = ?",
+        tuple(assignments[column] for column in columns) + (player_id,),
+    )
+
+
 def write_player_assets(
     connection: Any,
     player_id: int,
@@ -29,26 +76,24 @@ def write_player_assets(
     updated_at: str,
     *,
     preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
 ) -> AssetState:
     """Persist one player's currency and inventory in the current transaction."""
 
-    connection.execute(
-        "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-        (
-            assets.currency,
-            inventory_json(assets.inventory, keep_zero=preserve_zero),
-            updated_at,
-            player_id,
-        ),
-    )
+    values = {
+        "spirit_stones": assets.currency,
+        "inventory_json": inventory_json(assets.inventory, keep_zero=preserve_zero),
+    }
+    if player_values:
+        if set(player_values) & {"id", "spirit_stones", "inventory_json", "updated_at"}:
+            raise ValueError("asset columns must be supplied through AssetState")
+        values.update(player_values)
+    write_player_values(connection, player_id, values, updated_at)
     return assets
 
 
 def _player_asset_state(row: Any, *, preserve_zero: bool = False) -> AssetState:
-    return AssetState(
-        currency=row["spirit_stones"],
-        inventory=inventory_value(row["inventory_json"], keep_zero=preserve_zero),
-    )
+    return player_asset_state(row, preserve_zero=preserve_zero)
 
 
 def grant_player_assets(
@@ -58,6 +103,7 @@ def grant_player_assets(
     updated_at: str,
     *,
     preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
 ) -> AssetState:
     """Grant currency and stackable items, then persist them atomically."""
 
@@ -69,6 +115,7 @@ def grant_player_assets(
         next_assets,
         updated_at,
         preserve_zero=preserve_zero,
+        player_values=player_values,
     )
 
 
@@ -79,6 +126,7 @@ def spend_player_assets(
     updated_at: str,
     *,
     preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
 ) -> AssetState:
     """Spend currency and stackable items, then persist them atomically."""
 
@@ -95,6 +143,7 @@ def spend_player_assets(
         next_assets,
         updated_at,
         preserve_zero=preserve_zero,
+        player_values=player_values,
     )
 
 
@@ -105,6 +154,7 @@ def change_player_assets(
     updated_at: str,
     *,
     preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
 ) -> AssetState:
     """Apply one signed asset delta and persist it in the current transaction."""
 
@@ -120,6 +170,7 @@ def change_player_assets(
         next_assets,
         updated_at,
         preserve_zero=preserve_zero,
+        player_values=player_values,
     )
 
 
@@ -127,11 +178,17 @@ def _asset_delta_parts(
     delta: Mapping[str, Any], *, currency_key: str
 ) -> tuple[Any, dict[str, Any]]:
     currency_delta: Any = 0
+    currency_seen = False
     item_delta: dict[str, Any] = {}
     for raw_key, raw_value in delta.items():
         key = str(raw_key)
-        if key == currency_key:
+        if key == currency_key or (
+            currency_key == "spirit_stones" and key == "currency.spirit_stone"
+        ):
+            if currency_seen:
+                raise AssetDeltaError("currency delta must use one key")
             currency_delta = raw_value
+            currency_seen = True
         else:
             item_delta[key] = raw_value
     return currency_delta, item_delta
@@ -384,6 +441,8 @@ __all__ = [
     "inventory_spend",
     "inventory_value",
     "inventory_with_delta",
+    "player_asset_state",
     "spend_player_assets",
+    "write_player_values",
     "write_player_assets",
 ]

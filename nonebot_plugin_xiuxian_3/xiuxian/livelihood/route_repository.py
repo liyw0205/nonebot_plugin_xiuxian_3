@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import currency_with_delta, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import inventory_value, spend_player_assets, grant_player_assets
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -178,7 +178,6 @@ class RouteRepositoryMixin:
             inventory = inventory_value(player["inventory_json"])
             if int(inventory.get(cargo_key, 0)) < cargo_quantity:
                 raise RouteCargoRequirementError("cargo is insufficient")
-            inventory = inventory_spend(inventory, {cargo_key: cargo_quantity})
             effects = self._public_project_effects(connection, now)
             delay_chance_bp = max(
                 0,
@@ -205,12 +204,13 @@ class RouteRepositoryMixin:
                 "delay_roll_bp": delay_roll,
                 "delay_chance_bp": delay_chance_bp,
                 "delay_seconds": delay_seconds,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
-            connection.execute(
-                "UPDATE players SET stamina = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (int(player["stamina"]) - definition.stamina_cost, inventory_json(inventory), now_text, player["id"]),
+            spend_player_assets(
+                connection,
+                player,
+                {cargo_key: cargo_quantity},
+                now_text,
+                player_values={"stamina": int(player["stamina"]) - definition.stamina_cost},
             )
             connection.execute(
                 """
@@ -329,12 +329,12 @@ class RouteRepositoryMixin:
             local_before = int(local.get(local_key, 0))
             local_after = min(1000, local_before + int(snapshot.get("local_reputation", 0)))
             local[local_key] = local_after
-            updated_stones = currency_with_delta(
-                player["spirit_stones"], int(snapshot.get("reward_stones", route["reward_stones"]))
-            )
-            connection.execute(
-                "UPDATE players SET location_key = ?, spirit_stones = ?, updated_at = ? WHERE id = ?",
-                (str(route["destination_location"]), updated_stones, now_text, player["id"]),
+            grant_player_assets(
+                connection,
+                player,
+                {"spirit_stones": int(snapshot.get("reward_stones", route["reward_stones"]))},
+                now_text,
+                player_values={"location_key": str(route["destination_location"])},
             )
             connection.execute(
                 """

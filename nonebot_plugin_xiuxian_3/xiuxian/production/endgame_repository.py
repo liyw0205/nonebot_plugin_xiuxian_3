@@ -8,7 +8,11 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import (
+    change_player_assets,
+    inventory_value,
+    spend_player_assets,
+)
 from ..persistence.errors import (
     EndgameRecipeAlreadyCreatedError,
     EndgameRecipeBusyError,
@@ -146,7 +150,6 @@ class EndgameProductionRepositoryMixin:
             for item_key, quantity in recipe.inputs.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise MaterialInsufficientError(f"missing {item_key}")
-            inventory = inventory_spend(inventory, recipe.inputs)
             session_id = uuid4().hex
             roll_bp = recipe_roll_bp(operation_id)
             snapshot = {
@@ -160,9 +163,12 @@ class EndgameProductionRepositoryMixin:
                 "progress_before": int(player["dao_fruit_progress"]),
                 "roll_bp": roll_bp,
             }
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, world_merit = world_merit - ?, updated_at = ? WHERE id = ?",
-                (inventory_json(inventory), recipe.world_merit_cost, now_text, player["id"]),
+            spend_player_assets(
+                connection,
+                player,
+                recipe.inputs,
+                now_text,
+                player_values={"world_merit": int(player["world_merit"]) - recipe.world_merit_cost},
             )
             connection.execute(
                 "INSERT INTO endgame_sessions(session_id, player_id, operation_id, session_type, status, starts_at, ends_at, snapshot_json, result_json, created_at, updated_at) "
@@ -222,14 +228,12 @@ class EndgameProductionRepositoryMixin:
             snapshot = self._json_object(session["snapshot_json"], {})
             roll_bp = int(snapshot["roll_bp"])
             success = roll_bp < SUCCESS_THRESHOLD_BP
-            inventory = inventory_value(player["inventory_json"])
             rewards: dict[str, int] = {}
             refunds: dict[str, int] = {}
             progress_reward = 0
             world_merit_refund = 0
             if success:
                 if recipe.output_item:
-                    inventory = inventory_grant(inventory, {recipe.output_item: 1})
                     rewards[recipe.output_item] = 1
                 if recipe.output_progress:
                     progress_reward = min(recipe.output_progress, DAO_FRUIT_PROGRESS_CAP - int(player["dao_fruit_progress"]))
@@ -238,15 +242,21 @@ class EndgameProductionRepositoryMixin:
             else:
                 status = "failed"
                 if recipe.key == "recipe.dao.fruit_fragment":
-                    inventory = inventory_grant(inventory, {"item.dao_fruit_fragment": 5})
                     refunds["item.dao_fruit_fragment"] = 5
                 elif recipe.key == "recipe.ascension.certificate":
                     world_merit_refund = recipe.world_merit_cost
                     refunds["world_merit"] = world_merit_refund
 
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, dao_fruit_progress = dao_fruit_progress + ?, world_merit = world_merit + ?, updated_at = ? WHERE id = ?",
-                (inventory_json(inventory), progress_reward, world_merit_refund, now_text, player["id"]),
+            change_player_assets(
+                connection,
+                player,
+                {str(key): int(value) for key, value in rewards.items() if str(key).startswith("item.")}
+                | {str(key): int(value) for key, value in refunds.items() if str(key).startswith("item.")},
+                now_text,
+                player_values={
+                    "dao_fruit_progress": int(player["dao_fruit_progress"]) + progress_reward,
+                    "world_merit": int(player["world_merit"]) + world_merit_refund,
+                },
             )
             result = {
                 "success": success,

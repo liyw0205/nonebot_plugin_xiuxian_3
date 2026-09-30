@@ -32,7 +32,9 @@ from .assets import (
     inventory_spend,
     inventory_value,
     inventory_with_delta,
+    player_asset_state,
     spend_player_assets,
+    write_player_values,
     write_player_assets,
 )
 
@@ -57,6 +59,7 @@ __all__ = [
     "inventory_spend",
     "inventory_value",
     "inventory_with_delta",
+    "player_asset_state",
     "json_object",
     "player_field",
     "player_integer",
@@ -69,5 +72,6 @@ __all__ = [
     "player_values",
     "read_json_cached",
     "spend_player_assets",
+    "write_player_values",
     "write_player_assets",
 ]

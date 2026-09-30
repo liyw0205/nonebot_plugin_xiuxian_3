@@ -198,7 +198,13 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import currency_spend, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import (
+    currency_spend,
+    inventory_json,
+    inventory_spend,
+    inventory_value,
+    spend_player_assets,
+)
 
 
 class AdvancementRepositoryMixin:
@@ -321,7 +327,6 @@ class AdvancementRepositoryMixin:
                     raise ResourceInsufficientError("retreat item is insufficient")
             if int(row["energy"]) < definition.energy_cost:
                 raise ResourceInsufficientError("energy is insufficient")
-            inventory = inventory_spend(inventory, item_cost)
             seed = f"{definition.random_pool or definition.key}:{operation_id}"
             snapshot = {
                 "retreat_key": definition.key,
@@ -339,14 +344,12 @@ class AdvancementRepositoryMixin:
             session_id = uuid4().hex
             starts_at = now_text
             ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
-            connection.execute(
-                "UPDATE players SET energy = energy - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    definition.energy_cost,
-                    inventory_json(inventory),
-                    now_text,
-                    row["id"],
-                ),
+            spend_player_assets(
+                connection,
+                row,
+                item_cost,
+                now_text,
+                player_values={"energy": int(row["energy"]) - definition.energy_cost},
             )
             connection.execute(
                 """
@@ -833,7 +836,6 @@ class AdvancementRepositoryMixin:
             reset_item_key = str(constitution_reshape_rules(self.content)["reset_item_key"])
             if int(inventory.get(reset_item_key, 0)) < 1:
                 raise ResourceInsufficientError("constitution reset token is missing")
-            inventory = inventory_spend(inventory, {reset_item_key: 1})
             snapshot = {
                 "constitution_key": definition.key,
                 "effect": dict(definition.effect),
@@ -861,10 +863,7 @@ class AdvancementRepositoryMixin:
                     profile["id"],
                 ),
             )
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                (inventory_json(inventory), now_text, row["id"]),
-            )
+            spend_player_assets(connection, row, {reset_item_key: 1}, now_text)
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
                 raise RuntimeError("constitution reshape returned no player")
@@ -1505,9 +1504,11 @@ class AdvancementRepositoryMixin:
             success_bp = temper_success_bp(target_level, definition)
             success = roll_bp < success_bp
             level_after = target_level if success else from_level
-            connection.execute(
-                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones_after, inventory_json(inventory), now_text, player["id"]),
+            spend_player_assets(
+                connection,
+                player,
+                costs,
+                now_text,
             )
             connection.execute(
                 "UPDATE equipment_instances SET temper_level = ?, updated_at = ? WHERE id = ?",
@@ -1690,9 +1691,11 @@ class AdvancementRepositoryMixin:
                 )
                 new_affixes = {affix_key: affix_value}
             streak_after = 0 if success else streak_before + 1
-            connection.execute(
-                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones_after, inventory_json(inventory), now_text, player["id"]),
+            spend_player_assets(
+                connection,
+                player,
+                costs,
+                now_text,
             )
             connection.execute(
                 "UPDATE equipment_instances SET affixes_json = ?, refinement_failure_streak = ?, updated_at = ? WHERE id = ?",

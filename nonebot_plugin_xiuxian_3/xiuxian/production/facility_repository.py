@@ -9,7 +9,7 @@ from datetime import date
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_amount, inventory_value
+from ..utils.assets import inventory_amount, inventory_value, spend_player_assets
 from .facility_models import FacilityMaintenanceRecord, FacilitySlotRecord
 from .facility_rules import FACILITY_DURATION_BONUS_BP, FACILITY_MAINTENANCE_FEE, resolve_facility
 from ..persistence.errors import (
@@ -187,10 +187,7 @@ class FacilityRepositoryMixin:
                     continue
                 paid = int(player["spirit_stones"]) >= FACILITY_MAINTENANCE_FEE
                 if paid:
-                    connection.execute(
-                        "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                        (FACILITY_MAINTENANCE_FEE, now_text, player["id"]),
-                    )
+                    spend_player_assets(connection, player, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
                     player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
                 status = "active" if paid else "inactive"
                 maintenance_operation_id = f"production.facility.maintenance:{slot['slot_key']}:{day}"
@@ -240,12 +237,9 @@ class FacilityRepositoryMixin:
                     continue
                 paid = False
                 if owner_type == "personal":
-                    owner = connection.execute("SELECT spirit_stones FROM players WHERE id = ? AND status = 'active'", (owner_id,)).fetchone()
+                    owner = connection.execute("SELECT * FROM players WHERE id = ? AND status = 'active'", (owner_id,)).fetchone()
                     if owner is not None and int(owner["spirit_stones"]) >= FACILITY_MAINTENANCE_FEE:
-                        connection.execute(
-                            "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                            (FACILITY_MAINTENANCE_FEE, now_text, owner_id),
-                        )
+                        spend_player_assets(connection, owner, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
                         paid = True
                 else:
                     owner = connection.execute("SELECT spirit_stones FROM sects WHERE sect_id = ? AND status = 'active'", (owner_id,)).fetchone()

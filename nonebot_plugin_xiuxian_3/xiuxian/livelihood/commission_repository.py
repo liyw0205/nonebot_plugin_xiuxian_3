@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import currency_with_delta, inventory_json, inventory_missing, inventory_spend, inventory_value
+from ..utils.assets import change_player_assets, inventory_missing, inventory_value
 from ..utils.json import json_object
 from ..content import bundled_content
 from ..persistence.errors import (
@@ -276,7 +276,6 @@ class CommissionRepositoryMixin:
             missing = inventory_missing(inventory, inputs)
             if missing:
                 raise CommissionMaterialInsufficientError("commission materials are insufficient")
-            inventory = inventory_spend(inventory, inputs)
             reward_stones = int(snapshot.get("reward_stones", 0))
             local_delta = int(snapshot.get("local_reputation", 0))
             service_delta = int(snapshot.get("service_reputation", 0))
@@ -291,10 +290,14 @@ class CommissionRepositoryMixin:
             local_after = min(1000, local_before + local_delta)
             service_after = min(100, service_before + service_delta)
             local[local_key] = local_after
-            updated_stones = currency_with_delta(player["spirit_stones"], reward_stones)
-            connection.execute(
-                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (updated_stones, inventory_json(inventory), now_text, player["id"]),
+            change_player_assets(
+                connection,
+                player,
+                {
+                    "spirit_stones": reward_stones,
+                    **{str(key): -int(value) for key, value in inputs.items()},
+                },
+                now_text,
             )
             connection.execute(
                 """
@@ -356,8 +359,6 @@ class CommissionRepositoryMixin:
                 "local_reputation": definition.local_reputation,
                 "local_reputation_key": definition.local_reputation_key,
                 "service_reputation": definition.service_reputation,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             connection.execute(
                 """

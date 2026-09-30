@@ -16,8 +16,6 @@ class CrossRealmTradeRecord:
     currency_cost: int
     output_items: dict[str, int]
     binding_expires_at: str
-    content_version: str
-    rule_version: str
     already_completed: bool = False
 
 

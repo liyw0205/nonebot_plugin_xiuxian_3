@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import spend_player_assets
 from ..persistence.errors import (
     CurrencyInsufficientError,
     OperationConflictError,
@@ -83,8 +84,6 @@ class TradePermitRepositoryMixin:
                     "faction_key": definition.faction_key,
                     "faction_reputation": int(reputation.get(definition.faction_key, 0)),
                     "cost": definition.cost,
-                    "content_version": definition.content_version,
-                    "rule_version": definition.rule_version,
                 }
                 connection.execute(
                     """
@@ -106,10 +105,7 @@ class TradePermitRepositoryMixin:
                         now_text,
                     ),
                 )
-                connection.execute(
-                    "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                    (definition.cost, now_text, player["id"]),
-                )
+                spend_player_assets(connection, player, {"spirit_stones": definition.cost}, now_text)
                 updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
                 active = connection.execute(
                     "SELECT * FROM trade_permits WHERE permit_id = ?", (permit_id,)

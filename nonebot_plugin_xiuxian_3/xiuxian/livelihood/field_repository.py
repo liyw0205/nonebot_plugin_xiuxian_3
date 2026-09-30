@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import grant_player_assets, inventory_value, spend_player_assets
 from ..persistence.errors import (
     CropContentClosedError,
     CropDailyLimitError,
@@ -89,7 +89,6 @@ class FieldPlotRepositoryMixin:
                 raise ResourceInsufficientError("seed is insufficient")
             if int(row["energy"]) < crop.maintenance_energy:
                 raise ResourceInsufficientError("energy is insufficient")
-            inventory = inventory_spend(inventory, {crop.seed_key: 1})
             harvest_at = serialize_datetime(now + timedelta(seconds=crop.growth_seconds))
             plot_id = uuid4().hex
             snapshot = {
@@ -99,8 +98,6 @@ class FieldPlotRepositoryMixin:
                 "maintenance_energy": crop.maintenance_energy,
                 "maintained_harvest": crop.maintained_harvest,
                 "unmaintained_harvest": crop.unmaintained_harvest,
-                "content_version": crop.content_version,
-                "rule_version": crop.rule_version,
                 "wither_at": serialize_datetime(now + timedelta(seconds=crop.growth_seconds + 24 * 60 * 60)),
             }
             if crop.random_pool:
@@ -111,9 +108,12 @@ class FieldPlotRepositoryMixin:
                         "array_sand_roll": spirit_leaf_array_sand_roll(operation_id),
                     }
                 )
-            connection.execute(
-                "UPDATE players SET energy = energy - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (crop.maintenance_energy, inventory_json(inventory), now_text, row["id"]),
+            spend_player_assets(
+                connection,
+                row,
+                {crop.seed_key: 1},
+                now_text,
+                player_values={"energy": int(row["energy"]) - crop.maintenance_energy},
             )
             connection.execute(
                 """
@@ -272,9 +272,14 @@ class FieldPlotRepositoryMixin:
                 if int(row["energy"]) < int(snapshot.get("maintenance_energy", 1)):
                     raise ResourceInsufficientError("energy is insufficient")
                 count += 1
-                connection.execute(
-                    "UPDATE players SET energy = energy - ?, updated_at = ? WHERE id = ?",
-                    (int(snapshot.get("maintenance_energy", 1)), now_text, row["id"]),
+                spend_player_assets(
+                    connection,
+                    row,
+                    {},
+                    now_text,
+                    player_values={
+                        "energy": int(row["energy"]) - int(snapshot.get("maintenance_energy", 1))
+                    },
                 )
                 connection.execute(
                     "UPDATE field_plots SET maintenance_count = ?, updated_at = ? WHERE id = ? AND status = 'growing'",
@@ -307,11 +312,11 @@ class FieldPlotRepositoryMixin:
                 harvest = dict(snapshot.get("maintained_harvest" if maintained else "unmaintained_harvest", {}))
                 if maintained and int(snapshot.get("array_sand_roll", 0)):
                     harvest["item.mat.array_sand"] = int(harvest.get("item.mat.array_sand", 0)) + 1
-                inventory = inventory_value(row["inventory_json"])
-                inventory = inventory_grant(inventory, harvest)
-                connection.execute(
-                    "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (inventory_json(inventory), now_text, row["id"]),
+                grant_player_assets(
+                    connection,
+                    row,
+                    harvest,
+                    now_text,
                 )
                 reputation_delta = 1 if str(plot["crop_key"]) == "crop.blood_grass" else 0
                 if reputation_delta:

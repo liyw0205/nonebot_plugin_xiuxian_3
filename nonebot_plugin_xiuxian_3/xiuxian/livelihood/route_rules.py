@@ -5,9 +5,6 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-from .rules import CONTENT_VERSION, RULE_VERSION
-
-
 ROUTE_NEW_TOWN_OUTSKIRTS = "route.new_town_outskirts"
 
 
@@ -26,8 +23,6 @@ class RouteDefinition:
     delay_seconds: int
     max_cargo_value: int
     random_pool: str
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
 
 ROUTE_DEFINITIONS = {

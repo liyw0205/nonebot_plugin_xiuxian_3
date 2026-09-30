@@ -6,8 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 PERMIT_DURATION_SECONDS = 7 * 24 * 60 * 60
 PERMIT_COST = 500
 
@@ -21,8 +19,6 @@ class TradePermitDefinition:
     reputation_required: int = 80
     cost: int = PERMIT_COST
     duration_seconds: int = PERMIT_DURATION_SECONDS
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
 
 TRADE_PERMITS = {
@@ -54,10 +50,8 @@ def resolve_trade_permit(value: str) -> TradePermitDefinition:
 
 
 __all__ = [
-    "CONTENT_VERSION",
     "PERMIT_COST",
     "PERMIT_DURATION_SECONDS",
-    "RULE_VERSION",
     "TRADE_PERMITS",
     "TradePermitDefinition",
     "resolve_trade_permit",

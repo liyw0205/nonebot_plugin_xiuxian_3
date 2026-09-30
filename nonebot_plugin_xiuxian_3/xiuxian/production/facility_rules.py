@@ -8,8 +8,6 @@ from dataclasses import dataclass
 FACILITY_LOCATION = "cave.mist_grotto_2"
 FACILITY_MAINTENANCE_FEE = 100
 FACILITY_DURATION_BONUS_BP = 1000
-FACILITY_CONTENT_VERSION = ""
-FACILITY_RULE_VERSION = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,12 +54,10 @@ def facility_for_kind(kind: str) -> tuple[FacilityDefinition, ...]:
 __all__ = [
     "FACILITY_ALIASES",
     "FACILITY_BY_KEY",
-    "FACILITY_CONTENT_VERSION",
     "FACILITY_DURATION_BONUS_BP",
     "FACILITY_DEFINITIONS",
     "FACILITY_LOCATION",
     "FACILITY_MAINTENANCE_FEE",
-    "FACILITY_RULE_VERSION",
     "FacilityDefinition",
     "facility_for_kind",
     "resolve_facility",

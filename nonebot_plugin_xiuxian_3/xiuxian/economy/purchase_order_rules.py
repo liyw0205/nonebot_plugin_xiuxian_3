@@ -9,8 +9,6 @@ from datetime import timedelta
 from .rules import NON_TRADEABLE_ITEMS, resolve_market_item
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 PURCHASE_ORDER_TTL_SECONDS = 12 * 60 * 60
 PURCHASE_DELIVERY_GRACE_SECONDS = 10 * 60
 PURCHASE_MAX_LISTINGS = 3
@@ -80,7 +78,6 @@ def required_faction_reputation(location_key: str) -> tuple[str, int] | None:
 
 __all__ = [
     "BP_DENOMINATOR",
-    "CONTENT_VERSION",
     "PURCHASE_DELIVERY_GRACE_SECONDS",
     "PURCHASE_FEE_BP",
     "PURCHASE_MAX_LISTINGS",
@@ -90,7 +87,6 @@ __all__ = [
     "PURCHASE_MIN_UNIT_PRICE",
     "PURCHASE_ORDER_TTL_SECONDS",
     "PurchaseOrderItem",
-    "RULE_VERSION",
     "delivery_deadline",
     "faction_for_location",
     "order_region",

@@ -127,8 +127,6 @@ class CrossRealmTradeApplication:
                 "currency_cost": record.currency_cost,
                 "output_items": record.output_items,
                 "binding_expires_at": record.binding_expires_at,
-                "content_version": record.content_version,
-                "rule_version": record.rule_version,
                 "idempotent_replay": record.already_completed,
             },
         )

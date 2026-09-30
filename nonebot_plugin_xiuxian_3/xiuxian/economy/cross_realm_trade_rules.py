@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 WEEKLY_LIMIT = 5
 BINDING_SECONDS = 24 * 60 * 60
 TRADE_LOCATION = "demon.abyss_market"
@@ -26,8 +24,6 @@ class CrossRealmTradeDefinition:
     output_items: dict[str, int]
     weekly_limit: int = WEEKLY_LIMIT
     binding_seconds: int = BINDING_SECONDS
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
     required_faction: str = "demon"
     required_reputation: int = 200
     required_reputations: dict[str, int] | None = None
@@ -109,9 +105,7 @@ def week_start(value) -> str:
 
 __all__ = [
     "BINDING_SECONDS",
-    "CONTENT_VERSION",
     "CrossRealmTradeDefinition",
-    "RULE_VERSION",
     "TRADE_DEFINITIONS",
     "TRADE_LOCATION",
     "BEAST_TRADE_LOCATION",

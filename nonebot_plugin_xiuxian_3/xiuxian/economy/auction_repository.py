@@ -27,8 +27,6 @@ from .auction_rules import (
     AUCTION_DURATION,
     AUCTION_SETTLEMENT_GRACE,
     AUCTION_SLOT_LIMIT,
-    CONTENT_VERSION,
-    RULE_VERSION,
     auction_week_start,
     minimum_next_bid,
     validate_auction_listing,
@@ -126,7 +124,6 @@ class AuctionRepositoryMixin:
             ends_at = now + AUCTION_DURATION
             settlement_deadline = ends_at + AUCTION_SETTLEMENT_GRACE
             snapshot = {
-                "content_version": CONTENT_VERSION, "rule_version": RULE_VERSION,
                 "auction_id": auction_id, "week_start": week_start,
                 "item_key": item.key, "quantity": int(quantity),
                 "starting_bid": int(starting_bid), "slot_limit": AUCTION_SLOT_LIMIT,

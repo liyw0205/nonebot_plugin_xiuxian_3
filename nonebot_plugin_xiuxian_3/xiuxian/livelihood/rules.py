@@ -12,8 +12,6 @@ from ..content import ContentBundle, ContentError, bundled_content
 
 TOWN_ROOM = "residence.town_room"
 COURTYARD = "residence.courtyard"
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,8 +23,6 @@ class ResidenceDefinition:
     required_stage: str
     required_local_reputation: int = 0
     plot_count: int = 0
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
 
 RESIDENCE_DEFINITIONS = {
@@ -83,8 +79,6 @@ class CropDefinition:
     daily_limit: int
     residence_key: str | None = None
     random_pool: str | None = None
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,8 +97,6 @@ class TownCommissionDefinition:
     requirements_any: tuple[dict[str, object], ...] = ()
     stock_bonus_key: str | None = None
     reward_bonus_key: str | None = None
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
 
 CROP_DEFINITIONS = {
@@ -292,10 +284,6 @@ PROJECT_HERB_GARDEN = "project.herb_garden"
 PROJECT_DOMAIN_REFUGE = "project.domain_refuge"
 PROJECT_ABYSS_PURIFICATION = "project.abyss_purification"
 PROJECT_ANCESTRAL_HABITAT = "project.ancestral_habitat"
-PROJECT_CONTENT_VERSION = ""
-PROJECT_RULE_VERSION = ""
-PROJECT_V04_CONTENT_VERSION = ""
-PROJECT_V04_RULE_VERSION = ""
 TRANSPORT_TICKET = "item.token.transport_coupon"
 HERB_SEED_BUNDLE = "item.seed.herb_bundle"
 CONSTRUCTION_COUPON = "item.token.construction_coupon"
@@ -313,8 +301,6 @@ class PublicProjectDefinition:
     required_faction: str | None = None
     required_faction_reputation: int = 0
     required_sect_level: int = 0
-    content_version: str = PROJECT_CONTENT_VERSION
-    rule_version: str = PROJECT_RULE_VERSION
 
 
 PUBLIC_PROJECT_DEFINITIONS = {
@@ -361,8 +347,6 @@ PUBLIC_PROJECT_DEFINITIONS = {
         reward={"local_reputation": 8, "service_reputation": 3, "item": CONSTRUCTION_COUPON},
         local_reputation_key="local.domain_refuge",
         required_sect_level=4,
-        content_version=PROJECT_V04_CONTENT_VERSION,
-        rule_version=PROJECT_V04_RULE_VERSION,
     ),
     PROJECT_ABYSS_PURIFICATION: PublicProjectDefinition(
         key=PROJECT_ABYSS_PURIFICATION,
@@ -374,8 +358,6 @@ PUBLIC_PROJECT_DEFINITIONS = {
         local_reputation_key="local.abyss_outpost",
         required_faction="demon",
         required_faction_reputation=300,
-        content_version=PROJECT_V04_CONTENT_VERSION,
-        rule_version=PROJECT_V04_RULE_VERSION,
     ),
     PROJECT_ANCESTRAL_HABITAT: PublicProjectDefinition(
         key=PROJECT_ANCESTRAL_HABITAT,
@@ -387,8 +369,6 @@ PUBLIC_PROJECT_DEFINITIONS = {
         local_reputation_key="local.ancestral_habitat",
         required_faction="beast",
         required_faction_reputation=300,
-        content_version=PROJECT_V04_CONTENT_VERSION,
-        rule_version=PROJECT_V04_RULE_VERSION,
     ),
 }
 
@@ -435,11 +415,9 @@ __all__ = [
     "BLOOD_GRASS",
     "SPIRIT_LEAF",
     "SPIRIT_LEAF_HARVEST_POOL",
-    "CONTENT_VERSION",
     "COURTYARD",
     "CROP_DEFINITIONS",
     "CROP_ALIASES",
-    "RULE_VERSION",
     "TownCommissionDefinition",
     "TOWN_ROOM",
     "CropDefinition",
@@ -451,15 +429,11 @@ __all__ = [
     "residence_definition",
     "HERB_SEED_BUNDLE",
     "PROJECT_ALIASES",
-    "PROJECT_CONTENT_VERSION",
-    "PROJECT_V04_CONTENT_VERSION",
-    "PROJECT_V04_RULE_VERSION",
     "PROJECT_DOMAIN_REFUGE",
     "PROJECT_ABYSS_PURIFICATION",
     "PROJECT_ANCESTRAL_HABITAT",
     "PROJECT_HERB_GARDEN",
     "PROJECT_MARKET_ROAD",
-    "PROJECT_RULE_VERSION",
     "PROJECT_TOWN_WELL",
     "CONSTRUCTION_COUPON",
     "PUBLIC_PROJECT_DEFINITIONS",

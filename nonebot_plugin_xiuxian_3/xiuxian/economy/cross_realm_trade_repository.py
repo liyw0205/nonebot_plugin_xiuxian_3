@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import currency_spend, inventory_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import change_player_assets, inventory_value, inventory_with_delta
 from ..persistence.errors import (
     CrossRealmTradeCurrencyInsufficientError,
     CrossRealmTradeInputInsufficientError,
@@ -100,18 +100,18 @@ class CrossRealmTradeRepositoryMixin:
                 raise CrossRealmTradeCurrencyInsufficientError("trade currency is insufficient")
 
             input_before = {key: int(inventory.get(key, 0)) for key in definition.input_items}
-            inventory = inventory_spend(inventory, definition.input_items)
-            output_before = {key: int(inventory.get(key, 0)) for key in definition.output_items}
-            inventory = inventory_grant(inventory, definition.output_items)
+            inventory_after_inputs = inventory_with_delta(
+                inventory,
+                {key: -int(quantity) for key, quantity in definition.input_items.items()},
+            )
+            output_before = {key: int(inventory_after_inputs.get(key, 0)) for key in definition.output_items}
             binding_expires_at = serialize_datetime(now + timedelta(seconds=definition.binding_seconds))
             trade_id = f"trade-{uuid4().hex}"
             snapshot = {
-                "content_version": definition.content_version,
                 "currency_cost": definition.currency_cost,
                 "input_items": definition.input_items,
                 "location_key": definition.location_key,
                 "output_items": definition.output_items,
-                "rule_version": definition.rule_version,
                 "trade_key": definition.key,
                 "weekly_limit": definition.weekly_limit,
                 "week_start": current_week,
@@ -121,18 +121,15 @@ class CrossRealmTradeRepositoryMixin:
                 "required_reputation": definition.required_reputation,
                 "required_reputations": required_reputations,
             }
-            connection.execute(
-                """
-                UPDATE players
-                SET inventory_json = ?, spirit_stones = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    inventory_json(inventory),
-                    currency_spend(player["spirit_stones"], definition.currency_cost),
-                    now_text,
-                    player["id"],
-                ),
+            change_player_assets(
+                connection,
+                player,
+                {
+                    **{key: -int(quantity) for key, quantity in definition.input_items.items()},
+                    **{key: int(quantity) for key, quantity in definition.output_items.items()},
+                    "spirit_stones": -definition.currency_cost,
+                },
+                now_text,
             )
             connection.execute(
                 """
@@ -222,8 +219,6 @@ class CrossRealmTradeRepositoryMixin:
                 "currency_cost": definition.currency_cost,
                 "output_items": definition.output_items,
                 "binding_expires_at": binding_expires_at,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -287,8 +282,6 @@ class CrossRealmTradeRepositoryMixin:
             currency_cost=int(payload["currency_cost"]),
             output_items={str(key): int(value) for key, value in dict(payload.get("output_items", {})).items()},
             binding_expires_at=str(payload["binding_expires_at"]),
-            content_version=str(payload["content_version"]),
-            rule_version=str(payload["rule_version"]),
             already_completed=replay,
         )
 

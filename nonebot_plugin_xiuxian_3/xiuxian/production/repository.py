@@ -40,7 +40,13 @@ from ..production.models import (
 )
 from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
 from ..utils.equipment import create_equipment_instances
-from ..utils.assets import currency_spend, inventory_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import (
+    AssetState,
+    inventory_grant,
+    inventory_value,
+    spend_player_assets,
+    write_player_assets,
+)
 from ..progression.breakthrough.models import (
     BreakthroughSettlementRecord,
     BreakthroughSessionRecord,
@@ -389,7 +395,6 @@ class ProductionRepositoryMixin:
                 if tool_durability_before < recipe.tool_cost_bp:
                     raise ToolDurabilityInsufficientError("production tool durability is insufficient")
                 durability[recipe.tool_key] = tool_durability_before - recipe.tool_cost_bp
-            inventory = inventory_spend(inventory, recipe.inputs)
             order_id = uuid4().hex
             starts_at = now_text
             ends_at = serialize_datetime(now + timedelta(seconds=duration_seconds))
@@ -424,21 +429,15 @@ class ProductionRepositoryMixin:
                 "facility_slot_id": int(facility_slot["id"]) if facility_slot is not None else None,
                 "constitution_effect": constitution_effect_snapshot(connection, int(row["id"])),
             }
-            connection.execute(
-                """
-                UPDATE players
-                SET energy = energy - ?, spirit_stones = ?,
-                    inventory_json = ?, durability_json = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    recipe.energy_cost,
-                    currency_spend(row["spirit_stones"], recipe.currency_cost),
-                    inventory_json(inventory),
-                    json.dumps(durability, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    row["id"],
-                ),
+            spend_player_assets(
+                connection,
+                row,
+                {"spirit_stones": recipe.currency_cost, **recipe.inputs},
+                now_text,
+                player_values={
+                    "energy": int(row["energy"]) - recipe.energy_cost,
+                    "durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True),
+                },
             )
             connection.execute(
                 """
@@ -655,16 +654,14 @@ class ProductionRepositoryMixin:
                     now + timedelta(seconds=int(snapshot["binding_duration_seconds"]))
                 )
             status = "completed" if success else "failed"
-            connection.execute(
-                """
-                UPDATE players SET inventory_json = ?, durability_json = ?, updated_at = ? WHERE id = ?
-                """,
-                (
-                    inventory_json(inventory),
-                    json.dumps(durability, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    row["id"],
-                ),
+            write_player_assets(
+                connection,
+                int(row["id"]),
+                AssetState(int(row["spirit_stones"]), inventory),
+                now_text,
+                player_values={
+                    "durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True),
+                },
             )
             self._persist_production_bindings(
                 connection,

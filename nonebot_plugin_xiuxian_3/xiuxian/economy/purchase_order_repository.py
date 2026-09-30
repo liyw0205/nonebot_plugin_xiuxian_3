@@ -32,11 +32,10 @@ from ..persistence.errors import (
 )
 from .purchase_order_models import PurchaseOrderRecord
 from .bindings import active_binding_totals
+from ..utils.assets import change_player_assets, grant_player_assets, inventory_value, spend_player_assets
 from .purchase_order_rules import (
-    CONTENT_VERSION,
     PURCHASE_ORDER_TTL_SECONDS,
     PURCHASE_MAX_LISTINGS,
-    RULE_VERSION,
     delivery_deadline,
     faction_for_location,
     order_region,
@@ -180,8 +179,6 @@ class PurchaseOrderRepositoryMixin:
             order_id = f"purchase-{uuid4().hex}"
             expires_at = now + timedelta(seconds=PURCHASE_ORDER_TTL_SECONDS)
             snapshot = {
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
                 "buyer_faction": buyer_faction,
                 "buyer_location": str(buyer["location_key"]),
                 "alliance_key": alliance_key,
@@ -222,10 +219,7 @@ class PurchaseOrderRepositoryMixin:
                 "INSERT INTO purchase_order_funds(order_id, buyer_player_id, amount, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
                 (order_id, buyer["id"], escrow, now_text, now_text),
             )
-            connection.execute(
-                "UPDATE players SET spirit_stones=spirit_stones-?, updated_at=? WHERE id=?",
-                (escrow, now_text, buyer["id"]),
-            )
+            spend_player_assets(connection, buyer, {"spirit_stones": escrow}, now_text)
             self._purchase_ledger(
                 connection,
                 operation_id,
@@ -270,7 +264,7 @@ class PurchaseOrderRepositoryMixin:
                 raise PurchaseOrderExpiredError("purchase order expired")
             item_key = str(order["item_key"])
             quantity = int(order["quantity"])
-            inventory = self._json_object(seller["inventory_json"], {})
+            inventory = inventory_value(seller["inventory_json"])
             locked_market = connection.execute(
                 "SELECT COALESCE(SUM(quantity),0) FROM market_item_locks WHERE seller_player_id=? AND item_key=?",
                 (seller["id"], item_key),
@@ -384,8 +378,8 @@ class PurchaseOrderRepositoryMixin:
                 seller = connection.execute("SELECT * FROM players WHERE id=?", (order["seller_player_id"],)).fetchone()
                 if buyer is None or seller is None:
                     raise PlayerNotFoundError("purchase participant does not exist")
-                seller_inventory = self._json_object(seller["inventory_json"], {})
-                buyer_inventory = self._json_object(buyer["inventory_json"], {})
+                seller_inventory = inventory_value(seller["inventory_json"])
+                buyer_inventory = inventory_value(buyer["inventory_json"])
                 quantity = int(order["quantity"])
                 if int(seller_inventory.get(order["item_key"], 0)) < quantity:
                     self._release_item_lock(connection, order, item_lock, operation_id, now_text)
@@ -400,27 +394,25 @@ class PurchaseOrderRepositoryMixin:
                 capacity = int(buyer["carry_capacity"] or 0)
                 if capacity > 0 and sum(int(value) for value in buyer_inventory.values()) + quantity > capacity:
                     raise PurchaseBuyerCapacityInsufficientError("buyer inventory capacity is insufficient")
-                seller_inventory[order["item_key"]] = int(seller_inventory[order["item_key"]]) - quantity
-                if seller_inventory[order["item_key"]] <= 0:
-                    seller_inventory.pop(order["item_key"], None)
-                buyer_inventory[order["item_key"]] = int(buyer_inventory.get(order["item_key"], 0)) + quantity
-                connection.execute(
-                    "UPDATE players SET inventory_json=?, spirit_stones=spirit_stones+?, updated_at=? WHERE id=?",
-                    (json.dumps(seller_inventory, ensure_ascii=False, sort_keys=True), int(order["total_price"]), now_text, seller["id"]),
+                seller_item_before = int(seller_inventory.get(str(order["item_key"]), 0))
+                buyer_item_before = int(buyer_inventory.get(str(order["item_key"]), 0))
+                seller_currency_before = int(seller["spirit_stones"])
+                change_player_assets(
+                    connection,
+                    seller,
+                    {str(order["item_key"]): -quantity, "spirit_stones": int(order["total_price"])},
+                    now_text,
                 )
-                connection.execute(
-                    "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                    (json.dumps(buyer_inventory, ensure_ascii=False, sort_keys=True), now_text, buyer["id"]),
-                )
+                grant_player_assets(connection, buyer, {str(order["item_key"]): quantity}, now_text)
                 connection.execute("DELETE FROM purchase_item_locks WHERE order_id=?", (order_id,))
                 connection.execute("DELETE FROM purchase_order_funds WHERE order_id=?", (order_id,))
                 connection.execute(
                     "UPDATE purchase_orders SET status='settled', delivery_deadline=NULL, result_json=?, updated_at=? WHERE order_id=?",
                     (json.dumps({"notice": "settled", "platform_fee": int(order["purchase_fee"])}, ensure_ascii=False, sort_keys=True), now_text, order_id),
                 )
-                self._purchase_ledger(connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone", "purchase.sale", "credit", int(order["total_price"]), int(seller["spirit_stones"]), int(seller["spirit_stones"]) + int(order["total_price"]), order_id, now_text)
-                self._purchase_ledger(connection, operation_id, int(seller["id"]), "item", str(order["item_key"]), "purchase.sale", "debit", quantity, int(seller_inventory.get(order["item_key"], 0)) + quantity, int(seller_inventory.get(order["item_key"], 0)), order_id, now_text)
-                self._purchase_ledger(connection, operation_id, int(buyer["id"]), "item", str(order["item_key"]), "purchase.delivery", "credit", quantity, int(buyer_inventory.get(order["item_key"], 0)) - quantity, int(buyer_inventory.get(order["item_key"], 0)), order_id, now_text)
+                self._purchase_ledger(connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone", "purchase.sale", "credit", int(order["total_price"]), seller_currency_before, seller_currency_before + int(order["total_price"]), order_id, now_text)
+                self._purchase_ledger(connection, operation_id, int(seller["id"]), "item", str(order["item_key"]), "purchase.sale", "debit", quantity, seller_item_before, seller_item_before - quantity, order_id, now_text)
+                self._purchase_ledger(connection, operation_id, int(buyer["id"]), "item", str(order["item_key"]), "purchase.delivery", "credit", quantity, buyer_item_before, buyer_item_before + quantity, order_id, now_text)
                 payload = self._purchase_payload(connection, order_id)
                 self._record_purchase_operation(connection, operation_id, operation_name, int(seller_actor["id"]), request_hash, payload, now_text)
         return self._purchase_record_from_payload(payload)
@@ -524,7 +516,7 @@ class PurchaseOrderRepositoryMixin:
         if buyer is None:
             raise PlayerNotFoundError("purchase buyer does not exist")
         amount = int(funds["amount"])
-        connection.execute("UPDATE players SET spirit_stones=spirit_stones+?, updated_at=? WHERE id=?", (amount, now_text, buyer["id"]))
+        grant_player_assets(connection, buyer, {"spirit_stones": amount}, now_text)
         connection.execute("DELETE FROM purchase_order_funds WHERE order_id=?", (order["order_id"],))
         self._purchase_ledger(connection, operation_id, int(buyer["id"]), "currency", "currency.spirit_stone", "purchase.escrow_release", "release", amount, int(buyer["spirit_stones"]), int(buyer["spirit_stones"]) + amount, str(order["order_id"]), now_text)
 

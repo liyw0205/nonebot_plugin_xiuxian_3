@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .rules import CONTENT_VERSION, RULE_VERSION
-
-
 SERVICE_GATHER_HELP = "service.gather_help"
 SERVICE_COOK_MEAL = "service.cook_meal"
 
@@ -27,8 +24,6 @@ class ServiceDefinition:
     failure_provider_refund: dict[str, int] | None = None
     failure_stamina_refund: int = 0
     duration_seconds: int = 24 * 60 * 60
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
 
 SERVICE_DEFINITIONS = {

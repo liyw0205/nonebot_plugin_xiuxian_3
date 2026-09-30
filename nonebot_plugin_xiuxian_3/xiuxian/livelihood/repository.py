@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import spend_player_assets
 from ..persistence.errors import (
     CurrencyInsufficientError,
     LocalReputationInsufficientError,
@@ -111,10 +112,7 @@ class LivelihoodRepositoryMixin(
                     raise LocalReputationInsufficientError("local reputation is insufficient")
             residence_id = uuid4().hex
             ends_at = serialize_datetime(now + timedelta(days=definition.lease_days))
-            connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                (definition.rent_cost, now_text, row["id"]),
-            )
+            spend_player_assets(connection, row, {"spirit_stones": definition.rent_cost}, now_text)
             connection.execute(
                 """
                 INSERT INTO residences(
@@ -132,8 +130,6 @@ class LivelihoodRepositoryMixin(
                     definition.rent_cost,
                     json.dumps(
                         {
-                            "content_version": definition.content_version,
-                            "rule_version": definition.rule_version,
                             "plot_count": definition.plot_count,
                         },
                         ensure_ascii=False,
