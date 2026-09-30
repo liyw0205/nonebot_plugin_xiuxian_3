@@ -9,15 +9,12 @@ from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import enemy_definition
 from nonebot_plugin_xiuxian_3.xiuxian.specials.three_realms_tower_rules import (
-    CONTENT_VERSION,
     MAX_FLOOR,
     V03_MAX_FLOOR,
-    RULE_VERSION,
     enemy_key_for,
     floor_definition,
     rebuild_reputation_total,
     reward_for,
-    versions_for_floor,
 )
 
 
@@ -56,16 +53,13 @@ def _make_eligible(runtime, adapter: str, user: str, faction: str) -> None:
         )
 
 
-def test_three_realms_tower_rules_are_versioned_and_faction_specific() -> None:
+def test_three_realms_tower_rules_are_faction_specific() -> None:
     assert MAX_FLOOR == 40
     assert V03_MAX_FLOOR == 20
-    assert (CONTENT_VERSION, RULE_VERSION) == ("current", "current")
     assert floor_definition(1).stamina_cost == 12
     assert floor_definition(20).weekly_limit == 2
     assert floor_definition(21).required_realm == "soul_transformation"
     assert floor_definition(40).required_realm == "soul_transformation"
-    assert versions_for_floor(20) == ("current", "current")
-    assert versions_for_floor(21) == ("current", "current")
     assert rebuild_reputation_total(
         {"local.domain_refuge": 200, "local.abyss_outpost": 200, "local.ancestral_habitat": 100}
     ) == 500
@@ -97,9 +91,8 @@ def _seed_v03_tower_completion(runtime, adapter: str, user: str) -> None:
         ).fetchone()[0]
         db.execute(
             "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,starts_at,"
-            "result_json,reward_json,content_version,rule_version,created_at,updated_at) "
-            "VALUES(?,?,'tower.three_realms',20,'claimed',1,?,'{}','{}','content-0.3',"
-            "'specials-0.3.0',?,?)",
+            "result_json,reward_json,created_at,updated_at) "
+            "VALUES(?,?,'tower.three_realms',20,'claimed',1,?,'{}','{}',?,?)",
             (f"fixture-v03-{adapter}-{user}", player_id, "2026-09-28T00:00:00+00:00", "2026-09-28T00:00:00+00:00", "2026-09-28T00:00:00+00:00"),
         )
 
@@ -158,7 +151,7 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                     original = runtime.repository.start_quest_battle
 
                     async def fail_start(**kwargs):
-                        raise RuntimeError("simulated v0.4 battle-start failure")
+                        raise RuntimeError("simulated battle-start failure")
 
                     monkeypatch.setattr(runtime.repository, "start_quest_battle", fail_start)
                     aborted = await _send(
@@ -185,7 +178,7 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                             "SELECT stamina FROM players WHERE platform=? AND platform_user_id=?",
                             (adapter, user),
                         ).fetchone()[0] == 10000
-                    # The old mainline permit cannot bypass the v0.4 rebuild threshold.
+                    # The mainline permit cannot bypass the rebuild threshold.
                     _make_v04_eligible(
                         runtime, adapter, user, faction, realm="nascent_soul", rebuild_reputation=500
                     )
@@ -225,9 +218,10 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                             ).fetchone()[0]
                         snapshot = json.loads(snapshot_json)
                         assert snapshot["enemy"]["key"] == enemy_key_for(floor_no, faction)
-                        assert (snapshot["content_version"], snapshot["rule_version"]) == ("current", "current")
-                        assert snapshot["tower_context"]["content_version"] == "current"
-                        assert snapshot["tower_context"]["rule_version"] == "current"
+                        assert "content_version" not in snapshot
+                        assert "rule_version" not in snapshot
+                        assert "content_version" not in snapshot["tower_context"]
+                        assert "rule_version" not in snapshot["tower_context"]
                         assert snapshot["tower_context"]["faction"] == faction
                         assert snapshot["tower_context"]["pollution"] == 17
                         assert snapshot["tower_context"]["bloodline_stability"] == 61
@@ -296,8 +290,7 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                 with sqlite3.connect(runtime.settings.database_path) as db:
                     v04_floors = db.execute(
                         "SELECT COUNT(*) FROM tower_reward_claims c JOIN players p ON p.id=c.player_id "
-                        "WHERE p.platform=? AND p.platform_user_id=? AND c.floor_no BETWEEN 21 AND 40 "
-                        "AND c.content_version='current' AND c.rule_version='current'",
+                        "WHERE p.platform=? AND p.platform_user_id=? AND c.floor_no BETWEEN 21 AND 40",
                         (adapter, user),
                     ).fetchone()[0]
                     battles_with_rewards = db.execute(
@@ -369,7 +362,8 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                         assert snapshot["tower_context"]["pollution"] == 17
                         assert snapshot["tower_context"]["bloodline_stability"] == 61
                         assert snapshot["tower_context"]["local_reputation"]["local.xuantian.new_town"] == 23
-                        assert (snapshot["content_version"], snapshot["rule_version"]) == ("current", "current")
+                        assert "content_version" not in snapshot
+                        assert "rule_version" not in snapshot
                         with sqlite3.connect(runtime.settings.database_path) as db:
                             settled = db.execute(
                                 "SELECT t.result_json,e.payload_json FROM tower_runs t "

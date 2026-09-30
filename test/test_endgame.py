@@ -88,7 +88,7 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                         connection.execute(
                             "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
                             "payload_json, content_version, rule_version, created_at) "
-                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, 'content-0.6', 'quests-0.6.0', 'created')",
+                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, '', '', 'created')",
                             (
                                 player_id,
                                 component_key,
@@ -178,7 +178,7 @@ def test_legacy_dao_union_flag_does_not_bypass_three_realm_mainline_evidence() -
                         connection.execute(
                             "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
                             "payload_json, content_version, rule_version, created_at) "
-                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, 'content-0.6', 'quests-0.6.0', 'created')",
+                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, '', '', 'created')",
                             (
                                 player_id,
                                 component_key,
@@ -211,7 +211,7 @@ def test_legacy_dao_union_flag_does_not_bypass_three_realm_mainline_evidence() -
                     connection.execute(
                         "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
                         "payload_json, content_version, rule_version, created_at) "
-                        "VALUES (?, 'quest.dao_union', 'three_realm_mainline', ?, 'success', ?, 'content-0.6', 'quests-0.6.0', 'created')",
+                        "VALUES (?, 'quest.dao_union', 'three_realm_mainline', ?, 'success', ?, '', '', 'created')",
                         (
                             player_id,
                             f"{user}-valid-mainline",
@@ -365,7 +365,7 @@ def test_tribulation_l10_requires_three_events_per_origin_task_in_a_shared_seaso
                             event_season = season_id if index < 2 else historical_season_id
                             connection.execute(
                                 "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, content_version, rule_version, created_at) "
-                                "VALUES (?, ?, 'completed', ?, 'success', ?, 'content-0.6', 'events-0.6.0', 'created')",
+                                "VALUES (?, ?, 'completed', ?, 'success', ?, '', '', 'created')",
                                 (
                                     player_id,
                                     task_key,

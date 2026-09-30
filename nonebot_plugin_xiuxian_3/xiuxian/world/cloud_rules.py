@@ -6,8 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 DEMON_INTRO_QUEST = "quest.demon_intro"
 DEMON_INTRO_FLAG = "access.demon_abyss_gate"
 BEAST_INTRO_QUEST = "quest.beast_intro"
@@ -30,8 +28,6 @@ class CloudRouteDefinition:
     pass_key: str | None = None
     pass_quantity: int = 0
     required_quest: str | None = None
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
 
 CLOUD_ROUTES = {
@@ -82,10 +78,8 @@ __all__ = [
     "BEAST_INTRO_QUEST",
     "ARRAY_HALL_INVITE_FLAG",
     "CLOUD_ROUTES",
-    "CONTENT_VERSION",
     "DEMON_INTRO_FLAG",
     "DEMON_INTRO_QUEST",
-    "RULE_VERSION",
     "CloudRouteDefinition",
     "cloud_route_definition",
     "resolve_cloud_route",

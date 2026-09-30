@@ -128,8 +128,8 @@ def test_demon_mainline_requires_server_evidence_and_unlocks_both_adapters() -> 
                     assert settled.code == "EXPLORATION_SETTLED"
                     assert settled.data["battle_outcome"] == "won"
                     with sqlite3.connect(runtime.settings.database_path) as connection:
-                        enemy_key, rule_version, snapshot_text = connection.execute(
-                            "SELECT enemy_key, rule_version, snapshot_json FROM battle_sessions WHERE battle_id=?",
+                        enemy_key, snapshot_text = connection.execute(
+                            "SELECT enemy_key, snapshot_json FROM battle_sessions WHERE battle_id=?",
                             (settled.data["battle_id"],),
                         ).fetchone()
                         qualification_text = connection.execute(
@@ -139,7 +139,6 @@ def test_demon_mainline_requires_server_evidence_and_unlocks_both_adapters() -> 
                     battle_snapshot = json.loads(snapshot_text)
                     qualification = json.loads(qualification_text)
                     assert enemy_key == "enemy.demon_ruins_scout"
-                    assert rule_version == "combat-0.3.1"
                     assert battle_snapshot["player"]["stats"]["max_hp"] == 600
                     assert battle_snapshot["player"]["stats"]["attack"] == 10 + qualification["body"] // 2
                     assert battle_snapshot["player"]["cross_realm_penalty_bp"] == 1000

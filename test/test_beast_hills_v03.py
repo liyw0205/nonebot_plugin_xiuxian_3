@@ -171,7 +171,7 @@ def test_beast_hills_clue_reward_uses_v03_snapshot() -> None:
                     ).fetchone()[0]
                 )
             assert snapshot["random_pool"] == "loot.beast.hills.v0.3"
-            assert snapshot["content_version"] == "content-0.3"
+            assert "content_version" not in snapshot
             assert snapshot["bloodline_stability_before"] == 33
             _expire(runtime, "exploration_sessions", "exploration_id", started.data["exploration_id"])
             settled = await runtime.adapters.dispatch(

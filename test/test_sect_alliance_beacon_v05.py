@@ -37,7 +37,7 @@ def test_qq_onebot_void_beacon_discount_and_alliance_contract() -> None:
                     ("sect-b", "乙宗", players["leader-b"], {"item.void_anchor": 20, "item.mat.array_sand": 30}),
                 ):
                     connection.execute(
-                        "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?,?,?,?, 'active',5,120,100,0,20000,0,?,?,?,'content-0.5','social-0.5.0')",
+                        "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?,?,?,?, 'active',5,120,100,0,20000,0,?,?,?,'','')",
                         (sect_id, name, name.casefold(), leader, json.dumps(warehouse), now_text, now_text),
                     )
                 connection.execute("UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=1, stamina=100, stamina_max=100, inventory_json=?", (json.dumps({"item.void_anchor": 20}),))
@@ -47,7 +47,7 @@ def test_qq_onebot_void_beacon_discount_and_alliance_contract() -> None:
                         (sect_id, players[user_id], role, now_text, now_text, now_text, now_text),
                     )
                 connection.execute(
-                    "INSERT INTO sect_void_fortresses(sect_id,status,anchor_balance,build_operation_id,build_ends_at,maintenance_due_at,snapshot_json,content_version,rule_version,created_at,updated_at) VALUES ('sect-a','active',20,'fortress-a',NULL,?,?, 'content-0.5','social-0.5.0',?,?)",
+                        "INSERT INTO sect_void_fortresses(sect_id,status,anchor_balance,build_operation_id,build_ends_at,maintenance_due_at,snapshot_json,created_at,updated_at) VALUES ('sect-a','active',20,'fortress-a',NULL,?,?,?,?)",
                         ((clock.value + timedelta(days=6)).isoformat(), json.dumps({}), now_text, now_text),
                 )
 
@@ -108,7 +108,7 @@ def test_alliance_confirmation_expires_and_is_idempotent() -> None:
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 players = dict(connection.execute("SELECT platform_user_id,id FROM players").fetchall())
                 for sect_id, name, leader in (("expire-a-sect", "甲过期", players["expire-a"]), ("expire-b-sect", "乙过期", players["expire-b"])):
-                    connection.execute("INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?,?,?,?, 'active',5,120,100,0,20000,0, '{}',?,?, 'content-0.5','social-0.5.0')", (sect_id, name, name.casefold(), leader, now_text, now_text))
+                    connection.execute("INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?,?,?,?, 'active',5,120,100,0,20000,0, '{}',?,?, '', '')", (sect_id, name, name.casefold(), leader, now_text, now_text))
                     connection.execute("INSERT INTO sect_members(sect_id,player_id,role,status,contribution,joined_at,last_action_at,created_at,updated_at) VALUES (?,?, 'leader','active',0,?,?,?,?)", (sect_id, leader, now_text, now_text, now_text, now_text))
             proposal = await runtime.dispatch(_context("qq.official", "expire-a", "expire-propose"), "发起生产联盟 expire-b-sect")
             assert proposal.code == "ALLIANCE_PROPOSED"

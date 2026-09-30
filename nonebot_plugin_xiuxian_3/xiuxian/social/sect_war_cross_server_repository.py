@@ -39,7 +39,6 @@ from .sect_war_cross_server_models import (
 )
 from .sect_war_cross_server_rules import (
     CROSS_SERVER_CLAIM_SECONDS,
-    CROSS_SERVER_CONTENT_VERSION,
     CROSS_SERVER_ENGINE_HP,
     CROSS_SERVER_FORTRESS_ANCHOR_COST,
     CROSS_SERVER_FORTRESS_BUILD_COST,
@@ -50,7 +49,6 @@ from .sect_war_cross_server_rules import (
     CROSS_SERVER_REGISTRATION_CAP,
     CROSS_SERVER_REGISTRATION_FEE,
     CROSS_SERVER_ROSTER_CAP,
-    CROSS_SERVER_RULE_VERSION,
     CROSS_SERVER_SCORE_BY_ACTION,
     CROSS_SERVER_WAR_SECONDS,
     CrossServerRoundWindow,
@@ -185,13 +183,13 @@ class SectWarCrossServerRepositoryMixin:
             snapshot_json = json.dumps({"sect_level": int(sect["level"]), "anchor_cost": CROSS_SERVER_FORTRESS_ANCHOR_COST, "wallet_cost": CROSS_SERVER_FORTRESS_BUILD_COST}, sort_keys=True)
             if existing is None:
                 connection.execute(
-                    "INSERT INTO sect_void_fortresses(sect_id,status,anchor_balance,build_operation_id,build_ends_at,maintenance_due_at,snapshot_json,content_version,rule_version,created_at,updated_at) VALUES (?, 'building', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (sect["sect_id"], CROSS_SERVER_FORTRESS_ANCHOR_COST, operation_id, serialize_datetime(build_end), serialize_datetime(build_end + timedelta(days=7)), snapshot_json, CROSS_SERVER_CONTENT_VERSION, CROSS_SERVER_RULE_VERSION, now_text, now_text),
+                    "INSERT INTO sect_void_fortresses(sect_id,status,anchor_balance,build_operation_id,build_ends_at,maintenance_due_at,snapshot_json,created_at,updated_at) VALUES (?, 'building', ?, ?, ?, ?, ?, ?, ?)",
+                    (sect["sect_id"], CROSS_SERVER_FORTRESS_ANCHOR_COST, operation_id, serialize_datetime(build_end), serialize_datetime(build_end + timedelta(days=7)), snapshot_json, now_text, now_text),
                 )
             else:
                 connection.execute(
-                    "UPDATE sect_void_fortresses SET status='building', anchor_balance=?, build_operation_id=?, build_ends_at=?, maintenance_due_at=?, snapshot_json=?, content_version=?, rule_version=?, updated_at=? WHERE sect_id=?",
-                    (CROSS_SERVER_FORTRESS_ANCHOR_COST, operation_id, serialize_datetime(build_end), serialize_datetime(build_end + timedelta(days=7)), snapshot_json, CROSS_SERVER_CONTENT_VERSION, CROSS_SERVER_RULE_VERSION, now_text, sect["sect_id"]),
+                    "UPDATE sect_void_fortresses SET status='building', anchor_balance=?, build_operation_id=?, build_ends_at=?, maintenance_due_at=?, snapshot_json=?, updated_at=? WHERE sect_id=?",
+                    (CROSS_SERVER_FORTRESS_ANCHOR_COST, operation_id, serialize_datetime(build_end), serialize_datetime(build_end + timedelta(days=7)), snapshot_json, now_text, sect["sect_id"]),
                 )
             payload = {"sect_id": str(sect["sect_id"]), "status": "building", "anchors": CROSS_SERVER_FORTRESS_ANCHOR_COST, "build_ends_at": serialize_datetime(build_end), "maintenance_due_at": serialize_datetime(build_end + timedelta(days=7))}
             self._cross_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -274,7 +272,7 @@ class SectWarCrossServerRepositoryMixin:
             roster = []
             for slot, member in enumerate(members, 1):
                 roster.append({"player_id": int(member["id"]), "platform": str(member["platform"]), "platform_user_id": str(member["platform_user_id"]), "void_power": int(member["void_power"]), "void_anchor_capacity": int(member["void_anchor_capacity"]), "space_resistance_bp": int(member["space_resistance_bp"]), "void_instability_until": member["void_instability_until"], "roster_slot": slot})
-            snapshot = {"round_id": window.round_id, "week_id": window.week_id, "shard_key": "local", "sect_id": str(sect["sect_id"]), "sect_name": str(sect["name"]), "level": int(sect["level"]), "members": roster, "enemy_pool": ["enemy.sect_war_engine"], "rule_version": CROSS_SERVER_RULE_VERSION, "content_version": CROSS_SERVER_CONTENT_VERSION}
+            snapshot = {"round_id": window.round_id, "week_id": window.week_id, "shard_key": "local", "sect_id": str(sect["sect_id"]), "sect_name": str(sect["name"]), "level": int(sect["level"]), "members": roster, "enemy_pool": ["enemy.sect_war_engine"]}
             connection.execute("UPDATE sects SET spirit_stones=spirit_stones-?, updated_at=? WHERE sect_id=?", (CROSS_SERVER_REGISTRATION_FEE, now_text, sect["sect_id"]))
             connection.execute("INSERT INTO sect_cross_server_war_registrations(round_id,sect_id,operation_id,entry_fee,status,roster_size,score,snapshot_json,registered_at) VALUES (?, ?, ?, ?, 'registered', ?, 0, ?, ?)", (window.round_id, sect["sect_id"], operation_id, CROSS_SERVER_REGISTRATION_FEE, len(roster), json.dumps(snapshot, sort_keys=True), now_text))
             for member in roster:
@@ -483,7 +481,7 @@ class SectWarCrossServerRepositoryMixin:
                     event = {"turn": turn, "phase": phase, "action": "break" if branch == "break" else "auto", "damage": damage, "hp": hp}
                 replay.append(event)
             status = "settled" if hp <= 0 else "running"
-            connection.execute("UPDATE sect_cross_server_war_sessions SET status=?,turn_no=?,engine_hp=?,replay_json=?,result_json=?,updated_at=? WHERE session_id=?", (status, turn, hp, json.dumps(replay, sort_keys=True), json.dumps({"victory": hp <= 0, "rule_version": CROSS_SERVER_RULE_VERSION}, sort_keys=True), now_text, session["session_id"]))
+            connection.execute("UPDATE sect_cross_server_war_sessions SET status=?,turn_no=?,engine_hp=?,replay_json=?,result_json=?,updated_at=? WHERE session_id=?", (status, turn, hp, json.dumps(replay, sort_keys=True), json.dumps({"victory": hp <= 0}, sort_keys=True), now_text, session["session_id"]))
 
     def _cross_auto_grant(self, connection: Any, window: CrossServerRoundWindow, now: datetime) -> None:
         rows = connection.execute("SELECT reward_key,player_id,reward_json FROM sect_cross_server_weekly_rewards WHERE round_id=?", (window.round_id,)).fetchall()

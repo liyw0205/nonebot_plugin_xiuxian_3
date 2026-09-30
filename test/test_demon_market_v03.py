@@ -99,7 +99,6 @@ def test_demon_market_reputation_gate_and_arrival_are_idempotent_on_both_adapter
                         (started.data["session_id"],),
                     ).fetchone()[0]
                 assert json.loads(snapshot) == {
-                    "content_version": "content-0.3",
                     "currency_cost": 500,
                     "daily_start_limit": 0,
                     "destination": "demon.abyss_market",
@@ -111,7 +110,6 @@ def test_demon_market_reputation_gate_and_arrival_are_idempotent_on_both_adapter
                     "required_faction": "demon",
                     "required_faction_reputation": 200,
                     "required_intro_flag": None,
-                    "rule_version": "world-0.3.0",
                     "source": "demon.fallen_ruins",
                     "stamina_cost": 12,
                     "consume_pass_on_arrival": False,

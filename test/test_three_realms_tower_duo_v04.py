@@ -146,7 +146,7 @@ def test_three_realms_tower_duo_v04_gate_failure_and_start_refund(monkeypatch) -
                 )
                 db.execute("UPDATE player_reputations SET local_json=? WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)", (json.dumps({"local.domain_refuge": 499}), identities[1][0], identities[1][1]))
                 db.execute(
-                    "INSERT INTO three_realms_tower_duo_runs(duo_run_id,party_id,tower_key,floor_no,status,member_run_ids_json,result_json,content_version,rule_version,start_operation_id,created_at,updated_at) VALUES ('seed-duo',?,'tower.three_realms',20,'won','[]','{}','content-0.4','specials-0.4.1','seed-op','2026-09-27T00:00:00+00:00','2026-09-27T00:00:00+00:00')",
+                    "INSERT INTO three_realms_tower_duo_runs(duo_run_id,party_id,tower_key,floor_no,status,member_run_ids_json,result_json,start_operation_id,created_at,updated_at) VALUES ('seed-duo',?,'tower.three_realms',20,'won','[]','{}','seed-op','2026-09-27T00:00:00+00:00','2026-09-27T00:00:00+00:00')",
                     (party_id,),
                 )
                 player_ids = [db.execute("SELECT id FROM players WHERE platform=? AND platform_user_id=?", identity).fetchone()[0] for identity in identities]

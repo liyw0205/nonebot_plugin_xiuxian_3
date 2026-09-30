@@ -12,13 +12,12 @@ from types import SimpleNamespace
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import ENEMIES, enemy_definition
+from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import enemy_definition
 from nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_rules import DAO_SERVICE, DISPATCHES, choose_outcome
 from nonebot_plugin_xiuxian_3.xiuxian.specials.void_spire_rules import (
     DESIGN_MAX_FLOOR,
     MAX_FLOOR,
     floor_definition,
-    versions_for_floor,
 )
 
 
@@ -56,14 +55,13 @@ def _seed_claimed_floors(connection: sqlite3.Connection, player_id: int, start: 
     history = "2026-01-01T00:00:00+00:00"
     connection.executemany(
         "INSERT INTO void_spire_runs(run_id,player_id,tower_key,floor_no,route_key,"
-        "status,first_clear,starts_at,result_json,reward_json,content_version,rule_version,"
-        "created_at,updated_at) VALUES(?,?,'tower.void_spire',?,?,'claimed',1,"
-        "?,'{}','{}',?,?,?,?)",
+        "status,first_clear,starts_at,result_json,reward_json,created_at,updated_at) "
+        "VALUES(?,?,'tower.void_spire',?,?,'claimed',1,?,'{}','{}',?,?)",
         [
             (
                 f"seed-{player_id}-{floor_no}", player_id, floor_no,
                 floor_definition(floor_no).route_key, history,
-                *versions_for_floor(floor_no), history, history,
+                history, history,
             )
             for floor_no in range(start, stop + 1)
         ],
@@ -114,7 +112,7 @@ def test_void_spire_first_slice_works_on_qq_and_onebot() -> None:
 
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     rows = connection.execute(
-                        "SELECT void_spire_runs.route_key, void_spire_runs.floor_no, void_spire_runs.content_version, void_spire_runs.rule_version FROM void_spire_runs "
+                        "SELECT void_spire_runs.route_key, void_spire_runs.floor_no FROM void_spire_runs "
                         "JOIN players ON players.id=void_spire_runs.player_id "
                         "WHERE players.platform=? AND players.platform_user_id=? ORDER BY void_spire_runs.id",
                         (adapter, user),
@@ -143,7 +141,7 @@ def test_void_spire_rules_and_content_records_are_stable() -> None:
     assert floor_definition(60).boss is True
     assert floor_definition(60).route_key == "witness"
     assert floor_definition(31).weekly_limit == 1
-    assert versions_for_floor(30) != versions_for_floor(31)
+    assert floor_definition(30).route_key != floor_definition(31).route_key
     with open("data/战斗/敌人.json", encoding="utf-8") as handle:
         records = {row["key"]: row for row in json.load(handle)["records"]}
     expected = {
@@ -237,10 +235,17 @@ def test_void_spire_losses_count_against_weekly_limit_without_rewards(monkeypatc
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
             await _setup(runtime, "qq.official", "loser", "loser")
-            enemy = enemy_definition("enemy.void_spire.scout")
-            monkeypatch.setitem(
-                ENEMIES, enemy.key,
-                replace(enemy, max_hp=200000, attack=10000, initiative=10000, agility=10000),
+            original_enemy_definition = enemy_definition
+
+            def overpowering_enemy(enemy_key: str, *, content=None):
+                enemy = original_enemy_definition(enemy_key, content=content)
+                if enemy_key == "enemy.void_spire.scout":
+                    return replace(enemy, max_hp=200000, attack=10000, initiative=10000, agility=10000)
+                return enemy
+
+            monkeypatch.setattr(
+                "nonebot_plugin_xiuxian_3.xiuxian.combat.repository.enemy_definition",
+                overpowering_enemy,
             )
             for index in range(2):
                 lost = await _send(runtime, "qq.official", "loser", f"loss-{index}", "挑战虚空塔 1")
@@ -277,14 +282,13 @@ def test_void_spire_route_bosses_keep_battle_and_claim_snapshots() -> None:
                     history = "2026-01-01T00:00:00+00:00"
                     connection.executemany(
                         "INSERT INTO void_spire_runs(run_id,player_id,tower_key,floor_no,route_key,"
-                        "status,first_clear,starts_at,result_json,reward_json,content_version,rule_version,"
-                        "created_at,updated_at) VALUES(?,?,'tower.void_spire',?,?,'claimed',1,"
-                        "?,'{}','{}',?,?,?,?)",
+                        "status,first_clear,starts_at,result_json,reward_json,created_at,updated_at) "
+                        "VALUES(?,?,'tower.void_spire',?,?,'claimed',1,?,'{}','{}',?,?)",
                         [
                             (
                                 f"{user}-historical-{previous}", player_id, previous,
                                 floor_definition(previous).route_key, history,
-                                *versions_for_floor(previous), history, history,
+                                history, history,
                             )
                             for previous in range(1, floor_no)
                         ],
@@ -293,15 +297,14 @@ def test_void_spire_route_bosses_keep_battle_and_claim_snapshots() -> None:
                 assert challenge.code == "VOID_SPIRE_CHALLENGE_SETTLED"
                 assert challenge.data["outcome"] == "won"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    snapshot, reward_status, content_version, rule_version = connection.execute(
-                        "SELECT b.snapshot_json,b.reward_status,t.content_version,t.rule_version "
+                    snapshot, reward_status = connection.execute(
+                        "SELECT b.snapshot_json,b.reward_status "
                         "FROM battle_sessions b JOIN void_spire_runs t ON b.battle_id=t.battle_id "
                         "WHERE t.run_id=?",
                         (challenge.data["run_id"],),
                     ).fetchone()
                     assert json.loads(snapshot)["enemy"]["key"] == floor_definition(floor_no).enemy_key
                     assert reward_status == "none"
-                    assert (content_version, rule_version) == versions_for_floor(floor_no)
                 reward = await _send(runtime, adapter, user, f"{user}-reward", "领取虚空塔奖励")
                 assert reward.code == "VOID_SPIRE_REWARD_CLAIMED"
                 assert reward.data["reward"]["local.void_supply"] == 30
@@ -415,13 +418,12 @@ def test_void_spire_upper_floors_have_independent_weekly_quota_on_both_adapters(
                 assert (await _send(runtime, adapter, user, f"{user}-lower-3", "挑战虚空塔 30")).code == "VOID_SPIRE_WEEKLY_LIMIT"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     battle = connection.execute(
-                        "SELECT b.snapshot_json,b.reward_status,t.content_version,t.rule_version "
+                        "SELECT b.snapshot_json,b.reward_status "
                         "FROM battle_sessions b JOIN void_spire_runs t ON t.battle_id=b.battle_id "
                         "WHERE t.run_id=?", (upper.data["run_id"],)
                     ).fetchone()
                     assert json.loads(battle[0])["enemy"]["key"] == floor_definition(31).enemy_key
                     assert battle[1] == "none"
-                    assert tuple(battle[2:]) == versions_for_floor(31)
                     assert connection.execute(
                         "SELECT stamina FROM players WHERE id=?", (player_id,)
                     ).fetchone()[0] == 140
@@ -479,73 +481,14 @@ def test_void_spire_upper_reputation_gate_boss_stories_and_display_title() -> No
                         "SELECT COUNT(*) FROM codex_entries WHERE player_id=? AND entry_key=?",
                         (player_id, f"codex.challenge.void_spire.floor_{floor_no}"),
                     ).fetchone()[0] == 1
-                    snapshot_json, reward_status, content_version, rule_version = connection.execute(
-                        "SELECT b.snapshot_json,b.reward_status,t.content_version,t.rule_version "
+                    snapshot_json, reward_status = connection.execute(
+                        "SELECT b.snapshot_json,b.reward_status "
                         "FROM battle_sessions b JOIN void_spire_runs t ON t.battle_id=b.battle_id "
                         "WHERE t.run_id=?", (challenge.data["run_id"],)
                     ).fetchone()
                     assert json.loads(snapshot_json)["enemy"]["key"] == floor_definition(floor_no).enemy_key
                     assert reward_status == "none"
-                    assert (content_version, rule_version) == versions_for_floor(floor_no)
             await runtime.close()
-
-    asyncio.run(run())
-
-
-def test_void_spire_upgrade_preserves_legacy_claims_and_operation_replays() -> None:
-    async def run() -> None:
-        with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
-            await _setup(runtime, "qq.official", "legacy", "legacy")
-            first = await _send(runtime, "qq.official", "legacy", "legacy-start", "挑战虚空塔 1")
-            claim = await _send(runtime, "qq.official", "legacy", "legacy-claim", "领取虚空塔奖励")
-            assert first.ok and claim.ok
-            database_path = runtime.settings.database_path
-            await runtime.close()
-
-            with sqlite3.connect(database_path) as connection:
-                connection.execute("PRAGMA foreign_keys = OFF")
-                schema = connection.execute(
-                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='void_spire_runs'"
-                ).fetchone()[0]
-                legacy_schema = schema.replace("void_spire_runs (", "void_spire_runs_v01 (", 1)
-                legacy_schema = legacy_schema.replace("BETWEEN 1 AND 60", "BETWEEN 1 AND 30")
-                connection.execute(legacy_schema)
-                connection.execute("INSERT INTO void_spire_runs_v01 SELECT * FROM void_spire_runs")
-                connection.execute("DROP TABLE void_spire_runs")
-                connection.execute("ALTER TABLE void_spire_runs_v01 RENAME TO void_spire_runs")
-                assert "BETWEEN 1 AND 30" in connection.execute(
-                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='void_spire_runs'"
-                ).fetchone()[0]
-
-            reopened = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
-            preview = await _send(reopened, "qq.official", "legacy", "legacy-preview", "虚空塔")
-            assert preview.code == "VOID_SPIRE_PREVIEW"
-            start_replay = await _send(reopened, "qq.official", "legacy", "legacy-start", "挑战虚空塔 1")
-            claim_replay = await _send(reopened, "qq.official", "legacy", "legacy-claim", "领取虚空塔奖励")
-            assert start_replay.data["idempotent_replay"] is True
-            assert claim_replay.data["idempotent_replay"] is True
-            assert claim_replay.data["reward"] == claim.data["reward"]
-            assert "codex.challenge.void_spire.floor_1" in claim_replay.data["discoveries"]
-            with sqlite3.connect(database_path) as connection:
-                connection.execute("PRAGMA foreign_keys = ON")
-                assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
-                assert "BETWEEN 1 AND 60" in connection.execute(
-                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='void_spire_runs'"
-                ).fetchone()[0]
-                assert connection.execute("SELECT COUNT(*) FROM void_spire_reward_claims").fetchone()[0] == 1
-                player_id = connection.execute(
-                    "SELECT id FROM players WHERE platform_user_id='legacy'"
-                ).fetchone()[0]
-                _seed_claimed_floors(connection, player_id, 2, 30)
-                connection.execute(
-                    "UPDATE players SET realm_key='dao_union',realm_layer=1,stamina=100,"
-                    "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                    (json.dumps({"body": 1000, "agility": 1000}), player_id),
-                )
-            upper = await _send(reopened, "qq.official", "legacy", "new-upper", "挑战虚空塔 31")
-            assert upper.code == "VOID_SPIRE_CHALLENGE_SETTLED" and upper.data["outcome"] == "won"
-            await reopened.close()
 
     asyncio.run(run())
 

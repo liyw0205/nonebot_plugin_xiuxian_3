@@ -157,7 +157,7 @@ def test_void_refining_failure_replays_and_recovers_after_instability_expires() 
                     for index in range(3):
                         db.execute(
                             "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, content_version, rule_version, created_at) "
-                            "VALUES (?, 'quest.break_void', 'void_wall_trial', ?, 'success', '{}', 'content-0.5', 'events-0.5.0', 'created')",
+                            "VALUES (?, 'quest.break_void', 'void_wall_trial', ?, 'success', '{}', '', '', 'created')",
                             (player_id, f"{user}-wall-trial-{index}"),
                         )
 
@@ -564,7 +564,7 @@ def test_void_refining_world_merit_can_be_replenished_by_public_events_before_re
                         (player_id,),
                     )
                     db.execute(
-                        "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?, 'content-0.4', 'social-0.4.0')",
+                        "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?, '', '')",
                         (f"void-merit-sect-{adapter}", "功勋补给宗", f"void-merit-sect-{adapter}", player_id, now, now),
                     )
                     db.execute(
@@ -726,7 +726,7 @@ def test_higher_realms_can_reenter_archive_route_on_both_adapters() -> None:
                         "SELECT snapshot_json FROM void_route_sessions WHERE session_id=?",
                         (started.data["session_id"],),
                     ).fetchone()[0]
-                assert json.loads(snapshot_json)["rule_version"] == "world-0.5.2"
+                assert "rule_version" not in json.loads(snapshot_json)
             await runtime.close()
 
     asyncio.run(run())

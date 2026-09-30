@@ -87,7 +87,7 @@ def _insert_origin_evidence(
             apprentice_id = apprentice_ids[index % len(apprentice_ids)]
             connection.execute(
                 "INSERT INTO mentor_relations(relation_id, master_id, apprentice_id, status, expires_at, invited_at, graduated_at, graduate_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, ?, 'graduated', ?, ?, ?, ?, 'content-0.1', 'social-0.1.0', ?, ?)",
+                "VALUES (?, ?, ?, 'graduated', ?, ?, ?, ?, '', '', ?, ?)",
                 (f"relation-{source}", player_id, apprentice_id, now_text, now_text, now_text, f"graduate-op-{source}", now_text, now_text),
             )
 
@@ -204,8 +204,8 @@ def test_dao_origin_resource_closure_and_qq_onebot_task_producers() -> None:
                 assert resources[:3] == (470, 450, 1_000)
                 assert json.loads(resources[3]).get("item.tribulation_token") == 3
                 assert event_count == 9
-                assert {tuple(row) for row in event_versions} == {("content-0.6", "events-0.6.0")}
-                assert {tuple(row) for row in progress_versions} == {("content-0.6", "events-0.6.0")}
+                assert {tuple(row) for row in event_versions} == {("", "")}
+                assert {tuple(row) for row in progress_versions} == {("", "")}
 
                 clock.advance(days=36)
                 season_id, _, _ = final_heaven_season_window(clock.value)
@@ -634,8 +634,8 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                 assert json.loads(state[1]).get("item.dao_fruit_fragment") == 12
                 assert json.loads(state[1]).get("item.tribulation_token") == 1
                 assert json.loads(state[1]).get("item.masterwork.body", 0) == 0
-                assert {tuple(row) for row in event_versions} == {("content-0.6", "quests-0.6.1")}
-                assert tuple(progress_version) == ("content-0.6", "quests-0.6.1")
+                assert {tuple(row) for row in event_versions} == {("", "")}
+                assert tuple(progress_version) == ("", "")
             await runtime.close()
 
     asyncio.run(run())
@@ -881,8 +881,8 @@ def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
                     )
                 assert row == (10, "{}", "void.archive_ruins")
                 snapshot = json.loads(snapshot_json)
-                assert snapshot["rule_version"] == "world-0.6.1"
-                assert snapshot["content_version"] == "content-0.6"
+                assert "rule_version" not in snapshot
+                assert "content_version" not in snapshot
                 assert snapshot["required_dao_fruit_progress"] == 470
                 assert snapshot["daily_start_limit"] == 1
                 arrived = await runtime.dispatch(

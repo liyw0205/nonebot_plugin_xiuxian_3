@@ -74,7 +74,7 @@ from ..world.void_rules import (
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
-from ..world.rules import destination_definition, meets_realm, RULE_VERSION
+from ..world.rules import destination_definition, meets_realm
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     battle_roll_bp,

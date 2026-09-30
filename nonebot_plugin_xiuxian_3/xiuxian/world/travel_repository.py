@@ -471,8 +471,6 @@ class TravelRepositoryMixin:
             session_id = uuid4().hex
             ends_at = now + timedelta(seconds=definition.duration_seconds)
             snapshot = {
-                "rule_version": definition.rule_version,
-                "content_version": definition.content_version,
                 "source": current,
                 "destination": destination,
                 "stamina_cost": definition.stamina_cost,

@@ -119,8 +119,6 @@ class VoidSpireRepositoryMixin:
             definition = floor_definition(floor_no)
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
-        content_version = ""
-        rule_version = ""
         operation_name = "specials.start_void_spire"
         request_payload = {
             "platform": platform,
@@ -128,8 +126,6 @@ class VoidSpireRepositoryMixin:
             "tower_key": TOWER_KEY,
             "floor_no": floor_no,
             "route_key": definition.route_key,
-            "content_version": content_version,
-            "rule_version": rule_version,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
@@ -206,8 +202,8 @@ class VoidSpireRepositoryMixin:
                 INSERT INTO void_spire_runs(
                     run_id, player_id, tower_key, floor_no, route_key, status,
                     battle_id, first_clear, starts_at, result_json, reward_json,
-                    content_version, rule_version, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'battle_running', NULL, ?, ?, '{}', ?, ?, ?, ?, ?)
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'battle_running', NULL, ?, ?, '{}', ?, ?, ?)
                 """,
                 (
                     run_id,
@@ -218,8 +214,6 @@ class VoidSpireRepositoryMixin:
                     int(first_clear),
                     now_text,
                     json.dumps(reward, ensure_ascii=False, sort_keys=True),
-                    content_version,
-                    rule_version,
                     now_text,
                     now_text,
                 ),
@@ -289,7 +283,7 @@ class VoidSpireRepositoryMixin:
                             f"specials.void_spire.floor.{run['floor_no']}",
                             f"battle.resolve:{run['battle_id']}",
                             now_text,
-                            json.dumps({"tower_key": TOWER_KEY, "floor_no": int(run["floor_no"]), "route_key": run["route_key"], "content_version": run["content_version"], "rule_version": run["rule_version"]}, sort_keys=True),
+                            json.dumps({"tower_key": TOWER_KEY, "floor_no": int(run["floor_no"]), "route_key": run["route_key"]}, sort_keys=True),
                         ),
                     )
             run = connection.execute("SELECT * FROM void_spire_runs WHERE run_id=?", (run_id,)).fetchone()
@@ -369,8 +363,6 @@ class VoidSpireRepositoryMixin:
                 "source": TOWER_KEY,
                 "floor_no": int(run["floor_no"]),
                 "route_key": str(run["route_key"]),
-                "content_version": str(run["content_version"]),
-                "rule_version": str(run["rule_version"]),
             }
             record_material_discoveries(
                 connection,
@@ -399,8 +391,8 @@ class VoidSpireRepositoryMixin:
                         snapshot=snapshot,
                     )
             connection.execute(
-                "INSERT INTO void_spire_reward_claims(run_id,player_id,floor_no,route_key,first_clear,operation_id,reward_json,content_version,rule_version,claimed_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (run["run_id"], player["id"], run["floor_no"], run["route_key"], run["first_clear"], operation_id, json.dumps(reward, sort_keys=True), run["content_version"], run["rule_version"], now_text),
+                "INSERT INTO void_spire_reward_claims(run_id,player_id,floor_no,route_key,first_clear,operation_id,reward_json,claimed_at) VALUES (?,?,?,?,?,?,?,?)",
+                (run["run_id"], player["id"], run["floor_no"], run["route_key"], run["first_clear"], operation_id, json.dumps(reward, sort_keys=True), now_text),
             )
             connection.execute(
                 "UPDATE void_spire_runs SET status='claimed',claim_operation_id=?,updated_at=? WHERE id=? AND status='reward_pending'",

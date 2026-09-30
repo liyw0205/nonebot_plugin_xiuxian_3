@@ -185,8 +185,8 @@ def test_legacy_manor_schema_migration_tags_existing_rows_as_first_manor() -> No
         connection.execute(
             "INSERT INTO legacy_manor_runs(run_id,player_id,status,node_index,starts_at,expires_at,snapshot_json,"
             "entry_operation_id,content_version,rule_version,created_at,updated_at) "
-            "VALUES ('old-run',1,'settled',3,'2026-01-01','2026-01-01','{}','old-op','content-0.6',"
-            "'adventures-0.6.0','2026-01-01','2026-01-01')"
+            "VALUES ('old-run',1,'settled',3,'2026-01-01','2026-01-01','{}','old-op','','',"
+            "'2026-01-01','2026-01-01')"
         )
         ensure_legacy_manor_schema(connection)
         row = connection.execute("SELECT instance_key FROM legacy_manor_runs WHERE run_id='old-run'").fetchone()

@@ -124,16 +124,12 @@ class ThreeRealmsTowerRepositoryMixin:
             definition = floor_definition(floor_no)
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
-        content_version = ""
-        rule_version = ""
         operation_name = "specials.start_three_realms_tower"
         payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
             "tower_key": TOWER_KEY,
             "floor_no": floor_no,
-            "content_version": content_version,
-            "rule_version": rule_version,
         }
         request_hash = self._request_hash(operation_name, payload)
         now = self._now()
@@ -212,8 +208,6 @@ class ThreeRealmsTowerRepositoryMixin:
                 player,
                 faction,
                 now_text,
-                content_version=content_version,
-                rule_version=rule_version,
             )
             run_id = uuid4().hex
             reward = reward_for(floor_no, run_id, first_clear=first_clear)
@@ -223,8 +217,8 @@ class ThreeRealmsTowerRepositoryMixin:
             )
             connection.execute(
                 "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,battle_id,first_clear,"
-                "starts_at,result_json,reward_json,content_version,rule_version,created_at,updated_at) "
-                "VALUES (?,?,?,?,'battle_running',NULL,?,?,?, ?,?,?,?,?)",
+                "starts_at,result_json,reward_json,created_at,updated_at) "
+                "VALUES (?,?,?,?,'battle_running',NULL,?,?,?,?,?,?)",
                 (
                     run_id,
                     player["id"],
@@ -234,8 +228,6 @@ class ThreeRealmsTowerRepositoryMixin:
                     now_text,
                     json.dumps({"tower_context": context}, ensure_ascii=False, sort_keys=True),
                     json.dumps(reward, ensure_ascii=False, sort_keys=True),
-                    content_version,
-                    rule_version,
                     now_text,
                     now_text,
                 ),
@@ -259,9 +251,6 @@ class ThreeRealmsTowerRepositoryMixin:
         player: sqlite3.Row,
         faction: str,
         captured_at: str,
-        *,
-        content_version: str,
-        rule_version: str,
     ) -> dict[str, Any]:
         intro = self._json_object(player["intro_json"], {})
         qualification = self._json_object(player["qualification_json"], {})
@@ -291,8 +280,6 @@ class ThreeRealmsTowerRepositoryMixin:
             "local_reputation": local_reputation,
             "pollution": int(player["pollution"]),
             "bloodline_stability": int(player["bloodline_stability"]),
-            "content_version": content_version,
-            "rule_version": rule_version,
             "captured_at": captured_at,
         }
 
@@ -395,8 +382,6 @@ class ThreeRealmsTowerRepositoryMixin:
                                     "floor_no": int(run["floor_no"]),
                                     "battle_id": run["battle_id"],
                                     "tower_context": result.get("tower_context", {}),
-                                    "content_version": str(run["content_version"]),
-                                    "rule_version": str(run["rule_version"]),
                                 },
                                 ensure_ascii=False,
                                 sort_keys=True,
@@ -478,8 +463,6 @@ class ThreeRealmsTowerRepositoryMixin:
                 "run_id": str(run["run_id"]),
                 "practice": not bool(run["first_clear"]),
             }
-            content_version = str(run["content_version"])
-            rule_version = str(run["rule_version"])
             record_material_discoveries(
                 connection,
                 player_id=int(player["id"]),
@@ -521,10 +504,10 @@ class ThreeRealmsTowerRepositoryMixin:
                 )
             connection.execute(
                 "INSERT INTO tower_reward_claims(run_id,player_id,floor_no,first_clear,operation_id,reward_json,"
-                "content_version,rule_version,claimed_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                "claimed_at) VALUES (?,?,?,?,?,?,?)",
                 (
                     run["run_id"], player["id"], run["floor_no"], run["first_clear"], operation_id,
-                    json.dumps(reward, ensure_ascii=False, sort_keys=True), content_version, rule_version, now_text,
+                    json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text,
                 ),
             )
             connection.execute(
@@ -540,8 +523,6 @@ class ThreeRealmsTowerRepositoryMixin:
                 "first_clear": bool(run["first_clear"]),
                 "faction": faction,
                 "reward": reward,
-                "content_version": content_version,
-                "rule_version": rule_version,
             }
             self._insert_three_realms_tower_operation(
                 connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text

@@ -110,15 +110,11 @@ class TowerRepositoryMixin:
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
         operation_name = "specials.start_tower"
-        content_version = ""
-        rule_version = ""
         payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
             "tower_key": TOWER_KEY,
             "floor_no": floor_no,
-            "content_version": content_version,
-            "rule_version": rule_version,
         }
         request_hash = self._request_hash(operation_name, payload)
         now = self._now()
@@ -192,14 +188,13 @@ class TowerRepositoryMixin:
                 """
                 INSERT INTO tower_runs(
                     run_id, player_id, tower_key, floor_no, status, battle_id, first_clear,
-                    starts_at, result_json, reward_json, content_version, rule_version,
+                    starts_at, result_json, reward_json,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'battle_running', NULL, ?, ?, '{}', ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, 'battle_running', NULL, ?, ?, '{}', ?, ?, ?)
                 """,
                 (
                     run_id, player["id"], TOWER_KEY, floor_no, int(first_clear), now_text,
-                    json.dumps(reward, ensure_ascii=False, sort_keys=True), content_version,
-                    rule_version, now_text, now_text,
+                    json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text, now_text,
                 ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
@@ -263,7 +258,7 @@ class TowerRepositoryMixin:
                         (
                             run["player_id"], f"specials.tower.floor.{run['floor_no']}",
                             f"battle.resolve:{run['battle_id']}", now_text,
-                            json.dumps({"tower_key": TOWER_KEY, "floor_no": int(run["floor_no"]), "battle_id": run["battle_id"], "content_version": str(run["content_version"]), "rule_version": str(run["rule_version"])}, ensure_ascii=False, sort_keys=True),
+                            json.dumps({"tower_key": TOWER_KEY, "floor_no": int(run["floor_no"]), "battle_id": run["battle_id"]}, ensure_ascii=False, sort_keys=True),
                         ),
                     )
             run = connection.execute("SELECT * FROM tower_runs WHERE run_id=?", (run_id,)).fetchone()
@@ -353,13 +348,11 @@ class TowerRepositoryMixin:
                         "floor_no": int(run["floor_no"]),
                         "run_id": run["run_id"],
                         "practice": not bool(run["first_clear"]),
-                        "tower_content_version": str(run["content_version"]),
-                        "tower_rule_version": str(run["rule_version"]),
                     },
                 )
             connection.execute(
-                "INSERT INTO tower_reward_claims(run_id,player_id,floor_no,first_clear,operation_id,reward_json,content_version,rule_version,claimed_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                (run["run_id"], player["id"], run["floor_no"], run["first_clear"], operation_id, json.dumps(reward, ensure_ascii=False, sort_keys=True), run["content_version"], run["rule_version"], now_text),
+                "INSERT INTO tower_reward_claims(run_id,player_id,floor_no,first_clear,operation_id,reward_json,claimed_at) VALUES (?,?,?,?,?,?,?)",
+                (run["run_id"], player["id"], run["floor_no"], run["first_clear"], operation_id, json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text),
             )
             connection.execute(
                 "UPDATE tower_runs SET status='claimed', claim_operation_id=?, updated_at=? WHERE id=? AND status='reward_pending'",
@@ -372,8 +365,6 @@ class TowerRepositoryMixin:
                 "floor_no": int(run["floor_no"]),
                 "first_clear": bool(run["first_clear"]),
                 "reward": reward,
-                "content_version": str(run["content_version"]),
-                "rule_version": str(run["rule_version"]),
             }
             self._insert_tower_operation(
                 connection, operation_id, operation_name, int(player["id"]), request_hash, result, now_text

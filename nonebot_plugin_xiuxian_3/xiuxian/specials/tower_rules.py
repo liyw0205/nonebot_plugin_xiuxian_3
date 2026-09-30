@@ -1,4 +1,4 @@
-"""Versioned v0.1 mist-trial tower rules."""
+"""Mist-trial tower rules."""
 
 from __future__ import annotations
 
@@ -8,10 +8,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
-LEGACY_CONTENT_VERSION = ""
-LEGACY_RULE_VERSION = ""
 TOWER_KEY = "tower.mist_trial"
 MAX_FLOOR = 45
 
@@ -87,11 +83,7 @@ def practice_week_start(value) -> str:
 
 
 __all__ = [
-    "CONTENT_VERSION",
-    "LEGACY_CONTENT_VERSION",
-    "LEGACY_RULE_VERSION",
     "MAX_FLOOR",
-    "RULE_VERSION",
     "TOWER_KEY",
     "TowerFloorDefinition",
     "attempt_band_for",

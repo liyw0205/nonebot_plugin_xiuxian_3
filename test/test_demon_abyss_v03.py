@@ -95,7 +95,7 @@ def test_demon_abyss_success_and_replay_on_qq_and_onebot() -> None:
                     "开始探索 魔界堕落遗迹探索",
                 )
                 assert started.code == "EXPLORATION_STARTED"
-                assert started.data["content_version"] == "content-0.3"
+                assert "content_version" not in started.data
                 assert started.data["pollution_before"] == 0
                 assert started.data["pollution_after"] == 10
                 assert started.data["cross_realm_penalty_bp"] == 1000
@@ -235,10 +235,9 @@ def test_demon_abyss_reputation_reward_is_snapshotted_and_projected() -> None:
             assert settled.data["result"] == {"faction_reputation.demon": 15}
 
             with sqlite3.connect(runtime.settings.database_path) as connection:
-                faction_text, battle_id, content_version, rule_version, snapshot_text = connection.execute(
+                faction_text, battle_id, snapshot_text = connection.execute(
                     """
-                    SELECT p.faction_reputation_json, b.battle_id, b.content_version,
-                           b.rule_version, b.snapshot_json
+                    SELECT p.faction_reputation_json, b.battle_id, b.snapshot_json
                     FROM players p
                     JOIN battle_sessions b ON b.player_id = p.id
                     WHERE p.platform=? AND p.platform_user_id=?
@@ -248,8 +247,6 @@ def test_demon_abyss_reputation_reward_is_snapshotted_and_projected() -> None:
                 ).fetchone()
             assert json.loads(faction_text)["demon"] == 15
             assert battle_id == settled.data["battle_id"]
-            assert content_version == "content-0.3"
-            assert rule_version == "combat-0.3.1"
             assert json.loads(snapshot_text)["player"]["cross_realm_penalty_bp"] == 1000
 
             replay = await runtime.adapters.dispatch(

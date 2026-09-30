@@ -8,8 +8,6 @@ from hashlib import blake2b
 
 from .void_models import VoidRouteDefinition
 
-RULE_VERSION = ""
-CONTENT_VERSION = ""
 VOID_ROUTE_DURATION_SECONDS = 30 * 60
 VOID_ROUTE_STORM_CHANCE_BP = 1500
 VOID_INSTABILITY_SECONDS = 48 * 60 * 60
@@ -56,8 +54,6 @@ def void_route_roll_bp(operation_id: str) -> int:
 
 
 __all__ = [
-    "CONTENT_VERSION",
-    "RULE_VERSION",
     "VOID_INSTABILITY_SECONDS",
     "VOID_ROUTE_STORM_CHANCE_BP",
     "navigation_anchor_cost",

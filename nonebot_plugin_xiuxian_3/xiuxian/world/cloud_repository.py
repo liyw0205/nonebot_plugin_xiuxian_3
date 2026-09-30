@@ -25,10 +25,8 @@ from .cloud_rules import (
     BEAST_INTRO_FLAG,
     BEAST_INTRO_QUEST,
     CLOUD_ROUTES,
-    CONTENT_VERSION,
     DEMON_INTRO_FLAG,
     DEMON_INTRO_QUEST,
-    RULE_VERSION,
     cloud_route_definition,
 )
 from .permissions import array_hall_permission
@@ -118,8 +116,6 @@ class CloudRepositoryMixin:
             session_id = uuid4().hex
             ends_at = now + timedelta(seconds=definition.duration_seconds)
             snapshot = {
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "route_key": definition.key,
                 "source": source,
                 "destination": definition.destination,
@@ -374,8 +370,6 @@ class CloudRepositoryMixin:
                 outcome="success",
                 payload={"route": "route.cloud_to_abyss_intro", "submitted_stones": 100, "reputation": 20},
                 now_text=now_text,
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
             )
             self._upsert_progress(
                 connection,
@@ -386,8 +380,6 @@ class CloudRepositoryMixin:
                 {"access_flag": DEMON_INTRO_FLAG, "faction": "demon"},
                 operation_id,
                 now_text,
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
             payload = {
@@ -446,8 +438,6 @@ class CloudRepositoryMixin:
                 outcome="read",
                 payload={"source": "beast_history"},
                 now_text=now_text,
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
             )
             progress = connection.execute(
                 "SELECT status FROM quest_progress WHERE player_id = ? AND quest_key = ?",
@@ -460,11 +450,9 @@ class CloudRepositoryMixin:
                     BEAST_INTRO_QUEST,
                     "active",
                     {component_key: 1},
-                    {"quest_key": BEAST_INTRO_QUEST, "content_version": CONTENT_VERSION, "rule_version": RULE_VERSION},
+                    {"quest_key": BEAST_INTRO_QUEST},
                     operation_id,
                     now_text,
-                    content_version=CONTENT_VERSION,
-                    rule_version=RULE_VERSION,
                 )
             payload = {"quest_key": BEAST_INTRO_QUEST, "component_key": component_key}
             self._cloud_insert_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
@@ -550,8 +538,6 @@ class CloudRepositoryMixin:
                 outcome="success",
                 payload={"exploration_id": str(observation["exploration_id"]), "mode_key": str(observation["mode_key"])},
                 now_text=now_text,
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
             )
             self._insert_quest_event(
                 connection,
@@ -562,13 +548,9 @@ class CloudRepositoryMixin:
                 outcome="success",
                 payload={"submitted_stones": 100, "reputation": 20},
                 now_text=now_text,
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
             )
             quest_snapshot = {
                 "quest_key": BEAST_INTRO_QUEST,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
                 "access_flag": BEAST_INTRO_FLAG,
                 "exploration_id": str(observation["exploration_id"]),
                 "exploration_operation_id": str(observation["settlement_operation_id"]),
@@ -584,8 +566,6 @@ class CloudRepositoryMixin:
                 quest_snapshot,
                 operation_id,
                 now_text,
-                content_version=CONTENT_VERSION,
-                rule_version=RULE_VERSION,
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
             payload = {

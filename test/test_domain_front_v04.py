@@ -35,7 +35,7 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> int:
             (player_id,),
         )
         connection.execute(
-            "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?, 'content-0.4', 'social-0.4.0')",
+            "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?, '', '')",
             (sect_id, f"宗门{sect_id}", sect_id, player_id, now, now),
         )
         connection.execute(

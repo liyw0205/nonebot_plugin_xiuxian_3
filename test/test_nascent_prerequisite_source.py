@@ -67,7 +67,7 @@ def test_qq_onebot_golden_core_player_gets_nascent_breakthrough_materials() -> N
                         assert replay.data["idempotent_replay"] is True
                         with sqlite3.connect(runtime.settings.database_path) as connection:
                             snapshot = json.loads(connection.execute("SELECT snapshot_json FROM exploration_sessions WHERE exploration_id=?", (started.data["exploration_id"],)).fetchone()[0])
-                            assert snapshot["rule_version"] == "exploration-0.3.1"
+                            assert "rule_version" not in snapshot
                             assert connection.execute("SELECT COUNT(*) FROM exploration_item_bindings WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)", (adapter, user)).fetchone()[0] == 1
                         assert (await send("发布摆摊 魔核 1 100", "bound-market")).code == "ITEM_BINDING_ACTIVE"
                         assert (await send("发布拍卖 魔核 1 100", "bound-auction")).code == "ITEM_BINDING_ACTIVE"
@@ -94,7 +94,7 @@ def test_qq_onebot_golden_core_player_gets_nascent_breakthrough_materials() -> N
                 assert (await send("发布摆摊 item.pill.soul_condense 1 1", "market-bound")).code == "MARKET_ITEM_FORBIDDEN"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     snapshot = json.loads(connection.execute("SELECT snapshot_json FROM production_orders WHERE order_id=?", (produced.data["order_id"],)).fetchone()[0])
-                    assert snapshot["rule_version"] == "production-0.3.1"
+                    assert "rule_version" not in snapshot
                     inventory = json.loads(connection.execute("SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)).fetchone()[0])
                     assert inventory["item.soul_crystal"] == 5
                     assert inventory["item.demon_core"] == 6

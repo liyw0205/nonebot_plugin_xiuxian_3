@@ -173,7 +173,7 @@ def test_dao_origin_gate_accepts_same_historical_season_on_both_adapters() -> No
                                     "INSERT INTO quest_events(player_id, quest_key, component_key, "
                                     "source_operation_id, outcome, payload_json, content_version, "
                                     "rule_version, created_at) VALUES (?, ?, 'completed', ?, 'success', ?, "
-                                    "'content-0.6', 'events-0.6.0', ?)",
+                                    ", '', '', ?)",
                                     (
                                         player_id,
                                         task_key,

@@ -90,7 +90,7 @@ def test_sect_war_registration_contribution_settlement_and_rewards_across_adapte
                 for sect_id, leader, level in (("sect-a", "a0", 4), ("sect-b", "b0", 4), ("sect-low", "low0", 3)):
                     connection.execute(
                         "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,created_at,updated_at,content_version,rule_version) "
-                        "VALUES (?, ?, ?, ?, 'active', ?, 80, 100, 0, 5000, 0, ?, ?, 'content-0.3', 'social-0.3.1')",
+                        "VALUES (?, ?, ?, ?, 'active', ?, 80, 100, 0, 5000, 0, ?, ?, '', '')",
                         (sect_id, sect_id, sect_id, player_ids[leader], level, now_text, now_text),
                     )
                     members = [leader] if sect_id != "sect-a" else [f"a{index}" for index in range(11)]

@@ -21,10 +21,8 @@ from .sect_beacon_models import VoidBeaconRecord
 from .sect_beacon_rules import (
     VOID_BEACON_ANCHOR_COST,
     VOID_BEACON_BUILD_SECONDS,
-    VOID_BEACON_CONTENT_VERSION,
     VOID_BEACON_MAINTENANCE_ANCHOR_COST,
     VOID_BEACON_ROUTE_DISCOUNT,
-    VOID_BEACON_RULE_VERSION,
     VOID_BEACON_SAND_COST,
 )
 
@@ -119,21 +117,19 @@ class SectBeaconRepositoryMixin:
             )
             if existing is None:
                 connection.execute(
-                    "INSERT INTO sect_void_beacons(sect_id,status,build_operation_id,build_ends_at,maintenance_due_at,snapshot_json,content_version,rule_version,created_at,updated_at) VALUES (?, 'building', ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO sect_void_beacons(sect_id,status,build_operation_id,build_ends_at,maintenance_due_at,snapshot_json,created_at,updated_at) VALUES (?, 'building', ?, ?, ?, ?, ?, ?)",
                     (
                         sect["sect_id"], operation_id, serialize_datetime(build_end),
                         serialize_datetime(build_end + timedelta(days=7)),
-                        json.dumps(snapshot, sort_keys=True), VOID_BEACON_CONTENT_VERSION,
-                        VOID_BEACON_RULE_VERSION, now_text, now_text,
+                        json.dumps(snapshot, sort_keys=True), now_text, now_text,
                     ),
                 )
             else:
                 connection.execute(
-                    "UPDATE sect_void_beacons SET status='building', build_operation_id=?, build_ends_at=?, maintenance_due_at=?, snapshot_json=?, content_version=?, rule_version=?, updated_at=? WHERE sect_id=?",
+                    "UPDATE sect_void_beacons SET status='building', build_operation_id=?, build_ends_at=?, maintenance_due_at=?, snapshot_json=?, updated_at=? WHERE sect_id=?",
                     (
                         operation_id, serialize_datetime(build_end), serialize_datetime(build_end + timedelta(days=7)),
-                        json.dumps(snapshot, sort_keys=True), VOID_BEACON_CONTENT_VERSION,
-                        VOID_BEACON_RULE_VERSION, now_text, sect["sect_id"],
+                        json.dumps(snapshot, sort_keys=True), now_text, sect["sect_id"],
                     ),
                 )
             payload = {

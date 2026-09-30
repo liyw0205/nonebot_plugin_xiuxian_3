@@ -18,8 +18,6 @@ def ensure_three_realms_tower_duo_schema(connection: sqlite3.Connection) -> None
             battle_id TEXT UNIQUE,
             member_run_ids_json TEXT NOT NULL,
             result_json TEXT NOT NULL DEFAULT '{}',
-            content_version TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
             start_operation_id TEXT NOT NULL UNIQUE,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL

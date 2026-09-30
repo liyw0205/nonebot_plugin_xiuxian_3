@@ -15,8 +15,6 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
-    CONTENT_VERSION,
-    RULE_VERSION,
     VOID_INSTABILITY_SECONDS,
     VOID_ROUTE_STORM_CHANCE_BP,
     navigation_anchor_cost,
@@ -159,8 +157,6 @@ class WorldRepositoryMixin:
                 "anchor_cost": anchor_cost,
                 "beacon_discount": beacon_discount,
                 "stamina_cost": definition.stamina_cost,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             }
             connection.execute(
                 "UPDATE players SET inventory_json = ?, stamina = stamina - ?, void_instability_until = ?, updated_at = ? WHERE id = ?",

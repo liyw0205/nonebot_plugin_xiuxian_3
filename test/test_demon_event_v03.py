@@ -395,10 +395,10 @@ def test_demon_war_front_travel_and_battle_are_server_authoritative_on_qq_and_on
                 assert replay.data["idempotent_replay"] is True
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     snapshot = connection.execute(
-                        "SELECT battle_type, location_key, status, content_version, rule_version FROM battle_sessions WHERE start_operation_id=?",
+                        "SELECT battle_type, location_key, status FROM battle_sessions WHERE start_operation_id=?",
                         ("war-battle",),
                     ).fetchone()
-                assert snapshot == ("pve.demon_war_front", "xuantian.war_front", "settled", "content-0.3", "combat-0.3.0")
+                assert snapshot == ("pve.demon_war_front", "xuantian.war_front", "settled")
                 contributed = await runtime.adapters.dispatch(
                     adapter, _context(adapter, user, "contribute-battle", "war-contribution"), "贡献魔界战场 战斗"
                 )

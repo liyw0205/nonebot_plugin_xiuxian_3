@@ -118,11 +118,11 @@ def test_boundary_rift_event_recovers_round_and_claims_settled_party_source() ->
             now = clock.value.isoformat()
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
-                    "INSERT INTO parties(party_id, party_type, status, leader_id, location_key, confirmation_deadline, distribution_key, content_version, rule_version, created_at, updated_at) VALUES ('boundary-event-party', 'boundary_realm', 'ready', ?, 'cave.boundary_realm', ?, 'contribution', 'content-0.3', 'social-0.3.0', ?, ?)",
+                    "INSERT INTO parties(party_id, party_type, status, leader_id, location_key, confirmation_deadline, distribution_key, content_version, rule_version, created_at, updated_at) VALUES ('boundary-event-party', 'boundary_realm', 'ready', ?, 'cave.boundary_realm', ?, 'contribution', '', '', ?, ?)",
                     (player_id, now, now, now),
                 )
                 connection.execute(
-                    "INSERT INTO party_battle_sessions(battle_id, party_id, start_operation_id, battle_type, enemy_key, location_key, status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) VALUES ('boundary-event-battle', 'boundary-event-party', 'boundary-source-operation', 'pve.party', 'enemy.boundary_watcher', 'cave.boundary_realm', 'settled', 3, 3, ?, ?, '{}', '{}', ?, 'content-0.3', 'combat-0.3.0', ?, ?)",
+                    "INSERT INTO party_battle_sessions(battle_id, party_id, start_operation_id, battle_type, enemy_key, location_key, status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) VALUES ('boundary-event-battle', 'boundary-event-party', 'boundary-source-operation', 'pve.party', 'enemy.boundary_watcher', 'cave.boundary_realm', 'settled', 3, 3, ?, ?, '{}', '{}', ?, '', '', ?, ?)",
                     (now, now, json.dumps({"outcome": "won"}), now, now),
                 )
                 connection.execute(
@@ -164,11 +164,11 @@ def test_boundary_rift_event_claims_on_onebot_v11() -> None:
             now = clock.value.isoformat()
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
-                    "INSERT INTO parties(party_id, party_type, status, leader_id, location_key, confirmation_deadline, distribution_key, content_version, rule_version, created_at, updated_at) VALUES ('boundary-event-party-ob', 'boundary_realm', 'ready', ?, 'cave.boundary_realm', ?, 'contribution', 'content-0.3', 'social-0.3.0', ?, ?)",
+                    "INSERT INTO parties(party_id, party_type, status, leader_id, location_key, confirmation_deadline, distribution_key, content_version, rule_version, created_at, updated_at) VALUES ('boundary-event-party-ob', 'boundary_realm', 'ready', ?, 'cave.boundary_realm', ?, 'contribution', '', '', ?, ?)",
                     (player_id, now, now, now),
                 )
                 connection.execute(
-                    "INSERT INTO party_battle_sessions(battle_id, party_id, start_operation_id, battle_type, enemy_key, location_key, status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) VALUES ('boundary-event-battle-ob', 'boundary-event-party-ob', 'boundary-source-operation-ob', 'pve.party', 'enemy.boundary_watcher', 'cave.boundary_realm', 'settled', 3, 3, ?, ?, '{}', '{}', ?, 'content-0.3', 'combat-0.3.0', ?, ?)",
+                    "INSERT INTO party_battle_sessions(battle_id, party_id, start_operation_id, battle_type, enemy_key, location_key, status, round_no, action_sequence, starts_at, turn_deadline, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) VALUES ('boundary-event-battle-ob', 'boundary-event-party-ob', 'boundary-source-operation-ob', 'pve.party', 'enemy.boundary_watcher', 'cave.boundary_realm', 'settled', 3, 3, ?, ?, '{}', '{}', ?, '', '', ?, ?)",
                     (now, now, json.dumps({"outcome": "won"}), now, now),
                 )
                 connection.execute(

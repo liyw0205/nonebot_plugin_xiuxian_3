@@ -101,13 +101,13 @@ def test_final_heaven_rankings_freeze_anonymously_and_claim_once_across_adapters
                     ):
                         connection.execute(
                             "INSERT INTO endgame_endings(player_id, ending_key, status, fruit_key, snapshot_json, operation_id, content_version, rule_version, created_at) "
-                            "VALUES (?, ?, ?, ?, '{}', ?, 'content-0.6', 'progression-0.6.1', ?)",
+                            "VALUES (?, ?, ?, ?, '{}', ?, '', '', ?)",
                             (player_ids[user_id], ending_key, status, "fruit.dao" if suffix == "d" else None, f"ending-{suffix}", start_text),
                         )
                     battle_id = "season-coop-success"
                     connection.execute(
                         "INSERT INTO final_battle_sessions(battle_id, initiator_id, create_operation_id, status, round_no, action_sequence, starts_at, expires_at, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) "
-                        "VALUES (?, ?, ?, 'settled', 3, 8, ?, ?, '{}', '{}', ?, 'content-0.6', 'combat-0.6.1', ?, ?)",
+                        "VALUES (?, ?, ?, 'settled', 3, 8, ?, ?, '{}', '{}', ?, '', '', ?, ?)",
                         (
                             battle_id,
                             player_ids["ascender-private-id"],
@@ -131,7 +131,7 @@ def test_final_heaven_rankings_freeze_anonymously_and_claim_once_across_adapters
                     # A failed session must never add seasonal cooperation score.
                     connection.execute(
                         "INSERT INTO final_battle_sessions(battle_id, initiator_id, create_operation_id, status, round_no, action_sequence, starts_at, expires_at, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) "
-                        "VALUES ('season-coop-failed', ?, 'season-battle-failed', 'settled', 3, 8, ?, ?, '{}', '{}', ?, 'content-0.6', 'combat-0.6.1', ?, ?)",
+                        "VALUES ('season-coop-failed', ?, 'season-battle-failed', 'settled', 3, 8, ?, ?, '{}', '{}', ?, '', '', ?, ?)",
                         (
                             player_ids["remainer-private-id"],
                             start_text,
@@ -288,7 +288,7 @@ def test_final_heaven_expired_claim_auto_grants_titles_but_not_chapter_entitleme
                 completed_at = (starts_at + timedelta(days=1)).isoformat()
                 connection.execute(
                     "INSERT INTO endgame_endings(player_id, ending_key, status, snapshot_json, operation_id, content_version, rule_version, created_at) "
-                    "VALUES (?, 'ascend', 'ascended', '{}', 'expired-ending', 'content-0.6', 'progression-0.6.1', ?)",
+                    "VALUES (?, 'ascend', 'ascended', '{}', 'expired-ending', '', '', ?)",
                     (player_id, completed_at),
                 )
             clock.value = ends_at + timedelta(days=7)

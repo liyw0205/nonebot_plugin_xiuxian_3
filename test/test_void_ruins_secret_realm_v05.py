@@ -217,11 +217,11 @@ def test_void_ruins_full_route_handoff_restart_and_first_clear(leader_adapter, m
                     "WHERE c.entry_key='codex.void.route_ruins' AND p.platform_user_id IN (?, ?)",
                     (leader[1], member[1]),
                 ).fetchone()[0]
-            assert runs == [("settled", "content-0.5", "adventures-0.5.1")]
+            assert runs == [("settled", "", "")]
             assert [battle[0] for battle in battles] == [
                 "enemy.void_ruins_sentinel_unstable", "enemy.void_ruins_keeper_unstable"
             ]
-            assert all(battle[1] == "combat-0.5.1" for battle in battles)
+            assert all(battle[1] == "" for battle in battles)
             assert claimed == 0
             assert codex_count == 2
             for user, stamina, inventory_json, intro_json in players:

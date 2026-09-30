@@ -214,8 +214,8 @@ def test_qq_and_onebot_players_produce_and_deliver_real_endgame_work() -> None:
                             )
                         assert snapshot["path_key"] == path
                         assert snapshot["subprofession_key"] == subprofession
-                        assert snapshot["content_version"] == "content-0.6"
-                        assert snapshot["rule_version"] == "production-0.6.0"
+                        assert "content_version" not in snapshot
+                        assert "rule_version" not in snapshot
                         assert (snapshot["random_quality_bp"] >= 500) is should_succeed
 
                 if path == "support":

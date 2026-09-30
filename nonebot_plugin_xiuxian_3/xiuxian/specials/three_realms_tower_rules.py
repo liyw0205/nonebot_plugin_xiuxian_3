@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 TOWER_KEY = "tower.three_realms"
 V03_MAX_FLOOR = 20
 MAX_FLOOR = 40
@@ -89,11 +87,9 @@ def week_start(value) -> str:
 
 
 __all__ = [
-    "CONTENT_VERSION",
     "FACTIONS",
     "MAX_FLOOR",
     "REBUILD_REPUTATION_KEYS",
-    "RULE_VERSION",
     "TOWER_KEY",
     "WEEKLY_ATTEMPT_LIMIT",
     "V03_MAX_FLOOR",

@@ -65,7 +65,7 @@ def test_v02_cloud_mine_energy_gate_and_qq_onebot_settlement() -> None:
                 )
                 assert started.code == "EXPLORATION_STARTED"
                 assert started.data["energy_cost"] == 2
-                assert started.data["content_version"] == "content-0.2"
+                assert "content_version" not in started.data
                 assert started.message.find("精力") >= 0
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     stamina, energy, snapshot_text = connection.execute(

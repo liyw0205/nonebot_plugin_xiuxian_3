@@ -23,8 +23,6 @@ from ..persistence.errors import (
 from .three_realms_tower_duo_models import ThreeRealmsTowerDuoRewardRecord, ThreeRealmsTowerDuoRunRecord
 from .three_realms_tower_duo_rules import (
     PARTY_TYPE_THREE_REALMS_TOWER_DUO,
-    TOWER_DUO_CONTENT_VERSION,
-    TOWER_DUO_RULE_VERSION,
     TOWER_DUO_STAMINA_COST,
     TOWER_KEY,
     enemy_key_for,
@@ -149,8 +147,6 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 raise ResourceInsufficientError("tower duo stamina changed during start")
             duo_run_id = f"tower-duo-{uuid4().hex}"
             member_run_ids = [f"{duo_run_id}:member:{row['id']}" for row in members]
-            content_version = TOWER_DUO_CONTENT_VERSION
-            rule_version = TOWER_DUO_RULE_VERSION
             result = {
                 "enemy_key": enemy_key_for(floor_no, self._tower_run_faction_for_player(connection, int(leader["id"]))),
                 "member_database_ids": [int(row["id"]) for row in members],
@@ -159,8 +155,8 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 "floor_no": floor_no,
             }
             connection.execute(
-                "INSERT INTO three_realms_tower_duo_runs(duo_run_id,party_id,tower_key,floor_no,status,battle_id,member_run_ids_json,result_json,content_version,rule_version,start_operation_id,created_at,updated_at) VALUES (?,?,?,?, 'battle_running',NULL,?,?,?,?,?,?,?)",
-                (duo_run_id, party["party_id"], TOWER_KEY, floor_no, json.dumps(member_run_ids), json.dumps(result, ensure_ascii=False, sort_keys=True), content_version, rule_version, operation_id, now_text, now_text),
+                "INSERT INTO three_realms_tower_duo_runs(duo_run_id,party_id,tower_key,floor_no,status,battle_id,member_run_ids_json,result_json,start_operation_id,created_at,updated_at) VALUES (?,?,?,?, 'battle_running',NULL,?,?,?,?,?)",
+                (duo_run_id, party["party_id"], TOWER_KEY, floor_no, json.dumps(member_run_ids), json.dumps(result, ensure_ascii=False, sort_keys=True), operation_id, now_text, now_text),
             )
             payload = {"duo_run_id": duo_run_id, "party_id": str(party["party_id"]), "battle_id": None, "floor_no": floor_no, "status": "battle_running", "member_run_ids": member_run_ids, "first_clear_by_player": {}, "reward_by_player": {}}
             self._insert_duo_operation(connection, operation_id, operation_name, int(leader["id"]), request_hash, payload, now_text)

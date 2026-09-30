@@ -369,7 +369,7 @@ def test_foundation_breakthrough_uses_quality_snapshot_and_grants_cave_pass() ->
                     "SELECT snapshot_json FROM breakthrough_sessions WHERE session_id=?",
                     (started.data["session_id"],),
                 ).fetchone()[0])
-            assert snapshot["rule_version"] == "progression-0.1.6"
+            assert "rule_version" not in snapshot
             assert snapshot["foundation_quality_on_success"] == 5500
             _finish_breakthrough(runtime, started.data["session_id"])
             settled = await runtime.dispatch(_context(user, "settle", operation_id="foundation-settle"), "结算突破")

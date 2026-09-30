@@ -172,76 +172,27 @@ def test_mist_trial_tower_v02_rules_are_a_separate_band() -> None:
     assert reward_for(35, "seed", first_clear=False) in ({}, {"item.mat.array_sand": 1})
 
 
-def test_tower_schema_migration_expands_floor_check_and_preserves_claim_foreign_keys() -> None:
+def test_tower_schema_has_current_floor_range_and_no_release_metadata() -> None:
     with sqlite3.connect(":memory:") as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("CREATE TABLE players(id INTEGER PRIMARY KEY)")
         connection.execute("INSERT INTO players(id) VALUES (1)")
-        connection.executescript(
-            """
-            CREATE TABLE tower_runs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id TEXT NOT NULL UNIQUE,
-                player_id INTEGER NOT NULL REFERENCES players(id),
-                tower_key TEXT NOT NULL,
-                floor_no INTEGER NOT NULL CHECK (floor_no BETWEEN 1 AND 30),
-                status TEXT NOT NULL CHECK (status IN ('battle_running', 'reward_pending', 'lost', 'claimed', 'aborted')),
-                battle_id TEXT UNIQUE,
-                first_clear INTEGER NOT NULL CHECK (first_clear IN (0, 1)),
-                starts_at TEXT NOT NULL,
-                result_json TEXT NOT NULL DEFAULT '{}',
-                reward_json TEXT NOT NULL DEFAULT '{}',
-                content_version TEXT NOT NULL,
-                rule_version TEXT NOT NULL,
-                claim_operation_id TEXT UNIQUE,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            CREATE TABLE tower_reward_claims (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id TEXT NOT NULL UNIQUE REFERENCES tower_runs(run_id),
-                player_id INTEGER NOT NULL REFERENCES players(id),
-                floor_no INTEGER NOT NULL,
-                first_clear INTEGER NOT NULL CHECK (first_clear IN (0, 1)),
-                operation_id TEXT NOT NULL UNIQUE,
-                reward_json TEXT NOT NULL,
-                content_version TEXT NOT NULL,
-                rule_version TEXT NOT NULL,
-                claimed_at TEXT NOT NULL
-            );
-            """
-        )
-        connection.execute(
-            "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,starts_at,"
-            "result_json,reward_json,content_version,rule_version,created_at,updated_at) "
-            "VALUES('old-run',1,'tower.mist_trial',30,'claimed',1,'2026-01-01','{}','{}',"
-            "'content-0.1','specials-0.1.2','2026-01-01','2026-01-01')"
-        )
-        connection.execute(
-            "INSERT INTO tower_reward_claims(run_id,player_id,floor_no,first_clear,operation_id,"
-            "reward_json,content_version,rule_version,claimed_at) VALUES('old-run',1,30,1,'old-claim',"
-            "'{}','content-0.1','specials-0.1.2','2026-01-01')"
-        )
-        connection.commit()
-
         ensure_tower_schema(connection)
         ensure_tower_schema(connection)
 
+        assert "content_version" not in {
+            row[1] for row in connection.execute("PRAGMA table_info(tower_runs)")
+        }
+        assert "rule_version" not in {
+            row[1] for row in connection.execute("PRAGMA table_info(tower_reward_claims)")
+        }
+
         connection.execute(
             "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,starts_at,"
-            "result_json,reward_json,content_version,rule_version,created_at,updated_at) "
-            "VALUES('new-run',1,'tower.mist_trial',45,'claimed',1,'2026-01-02','{}','{}',"
-            "'content-0.2','specials-0.2.0','2026-01-02','2026-01-02')"
+            "result_json,reward_json,created_at,updated_at) VALUES('new-run',1,'tower.mist_trial',45,"
+            "'claimed',1,'2026-01-02','{}','{}','2026-01-02','2026-01-02')"
         )
-        assert connection.execute(
-            "SELECT run_id, floor_no, content_version FROM tower_runs ORDER BY id"
-        ).fetchall() == [
-            ("old-run", 30, "content-0.1"),
-            ("new-run", 45, "content-0.2"),
-        ]
-        assert connection.execute("SELECT run_id, operation_id FROM tower_reward_claims").fetchall() == [
-            ("old-run", "old-claim")
-        ]
+        assert connection.execute("SELECT run_id, floor_no FROM tower_runs").fetchall() == [("new-run", 45)]
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
@@ -259,9 +210,8 @@ def test_tower_v01_start_operation_hash_remains_replayable_after_expansion() -> 
                 now = "2026-01-01T00:00:00+00:00"
                 connection.execute(
                     "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,"
-                    "starts_at,result_json,reward_json,content_version,rule_version,created_at,updated_at) "
-                    "VALUES('v01-existing-run',?,'tower.mist_trial',1,'claimed',1,?,'{}','{}',"
-                    "'content-0.1','specials-0.1.2',?,?)",
+                    "starts_at,result_json,reward_json,created_at,updated_at) "
+                    "VALUES('v01-existing-run',?,'tower.mist_trial',1,'claimed',1,?,'{}','{}',?,?)",
                     (player_id, now, now, now),
                 )
                 old_payload = {
@@ -269,8 +219,6 @@ def test_tower_v01_start_operation_hash_remains_replayable_after_expansion() -> 
                     "platform_user_id": user,
                     "tower_key": "tower.mist_trial",
                     "floor_no": 1,
-                    "content_version": "content-0.1",
-                    "rule_version": "specials-0.1.2",
                 }
                 old_hash = runtime.repository._request_hash("specials.start_tower", old_payload)
                 connection.execute(
@@ -326,9 +274,8 @@ def test_mist_trial_tower_upper_floors_and_quotas_on_both_adapters() -> None:
                         historical = "2026-09-01T00:00:00+00:00"
                         connection.executemany(
                             "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,"
-                            "starts_at,result_json,reward_json,content_version,rule_version,created_at,updated_at) "
-                            "VALUES(?,?,'tower.mist_trial',?,'claimed',1,?,'{}','{}','content-0.1',"
-                            "'specials-0.1.2',?,?)",
+                            "starts_at,result_json,reward_json,created_at,updated_at) "
+                            "VALUES(?,?,'tower.mist_trial',?,'claimed',1,?,'{}','{}',?,?)",
                             [
                                 (f"history-{player_id}-{previous_floor}", player_id, previous_floor,
                                  historical, historical, historical)
@@ -359,11 +306,11 @@ def test_mist_trial_tower_upper_floors_and_quotas_on_both_adapters() -> None:
                     assert challenge.code == "TOWER_CHALLENGE_SETTLED"
                     assert challenge.data["outcome"] == "won"
                     with sqlite3.connect(runtime.settings.database_path) as connection:
-                        snapshot_json, content_version, rule_version = connection.execute(
-                            "SELECT b.snapshot_json,t.content_version,t.rule_version FROM battle_sessions b "
+                        snapshot_json = connection.execute(
+                            "SELECT b.snapshot_json FROM battle_sessions b "
                             "JOIN tower_runs t ON t.battle_id=b.battle_id WHERE t.run_id=?",
                             (challenge.data["run_id"],),
-                        ).fetchone()
+                        ).fetchone()[0]
                     enemy_key = json.loads(snapshot_json)["enemy"]["key"]
                     expected_enemy = (
                         "enemy.mist_trial.golden_core_boss"
@@ -371,7 +318,6 @@ def test_mist_trial_tower_upper_floors_and_quotas_on_both_adapters() -> None:
                         else "enemy.mist_trial.golden_core"
                     )
                     assert enemy_key == expected_enemy
-                    assert (content_version, rule_version) == ("content-0.2", "specials-0.2.0")
 
                     claimed = await _send(
                         runtime, adapter, user, f"{prefix}-claim-{floor_no}", "领取试炼塔奖励"
@@ -676,8 +622,8 @@ def test_tower_defeat_consumes_one_attempt_without_reward_on_both_adapters(monke
             runtime = create_runtime(data_dir=data_dir)
             original_enemy_definition = enemy_definition
 
-            def overpowering_enemy(enemy_key: str):
-                enemy = original_enemy_definition(enemy_key)
+            def overpowering_enemy(enemy_key: str, *, content=None):
+                enemy = original_enemy_definition(enemy_key, content=content)
                 if enemy_key == "enemy.mist_trial.sensing":
                     return replace(
                         enemy,
@@ -753,9 +699,8 @@ def test_tower_upper_floor_clue_rewards_are_claimed_on_both_adapters() -> None:
                         historical = "2026-09-01T00:00:00+00:00"
                         connection.executemany(
                             "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,"
-                            "starts_at,result_json,reward_json,content_version,rule_version,created_at,updated_at) "
-                            "VALUES(?,?,'tower.mist_trial',?,'claimed',1,?,'{}','{}','content-0.1',"
-                            "'specials-0.1.2',?,?)",
+                            "starts_at,result_json,reward_json,created_at,updated_at) "
+                            "VALUES(?,?,'tower.mist_trial',?,'claimed',1,?,'{}','{}',?,?)",
                             [
                                 (f"history-{user}-{previous_floor}", player_id, previous_floor,
                                  historical, historical, historical)
@@ -806,14 +751,13 @@ def test_tower_upper_floor_clue_rewards_are_claimed_on_both_adapters() -> None:
                     )
                     assert reward.data["reward"][clue_key] == 1
                     with sqlite3.connect(runtime.settings.database_path) as connection:
-                        inventory_json, versions = connection.execute(
-                            "SELECT p.inventory_json, c.content_version || ':' || c.rule_version "
+                        inventory_json = connection.execute(
+                            "SELECT p.inventory_json "
                             "FROM players p JOIN tower_reward_claims c ON c.player_id=p.id "
                             "WHERE p.platform=? AND p.platform_user_id=? AND c.floor_no=?",
                             (adapter, user, floor_no),
-                        ).fetchone()
+                        ).fetchone()[0]
                     assert json.loads(inventory_json)[clue_key] == 1
-                    assert versions == "content-0.1:specials-0.1.2"
             await runtime.close()
 
     asyncio.run(run())

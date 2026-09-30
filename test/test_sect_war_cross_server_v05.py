@@ -72,7 +72,7 @@ def test_qq_and_onebot_cross_server_fortress_war_and_reward_box() -> None:
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 players = dict(connection.execute("SELECT platform_user_id,id FROM players").fetchall())
                 connection.execute(
-                    "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES ('cross-sect','跨服堡垒宗','cross-sect',?,'active',5,120,100,0,20000,0,?,?,?,'content-0.5','social-0.5.0')",
+                    "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES ('cross-sect','跨服堡垒宗','cross-sect',?,'active',5,120,100,0,20000,0,?,?,?,'','')",
                     (players["cross-qq"], json.dumps({"item.void_anchor": 25}), now_text, now_text),
                 )
                 for user, role, contribution in (("cross-qq", "leader", 20), ("cross-ob", "member", 10)):
@@ -162,7 +162,7 @@ def test_cross_server_fortress_build_is_concurrent_and_idempotent() -> None:
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 player_id = connection.execute("SELECT id FROM players WHERE platform_user_id='concurrent-leader'").fetchone()[0]
                 connection.execute(
-                    "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES ('concurrent-sect','并发宗','concurrent-sect',?,'active',5,120,100,0,10000,0,?,?,?,'content-0.5','social-0.5.0')",
+                    "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at,content_version,rule_version) VALUES ('concurrent-sect','并发宗','concurrent-sect',?,'active',5,120,100,0,10000,0,?,?,?,'','')",
                     (player_id, json.dumps({"item.void_anchor": 20}), now_text, now_text),
                 )
                 connection.execute(
