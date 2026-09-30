@@ -167,7 +167,9 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.assets import currency_grant, inventory_grant, inventory_json, inventory_value
 from ..utils.json import json_object
+from ..utils.player import player_values
 
 
 class PlayerRepositoryMixin:
@@ -421,7 +423,7 @@ class PlayerRepositoryMixin:
                     """
                     UPDATE players
                     SET stage = ?, realm_key = 'mortal', realm_layer = 0, cultivation = 0, total_cultivation = 0,
-                        qualification_json = ?, spirit_stones = spirit_stones + 100,
+                        qualification_json = ?, spirit_stones = ?,
                         stamina = 30, stamina_max = 30, energy = 30, energy_max = 30,
                         inventory_json = ?, updated_at = ?
                     WHERE id = ? AND stage = ?
@@ -429,13 +431,12 @@ class PlayerRepositoryMixin:
                     (
                         STAGE_MORTAL,
                         json.dumps(qualification, ensure_ascii=False, sort_keys=True),
-                        json.dumps(
+                        currency_grant(row["spirit_stones"], 100),
+                        inventory_json(
                             {
                                 "item.food.coarse_spirit_rice": 3,
                                 "item.herb.blood_grass": 3,
                             },
-                            ensure_ascii=False,
-                            sort_keys=True,
                         ),
                         serialize_datetime(now),
                         row["id"],
@@ -581,7 +582,7 @@ class PlayerRepositoryMixin:
             item_quantity = 0
             stamina = int(row["stamina"])
             energy = int(row["energy"])
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             if changed:
                 if guide_key == "guide.gather_blood_grass":
                     if row["location_key"] != "xuantian.outskirts":
@@ -590,7 +591,10 @@ class PlayerRepositoryMixin:
                         raise ResourceInsufficientError("stamina is insufficient")
                     stamina -= 2
                     item_quantity = 1 + (hashlib.blake2b(operation_id.encode("utf-8"), digest_size=1).digest()[0] % 2)
-                    inventory["item.herb.blood_grass"] = int(inventory.get("item.herb.blood_grass", 0)) + item_quantity
+                    inventory = inventory_grant(
+                        inventory,
+                        {"item.herb.blood_grass": item_quantity},
+                    )
                 elif guide_key == "guide.choose_service":
                     if energy < 2:
                         raise ResourceInsufficientError("energy is insufficient")
@@ -618,7 +622,7 @@ class PlayerRepositoryMixin:
                     stage,
                     stamina,
                     energy,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     json.dumps(intro_state, ensure_ascii=False, sort_keys=True),
                     selected,
                     serialize_datetime(now),
@@ -1015,61 +1019,51 @@ class PlayerRepositoryMixin:
             except (IndexError, KeyError):
                 return default
 
-        qualification_raw = value("qualification_json", "{}")
-        qualification = json.loads(qualification_raw) if isinstance(qualification_raw, str) else qualification_raw
-        inventory_raw = value("inventory_json", "{}")
-        inventory = json.loads(inventory_raw) if isinstance(inventory_raw, str) else inventory_raw
-        intro_raw = value("intro_json", "{}")
-        intro_state = json.loads(intro_raw) if isinstance(intro_raw, str) else intro_raw
-        if not isinstance(inventory, dict):
-            inventory = {}
-        if not isinstance(intro_state, dict):
-            intro_state = {}
+        normalized = player_values(row)
+        qualification = normalized["qualification"]
+        inventory = normalized["inventory"]
+        intro_state = {"flags": normalized["intro_flags"]}
         return PlayerView(
-            player_id=str(value("player_id", value("id", ""))),
-            platform=str(value("platform", "")),
-            platform_user_id=str(value("platform_user_id", "")),
-            scene_id=str(value("scene_id", "")),
-            nickname=str(value("nickname", "")),
-            dao_name=str(value("dao_name", "")),
-            stage=str(value("stage", STAGE_NEW_USER)),
-            spirit_stones=int(value("spirit_stones", 0)),
+            player_id=normalized["player_id"],
+            platform=normalized["platform"],
+            platform_user_id=normalized["platform_user_id"],
+            scene_id=normalized["scene_id"],
+            nickname=normalized["nickname"],
+            dao_name=normalized["dao_name"],
+            stage=normalized["stage"] or STAGE_NEW_USER,
+            spirit_stones=normalized["spirit_stones"],
             qualification={str(key): int(value) for key, value in qualification.items()},
             created_at=datetime.fromisoformat(str(value("created_at"))),
             updated_at=datetime.fromisoformat(str(value("updated_at"))),
-            status=str(value("status", "active")),
-            location_key=str(value("location_key", "xuantian.new_town")),
+            status=normalized["status"],
+            location_key=normalized["location_key"],
             path_key=value("path_key"),
             subprofession_key=value("subprofession_key"),
-            stamina=int(value("stamina", 0)),
-            stamina_max=int(value("stamina_max", 0)),
-            energy=int(value("energy", 0)),
-            energy_max=int(value("energy_max", 0)),
+            stamina=normalized["stamina"],
+            stamina_max=normalized["stamina_max"],
+            energy=normalized["energy"],
+            energy_max=normalized["energy_max"],
             inventory={str(key): int(item) for key, item in inventory.items()},
             durability={
                 str(key): int(item)
-                for key, item in SQLitePlayerRepository._json_object(value("durability_json", "{}"), {}).items()
+                for key, item in json_object(value("durability_json", "{}"), {}).items()
             },
             intro_flags=tuple(str(item) for item in intro_state.get("flags", [])),
-            selected_service=(
-                str(intro_state.get("selected_service"))
-                if intro_state.get("selected_service")
-                else value("selected_service")
-            ),
-            realm_key=str(value("realm_key", "mortal")),
-            realm_layer=int(value("realm_layer", 0)),
-            cultivation=int(value("cultivation", 0)),
-            total_cultivation=int(value("total_cultivation", 0)),
-            foundation_quality=int(value("foundation_quality", 0)),
-            world_merit=int(value("world_merit", 0)),
-            void_merit=int(value("void_merit", 0)),
-            alliance_points=int(value("alliance_points", 0)),
-            arena_rating=int(value("arena_rating", 1000)),
-            arena_wins=int(value("arena_wins", 0)),
-            arena_losses=int(value("arena_losses", 0)),
-            arena_draws=int(value("arena_draws", 0)),
-            talent_points=int(value("talent_points", 0)),
-            skill_insights=int(value("skill_insights", 0)),
+            selected_service=normalized["selected_service"],
+            realm_key=normalized["realm_key"],
+            realm_layer=normalized["realm_layer"],
+            cultivation=normalized["cultivation"],
+            total_cultivation=normalized["total_cultivation"],
+            foundation_quality=normalized["foundation_quality"],
+            world_merit=normalized["world_merit"],
+            void_merit=normalized["void_merit"],
+            alliance_points=normalized["alliance_points"],
+            arena_rating=normalized["arena_rating"],
+            arena_wins=normalized["arena_wins"],
+            arena_losses=normalized["arena_losses"],
+            arena_draws=normalized["arena_draws"],
+            talent_points=normalized["talent_points"],
+            skill_insights=normalized["skill_insights"],
             weakness_until=(
                 datetime.fromisoformat(str(value("weakness_until")))
                 if value("weakness_until")
@@ -1080,52 +1074,52 @@ class PlayerRepositoryMixin:
                 if value("battle_defeat_until")
                 else None
             ),
-            breakthrough_pity_bp=int(value("breakthrough_pity_bp", 0)),
-            soul_power=int(value("soul_power", 0)),
-            soul_power_max=int(value("soul_power_max", 0)),
-            domain_charge=int(value("domain_charge", 0)),
-            domain_charge_max=int(value("domain_charge_max", 0)),
-            pollution=int(value("pollution", 0)),
-            bloodline_stability=int(value("bloodline_stability", 0)),
-            cross_realm_penalty_bp=int(value("cross_realm_penalty_bp", 0)),
+            breakthrough_pity_bp=normalized["breakthrough_pity_bp"],
+            soul_power=normalized["soul_power"],
+            soul_power_max=normalized["soul_power_max"],
+            domain_charge=normalized["domain_charge"],
+            domain_charge_max=normalized["domain_charge_max"],
+            pollution=normalized["pollution"],
+            bloodline_stability=normalized["bloodline_stability"],
+            cross_realm_penalty_bp=normalized["cross_realm_penalty_bp"],
             soul_fatigue_until=(
                 datetime.fromisoformat(str(value("soul_fatigue_until")))
                 if value("soul_fatigue_until")
                 else None
             ),
-            heart_demon_bonus_bp=int(value("heart_demon_bonus_bp", 0)),
-            max_hp=int(value("max_hp", 0)),
-            max_mp=int(value("max_mp", 0)),
-            carry_capacity=int(value("carry_capacity", 0)),
-            exploration_efficiency_bp=int(value("exploration_efficiency_bp", 0)),
-            domain_key=value("domain_key"),
-            domain_power=int(value("domain_power", 0)),
-            realm_resistance_bp=int(value("realm_resistance_bp", 0)),
+            heart_demon_bonus_bp=normalized["heart_demon_bonus_bp"],
+            max_hp=normalized["max_hp"],
+            max_mp=normalized["max_mp"],
+            carry_capacity=normalized["carry_capacity"],
+            exploration_efficiency_bp=normalized["exploration_efficiency_bp"],
+            domain_key=normalized["domain_key"],
+            domain_power=normalized["domain_power"],
+            realm_resistance_bp=normalized["realm_resistance_bp"],
             domain_crack_until=(
                 datetime.fromisoformat(str(value("domain_crack_until")))
                 if value("domain_crack_until") else None
             ),
-            initiative=int(value("initiative", 0)),
+            initiative=normalized["initiative"],
             faction_reputation={
                 str(key): int(item)
                 for key, item in SQLitePlayerRepository._json_object(value("faction_reputation_json", "{}"), {}).items()
             },
-            domain_level=int(value("domain_level", 0)),
-            void_power=int(value("void_power", 0)),
-            void_power_max=int(value("void_power_max", 0)),
-            space_resistance_bp=int(value("space_resistance_bp", 0)),
+            domain_level=normalized["domain_level"],
+            void_power=normalized["void_power"],
+            void_power_max=normalized["void_power_max"],
+            space_resistance_bp=normalized["space_resistance_bp"],
             void_instability_until=(
                 datetime.fromisoformat(str(value("void_instability_until")))
                 if value("void_instability_until") else None
             ),
-            void_route_count=int(value("void_route_count", 0)),
-            void_anchor_capacity=int(value("void_anchor_capacity", 0)),
-            dao_fruit_progress=int(value("dao_fruit_progress", 0)),
-            ascension_merit=int(value("ascension_merit", 0)),
-            tribulation_debt=int(value("tribulation_debt", 0)),
-            dao_fruit_key=value("dao_fruit_key"),
-            endgame_status=str(value("endgame_status", "none")),
-            ending_key=value("ending_key"),
+            void_route_count=normalized["void_route_count"],
+            void_anchor_capacity=normalized["void_anchor_capacity"],
+            dao_fruit_progress=normalized["dao_fruit_progress"],
+            ascension_merit=normalized["ascension_merit"],
+            tribulation_debt=normalized["tribulation_debt"],
+            dao_fruit_key=normalized["dao_fruit_key"],
+            endgame_status=normalized["endgame_status"],
+            ending_key=normalized["ending_key"],
         )
 
     @staticmethod
@@ -1153,7 +1147,7 @@ class PlayerRepositoryMixin:
             "stamina_max": player.stamina_max,
             "energy": player.energy,
             "energy_max": player.energy_max,
-            "inventory_json": json.dumps(player.inventory, ensure_ascii=False, sort_keys=True),
+            "inventory_json": inventory_json(player.inventory),
             "durability_json": json.dumps(player.durability, ensure_ascii=False, sort_keys=True),
             "intro_json": json.dumps(
                 {"flags": list(player.intro_flags), "selected_service": player.selected_service},

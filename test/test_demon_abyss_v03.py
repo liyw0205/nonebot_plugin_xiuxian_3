@@ -166,7 +166,7 @@ def test_demon_abyss_contract_clue_is_frozen_and_idempotent_on_both_adapters() -
                         "SELECT snapshot_json FROM exploration_sessions WHERE exploration_id=?",
                         (started.data["exploration_id"],),
                     ).fetchone()[0]
-                assert json.loads(snapshot)["random_pool"] == "loot.demon.abyss.v0.3"
+                assert json.loads(snapshot)["random_pool"] == "loot.demon.abyss"
                 _expire(runtime, started.data["exploration_id"])
                 settled = await runtime.adapters.dispatch(
                     adapter,

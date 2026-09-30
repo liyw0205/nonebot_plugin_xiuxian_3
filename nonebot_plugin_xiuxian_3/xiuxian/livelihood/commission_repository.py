@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import currency_with_delta, inventory_json, inventory_missing, inventory_spend, inventory_value
 from ..utils.json import json_object
 from ..content import bundled_content
 from ..persistence.errors import (
@@ -270,17 +271,12 @@ class CommissionRepositoryMixin:
                 )
                 raise CommissionExpiredError("commission has expired")
             snapshot = json_object(claim["snapshot_json"], {})
-            inventory = json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             inputs = {str(key): int(value) for key, value in dict(snapshot.get("inputs", {})).items()}
-            missing = {
-                key: quantity - int(inventory.get(key, 0))
-                for key, quantity in inputs.items()
-                if int(inventory.get(key, 0)) < quantity
-            }
+            missing = inventory_missing(inventory, inputs)
             if missing:
                 raise CommissionMaterialInsufficientError("commission materials are insufficient")
-            for item_key, quantity in inputs.items():
-                inventory[item_key] = int(inventory.get(item_key, 0)) - quantity
+            inventory = inventory_spend(inventory, inputs)
             reward_stones = int(snapshot.get("reward_stones", 0))
             local_delta = int(snapshot.get("local_reputation", 0))
             service_delta = int(snapshot.get("service_reputation", 0))
@@ -295,9 +291,10 @@ class CommissionRepositoryMixin:
             local_after = min(1000, local_before + local_delta)
             service_after = min(100, service_before + service_delta)
             local[local_key] = local_after
+            updated_stones = currency_with_delta(player["spirit_stones"], reward_stones)
             connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones + ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (reward_stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                (updated_stones, inventory_json(inventory), now_text, player["id"]),
             )
             connection.execute(
                 """

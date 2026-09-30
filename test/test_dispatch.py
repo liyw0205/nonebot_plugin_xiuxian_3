@@ -137,7 +137,7 @@ def test_qq_dispatch_town_freezes_result_and_settles_idempotently() -> None:
                 ).fetchone()
             snapshot = json.loads(snapshot_text)
             assert snapshot["outcome"] == accepted.data["outcome"]
-            assert snapshot["risk_pool"] == "dispatch.town.v0.1"
+            assert snapshot["risk_pool"] == "dispatch.town"
             assert "cultivation" not in snapshot["reward"]
             assert datetime.fromisoformat(accepted.data["ends_at"]) - datetime.fromisoformat(
                 accepted.data["accepted_at"]

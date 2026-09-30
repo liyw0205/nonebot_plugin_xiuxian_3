@@ -8,6 +8,7 @@ import sqlite3
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_json, inventory_spend, inventory_value
 from ..persistence.errors import (
     HeartDemonPendingError,
     MaterialInsufficientError,
@@ -87,17 +88,17 @@ class PollutionRepositoryMixin:
             pollution_before = int(row["pollution"])
             if pollution_before <= 0:
                 raise PollutionAlreadyClearError("pollution is already clear")
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             quantity = int(inventory.get(POLLUTION_PURIFICATION_ITEM, 0))
             if quantity < 1:
                 raise MaterialInsufficientError("soul restore pill is missing")
 
-            inventory[POLLUTION_PURIFICATION_ITEM] = quantity - 1
+            inventory = inventory_spend(inventory, {POLLUTION_PURIFICATION_ITEM: 1})
             pollution_after = max(0, pollution_before - POLLUTION_PURIFICATION_DELTA)
             connection.execute(
                 "UPDATE players SET inventory_json = ?, pollution = ?, updated_at = ? WHERE id = ?",
                 (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     pollution_after,
                     now_text,
                     row["id"],

@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import currency_with_delta, inventory_json, inventory_spend, inventory_value
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -69,7 +70,7 @@ class RouteRepositoryMixin:
         business_date = now.date().isoformat()
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
-            inventory = json_object(player["inventory_json"])
+            inventory = inventory_value(player["inventory_json"])
             missing: list[str] = []
             if str(player["stage"]) not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 missing.append("入道")
@@ -174,14 +175,10 @@ class RouteRepositoryMixin:
             if used is not None and int(used["count"]) >= definition.daily_limit:
                 raise RouteQuotaError("route daily limit reached")
             self._check_route_busy(connection, int(player["id"]))
-            inventory = json_object(player["inventory_json"])
+            inventory = inventory_value(player["inventory_json"])
             if int(inventory.get(cargo_key, 0)) < cargo_quantity:
                 raise RouteCargoRequirementError("cargo is insufficient")
-            remaining = int(inventory[cargo_key]) - cargo_quantity
-            if remaining:
-                inventory[cargo_key] = remaining
-            else:
-                inventory.pop(cargo_key, None)
+            inventory = inventory_spend(inventory, {cargo_key: cargo_quantity})
             effects = self._public_project_effects(connection, now)
             delay_chance_bp = max(
                 0,
@@ -213,7 +210,7 @@ class RouteRepositoryMixin:
             }
             connection.execute(
                 "UPDATE players SET stamina = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (int(player["stamina"]) - definition.stamina_cost, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                (int(player["stamina"]) - definition.stamina_cost, inventory_json(inventory), now_text, player["id"]),
             )
             connection.execute(
                 """
@@ -332,9 +329,12 @@ class RouteRepositoryMixin:
             local_before = int(local.get(local_key, 0))
             local_after = min(1000, local_before + int(snapshot.get("local_reputation", 0)))
             local[local_key] = local_after
+            updated_stones = currency_with_delta(
+                player["spirit_stones"], int(snapshot.get("reward_stones", route["reward_stones"]))
+            )
             connection.execute(
-                "UPDATE players SET location_key = ?, spirit_stones = spirit_stones + ?, updated_at = ? WHERE id = ?",
-                (str(route["destination_location"]), int(snapshot.get("reward_stones", route["reward_stones"])), now_text, player["id"]),
+                "UPDATE players SET location_key = ?, spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (str(route["destination_location"]), updated_stones, now_text, player["id"]),
             )
             connection.execute(
                 """

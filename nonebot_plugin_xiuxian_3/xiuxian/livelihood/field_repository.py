@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
 from ..persistence.errors import (
     CropContentClosedError,
     CropDailyLimitError,
@@ -83,12 +84,12 @@ class FieldPlotRepositoryMixin:
             ).fetchone()
             if used is not None and int(used["count"]) >= crop.daily_limit:
                 raise CropDailyLimitError("crop daily limit reached")
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             if int(inventory.get(crop.seed_key, 0)) < 1:
                 raise ResourceInsufficientError("seed is insufficient")
             if int(row["energy"]) < crop.maintenance_energy:
                 raise ResourceInsufficientError("energy is insufficient")
-            inventory[crop.seed_key] = int(inventory.get(crop.seed_key, 0)) - 1
+            inventory = inventory_spend(inventory, {crop.seed_key: 1})
             harvest_at = serialize_datetime(now + timedelta(seconds=crop.growth_seconds))
             plot_id = uuid4().hex
             snapshot = {
@@ -112,7 +113,7 @@ class FieldPlotRepositoryMixin:
                 )
             connection.execute(
                 "UPDATE players SET energy = energy - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (crop.maintenance_energy, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                (crop.maintenance_energy, inventory_json(inventory), now_text, row["id"]),
             )
             connection.execute(
                 """
@@ -306,12 +307,11 @@ class FieldPlotRepositoryMixin:
                 harvest = dict(snapshot.get("maintained_harvest" if maintained else "unmaintained_harvest", {}))
                 if maintained and int(snapshot.get("array_sand_roll", 0)):
                     harvest["item.mat.array_sand"] = int(harvest.get("item.mat.array_sand", 0)) + 1
-                inventory = self._json_object(row["inventory_json"], {})
-                for item_key, quantity in harvest.items():
-                    inventory[str(item_key)] = int(inventory.get(str(item_key), 0)) + int(quantity)
+                inventory = inventory_value(row["inventory_json"])
+                inventory = inventory_grant(inventory, harvest)
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                    (inventory_json(inventory), now_text, row["id"]),
                 )
                 reputation_delta = 1 if str(plot["crop_key"]) == "crop.blood_grass" else 0
                 if reputation_delta:

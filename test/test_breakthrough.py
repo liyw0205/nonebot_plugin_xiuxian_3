@@ -330,7 +330,7 @@ def test_foundation_breakthrough_failure_consumes_foundation_guard() -> None:
                     (user,),
                 ).fetchone()
                 inventory = json.loads(inventory_json)
-            assert inventory["item.pill.foundation_guard"] == 0
+            assert inventory.get("item.pill.foundation_guard", 0) == 0
             assert quality == 0
             await runtime.close()
 
@@ -400,7 +400,7 @@ def test_legacy_foundation_quality_backfill_runs_once() -> None:
             await runtime.close()
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
-                    "DELETE FROM schema_migrations WHERE migration_key='progression.foundation_quality.v0.1.6'"
+                    "DELETE FROM schema_migrations WHERE migration_key='progression.foundation_quality'"
                 )
                 connection.execute(
                     "UPDATE players SET realm_key='foundation' WHERE platform_user_id='old-foundation'"
@@ -551,7 +551,7 @@ def test_golden_core_failure_protection_and_foundation_shock_recovery() -> None:
             assert row[0] is None
             assert row[1] == 500
             assert row[2] == 800
-            assert '"item.pill.golden_core_restore": 0' in row[3]
+            assert json.loads(row[3]).get("item.pill.golden_core_restore", 0) == 0
             await runtime.close()
 
     asyncio.run(run())

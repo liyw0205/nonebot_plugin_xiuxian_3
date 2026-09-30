@@ -81,6 +81,8 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_DAMAGE_BP,
     TIME_FORT_STORM_INTERVAL,
 )
+from ..utils.player import player_values
+from ..utils.assets import currency_grant, inventory_grant, inventory_json, inventory_spend, inventory_value
 
 
 class PartyCombatRepositoryMixin:
@@ -394,6 +396,7 @@ class PartyCombatRepositoryMixin:
             beast_party = party_type == PARTY_TYPE_BEAST_REALM
             leader_ticket_inventory: dict[str, int] | None = None
             for row in members:
+                player_state = player_values(row)
                 entry_snapshot = (
                     ancient_member_snapshots.get(int(row["database_player_id"]))
                     or void_member_snapshots.get(int(row["database_player_id"]))
@@ -459,21 +462,21 @@ class PartyCombatRepositoryMixin:
                     raise PartyBattleBusyError("a party member has locked battle assets")
                 equipment = tuple(entry_snapshot["equipment"]) if entry_snapshot else self._battle_equipment_snapshot(connection, int(row["database_player_id"]))
                 skills = list(entry_snapshot["skills"]) if entry_snapshot else self._battle_skill_snapshot(
-                    connection, int(row["database_player_id"]), str(row["path_key"] or "")
+                    connection, int(row["database_player_id"]), str(player_state["path_key"] or "")
                 )
-                qualification = dict(entry_snapshot["qualification"]) if entry_snapshot else self._json_object(row["qualification_json"], {})
+                qualification = dict(entry_snapshot["qualification"]) if entry_snapshot else player_state["qualification"]
                 constitution_effect = (
                     dict(entry_snapshot.get("constitution_effect", {}))
                     if entry_snapshot
                     else constitution_effect_snapshot(connection, int(row["database_player_id"]))
                 )
-                inventory = self._json_object(row["inventory_json"], {})
+                inventory = player_state["inventory"]
                 if boundary_party and row["database_player_id"] == leader["id"]:
                     leader_ticket_inventory = inventory
                 stats = dict(entry_snapshot["stats"]) if entry_snapshot else player_stat_snapshot(
                     qualification,
-                    max_hp=int(row["max_hp"]),
-                    initiative=int(row["initiative"]),
+                    max_hp=player_state["max_hp"],
+                    initiative=player_state["initiative"],
                     equipment=equipment,
                     constitution_effect=constitution_effect,
                 )
@@ -491,7 +494,7 @@ class PartyCombatRepositoryMixin:
                         "role": str(row["member_role"]),
                         "realm_key": member_realm,
                         "realm_layer": member_realm_layer,
-                        "path_key": entry_snapshot.get("path_key", row["path_key"]) if entry_snapshot else row["path_key"],
+                        "path_key": entry_snapshot.get("path_key", player_state["path_key"]) if entry_snapshot else player_state["path_key"],
                         "qualification": qualification,
                         "stats": stats,
                         "constitution_effect": constitution_effect,
@@ -514,9 +517,9 @@ class PartyCombatRepositoryMixin:
                     raise BoundaryRealmRequirementError("boundary party must use cave.boundary_realm")
                 if leader_ticket_inventory is None or int(leader_ticket_inventory.get(BOUNDARY_REALM_TICKET, 0)) < BOUNDARY_REALM_TICKET_COST:
                     raise BoundaryRealmResourceError("boundary-realm ticket is insufficient")
-                leader_ticket_inventory[BOUNDARY_REALM_TICKET] = int(leader_ticket_inventory[BOUNDARY_REALM_TICKET]) - BOUNDARY_REALM_TICKET_COST
-                if leader_ticket_inventory[BOUNDARY_REALM_TICKET] <= 0:
-                    leader_ticket_inventory.pop(BOUNDARY_REALM_TICKET, None)
+                leader_ticket_inventory = inventory_spend(
+                    leader_ticket_inventory, {BOUNDARY_REALM_TICKET: BOUNDARY_REALM_TICKET_COST}
+                )
                 # All validation above happens before this atomic resource debit.
                 for row in members:
                     connection.execute(
@@ -525,7 +528,7 @@ class PartyCombatRepositoryMixin:
                     )
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(leader_ticket_inventory, ensure_ascii=False, sort_keys=True), now_text, leader["id"]),
+                    (inventory_json(leader_ticket_inventory), now_text, leader["id"]),
                 )
             elif tower_duo_party:
                 # The tower-duo repository debits both members atomically before
@@ -1315,10 +1318,10 @@ class PartyCombatRepositoryMixin:
                 if player is None:
                     raise PartyBattleNotFoundError("party battle member no longer exists")
                 if reward:
-                    inventory = self._json_object(player["inventory_json"], {})
+                    inventory = inventory_value(player["inventory_json"])
                     cultivation = int(player["cultivation"]) + int(reward.get("cultivation", 0))
                     total_cultivation = int(player["total_cultivation"]) + int(reward.get("cultivation", 0))
-                    spirit_stones = int(player["spirit_stones"]) + int(reward.get("spirit_stones", 0))
+                    spirit_stones = currency_grant(player["spirit_stones"], reward.get("spirit_stones", 0))
                     world_merit = int(player["world_merit"]) + int(reward.get("world_merit", 0))
                     soul_power_max = max(
                         int(player["soul_power_max"]),
@@ -1332,13 +1335,13 @@ class PartyCombatRepositoryMixin:
                     faction = self._json_object(player["faction_reputation_json"], {})
                     for item_key, quantity in reward.items():
                         if item_key.startswith("item."):
-                            inventory[item_key] = int(inventory.get(item_key, 0)) + int(quantity)
+                            inventory = inventory_grant(inventory, {item_key: int(quantity)})
                         elif item_key.startswith("faction_reputation."):
                             faction_key = item_key.removeprefix("faction_reputation.")
                             faction[faction_key] = int(faction.get(faction_key, 0)) + int(quantity)
                     connection.execute(
                         "UPDATE players SET cultivation=?, total_cultivation=?, spirit_stones=?, world_merit=?, soul_power=?, soul_power_max=?, inventory_json=?, faction_reputation_json=?, updated_at=? WHERE id=?",
-                        (cultivation, total_cultivation, spirit_stones, world_merit, soul_power, soul_power_max, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                        (cultivation, total_cultivation, spirit_stones, world_merit, soul_power, soul_power_max, inventory_json(inventory), json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
                     )
                 if fatigue_party and outcome in {"lost", "expired"}:
                     fatigue_until = serialize_datetime(self._now() + timedelta(hours=2))

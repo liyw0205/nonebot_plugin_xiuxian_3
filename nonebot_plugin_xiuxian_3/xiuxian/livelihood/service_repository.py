@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import currency_grant, currency_with_delta, inventory_grant, inventory_json, inventory_missing, inventory_spend, inventory_value
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -85,9 +86,10 @@ class ServiceRepositoryMixin:
             publisher = self._require_player(connection, platform, platform_user_id)
             if int(publisher["spirit_stones"]) < reward:
                 raise ResourceInsufficientError("publisher reward is insufficient")
+            remaining_stones = currency_with_delta(publisher["spirit_stones"], -reward)
             connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                (reward, now_text, publisher["id"]),
+                "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (remaining_stones, now_text, publisher["id"]),
             )
             order_id = uuid4().hex
             snapshot = self._service_snapshot(definition, reward, publisher, now_text, expires_at)
@@ -171,8 +173,8 @@ class ServiceRepositoryMixin:
                 (now_text, order["id"]),
             )
             connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones + ?, updated_at = ? WHERE id = ?",
-                (int(order["reward_stones"]), now_text, publisher["id"]),
+                "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (currency_grant(publisher["spirit_stones"], order["reward_stones"]), now_text, publisher["id"]),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (publisher["id"],)).fetchone()
             if updated is None:
@@ -242,9 +244,14 @@ class ServiceRepositoryMixin:
                     "UPDATE livelihood_service_orders SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'published'",
                     (now_text, order["id"]),
                 )
+                expired_publisher = connection.execute(
+                    "SELECT spirit_stones FROM players WHERE id = ?", (order["publisher_id"],)
+                ).fetchone()
+                if expired_publisher is None:
+                    raise PlayerNotFoundError("publisher does not exist")
                 connection.execute(
-                    "UPDATE players SET spirit_stones = spirit_stones + ?, updated_at = ? WHERE id = ?",
-                    (int(order["reward_stones"]), now_text, order["publisher_id"]),
+                    "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
+                    (currency_grant(expired_publisher["spirit_stones"], order["reward_stones"]), now_text, order["publisher_id"]),
                 )
                 connection.commit()
                 raise ServiceExpiredError("service order has expired")
@@ -274,22 +281,17 @@ class ServiceRepositoryMixin:
                 raise ServiceLocationConflictError("service participants are not at the same location")
             self._check_provider_daily_limit(connection, provider["id"], definition, now)
             inputs = json_object(snapshot.get("provider_inputs", {}), {})
-            inventory = json_object(provider["inventory_json"], {})
-            missing = {
-                key: quantity - int(inventory.get(key, 0))
-                for key, quantity in inputs.items()
-                if int(inventory.get(key, 0)) < int(quantity)
-            }
+            inventory = inventory_value(provider["inventory_json"])
+            missing = inventory_missing(inventory, inputs)
             if missing or int(provider["stamina"]) < definition.provider_stamina or int(provider["energy"]) < definition.provider_energy:
                 raise ResourceInsufficientError("service resources are insufficient")
-            for key, quantity in inputs.items():
-                inventory[key] = int(inventory.get(key, 0)) - int(quantity)
+            inventory = inventory_spend(inventory, inputs)
             connection.execute(
                 "UPDATE players SET stamina = stamina - ?, energy = energy - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
                 (
                     definition.provider_stamina,
                     definition.provider_energy,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     now_text,
                     provider["id"],
                 ),
@@ -378,18 +380,17 @@ class ServiceRepositoryMixin:
             successful = not expired and (same_location or definition.key == "service.cook_meal")
             if successful:
                 outputs = json_object(snapshot.get("publisher_outputs", {}), {})
-                publisher_inventory = json_object(publisher["inventory_json"], {})
-                for key, quantity in outputs.items():
-                    publisher_inventory[key] = int(publisher_inventory.get(key, 0)) + int(quantity)
+                publisher_inventory = inventory_value(publisher["inventory_json"])
+                publisher_inventory = inventory_grant(publisher_inventory, outputs)
                 provider_payment = (int(order["reward_stones"]) * 9800) // 10000
                 publisher_refund = 0
                 connection.execute(
-                    "UPDATE players SET spirit_stones = spirit_stones + ?, updated_at = ? WHERE id = ?",
-                    (provider_payment, now_text, provider["id"]),
+                    "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
+                    (currency_grant(provider["spirit_stones"], provider_payment), now_text, provider["id"]),
                 )
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(publisher_inventory, ensure_ascii=False, sort_keys=True), now_text, publisher["id"]),
+                    (inventory_json(publisher_inventory), now_text, publisher["id"]),
                 )
                 status = "delivered"
                 provider_refunds: dict[str, int] = {}
@@ -398,29 +399,28 @@ class ServiceRepositoryMixin:
                 outputs = {}
                 provider_payment = 0
                 publisher_refund = (int(order["reward_stones"]) * 8000) // 10000
-                provider_inventory = json_object(provider["inventory_json"], {})
+                provider_inventory = inventory_value(provider["inventory_json"])
                 provider_refunds = (
                     json_object(snapshot.get("provider_inputs", {}), {})
                     if expired
                     else json_object(snapshot.get("failure_provider_refund", {}), {})
                 )
-                for key, quantity in provider_refunds.items():
-                    provider_inventory[key] = int(provider_inventory.get(key, 0)) + int(quantity)
+                provider_inventory = inventory_grant(provider_inventory, provider_refunds)
                 stamina_refund = (
                     int(snapshot.get("provider_stamina", 0))
                     if expired
                     else int(snapshot.get("failure_stamina_refund", 0))
                 )
                 connection.execute(
-                    "UPDATE players SET spirit_stones = spirit_stones + ?, updated_at = ? WHERE id = ?",
-                    (publisher_refund, now_text, publisher["id"]),
+                    "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
+                    (currency_grant(publisher["spirit_stones"], publisher_refund), now_text, publisher["id"]),
                 )
                 connection.execute(
                     "UPDATE players SET stamina = stamina + ?, energy = energy + ?, inventory_json = ?, updated_at = ? WHERE id = ?",
                     (
                         stamina_refund,
                         int(snapshot.get("provider_energy", 0)) if expired else 0,
-                        json.dumps(provider_inventory, ensure_ascii=False, sort_keys=True),
+                        inventory_json(provider_inventory),
                         now_text,
                         provider["id"],
                     ),

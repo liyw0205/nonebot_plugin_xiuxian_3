@@ -166,7 +166,7 @@ def test_spirit_leaf_requires_courtyard_and_freezes_array_sand_roll() -> None:
                     "SELECT snapshot_json FROM field_plots WHERE plot_id = ?", (planted.data["plot_id"],)
                 ).fetchone()[0]
                 payload = json.loads(snapshot)
-                assert payload["random_pool"] == "livelihood.harvest.v0.1"
+                assert payload["random_pool"] == "livelihood.harvest"
                 assert payload["random_seed"] == "spirit-plant"
                 assert payload["array_sand_roll"] in {0, 1}
             await runtime.close()
@@ -220,7 +220,7 @@ def test_town_commission_defers_materials_until_delivery_and_settles_once() -> N
                     (user,),
                 ).fetchone()
             assert after[:3] == (118, 0, 0)
-            assert json.loads(after[3])["item.herb.blood_grass"] == 0
+            assert json.loads(after[3]).get("item.herb.blood_grass", 0) == 0
             assert json.loads(reputation[0])["local.xuantian.new_town"] == 3
             assert reputation[1] == 1
             await runtime.close()

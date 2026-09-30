@@ -198,6 +198,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.assets import currency_spend, inventory_json, inventory_spend, inventory_value
 
 
 class AdvancementRepositoryMixin:
@@ -303,7 +304,7 @@ class AdvancementRepositoryMixin:
             if used is not None and int(used["count"]) >= definition.daily_limit:
                 raise RetreatDailyLimitError("retreat daily limit reached")
 
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             item_cost = definition.item_cost_map()
             if definition.required_item:
                 content = self.content or bundled_content()
@@ -320,8 +321,7 @@ class AdvancementRepositoryMixin:
                     raise ResourceInsufficientError("retreat item is insufficient")
             if int(row["energy"]) < definition.energy_cost:
                 raise ResourceInsufficientError("energy is insufficient")
-            for item_key, quantity in item_cost.items():
-                inventory[item_key] = int(inventory.get(item_key, 0)) - quantity
+            inventory = inventory_spend(inventory, item_cost)
             seed = f"{definition.random_pool or definition.key}:{operation_id}"
             snapshot = {
                 "retreat_key": definition.key,
@@ -343,7 +343,7 @@ class AdvancementRepositoryMixin:
                 "UPDATE players SET energy = energy - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
                 (
                     definition.energy_cost,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     now_text,
                     row["id"],
                 ),
@@ -492,7 +492,7 @@ class AdvancementRepositoryMixin:
             cycles = max(1, min(4, capped // definition.duration_seconds))
             result = retreat_reward(definition.key, str(snapshot.get("random_seed", operation_id)))
             result = {key: int(value) * cycles for key, value in result.items()}
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             cultivation = int(row["cultivation"])
             total_cultivation = int(row["total_cultivation"])
             energy = int(row["energy"])
@@ -829,13 +829,11 @@ class AdvancementRepositoryMixin:
                 reshape_rules = constitution_reshape_rules(self.content)
                 if now < last_reshaped_at + timedelta(seconds=int(reshape_rules["cooldown_seconds"])):
                     raise ConstitutionCooldownError("constitution reshape cooldown is active")
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             reset_item_key = str(constitution_reshape_rules(self.content)["reset_item_key"])
             if int(inventory.get(reset_item_key, 0)) < 1:
                 raise ResourceInsufficientError("constitution reset token is missing")
-            inventory[reset_item_key] = int(inventory[reset_item_key]) - 1
-            if inventory[reset_item_key] <= 0:
-                inventory.pop(reset_item_key, None)
+            inventory = inventory_spend(inventory, {reset_item_key: 1})
             snapshot = {
                 "constitution_key": definition.key,
                 "effect": dict(definition.effect),
@@ -865,7 +863,7 @@ class AdvancementRepositoryMixin:
             )
             connection.execute(
                 "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                (inventory_json(inventory), now_text, row["id"]),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
@@ -1298,7 +1296,7 @@ class AdvancementRepositoryMixin:
         ).fetchall()
         if rows:
             return rows[0] if len(rows) == 1 else player
-        inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
+        inventory = inventory_value(player["inventory_json"])
         quantity = int(inventory.get(definition.key, 0))
         if quantity <= 0:
             return player
@@ -1328,7 +1326,7 @@ class AdvancementRepositoryMixin:
         inventory.pop(definition.key, None)
         connection.execute(
             "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-            (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            (inventory_json(inventory), now_text, player["id"]),
         )
         return connection.execute(
             "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id LIMIT 1",
@@ -1366,7 +1364,7 @@ class AdvancementRepositoryMixin:
         ).fetchone()
         if instance is not None:
             return True
-        inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
+        inventory = inventory_value(player["inventory_json"])
         return int(inventory.get(definition.key, 0)) > 0
 
     @staticmethod
@@ -1381,18 +1379,20 @@ class AdvancementRepositoryMixin:
         item_total = sum(int(costs[key]) for key in item_keys)
         stones_spent = int(costs.get("currency.spirit_stone", 0))
 
+        item_costs: dict[str, int] = {}
         for resource_key, quantity in costs.items():
             if resource_key.startswith("item."):
                 available = int(remaining_inventory.get(resource_key, 0))
                 if available < quantity:
                     raise ResourceInsufficientError("equipment materials are insufficient")
-                remaining_inventory[resource_key] = available - quantity
+                item_costs[resource_key] = int(quantity)
             elif resource_key == "currency.spirit_stone":
                 if remaining_stones < quantity:
                     raise ResourceInsufficientError("spirit stones are insufficient")
-                remaining_stones -= quantity
             else:
                 raise RuntimeError(f"unsupported configured equipment resource: {resource_key}")
+        remaining_inventory = inventory_spend(remaining_inventory, item_costs)
+        remaining_stones = currency_spend(remaining_stones, stones_spent)
 
         material_key = item_keys[0] if item_keys else ""
         return remaining_inventory, remaining_stones, material_key, item_total, stones_spent
@@ -1497,7 +1497,7 @@ class AdvancementRepositoryMixin:
             player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if player is None:
                 raise PlayerNotFoundError("player disappeared during equipment resolution")
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             inventory, stones_after, material_key, material_spent, stones_spent = self._consume_equipment_costs(
                 player, inventory, costs
             )
@@ -1507,7 +1507,7 @@ class AdvancementRepositoryMixin:
             level_after = target_level if success else from_level
             connection.execute(
                 "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones_after, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                (stones_after, inventory_json(inventory), now_text, player["id"]),
             )
             connection.execute(
                 "UPDATE equipment_instances SET temper_level = ?, updated_at = ? WHERE id = ?",
@@ -1670,7 +1670,7 @@ class AdvancementRepositoryMixin:
             player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if player is None:
                 raise PlayerNotFoundError("player disappeared during equipment resolution")
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             inventory, stones_after, material_key, material_spent, stones_spent = self._consume_equipment_costs(
                 player, inventory, costs
             )
@@ -1692,7 +1692,7 @@ class AdvancementRepositoryMixin:
             streak_after = 0 if success else streak_before + 1
             connection.execute(
                 "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones_after, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                (stones_after, inventory_json(inventory), now_text, player["id"]),
             )
             connection.execute(
                 "UPDATE equipment_instances SET affixes_json = ?, refinement_failure_streak = ?, updated_at = ? WHERE id = ?",
@@ -1893,7 +1893,7 @@ class AdvancementRepositoryMixin:
                 "SELECT * FROM skill_masteries WHERE player_id = ? AND skill_key = ? LIMIT 1",
                 (row["id"], definition.key),
             ).fetchone()
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             if definition.key not in available_skill_keys(
                 str(row["path_key"]),
                 self.content,
@@ -1908,10 +1908,9 @@ class AdvancementRepositoryMixin:
                 quantity = int(inventory_after.get(definition.acquisition_item_key, 0))
                 if quantity <= 0:
                     raise SkillNotAvailableError("skill inheritance item is missing")
-                if quantity == 1:
-                    inventory_after.pop(definition.acquisition_item_key, None)
-                else:
-                    inventory_after[definition.acquisition_item_key] = quantity - 1
+                inventory_after = inventory_spend(
+                    inventory_after, {definition.acquisition_item_key: 1}
+                )
             current_level = int(mastery["level"]) if mastery is not None else 0
             if current_level >= definition.max_level:
                 raise SkillAlreadyMaxedError("skill is already at maximum level")
@@ -1982,7 +1981,7 @@ class AdvancementRepositoryMixin:
             values = [after for _, _, after in resource_balances.values()]
             if mastery is None and definition.acquisition_item_key:
                 assignments.append('"inventory_json" = ?')
-                values.append(json.dumps(inventory_after, ensure_ascii=False, sort_keys=True))
+                values.append(inventory_json(inventory_after))
             if assignments:
                 connection.execute(
                     f"UPDATE players SET {', '.join(assignments)}, updated_at = ? WHERE id = ?",

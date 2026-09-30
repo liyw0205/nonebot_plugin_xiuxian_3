@@ -14,6 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.player import player_values
 from ..persistence.errors import (
     ArenaChallengeCapError,
     ArenaMatchNotFoundError,
@@ -845,7 +846,8 @@ class ArenaRepositoryMixin:
     def _arena_player_snapshot(
         self, connection: sqlite3.Connection, player: sqlite3.Row, snapshot_id: str
     ) -> dict[str, object]:
-        qualification = self._json_map(player["qualification_json"])
+        player_state = player_values(player)
+        qualification = player_state["qualification"]
         equipment = []
         attack_bonus = 0
         equipment_rows = connection.execute(
@@ -887,14 +889,14 @@ class ArenaRepositoryMixin:
 
         return {
             "snapshot_id": snapshot_id,
-            "dao_name": str(player["dao_name"] or ""),
+            "dao_name": player_state["dao_name"],
             "qualification": qualification_snapshot,
-            "max_hp": int(player["max_hp"]),
-            "initiative": int(player["initiative"]),
+            "max_hp": player_state["max_hp"],
+            "initiative": player_state["initiative"],
             "attack_bonus": attack_bonus,
-            "path_key": player["path_key"],
-            "realm_key": str(player["realm_key"]),
-            "realm_layer": int(player["realm_layer"]),
+            "path_key": player_state["path_key"],
+            "realm_key": player_state["realm_key"],
+            "realm_layer": player_state["realm_layer"],
             "skills": list(skills),
             "equipment": equipment,
             "faction_key": player_faction(player),

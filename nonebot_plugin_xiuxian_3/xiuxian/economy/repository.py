@@ -26,6 +26,14 @@ from ..persistence.errors import (
     PlayerNotFoundError,
     PlayerSuspendedError,
 )
+from ..utils.assets import (
+    currency_grant,
+    currency_spend,
+    inventory_grant,
+    inventory_json,
+    inventory_spend,
+    inventory_value,
+)
 from .models import MarketOrderRecord
 from .bindings import active_binding_totals
 from .commission_models import ProductionCommissionRecord
@@ -302,7 +310,7 @@ class EconomyRepositoryMixin:
             ).fetchone()[0]
             if int(active_count) >= MARKET_MAX_LISTINGS:
                 raise MarketOrderLimitError("listing limit reached")
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             market_locked = self._market_locked_quantity(connection, int(player["id"]), item.key)
             bound_quantity, _ = active_binding_totals(connection, int(player["id"]), item.key, now_text)
             unbound_inventory = int(inventory.get(item.key, 0)) - market_locked
@@ -346,8 +354,8 @@ class EconomyRepositoryMixin:
                 (order_id, player["id"], item.key, quantity, now_text, now_text),
             )
             connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                (fee, now_text, player["id"]),
+                "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (currency_spend(player["spirit_stones"], fee), now_text, player["id"]),
             )
             self._market_ledger(
                 connection, operation_id, int(player["id"]), "currency", "currency.spirit_stone",
@@ -416,8 +424,8 @@ class EconomyRepositoryMixin:
             seller = connection.execute("SELECT * FROM players WHERE id = ?", (order["seller_player_id"],)).fetchone()
             if seller is None:
                 raise PlayerNotFoundError("seller does not exist")
-            seller_inventory = self._json_object(seller["inventory_json"], {})
-            buyer_inventory = self._json_object(buyer["inventory_json"], {})
+            seller_inventory = inventory_value(seller["inventory_json"])
+            buyer_inventory = inventory_value(buyer["inventory_json"])
             if int(seller_inventory.get(order["item_key"], 0)) < quantity:
                 raise MarketItemLockedError("seller inventory no longer contains locked item")
             capacity = int(buyer["carry_capacity"] or 0)
@@ -429,19 +437,19 @@ class EconomyRepositoryMixin:
                 raise BalanceInsufficientError("buyer balance is insufficient")
             seller_before = int(seller["spirit_stones"])
             buyer_before = int(buyer["spirit_stones"])
-            seller_inventory[order["item_key"]] = int(seller_inventory[order["item_key"]]) - quantity
-            if seller_inventory[order["item_key"]] <= 0:
-                seller_inventory.pop(order["item_key"], None)
-            buyer_inventory[order["item_key"]] = int(buyer_inventory.get(order["item_key"], 0)) + quantity
+            seller_inventory = inventory_spend(seller_inventory, {str(order["item_key"]): quantity})
+            buyer_inventory = inventory_grant(buyer_inventory, {str(order["item_key"]): quantity})
+            buyer_after = currency_spend(buyer["spirit_stones"], total)
+            seller_after = currency_grant(seller["spirit_stones"], total - fee)
             new_remaining = remaining - quantity
             new_status = "settled" if new_remaining == 0 else "listed"
             connection.execute(
-                "UPDATE players SET inventory_json = ?, spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                (json.dumps(buyer_inventory, ensure_ascii=False, sort_keys=True), total, now_text, buyer["id"]),
+                "UPDATE players SET inventory_json = ?, spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (inventory_json(buyer_inventory), buyer_after, now_text, buyer["id"]),
             )
             connection.execute(
-                "UPDATE players SET inventory_json = ?, spirit_stones = spirit_stones + ?, updated_at = ? WHERE id = ?",
-                (json.dumps(seller_inventory, ensure_ascii=False, sort_keys=True), total - fee, now_text, seller["id"]),
+                "UPDATE players SET inventory_json = ?, spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (inventory_json(seller_inventory), seller_after, now_text, seller["id"]),
             )
             if new_remaining:
                 connection.execute(
@@ -761,7 +769,7 @@ class EconomyRepositoryMixin:
             publisher = self._require_player(connection, platform, platform_user_id)
             if int(publisher["spirit_stones"]) < reward:
                 raise CommissionEscrowConflictError("reward cannot be escrowed")
-            inventory = self._json_object(publisher["inventory_json"], {})
+            inventory = inventory_value(publisher["inventory_json"])
             publisher_inputs = dict(recipe.inputs) if mode == "publisher_supplies" else {}
             if publisher_inputs:
                 missing = {
@@ -771,10 +779,7 @@ class EconomyRepositoryMixin:
                 }
                 if missing:
                     raise CommissionRequirementError("publisher materials are insufficient")
-                for key, quantity in publisher_inputs.items():
-                    inventory[key] = int(inventory[key]) - quantity
-                    if inventory[key] <= 0:
-                        inventory.pop(key, None)
+                inventory = inventory_spend(inventory, publisher_inputs)
             commission_id = f"commission-{uuid4().hex}"
             snapshot = {
                 "recipe_key": recipe.key,
@@ -814,10 +819,10 @@ class EconomyRepositoryMixin:
                         connection, commission_id, int(publisher["id"]), "item", key, quantity, now_text
                     )
             connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
+                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
                 (
-                    reward,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    currency_spend(publisher["spirit_stones"], reward),
+                    inventory_json(inventory),
                     now_text,
                     publisher["id"],
                 ),
@@ -929,7 +934,7 @@ class EconomyRepositoryMixin:
                 self._check_production_requirements(connection, producer, recipe)
             except Exception as exc:
                 raise CommissionRequirementError("producer does not satisfy recipe requirements") from exc
-            inventory = self._json_object(producer["inventory_json"], {})
+            inventory = inventory_value(producer["inventory_json"])
             durability = self._json_object(producer["durability_json"], {})
             mode = str(order["material_mode"])
             producer_inputs = dict(recipe.inputs) if mode == "producer_supplies" else {}
@@ -940,10 +945,7 @@ class EconomyRepositoryMixin:
                     )
                     if available < quantity:
                         raise CommissionRequirementError("producer materials are insufficient")
-                for key, quantity in producer_inputs.items():
-                    inventory[key] = int(inventory[key]) - quantity
-                    if inventory[key] <= 0:
-                        inventory.pop(key, None)
+                inventory = inventory_spend(inventory, producer_inputs)
             energy_cost = int(recipe.energy_cost)
             locked_energy = self._commission_locked_quantity(connection, int(producer["id"]), "energy", "energy")
             if int(producer["energy"]) - locked_energy < energy_cost:
@@ -995,7 +997,7 @@ class EconomyRepositoryMixin:
                 """,
                 (
                     energy_cost,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     json.dumps(durability, ensure_ascii=False, sort_keys=True),
                     now_text,
                     producer["id"],
@@ -1209,20 +1211,18 @@ class EconomyRepositoryMixin:
             producer = connection.execute("SELECT * FROM players WHERE id = ?", (order["producer_player_id"],)).fetchone()
             if producer is None:
                 raise CommissionNotFoundError("producer does not exist")
-            publisher_inventory = self._json_object(publisher["inventory_json"], {})
-            for key, quantity in outputs.items():
-                publisher_inventory[key] = int(publisher_inventory.get(key, 0)) + int(quantity)
+            publisher_inventory = inventory_grant(inventory_value(publisher["inventory_json"]), outputs)
             reward = int(order["reward_stones"])
             payment = reward - commission_platform_fee(reward)
             fee = reward - payment
             producer_before = int(producer["spirit_stones"])
             connection.execute(
                 "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(publisher_inventory, ensure_ascii=False, sort_keys=True), now_text, publisher["id"]),
+                (inventory_json(publisher_inventory), now_text, publisher["id"]),
             )
             connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones + ?, updated_at = ? WHERE id = ?",
-                (payment, now_text, producer["id"]),
+                "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (currency_grant(producer["spirit_stones"], payment), now_text, producer["id"]),
             )
             for key, quantity in outputs.items():
                 self._commission_ledger(
@@ -1415,12 +1415,12 @@ class EconomyRepositoryMixin:
             kind = str(lock["asset_kind"])
             key = str(lock["asset_key"])
             if kind == "item":
-                inventory = self._json_object(player["inventory_json"], {})
+                inventory = inventory_value(player["inventory_json"])
                 before = int(inventory.get(key, 0))
-                inventory[key] = before + quantity
+                inventory = inventory_grant(inventory, {key: quantity})
                 connection.execute(
                     "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    (inventory_json(inventory), now_text, player["id"]),
                 )
                 self._commission_ledger(
                     connection, operation_id, int(player["id"]), "item", key,
@@ -1469,10 +1469,10 @@ class EconomyRepositoryMixin:
         player = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
         if player is None:
             return
-        inventory = self._json_object(player["inventory_json"], {})
+        inventory = inventory_value(player["inventory_json"])
         for key, quantity in refunds.items():
             before = int(inventory.get(key, 0))
-            inventory[key] = before + int(quantity)
+            inventory = inventory_grant(inventory, {key: int(quantity)})
             self._commission_ledger(
                 connection, operation_id, player_id, "item", key,
                 "commission.failure_material_refund", "credit", int(quantity), before, before + int(quantity),
@@ -1480,7 +1480,7 @@ class EconomyRepositoryMixin:
             )
         connection.execute(
             "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-            (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player_id),
+            (inventory_json(inventory), now_text, player_id),
         )
         self._commission_delete_locks(connection, commission_id)
 
@@ -1501,8 +1501,8 @@ class EconomyRepositoryMixin:
             return
         before = int(publisher["spirit_stones"])
         connection.execute(
-            "UPDATE players SET spirit_stones = spirit_stones + ?, updated_at = ? WHERE id = ?",
-            (amount, now_text, publisher["id"]),
+            "UPDATE players SET spirit_stones = ?, updated_at = ? WHERE id = ?",
+            (currency_grant(publisher["spirit_stones"], amount), now_text, publisher["id"]),
         )
         self._commission_ledger(
             connection, operation_id, int(publisher["id"]), "currency", "currency.spirit_stone",

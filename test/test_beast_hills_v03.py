@@ -138,7 +138,7 @@ def test_beast_hills_gate_travel_and_blood_reward_are_idempotent_on_both_adapter
     asyncio.run(run())
 
 
-def test_beast_hills_clue_reward_uses_v03_snapshot() -> None:
+def test_beast_hills_clue_reward_uses_stable_snapshot() -> None:
     async def run() -> None:
         operation = next(
             f"beast-clue-{index}"
@@ -170,7 +170,7 @@ def test_beast_hills_clue_reward_uses_v03_snapshot() -> None:
                         (started.data["exploration_id"],),
                     ).fetchone()[0]
                 )
-            assert snapshot["random_pool"] == "loot.beast.hills.v0.3"
+            assert snapshot["random_pool"] == "loot.beast.hills"
             assert "content_version" not in snapshot
             assert snapshot["bloodline_stability_before"] == 33
             _expire(runtime, "exploration_sessions", "exploration_id", started.data["exploration_id"])

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
 from ..persistence.errors import (
     EndgameRecipeAlreadyCreatedError,
     EndgameRecipeBusyError,
@@ -141,14 +142,11 @@ class EndgameProductionRepositoryMixin:
                 if issued is not None:
                     raise EndgameRecipeAlreadyCreatedError("ascension certificate was already created")
 
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             for item_key, quantity in recipe.inputs.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise MaterialInsufficientError(f"missing {item_key}")
-            for item_key, quantity in recipe.inputs.items():
-                inventory[item_key] = int(inventory[item_key]) - quantity
-                if inventory[item_key] == 0:
-                    inventory.pop(item_key)
+            inventory = inventory_spend(inventory, recipe.inputs)
             session_id = uuid4().hex
             roll_bp = recipe_roll_bp(operation_id)
             snapshot = {
@@ -164,7 +162,7 @@ class EndgameProductionRepositoryMixin:
             }
             connection.execute(
                 "UPDATE players SET inventory_json = ?, world_merit = world_merit - ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), recipe.world_merit_cost, now_text, player["id"]),
+                (inventory_json(inventory), recipe.world_merit_cost, now_text, player["id"]),
             )
             connection.execute(
                 "INSERT INTO endgame_sessions(session_id, player_id, operation_id, session_type, status, starts_at, ends_at, snapshot_json, result_json, created_at, updated_at) "
@@ -224,14 +222,14 @@ class EndgameProductionRepositoryMixin:
             snapshot = self._json_object(session["snapshot_json"], {})
             roll_bp = int(snapshot["roll_bp"])
             success = roll_bp < SUCCESS_THRESHOLD_BP
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             rewards: dict[str, int] = {}
             refunds: dict[str, int] = {}
             progress_reward = 0
             world_merit_refund = 0
             if success:
                 if recipe.output_item:
-                    inventory[recipe.output_item] = int(inventory.get(recipe.output_item, 0)) + 1
+                    inventory = inventory_grant(inventory, {recipe.output_item: 1})
                     rewards[recipe.output_item] = 1
                 if recipe.output_progress:
                     progress_reward = min(recipe.output_progress, DAO_FRUIT_PROGRESS_CAP - int(player["dao_fruit_progress"]))
@@ -240,7 +238,7 @@ class EndgameProductionRepositoryMixin:
             else:
                 status = "failed"
                 if recipe.key == "recipe.dao.fruit_fragment":
-                    inventory["item.dao_fruit_fragment"] = int(inventory.get("item.dao_fruit_fragment", 0)) + 5
+                    inventory = inventory_grant(inventory, {"item.dao_fruit_fragment": 5})
                     refunds["item.dao_fruit_fragment"] = 5
                 elif recipe.key == "recipe.ascension.certificate":
                     world_merit_refund = recipe.world_merit_cost
@@ -248,7 +246,7 @@ class EndgameProductionRepositoryMixin:
 
             connection.execute(
                 "UPDATE players SET inventory_json = ?, dao_fruit_progress = dao_fruit_progress + ?, world_merit = world_merit + ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), progress_reward, world_merit_refund, now_text, player["id"]),
+                (inventory_json(inventory), progress_reward, world_merit_refund, now_text, player["id"]),
             )
             result = {
                 "success": success,

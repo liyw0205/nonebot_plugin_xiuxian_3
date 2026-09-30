@@ -65,6 +65,8 @@ from .spectator_rules import (
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
+from ..utils.assets import currency_grant, inventory_grant, inventory_json, inventory_value
+from ..utils.player import player_values
 
 
 class CombatRepositoryMixin:
@@ -299,6 +301,7 @@ class CombatRepositoryMixin:
                     raise EventNotActiveError("demon invasion war front is closed")
 
             player = self._require_player(connection, platform, platform_user_id)
+            player_state = player_values(player)
             if battle_type == "pve.void_wall_trial":
                 from ..quests.rules import (
                     VOID_QUEST,
@@ -325,7 +328,7 @@ class CombatRepositoryMixin:
                 if int(trial_count["count"]) >= VOID_TRIAL_WEEKLY_LIMIT:
                     raise QuestWeeklyLimitError("void wall trial weekly limit reached")
             if (
-                str(player["location_key"]) != enemy.location_key
+                player_state["location_key"] != enemy.location_key
                 and exploration_id is None
                 and battle_type not in {"pve.archive_keeper", "pve.tower"}
             ):
@@ -367,7 +370,7 @@ class CombatRepositoryMixin:
             if exploration is not None:
                 location_key = str(exploration_snapshot.get("location_key", enemy.location_key))
             elif battle_type == "pve.tower":
-                location_key = str(player["location_key"])
+                location_key = player_state["location_key"]
             else:
                 location_key = enemy.location_key
             active = connection.execute(
@@ -385,7 +388,7 @@ class CombatRepositoryMixin:
             qualification = (
                 self._json_object(exploration_snapshot.get("qualification"), {})
                 if exploration is not None
-                else self._json_object(player["qualification_json"], {})
+                else player_state["qualification"]
             )
             constitution_effect = (
                 dict(exploration_snapshot.get("constitution_effect", {}))
@@ -393,15 +396,15 @@ class CombatRepositoryMixin:
                 else constitution_effect_snapshot(connection, int(player["id"]))
             )
             manual_effects = manual_effect_totals(
-                self._json_object(player["inventory_json"], {}), self.content
+                player_state["inventory"], self.content
             )
             manual_stat_bonus = manual_effects["combat_stat_bonus_bp"]
             if not isinstance(manual_stat_bonus, dict):
                 raise ValueError("manual combat stat bonuses must be an object")
             stats = player_stat_snapshot(
                 qualification,
-                max_hp=int(exploration_snapshot.get("max_hp", player["max_hp"])),
-                initiative=int(exploration_snapshot.get("initiative", player["initiative"])),
+                max_hp=int(exploration_snapshot.get("max_hp", player_state["max_hp"])),
+                initiative=int(exploration_snapshot.get("initiative", player_state["initiative"])),
                 equipment=equipment,
                 constitution_effect=constitution_effect,
                 manual_stat_bonus_bp=manual_stat_bonus,
@@ -409,7 +412,7 @@ class CombatRepositoryMixin:
             skills = self._battle_skill_snapshot(
                 connection,
                 int(player["id"]),
-                str(player["path_key"] or ""),
+                str(player_state["path_key"] or ""),
             )
             battle_id = uuid4().hex
             snapshot = {
@@ -417,8 +420,8 @@ class CombatRepositoryMixin:
                 "exploration_id": exploration_id,
                 "location_key": location_key,
                 "player": {
-                    "player_id": str(player["player_id"]),
-                    "path_key": player["path_key"],
+                    "player_id": player_state["player_id"],
+                    "path_key": player_state["path_key"],
                     "qualification": qualification,
                     "stats": stats,
                     "constitution_effect": constitution_effect,
@@ -604,29 +607,30 @@ class CombatRepositoryMixin:
     def _spectator_player_snapshot(
         self, connection: sqlite3.Connection, player: sqlite3.Row
     ) -> tuple[dict[str, object], str]:
-        qualification = self._json_object(player["qualification_json"], {})
+        player_state = player_values(player)
+        qualification = player_state["qualification"]
         equipment = self._battle_equipment_snapshot(connection, int(player["id"]))
         constitution_effect = constitution_effect_snapshot(connection, int(player["id"]))
-        manual_effects = manual_effect_totals(self._json_object(player["inventory_json"], {}), self.content)
+        manual_effects = manual_effect_totals(player_state["inventory"], self.content)
         manual_bonus = manual_effects["combat_stat_bonus_bp"]
         if not isinstance(manual_bonus, dict):
             raise ValueError("manual combat stat bonuses must be an object")
         stats = player_stat_snapshot(
             qualification,
-            max_hp=int(player["max_hp"]),
-            initiative=int(player["initiative"]),
+            max_hp=player_state["max_hp"],
+            initiative=player_state["initiative"],
             equipment=equipment,
             constitution_effect=constitution_effect,
             manual_stat_bonus_bp=manual_bonus,
         )
-        skills = self._battle_skill_snapshot(connection, int(player["id"]), str(player["path_key"] or ""))
+        skills = self._battle_skill_snapshot(connection, int(player["id"]), str(player_state["path_key"] or ""))
         selected_skill = self._select_battle_skill(skills, available_mana=stats["max_mana"])
         return (
             {
-                "dao_name": str(player["dao_name"] or ""),
-                "path_key": str(player["path_key"] or ""),
-                "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "dao_name": player_state["dao_name"],
+                "path_key": str(player_state["path_key"] or ""),
+                "realm_key": player_state["realm_key"],
+                "realm_layer": player_state["realm_layer"],
                 "qualification": qualification,
                 "stats": stats,
                 "equipment": list(equipment),
@@ -1245,18 +1249,18 @@ class CombatRepositoryMixin:
             reward = {str(key): int(value) for key, value in dict(result.get("reward", {})).items()}
             if not reward:
                 raise BattleRewardNotAvailableError("battle has no claimable reward")
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             stones = int(player["spirit_stones"])
             cultivation = int(player["cultivation"])
             total_cultivation = int(player["total_cultivation"])
             for key, quantity in reward.items():
                 if key == "spirit_stones":
-                    stones += quantity
+                    stones = currency_grant(stones, quantity)
                 elif key == "cultivation":
                     cultivation += quantity
                     total_cultivation += quantity
                 else:
-                    inventory[key] = int(inventory.get(key, 0)) + quantity
+                    inventory = inventory_grant(inventory, {key: quantity})
             record_material_discoveries(
                 connection,
                 player_id=int(player["id"]),
@@ -1276,7 +1280,7 @@ class CombatRepositoryMixin:
                     stones,
                     cultivation,
                     total_cultivation,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     now_text,
                     player["id"],
                 ),

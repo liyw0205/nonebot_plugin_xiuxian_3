@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import currency_spend, inventory_grant, inventory_json, inventory_spend, inventory_value
 from ..persistence.errors import (
     CrossRealmTradeCurrencyInsufficientError,
     CrossRealmTradeInputInsufficientError,
@@ -91,7 +92,7 @@ class CrossRealmTradeRepositoryMixin:
             if int(weekly_count["count"] if weekly_count else 0) >= definition.weekly_limit:
                 raise TradeWeeklyCapError("cross-realm trade weekly cap is reached")
 
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = inventory_value(player["inventory_json"])
             for item_key, quantity in definition.input_items.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise CrossRealmTradeInputInsufficientError(f"missing trade input: {item_key}")
@@ -99,15 +100,9 @@ class CrossRealmTradeRepositoryMixin:
                 raise CrossRealmTradeCurrencyInsufficientError("trade currency is insufficient")
 
             input_before = {key: int(inventory.get(key, 0)) for key in definition.input_items}
-            for item_key, quantity in definition.input_items.items():
-                remaining = input_before[item_key] - quantity
-                if remaining:
-                    inventory[item_key] = remaining
-                else:
-                    inventory.pop(item_key, None)
+            inventory = inventory_spend(inventory, definition.input_items)
             output_before = {key: int(inventory.get(key, 0)) for key in definition.output_items}
-            for item_key, quantity in definition.output_items.items():
-                inventory[item_key] = output_before[item_key] + quantity
+            inventory = inventory_grant(inventory, definition.output_items)
             binding_expires_at = serialize_datetime(now + timedelta(seconds=definition.binding_seconds))
             trade_id = f"trade-{uuid4().hex}"
             snapshot = {
@@ -129,12 +124,12 @@ class CrossRealmTradeRepositoryMixin:
             connection.execute(
                 """
                 UPDATE players
-                SET inventory_json = ?, spirit_stones = spirit_stones - ?, updated_at = ?
+                SET inventory_json = ?, spirit_stones = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                    definition.currency_cost,
+                    inventory_json(inventory),
+                    currency_spend(player["spirit_stones"], definition.currency_cost),
                     now_text,
                     player["id"],
                 ),

@@ -180,6 +180,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.assets import currency_grant, currency_spend, inventory_grant, inventory_json, inventory_value
 
 
 class ExplorationRepositoryMixin:
@@ -279,7 +280,7 @@ class ExplorationRepositoryMixin:
                 if "guide.gather_blood_grass" not in set(intro_state.get("flags", [])):
                     raise LocationRequirementError("spring gathering requires the gathering lesson")
 
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             intro_state = self._json_object(row["intro_json"], {})
             if definition.key == "explore.demon_threshold" and DEMON_INTRO_FLAG not in intro_state.get("flags", []):
                 raise LocationRequirementError("demon gate risk briefing is required")
@@ -611,7 +612,7 @@ class ExplorationRepositoryMixin:
                 str(key): int(value) for key, value in dict(frozen.get("result", {})).items()
             }
             result = frozen_result if battle_outcome == "won" else {}
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             faction_reputation = self._json_object(row["faction_reputation_json"], {})
             stones = int(row["spirit_stones"])
             cultivation = int(row["cultivation"])
@@ -622,7 +623,7 @@ class ExplorationRepositoryMixin:
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             for key, quantity in result.items():
                 if key == "spirit_stones":
-                    stones += quantity
+                    stones = currency_grant(stones, quantity)
                 elif key == "cultivation":
                     cultivation += quantity
                     total_cultivation += quantity
@@ -630,13 +631,13 @@ class ExplorationRepositoryMixin:
                     faction_key = key.removeprefix("faction_reputation.")
                     faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + quantity
                 else:
-                    inventory[key] = int(inventory.get(key, 0)) + quantity
+                    inventory = inventory_grant(inventory, {key: quantity})
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, int(row["soul_power"]))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
             connection.execute(
                 "UPDATE players SET spirit_stones=?, cultivation=?, total_cultivation=?, inventory_json=?, faction_reputation_json=?, soul_power=?, soul_fatigue_until=?, bloodline_stability=?, updated_at=? WHERE id=?",
-                (stones, cultivation, total_cultivation, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True), max(0, int(row["soul_power"]) - soul_power_loss), soul_fatigue_until, bloodline_stability_after, now_text, row["id"]),
+                (stones, cultivation, total_cultivation, inventory_json(inventory), json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True), max(0, int(row["soul_power"]) - soul_power_loss), soul_fatigue_until, bloodline_stability_after, now_text, row["id"]),
             )
             result_json = {
                 "status": "settled",
@@ -912,7 +913,7 @@ class ExplorationRepositoryMixin:
                 if battle_pending:
                     status = "combat_pending"
 
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             faction_reputation = self._json_object(row["faction_reputation_json"], {})
             stones = int(row["spirit_stones"])
             cultivation = int(row["cultivation"])
@@ -921,7 +922,7 @@ class ExplorationRepositoryMixin:
             if status == "settled":
                 for key, quantity in result.items():
                     if key == "spirit_stones":
-                        stones += int(quantity)
+                        stones = currency_grant(stones, quantity)
                     elif key == "cultivation":
                         cultivation += int(quantity)
                         total_cultivation += int(quantity)
@@ -929,7 +930,7 @@ class ExplorationRepositoryMixin:
                         faction_key = key.removeprefix("faction_reputation.")
                         faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + int(quantity)
                     else:
-                        inventory[key] = int(inventory.get(key, 0)) + int(quantity)
+                        inventory = inventory_grant(inventory, {key: quantity})
                 connection.execute(
                     """
                     UPDATE players
@@ -940,7 +941,7 @@ class ExplorationRepositoryMixin:
                         stones,
                         cultivation,
                         total_cultivation,
-                        json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                        inventory_json(inventory),
                         json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
                         bloodline_stability_after,
                         now_text,
@@ -1160,7 +1161,7 @@ class ExplorationRepositoryMixin:
             cultivation = int(row["cultivation"])
             total_cultivation = int(row["total_cultivation"])
             stamina = int(row["stamina"])
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             if effective_choice == "wait":
                 status = "running"
                 ends_at = serialize_datetime(now + timedelta(seconds=CLOUD_BOAT_STORM_WAIT_SECONDS))
@@ -1175,7 +1176,7 @@ class ExplorationRepositoryMixin:
             elif effective_choice == "pay":
                 if stones < CLOUD_BOAT_STORM_PAY_COST:
                     raise CurrencyInsufficientError("cloud boat storm payment requires spirit stones")
-                stones -= CLOUD_BOAT_STORM_PAY_COST
+                stones = currency_spend(stones, CLOUD_BOAT_STORM_PAY_COST)
                 result = dict(frozen_result)
                 result["cultivation"] = int(result.get("cultivation", 0)) + 200
                 status = "settled"
@@ -1184,9 +1185,9 @@ class ExplorationRepositoryMixin:
                         cultivation += int(quantity)
                         total_cultivation += int(quantity)
                     elif key == "spirit_stones":
-                        stones += int(quantity)
+                        stones = currency_grant(stones, quantity)
                     else:
-                        inventory[key] = int(inventory.get(key, 0)) + int(quantity)
+                        inventory = inventory_grant(inventory, {key: quantity})
                 result_json = {
                     **stored,
                     "status": status,
@@ -1211,7 +1212,7 @@ class ExplorationRepositoryMixin:
                 }
             connection.execute(
                 "UPDATE players SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, stamina = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones, cultivation, total_cultivation, stamina, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                (stones, cultivation, total_cultivation, stamina, inventory_json(inventory), now_text, row["id"]),
             )
             connection.execute(
                 "UPDATE exploration_sessions SET status = ?, ends_at = ?, result_json = ?, updated_at = ? WHERE id = ? AND status IN ('created', 'running')",

@@ -40,6 +40,7 @@ from ..production.models import (
 )
 from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
 from ..utils.equipment import create_equipment_instances
+from ..utils.assets import currency_spend, inventory_grant, inventory_json, inventory_spend, inventory_value
 from ..progression.breakthrough.models import (
     BreakthroughSettlementRecord,
     BreakthroughSessionRecord,
@@ -370,7 +371,7 @@ class ProductionRepositoryMixin:
             facility_slot = self._facility_reserve_for_recipe(connection, row, recipe)
             duration_seconds = self._facility_duration_seconds(row, recipe)
 
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             for item_key, quantity in recipe.inputs.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise MaterialInsufficientError("recipe inputs are insufficient")
@@ -388,8 +389,7 @@ class ProductionRepositoryMixin:
                 if tool_durability_before < recipe.tool_cost_bp:
                     raise ToolDurabilityInsufficientError("production tool durability is insufficient")
                 durability[recipe.tool_key] = tool_durability_before - recipe.tool_cost_bp
-            for item_key, quantity in recipe.inputs.items():
-                inventory[item_key] = int(inventory[item_key]) - quantity
+            inventory = inventory_spend(inventory, recipe.inputs)
             order_id = uuid4().hex
             starts_at = now_text
             ends_at = serialize_datetime(now + timedelta(seconds=duration_seconds))
@@ -427,14 +427,14 @@ class ProductionRepositoryMixin:
             connection.execute(
                 """
                 UPDATE players
-                SET energy = energy - ?, spirit_stones = spirit_stones - ?,
+                SET energy = energy - ?, spirit_stones = ?,
                     inventory_json = ?, durability_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
                     recipe.energy_cost,
-                    recipe.currency_cost,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    currency_spend(row["spirit_stones"], recipe.currency_cost),
+                    inventory_json(inventory),
                     json.dumps(durability, ensure_ascii=False, sort_keys=True),
                     now_text,
                     row["id"],
@@ -601,7 +601,7 @@ class ProductionRepositoryMixin:
             currency_spent = int(snapshot.get("currency_cost", recipe.currency_cost))
             quality = self._production_quality_from_snapshot(snapshot)
             success = quality >= int(snapshot.get("success_threshold_bp", QUALITY_SUCCESS_THRESHOLD_BP))
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             durability = self._json_object(row["durability_json"], {})
             outputs: dict[str, int] = {}
             refunds: dict[str, int] = {}
@@ -621,7 +621,7 @@ class ProductionRepositoryMixin:
                     try:
                         equipment = equipment_definition(item_key, self.content)
                     except ValueError:
-                        inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
+                        inventory = inventory_grant(inventory, {item_key: quantity})
                         continue
                     durability_bp = equipment_initial_durability_bp(quality, equipment)
                     durability[item_key] = durability_bp
@@ -647,7 +647,7 @@ class ProductionRepositoryMixin:
                 for item_key, quantity in failure_refunds.items():
                     if quantity > 0:
                         refunds[item_key] = quantity
-                        inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
+                        inventory = inventory_grant(inventory, {item_key: quantity})
             tool_durability = snapshot.get("tool_durability_after")
             binding_expires_at: str | None = None
             if success and snapshot.get("binding_kind") and int(snapshot.get("binding_duration_seconds", 0)) > 0:
@@ -660,7 +660,7 @@ class ProductionRepositoryMixin:
                 UPDATE players SET inventory_json = ?, durability_json = ?, updated_at = ? WHERE id = ?
                 """,
                 (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     json.dumps(durability, ensure_ascii=False, sort_keys=True),
                     now_text,
                     row["id"],

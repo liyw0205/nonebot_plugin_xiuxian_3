@@ -85,6 +85,7 @@ from ...exploration.rules import (
     settlement_result,
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
+from ...utils.assets import currency_grant, currency_spend, inventory_grant, inventory_json, inventory_spend, inventory_value
 from ...adventures.mainline_models import (
     MainlineClaimRecord,
     MainlineStageView,
@@ -437,7 +438,7 @@ class BreakthroughRepositoryMixin:
             if idle_or_dispatch is not None:
                 raise BreakthroughBusyError("another long action is active")
 
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             for item_key, quantity in definition.materials.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise MaterialInsufficientError("breakthrough material is insufficient")
@@ -527,10 +528,10 @@ class BreakthroughRepositoryMixin:
                 final_success_bp = max(7500, min(9200, 7500 + preparation_bp + min(750, pity_before)))
             else:
                 final_success_bp = success_bp(definition, pity_before, preparation_bp)
-            for item_key, quantity in definition.materials.items():
-                inventory[item_key] = int(inventory.get(item_key, 0)) - quantity
+            material_costs = {str(key): int(value) for key, value in definition.materials.items()}
             if alternative_material:
-                inventory[alternative_material] = int(inventory.get(alternative_material, 0)) - 2
+                material_costs[alternative_material] = material_costs.get(alternative_material, 0) + 2
+            inventory = inventory_spend(inventory, material_costs)
             session_materials = dict(definition.materials)
             if alternative_material:
                 session_materials[alternative_material] = 2
@@ -585,10 +586,10 @@ class BreakthroughRepositoryMixin:
                 "void_instability_until": row["void_instability_until"],
             }
             connection.execute(
-                "UPDATE players SET inventory_json = ?, spirit_stones = spirit_stones - ?, world_merit = world_merit - ?, heart_demon_bonus_bp = CASE WHEN ? = 1 THEN 0 ELSE heart_demon_bonus_bp END, updated_at = ? WHERE id = ?",
+                "UPDATE players SET inventory_json = ?, spirit_stones = ?, world_merit = world_merit - ?, heart_demon_bonus_bp = CASE WHEN ? = 1 THEN 0 ELSE heart_demon_bonus_bp END, updated_at = ? WHERE id = ?",
                 (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                    definition.currency_cost,
+                    inventory_json(inventory),
+                    currency_spend(row["spirit_stones"], definition.currency_cost),
                     100 if is_nascent else (500 if is_soul_transformation or is_void_refining else 0),
                     1 if is_nascent else 0,
                     now_text,
@@ -709,7 +710,7 @@ class BreakthroughRepositoryMixin:
                 if now < datetime.fromisoformat(str(pending["ends_at"])):
                     raise DomainSelectionBusyError("domain selection is already pending")
                 connection.execute("UPDATE domain_selection_sessions SET status = 'expired', updated_at = ? WHERE id = ?", (now_text, pending["id"]))
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             if int(inventory.get("item.domain_core", 0)) < 1:
                 raise MaterialInsufficientError("domain core is missing")
             if int(row["spirit_stones"]) < 10_000:
@@ -784,17 +785,17 @@ class BreakthroughRepositoryMixin:
                     pass
             if row["domain_key"]:
                 raise DomainAlreadySelectedError("domain already selected")
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             if int(inventory.get("item.domain_core", 0)) < 1:
                 raise MaterialInsufficientError("domain core is missing")
             if int(row["spirit_stones"]) < 10_000:
                 raise CurrencyInsufficientError("domain selection requires spirit stones")
-            inventory["item.domain_core"] = int(inventory.get("item.domain_core", 0)) - 1
+            inventory = inventory_spend(inventory, {"item.domain_core": 1})
             snapshot = self._json_object(session["snapshot_json"], {})
             domain_key = str(session["domain_key"])
             pollution_delta = 15 if domain_key == "domain.abyss_shadow" else 0
             bloodline_delta = -10 if domain_key == "domain.ancestral_wild" else 0
-            connection.execute("UPDATE players SET domain_key = ?, inventory_json = ?, spirit_stones = spirit_stones - 10000, pollution = pollution + ?, bloodline_stability = MAX(0, bloodline_stability + ?), updated_at = ? WHERE id = ?", (domain_key, json.dumps(inventory, ensure_ascii=False, sort_keys=True), pollution_delta, bloodline_delta, now_text, row["id"]))
+            connection.execute("UPDATE players SET domain_key = ?, inventory_json = ?, spirit_stones = ?, pollution = pollution + ?, bloodline_stability = MAX(0, bloodline_stability + ?), updated_at = ? WHERE id = ?", (domain_key, inventory_json(inventory), currency_spend(row["spirit_stones"], 10000), pollution_delta, bloodline_delta, now_text, row["id"]))
             connection.execute("UPDATE domain_selection_sessions SET status = 'confirmed', result_json = ?, updated_at = ? WHERE id = ?", (json.dumps({"domain_key": domain_key, "pollution_delta": pollution_delta, "bloodline_delta": bloodline_delta}, ensure_ascii=False, sort_keys=True), now_text, session["id"]))
             content = self.content or bundled_content()
             path_key = str(snapshot["path_key"])
@@ -839,7 +840,7 @@ class BreakthroughRepositoryMixin:
             if not crack_until:
                 raise WeaknessNotActiveError("no domain crack is active")
             expired = now >= datetime.fromisoformat(str(crack_until))
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             stones_spent = 0
             medicine_consumed = False
             if not expired and not early:
@@ -851,10 +852,10 @@ class BreakthroughRepositoryMixin:
                     raise MaterialInsufficientError("domain restore pill is missing")
                 if int(row["spirit_stones"]) < 2000:
                     raise CurrencyInsufficientError("early domain recovery requires spirit stones")
-                inventory["item.pill.domain_restore"] = int(inventory.get("item.pill.domain_restore", 0)) - 1
+                inventory = inventory_spend(inventory, {"item.pill.domain_restore": 1})
                 stones_spent = 2000
                 medicine_consumed = True
-            connection.execute("UPDATE players SET domain_crack_until = NULL, inventory_json = ?, spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?", (json.dumps(inventory, ensure_ascii=False, sort_keys=True), stones_spent, now_text, row["id"]))
+            connection.execute("UPDATE players SET domain_crack_until = NULL, inventory_json = ?, spirit_stones = ?, updated_at = ? WHERE id = ?", (inventory_json(inventory), currency_spend(row["spirit_stones"], stones_spent), now_text, row["id"]))
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             payload = {"player": self._player_payload(self._row_to_player(updated)), "early": early, "spirit_stones_spent": stones_spent, "medicine_consumed": medicine_consumed}
             connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
@@ -941,7 +942,7 @@ class BreakthroughRepositoryMixin:
             is_soul_transformation = str(snapshot.get("target_realm", session["target_realm"])) == "soul_transformation"
             is_void_refining = str(snapshot.get("target_realm", session["target_realm"])) == "void_refining"
             protection_key = str(snapshot.get("protection_key") or definition.protection_key)
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             protection_consumed = bool(
                 (not success)
                 and not is_nascent
@@ -949,7 +950,7 @@ class BreakthroughRepositoryMixin:
                 and int(inventory.get(protection_key, 0)) > 0
             )
             if protection_consumed:
-                inventory[protection_key] = int(inventory.get(protection_key, 0)) - 1
+                inventory = inventory_spend(inventory, {protection_key: 1})
             pity_after = next_pity_bp(definition, pity_before, success)
             weakness_until: str | None = None
             heart_demon_pending = False
@@ -960,17 +961,16 @@ class BreakthroughRepositoryMixin:
                     int(row["stamina"]) + definition.reward_stamina,
                 )
                 reward_items = dict(definition.reward_items or {})
-                for item_key, quantity in reward_items.items():
-                    inventory[item_key] = int(inventory.get(item_key, 0)) + quantity
+                inventory = inventory_grant(inventory, reward_items)
                 if is_nascent:
                     connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, soul_power = 100, soul_power_max = 300, domain_charge = 100, domain_charge_max = 100, cross_realm_penalty_bp = ?, max_hp = max_hp + 600, max_mp = max_mp + 480, carry_capacity = carry_capacity + 50, exploration_efficiency_bp = exploration_efficiency_bp + 1500, heart_demon_bonus_bp = 0, soul_fatigue_until = NULL, updated_at = ? WHERE id = ?",
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, soul_power = 100, soul_power_max = 300, domain_charge = 100, domain_charge_max = 100, cross_realm_penalty_bp = ?, max_hp = max_hp + 600, max_mp = max_mp + 480, carry_capacity = carry_capacity + 50, exploration_efficiency_bp = exploration_efficiency_bp + 1500, heart_demon_bonus_bp = 0, soul_fatigue_until = NULL, updated_at = ? WHERE id = ?",
                         (
                             definition.target_realm,
-                            definition.reward_currency,
+                            currency_grant(row["spirit_stones"], definition.reward_currency),
                             stamina_after,
                             definition.reward_world_merit,
-                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            inventory_json(inventory),
                             0 if str(row["location_key"]).startswith("xuantian.") else 1000,
                             now_text,
                             row["id"],
@@ -978,13 +978,13 @@ class BreakthroughRepositoryMixin:
                     )
                 elif is_soul_transformation:
                     connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, stamina_max = stamina_max + 20, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_key = NULL, domain_power = 100, domain_charge = 150, domain_charge_max = 150, domain_charge_reset_date = ?, realm_resistance_bp = 1000, domain_crack_until = NULL, max_hp = max_hp + 1000, max_mp = max_mp + 800, initiative = initiative + 20, updated_at = ? WHERE id = ?",
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = ?, stamina = ?, stamina_max = stamina_max + 20, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_key = NULL, domain_power = 100, domain_charge = 150, domain_charge_max = 150, domain_charge_reset_date = ?, realm_resistance_bp = 1000, domain_crack_until = NULL, max_hp = max_hp + 1000, max_mp = max_mp + 800, initiative = initiative + 20, updated_at = ? WHERE id = ?",
                         (
                             definition.target_realm,
-                            definition.reward_currency,
+                            currency_grant(row["spirit_stones"], definition.reward_currency),
                             stamina_after,
                             definition.reward_world_merit,
-                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            inventory_json(inventory),
                             now.date().isoformat(),
                             now_text,
                             row["id"],
@@ -992,13 +992,13 @@ class BreakthroughRepositoryMixin:
                     )
                 elif is_void_refining:
                     connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_crack_until = NULL, void_power = 200, void_power_max = 200, space_resistance_bp = 1500, void_instability_until = NULL, void_anchor_capacity = 20, void_power_reset_date = ?, max_hp = max_hp + 1500, max_mp = max_mp + 1200, carry_capacity = carry_capacity + 100, updated_at = ? WHERE id = ?",
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_crack_until = NULL, void_power = 200, void_power_max = 200, space_resistance_bp = 1500, void_instability_until = NULL, void_anchor_capacity = 20, void_power_reset_date = ?, max_hp = max_hp + 1500, max_mp = max_mp + 1200, carry_capacity = carry_capacity + 100, updated_at = ? WHERE id = ?",
                         (
                             definition.target_realm,
-                            definition.reward_currency,
+                            currency_grant(row["spirit_stones"], definition.reward_currency),
                             stamina_after,
                             definition.reward_world_merit,
-                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            inventory_json(inventory),
                             now.date().isoformat(),
                             now_text,
                             row["id"],
@@ -1006,13 +1006,13 @@ class BreakthroughRepositoryMixin:
                     )
                 else:
                     connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = spirit_stones + ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
+                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
                         (
                             definition.target_realm,
-                            definition.reward_currency,
+                            currency_grant(row["spirit_stones"], definition.reward_currency),
                             stamina_after,
                             definition.reward_world_merit,
-                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            inventory_json(inventory),
                             now_text,
                             row["id"],
                         ),
@@ -1056,7 +1056,7 @@ class BreakthroughRepositoryMixin:
                         (
                             cultivation_after,
                             pity_after,
-                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            inventory_json(inventory),
                             now_text,
                             row["id"],
                         ),
@@ -1068,7 +1068,7 @@ class BreakthroughRepositoryMixin:
                         (
                             cultivation_after,
                             pity_after,
-                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            inventory_json(inventory),
                             domain_crack_until,
                             now_text,
                             row["id"],
@@ -1082,7 +1082,7 @@ class BreakthroughRepositoryMixin:
                         (
                             cultivation_after,
                             pity_after,
-                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            inventory_json(inventory),
                             weakness_until,
                             now_text,
                             row["id"],
@@ -1095,7 +1095,7 @@ class BreakthroughRepositoryMixin:
                         (
                             cultivation_after,
                             pity_after,
-                            json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                            inventory_json(inventory),
                             weakness_until,
                             now_text,
                             row["id"],
@@ -1244,11 +1244,11 @@ class BreakthroughRepositoryMixin:
             effective_choice = "heart_demon.face" if expired else choice_key
             if effective_choice == "heart_demon.bargain" and str(row["path_key"] or "") != "demonic" and int(row["pollution"]) < 20:
                 raise BreakthroughRequirementError("bargain requires a demonic path or pollution 20")
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             if effective_choice == "heart_demon.purify":
                 if int(inventory.get("item.pill.soul_restore", 0)) < 1:
                     raise MaterialInsufficientError("soul restore pill is missing")
-                inventory["item.pill.soul_restore"] = int(inventory.get("item.pill.soul_restore", 0)) - 1
+                inventory = inventory_spend(inventory, {"item.pill.soul_restore": 1})
             pollution_before = int(row["pollution"])
             pollution_after = pollution_before
             merit_gain = 0
@@ -1268,7 +1268,7 @@ class BreakthroughRepositoryMixin:
             connection.execute(
                 "UPDATE players SET inventory_json = ?, pollution = ?, world_merit = world_merit + ?, breakthrough_pity_bp = ?, heart_demon_bonus_bp = ?, soul_fatigue_until = ?, updated_at = ? WHERE id = ?",
                 (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
+                    inventory_json(inventory),
                     pollution_after,
                     merit_gain,
                     pity_after,
@@ -1436,7 +1436,7 @@ class BreakthroughRepositoryMixin:
                 raise WeaknessNotActiveError("no breakthrough weakness is active")
             until = datetime.fromisoformat(str(weakness_until))
             expired = now >= until
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = inventory_value(row["inventory_json"])
             medicine_key = "item.pill.golden_core_restore" if recovery_kind == "foundation_shock" else "item.pill.healing_low"
             stones_cost = 200 if recovery_kind == "foundation_shock" else 50
             medicine_consumed = False
@@ -1448,12 +1448,12 @@ class BreakthroughRepositoryMixin:
                     raise MaterialInsufficientError("early recovery requires a recovery pill")
                 if int(row["spirit_stones"]) < stones_cost:
                     raise CurrencyInsufficientError("early recovery requires spirit stones")
-                inventory[medicine_key] = int(inventory.get(medicine_key, 0)) - 1
+                inventory = inventory_spend(inventory, {medicine_key: 1})
                 medicine_consumed = True
                 stones_spent = stones_cost
             connection.execute(
-                "UPDATE players SET weakness_until = NULL, inventory_json = ?, spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), stones_spent, now_text, row["id"]),
+                "UPDATE players SET weakness_until = NULL, inventory_json = ?, spirit_stones = ?, updated_at = ? WHERE id = ?",
+                (inventory_json(inventory), currency_spend(row["spirit_stones"], stones_spent), now_text, row["id"]),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
