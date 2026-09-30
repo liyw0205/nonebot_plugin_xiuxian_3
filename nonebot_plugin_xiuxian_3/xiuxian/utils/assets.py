@@ -159,6 +159,86 @@ def change_player_assets(
     )
 
 
+def grant_player_items(
+    connection: Any,
+    row: Any,
+    items: Mapping[str, Any],
+    updated_at: str,
+    *,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+) -> AssetState:
+    """Grant only stackable items while preserving the player's currency."""
+
+    return grant_player_assets(
+        connection,
+        row,
+        items,
+        updated_at,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+    )
+
+
+def spend_player_items(
+    connection: Any,
+    row: Any,
+    items: Mapping[str, Any],
+    updated_at: str,
+    *,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+) -> AssetState:
+    """Spend only stackable items while preserving the player's currency."""
+
+    return spend_player_assets(
+        connection,
+        row,
+        items,
+        updated_at,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+    )
+
+
+def add_player_currency(
+    connection: Any,
+    row: Any,
+    amount: Any,
+    updated_at: str,
+    *,
+    player_values: Mapping[str, Any] | None = None,
+) -> AssetState:
+    """Add spirit stones without duplicating inventory persistence."""
+
+    return grant_player_assets(
+        connection,
+        row,
+        {"spirit_stones": amount},
+        updated_at,
+        player_values=player_values,
+    )
+
+
+def spend_player_currency(
+    connection: Any,
+    row: Any,
+    amount: Any,
+    updated_at: str,
+    *,
+    player_values: Mapping[str, Any] | None = None,
+) -> AssetState:
+    """Spend spirit stones without duplicating inventory persistence."""
+
+    return spend_player_assets(
+        connection,
+        row,
+        {"spirit_stones": amount},
+        updated_at,
+        player_values=player_values,
+    )
+
+
 def apply_player_assets(
     connection: Any,
     row: Any,
@@ -458,10 +538,12 @@ __all__ = [
     "assets_spend",
     "assets_with_delta",
     "change_player_assets",
+    "add_player_currency",
     "currency_grant",
     "currency_spend",
     "currency_with_delta",
     "grant_player_assets",
+    "grant_player_items",
     "inventory_amount",
     "inventory_grant",
     "inventory_json",
@@ -471,6 +553,8 @@ __all__ = [
     "inventory_with_delta",
     "player_asset_state",
     "spend_player_assets",
+    "spend_player_currency",
+    "spend_player_items",
     "write_player_values",
     "write_player_assets",
 ]

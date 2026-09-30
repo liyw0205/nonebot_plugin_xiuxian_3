@@ -58,6 +58,8 @@
         5
       ],
       "transport_experience": 5,
+      "transport_injury_chance_bp": 1000,
+      "transport_injury_recovery_seconds": 1800,
       "effect": {
         "type": "transport_duration_multiplier_bp",
         "value_per_level": 300

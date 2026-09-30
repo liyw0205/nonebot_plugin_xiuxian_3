@@ -7,9 +7,17 @@ assets outside the arena transaction.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from typing import Any
+
+from ..utils.player import (
+    player_field,
+    player_integer,
+    player_intro_flags,
+    player_inventory,
+    player_object,
+    player_reputation,
+)
 
 THREE_REALMS_ARENA_MODE_KEY = "arena.three_realms"
 THREE_REALMS_ARENA_MIN_REALM = "nascent_soul"
@@ -18,43 +26,21 @@ THREE_REALMS_ARENA_PERMIT_KEY = "item.permit.three_realms_arena"
 THREE_REALMS = ("xuantian", "demon", "beast")
 
 
-def _json_map(raw: Any) -> dict[str, Any]:
-    if isinstance(raw, str):
-        try:
-            raw = json.loads(raw)
-        except json.JSONDecodeError:
-            return {}
-    return dict(raw) if isinstance(raw, Mapping) else {}
-
-
-def _value(player: Mapping[str, Any], key: str, default: Any = None) -> Any:
-    try:
-        return player[key]
-    except (KeyError, IndexError, TypeError):
-        return default
-
-
 def intro_flags(player: Mapping[str, Any]) -> set[str]:
-    intro = _json_map(_value(player, "intro_json", {}))
-    return {str(value) for value in intro.get("flags", ())}
-
-
-def player_inventory(player: Mapping[str, Any]) -> dict[str, int]:
-    inventory = _json_map(_value(player, "inventory_json", {}))
-    return {str(key): max(0, int(value)) for key, value in inventory.items()}
+    return set(player_intro_flags(player))
 
 
 def player_faction(player: Mapping[str, Any]) -> str:
     """Resolve the frozen tactical faction without trusting client input."""
 
     for direct_key in ("faction_key", "alliance_key"):
-        direct = str(_value(player, direct_key, "") or "").strip().lower()
+        direct = str(player_field(player, direct_key, "") or "").strip().lower()
         if direct.startswith("alliance."):
             direct = direct.split(".", 1)[1]
         if direct in THREE_REALMS:
             return direct
-    qualification = _json_map(_value(player, "qualification_json", {}))
-    intro = _json_map(_value(player, "intro_json", {}))
+    qualification = player_object(player, "qualification_json")
+    intro = player_object(player, "intro_json")
     for source in (qualification, intro):
         for key in ("cross_realm_alliance", "alliance_key", "alliance", "盟约"):
             value = str(source.get(key) or "").strip().lower()
@@ -66,7 +52,7 @@ def player_faction(player: Mapping[str, Any]) -> str:
     for faction in THREE_REALMS:
         if f"alliance.{faction}" in flags:
             return faction
-    reputation = _json_map(_value(player, "faction_reputation_json", {}))
+    reputation = player_reputation(player)
     ranked = sorted(
         ((faction, int(reputation.get(faction, 0))) for faction in THREE_REALMS),
         key=lambda item: (-item[1], THREE_REALMS.index(item[0])),
@@ -83,9 +69,9 @@ def has_three_realms_permit(player: Mapping[str, Any]) -> bool:
 
 def meets_three_realms_gate(player: Mapping[str, Any]) -> bool:
     return (
-        str(_value(player, "stage", "")) == "cultivator"
-        and str(_value(player, "realm_key", "")) == THREE_REALMS_ARENA_MIN_REALM
-        and int(_value(player, "realm_layer", 0)) >= THREE_REALMS_ARENA_MIN_LAYER
+        str(player_field(player, "stage", "")) == "cultivator"
+        and str(player_field(player, "realm_key", "")) == THREE_REALMS_ARENA_MIN_REALM
+        and player_integer(player, "realm_layer") >= THREE_REALMS_ARENA_MIN_LAYER
         and has_three_realms_permit(player)
         and player_faction(player) in THREE_REALMS
     )
@@ -99,10 +85,10 @@ def tactical_environment(challenger: Mapping[str, Any], defender: Mapping[str, A
         "relation": relation,
         "challenger_faction": left,
         "defender_faction": right,
-        "challenger_pollution": int(_value(challenger, "pollution", 0)),
-        "defender_pollution": int(_value(defender, "pollution", 0)),
-        "challenger_bloodline_stability": int(_value(challenger, "bloodline_stability", 0)),
-        "defender_bloodline_stability": int(_value(defender, "bloodline_stability", 0)),
+        "challenger_pollution": player_integer(challenger, "pollution"),
+        "defender_pollution": player_integer(defender, "pollution"),
+        "challenger_bloodline_stability": player_integer(challenger, "bloodline_stability"),
+        "defender_bloodline_stability": player_integer(defender, "bloodline_stability"),
     }
 
 

@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import assets_grant, inventory_json, inventory_value
+from ..utils.assets import grant_player_assets
 from ..persistence.errors import (
     OperationConflictError,
     ThreeRealmsRankingNotFinalizedError,
@@ -90,18 +90,16 @@ class ThreeRealmsSeasonRepositoryMixin:
                 boards.append(str(row["board_key"]))
                 for key, value in reward_for_rank(int(row["rank"])).items():
                     reward[key] = reward.get(key, 0) + value
-            assets = assets_grant(
-                player["spirit_stones"],
-                inventory_value(player["inventory_json"]),
+            grant_player_assets(
+                connection,
+                player,
                 {
                     key: value
                     for key, value in reward.items()
                     if key == "spirit_stones" or key.startswith("item.")
                 },
-            )
-            connection.execute(
-                "UPDATE players SET spirit_stones=?, inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?",
-                (assets.currency, inventory_json(assets.inventory), reward.get("world_merit", 0), now_text, player["id"]),
+                now_text,
+                player_values={"world_merit": int(player["world_merit"]) + reward.get("world_merit", 0)},
             )
             binding_until = "9999-12-31T23:59:59+00:00"
             for item_key, value in reward.items():

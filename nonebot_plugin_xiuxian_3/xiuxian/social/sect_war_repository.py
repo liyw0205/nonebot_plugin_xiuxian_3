@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.player import change_player_values
 from ..persistence.errors import (
     OperationConflictError,
     SectNotFoundError,
@@ -270,7 +271,7 @@ class SectWarRepositoryMixin:
             if member is None or int(member["contribution"]) < SECT_WAR_MEMBER_THRESHOLD:
                 raise SectWarRewardNotEligibleError("war contribution threshold is not met")
             reward = {"world_merit": SECT_WAR_MEMBER_REWARD}
-            connection.execute("UPDATE players SET world_merit=world_merit+?, updated_at=? WHERE id=?", (SECT_WAR_MEMBER_REWARD, now_text, player["id"]))
+            change_player_values(connection, player, {"world_merit": SECT_WAR_MEMBER_REWARD}, now_text)
             connection.execute("INSERT INTO sect_war_claims(round_id,player_id,operation_id,reward_json,status,claimed_at) VALUES (?, ?, ?, ?, 'claimed', ?)", (canonical, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
             payload = {"round_id": canonical, "reward": reward, "claimed_at": now_text, "expired": False}
             self._sect_war_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -325,7 +326,10 @@ class SectWarRepositoryMixin:
             if connection.execute("SELECT 1 FROM sect_war_claims WHERE round_id=? AND player_id=?", (round_id, member["player_id"])).fetchone() is not None:
                 continue
             reward = {"world_merit": SECT_WAR_MEMBER_REWARD}
-            connection.execute("UPDATE players SET world_merit=world_merit+?, updated_at=? WHERE id=?", (SECT_WAR_MEMBER_REWARD, now_text, member["player_id"]))
+            player = connection.execute("SELECT id, world_merit FROM players WHERE id=?", (member["player_id"],)).fetchone()
+            if player is None:
+                continue
+            change_player_values(connection, player, {"world_merit": SECT_WAR_MEMBER_REWARD}, now_text)
             connection.execute("INSERT INTO sect_war_claims(round_id,player_id,operation_id,reward_json,status,claimed_at,auto_granted_at) VALUES (?, ?, ?, ?, 'auto_granted', ?, ?)", (round_id, member["player_id"], f"sect-war.auto:{round_id}:{member['player_id']}", json.dumps(reward, sort_keys=True), now_text, now_text))
 
     def _sect_war_record(self, connection: Any, row: Any, player_id: int, *, already_completed: bool = False) -> SectWarRecord:

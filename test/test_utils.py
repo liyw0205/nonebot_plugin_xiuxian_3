@@ -9,6 +9,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.database import connect_sqlite
 from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     AssetState,
     AssetDeltaError,
+    add_player_currency,
     apply_player_assets,
     assets_grant,
     assets_spend,
@@ -17,6 +18,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     currency_spend,
     currency_with_delta,
     grant_player_assets,
+    grant_player_items,
     inventory_grant,
     inventory_json,
     inventory_missing,
@@ -25,6 +27,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     inventory_with_delta,
     player_asset_state,
     spend_player_assets,
+    spend_player_currency,
+    spend_player_items,
     write_player_values,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_object
@@ -36,6 +40,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
 from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_field,
     player_integer,
+    player_numeric_delta,
+    change_player_values,
     player_object,
     player_inventory,
     player_qualification,
@@ -45,6 +51,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_values,
     player_numeric_values,
     player_resource_values,
+    player_resource,
+    player_realm_values,
 )
 
 
@@ -206,6 +214,29 @@ def test_player_asset_operation_dispatch_keeps_one_transaction_kernel() -> None:
     connection.close()
 
 
+def test_asset_shortcuts_share_the_same_player_transaction_kernel() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, energy INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, energy, updated_at) VALUES (1, 10, ?, 8, 'before')",
+        ('{"item.herb": 1}',),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    grant_player_items(connection, row, {"item.sand": 2}, "items-granted")
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    spend_player_items(connection, row, {"item.herb": 1}, "items-spent")
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    add_player_currency(connection, row, 5, "currency-added", player_values={"energy": 9})
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    spend_player_currency(connection, row, 3, "currency-spent")
+    stored = connection.execute("SELECT spirit_stones, inventory_json, energy, updated_at FROM players WHERE id = 1").fetchone()
+    assert tuple(stored) == (12, '{"item.sand": 2}', 9, "currency-spent")
+    connection.close()
+
+
 def test_player_asset_mutation_can_commit_other_player_values_atomically() -> None:
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
@@ -304,3 +335,41 @@ def test_player_resource_projection_is_shared_by_profile_and_combat_reads() -> N
     assert resources["stamina"] == 8
     assert player_numeric_values(row, ("energy", "world_merit")) == {"energy": 4, "world_merit": 2}
     assert player_values(row)["spirit_stones"] == resources["spirit_stones"]
+
+
+def test_player_numeric_projection_and_delta_share_resource_validation() -> None:
+    row = {
+        "realm_key": "foundation",
+        "realm_layer": "4",
+        "stamina": 8,
+        "stamina_max": 10,
+        "pollution": 3,
+    }
+    assert player_resource(row, "stamina") == 8
+    assert player_realm_values(row) == {
+        "stage": "new_user",
+        "status": "active",
+        "location_key": "xuantian.new_town",
+        "realm_key": "foundation",
+        "realm_layer": 4,
+        "path_key": None,
+        "subprofession_key": None,
+    }
+    assert player_numeric_delta(row, {"stamina": 3}, maximums={"stamina": 10}) == {"stamina": 10}
+    assert player_numeric_delta(row, {"pollution": -3}) == {"pollution": 0}
+    with pytest.raises(ValueError, match="cannot be below"):
+        player_numeric_delta(row, {"stamina": -9})
+
+
+def test_change_player_values_persists_the_same_validated_delta() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, stamina INTEGER NOT NULL, stamina_max INTEGER NOT NULL, world_merit INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute("INSERT INTO players VALUES (1, 8, 10, 20, 'before')")
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    assert change_player_values(connection, row, {"stamina": 5, "world_merit": 3}, "after", maximums={"stamina": row["stamina_max"]}) == {"stamina": 10, "world_merit": 23}
+    stored = connection.execute("SELECT stamina, world_merit, updated_at FROM players WHERE id=1").fetchone()
+    assert tuple(stored) == (10, 23, "after")
+    connection.close()

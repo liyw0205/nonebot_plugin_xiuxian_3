@@ -23,6 +23,12 @@ class RoutePreviewRecord:
     daily_limit: int
     ready: bool
     missing: tuple[str, ...] = ()
+    mount_instance_id: str | None = None
+    mount_name: str | None = None
+    mount_level: int | None = None
+    mount_stamina: int | None = None
+    mount_stamina_cost: int = 0
+    duration_seconds_with_mount: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +49,10 @@ class RouteStartRecord:
     reward_stones: int
     delay_seconds: int = 0
     already_completed: bool = False
+    mount_instance_id: str | None = None
+    mount_name: str | None = None
+    mount_level: int | None = None
+    mount_stamina_cost: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +69,11 @@ class RouteSettlementRecord:
     delay_seconds: int = 0
     already_completed: bool = False
     cargo: dict[str, int] = field(default_factory=dict)
+    mount_instance_id: str | None = None
+    mount_name: str | None = None
+    mount_level: int | None = None
+    mount_experience: int = 0
+    mount_level_after: int | None = None
 
 
 __all__ = ["RoutePreviewRecord", "RouteSettlementRecord", "RouteStartRecord"]

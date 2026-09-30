@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_grant, inventory_json, inventory_value
+from ..utils.assets import grant_player_items
 from ..persistence.errors import (
     OperationConflictError,
     VoidArchiveGuardAlreadySettledError,
@@ -216,13 +216,7 @@ class VoidArchiveRepositoryMixin:
                     reward = dict(ARCHIVE_REWARD)
                 else:
                     reward = dict(ARCHIVE_CONVERSION_REWARD)
-                inventory = inventory_grant(
-                    inventory_value(player["inventory_json"]), reward
-                )
-                connection.execute(
-                    "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (inventory_json(inventory), now_text, player["id"]),
-                )
+                grant_player_items(connection, player, reward, now_text)
             run_id = uuid4().hex
             snapshot = {
                 "battle_id": battle_id,
@@ -304,12 +298,12 @@ class VoidArchiveRepositoryMixin:
             if progress < target:
                 raise VoidArchiveTaskNotCompleteError("archive task evidence is incomplete")
             reward = dict(TASK_REWARDS[task_key])
-            inventory = inventory_grant(
-                inventory_value(player["inventory_json"]), reward
-            )
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, void_merit = void_merit + ?, updated_at = ? WHERE id = ?",
-                (inventory_json(inventory), TASK_VOID_MERIT, now_text, player["id"]),
+            grant_player_items(
+                connection,
+                player,
+                reward,
+                now_text,
+                player_values={"void_merit": int(player["void_merit"]) + TASK_VOID_MERIT},
             )
             connection.execute(
                 "INSERT INTO void_archive_tasks(player_id, week_id, task_key, status, progress, target, reward_json, operation_id, claimed_at) VALUES (?, ?, ?, 'claimed', ?, ?, ?, ?, ?)",

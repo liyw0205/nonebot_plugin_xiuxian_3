@@ -28,6 +28,18 @@ PLAYER_RESOURCE_FIELDS = (
     "bloodline_stability",
 )
 
+PLAYER_COMBAT_FIELDS = (
+    "max_hp",
+    "initiative",
+    "pollution",
+    "bloodline_stability",
+    "cross_realm_penalty_bp",
+    "soul_power",
+    "domain_charge",
+    "domain_charge_max",
+    "domain_power",
+)
+
 
 def player_field(row: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
     """Read a player column from either a mapping or a SQLite row."""
@@ -51,6 +63,65 @@ def player_integer(row: Mapping[str, Any] | Any, key: str, default: int = 0) -> 
     return int(raw)
 
 
+def player_resource(row: Mapping[str, Any] | Any, key: str, default: int = 0) -> int:
+    """Read one shared numeric player value through the same validation path."""
+
+    return player_integer(row, key, default)
+
+
+def player_numeric_delta(
+    row: Mapping[str, Any] | Any,
+    delta: Mapping[str, Any],
+    *,
+    minimum: int = 0,
+    maximums: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    """Calculate validated numeric player values after one signed change.
+
+    Resource updates use this pure helper before persistence.  It keeps the
+    non-negative and capped-value rules identical for profile, status and
+    battle-related transactions without embedding SQL in the projection layer.
+    """
+
+    caps = maximums or {}
+    result: dict[str, int] = {}
+    for raw_key, raw_delta in delta.items():
+        key = str(raw_key)
+        if isinstance(raw_delta, bool):
+            raise ValueError(f"player delta for {key!r} must be an integer")
+        try:
+            change = int(raw_delta)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"player delta for {key!r} must be an integer") from exc
+        value = player_integer(row, key) + change
+        floor = int(minimum)
+        if value < floor:
+            raise ValueError(f"player value for {key!r} cannot be below {floor}")
+        if key in caps:
+            cap = player_integer(caps, key)
+            if value > cap:
+                value = cap
+        result[key] = value
+    return result
+
+
+def change_player_values(
+    connection: Any,
+    row: Mapping[str, Any] | Any,
+    delta: Mapping[str, Any],
+    updated_at: str,
+    *,
+    maximums: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    """Persist one validated numeric player delta in the current transaction."""
+
+    values = player_numeric_delta(row, delta, maximums=maximums)
+    from .assets import write_player_values
+
+    write_player_values(connection, int(row["id"]), values, updated_at)
+    return values
+
+
 def player_numeric_values(
     row: Mapping[str, Any] | Any,
     fields: tuple[str, ...] = PLAYER_RESOURCE_FIELDS,
@@ -64,6 +135,20 @@ def player_resource_values(row: Mapping[str, Any] | Any) -> dict[str, int]:
     """Return the shared resource projection used by views and transactions."""
 
     return player_numeric_values(row)
+
+
+def player_realm_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
+    """Return the shared realm/location portion used by views and battles."""
+
+    return {
+        "stage": str(player_field(row, "stage", "new_user") or "new_user"),
+        "status": str(player_field(row, "status", "active") or "active"),
+        "location_key": str(player_field(row, "location_key", "xuantian.new_town") or "xuantian.new_town"),
+        "realm_key": str(player_field(row, "realm_key", "mortal") or "mortal"),
+        "realm_layer": player_integer(row, "realm_layer"),
+        "path_key": player_field(row, "path_key"),
+        "subprofession_key": player_field(row, "subprofession_key"),
+    }
 
 
 def player_object(
@@ -87,10 +172,15 @@ def player_inventory(row: Mapping[str, Any] | Any) -> dict[str, int]:
 def player_qualification(row: Mapping[str, Any] | Any) -> dict[str, int]:
     """Read normalized qualification values from a player row."""
 
-    return {
-        key: player_integer({key: value}, key)
-        for key, value in player_object(row, "qualification_json").items()
-    }
+    values: dict[str, int] = {}
+    for key, value in player_object(row, "qualification_json").items():
+        # The stored object may also carry non-numeric tactical selections;
+        # only numeric entries belong in the shared qualification projection.
+        try:
+            values[str(key)] = player_integer({"value": value}, "value")
+        except (TypeError, ValueError):
+            continue
+    return values
 
 
 def player_intro_flags(row: Mapping[str, Any] | Any) -> tuple[str, ...]:
@@ -120,20 +210,21 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     inventory = player_inventory(row)
     intro = player_object(row, "intro_json")
     resources = player_resource_values(row)
+    realm = player_realm_values(row)
     return {
         "player_id": str(player_field(row, "player_id", player_field(row, "id", ""))),
         "platform": str(player_field(row, "platform", "") or ""),
         "platform_user_id": str(player_field(row, "platform_user_id", "") or ""),
         "scene_id": str(player_field(row, "scene_id", "") or ""),
         "nickname": str(player_field(row, "nickname", "") or ""),
-        "stage": str(player_field(row, "stage", "new_user") or "new_user"),
-        "status": str(player_field(row, "status", "active") or "active"),
+        "stage": realm["stage"],
+        "status": realm["status"],
         "dao_name": str(player_field(row, "dao_name", "") or ""),
-        "path_key": player_field(row, "path_key"),
-        "subprofession_key": player_field(row, "subprofession_key"),
-        "location_key": str(player_field(row, "location_key", "xuantian.new_town")),
-        "realm_key": str(player_field(row, "realm_key", "mortal")),
-        "realm_layer": player_integer(row, "realm_layer"),
+        "path_key": realm["path_key"],
+        "subprofession_key": realm["subprofession_key"],
+        "location_key": realm["location_key"],
+        "realm_key": realm["realm_key"],
+        "realm_layer": realm["realm_layer"],
         "qualification": qualification,
         "inventory": inventory,
         "intro_flags": player_intro_flags(row),
@@ -209,13 +300,18 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
 
 
 __all__ = [
+    "PLAYER_COMBAT_FIELDS",
     "PLAYER_RESOURCE_FIELDS",
     "player_field",
     "player_integer",
+    "player_numeric_delta",
+    "change_player_values",
     "player_numeric_values",
     "player_object",
     "player_inventory",
     "player_resource_values",
+    "player_resource",
+    "player_realm_values",
     "player_qualification",
     "player_intro_flags",
     "player_reputation",

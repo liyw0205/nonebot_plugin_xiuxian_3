@@ -884,6 +884,14 @@ class RouteCargoRequirementError(RuntimeError):
     """The route cargo is invalid, unavailable or over the route value limit."""
 
 
+class RouteMountNotFoundError(RuntimeError):
+    """The requested mount does not belong to the player."""
+
+
+class RouteMountRequirementError(RuntimeError):
+    """The selected mount cannot undertake this route."""
+
+
 class RouteLocationRequirementError(RuntimeError):
     """The player is not at the route's source location."""
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,6 +22,8 @@ class CompanionDefinition:
     feed_item_key: str | None = None
     feed_experience: int = 0
     transport_experience: int = 0
+    transport_injury_chance_bp: int = 0
+    transport_injury_recovery_seconds: int = 0
     stamina: int = 0
     effect: dict[str, Any] | None = None
     instance_mode: str | None = None
@@ -74,6 +77,17 @@ def companion_definitions(content: ContentBundle | None = None) -> dict[str, Com
         effect = row.get("effect")
         if effect is not None and not isinstance(effect, dict):
             raise ValueError(f"灵兽效果无效: {key}")
+        transport_experience = row.get("transport_experience", 0)
+        injury_chance_bp = row.get("transport_injury_chance_bp", 0)
+        injury_recovery_seconds = row.get("transport_injury_recovery_seconds", 0)
+        if (
+            any(
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+                for value in (transport_experience, injury_chance_bp, injury_recovery_seconds)
+            )
+            or injury_chance_bp > 10_000
+        ):
+            raise ValueError(f"灵兽运输规则无效: {key}")
         result[key] = CompanionDefinition(
             key=key,
             label=name.strip(),
@@ -85,7 +99,9 @@ def companion_definitions(content: ContentBundle | None = None) -> dict[str, Com
             capacity=capacity,
             feed_item_key=str(row["feed_item_key"]) if row.get("feed_item_key") else None,
             feed_experience=int(row.get("feed_experience", 0)),
-            transport_experience=int(row.get("transport_experience", 0)),
+            transport_experience=transport_experience,
+            transport_injury_chance_bp=injury_chance_bp,
+            transport_injury_recovery_seconds=injury_recovery_seconds,
             stamina=int(row.get("stamina", 0)),
             effect=dict(effect or {}),
             instance_mode=str(row["instance_mode"]) if row.get("instance_mode") else None,
@@ -185,6 +201,41 @@ def level_after_experience(definition: CompanionDefinition, experience: int) -> 
     return level
 
 
+def mount_transport_duration(base_seconds: int, definition: CompanionDefinition, level: int) -> int:
+    """Apply the content-defined mount travel modifier to a route duration."""
+
+    effect = definition.effect or {}
+    if effect.get("type") != "transport_duration_multiplier_bp":
+        return max(1, int(base_seconds))
+    per_level = int(effect.get("value_per_level", 0))
+    multiplier_bp = max(0, 10_000 - per_level * max(0, int(level)))
+    return max(1, (int(base_seconds) * multiplier_bp + 9_999) // 10_000)
+
+
+def mount_transport_stamina(base_cost: int, gear: tuple[dict[str, object], ...], content: ContentBundle | None = None) -> int:
+    """Apply the active mount-tack stamina effect, never reducing cost below one."""
+
+    total = int(base_cost)
+    bundle = _bundle(content)
+    for item in gear:
+        if str(item.get("status", "")) != "equipped" or int(item.get("durability_bp", 0)) <= 0:
+            continue
+        record = bundle.get("companion", str(item.get("gear_key", "")), include_locked=False)
+        if record is None or record.get("kind") != "mount_tack":
+            continue
+        effect = record.get("effect")
+        if isinstance(effect, dict) and effect.get("type") == "transport_stamina_cost_delta":
+            total += int(effect.get("value", 0))
+    return max(1, total)
+
+
+def mount_transport_injury_roll_bp(operation_id: str) -> int:
+    """Return the deterministic hazard roll used by a transport settlement."""
+
+    digest = hashlib.blake2b(f"{operation_id}:mount-injury".encode("utf-8"), digest_size=2).digest()
+    return int.from_bytes(digest, "big") % 10_000
+
+
 __all__ = [
     "CompanionDefinition",
     "CompanionEvolutionDefinition",
@@ -193,4 +244,7 @@ __all__ = [
     "companion_evolution_definition",
     "companion_evolution_definitions",
     "level_after_experience",
+    "mount_transport_duration",
+    "mount_transport_stamina",
+    "mount_transport_injury_roll_bp",
 ]

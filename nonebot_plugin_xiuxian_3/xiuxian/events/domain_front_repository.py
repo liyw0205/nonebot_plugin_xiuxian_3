@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..content import bundled_content
-from ..utils.assets import assets_grant, assets_spend, inventory_json, inventory_value
+from ..utils.assets import change_player_assets, grant_player_assets
 from ..specials.codex_projection import record_codex_discovery
 from ..persistence.errors import (
     DomainCrackActiveError,
@@ -291,12 +291,13 @@ class DomainFrontRepositoryMixin:
             if connection.execute("SELECT 1 FROM domain_front_claims WHERE round_id=? AND player_id=?", (round_id, player["id"])).fetchone() is not None:
                 raise DomainEventRewardAlreadyClaimedError("domain-front reward already claimed")
             reward = {"item.domain_core_fragment": 5, "world_merit": 100}
-            assets = assets_grant(
-                player["spirit_stones"],
-                inventory_value(player["inventory_json"]),
+            grant_player_assets(
+                connection,
+                player,
                 {"item.domain_core_fragment": reward["item.domain_core_fragment"]},
+                now_text,
+                player_values={"world_merit": int(player["world_merit"]) + reward["world_merit"]},
             )
-            connection.execute("UPDATE players SET spirit_stones=?, inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?", (assets.currency, inventory_json(assets.inventory), reward["world_merit"], now_text, player["id"]))
             connection.execute("INSERT INTO domain_front_claims(round_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (round_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
             content = self.content or bundled_content()
             event_definition = content.require("event", EVENT_KEY)
@@ -362,16 +363,17 @@ class DomainFrontRepositoryMixin:
             if connection.execute("SELECT 1 FROM domain_war_claims WHERE season_id=? AND player_id=?", (canonical_id, player["id"])).fetchone() is not None:
                 raise DomainSeasonRewardAlreadyClaimedError("domain-war reward already claimed")
             reward = {str(k): int(v) for k, v in self._json_object(standing["reward_json"], {}).items()}
-            assets = assets_grant(
-                player["spirit_stones"],
-                inventory_value(player["inventory_json"]),
+            grant_player_assets(
+                connection,
+                player,
                 {
                     key: value
                     for key, value in reward.items()
                     if key == "spirit_stones" or key.startswith("item.")
                 },
+                now_text,
+                player_values={"world_merit": int(player["world_merit"]) + reward.get("world_merit", 0)},
             )
-            connection.execute("UPDATE players SET spirit_stones=?, inventory_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?", (assets.currency, inventory_json(assets.inventory), reward.get("world_merit", 0), now_text, player["id"]))
             connection.execute("INSERT INTO domain_war_claims(season_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (canonical_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
             payload = {"season_id": canonical_id, "rank": int(standing["rank"]), "reward": reward}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -398,17 +400,14 @@ class DomainFrontRepositoryMixin:
             if connection.execute("SELECT 1 FROM domain_core_redemptions WHERE season_id=? AND player_id=?", (canonical_id, player["id"])).fetchone() is not None:
                 raise DomainCoreRedeemAlreadyUsedError("domain core already redeemed")
             try:
-                inventory = assets_spend(
-                    player["spirit_stones"],
-                    inventory_value(player["inventory_json"]),
-                    {"item.domain_core_fragment": 20},
-                ).inventory
+                change_player_assets(
+                    connection,
+                    player,
+                    {"item.domain_core_fragment": -20, "item.domain_core": 1},
+                    now_text,
+                )
             except ValueError as exc:
                 raise DomainCoreFragmentInsufficientError("domain core fragments are insufficient") from exc
-            inventory = assets_grant(
-                player["spirit_stones"], inventory, {"item.domain_core": 1}
-            ).inventory
-            connection.execute("UPDATE players SET inventory_json=?, updated_at=? WHERE id=?", (inventory_json(inventory), now_text, player["id"]))
             connection.execute("INSERT INTO domain_core_redemptions(season_id,player_id,operation_id,redeemed_at) VALUES (?, ?, ?, ?)", (canonical_id, player["id"], operation_id, now_text))
             payload = {"season_id": canonical_id, "item_key": "item.domain_core", "quantity": 1}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)

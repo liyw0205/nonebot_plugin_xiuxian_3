@@ -23,7 +23,7 @@ from ..persistence.errors import (
     PlayerSuspendedError,
     ResourceInsufficientError,
 )
-from ..utils.assets import AssetDeltaError, spend_player_assets
+from ..utils.assets import AssetDeltaError, spend_player_assets, spend_player_items
 from ..utils.player import player_field
 from .models import CompanionMutationRecord, CompanionSnapshot, CompanionStatusRecord, CompanionView
 from .rules import (
@@ -239,7 +239,7 @@ class CompanionRepositoryMixin:
                 raise CompanionInjuredError("companion is resting")
             spent = {definition.feed_item_key: 1}
             try:
-                spend_player_assets(connection, player, spent, now_text)
+                spend_player_items(connection, player, spent, now_text)
             except ValueError as exc:
                 raise ResourceInsufficientError("feed item is insufficient") from exc
             experience = int(instance["experience"]) + definition.feed_experience
@@ -317,8 +317,10 @@ class CompanionRepositoryMixin:
             expected_kind = "beast" if gear["kind"] == "beast_gear" else "mount"
             if str(instance["kind"]) != expected_kind:
                 raise CompanionGearError("gear does not fit this entity")
+            if str(instance["status"]) == "travelling":
+                raise CompanionRequirementError("travelling companion cannot change gear")
             try:
-                spend_player_assets(
+                spend_player_items(
                     connection,
                     player,
                     {str(gear["key"]): 1},
@@ -375,6 +377,8 @@ class CompanionRepositoryMixin:
             source = companion_definition(str(instance["companion_key"]), getattr(self, "content", None))
             if evolution.kind != source.kind:
                 raise CompanionRequirementError("evolution kind does not match companion")
+            if str(instance["status"]) == "travelling":
+                raise CompanionRequirementError("travelling companion cannot evolve")
             if str(instance["status"]) in {"resting", "injured", "retired"}:
                 raise CompanionInjuredError("companion is resting")
             if str(player_field(instance, "evolution_stage", "base")) == "evolved":
