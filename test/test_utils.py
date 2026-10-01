@@ -68,6 +68,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_values,
     player_numeric_values,
     player_has_values,
+    player_requirements_missing,
+    player_has_requirements,
     player_values_missing,
     player_realm_values,
     player_profile_values,
@@ -220,6 +222,29 @@ def test_player_requirement_helpers_share_asset_and_numeric_reading() -> None:
     assert player_has_values(row, {"stamina": 4})
     with pytest.raises(ValueError, match="must be non-negative"):
         player_values_missing(row, {"stamina": -1})
+
+
+def test_player_requirements_combine_assets_and_numeric_resources() -> None:
+    row = {
+        "spirit_stones": 80,
+        "inventory_json": '{"item.herb": 2}',
+        "stamina": 4,
+        "energy": 9,
+    }
+    assert player_requirements_missing(
+        row,
+        assets={"spirit_stones": 100, "item.herb": 3},
+        values={"stamina": 6, "energy": 8},
+    ) == {"spirit_stones": 20, "item.herb": 1, "stamina": 2}
+    assert player_has_requirements(
+        row,
+        assets={"spirit_stones": 80, "item.herb": 2},
+        values={"stamina": 4},
+    )
+    with pytest.raises(ValueError, match="duplicated"):
+        player_requirements_missing(row, assets={"energy": 1}, values={"energy": 1})
+    with pytest.raises(ValueError, match="at least one"):
+        player_requirements_missing(row)
 
 
 def test_asset_state_applies_currency_and_items_together() -> None:

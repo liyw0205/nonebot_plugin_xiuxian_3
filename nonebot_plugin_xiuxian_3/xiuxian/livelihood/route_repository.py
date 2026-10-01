@@ -9,8 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import grant_player_currency, inventory_amount, spend_player_items
-from ..utils.player import player_integer, player_inventory
+from ..utils.assets import grant_player_currency
+from ..utils.player import player_requirements_missing, spend_player_state
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -82,7 +82,6 @@ class RouteRepositoryMixin:
         business_date = now.date().isoformat()
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
-            inventory = player_inventory(player)
             mount = self._route_mount(connection, int(player["id"]), mount_ref, definition) if mount_ref else None
             duration_seconds = int(mount["duration_seconds"]) if mount else definition.duration_seconds
             mount_stamina_cost = int(mount["stamina_cost"]) if mount else 0
@@ -91,9 +90,15 @@ class RouteRepositoryMixin:
                 missing.append("入道")
             if str(player["location_key"]) != definition.source_location:
                 missing.append("青石镇")
-            if player_integer(player, "stamina") < (mount_stamina_cost or definition.stamina_cost):
+            stamina_cost = mount_stamina_cost or definition.stamina_cost
+            requirements = player_requirements_missing(
+                player,
+                assets={cargo_key: cargo_quantity},
+                values={"stamina": stamina_cost},
+            )
+            if "stamina" in requirements:
                 missing.append("体力")
-            if inventory_amount(inventory, cargo_key) < cargo_quantity:
+            if cargo_key in requirements:
                 missing.append("货物")
             used = connection.execute(
                 "SELECT COUNT(*) AS count FROM livelihood_trade_routes WHERE player_id = ? AND business_date = ?",
@@ -117,7 +122,7 @@ class RouteRepositoryMixin:
                 cargo_key=cargo_key,
                 cargo_quantity=cargo_quantity,
                 cargo_value=cargo_value,
-                stamina_cost=mount_stamina_cost or definition.stamina_cost,
+                stamina_cost=stamina_cost,
                 duration_seconds=duration_seconds,
                 daily_used=daily_used,
                 daily_limit=definition.daily_limit,
@@ -194,7 +199,7 @@ class RouteRepositoryMixin:
             mount = self._route_mount(connection, int(player["id"]), mount_ref, definition) if mount_ref else None
             route_stamina_cost = int(mount["stamina_cost"]) if mount else definition.stamina_cost
             duration_seconds = int(mount["duration_seconds"]) if mount else definition.duration_seconds
-            if player_integer(player, "stamina") < route_stamina_cost:
+            if player_requirements_missing(player, values={"stamina": route_stamina_cost}):
                 raise ResourceInsufficientError("stamina is insufficient")
             used = connection.execute(
                 "SELECT COUNT(*) AS count FROM livelihood_trade_routes WHERE player_id = ? AND business_date = ?",
@@ -203,8 +208,7 @@ class RouteRepositoryMixin:
             if used is not None and int(used["count"]) >= definition.daily_limit:
                 raise RouteQuotaError("route daily limit reached")
             self._check_route_busy(connection, int(player["id"]))
-            inventory = player_inventory(player)
-            if inventory_amount(inventory, cargo_key) < cargo_quantity:
+            if player_requirements_missing(player, assets={cargo_key: cargo_quantity}):
                 raise RouteCargoRequirementError("cargo is insufficient")
             effects = self._public_project_effects(connection, now)
             delay_chance_bp = max(
@@ -235,12 +239,12 @@ class RouteRepositoryMixin:
                 "delay_seconds": delay_seconds,
                 "mount": self._mount_snapshot(mount) if mount else None,
             }
-            spend_player_items(
+            spend_player_state(
                 connection,
                 player,
                 {cargo_key: cargo_quantity},
                 now_text,
-                player_values={"stamina": player_integer(player, "stamina") - route_stamina_cost},
+                value_delta={"stamina": -route_stamina_cost},
             )
             if mount is not None:
                 connection.execute(

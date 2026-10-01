@@ -10,13 +10,11 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import (
-    change_player_assets,
     grant_player_assets,
-    inventory_missing,
     spend_player_assets,
     player_currency,
 )
-from ..utils.player import player_inventory, player_integer
+from ..utils.player import change_player_state, player_requirements_missing, spend_player_state
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -288,18 +286,24 @@ class ServiceRepositoryMixin:
                 raise ServiceLocationConflictError("service participants are not at the same location")
             self._check_provider_daily_limit(connection, provider["id"], definition, now)
             inputs = json_object(snapshot.get("provider_inputs", {}), {})
-            inventory = player_inventory(provider)
-            missing = inventory_missing(inventory, inputs)
-            if missing or player_integer(provider, "stamina") < definition.provider_stamina or player_integer(provider, "energy") < definition.provider_energy:
+            missing = player_requirements_missing(
+                provider,
+                assets=inputs,
+                values={
+                    "stamina": definition.provider_stamina,
+                    "energy": definition.provider_energy,
+                },
+            )
+            if missing:
                 raise ResourceInsufficientError("service resources are insufficient")
-            spend_player_assets(
+            spend_player_state(
                 connection,
                 provider,
                 inputs,
                 now_text,
-                player_values={
-                    "stamina": player_integer(provider, "stamina") - definition.provider_stamina,
-                    "energy": player_integer(provider, "energy") - definition.provider_energy,
+                value_delta={
+                    "stamina": -definition.provider_stamina,
+                    "energy": -definition.provider_energy,
                 },
             )
             connection.execute(
@@ -423,14 +427,14 @@ class ServiceRepositoryMixin:
                     {"spirit_stones": publisher_refund},
                     now_text,
                 )
-                change_player_assets(
+                change_player_state(
                     connection,
                     provider,
-                    provider_refunds,
-                    now_text,
-                    player_values={
-                        "stamina": player_integer(provider, "stamina") + stamina_refund,
-                        "energy": player_integer(provider, "energy") + (int(snapshot.get("provider_energy", 0)) if expired else 0),
+                    updated_at=now_text,
+                    asset_values=provider_refunds,
+                    value_delta={
+                        "stamina": stamina_refund,
+                        "energy": int(snapshot.get("provider_energy", 0)) if expired else 0,
                     },
                 )
                 status = "expired" if expired else "failed"

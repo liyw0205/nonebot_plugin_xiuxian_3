@@ -35,7 +35,7 @@ from ..utils.assets import (
     spend_player_assets,
     player_currency,
 )
-from ..utils.player import player_inventory, player_integer
+from ..utils.player import change_player_state, player_inventory, player_integer, spend_player_state
 from .models import MarketOrderRecord
 from .bindings import active_binding_totals
 from .commission_models import ProductionCommissionRecord
@@ -990,15 +990,13 @@ class EconomyRepositoryMixin:
                     "ends_at": ends_at,
                 }
             )
-            spend_player_assets(
+            spend_player_state(
                 connection,
                 producer,
                 producer_inputs,
                 now_text,
-                player_values={
-                    "energy": player_integer(producer, "energy") - energy_cost,
-                    "durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True),
-                },
+                value_delta={"energy": -energy_cost},
+                player_values={"durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True)},
             )
             connection.execute(
                 """
@@ -1418,7 +1416,12 @@ class EconomyRepositoryMixin:
                 )
             elif kind == "energy" and key == "energy":
                 before = player_integer(player, "energy")
-                change_player_assets(connection, player, {}, now_text, player_values={"energy": before + quantity})
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"energy": quantity},
+                )
                 self._commission_ledger(
                     connection, operation_id, int(player["id"]), "resource", key,
                     "commission.lock_release", "release", quantity, before, before + quantity,

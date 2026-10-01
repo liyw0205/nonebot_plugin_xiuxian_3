@@ -274,6 +274,47 @@ def player_has_values(
     return not player_values_missing(row, requirements)
 
 
+def player_requirements_missing(
+    row: Mapping[str, Any] | Any,
+    *,
+    assets: Mapping[str, Any] | None = None,
+    values: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    """Return one shortfall map for owned assets and numeric resources.
+
+    Repositories commonly need to validate a mixed cost such as items plus
+    stamina. Keeping that check here prevents each feature from maintaining a
+    slightly different currency/item/resource branch.
+    """
+
+    if assets is None and values is None:
+        raise ValueError("at least one player requirement group is required")
+    asset_keys = {str(key) for key in (assets or {})}
+    value_keys = {str(key) for key in (values or {})}
+    overlap = asset_keys & value_keys
+    if overlap:
+        raise ValueError(f"player requirement key is duplicated: {sorted(overlap)!r}")
+    missing: dict[str, int] = {}
+    if assets is not None:
+        from .assets import player_assets_missing
+
+        missing.update(player_assets_missing(row, assets))
+    if values is not None:
+        missing.update(player_values_missing(row, values))
+    return missing
+
+
+def player_has_requirements(
+    row: Mapping[str, Any] | Any,
+    *,
+    assets: Mapping[str, Any] | None = None,
+    values: Mapping[str, Any] | None = None,
+) -> bool:
+    """Return whether a player satisfies a mixed asset/resource requirement."""
+
+    return not player_requirements_missing(row, assets=assets, values=values)
+
+
 def player_numeric_delta(
     row: Mapping[str, Any] | Any,
     delta: Mapping[str, Any],
@@ -691,6 +732,8 @@ __all__ = [
     "player_numeric_delta",
     "player_values_missing",
     "player_has_values",
+    "player_requirements_missing",
+    "player_has_requirements",
     "change_player_values",
     "change_player_state",
     "grant_player_state",

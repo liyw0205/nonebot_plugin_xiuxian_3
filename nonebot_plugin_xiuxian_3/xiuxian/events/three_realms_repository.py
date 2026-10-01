@@ -8,8 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import grant_player_assets
-from ..utils.player import player_integer
+from ..utils.player import grant_player_state
 from ..persistence.errors import (
     OperationConflictError,
     ThreeRealmsRankingNotFinalizedError,
@@ -91,7 +90,7 @@ class ThreeRealmsSeasonRepositoryMixin:
                 boards.append(str(row["board_key"]))
                 for key, value in reward_for_rank(int(row["rank"])).items():
                     reward[key] = reward.get(key, 0) + value
-            grant_player_assets(
+            grant_player_state(
                 connection,
                 player,
                 {
@@ -100,7 +99,7 @@ class ThreeRealmsSeasonRepositoryMixin:
                     if key == "spirit_stones" or key.startswith("item.")
                 },
                 now_text,
-                player_values={"world_merit": player_integer(player, "world_merit") + reward.get("world_merit", 0)},
+                value_delta={"world_merit": reward.get("world_merit", 0)},
             )
             binding_until = "9999-12-31T23:59:59+00:00"
             for item_key, value in reward.items():
