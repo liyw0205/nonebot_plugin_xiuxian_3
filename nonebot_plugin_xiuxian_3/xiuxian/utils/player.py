@@ -57,8 +57,8 @@ def player_field(row: Mapping[str, Any] | Any, key: str, default: Any = None) ->
         return row.get(key, default)
     try:
         return row[key]
-    except (IndexError, KeyError):
-        return default
+    except (IndexError, KeyError, TypeError):
+        return getattr(row, key, default)
 
 
 def player_integer(row: Mapping[str, Any] | Any, key: str, default: int = 0) -> int:
@@ -106,7 +106,9 @@ def player_numeric_delta(
         floor = int(minimum)
         if value < floor:
             raise ValueError(f"player value for {key!r} cannot be below {floor}")
-        if key in caps:
+        # A cap limits recovery only. Costs and penalties must still apply
+        # when an older row has a stale or missing maximum value.
+        if key in caps and change > 0:
             cap = player_integer(caps, key)
             if value > cap:
                 value = cap
@@ -217,21 +219,35 @@ def player_object(
     """Read one JSON object column from a player row without sharing defaults."""
 
     fallback = dict(default or {})
-    value = json_object(player_field(row, key, fallback), fallback)
+    raw = player_field(row, key, None)
+    if raw is None:
+        aliases = {
+            "qualification_json": "qualification",
+            "inventory_json": "inventory",
+            "intro_json": "intro",
+            "faction_reputation_json": "faction_reputation",
+        }
+        raw = player_field(row, aliases.get(key, ""), fallback)
+    value = json_object(raw, fallback)
     return {str(name): item for name, item in value.items()}
 
 
 def player_inventory(row: Mapping[str, Any] | Any) -> dict[str, int]:
     """Read the normalized item inventory shared by displays and battles."""
 
-    return inventory_value(player_field(row, "inventory_json", {}))
+    raw = player_field(row, "inventory_json", None)
+    if raw is None:
+        raw = player_field(row, "inventory", {})
+    return inventory_value(raw)
 
 
 def player_qualification(row: Mapping[str, Any] | Any) -> dict[str, int]:
     """Read normalized qualification values from a player row."""
 
     values: dict[str, int] = {}
-    for key, value in player_object(row, "qualification_json").items():
+    raw = player_field(row, "qualification", None)
+    source = raw if isinstance(raw, Mapping) else player_object(row, "qualification_json")
+    for key, value in source.items():
         # The stored object may also carry non-numeric tactical selections;
         # only numeric entries belong in the shared qualification projection.
         try:
@@ -244,7 +260,8 @@ def player_qualification(row: Mapping[str, Any] | Any) -> dict[str, int]:
 def player_intro_flags(row: Mapping[str, Any] | Any) -> tuple[str, ...]:
     """Read the immutable-style onboarding flags used by access checks."""
 
-    flags = player_object(row, "intro_json").get("flags", [])
+    direct = player_field(row, "intro_flags", None)
+    flags = direct if direct is not None else player_object(row, "intro_json").get("flags", [])
     if not isinstance(flags, (list, tuple)):
         return ()
     return tuple(str(flag) for flag in flags)
@@ -253,7 +270,8 @@ def player_intro_flags(row: Mapping[str, Any] | Any) -> tuple[str, ...]:
 def player_reputation(row: Mapping[str, Any] | Any) -> dict[str, int]:
     """Read normalized local faction reputation values."""
 
-    values = player_object(row, "faction_reputation_json")
+    direct = player_field(row, "faction_reputation", None)
+    values = direct if isinstance(direct, Mapping) else player_object(row, "faction_reputation_json")
     return {str(key): player_integer({"value": value}, "value") for key, value in values.items()}
 
 
@@ -349,6 +367,10 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
         "realm_layer": values["realm_layer"],
         "qualification": dict(values["qualification"]),
         "inventory": dict(values["inventory"]),
+        "stamina": values["stamina"],
+        "stamina_max": values["stamina_max"],
+        "energy": values["energy"],
+        "energy_max": values["energy_max"],
         "max_hp": values["max_hp"],
         "initiative": values["initiative"],
         "pollution": values["pollution"],

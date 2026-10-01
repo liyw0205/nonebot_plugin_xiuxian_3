@@ -221,9 +221,14 @@ class EndgameRepositoryMixin:
         if allow_final_battle and str(row["endgame_status"]) == "tribulation" and ending_key == "remain_in_world":
             if not fruit_key:
                 raise AscensionRequirementError("remain in world requires a locked dao fruit")
-            connection.execute(
-                "UPDATE players SET endgame_status=?, location_key='ascension.heaven_path', updated_at=? WHERE id=?",
-                (ASCENSION_READY_STATUS, now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                player_values={
+                    "endgame_status": ASCENSION_READY_STATUS,
+                    "location_key": "ascension.heaven_path",
+                },
             )
             row = connection.execute("SELECT * FROM players WHERE id=?", (row["id"],)).fetchone()
         if str(row["endgame_status"]) != ASCENSION_READY_STATUS:

@@ -11,6 +11,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..persistence.errors import (
     OperationConflictError,
+    PlayerNotFoundError,
     ResourceInsufficientError,
     TowerAlreadyClaimedError,
     TowerBusyError,
@@ -23,6 +24,7 @@ from ..persistence.errors import (
     TowerStartFailedError,
 )
 from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state, player_integer
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .void_spire_models import VoidSpirePreviewRecord, VoidSpireRewardRecord, VoidSpireRunRecord
 from .void_spire_rules import (
@@ -190,13 +192,15 @@ class VoidSpireRepositoryMixin:
             )
             if weekly_used >= definition.weekly_limit:
                 raise TowerQuotaError("void spire weekly attempt limit is exhausted")
-            if int(player["stamina"]) < definition.stamina_cost:
+            if player_integer(player, "stamina") < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             run_id = uuid4().hex
             reward = reward_for(floor_no, run_id, first_clear=first_clear)
-            connection.execute(
-                "UPDATE players SET stamina=stamina-?,updated_at=? WHERE id=? AND stamina>=?",
-                (definition.stamina_cost, now_text, player["id"], definition.stamina_cost),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"stamina": -definition.stamina_cost},
             )
             connection.execute(
                 """
@@ -420,9 +424,17 @@ class VoidSpireRepositoryMixin:
             if run is None:
                 return
             definition = floor_definition(int(run["floor_no"]))
-            connection.execute(
-                "UPDATE players SET stamina=MIN(stamina_max,stamina+?),updated_at=? WHERE id=?",
-                (definition.stamina_cost, now_text, run["player_id"]),
+            player = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (run["player_id"],)
+            ).fetchone()
+            if player is None:
+                raise PlayerNotFoundError("void spire player disappeared during recovery")
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"stamina": definition.stamina_cost},
+                maximums={"stamina": player["stamina_max"]},
             )
             connection.execute(
                 "UPDATE void_spire_runs SET status='aborted',result_json=?,updated_at=? WHERE id=?",

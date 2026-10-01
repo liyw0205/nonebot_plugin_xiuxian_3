@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from datetime import datetime, timezone
 
 import pytest
 
@@ -26,11 +27,15 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     inventory_value,
     inventory_with_delta,
     player_asset_state,
+    player_asset_amount,
+    player_asset_amounts,
+    player_assets_missing,
     spend_player_assets,
     spend_player_currency,
     spend_player_items,
     write_player_values,
 )
+from nonebot_plugin_xiuxian_3.contracts import PlayerView
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_object
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
     DuplicateJSONKeyError,
@@ -140,6 +145,35 @@ def test_asset_helpers_share_inventory_and_currency_accounting() -> None:
         inventory_spend(inventory, {"item.herb": 3})
     with pytest.raises(AssetDeltaError):
         currency_with_delta(0, -1)
+
+
+def test_player_asset_reads_share_row_and_projection_shapes() -> None:
+    player = PlayerView(
+        player_id="p1",
+        platform="qq.official",
+        platform_user_id="u1",
+        scene_id="s1",
+        nickname="道友",
+        dao_name="玄尘",
+        stage="cultivator",
+        spirit_stones=80,
+        qualification={"body": 10},
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        inventory={"item.herb": 2},
+        realm_key="qi_sensing",
+        realm_layer=1,
+    )
+    assert player_asset_amount(player, "spirit_stones") == 80
+    assert player_asset_amount(player, "item.herb") == 2
+    assert player_asset_amounts(player, ["spirit_stones", "item.herb"]) == {
+        "spirit_stones": 80,
+        "item.herb": 2,
+    }
+    assert player_assets_missing(player, {"spirit_stones": 100, "item.herb": 3}) == {
+        "spirit_stones": 20,
+        "item.herb": 1,
+    }
 
 
 def test_asset_state_applies_currency_and_items_together() -> None:
@@ -357,6 +391,9 @@ def test_player_numeric_projection_and_delta_share_resource_validation() -> None
         "subprofession_key": None,
     }
     assert player_numeric_delta(row, {"stamina": 3}, maximums={"stamina": 10}) == {"stamina": 10}
+    assert player_numeric_delta({"stamina": 100}, {"stamina": -20}, maximums={"stamina": 0}) == {
+        "stamina": 80
+    }
     assert player_numeric_delta(row, {"pollution": -3}) == {"pollution": 0}
     with pytest.raises(ValueError, match="cannot be below"):
         player_numeric_delta(row, {"stamina": -9})

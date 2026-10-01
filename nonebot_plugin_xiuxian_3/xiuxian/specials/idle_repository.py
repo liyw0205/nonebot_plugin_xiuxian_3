@@ -35,7 +35,7 @@ from .idle_rules import (
     resolve_route,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.player import change_player_state, player_inventory
+from ..utils.player import change_player_state, player_integer, player_inventory
 
 
 class IdleRepositoryMixin:
@@ -472,9 +472,9 @@ class IdleRepositoryMixin:
                 if "已有进行中的挂机" in preview.missing or "已有进行中的长时行动" in preview.missing:
                     raise IdleBusyError("another long action is active")
                 raise IdleRequirementError("; ".join(preview.missing))
-        if definition.energy_cost and int(player["energy"]) < definition.energy_cost:
+        if definition.energy_cost and player_integer(player, "energy") < definition.energy_cost:
             raise IdleRequirementError("energy is insufficient")
-        if definition.stamina_cost and int(player["stamina"]) < definition.stamina_cost:
+        if definition.stamina_cost and player_integer(player, "stamina") < definition.stamina_cost:
             raise IdleRequirementError("stamina is insufficient")
         selected_tool = self._idle_select_tool(connection, player, definition, tool_or_facility)
         selected_facility = self._idle_select_facility(connection, player, definition, tool_or_facility)

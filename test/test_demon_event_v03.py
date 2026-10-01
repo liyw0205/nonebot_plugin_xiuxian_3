@@ -32,7 +32,7 @@ def _insert_transport_sources(runtime, adapter: str, user: str, count: int) -> l
                     source_location, destination_location, cargo_json, cargo_value,
                     starts_at, arrives_at, settled_at, stamina_cost, reward_stones,
                     snapshot_json, result_json, created_at, updated_at
-                ) VALUES (?, ?, ?, 'route.town.v0.1', '2026-09-23', 'settled',
+                ) VALUES (?, ?, ?, 'route.new_town_outskirts', '2026-09-23', 'settled',
                     'xuantian.new_town', 'xuantian.outskirts', '{}', 10,
                     ?, ?, ?, 0, 0, '{}', '{}', ?, ?)
                 """,

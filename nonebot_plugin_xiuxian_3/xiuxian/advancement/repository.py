@@ -345,12 +345,13 @@ class AdvancementRepositoryMixin:
             session_id = uuid4().hex
             starts_at = now_text
             ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
-            spend_player_assets(
+            change_player_state(
                 connection,
                 row,
-                item_cost,
-                now_text,
-                player_values={"energy": int(row["energy"]) - definition.energy_cost},
+                updated_at=now_text,
+                asset_values=item_cost,
+                asset_mode="spend",
+                value_delta={"energy": -definition.energy_cost},
             )
             connection.execute(
                 """
@@ -1977,14 +1978,15 @@ class AdvancementRepositoryMixin:
                     """,
                     (operation_id, target_level, snapshot_json, now_text, now_text, mastery["id"]),
                 )
-            spend_player_assets(
+            change_player_state(
                 connection,
                 row,
-                {**asset_costs, **asset_resource_costs},
-                now_text,
-                player_values={
-                    storage: after
-                    for storage, _, after in resource_balances.values()
+                updated_at=now_text,
+                asset_values={**asset_costs, **asset_resource_costs},
+                asset_mode="spend",
+                value_delta={
+                    storage: after - before
+                    for storage, before, after in resource_balances.values()
                     if storage != "spirit_stones"
                 },
             )

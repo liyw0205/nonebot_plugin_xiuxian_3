@@ -469,9 +469,11 @@ class AncestralHallRepositoryMixin:
                 if first_clear:
                     flags.append(ANCESTRAL_HALL_STORY_FLAG)
                     intro["flags"] = flags
-                    connection.execute(
-                        "UPDATE players SET intro_json=?, updated_at=? WHERE id=?",
-                        (json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    change_player_state(
+                        connection,
+                        player,
+                        updated_at=now_text,
+                        player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
                     )
                     content = self.content or bundled_content()
                     content.require("codex_entry", ANCESTRAL_HALL_CODEX_ENTRY, include_locked=False)

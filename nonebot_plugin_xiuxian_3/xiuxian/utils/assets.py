@@ -40,17 +40,29 @@ class AssetState:
     inventory: dict[str, int]
 
 
+def _row_value(row: Any, key: str, default: Any = None) -> Any:
+    """Read a stored column or a detached projection attribute."""
+
+    if isinstance(row, Mapping):
+        return row.get(key, default)
+    try:
+        return row[key]
+    except (IndexError, KeyError, TypeError):
+        return getattr(row, key, default)
+
+
 _PLAYER_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def player_asset_state(row: Any, *, preserve_zero: bool = False) -> AssetState:
     """Read a detached asset state from a player row or mapping."""
 
-    try:
-        currency = row["spirit_stones"]
-        raw_inventory = row["inventory_json"]
-    except (IndexError, KeyError, TypeError) as exc:
-        raise AssetDeltaError("player row does not contain asset columns") from exc
+    currency = _row_value(row, "spirit_stones")
+    raw_inventory = _row_value(row, "inventory_json")
+    if raw_inventory is None:
+        raw_inventory = _row_value(row, "inventory")
+    if currency is None or raw_inventory is None:
+        raise AssetDeltaError("player row does not contain asset columns")
     return AssetState(
         currency=currency_with_delta(currency, 0),
         inventory=inventory_value(raw_inventory, keep_zero=preserve_zero),
@@ -416,6 +428,42 @@ def inventory_amount(inventory: Mapping[str, Any], key: str) -> int:
     return quantity
 
 
+def player_asset_amount(row: Any, key: str) -> int:
+    """Read one currency or item balance through the shared asset rules."""
+
+    state = player_asset_state(row)
+    if key in {"spirit_stones", "currency.spirit_stone"}:
+        return state.currency
+    return inventory_amount(state.inventory, str(key))
+
+
+def player_asset_amounts(row: Any, keys: tuple[str, ...] | list[str] | None = None) -> dict[str, int]:
+    """Read selected asset balances without duplicating currency/item branches."""
+
+    state = player_asset_state(row)
+    selected = keys or tuple(["spirit_stones", *state.inventory.keys()])
+    return {
+        str(key): state.currency
+        if str(key) in {"spirit_stones", "currency.spirit_stone"}
+        else inventory_amount(state.inventory, str(key))
+        for key in selected
+    }
+
+
+def player_assets_missing(row: Any, requirements: Mapping[str, Any]) -> dict[str, int]:
+    """Return missing currency/items using one shared affordability check."""
+
+    state = player_asset_state(row)
+    currency_key = "spirit_stones"
+    currency_required, item_requirements = _asset_delta_parts(requirements, currency_key=currency_key)
+    missing: dict[str, int] = {}
+    required_currency = _non_negative_amount(currency_required, "currency requirement")
+    if state.currency < required_currency:
+        missing[currency_key] = required_currency - state.currency
+    missing.update(inventory_missing(state.inventory, item_requirements))
+    return missing
+
+
 def inventory_missing(
     inventory: Mapping[str, Any], requirements: Mapping[str, Any]
 ) -> dict[str, int]:
@@ -519,31 +567,29 @@ def currency_with_delta(balance: Any, delta: Any) -> int:
     return next_balance
 
 
+def _non_negative_amount(value: Any, label: str) -> int:
+    if isinstance(value, bool):
+        raise AssetDeltaError(f"{label} must be an integer")
+    try:
+        amount = int(value)
+    except (TypeError, ValueError) as exc:
+        raise AssetDeltaError(f"{label} must be an integer") from exc
+    if amount < 0:
+        raise AssetDeltaError(f"{label} must be non-negative")
+    return amount
+
+
 def currency_grant(balance: Any, amount: Any) -> int:
     """Return a balance after granting currency."""
 
-    if isinstance(amount, bool):
-        raise AssetDeltaError("currency amount must be an integer")
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError) as exc:
-        raise AssetDeltaError("currency amount must be an integer") from exc
-    if amount < 0:
-        raise AssetDeltaError("currency amount must be non-negative")
+    amount = _non_negative_amount(amount, "currency amount")
     return currency_with_delta(balance, amount)
 
 
 def currency_spend(balance: Any, amount: Any) -> int:
     """Return a balance after spending currency."""
 
-    if isinstance(amount, bool):
-        raise AssetDeltaError("currency amount must be an integer")
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError) as exc:
-        raise AssetDeltaError("currency amount must be an integer") from exc
-    if amount < 0:
-        raise AssetDeltaError("currency amount must be non-negative")
+    amount = _non_negative_amount(amount, "currency amount")
     return currency_with_delta(balance, -amount)
 
 
@@ -568,6 +614,9 @@ __all__ = [
     "inventory_spend",
     "inventory_value",
     "inventory_with_delta",
+    "player_asset_amount",
+    "player_asset_amounts",
+    "player_assets_missing",
     "player_asset_state",
     "player_database_id",
     "spend_player_assets",

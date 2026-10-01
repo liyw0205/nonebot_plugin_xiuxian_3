@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.player import change_player_state
 from ..persistence.errors import (
     HeavenEchoBusyError,
     HeavenEchoFinalBattleError,
@@ -279,7 +280,12 @@ class HeavenEchoRepositoryMixin:
                 if first_clear:
                     flags.append(HEAVEN_ECHO_STORY_FLAG)
                     intro["flags"] = flags
-                    connection.execute("UPDATE players SET intro_json=?, updated_at=? WHERE id=?", (json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, player["id"]))
+                    change_player_state(
+                        connection,
+                        player,
+                        updated_at=now_text,
+                        player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
+                    )
                 result.update({"outcome": "won", "first_clear": first_clear, "story_flag_written": first_clear})
                 status = "settled"
             elif status in {"expired", "system_aborted"}:

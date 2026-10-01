@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
+from ..utils.player import change_player_state
 from .codex_projection import record_codex_discovery
 from .story_models import StoryBranchView, StoryRecord
 from .story_rules import BRANCHES, STORY_KEY, completed_nodes
@@ -261,9 +262,11 @@ class StoryRepositoryMixin:
             flags = set(str(item) for item in intro.get("flags", []))
             flags.update((branch.flag_key, branch.appearance_key))
             intro["flags"] = sorted(flags)
-            connection.execute(
-                "UPDATE players SET intro_json=?,updated_at=? WHERE id=?",
-                (json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
             )
             record_codex_discovery(
                 connection,

@@ -19,6 +19,7 @@ from ..persistence.errors import (
     TeamArenaSnapshotRequirementError,
 )
 from .team_arena_models import TeamArenaMatchRecord, TeamArenaReplayRecord, TeamArenaSnapshotRecord
+from ..utils.player import change_player_state
 from .team_arena_rules import (
     TEAM_ARENA_MODE_KEY,
     TEAM_DAILY_CHALLENGE_LIMIT,
@@ -270,10 +271,20 @@ class TeamArenaRepositoryMixin:
     def _team_arena_update_ratings(self, connection, members, delta: int, won: bool, drawn: bool, now_text: str) -> None:
         for member in members:
             database_id = int(member["database_id"])
-            row = connection.execute("SELECT arena_rating, arena_wins, arena_losses, arena_draws FROM players WHERE id = ?", (database_id,)).fetchone()
+            row = connection.execute("SELECT id, arena_rating, arena_wins, arena_losses, arena_draws FROM players WHERE id = ?", (database_id,)).fetchone()
             if row is None:
                 continue
-            connection.execute("UPDATE players SET arena_rating = ?, arena_wins = ?, arena_losses = ?, arena_draws = ?, updated_at = ? WHERE id = ?", (max(0, int(row["arena_rating"]) + delta), int(row["arena_wins"]) + int(won), int(row["arena_losses"]) + int(not won and not drawn), int(row["arena_draws"]) + int(drawn), now_text, database_id))
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                value_delta={
+                    "arena_rating": delta,
+                    "arena_wins": int(won),
+                    "arena_losses": int(not won and not drawn),
+                    "arena_draws": int(drawn),
+                },
+            )
 
     @staticmethod
     def _team_rating_deltas(outcome: str) -> tuple[int, int]:

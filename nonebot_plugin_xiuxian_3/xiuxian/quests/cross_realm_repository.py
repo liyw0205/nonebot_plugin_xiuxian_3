@@ -8,6 +8,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
+from ..utils.player import change_player_state
 from ..persistence.errors import (
     QuestAlreadyCompletedError,
     QuestNotCompletedError,
@@ -94,9 +95,11 @@ class DemonQuestRepositoryMixin:
             flags = {str(item) for item in intro.get("flags", [])}
             flags.update({DEMON_MAINLINE, DEMON_MAINLINE_ACCESS_FLAG})
             intro["flags"] = sorted(flags)
-            connection.execute(
-                "UPDATE players SET intro_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, player_id),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
             )
             for item in evidence:
                 self._insert_quest_event(

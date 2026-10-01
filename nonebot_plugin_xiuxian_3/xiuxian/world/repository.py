@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, inventory_value
+from ..utils.assets import inventory_value
 from ..utils.player import change_player_state, player_inventory
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
@@ -261,15 +261,6 @@ class WorldRepositoryMixin:
             if storm:
                 extra_anchor_lost = min(1, int(inventory.get("item.void_anchor", 0)))
             reward = {"item.void_crystal": 1}
-            change_player_assets(
-                connection,
-                row,
-                {
-                    "item.void_anchor": -extra_anchor_lost,
-                    **reward,
-                },
-                now_text,
-            )
             instability_until = (
                 serialize_datetime(now + timedelta(seconds=VOID_INSTABILITY_SECONDS))
                 if storm
@@ -283,15 +274,20 @@ class WorldRepositoryMixin:
                 "SELECT 1 FROM void_route_sessions WHERE player_id = ? AND route_key = ? AND status = 'settled' LIMIT 1",
                 (row["id"], arrival_location),
             ).fetchone()
-            connection.execute(
-                "UPDATE players SET location_key = ?, void_route_count = void_route_count + ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
-                (
-                    arrival_location,
-                    0 if discovered_route is not None else 1,
-                    instability_until,
-                    now_text,
-                    row["id"],
-                ),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={
+                    "item.void_anchor": -extra_anchor_lost,
+                    **reward,
+                },
+                asset_mode="delta",
+                value_delta={"void_route_count": 0 if discovered_route is not None else 1},
+                player_values={
+                    "location_key": arrival_location,
+                    "void_instability_until": instability_until,
+                },
             )
             result = {
                 "reward": reward,

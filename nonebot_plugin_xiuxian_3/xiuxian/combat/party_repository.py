@@ -81,8 +81,8 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_DAMAGE_BP,
     TIME_FORT_STORM_INTERVAL,
 )
-from ..utils.player import change_player_state, player_combat_values, player_intro_flags, player_object, player_reputation
-from ..utils.assets import grant_player_assets, inventory_spend, spend_player_assets
+from ..utils.player import change_player_state, player_combat_values, player_integer, player_intro_flags, player_object, player_reputation
+from ..utils.assets import inventory_spend, spend_player_assets
 
 
 class PartyCombatRepositoryMixin:
@@ -419,21 +419,21 @@ class PartyCombatRepositoryMixin:
                     raise BoundaryRealmRequirementError("three-realms mainline evidence is missing")
                 if demon_party and not self._intro_flag(row, "access.demon.fallen_ruins"):
                     raise CrossRealmPartyRequirementError("demon fallen ruins access is missing")
-                if demon_party and int(row["pollution"]) >= 80:
+                if demon_party and player_state["pollution"] >= 80:
                     raise PollutionTooHighError("pollution is too high for the demon dungeon")
                 if beast_party and self._faction_reputation(row, "beast") < 200:
                     raise FactionReputationInsufficientError("beast reputation is insufficient")
-                if tower_duo_party and int(row["stamina"]) < 12:
+                if tower_duo_party and player_state["stamina"] < 12:
                     raise PartyBattleRequirementError("a tower duo member lacks stamina")
                 if ancient_domain_party and str(party["location_key"]) != ANCIENT_DOMAIN_LOCATION:
                     raise PartyBattleRequirementError("ancient-domain party is at the wrong location")
                 if void_ruins_party and str(party["location_key"]) != VOID_RUINS_LOCATION:
                     raise PartyBattleRequirementError("void-ruins party is at the wrong location")
-                if boundary_party and int(row["stamina"]) < BOUNDARY_REALM_STAMINA_COST:
+                if boundary_party and player_state["stamina"] < BOUNDARY_REALM_STAMINA_COST:
                     raise BoundaryRealmResourceError("a party member lacks boundary-realm stamina")
-                if demon_party and int(row["stamina"]) < DEMON_REALM_STAMINA_COST:
+                if demon_party and player_state["stamina"] < DEMON_REALM_STAMINA_COST:
                     raise CrossRealmPartyRequirementError("a party member lacks demon-dungeon stamina")
-                if beast_party and int(row["stamina"]) < BEAST_REALM_STAMINA_COST:
+                if beast_party and player_state["stamina"] < BEAST_REALM_STAMINA_COST:
                     raise CrossRealmPartyRequirementError("a party member lacks beast-dungeon stamina")
                 if boundary_rift_combat or demon_party or beast_party:
                     fatigue_until = row["soul_fatigue_until"]
@@ -443,7 +443,7 @@ class PartyCombatRepositoryMixin:
                                 raise SoulExhaustionActiveError("soul exhaustion is active")
                         except ValueError:
                             pass
-                    if int(row["soul_power"]) <= 0:
+                    if player_state["soul_power"] <= 0:
                         raise SoulPowerInsufficientError("soul power is insufficient")
                 if self._has_active_long_action(
                     connection,
@@ -486,9 +486,9 @@ class PartyCombatRepositoryMixin:
                     constitution_effect=constitution_effect,
                 )
                 cross_realm_snapshot = {
-                    "pollution": int(entry_snapshot.get("pollution", row["pollution"]) if entry_snapshot else row["pollution"]),
-                    "bloodline_stability": int(entry_snapshot.get("bloodline_stability", row["bloodline_stability"]) if entry_snapshot else row["bloodline_stability"]),
-                    "cross_realm_penalty_bp": int(entry_snapshot.get("cross_realm_penalty_bp", row["cross_realm_penalty_bp"]) if entry_snapshot else row["cross_realm_penalty_bp"]),
+                    "pollution": int(entry_snapshot.get("pollution", player_state["pollution"]) if entry_snapshot else player_state["pollution"]),
+                    "bloodline_stability": int(entry_snapshot.get("bloodline_stability", player_state["bloodline_stability"]) if entry_snapshot else player_state["bloodline_stability"]),
+                    "cross_realm_penalty_bp": int(entry_snapshot.get("cross_realm_penalty_bp", player_state["cross_realm_penalty_bp"]) if entry_snapshot else player_state["cross_realm_penalty_bp"]),
                     "faction_reputation": dict(entry_snapshot.get("faction_reputation", {}) if entry_snapshot else self._json_object(row["faction_reputation_json"], {})),
                     "alliance_key": entry_snapshot.get("alliance_key") if entry_snapshot else self._alliance_key_from_row(row),
                 }
@@ -506,11 +506,11 @@ class PartyCombatRepositoryMixin:
                         "equipment": list(equipment),
                         "skills": skills,
                         "companions": companions,
-                        "soul_power": int(entry_snapshot.get("soul_power", row["soul_power"]) if entry_snapshot else row["soul_power"]),
+                        "soul_power": int(entry_snapshot.get("soul_power", player_state["soul_power"]) if entry_snapshot else player_state["soul_power"]),
                         "domain_key": (entry_snapshot.get("domain_key") if entry_snapshot else row["domain_key"]),
-                        "domain_charge": int(entry_snapshot.get("domain_charge", row["domain_charge"]) if entry_snapshot else row["domain_charge"]),
-                        "domain_charge_max": int(entry_snapshot.get("domain_charge_max", row["domain_charge_max"]) if entry_snapshot else row["domain_charge_max"]),
-                        "domain_power": int(entry_snapshot.get("domain_power", row["domain_power"]) if entry_snapshot else row["domain_power"]),
+                        "domain_charge": int(entry_snapshot.get("domain_charge", player_state["domain_charge"]) if entry_snapshot else player_state["domain_charge"]),
+                        "domain_charge_max": int(entry_snapshot.get("domain_charge_max", player_state["domain_charge_max"]) if entry_snapshot else player_state["domain_charge_max"]),
+                        "domain_power": int(entry_snapshot.get("domain_power", player_state["domain_power"]) if entry_snapshot else player_state["domain_power"]),
                         "cross_realm": cross_realm_snapshot,
                         "pollution": cross_realm_snapshot["pollution"],
                         "bloodline_stability": cross_realm_snapshot["bloodline_stability"],
@@ -1084,9 +1084,16 @@ class PartyCombatRepositoryMixin:
                     member_domain_energy[player_id] -= amount
                     if member_domain_energy[player_id] <= 0:
                         member_domain_active[player_id] = False
-                    connection.execute(
-                        "UPDATE players SET domain_charge=MAX(0, domain_charge-?), updated_at=? WHERE id=?",
-                        (amount, now_text, player_id_db),
+                    current_player = connection.execute(
+                        "SELECT * FROM players WHERE id = ?", (player_id_db,)
+                    ).fetchone()
+                    if current_player is None:
+                        raise PartyBattleNotFoundError("party member disappeared during battle")
+                    change_player_state(
+                        connection,
+                        current_player,
+                        updated_at=now_text,
+                        value_delta={"domain_charge": -amount},
                     )
                     connection.execute(
                         "INSERT OR IGNORE INTO ancient_domain_energy_events(run_id, battle_id, player_id, round_no, amount, created_at) "
@@ -1111,9 +1118,16 @@ class PartyCombatRepositoryMixin:
                 for member in members:
                     player_id = str(member["player_id"])
                     member_soul_power[player_id] = max(0, member_soul_power[player_id] - 10)
-                    connection.execute(
-                        "UPDATE players SET soul_power=MAX(0, soul_power-10), updated_at=? WHERE id=?",
-                        (now_text, member["database_id"]),
+                    current_player = connection.execute(
+                        "SELECT * FROM players WHERE id = ?", (member["database_id"],)
+                    ).fetchone()
+                    if current_player is None:
+                        raise PartyBattleNotFoundError("party member disappeared during battle")
+                    change_player_state(
+                        connection,
+                        current_player,
+                        updated_at=now_text,
+                        value_delta={"soul_power": -10},
                     )
                 sequence += 1
                 actions.append(
@@ -1152,12 +1166,17 @@ class PartyCombatRepositoryMixin:
                     if reviver is None:
                         continue
                     reviver_id = str(reviver["player_id"])
-                    debited = connection.execute(
-                        "UPDATE players SET soul_power=soul_power-25, updated_at=? WHERE id=? AND soul_power>=25",
-                        (now_text, reviver["database_id"]),
-                    ).rowcount
-                    if debited != 1:
+                    current_reviver = connection.execute(
+                        "SELECT * FROM players WHERE id = ?", (reviver["database_id"],)
+                    ).fetchone()
+                    if current_reviver is None or player_integer(current_reviver, "soul_power") < 25:
                         continue
+                    change_player_state(
+                        connection,
+                        current_reviver,
+                        updated_at=now_text,
+                        value_delta={"soul_power": -25},
+                    )
                     member_soul_power[reviver_id] = max(0, member_soul_power.get(reviver_id, 0) - 25)
                     member_hp[downed_id] = max(1, int(downed["stats"]["max_hp"]) // 2)
                     member_status[downed_id] = "active"
@@ -1336,39 +1355,55 @@ class PartyCombatRepositoryMixin:
                 if player is None:
                     raise PartyBattleNotFoundError("party battle member no longer exists")
                 if reward:
-                    cultivation = int(player["cultivation"]) + int(reward.get("cultivation", 0))
-                    total_cultivation = int(player["total_cultivation"]) + int(reward.get("cultivation", 0))
                     asset_reward = {
                         key: value
                         for key, value in reward.items()
                         if key not in {"cultivation", "world_merit", "soul_power"}
                         and not key.startswith("faction_reputation.")
                     }
-                    grant_player_assets(connection, player, asset_reward, now_text)
-                    world_merit = int(player["world_merit"]) + int(reward.get("world_merit", 0))
                     soul_power_max = max(
                         int(player["soul_power_max"]),
                         int(player["soul_power"]),
                         BOUNDARY_REALM_SOUL_POWER_MAX if boundary_party and reward.get("soul_power") else 0,
-                    )
-                    soul_power = min(
-                        soul_power_max,
-                        int(player["soul_power"]) + int(reward.get("soul_power", 0)),
                     )
                     faction = self._json_object(player["faction_reputation_json"], {})
                     for item_key, quantity in reward.items():
                         if item_key.startswith("faction_reputation."):
                             faction_key = item_key.removeprefix("faction_reputation.")
                             faction[faction_key] = int(faction.get(faction_key, 0)) + int(quantity)
-                    connection.execute(
-                        "UPDATE players SET cultivation=?, total_cultivation=?, world_merit=?, soul_power=?, soul_power_max=?, faction_reputation_json=?, updated_at=? WHERE id=?",
-                        (cultivation, total_cultivation, world_merit, soul_power, soul_power_max, json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+                    change_player_state(
+                        connection,
+                        player,
+                        updated_at=now_text,
+                        asset_values=asset_reward or None,
+                        asset_mode="grant",
+                        value_delta={
+                            "cultivation": int(reward.get("cultivation", 0)),
+                            "total_cultivation": int(reward.get("cultivation", 0)),
+                            "world_merit": int(reward.get("world_merit", 0)),
+                            "soul_power": int(reward.get("soul_power", 0)),
+                        },
+                        maximums={"soul_power": soul_power_max},
+                        player_values={
+                            "soul_power_max": soul_power_max,
+                            "faction_reputation_json": json.dumps(
+                                faction, ensure_ascii=False, sort_keys=True
+                            ),
+                        },
                     )
                 if fatigue_party and outcome in {"lost", "expired"}:
                     fatigue_until = serialize_datetime(self._now() + timedelta(hours=2))
-                    connection.execute(
-                        "UPDATE players SET soul_power=MAX(0, soul_power-2000), soul_fatigue_until=?, updated_at=? WHERE id=?",
-                        (fatigue_until, now_text, player["id"]),
+                    current_player = connection.execute(
+                        "SELECT * FROM players WHERE id = ?", (player["id"],)
+                    ).fetchone()
+                    if current_player is None:
+                        raise PartyBattleNotFoundError("party battle member no longer exists")
+                    change_player_state(
+                        connection,
+                        current_player,
+                        updated_at=now_text,
+                        value_delta={"soul_power": -2000},
+                        player_values={"soul_fatigue_until": fatigue_until},
                     )
                 connection.execute(
                     "INSERT INTO party_battle_rewards(battle_id, party_id, player_id, reward_json, status, operation_id, claimed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",

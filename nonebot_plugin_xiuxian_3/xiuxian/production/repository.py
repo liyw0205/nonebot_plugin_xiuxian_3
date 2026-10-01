@@ -40,7 +40,8 @@ from ..production.models import (
 )
 from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
 from ..utils.equipment import create_equipment_instances
-from ..utils.assets import grant_player_assets, inventory_value, spend_player_assets
+from ..utils.assets import grant_player_assets, inventory_value
+from ..utils.player import change_player_state
 from ..progression.breakthrough.models import (
     BreakthroughSettlementRecord,
     BreakthroughSessionRecord,
@@ -423,15 +424,14 @@ class ProductionRepositoryMixin:
                 "facility_slot_id": int(facility_slot["id"]) if facility_slot is not None else None,
                 "constitution_effect": constitution_effect_snapshot(connection, int(row["id"])),
             }
-            spend_player_assets(
+            change_player_state(
                 connection,
                 row,
-                {"spirit_stones": recipe.currency_cost, **recipe.inputs},
-                now_text,
-                player_values={
-                    "energy": int(row["energy"]) - recipe.energy_cost,
-                    "durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True),
-                },
+                updated_at=now_text,
+                asset_values={"spirit_stones": recipe.currency_cost, **recipe.inputs},
+                asset_mode="spend",
+                value_delta={"energy": -recipe.energy_cost},
+                player_values={"durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True)},
             )
             connection.execute(
                 """

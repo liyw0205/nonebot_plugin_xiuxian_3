@@ -168,7 +168,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_grant, inventory_json
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer
 from ..utils.json import json_object
 from ..utils.player import player_field, player_reputation, player_values
 
@@ -585,8 +585,8 @@ class PlayerRepositoryMixin:
                 raise OperationConflictError("teaching service differs from the completed choice")
 
             item_quantity = 0
-            stamina = int(row["stamina"])
-            energy = int(row["energy"])
+            stamina = player_integer(row, "stamina")
+            energy = player_integer(row, "energy")
             if changed:
                 if guide_key == "guide.gather_blood_grass":
                     if row["location_key"] != "xuantian.outskirts":
@@ -622,8 +622,8 @@ class PlayerRepositoryMixin:
                 ),
                 asset_mode="grant",
                 value_delta={
-                    "stamina": stamina - int(row["stamina"]),
-                    "energy": energy - int(row["energy"]),
+                    "stamina": stamina - player_integer(row, "stamina"),
+                    "energy": energy - player_integer(row, "energy"),
                 },
                 player_values={
                     "stage": stage,
@@ -803,14 +803,17 @@ class PlayerRepositoryMixin:
                 raise LocationRequirementError("spirit field can only be entered from the starting area")
             changed = current != destination
             cost = TRAVEL_COSTS[destination] if changed else 0
-            stamina = int(row["stamina"])
+            stamina = player_integer(row, "stamina")
             if changed and stamina < cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             if changed:
                 stamina -= cost
-                connection.execute(
-                    "UPDATE players SET location_key = ?, stamina = ?, updated_at = ? WHERE id = ?",
-                    (destination, stamina, serialize_datetime(now), row["id"]),
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=serialize_datetime(now),
+                    value_delta={"stamina": stamina - player_integer(row, "stamina")},
+                    player_values={"location_key": destination},
                 )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
@@ -936,9 +939,11 @@ class PlayerRepositoryMixin:
                 ).fetchone()
                 if taken is not None:
                     raise DaoNameTakenError("dao name is already used")
-                connection.execute(
-                    "UPDATE players SET dao_name = ?, updated_at = ? WHERE id = ?",
-                    (dao_name, serialize_datetime(now), row["id"]),
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=serialize_datetime(now),
+                    player_values={"dao_name": dao_name},
                 )
                 updated = connection.execute(
                     "SELECT * FROM players WHERE id = ?", (row["id"],)
@@ -980,18 +985,28 @@ class PlayerRepositoryMixin:
             ).fetchone()
             if row is None:
                 return None
-            if str(row["realm_key"]) == "soul_transformation" and int(row["domain_charge_max"]) > 0:
+            if str(row["realm_key"]) == "soul_transformation" and player_integer(row, "domain_charge_max") > 0:
                 business_date = self._now().date().isoformat()
                 if str(row["domain_charge_reset_date"] or "") != business_date:
-                    connection.execute(
-                        "UPDATE players SET domain_charge = domain_charge_max, domain_charge_reset_date = ?, updated_at = ? WHERE id = ?",
-                        (business_date, serialize_datetime(self._now()), row["id"]),
+                    change_player_state(
+                        connection,
+                        row,
+                        updated_at=serialize_datetime(self._now()),
+                        player_values={
+                            "domain_charge": player_integer(row, "domain_charge_max"),
+                            "domain_charge_reset_date": business_date,
+                        },
                     )
                     row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if row["domain_crack_until"]:
                 try:
                     if self._now() >= datetime.fromisoformat(str(row["domain_crack_until"])):
-                        connection.execute("UPDATE players SET domain_crack_until = NULL, updated_at = ? WHERE id = ?", (serialize_datetime(self._now()), row["id"]))
+                        change_player_state(
+                            connection,
+                            row,
+                            updated_at=serialize_datetime(self._now()),
+                            player_values={"domain_crack_until": None},
+                        )
                         row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
                 except ValueError:
                     pass

@@ -8,11 +8,8 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import (
-    change_player_assets,
-    inventory_value,
-    spend_player_assets,
-)
+from ..utils.assets import inventory_value
+from ..utils.player import change_player_state
 from ..persistence.errors import (
     EndgameRecipeAlreadyCreatedError,
     EndgameRecipeBusyError,
@@ -163,12 +160,13 @@ class EndgameProductionRepositoryMixin:
                 "progress_before": int(player["dao_fruit_progress"]),
                 "roll_bp": roll_bp,
             }
-            spend_player_assets(
+            change_player_state(
                 connection,
                 player,
-                recipe.inputs,
-                now_text,
-                player_values={"world_merit": int(player["world_merit"]) - recipe.world_merit_cost},
+                updated_at=now_text,
+                asset_values=recipe.inputs,
+                asset_mode="spend",
+                value_delta={"world_merit": -recipe.world_merit_cost},
             )
             connection.execute(
                 "INSERT INTO endgame_sessions(session_id, player_id, operation_id, session_type, status, starts_at, ends_at, snapshot_json, result_json, created_at, updated_at) "
@@ -247,15 +245,16 @@ class EndgameProductionRepositoryMixin:
                     world_merit_refund = recipe.world_merit_cost
                     refunds["world_merit"] = world_merit_refund
 
-            change_player_assets(
+            change_player_state(
                 connection,
                 player,
-                {str(key): int(value) for key, value in rewards.items() if str(key).startswith("item.")}
+                updated_at=now_text,
+                asset_values={str(key): int(value) for key, value in rewards.items() if str(key).startswith("item.")}
                 | {str(key): int(value) for key, value in refunds.items() if str(key).startswith("item.")},
-                now_text,
-                player_values={
-                    "dao_fruit_progress": int(player["dao_fruit_progress"]) + progress_reward,
-                    "world_merit": int(player["world_merit"]) + world_merit_refund,
+                asset_mode="delta",
+                value_delta={
+                    "dao_fruit_progress": progress_reward,
+                    "world_merit": world_merit_refund,
                 },
             )
             result = {

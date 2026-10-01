@@ -14,7 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.player import player_combat_values
+from ..utils.player import change_player_state, player_combat_values
 from ..persistence.errors import (
     ArenaChallengeCapError,
     ArenaMatchNotFoundError,
@@ -459,27 +459,30 @@ class ArenaRepositoryMixin:
             challenger_rating = max(0, int(challenger["arena_rating"]) + challenger_delta)
             defender_rating = max(0, int(defender["arena_rating"]) + defender_delta)
             if score_counted:
-                connection.execute(
-                    "UPDATE players SET arena_rating = ?, arena_wins = arena_wins + ?, arena_losses = arena_losses + ?, arena_draws = arena_draws + ?, updated_at = ? WHERE id = ?",
-                    (
-                        challenger_rating,
-                        1 if outcome == "challenger_won" else 0,
-                        1 if outcome == "defender_won" else 0,
-                        1 if outcome == "draw" else 0,
-                        now_text,
-                        challenger_id,
-                    ),
+                change_player_state(
+                    connection,
+                    challenger,
+                    updated_at=now_text,
+                    value_delta={
+                        "arena_rating": challenger_delta,
+                        "arena_wins": 1 if outcome == "challenger_won" else 0,
+                        "arena_losses": 1 if outcome == "defender_won" else 0,
+                        "arena_draws": 1 if outcome == "draw" else 0,
+                    },
                 )
-                connection.execute(
-                    "UPDATE players SET arena_rating = ?, arena_wins = arena_wins + ?, arena_losses = arena_losses + ?, arena_draws = arena_draws + ?, updated_at = ? WHERE id = ?",
-                    (
-                        defender_rating,
-                        1 if outcome == "defender_won" else 0,
-                        1 if outcome == "challenger_won" else 0,
-                        1 if outcome == "draw" else 0,
-                        now_text,
-                        defender["id"],
-                    ),
+                defender_row = connection.execute("SELECT * FROM players WHERE id = ?", (defender["id"],)).fetchone()
+                if defender_row is None:
+                    raise ArenaOpponentUnavailableError("opponent disappeared during settlement")
+                change_player_state(
+                    connection,
+                    defender_row,
+                    updated_at=now_text,
+                    value_delta={
+                        "arena_rating": defender_delta,
+                        "arena_wins": 1 if outcome == "defender_won" else 0,
+                        "arena_losses": 1 if outcome == "challenger_won" else 0,
+                        "arena_draws": 1 if outcome == "draw" else 0,
+                    },
                 )
             else:
                 challenger_rating = int(challenger["arena_rating"])

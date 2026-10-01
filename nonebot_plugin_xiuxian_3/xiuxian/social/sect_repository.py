@@ -39,6 +39,7 @@ from .sect_rules import (
     validate_sect_name,
 )
 from ..utils.assets import spend_player_currency
+from ..utils.player import change_player_state
 
 
 class SectRepositoryMixin:
@@ -405,9 +406,11 @@ class SectRepositoryMixin:
                 (now_text, now_text, now_text, membership["id"]),
             )
             cooldown_until = now + timedelta(seconds=SECT_JOIN_COOLDOWN_SECONDS)
-            connection.execute(
-                "UPDATE players SET sect_join_cooldown_until = ?, updated_at = ? WHERE id = ?",
-                (serialize_datetime(cooldown_until), now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                player_values={"sect_join_cooldown_until": serialize_datetime(cooldown_until)},
             )
             payload = self._sect_payload(
                 connection,

@@ -174,7 +174,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import grant_player_assets, spend_player_items
+from ..utils.assets import grant_player_assets
 from ..utils.player import change_player_state
 
 
@@ -624,17 +624,13 @@ class AdventuresRepositoryMixin:
             if progress < definition.target_amount:
                 raise BountyIncompleteError("bounty target is incomplete")
 
+            consumed_target: tuple[str, int] | None = None
             if definition.consume_target and definition.target_key:
                 inventory = self._json_object(row["inventory_json"], {})
                 quantity = int(inventory.get(definition.target_key, 0))
                 if quantity < definition.target_amount:
                     raise BountyIncompleteError("delivery inventory is insufficient")
-                spend_player_items(
-                    connection,
-                    row,
-                    {definition.target_key: definition.target_amount},
-                    now_text,
-                )
+                consumed_target = (definition.target_key, definition.target_amount)
             snapshot = self._json_object(offer["snapshot_json"], {})
             rewards = {str(key): int(value) for key, value in dict(snapshot["reward"]).items()}
             actual_rewards: dict[str, int] = {}
@@ -707,12 +703,16 @@ class AdventuresRepositoryMixin:
                 """,
                 (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
             )
+            asset_delta = dict(asset_rewards)
+            if consumed_target is not None:
+                target_key, target_amount = consumed_target
+                asset_delta[target_key] = asset_delta.get(target_key, 0) - target_amount
             change_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values=asset_rewards,
-                asset_mode="grant",
+                asset_values=asset_delta or None,
+                asset_mode="delta",
                 value_delta={
                     "cultivation": cultivation_gain,
                     "total_cultivation": cultivation_gain,

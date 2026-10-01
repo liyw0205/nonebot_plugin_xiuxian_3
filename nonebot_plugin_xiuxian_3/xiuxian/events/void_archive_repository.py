@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_items
+from ..utils.player import change_player_state
 from ..persistence.errors import (
     OperationConflictError,
     VoidArchiveGuardAlreadySettledError,
@@ -298,12 +299,13 @@ class VoidArchiveRepositoryMixin:
             if progress < target:
                 raise VoidArchiveTaskNotCompleteError("archive task evidence is incomplete")
             reward = dict(TASK_REWARDS[task_key])
-            grant_player_items(
+            change_player_state(
                 connection,
                 player,
-                reward,
-                now_text,
-                player_values={"void_merit": int(player["void_merit"]) + TASK_VOID_MERIT},
+                updated_at=now_text,
+                asset_values=reward,
+                asset_mode="grant",
+                value_delta={"void_merit": TASK_VOID_MERIT},
             )
             connection.execute(
                 "INSERT INTO void_archive_tasks(player_id, week_id, task_key, status, progress, target, reward_json, operation_id, claimed_at) VALUES (?, ?, ?, 'claimed', ?, ?, ?, ?, ?)",
@@ -327,9 +329,17 @@ class VoidArchiveRepositoryMixin:
                         "INSERT INTO void_archive_unlocks(player_id, week_id, event_key, starts_at, ends_at, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                         (player["id"], week_id, ARCHIVE_EVENT_KEY, now_text, serialize_datetime(week_end), f"{operation_id}:unlock", now_text),
                     )
-                    connection.execute(
-                        "UPDATE players SET void_merit = void_merit + ? WHERE id = ?",
-                        (UNLOCK_VOID_MERIT, player["id"]),
+                    updated_player = connection.execute(
+                        "SELECT * FROM players WHERE id = ?",
+                        (player["id"],),
+                    ).fetchone()
+                    if updated_player is None:
+                        raise RuntimeError("archive unlock player disappeared")
+                    change_player_state(
+                        connection,
+                        updated_player,
+                        updated_at=now_text,
+                        value_delta={"void_merit": UNLOCK_VOID_MERIT},
                     )
                     connection.execute(
                         "INSERT OR IGNORE INTO activity_events(player_id, event_key, source_operation_id, occurred_at, payload_json) VALUES (?, ?, ?, ?, ?)",

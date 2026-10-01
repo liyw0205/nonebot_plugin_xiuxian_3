@@ -39,7 +39,7 @@ from .dispatch_rules import (
     reward_for,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.player import change_player_state, player_inventory
+from ..utils.player import change_player_state, player_integer, player_inventory
 
 
 class DispatchRepositoryMixin:
@@ -98,9 +98,9 @@ class DispatchRepositoryMixin:
         ) is None:
             missing.append(f"需要有效 {definition.required_permit}")
         costs = dict(definition.costs)
-        if int(player["stamina"]) < costs.get("stamina", 0):
+        if player_integer(player, "stamina") < costs.get("stamina", 0):
             missing.append("体力不足")
-        if int(player["energy"]) < costs.get("energy", 0):
+        if player_integer(player, "energy") < costs.get("energy", 0):
             missing.append("精力不足")
         inventory = player_inventory(player)
         for key, amount in costs.items():

@@ -457,7 +457,7 @@ def test_redemption_code_is_hashed_idempotent_and_player_unique() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             code = redemption_code_definition(
-                "code.onboarding.v0.1",
+                "code.onboarding",
                 "WELCOME-01",
                 {"item.herb.blood_grass": 2},
             )
@@ -506,19 +506,19 @@ def test_redemption_code_window_revoke_capacity_and_reward_validation() -> None:
         clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
         with TemporaryDirectory() as data_dir:
             limited = redemption_code_definition(
-                "code.repair.v0.1",
+                "code.repair",
                 "LIMIT-01",
                 {"item.mat.array_sand": 1},
                 max_claims=1,
             )
             expired = redemption_code_definition(
-                "code.expired.v0.1",
+                "code.expired",
                 "EXPIRED-01",
                 {"item.herb.blood_grass": 1},
                 ends_on="2026-09-21",
             )
             revoked = redemption_code_definition(
-                "code.revoked.v0.1",
+                "code.revoked",
                 "REVOKED-01",
                 {"item.herb.blood_grass": 1},
                 revoked=True,
@@ -557,7 +557,7 @@ def test_redemption_code_window_revoke_capacity_and_reward_validation() -> None:
 
         with pytest.raises(ValueError):
             redemption_code_definition(
-                "code.invalid.v0.1",
+                "code.invalid",
                 "INVALID-01",
                 {"cultivation": 1},
             )

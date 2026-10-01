@@ -208,7 +208,12 @@ class BreakthroughRepositoryMixin:
             if "quest.prepare_nascent_soul" not in flags:
                 flags.append("quest.prepare_nascent_soul")
             intro["flags"] = flags
-            connection.execute("UPDATE players SET intro_json = ?, updated_at = ? WHERE id = ?", (json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, row["id"]))
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
+            )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
                 raise RuntimeError("nascent soul preparation returned no player")
@@ -337,7 +342,12 @@ class BreakthroughRepositoryMixin:
                             raise DomainCrackActiveError("domain crack is active")
                     except ValueError:
                         pass
-                    connection.execute("UPDATE players SET domain_crack_until = NULL WHERE id = ?", (row["id"],))
+                    change_player_state(
+                        connection,
+                        row,
+                        updated_at=now_text,
+                        player_values={"domain_crack_until": None},
+                    )
             if is_nascent:
                 pending = connection.execute(
                     "SELECT 1 FROM heart_demon_sessions WHERE player_id = ? AND status = 'pending' LIMIT 1",
@@ -400,7 +410,12 @@ class BreakthroughRepositoryMixin:
                     weak_time = now
                 if weak_time > now:
                     raise WeaknessActiveError("breakthrough weakness is active")
-                connection.execute("UPDATE players SET weakness_until = NULL WHERE id = ?", (row["id"],))
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    player_values={"weakness_until": None},
+                )
             active = connection.execute(
                 "SELECT 1 FROM breakthrough_sessions WHERE player_id = ? AND status = 'preparing' LIMIT 1",
                 (row["id"],),
@@ -695,7 +710,12 @@ class BreakthroughRepositoryMixin:
                         raise DomainCrackActiveError("domain crack is active")
                 except ValueError:
                     pass
-                connection.execute("UPDATE players SET domain_crack_until = NULL WHERE id = ?", (row["id"],))
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    player_values={"domain_crack_until": None},
+                )
             if str(row["realm_key"]) != "soul_transformation" or int(row["realm_layer"]) < 3:
                 raise DomainNotEligibleError("domain requires soul transformation L3")
             if row["domain_key"]:
@@ -1353,7 +1373,12 @@ class BreakthroughRepositoryMixin:
                         raise SoulFatigueActiveError("soul fatigue is active")
                 except ValueError:
                     pass
-            connection.execute("UPDATE players SET soul_fatigue_until = NULL, updated_at = ? WHERE id = ?", (now_text, row["id"]))
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                player_values={"soul_fatigue_until": None},
+            )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
                 raise RuntimeError("soul fatigue recovery returned no player")

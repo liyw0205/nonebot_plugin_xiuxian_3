@@ -16,6 +16,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..content import bundled_content
 from ..utils.assets import change_player_assets, grant_player_assets
+from ..utils.player import change_player_state
 from ..specials.codex_projection import record_codex_discovery
 from ..persistence.errors import (
     DomainCrackActiveError,
@@ -179,7 +180,12 @@ class DomainFrontRepositoryMixin:
                 "INSERT INTO domain_front_participants(round_id,player_id,sect_id,domain_key,stamina_cost,contribution,status,snapshot_json,joined_at) VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?)",
                 (event["round_id"], player["id"], sect["sect_id"], player["domain_key"], JOIN_STAMINA_COST, json.dumps(snapshot, sort_keys=True), now_text),
             )
-            connection.execute("UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=?", (JOIN_STAMINA_COST, now_text, player["id"]))
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"stamina": -JOIN_STAMINA_COST},
+            )
             payload = self._domain_payload(connection, int(player["id"]), event)
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._domain_record_from_payload(payload)

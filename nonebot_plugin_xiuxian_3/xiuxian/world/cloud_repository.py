@@ -226,9 +226,11 @@ class CloudRepositoryMixin:
                 raise CloudBoatNotFoundError("no running cloud boat")
             if now < datetime.fromisoformat(str(session["ends_at"])):
                 raise CloudBoatNotReadyError("cloud boat is not ready")
-            connection.execute(
-                "UPDATE players SET location_key = ?, updated_at = ? WHERE id = ?",
-                (session["destination"], now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                player_values={"location_key": session["destination"]},
             )
             result = {"arrived": True, "settled_at": now_text, "destination": session["destination"]}
             connection.execute(
@@ -281,9 +283,11 @@ class CloudRepositoryMixin:
             recovery_deadline = datetime.fromisoformat(str(session["ends_at"])) + timedelta(hours=24)
             if now < recovery_deadline:
                 raise CloudBoatNotReadyError("cloud boat recovery window has not opened")
-            connection.execute(
-                "UPDATE players SET location_key = ?, updated_at = ? WHERE id = ?",
-                (session["destination"], now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                player_values={"location_key": session["destination"]},
             )
             result = {"arrived": True, "recovered": True, "settled_at": now_text, "destination": session["destination"]}
             connection.execute(

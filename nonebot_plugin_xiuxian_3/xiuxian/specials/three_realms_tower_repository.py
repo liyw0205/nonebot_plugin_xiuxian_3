@@ -11,6 +11,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..persistence.errors import (
     OperationConflictError,
+    PlayerNotFoundError,
     ResourceInsufficientError,
     TowerAlreadyClaimedError,
     TowerBusyError,
@@ -23,6 +24,7 @@ from ..persistence.errors import (
     TowerStartFailedError,
 )
 from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state, player_integer
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .three_realms_arena_rules import player_faction
 from .three_realms_tower_models import (
@@ -200,7 +202,7 @@ class ThreeRealmsTowerRepositoryMixin:
             ).fetchone()[0])
             if used >= definition.weekly_limit:
                 raise TowerQuotaError("weekly attempts for this tower floor are exhausted")
-            if int(player["stamina"]) < definition.stamina_cost:
+            if player_integer(player, "stamina") < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
 
             faction = player_faction(player)
@@ -212,9 +214,11 @@ class ThreeRealmsTowerRepositoryMixin:
             )
             run_id = uuid4().hex
             reward = reward_for(floor_no, run_id, first_clear=first_clear)
-            connection.execute(
-                "UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=? AND stamina>=?",
-                (definition.stamina_cost, now_text, player["id"], definition.stamina_cost),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"stamina": -definition.stamina_cost},
             )
             connection.execute(
                 "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,battle_id,first_clear,"
@@ -279,8 +283,8 @@ class ThreeRealmsTowerRepositoryMixin:
             "alliance": alliance,
             "faction_reputation": self._json_object(player["faction_reputation_json"], {}),
             "local_reputation": local_reputation,
-            "pollution": int(player["pollution"]),
-            "bloodline_stability": int(player["bloodline_stability"]),
+            "pollution": player_integer(player, "pollution"),
+            "bloodline_stability": player_integer(player, "bloodline_stability"),
             "captured_at": captured_at,
         }
 
@@ -533,9 +537,17 @@ class ThreeRealmsTowerRepositoryMixin:
             if run is None:
                 return
             stamina_cost = floor_definition(int(run["floor_no"])).stamina_cost
-            connection.execute(
-                "UPDATE players SET stamina=MIN(stamina_max,stamina+?),updated_at=? WHERE id=?",
-                (stamina_cost, now_text, run["player_id"]),
+            player = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (run["player_id"],)
+            ).fetchone()
+            if player is None:
+                raise PlayerNotFoundError("three-realms tower player disappeared during recovery")
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"stamina": stamina_cost},
+                maximums={"stamina": player["stamina_max"]},
             )
             result = self._json_object(run["result_json"], {})
             result["reason"] = "battle_start_failed"

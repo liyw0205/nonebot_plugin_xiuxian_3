@@ -65,8 +65,7 @@ from .spectator_rules import (
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.assets import grant_player_assets
-from ..utils.player import player_combat_values
+from ..utils.player import change_player_state, player_combat_values
 
 
 class CombatRepositoryMixin:
@@ -1255,12 +1254,19 @@ class CombatRepositoryMixin:
             reward = {str(key): int(value) for key, value in dict(result.get("reward", {})).items()}
             if not reward:
                 raise BattleRewardNotAvailableError("battle has no claimable reward")
-            cultivation = int(player["cultivation"])
-            total_cultivation = int(player["total_cultivation"])
             asset_reward = {key: quantity for key, quantity in reward.items() if key != "cultivation"}
-            grant_player_assets(connection, player, asset_reward, now_text)
-            cultivation += int(reward.get("cultivation", 0))
-            total_cultivation += int(reward.get("cultivation", 0))
+            cultivation_reward = int(reward.get("cultivation", 0))
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values=asset_reward or None,
+                asset_mode="grant",
+                value_delta={
+                    "cultivation": cultivation_reward,
+                    "total_cultivation": cultivation_reward,
+                },
+            )
             record_material_discoveries(
                 connection,
                 player_id=int(player["id"]),
@@ -1268,19 +1274,6 @@ class CombatRepositoryMixin:
                 occurred_at=self._now(),
                 reward=reward,
                 snapshot={"source": "battle.claim_reward", "battle_id": str(session["battle_id"])},
-            )
-            connection.execute(
-                """
-                UPDATE players
-                SET cultivation = ?, total_cultivation = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    cultivation,
-                    total_cultivation,
-                    now_text,
-                    player["id"],
-                ),
             )
             connection.execute(
                 """

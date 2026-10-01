@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..utils.player import change_player_state
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -214,9 +215,16 @@ class DemonInvasionRepositoryMixin:
             reward = {"world_merit": 50, "faction_reputation.demon": 20}
             faction = self._json_object(player["faction_reputation_json"], {})
             faction["demon"] = int(faction.get("demon", 0)) + reward["faction_reputation.demon"]
-            connection.execute(
-                "UPDATE players SET world_merit=world_merit+?, faction_reputation_json=?, updated_at=? WHERE id=?",
-                (reward["world_merit"], json.dumps(faction, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"world_merit": reward["world_merit"]},
+                player_values={
+                    "faction_reputation_json": json.dumps(
+                        faction, ensure_ascii=False, sort_keys=True
+                    )
+                },
             )
             connection.execute(
                 "INSERT INTO world_event_claims(round_id, player_id, operation_id, reward_json, claimed_at) VALUES (?, ?, ?, ?, ?)",

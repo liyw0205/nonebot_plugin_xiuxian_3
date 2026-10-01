@@ -9,7 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import grant_player_assets, inventory_value, spend_player_assets
+from ..utils.assets import grant_player_assets, inventory_value
+from ..utils.player import change_player_state
 from ..persistence.errors import (
     CropContentClosedError,
     CropDailyLimitError,
@@ -108,12 +109,13 @@ class FieldPlotRepositoryMixin:
                         "array_sand_roll": spirit_leaf_array_sand_roll(operation_id),
                     }
                 )
-            spend_player_assets(
+            change_player_state(
                 connection,
                 row,
-                {crop.seed_key: 1},
-                now_text,
-                player_values={"energy": int(row["energy"]) - crop.maintenance_energy},
+                updated_at=now_text,
+                asset_values={crop.seed_key: 1},
+                asset_mode="spend",
+                value_delta={"energy": -crop.maintenance_energy},
             )
             connection.execute(
                 """
@@ -272,14 +274,11 @@ class FieldPlotRepositoryMixin:
                 if int(row["energy"]) < int(snapshot.get("maintenance_energy", 1)):
                     raise ResourceInsufficientError("energy is insufficient")
                 count += 1
-                spend_player_assets(
+                change_player_state(
                     connection,
                     row,
-                    {},
-                    now_text,
-                    player_values={
-                        "energy": int(row["energy"]) - int(snapshot.get("maintenance_energy", 1))
-                    },
+                    updated_at=now_text,
+                    value_delta={"energy": -int(snapshot.get("maintenance_energy", 1))},
                 )
                 connection.execute(
                     "UPDATE field_plots SET maintenance_count = ?, updated_at = ? WHERE id = ? AND status = 'growing'",

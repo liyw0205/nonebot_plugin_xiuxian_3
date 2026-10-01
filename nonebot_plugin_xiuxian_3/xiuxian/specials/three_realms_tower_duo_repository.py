@@ -8,8 +8,10 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state
 from ..persistence.errors import (
     OperationConflictError,
+    PlayerNotFoundError,
     PartyBattleRequirementError,
     PartyNotFoundError,
     ResourceInsufficientError,
@@ -140,12 +142,13 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 ).fetchone()[0]
                 if floor_no > int(highest) + 1:
                     raise TowerFloorLockedError("tower duo floor is locked")
-            connection.execute(
-                "UPDATE players SET stamina=stamina-?, updated_at=? WHERE id IN (?,?) AND stamina>=?",
-                (TOWER_DUO_STAMINA_COST, now_text, members[0]["id"], members[1]["id"], TOWER_DUO_STAMINA_COST),
-            )
-            if connection.execute("SELECT changes()").fetchone()[0] != 2:
-                raise ResourceInsufficientError("tower duo stamina changed during start")
+            for member in members:
+                change_player_state(
+                    connection,
+                    member,
+                    updated_at=now_text,
+                    value_delta={"stamina": -TOWER_DUO_STAMINA_COST},
+                )
             duo_run_id = f"tower-duo-{uuid4().hex}"
             member_run_ids = [f"{duo_run_id}:member:{row['id']}" for row in members]
             result = {
@@ -209,7 +212,18 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 return
             ids = self._json_object(row["result_json"], {}).get("member_database_ids", [])
             for player_id in ids:
-                connection.execute("UPDATE players SET stamina=MIN(stamina_max,stamina+?),updated_at=? WHERE id=?", (TOWER_DUO_STAMINA_COST, now_text, player_id))
+                player = connection.execute(
+                    "SELECT * FROM players WHERE id = ?", (player_id,)
+                ).fetchone()
+                if player is None:
+                    raise PlayerNotFoundError("tower duo player disappeared during recovery")
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"stamina": TOWER_DUO_STAMINA_COST},
+                    maximums={"stamina": player["stamina_max"]},
+                )
             connection.execute("UPDATE three_realms_tower_duo_runs SET status='aborted',result_json=?,updated_at=? WHERE duo_run_id=?", (json.dumps({"reason": "battle_start_failed"}), now_text, duo_run_id))
 
     def _claim_three_realms_tower_duo_reward_once(self, platform: str, platform_user_id: str, operation_id: str) -> ThreeRealmsTowerDuoRewardRecord:
