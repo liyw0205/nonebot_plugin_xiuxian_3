@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
-from ..content import bundled_content
+from ..content import ContentBundle, bundled_content
 from ..repository import (
     EquipmentAmbiguousError,
     EquipmentNotOwnedError,
@@ -54,38 +54,43 @@ class EquipmentApplication:
             .replace("~", "\\~")
         )
 
-    def _cost_text(self, costs: dict[str, int]) -> str:
-        content = self.repository.content
+    def _content(self) -> ContentBundle:
+        return self.repository.content or bundled_content()
+
+    def _cost_text(self, costs: dict[str, int], content: ContentBundle | None = None) -> str:
+        content = content or self._content()
         return "、".join(
             f"{equipment_resource_label(resource_key, content)} ×{quantity}"
             for resource_key, quantity in costs.items()
         ) or "无消耗"
 
-    def _affix_text(self, affixes: dict[str, int]) -> str:
+    def _affix_text(self, affixes: dict[str, int], content: ContentBundle | None = None) -> str:
         if not affixes:
             return "无"
+        content = content or self._content()
         return "、".join(
-            f"**{equipment_affix_label(key, self.repository.content)}** +{value}"
+            f"**{equipment_affix_label(key, content)}** +{value}"
             for key, value in affixes.items()
         )
 
     async def preview_tempering(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "法器预览无需附加参数。", context.request_id)
-        definitions = equipment_definitions(self.repository.content)
+        content = self._content()
+        definitions = equipment_definitions(content)
         lines = ["## 装备祭炼", ""]
         for definition in sorted(definitions.values(), key=lambda item: item.label):
             lines.append(f"### {definition.label}")
             if definition.min_realm_key:
                 lines.append(
-                    f"最低境界：{(self.repository.content or bundled_content()).label('realm', definition.min_realm_key)} L{definition.min_layer}"
+                    f"最低境界：{content.label('realm', definition.min_realm_key)} L{definition.min_layer}"
                 )
             lines.append(f"最高阶数：{definition.max_temper_level}")
             for level in range(1, definition.max_temper_level + 1):
                 costs = temper_cost(level, definition)
                 success_bp = temper_success_bp(level, definition)
                 lines.append(
-                    f"- **{level} 阶**：{self._cost_text(costs)}，成功率 `{success_bp / 100:.0f}%`。"
+                    f"- **{level} 阶**：{self._cost_text(costs, content)}，成功率 `{success_bp / 100:.0f}%`。"
                 )
             lines.append("")
         lines.append("> 使用 `强化法器 <装备名称>`。")
@@ -94,19 +99,20 @@ class EquipmentApplication:
     async def preview_refinement(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "重铸预览无需附加参数。", context.request_id)
-        definitions = equipment_definitions(self.repository.content)
+        content = self._content()
+        definitions = equipment_definitions(content)
         lines = ["## 灵纹重铸", ""]
         for definition in sorted(definitions.values(), key=lambda item: item.label):
             refinement = definition.growth["refinement"]
             affixes = refinement["affix_pool"]
             results = "、".join(
-                f"**{equipment_affix_label(row['key'], self.repository.content)} +{row['value']}**"
+                f"**{equipment_affix_label(row['key'], content)} +{row['value']}**"
                 for row in affixes
             )
             lines.extend(
                 [
                     f"### {definition.label}",
-                    f"消耗：{self._cost_text(refinement_cost(definition))}",
+                    f"消耗：{self._cost_text(refinement_cost(definition), content)}",
                     f"成功率：`{refinement_success_bp(definition) / 100:.0f}%`；连续失败 {refinement_pity_failures(definition)} 次后必定成功。",
                     f"可能词条：{results}。",
                     "",
