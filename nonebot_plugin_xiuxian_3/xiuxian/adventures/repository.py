@@ -94,6 +94,7 @@ from ..adventures.mainline import (
     MAINLINE_REWARD_PENDING,
     MAINLINE_STAGES,
     MAINLINE_STORY_KEY,
+    MAINLINE_TOWN_COMMISSION_DELIVERED,
     mainline_definition,
     mainline_first_clear_key,
     mainline_prerequisites_met,
@@ -175,7 +176,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer, player_inventory
 
 
 class AdventuresRepositoryMixin:
@@ -308,8 +309,7 @@ class AdventuresRepositoryMixin:
             flags = SQLitePlayerRepository._json_object(intro_raw, {}).get("flags", [])
             return str(condition.get("value", "")) in {str(flag) for flag in flags}
         if condition_type == "inventory_item":
-            inventory_raw = row["inventory_json"] if isinstance(row, sqlite3.Row) else row.get("inventory_json", {})
-            inventory = SQLitePlayerRepository._json_object(inventory_raw, {})
+            inventory = player_inventory(row)
             item_key = str(condition.get("item_key", ""))
             quantity = int(condition.get("quantity", 1))
             return bool(item_key) and int(inventory.get(item_key, 0)) >= quantity
@@ -327,7 +327,7 @@ class AdventuresRepositoryMixin:
     def _bounty_progress(connection: sqlite3.Connection, row: sqlite3.Row, offer: sqlite3.Row, definition) -> int:
         snapshot = SQLitePlayerRepository._json_object(offer["snapshot_json"], {})
         if definition.target_kind == "inventory_gain":
-            inventory = SQLitePlayerRepository._json_object(row["inventory_json"], {})
+            inventory = player_inventory(row)
             current = int(inventory.get(str(definition.target_key), 0))
             baseline = int(snapshot.get("baseline_quantity", 0))
             return max(0, min(definition.target_amount, current - baseline))
@@ -452,7 +452,7 @@ class AdventuresRepositoryMixin:
             ).fetchone()
             if accepted is not None:
                 raise BountyDailyLimitError("player already accepted a bounty today")
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = player_inventory(row)
             completed_orders = connection.execute(
                 "SELECT COUNT(*) AS count FROM production_orders WHERE player_id = ? AND status = 'completed'",
                 (row["id"],),
@@ -491,7 +491,7 @@ class AdventuresRepositoryMixin:
                     seed=f"{row['id']}:{business_date}:{definition.key}",
                     path_key=str(row["path_key"]) if row["path_key"] else None,
                     realm_key=str(row["realm_key"]),
-                    realm_layer=int(row["realm_layer"]),
+                    realm_layer=player_integer(row, "realm_layer"),
                 ),
                 "target_kind": definition.target_kind,
                 "target_key": definition.target_key,
@@ -626,7 +626,7 @@ class AdventuresRepositoryMixin:
 
             consumed_target: tuple[str, int] | None = None
             if definition.consume_target and definition.target_key:
-                inventory = self._json_object(row["inventory_json"], {})
+                inventory = player_inventory(row)
                 quantity = int(inventory.get(definition.target_key, 0))
                 if quantity < definition.target_amount:
                     raise BountyIncompleteError("delivery inventory is insufficient")
@@ -795,6 +795,29 @@ class AdventuresRepositoryMixin:
             return self._mainline_status_from_connection(connection, row)
 
     @staticmethod
+    def _mainline_completed_events(
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+    ) -> set[str]:
+        """Build server-owned evidence shared by status and start checks."""
+
+        intro = SQLitePlayerRepository._json_object(player["intro_json"], {})
+        events = {str(item) for item in intro.get("flags", [])}
+        if str(player["stage"]) != STAGE_NEW_USER:
+            events.add("player.start_seeking")
+        if connection.execute(
+            """
+            SELECT 1
+            FROM town_commission_claims
+            WHERE player_id = ? AND status = 'delivered'
+            LIMIT 1
+            """,
+            (player["id"],),
+        ).fetchone() is not None:
+            events.add(MAINLINE_TOWN_COMMISSION_DELIVERED)
+        return events
+
+    @staticmethod
     def _mainline_status_from_connection(
         connection: sqlite3.Connection,
         player: sqlite3.Row,
@@ -813,9 +836,7 @@ class AdventuresRepositoryMixin:
             for item in runs.values()
             if bool(item["first_clear_claimed"])
         }
-        intro_state = SQLitePlayerRepository._json_object(player["intro_json"], {})
-        flags = {str(item) for item in intro_state.get("flags", [])}
-        completed_events = {"player.start_seeking"} if str(player["stage"]) != STAGE_NEW_USER else set()
+        completed_events = AdventuresRepositoryMixin._mainline_completed_events(connection, player)
         views: list[MainlineStageView] = []
         for definition in MAINLINE_STAGES:
             run = runs.get(definition.key)
@@ -823,9 +844,9 @@ class AdventuresRepositoryMixin:
                 definition,
                 completed_stages=completed_stages,
                 completed_events=completed_events,
-                flags=flags,
+                flags=completed_events,
                 realm_key=str(player["realm_key"]),
-                realm_layer=int(player["realm_layer"]),
+                realm_layer=player_integer(player, "realm_layer"),
             )
             run_status = str(run["status"]) if run is not None else ""
             status = mainline_stage_status(
@@ -945,19 +966,16 @@ class AdventuresRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             status_record = self._mainline_status_from_connection(connection, row)
             stage_view = next(item for item in status_record.stages if item.key == definition.key)
+            completed_events = self._mainline_completed_events(connection, row)
             if not mainline_prerequisites_met(
                 definition,
                 completed_stages={
                     item.key for item in status_record.stages if item.completed
                 },
-                completed_events=(
-                    {"player.start_seeking"}
-                    if str(row["stage"]) != STAGE_NEW_USER
-                    else set()
-                ),
-                flags=SQLitePlayerRepository._json_object(row["intro_json"], {}).get("flags", []),
+                completed_events=completed_events,
+                flags=completed_events,
                 realm_key=str(row["realm_key"]),
-                realm_layer=int(row["realm_layer"]),
+                realm_layer=player_integer(row, "realm_layer"),
             ):
                 raise MainlineRequirementError("mainline prerequisites are not met")
             run = connection.execute(
@@ -986,7 +1004,7 @@ class AdventuresRepositoryMixin:
                         attempt_count, first_clear_claimed, first_clear_key,
                         start_operation_id, snapshot_json,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, 'running', 1, 0, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, 'running', 1, 0, ?, ?, ?, ?, ?)
                     """,
                     (
                         row["id"], MAINLINE_STORY_KEY, definition.chapter, definition.stage,

@@ -40,8 +40,8 @@ from ..production.models import (
 )
 from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
 from ..utils.equipment import create_equipment_instances
-from ..utils.assets import grant_player_assets, inventory_value
-from ..utils.player import change_player_state
+from ..utils.assets import grant_player_assets, player_assets_missing
+from ..utils.player import change_player_state, player_inventory, player_resource
 from ..progression.breakthrough.models import (
     BreakthroughSettlementRecord,
     BreakthroughSessionRecord,
@@ -372,14 +372,15 @@ class ProductionRepositoryMixin:
             facility_slot = self._facility_reserve_for_recipe(connection, row, recipe)
             duration_seconds = self._facility_duration_seconds(row, recipe)
 
-            inventory = inventory_value(row["inventory_json"])
-            for item_key, quantity in recipe.inputs.items():
-                if int(inventory.get(item_key, 0)) < quantity:
-                    raise MaterialInsufficientError("recipe inputs are insufficient")
-            if int(row["energy"]) < recipe.energy_cost:
+            inventory = player_inventory(row)
+            missing_assets = player_assets_missing(
+                row,
+                {**recipe.inputs, "spirit_stones": recipe.currency_cost},
+            )
+            if missing_assets:
+                raise MaterialInsufficientError("recipe inputs or spirit stones are insufficient")
+            if player_resource(row, "energy") < recipe.energy_cost:
                 raise EnergyInsufficientError("energy is insufficient")
-            if int(row["spirit_stones"]) < recipe.currency_cost:
-                raise MaterialInsufficientError("spirit stones are insufficient")
 
             durability = self._json_object(row["durability_json"], {})
             tool_durability_before: int | None = None

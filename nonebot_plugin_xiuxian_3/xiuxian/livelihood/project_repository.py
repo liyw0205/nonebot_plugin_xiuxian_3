@@ -11,9 +11,10 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..utils.assets import (
     grant_player_assets,
-    inventory_value,
     spend_player_assets,
 )
+from ..utils.assets import player_asset_amount
+from ..utils.player import player_inventory
 from ..persistence.errors import (
     OperationConflictError,
     ProjectAlreadyCompleteError,
@@ -153,9 +154,9 @@ class ProjectRepositoryMixin:
             if resource not in definition.contribution_resources:
                 raise ProjectContributionRequirementError("resource cannot contribute to this project")
             cost_key, resource_amount = self._resource_cost(resource, points)
-            inventory = inventory_value(player["inventory_json"])
+            inventory = player_inventory(player)
             if cost_key == "currency.spirit_stone":
-                available = int(player["spirit_stones"])
+                available = player_asset_amount(player, "spirit_stones")
             else:
                 available = int(inventory.get(cost_key, 0))
             if available < resource_amount:

@@ -22,7 +22,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..combat.rules import MAX_TURNS
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer, player_resource
 from .ancestral_hall_models import AncestralHallRunRecord
 from .ancestral_hall_rules import (
     ANCESTRAL_HALL_ENEMY,
@@ -179,7 +179,7 @@ class AncestralHallRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if (
                 str(player["location_key"]) != ANCESTRAL_HALL_LOCATION
-                or not realm_at_least(str(player["realm_key"]), int(player["realm_layer"]), "soul_transformation", 1)
+                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "soul_transformation", 1)
             ):
                 raise AncestralHallRequirementError("realm or location requirement is not met")
             faction = self._json_object(player["faction_reputation_json"], {})
@@ -198,7 +198,7 @@ class AncestralHallRepositoryMixin:
             ).fetchone()
             if int(attempts["count"]) >= 1:
                 raise AncestralHallQuotaError("ancestral-hall weekly quota is exhausted")
-            if int(player["stamina"]) < ANCESTRAL_HALL_STAMINA_COST:
+            if player_resource(player, "stamina") < ANCESTRAL_HALL_STAMINA_COST:
                 raise ResourceInsufficientError("stamina is insufficient")
 
             intro = self._json_object(player["intro_json"], {})
@@ -208,7 +208,7 @@ class AncestralHallRepositoryMixin:
                 "instance_key": ANCESTRAL_HALL_KEY,
                 "location_key": ANCESTRAL_HALL_LOCATION,
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "beast_reputation": int(faction.get("beast", 0)),
                 "bloodline_stability": int(player["bloodline_stability"]),
                 "node_keys": list(ANCESTRAL_HALL_NODES),

@@ -27,7 +27,8 @@ from .endgame_rules import (
     TRIBULATION_TOTAL_CULTIVATION,
     TRIAL_ORDER,
 )
-from ..utils.player import change_player_state
+from ..utils.assets import player_asset_amount
+from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 
 
 class EndgameRepositoryMixin:
@@ -67,9 +68,9 @@ class EndgameRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if str(row["status"]) != "active":
                 raise PlayerSuspendedError("player is not active")
-            if str(row["realm_key"]) != "void_refining" or int(row["realm_layer"]) != 10:
+            if str(row["realm_key"]) != "void_refining" or player_integer(row, "realm_layer") != 10:
                 raise DaoUnionRequirementError("dao union requires void refining L10")
-            if int(row["total_cultivation"]) < DAO_UNION_TOTAL_CULTIVATION:
+            if player_resource(row, "total_cultivation") < DAO_UNION_TOTAL_CULTIVATION:
                 raise DaoUnionRequirementError("total cultivation is insufficient")
             flags = set(str(item) for item in self._json_object(row["intro_json"], {}).get("flags", []))
             if "quest.dao_union" not in flags:
@@ -86,12 +87,12 @@ class EndgameRepositoryMixin:
             }
             if any(count < 1 for count in qualification_counts.values()):
                 raise DaoUnionRequirementError("dao union evidence is incomplete or invalid")
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = player_inventory(row)
             if int(inventory.get("item.dao_fruit_fragment", 0)) < DAO_UNION_FRAGMENT_COST:
                 raise MaterialInsufficientError("dao fruit fragments are insufficient")
             if int(row["world_merit"]) < DAO_UNION_MERIT_COST:
                 raise DaoUnionRequirementError("world merit is insufficient")
-            if int(row["spirit_stones"]) < DAO_UNION_STONE_COST:
+            if player_asset_amount(row, "spirit_stones") < DAO_UNION_STONE_COST:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
             intro = self._json_object(row["intro_json"], {})
             flags.add("endgame.dao_union")
@@ -236,7 +237,7 @@ class EndgameRepositoryMixin:
         if ending_key == "remain_in_world" and not fruit_key:
             raise AscensionRequirementError("remain in world requires a locked dao fruit")
         status = ASCENDED_STATUS if ending_key == "ascend" else REMAINED_IN_WORLD_STATUS
-        title_quantity = 0 if int(self._json_object(row["inventory_json"], {}).get("item.title.ascended", 0)) else 1
+        title_quantity = 0 if int(player_inventory(row).get("item.title.ascended", 0)) else 1
         change_player_state(
             connection,
             row,
@@ -301,9 +302,9 @@ class EndgameRepositoryMixin:
                 ).fetchall()
             )
             completed_set = set(completed)
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = player_inventory(row)
             missing: list[str] = []
-            if str(row["realm_key"]) != "tribulation" or int(row["realm_layer"]) != 10:
+            if str(row["realm_key"]) != "tribulation" or player_integer(row, "realm_layer") != 10:
                 missing.append("TRIBULATION_L10_REQUIRED")
             if not set(TRIAL_ORDER).issubset(completed_set):
                 missing.append("TRIBULATION_TRIALS_INCOMPLETE")
@@ -351,9 +352,9 @@ class EndgameRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if str(row["status"]) != "active":
                 raise PlayerSuspendedError("player is not active")
-            if str(row["realm_key"]) != "dao_union" or int(row["realm_layer"]) != 10:
+            if str(row["realm_key"]) != "dao_union" or player_integer(row, "realm_layer") != 10:
                 raise TribulationEntryRequirementError("tribulation requires dao union L10")
-            if int(row["total_cultivation"]) < TRIBULATION_TOTAL_CULTIVATION:
+            if player_resource(row, "total_cultivation") < TRIBULATION_TOTAL_CULTIVATION:
                 raise TribulationEntryRequirementError("total cultivation is insufficient")
             change_player_state(
                 connection,

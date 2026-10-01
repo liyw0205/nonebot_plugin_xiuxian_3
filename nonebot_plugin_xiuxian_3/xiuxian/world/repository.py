@@ -13,8 +13,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_value
-from ..utils.player import change_player_state, player_inventory
+from ..utils.player import change_player_state, player_inventory, player_resource
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
     VOID_INSTABILITY_SECONDS,
@@ -88,7 +87,7 @@ class WorldRepositoryMixin:
                 )
             row = self._require_player(connection, platform, platform_user_id)
             realm_key = str(row["realm_key"])
-            realm_layer = int(row["realm_layer"])
+            realm_layer = player_resource(row, "realm_layer")
             if realm_key == "soul_transformation" and realm_layer >= 1:
                 if route_key == "void.archive_ruins":
                     trial_count = connection.execute(
@@ -145,7 +144,7 @@ class WorldRepositoryMixin:
                 anchor_cost = max(1, anchor_cost - beacon_discount)
             if available_anchor < anchor_cost:
                 raise VoidAnchorInsufficientError("void anchors are insufficient")
-            if int(row["stamina"]) < definition.stamina_cost:
+            if player_resource(row, "stamina") < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             try:
                 change_player_state(
@@ -256,7 +255,7 @@ class WorldRepositoryMixin:
                 raise VoidRouteNotReadyError("void route is not ready")
             snapshot = self._json_object(session["snapshot_json"], {})
             storm = int(snapshot.get("storm_roll_bp", 0)) < VOID_ROUTE_STORM_CHANCE_BP
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             extra_anchor_lost = 0
             if storm:
                 extra_anchor_lost = min(1, int(inventory.get("item.void_anchor", 0)))

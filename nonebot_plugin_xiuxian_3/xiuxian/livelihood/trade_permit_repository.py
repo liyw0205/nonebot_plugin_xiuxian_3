@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import spend_player_assets
+from ..utils.assets import spend_player_assets, player_asset_amount
 from ..persistence.errors import (
     CurrencyInsufficientError,
     OperationConflictError,
@@ -75,7 +75,7 @@ class TradePermitRepositoryMixin:
                 reputation = self._json_object(player["faction_reputation_json"], {})
                 if definition.required_quest not in flags or int(reputation.get(definition.faction_key, 0)) < definition.reputation_required:
                     raise TradePermitRequirementError("trade permit requirements are not met")
-                if int(player["spirit_stones"]) < definition.cost:
+                if player_asset_amount(player, "spirit_stones") < definition.cost:
                     raise CurrencyInsufficientError("trade permit cost is insufficient")
                 permit_id = f"trade-permit:{uuid4().hex}"
                 expires_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))

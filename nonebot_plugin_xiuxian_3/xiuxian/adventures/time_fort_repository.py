@@ -23,7 +23,7 @@ from ..persistence.errors import (
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_TIME_FORT
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_combat_values
+from ..utils.player import change_player_state, player_combat_values, player_integer, player_resource
 from .secret_realm_rules import realm_at_least
 from .time_fort_models import TimeFortRunRecord
 from .time_fort_rules import (
@@ -154,7 +154,7 @@ class TimeFortRepositoryMixin:
             ).fetchall()
             if not TIME_FORT_MIN_MEMBERS <= len(members) <= TIME_FORT_MAX_MEMBERS or any(not row["confirmed_at"] for row in members):
                 raise TimeFortRequirementError("two to five confirmed members are required")
-            if int(leader["stamina"]) < TIME_FORT_STAMINA_COST:
+            if player_resource(leader, "stamina") < TIME_FORT_STAMINA_COST:
                 raise ResourceInsufficientError("party leader lacks entry stamina")
             combat_snapshots: list[dict[str, Any]] = []
             first_clear: dict[int, bool] = {}
@@ -163,7 +163,7 @@ class TimeFortRepositoryMixin:
                 intro = self._json_object(row["intro_json"], {})
                 if (
                     str(row["location_key"]) != TIME_FORT_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), int(row["realm_layer"]), "void_refining", 1)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1)
                     or TIME_FORT_PERMISSION not in {str(flag) for flag in intro.get("flags", [])}
                 ):
                     raise TimeFortRequirementError("a member lacks time-fort permission or archive location")

@@ -20,7 +20,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..specials.codex_projection import record_codex_discovery
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer, player_resource
 from .dao_origin_models import DaoOriginRunRecord
 from .dao_origin_rules import (
     DAO_ORIGIN_CODEX,
@@ -147,7 +147,7 @@ class DaoOriginRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if (
                 str(player["location_key"]) != DAO_ORIGIN_LOCATION
-                or not realm_at_least(str(player["realm_key"]), int(player["realm_layer"]), "dao_union", 1)
+                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union", 1)
                 or DAO_ORIGIN_PERMISSION not in self._dao_origin_json(player["intro_json"], {}).get("flags", [])
             ):
                 raise DaoOriginRequirementError("location, realm, or dao-origin permission is missing")
@@ -157,7 +157,7 @@ class DaoOriginRepositoryMixin:
                 raise DaoOriginBusyError("another long action is active")
             if connection.execute("SELECT 1 FROM dao_origin_runs WHERE player_id=? AND quota_key=? AND status<>'system_aborted' LIMIT 1", (player["id"], DAO_ORIGIN_QUOTA_KEY)).fetchone():
                 raise DaoOriginQuotaError("dao-origin lifetime quota is exhausted")
-            if int(player["stamina"]) < DAO_ORIGIN_STAMINA_COST:
+            if player_resource(player, "stamina") < DAO_ORIGIN_STAMINA_COST:
                 raise ResourceInsufficientError("stamina is insufficient")
             intro = self._dao_origin_json(player["intro_json"], {})
             flags = list(intro.get("flags", []))
@@ -167,7 +167,7 @@ class DaoOriginRepositoryMixin:
                 "instance_key": DAO_ORIGIN_KEY,
                 "location_key": DAO_ORIGIN_LOCATION,
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "permission": DAO_ORIGIN_PERMISSION,
                 "node_keys": list(DAO_ORIGIN_NODES),
                 "first_clear": DAO_ORIGIN_STORY_FLAG not in flags,

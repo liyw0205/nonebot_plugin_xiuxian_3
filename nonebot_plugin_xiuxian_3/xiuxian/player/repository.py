@@ -757,7 +757,7 @@ class PlayerRepositoryMixin:
             if destination not in TRAVEL_COSTS:
                 raise LocationRequirementError("destination is not available")
             if destination == SPIRIT_FIELD_LOCATION:
-                if row["realm_key"] != REALM_QI_SENSING or int(row["realm_layer"]) < 2:
+                if row["realm_key"] != REALM_QI_SENSING or player_integer(row, "realm_layer") < 2:
                     raise LocationRequirementError("spirit field requires qi sensing layer 2")
                 intro_state = self._json_object(row["intro_json"], {})
                 if GUIDE_GATHER_BLOOD_GRASS not in set(intro_state.get("flags", [])):

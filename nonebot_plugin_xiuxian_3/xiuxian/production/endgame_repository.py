@@ -8,8 +8,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_value
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_inventory
 from ..persistence.errors import (
     EndgameRecipeAlreadyCreatedError,
     EndgameRecipeBusyError,
@@ -143,7 +142,7 @@ class EndgameProductionRepositoryMixin:
                 if issued is not None:
                     raise EndgameRecipeAlreadyCreatedError("ascension certificate was already created")
 
-            inventory = inventory_value(player["inventory_json"])
+            inventory = player_inventory(player)
             for item_key, quantity in recipe.inputs.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise MaterialInsufficientError(f"missing {item_key}")

@@ -85,8 +85,8 @@ from ...exploration.rules import (
     settlement_result,
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
-from ...utils.assets import inventory_value
-from ...utils.player import change_player_state
+from ...utils.assets import player_asset_amount
+from ...utils.player import change_player_state, player_integer, player_inventory, player_resource
 from ...adventures.mainline_models import (
     MainlineClaimRecord,
     MainlineStageView,
@@ -199,7 +199,7 @@ class BreakthroughRepositoryMixin:
                 payload = json.loads(existing["result_json"])
                 return NascentSoulPreparationRecord(player=self._row_to_player(payload["player"]), already_completed=True)
             row = self._require_player(connection, platform, platform_user_id)
-            if row["realm_key"] != "golden_core" or int(row["realm_layer"]) != 10 or int(row["total_cultivation"]) < 58960:
+            if row["realm_key"] != "golden_core" or player_integer(row, "realm_layer") != 10 or player_resource(row, "total_cultivation") < 58960:
                 raise BreakthroughRequirementError("golden core preparation requirement is missing")
             if int(row["foundation_quality"]) < 5500:
                 raise FoundationQualityInsufficientError("foundation quality is insufficient")
@@ -321,11 +321,11 @@ class BreakthroughRepositoryMixin:
                 if target_realm == "soul_transformation":
                     raise RealmMismatchError("current realm does not match the breakthrough")
                 raise BreakthroughRequirementError("current realm does not match the breakthrough")
-            if int(row["realm_layer"]) != 10:
+            if player_integer(row, "realm_layer") != 10:
                 if target_realm == "soul_transformation":
                     raise RealmMismatchError("only the current realm's L10 can break through")
                 raise BreakthroughRequirementError("only the current realm's L10 can break through")
-            if int(row["total_cultivation"]) < definition.required_total_cultivation:
+            if player_resource(row, "total_cultivation") < definition.required_total_cultivation:
                 if target_realm == "soul_transformation":
                     raise CultivationInsufficientError("total cultivation is insufficient")
                 raise BreakthroughRequirementError("total cultivation is insufficient")
@@ -454,7 +454,7 @@ class BreakthroughRepositoryMixin:
             if idle_or_dispatch is not None:
                 raise BreakthroughBusyError("another long action is active")
 
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             for item_key, quantity in definition.materials.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise MaterialInsufficientError("breakthrough material is insufficient")
@@ -468,7 +468,7 @@ class BreakthroughRepositoryMixin:
                     raise MaterialInsufficientError("nascent soul alternative material is insufficient")
             if protection and int(inventory.get(definition.protection_key, 0)) < 1:
                 raise ProtectionItemInsufficientError("breakthrough protection item is missing")
-            if int(row["spirit_stones"]) < definition.currency_cost:
+            if player_asset_amount(row, "spirit_stones") < definition.currency_cost:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
 
             pity_before = int(row["breakthrough_pity_bp"])
@@ -557,9 +557,9 @@ class BreakthroughRepositoryMixin:
                 "target_realm": definition.target_realm,
                 "source_realm": definition.source_realm,
                 "realm_key": row["realm_key"],
-                "realm_layer": int(row["realm_layer"]),
-                "cultivation": int(row["cultivation"]),
-                "total_cultivation": int(row["total_cultivation"]),
+                "realm_layer": player_integer(row, "realm_layer"),
+                "cultivation": player_resource(row, "cultivation"),
+                "total_cultivation": player_resource(row, "total_cultivation"),
                 "location_key": row["location_key"],
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
@@ -716,7 +716,7 @@ class BreakthroughRepositoryMixin:
                     updated_at=now_text,
                     player_values={"domain_crack_until": None},
                 )
-            if str(row["realm_key"]) != "soul_transformation" or int(row["realm_layer"]) < 3:
+            if str(row["realm_key"]) != "soul_transformation" or player_integer(row, "realm_layer") < 3:
                 raise DomainNotEligibleError("domain requires soul transformation L3")
             if row["domain_key"]:
                 raise DomainAlreadySelectedError("domain already selected")
@@ -730,10 +730,10 @@ class BreakthroughRepositoryMixin:
                 if now < datetime.fromisoformat(str(pending["ends_at"])):
                     raise DomainSelectionBusyError("domain selection is already pending")
                 connection.execute("UPDATE domain_selection_sessions SET status = 'expired', updated_at = ? WHERE id = ?", (now_text, pending["id"]))
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             if int(inventory.get("item.domain_core", 0)) < 1:
                 raise MaterialInsufficientError("domain core is missing")
-            if int(row["spirit_stones"]) < 10_000:
+            if player_asset_amount(row, "spirit_stones") < 10_000:
                 raise CurrencyInsufficientError("domain selection requires spirit stones")
             session_id = uuid4().hex
             ends_at = serialize_datetime(now + timedelta(minutes=5))
@@ -805,10 +805,10 @@ class BreakthroughRepositoryMixin:
                     pass
             if row["domain_key"]:
                 raise DomainAlreadySelectedError("domain already selected")
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             if int(inventory.get("item.domain_core", 0)) < 1:
                 raise MaterialInsufficientError("domain core is missing")
-            if int(row["spirit_stones"]) < 10_000:
+            if player_asset_amount(row, "spirit_stones") < 10_000:
                 raise CurrencyInsufficientError("domain selection requires spirit stones")
             snapshot = self._json_object(session["snapshot_json"], {})
             domain_key = str(session["domain_key"])
@@ -868,7 +868,7 @@ class BreakthroughRepositoryMixin:
             if not crack_until:
                 raise WeaknessNotActiveError("no domain crack is active")
             expired = now >= datetime.fromisoformat(str(crack_until))
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             stones_spent = 0
             medicine_consumed = False
             if not expired and not early:
@@ -878,7 +878,7 @@ class BreakthroughRepositoryMixin:
                     raise BreakthroughRequirementError("early domain recovery requires domain front")
                 if int(inventory.get("item.pill.domain_restore", 0)) < 1:
                     raise MaterialInsufficientError("domain restore pill is missing")
-                if int(row["spirit_stones"]) < 2000:
+                if player_asset_amount(row, "spirit_stones") < 2000:
                     raise CurrencyInsufficientError("early domain recovery requires spirit stones")
                 stones_spent = 2000
                 medicine_consumed = True
@@ -973,14 +973,14 @@ class BreakthroughRepositoryMixin:
             roll_bp = breakthrough_roll_bp(str(snapshot.get("random_seed", session["operation_id"])))
             final_success_bp = int(snapshot.get("success_bp", definition.base_success_bp))
             success = roll_bp < final_success_bp
-            cultivation_before = int(snapshot.get("cultivation", row["cultivation"]))
-            pity_before = int(snapshot.get("pity_before_bp", row["breakthrough_pity_bp"]))
+            cultivation_before = int(snapshot.get("cultivation", player_resource(row, "cultivation")))
+            pity_before = int(snapshot.get("pity_before_bp", player_resource(row, "breakthrough_pity_bp")))
             protection_requested = bool(snapshot.get("protection_requested", False))
             is_nascent = str(snapshot.get("target_realm", session["target_realm"])) == "nascent_soul"
             is_soul_transformation = str(snapshot.get("target_realm", session["target_realm"])) == "soul_transformation"
             is_void_refining = str(snapshot.get("target_realm", session["target_realm"])) == "void_refining"
             protection_key = str(snapshot.get("protection_key") or definition.protection_key)
-            inventory = inventory_value(row["inventory_json"], keep_zero=is_void_refining)
+            inventory = player_inventory(row, keep_zero=is_void_refining)
             protection_consumed = bool(
                 (not success)
                 and not is_nascent
@@ -993,8 +993,8 @@ class BreakthroughRepositoryMixin:
             if success:
                 cultivation_after = 0
                 stamina_after = min(
-                    int(row["stamina_max"]),
-                    int(row["stamina"]) + definition.reward_stamina,
+                    player_resource(row, "stamina_max"),
+                    player_resource(row, "stamina") + definition.reward_stamina,
                 )
                 reward_items = dict(definition.reward_items or {})
                 player_values: dict[str, Any] = {
@@ -1005,7 +1005,7 @@ class BreakthroughRepositoryMixin:
                     "weakness_until": None,
                 }
                 value_delta = {
-                    "stamina": stamina_after - int(row["stamina"]),
+                    "stamina": stamina_after - player_resource(row, "stamina"),
                     "world_merit": definition.reward_world_merit,
                 }
                 if is_nascent:
@@ -1275,7 +1275,7 @@ class BreakthroughRepositoryMixin:
             effective_choice = "heart_demon.face" if expired else choice_key
             if effective_choice == "heart_demon.bargain" and str(row["path_key"] or "") != "demonic" and int(row["pollution"]) < 20:
                 raise BreakthroughRequirementError("bargain requires a demonic path or pollution 20")
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             if effective_choice == "heart_demon.purify":
                 if int(inventory.get("item.pill.soul_restore", 0)) < 1:
                     raise MaterialInsufficientError("soul restore pill is missing")
@@ -1472,7 +1472,7 @@ class BreakthroughRepositoryMixin:
                 raise WeaknessNotActiveError("no breakthrough weakness is active")
             until = datetime.fromisoformat(str(weakness_until))
             expired = now >= until
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             medicine_key = "item.pill.golden_core_restore" if recovery_kind == "foundation_shock" else "item.pill.healing_low"
             stones_cost = 200 if recovery_kind == "foundation_shock" else 50
             medicine_consumed = False
@@ -1482,7 +1482,7 @@ class BreakthroughRepositoryMixin:
             if not expired and early:
                 if int(inventory.get(medicine_key, 0)) < 1:
                     raise MaterialInsufficientError("early recovery requires a recovery pill")
-                if int(row["spirit_stones"]) < stones_cost:
+                if player_asset_amount(row, "spirit_stones") < stones_cost:
                     raise CurrencyInsufficientError("early recovery requires spirit stones")
                 medicine_consumed = True
                 stones_spent = stones_cost

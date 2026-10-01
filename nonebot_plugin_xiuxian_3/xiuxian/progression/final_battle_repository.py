@@ -47,7 +47,13 @@ from .endgame_rules import (
     TRIAL_ORDER,
 )
 from ..utils.assets import grant_player_items, spend_player_items
-from ..utils.player import change_player_state, change_player_values, player_combat_values
+from ..utils.player import (
+    change_player_state,
+    change_player_values,
+    player_combat_values,
+    player_integer,
+    player_inventory,
+)
 
 FINAL_BATTLE_LOCATION = "tribulation.sky_terrace"
 
@@ -207,7 +213,7 @@ class FinalBattleRepositoryMixin:
             self._require_final_battle_candidate(connection, player, now_text)
             if self._has_active_long_action(connection, int(player["id"])):
                 raise FinalBattleBusyError("initiator has another active action")
-            inventory = self._json_object(player["inventory_json"], {})
+            inventory = player_inventory(player)
             if int(inventory.get(ASCENSION_CERTIFICATE_KEY, 0)) < 1:
                 raise FinalBattleRequirementError("ascension certificate is missing")
 
@@ -277,7 +283,7 @@ class FinalBattleRepositoryMixin:
             member_count = int(connection.execute("SELECT COUNT(*) FROM final_battle_members WHERE battle_id=?", (battle_id,)).fetchone()[0])
             if member_count >= FINAL_BATTLE_MAX_MEMBERS:
                 raise FinalBattleMemberLimitError("final battle is full")
-            if str(player["realm_key"]) != "tribulation" or int(player["realm_layer"]) < 3 or str(player["location_key"]) != FINAL_BATTLE_LOCATION:
+            if str(player["realm_key"]) != "tribulation" or player_integer(player, "realm_layer") < 3 or str(player["location_key"]) != FINAL_BATTLE_LOCATION:
                 raise FinalBattleRequirementError("helper must be at the sky terrace from tribulation L3")
             if str(player["endgame_status"] or "none") != "tribulation":
                 raise FinalBattleRequirementError("helper is not on the tribulation route")
@@ -699,7 +705,7 @@ class FinalBattleRepositoryMixin:
         )
 
     def _require_final_battle_candidate(self, connection: sqlite3.Connection, player: sqlite3.Row, now_text: str) -> None:
-        if str(player["realm_key"]) != "tribulation" or int(player["realm_layer"]) != 10:
+        if str(player["realm_key"]) != "tribulation" or player_integer(player, "realm_layer") != 10:
             raise FinalBattleRequirementError("initiator must be at tribulation L10")
         if str(player["endgame_status"] or "none") != "tribulation" or str(player["location_key"]) != FINAL_BATTLE_LOCATION:
             raise FinalBattleRequirementError("initiator must be on the sky terrace tribulation route")
@@ -708,7 +714,7 @@ class FinalBattleRepositoryMixin:
             raise FinalBattleRequirementError("all three tribulation trials must be complete")
         if int(player["dao_fruit_progress"]) < FINAL_BATTLE_MIN_PROGRESS or int(player["ascension_merit"]) < FINAL_BATTLE_MIN_MERIT or int(player["tribulation_debt"]) >= 100:
             raise FinalBattleRequirementError("final battle progression requirements are not met")
-        inventory = self._json_object(player["inventory_json"], {})
+        inventory = player_inventory(player)
         if int(inventory.get(ASCENSION_CERTIFICATE_KEY, 0)) < 1:
             raise FinalBattleRequirementError("ascension certificate is missing")
         prior = connection.execute("SELECT cooldown_until FROM final_battle_sessions WHERE initiator_id=? AND cooldown_until IS NOT NULL ORDER BY id DESC LIMIT 1", (player["id"],)).fetchone()

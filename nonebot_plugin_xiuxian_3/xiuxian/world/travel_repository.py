@@ -166,7 +166,8 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.player import change_player_state
+from ..utils.assets import player_asset_amount
+from ..utils.player import change_player_state, player_inventory, player_resource
 
 
 class TravelRepositoryMixin:
@@ -435,9 +436,9 @@ class TravelRepositoryMixin:
             if retreat is not None:
                 raise TravelBusyError("retreat is already running")
 
-            stamina = int(row["stamina"])
-            stones = int(row["spirit_stones"])
-            inventory = self._json_object(row["inventory_json"], {})
+            stamina = player_resource(row, "stamina")
+            stones = player_asset_amount(row, "spirit_stones")
+            inventory = player_inventory(row)
             pass_key = definition.pass_key
             pass_quantity = definition.pass_quantity
             if current in definition.pass_exempt_source_locations:
@@ -577,7 +578,7 @@ class TravelRepositoryMixin:
             pass_key = str(snapshot.get("pass_key") or session["pass_key"] or "") or None
             pass_quantity = int(snapshot.get("pass_quantity", session["pass_quantity"] or 0))
             consume_pass_on_arrival = bool(snapshot.get("consume_pass_on_arrival", False))
-            inventory = self._json_object(row["inventory_json"], {})
+            inventory = player_inventory(row)
             pass_consumed = False
             if consume_pass_on_arrival and pass_key and pass_quantity:
                 available = int(inventory.get(pass_key, 0))

@@ -8,7 +8,8 @@ import sqlite3
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_value, spend_player_assets
+from ..utils.assets import spend_player_assets
+from ..utils.player import player_inventory, player_resource
 from ..persistence.errors import (
     HeartDemonPendingError,
     MaterialInsufficientError,
@@ -85,10 +86,10 @@ class PollutionRepositoryMixin:
             if pending is not None:
                 raise HeartDemonPendingError("heart demon must be resolved before pollution purification")
 
-            pollution_before = int(row["pollution"])
+            pollution_before = player_resource(row, "pollution")
             if pollution_before <= 0:
                 raise PollutionAlreadyClearError("pollution is already clear")
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             quantity = int(inventory.get(POLLUTION_PURIFICATION_ITEM, 0))
             if quantity < 1:
                 raise MaterialInsufficientError("soul restore pill is missing")

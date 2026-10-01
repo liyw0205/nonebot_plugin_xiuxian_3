@@ -124,8 +124,8 @@ class AdventuresMainlineApplication:
         lines.extend(
             [
                 "",
-                "> 可发送 `开始主线 1` 开始当前关卡，完成后发送 `领取主线奖励 1`。",
-                "> 章节尚未开放时会保留在主线列表，不会创建运行记录或扣除资源。",
+                "> 可发送 `开始主线 序号` 开始当前关卡，完成后发送 `领取主线奖励 序号`。",
+                "> 尚未满足前置时只会保留在主线列表，不会创建运行记录或扣除资源。",
             ]
         )
         return CommandResult(
@@ -139,7 +139,7 @@ class AdventuresMainlineApplication:
     async def start_stage(self, context: CommandContext) -> CommandResult:
         stage_key = self._stage_key(context.command_args)
         if stage_key is None:
-            return CommandResult(False, "INVALID_MAINLINE_COMMAND", "请使用 `开始主线 1`、`开始主线 2` 或 `开始主线 3`。", context.request_id)
+            return CommandResult(False, "INVALID_MAINLINE_COMMAND", "请使用 `开始主线 序号`，或直接输入关卡名称。", context.request_id)
         operation_id = self._operation_id(context, "mainline.start_stage")
         try:
             record = await self.repository.start_mainline(
@@ -183,7 +183,7 @@ class AdventuresMainlineApplication:
     async def claim_reward(self, context: CommandContext) -> CommandResult:
         stage_key = self._stage_key(context.command_args)
         if stage_key is None:
-            return CommandResult(False, "INVALID_MAINLINE_COMMAND", "请使用 `领取主线奖励 1`、`领取主线奖励 2` 或 `领取主线奖励 3`。", context.request_id)
+            return CommandResult(False, "INVALID_MAINLINE_COMMAND", "请使用 `领取主线奖励 序号`，或直接输入关卡名称。", context.request_id)
         operation_id = self._operation_id(context, "mainline.claim_first_clear")
         try:
             record = await self.repository.claim_mainline(

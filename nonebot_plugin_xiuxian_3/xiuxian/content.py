@@ -1,4 +1,4 @@
-"""Read-only loader for the versioned runtime content configuration."""
+"""Read-only loader for the runtime content configuration."""
 
 from __future__ import annotations
 

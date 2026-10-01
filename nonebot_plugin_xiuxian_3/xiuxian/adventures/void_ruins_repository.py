@@ -24,7 +24,13 @@ from ..persistence.errors import (
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_VOID_RUINS
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.assets import grant_player_assets, spend_player_items
-from ..utils.player import change_player_state, player_combat_values
+from ..utils.player import (
+    change_player_state,
+    player_combat_values,
+    player_integer,
+    player_inventory,
+    player_resource,
+)
 from .secret_realm_rules import realm_at_least
 from .void_ruins_models import VoidRuinsRunRecord
 from .void_ruins_rules import (
@@ -167,7 +173,7 @@ class VoidRuinsRepositoryMixin:
             ).fetchall()
             if not VOID_RUINS_MIN_MEMBERS <= len(members) <= VOID_RUINS_MAX_MEMBERS or any(not row["confirmed_at"] for row in members):
                 raise VoidRuinsRequirementError("two to five confirmed members are required")
-            if int(leader["stamina"]) < VOID_RUINS_STAMINA_COST:
+            if player_resource(leader, "stamina") < VOID_RUINS_STAMINA_COST:
                 raise ResourceInsufficientError("party leader lacks entry stamina")
 
             combat_snapshots: list[dict[str, Any]] = []
@@ -178,7 +184,7 @@ class VoidRuinsRepositoryMixin:
                 player_id = int(row["id"])
                 if (
                     str(row["location_key"]) != VOID_RUINS_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), int(row["realm_layer"]), "void_refining", 1)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1)
                 ):
                     raise VoidRuinsRequirementError("a member lacks void-refining realm or archive location")
                 if self._has_active_long_action(connection, player_id):
@@ -198,7 +204,7 @@ class VoidRuinsRepositoryMixin:
                     (player_id, quota_key),
                 ).fetchone()[0]) >= VOID_RUINS_WEEKLY_LIMIT:
                     raise VoidRuinsQuotaError("a member already used this UTC week")
-                inventory = self._json_object(row["inventory_json"], {})
+                inventory = player_inventory(row)
                 if int(inventory.get("item.void_anchor", 0)) < VOID_RUINS_ANCHOR_LOCK:
                     raise VoidRuinsRequirementError("a member lacks a void anchor to lock")
                 inventories[player_id] = inventory

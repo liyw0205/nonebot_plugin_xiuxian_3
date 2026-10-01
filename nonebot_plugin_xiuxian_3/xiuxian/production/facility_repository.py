@@ -9,7 +9,8 @@ from datetime import date
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_amount, inventory_value, spend_player_assets
+from ..utils.assets import inventory_amount, spend_player_assets, player_asset_amount
+from ..utils.player import player_inventory
 from .facility_models import FacilityMaintenanceRecord, FacilitySlotRecord
 from .facility_rules import FACILITY_DURATION_BONUS_BP, FACILITY_MAINTENANCE_FEE, resolve_facility
 from ..persistence.errors import (
@@ -185,7 +186,7 @@ class FacilityRepositoryMixin:
                 if existing_maintenance is not None:
                     records.append(self._maintenance_record(existing_maintenance, replay=True))
                     continue
-                paid = int(player["spirit_stones"]) >= FACILITY_MAINTENANCE_FEE
+                paid = player_asset_amount(player, "spirit_stones") >= FACILITY_MAINTENANCE_FEE
                 if paid:
                     spend_player_assets(connection, player, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
                     player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
@@ -238,7 +239,7 @@ class FacilityRepositoryMixin:
                 paid = False
                 if owner_type == "personal":
                     owner = connection.execute("SELECT * FROM players WHERE id = ? AND status = 'active'", (owner_id,)).fetchone()
-                    if owner is not None and int(owner["spirit_stones"]) >= FACILITY_MAINTENANCE_FEE:
+                    if owner is not None and player_asset_amount(owner, "spirit_stones") >= FACILITY_MAINTENANCE_FEE:
                         spend_player_assets(connection, owner, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
                         paid = True
                 else:
@@ -312,7 +313,7 @@ class FacilityRepositoryMixin:
 
         duration = int(base_seconds if base_seconds is not None else recipe.duration_seconds)
         if getattr(recipe, "facility_kind", None) and str(row["location_key"]) == "cave.mist_grotto_2":
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             if inventory_amount(inventory, "item.array.gathering_basic") > 0:
                 return max(1, duration * (10000 - FACILITY_DURATION_BONUS_BP) // 10000)
         return duration

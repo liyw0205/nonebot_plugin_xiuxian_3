@@ -24,7 +24,7 @@ from ..persistence.errors import (
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_BOUNDARY
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.assets import grant_player_assets, spend_player_items
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 from .boundary_rift_models import BoundaryRiftRunRecord
 from .boundary_rift_rules import (
     BOUNDARY_RIFT_EXPIRY_SECONDS,
@@ -140,11 +140,11 @@ class BoundaryRiftRepositoryMixin:
                 flags = {str(value) for value in intro.get("flags", [])}
                 if (
                     str(row["location_key"]) != BOUNDARY_RIFT_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), int(row["realm_layer"]), "nascent_soul", 1)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "nascent_soul", 1)
                     or REQUIRED_FLAG not in flags
                 ):
                     raise BoundaryRiftRequirementError("a member lacks location, realm, or three-realms evidence")
-                if int(row["stamina"]) < BOUNDARY_RIFT_STAMINA_COST:
+                if player_resource(row, "stamina") < BOUNDARY_RIFT_STAMINA_COST:
                     raise ResourceInsufficientError("a party member lacks entry stamina")
                 if self._has_active_long_action(connection, int(row["id"])):
                     raise BoundaryRiftBusyError("a party member has another active action")
@@ -189,12 +189,12 @@ class BoundaryRiftRepositoryMixin:
                         "platform_user_id": str(row["platform_user_id"]),
                         "role": str(row["role"]),
                         "realm_key": str(row["realm_key"]),
-                        "realm_layer": int(row["realm_layer"]),
+                        "realm_layer": player_integer(row, "realm_layer"),
                         "location_key": str(row["location_key"]),
                         "required_flags": sorted(flags & {REQUIRED_FLAG}),
                     }
                 )
-            leader_inventory = self._rift_json(leader["inventory_json"])
+            leader_inventory = player_inventory(leader)
             if int(leader_inventory.get(BOUNDARY_RIFT_TICKET, 0)) < BOUNDARY_RIFT_TICKET_COST:
                 raise BoundaryRiftRequirementError("the party leader lacks one soul crystal")
             run_id = f"boundary-rift-{uuid4().hex}"

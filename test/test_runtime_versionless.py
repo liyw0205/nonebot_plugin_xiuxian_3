@@ -30,5 +30,10 @@ def test_new_player_schema_has_no_release_marker(tmp_path: Path) -> None:
                     row[1]
                     for row in connection.execute(f"PRAGMA table_info({table})")
                 }
+                assert not {
+                    column
+                    for column in columns
+                    if "version" in str(column).lower() or "release" in str(column).lower()
+                }
 
     asyncio.run(run())

@@ -8,7 +8,8 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_value, spend_player_assets
+from ..utils.assets import spend_player_assets, player_asset_amount
+from ..utils.player import player_inventory
 from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
@@ -161,13 +162,13 @@ class SectSupplyRepositoryMixin:
             contribution_gain = quantity // 100 if item_key == "spirit_stones" else quantity
             warehouse = self._json_map(sect["warehouse_json"])
             if item_key == "spirit_stones":
-                if int(player["spirit_stones"]) < quantity:
+                if player_asset_amount(player, "spirit_stones") < quantity:
                     raise ResourceInsufficientError("not enough spirit stones")
                 spend_player_assets(connection, player, {"spirit_stones": quantity}, now_text)
                 connection.execute("UPDATE sects SET spirit_stones=spirit_stones+?,updated_at=? WHERE sect_id=?", (quantity, now_text, sect["sect_id"]))
                 balance = int(sect["spirit_stones"]) + quantity
             else:
-                inventory = inventory_value(player["inventory_json"])
+                inventory = player_inventory(player)
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise ResourceInsufficientError("not enough items")
                 if item_key not in warehouse and len(warehouse) >= int(sect["warehouse_capacity"]):

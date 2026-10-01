@@ -103,7 +103,7 @@ class AdapterRegistry:
             return CommandResult(
                 ok=False,
                 code="ADAPTER_NOT_REGISTERED",
-                message="当前适配器尚未启用。",
+                message="这道传讯暂未接通，请稍后再试。",
                 request_id=context.request_id,
             )
         return await self.router.dispatch(context, text)

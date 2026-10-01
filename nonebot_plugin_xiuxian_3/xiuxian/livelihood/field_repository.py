@@ -9,8 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import grant_player_assets, inventory_value
-from ..utils.player import change_player_state
+from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state, player_inventory, player_resource
 from ..persistence.errors import (
     CropContentClosedError,
     CropDailyLimitError,
@@ -85,10 +85,10 @@ class FieldPlotRepositoryMixin:
             ).fetchone()
             if used is not None and int(used["count"]) >= crop.daily_limit:
                 raise CropDailyLimitError("crop daily limit reached")
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             if int(inventory.get(crop.seed_key, 0)) < 1:
                 raise ResourceInsufficientError("seed is insufficient")
-            if int(row["energy"]) < crop.maintenance_energy:
+            if player_resource(row, "energy") < crop.maintenance_energy:
                 raise ResourceInsufficientError("energy is insufficient")
             harvest_at = serialize_datetime(now + timedelta(seconds=crop.growth_seconds))
             plot_id = uuid4().hex
@@ -271,7 +271,7 @@ class FieldPlotRepositoryMixin:
                 count = int(plot["maintenance_count"])
                 if count >= required:
                     raise FieldPlotNotReadyError("field plot maintenance is complete")
-                if int(row["energy"]) < int(snapshot.get("maintenance_energy", 1)):
+                if player_resource(row, "energy") < int(snapshot.get("maintenance_energy", 1)):
                     raise ResourceInsufficientError("energy is insufficient")
                 count += 1
                 change_player_state(

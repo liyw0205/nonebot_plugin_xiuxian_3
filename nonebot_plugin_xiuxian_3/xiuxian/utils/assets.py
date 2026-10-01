@@ -431,9 +431,12 @@ def inventory_amount(inventory: Mapping[str, Any], key: str) -> int:
 def player_asset_amount(row: Any, key: str) -> int:
     """Read one currency or item balance through the shared asset rules."""
 
-    state = player_asset_state(row)
     if key in {"spirit_stones", "currency.spirit_stone"}:
-        return state.currency
+        currency = _row_value(row, "spirit_stones")
+        if currency is None:
+            raise AssetDeltaError("player row does not contain currency columns")
+        return currency_with_delta(currency, 0)
+    state = player_asset_state(row)
     return inventory_amount(state.inventory, str(key))
 
 

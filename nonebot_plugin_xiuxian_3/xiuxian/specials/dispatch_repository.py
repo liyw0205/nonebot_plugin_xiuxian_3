@@ -90,7 +90,7 @@ class DispatchRepositoryMixin:
             ).fetchone()
             service = int(reputation["service_reputation"]) if reputation else 0
             if service < 80 and not self._meets_realm_values(
-                str(player["realm_key"]), int(player["realm_layer"]), "dao_union", 1
+                str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union", 1
             ):
                 missing.append("需要合道一层或通用服务信誉 80")
         if definition.required_permit and self._active_dispatch_permit(

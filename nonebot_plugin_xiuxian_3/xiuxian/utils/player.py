@@ -232,13 +232,17 @@ def player_object(
     return {str(name): item for name, item in value.items()}
 
 
-def player_inventory(row: Mapping[str, Any] | Any) -> dict[str, int]:
+def player_inventory(
+    row: Mapping[str, Any] | Any,
+    *,
+    keep_zero: bool = False,
+) -> dict[str, int]:
     """Read the normalized item inventory shared by displays and battles."""
 
     raw = player_field(row, "inventory_json", None)
     if raw is None:
         raw = player_field(row, "inventory", {})
-    return inventory_value(raw)
+    return inventory_value(raw, keep_zero=keep_zero)
 
 
 def player_qualification(row: Mapping[str, Any] | Any) -> dict[str, int]:

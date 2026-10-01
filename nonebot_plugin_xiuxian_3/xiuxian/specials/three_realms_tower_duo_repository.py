@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer, player_resource
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -124,7 +124,7 @@ class ThreeRealmsTowerDuoRepositoryMixin:
             if any(str(row["location_key"]) != str(party["location_key"]) for row in members):
                 raise TowerRequirementError("tower duo members must share a location")
             for row in members:
-                if not self._meets_realm_values(str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer):
+                if not self._meets_realm_values(str(row["realm_key"]), player_integer(row, "realm_layer"), definition.required_realm, definition.required_layer):
                     has_v03_permit = floor_no <= 20 and self._intro_flag(row, "story.mainline.three_realms")
                     if not has_v03_permit and rebuild_reputation_total(self._local_reputations(connection, int(row["id"]))) < 500:
                         raise TowerRequirementError("tower duo member lacks realm or reconstruction reputation")
@@ -134,7 +134,7 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 ).fetchone()[0]
                 if int(used) >= definition.weekly_limit:
                     raise TowerQuotaError("tower duo member weekly quota exhausted")
-                if int(row["stamina"]) < TOWER_DUO_STAMINA_COST:
+                if player_resource(row, "stamina") < TOWER_DUO_STAMINA_COST:
                     raise ResourceInsufficientError("tower duo member lacks stamina")
                 highest = connection.execute(
                     "SELECT COALESCE(MAX(floor_no),0) FROM three_realms_tower_duo_member_runs WHERE player_id=? AND status='claimed'",

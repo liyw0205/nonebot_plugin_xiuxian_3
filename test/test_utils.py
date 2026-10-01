@@ -176,6 +176,14 @@ def test_player_asset_reads_share_row_and_projection_shapes() -> None:
     }
 
 
+def test_player_asset_reads_allow_partial_currency_rows_and_preserve_zero_items() -> None:
+    assert player_asset_amount({"spirit_stones": "42"}, "currency.spirit_stone") == 42
+    assert player_inventory({"inventory_json": '{"item.herb": 2, "item.empty": 0}'}, keep_zero=True) == {
+        "item.herb": 2,
+        "item.empty": 0,
+    }
+
+
 def test_asset_state_applies_currency_and_items_together() -> None:
     inventory = {"item.herb": 2}
 

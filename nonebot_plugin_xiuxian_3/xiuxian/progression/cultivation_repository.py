@@ -167,8 +167,8 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import grant_player_assets, inventory_value
-from ..utils.player import change_player_state
+from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 
 
 class CultivationRepositoryMixin:
@@ -431,7 +431,7 @@ class CultivationRepositoryMixin:
                 raise LocationRequiredError("selected cultivation mode requires a specific location")
             if not meets_realm(
                 str(row["realm_key"]),
-                int(row["realm_layer"]),
+                player_integer(row, "realm_layer"),
                 mode.required_realm,
                 mode.required_layer,
             ):
@@ -497,7 +497,7 @@ class CultivationRepositoryMixin:
                 ).fetchone()
                 if used is not None and int(used["count"]) >= mode.daily_limit:
                     raise CultivationDailyLimitError("cultivation mode reached its daily limit")
-            if int(row["stamina"]) < mode.stamina_cost or int(row["energy"]) < mode.energy_cost:
+            if player_resource(row, "stamina") < mode.stamina_cost or player_resource(row, "energy") < mode.energy_cost:
                 raise ResourceInsufficientError("cultivation resources are insufficient")
 
             session_id = uuid4().hex
@@ -523,12 +523,10 @@ class CultivationRepositoryMixin:
             if cloud_tea_effect_bp > 0:
                 state_bp += cloud_tea_effect_bp
                 item_effects = {}
-            manual_effects = manual_effect_totals(
-                self._json_object(row["inventory_json"], {}), self.content
-            )
+            manual_effects = manual_effect_totals(player_inventory(row), self.content)
             snapshot = {
                 "realm_key": row["realm_key"],
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "location_key": row["location_key"],
                 "mode_key": mode.key,
@@ -1336,11 +1334,11 @@ class CultivationRepositoryMixin:
             ).fetchone()
             if retreat is not None:
                 raise CultivationBusyError("retreat is still running")
-            layer = int(row["realm_layer"])
+            layer = player_integer(row, "realm_layer")
             realm_key = str(row["realm_key"])
             if layer >= 10 or next_layer_threshold(realm_key, layer) is None:
                 raise RealmLayerInvalidError("realm is already at its maximum layer")
-            if not can_advance_layer(realm_key, layer, int(row["cultivation"])):
+            if not can_advance_layer(realm_key, layer, player_resource(row, "cultivation")):
                 raise RealmCultivationInsufficientError("realm cultivation is insufficient")
             if realm_key == "tribulation" and layer in {3, 6, 9}:
                 completed = {

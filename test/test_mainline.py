@@ -113,20 +113,107 @@ def test_mainline_stage_prerequisites_and_reward_assets() -> None:
     asyncio.run(run())
 
 
-def test_closed_mainline_stage_does_not_create_a_run() -> None:
+def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
             await runtime.dispatch(_context("create"), "开始修仙")
             await runtime.dispatch(_context("seek"), "寻仙问道")
-            result = await runtime.dispatch(_context("closed-stage"), "开始主线 城镇委托")
-            assert result.code == "CONTENT_CLOSED"
+            assert (await runtime.dispatch(_context("stage1-start"), "开始主线 1")).ok
+            assert (await runtime.dispatch(_context("stage1-claim"), "领取主线奖励 1")).ok
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key = 'qi_sensing', realm_layer = 3 WHERE platform_user_id = ?",
+                    ("mainline-user",),
+                )
+            assert (await runtime.dispatch(_context("stage2-start"), "开始主线 2")).ok
+            assert (await runtime.dispatch(_context("stage2-claim"), "领取主线奖励 2")).ok
+            assert (await runtime.dispatch(_context("stage3-start"), "开始主线 3")).ok
+            assert (await runtime.dispatch(_context("stage3-claim"), "领取主线奖励 3")).ok
+
+            locked = await runtime.dispatch(_context("before-commission"), "开始主线 城镇委托")
+            assert locked.code == "MAINLINE_REQUIREMENT_MISSING"
+            listed = await runtime.dispatch(_context("commission-list"), "城镇委托")
+            assert listed.code == "COMMISSION_LIST"
+            accepted = await runtime.dispatch(
+                _context("commission-accept"), "接取委托 止血草供应"
+            )
+            assert accepted.code == "COMMISSION_ACCEPTED"
+            delivered = await runtime.dispatch(
+                _context("commission-deliver"), "交付委托 止血草供应"
+            )
+            assert delivered.code == "COMMISSION_DELIVERED"
+
+            started = await runtime.dispatch(_context("stage4-start"), "开始主线 城镇委托")
+            assert started.code == "MAINLINE_STARTED"
+            claimed = await runtime.dispatch(_context("stage4-claim"), "领取主线奖励 城镇委托")
+            assert claimed.code == "MAINLINE_REWARD_CLAIMED"
+            assert claimed.data["first_clear"] is True
+            assert claimed.data["reward"] == {
+                "access.xuantian.trade_route": 1,
+                "service_reputation": 5,
+            }
+            replay = await runtime.dispatch(_context("stage4-claim"), "领取主线奖励 城镇委托")
+            assert replay.data["idempotent_replay"] is True
             with runtime.repository._connect() as connection:
                 count = connection.execute(
                     "SELECT COUNT(*) AS count FROM mainline_runs WHERE stage_key = ?",
                     ("chapter.2.stage.1",),
                 ).fetchone()
-                assert int(count["count"]) == 0
+                assert int(count["count"]) == 1
+                delivered_evidence = connection.execute(
+                    "SELECT COUNT(*) AS count FROM town_commission_claims WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?) AND status = 'delivered'",
+                    ("mainline-user",),
+                ).fetchone()
+                assert int(delivered_evidence["count"]) == 1
+                reputation = connection.execute(
+                    "SELECT service_reputation FROM player_reputations WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
+                    ("mainline-user",),
+                ).fetchone()
+                assert int(reputation["service_reputation"]) == 6
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_mainline_town_commission_runs_through_qq_and_onebot_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "mainline-qq"), ("onebot.v11", "mainline-onebot")):
+                def context(operation_id: str) -> CommandContext:
+                    return CommandContext(
+                        adapter=adapter,
+                        user_id=user,
+                        operation_id=f"{adapter}:{operation_id}",
+                    )
+
+                async def dispatch(operation_id: str, command: str):
+                    return await runtime.adapters.dispatch(adapter, context(operation_id), command)
+
+                assert (await dispatch("create", "开始修仙")).ok
+                assert (await dispatch("seek", "寻仙问道")).ok
+                assert (await dispatch("stage1-start", "开始主线 1")).ok
+                assert (await dispatch("stage1-claim", "领取主线奖励 1")).ok
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE players SET realm_key='qi_sensing', realm_layer=3 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                assert (await dispatch("stage2-start", "开始主线 2")).ok
+                assert (await dispatch("stage2-claim", "领取主线奖励 2")).ok
+                assert (await dispatch("stage3-start", "开始主线 3")).ok
+                assert (await dispatch("stage3-claim", "领取主线奖励 3")).ok
+                assert (await dispatch("list", "城镇委托")).code == "COMMISSION_LIST"
+                assert (await dispatch("accept", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
+                assert (await dispatch("deliver", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
+                claimed = await dispatch("stage4-start", "开始主线 城镇委托")
+                assert claimed.code == "MAINLINE_STARTED"
+                reward = await dispatch("stage4-claim", "领取主线奖励 城镇委托")
+                assert reward.code == "MAINLINE_REWARD_CLAIMED"
+                assert reward.data["reward"]["service_reputation"] == 5
+                replay = await dispatch("stage4-claim", "领取主线奖励 城镇委托")
+                assert replay.data["idempotent_replay"] is True
             await runtime.close()
 
     asyncio.run(run())

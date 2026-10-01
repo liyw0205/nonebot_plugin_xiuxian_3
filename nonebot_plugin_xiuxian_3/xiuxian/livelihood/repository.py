@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import spend_player_currency
+from ..utils.assets import spend_player_currency, player_asset_amount
 from ..persistence.errors import (
     CurrencyInsufficientError,
     LocalReputationInsufficientError,
@@ -101,7 +101,7 @@ class LivelihoodRepositoryMixin(
                     "UPDATE residences SET status = 'expired', updated_at = ? WHERE id = ?",
                     (now_text, active["id"]),
                 )
-            if int(row["spirit_stones"]) < definition.rent_cost:
+            if player_asset_amount(row, "spirit_stones") < definition.rent_cost:
                 raise CurrencyInsufficientError("rent is insufficient")
             if definition.required_local_reputation:
                 reputation = connection.execute(

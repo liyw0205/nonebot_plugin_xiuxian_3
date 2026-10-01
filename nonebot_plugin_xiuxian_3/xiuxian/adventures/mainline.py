@@ -1,11 +1,4 @@
-"""Pure rules for the Xuantian mainline.
-
-This module describes the v0.1 story contract.  Chapter one contains the
-open runtime stages; the documented chapter-two town commission remains
-explicitly closed until its persistent commission domain is available.  It
-does not advance a player, persist a run, or grant rewards; those concerns
-belong to the application/repository and reward services.
-"""
+"""玄天主线的纯规则。"""
 
 from __future__ import annotations
 
@@ -14,6 +7,7 @@ from typing import Iterable, Mapping
 
 
 MAINLINE_STORY_KEY = "story.mainline.xuantian"
+MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
 MAINLINE_AVAILABLE = "available"
@@ -114,13 +108,12 @@ MAINLINE_STAGES: tuple[MainlineStageDefinition, ...] = (
         stage=1,
         label="城镇委托",
         description="完成一项常驻经营委托，开启玄天商路。",
-        prerequisites=("chapter.1.stage.3",),
+        prerequisites=("chapter.1.stage.3", MAINLINE_TOWN_COMMISSION_DELIVERED),
         first_clear_reward=(
             ("access.xuantian.trade_route", 1),
             ("service_reputation", 5),
         ),
         repeat_reward=(("spirit_stones", 10),),
-        runtime_status="closed",
     ),
 )
 MAINLINE_STAGE_COUNT = len(MAINLINE_STAGES)
@@ -147,9 +140,7 @@ _REALM_RANK = {
     "soul_transformation": 6,
 }
 
-# Mainline v0.1 is intentionally limited to ordinary progression/display
-# assets.  Keeping this guard next to the content table makes accidental
-# introduction of path or ending state visible during module import/tests.
+# 主线奖励只能影响当前章节允许的展示和资产，不得改写境界或终局状态。
 MAINLINE_FORBIDDEN_REWARD_KEYS = frozenset(
     {
         "path_key",
@@ -255,7 +246,7 @@ def mainline_prerequisites_met(
     realm_key: str | None = None,
     realm_layer: int = 0,
 ) -> bool:
-    """Evaluate the v0.1 prerequisite snapshot without touching persistence."""
+    """在不访问持久化的情况下判断主线前置快照。"""
 
     if state is not None:
         completed_stages = state.get("completed_stages", completed_stages)  # type: ignore[assignment]
@@ -373,6 +364,7 @@ __all__ = [
     "MAINLINE_STAGES",
     "MAINLINE_STAGE_COUNT",
     "MAINLINE_STORY_KEY",
+    "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",
     "mainline_definition",

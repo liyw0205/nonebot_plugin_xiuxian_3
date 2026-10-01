@@ -157,7 +157,7 @@ class VoidSpireRepositoryMixin:
             required_reputation = DAO_SERVICE_REPUTATION_REQUIRED if upper_floor else SUPPLY_REPUTATION_REQUIRED
             reputation = self._void_spire_local_reputation(connection, int(player["id"]), reputation_key)
             if not self._meets_realm_values(
-                str(player["realm_key"]), int(player["realm_layer"]), definition.required_realm, definition.required_layer
+                str(player["realm_key"]), player_integer(player, "realm_layer"), definition.required_realm, definition.required_layer
             ) and reputation < required_reputation:
                 raise TowerRequirementError("realm or stage-specific reputation is required")
             if self._has_active_long_action(connection, int(player["id"])):

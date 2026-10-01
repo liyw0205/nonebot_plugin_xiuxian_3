@@ -9,7 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, inventory_value, inventory_with_delta
+from ..utils.assets import change_player_assets, inventory_with_delta, player_asset_amount
+from ..utils.player import player_inventory
 from ..persistence.errors import (
     CrossRealmTradeCurrencyInsufficientError,
     CrossRealmTradeInputInsufficientError,
@@ -92,11 +93,11 @@ class CrossRealmTradeRepositoryMixin:
             if int(weekly_count["count"] if weekly_count else 0) >= definition.weekly_limit:
                 raise TradeWeeklyCapError("cross-realm trade weekly cap is reached")
 
-            inventory = inventory_value(player["inventory_json"])
+            inventory = player_inventory(player)
             for item_key, quantity in definition.input_items.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise CrossRealmTradeInputInsufficientError(f"missing trade input: {item_key}")
-            if int(player["spirit_stones"]) < definition.currency_cost:
+            if player_asset_amount(player, "spirit_stones") < definition.currency_cost:
                 raise CrossRealmTradeCurrencyInsufficientError("trade currency is insufficient")
 
             input_before = {key: int(inventory.get(key, 0)) for key in definition.input_items}
@@ -189,8 +190,8 @@ class CrossRealmTradeRepositoryMixin:
                 "cross_realm_trade.input",
                 "debit",
                 definition.currency_cost,
-                int(player["spirit_stones"]),
-                int(player["spirit_stones"]) - definition.currency_cost,
+                player_asset_amount(player, "spirit_stones"),
+                player_asset_amount(player, "spirit_stones") - definition.currency_cost,
                 trade_id,
                 now_text,
             )

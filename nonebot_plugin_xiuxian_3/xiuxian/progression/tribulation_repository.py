@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_value, spend_player_items
-from ..utils.player import change_player_state
+from ..utils.assets import spend_player_items
+from ..utils.player import change_player_state, player_integer, player_inventory
 from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..combat.rules import apply_constitution_combat_effect, MAX_TURNS, TURN_TIMEOUT_SECONDS
 from ..combat.tribulation_rules import (
@@ -104,7 +104,7 @@ class TribulationTrialRepositoryMixin:
                 raise PlayerSuspendedError("player is not active")
             if self._has_active_long_action(connection, int(row["id"])):
                 raise TribulationTrialBusyError("another long action is active")
-            if str(row["realm_key"]) != "tribulation" or int(row["realm_layer"]) < definition.required_layer:
+            if str(row["realm_key"]) != "tribulation" or player_integer(row, "realm_layer") < definition.required_layer:
                 raise TrialSequenceError("tribulation layer is insufficient")
             if int(row["tribulation_debt"]) >= 100:
                 raise TribulationDebtBlockedError("tribulation debt is too high")
@@ -162,7 +162,7 @@ class TribulationTrialRepositoryMixin:
                     raise DaoFruitChoiceError("dao fruit does not match the primary path")
                 if row["dao_fruit_key"]:
                     raise DaoFruitChoiceError("dao fruit is already locked")
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             guard_used = int(inventory.get("item.tribulation_guard", 0)) > 0
             costs = {"item.tribulation_token": definition.token_cost}
             if guard_used:
@@ -178,7 +178,7 @@ class TribulationTrialRepositoryMixin:
             stats = apply_constitution_combat_effect(
                 tribulation_stat_snapshot(
                     qualification,
-                    realm_layer=int(row["realm_layer"]),
+                    realm_layer=player_integer(row, "realm_layer"),
                     equipment=equipment,
                 ),
                 constitution_effect,
@@ -205,7 +205,7 @@ class TribulationTrialRepositoryMixin:
                     "equipment": list(equipment),
                     "constitution_effect": constitution_effect,
                     "realm_key": str(row["realm_key"]),
-                    "realm_layer": int(row["realm_layer"]),
+                    "realm_layer": player_integer(row, "realm_layer"),
                     "dao_fruit_key": row["dao_fruit_key"],
                     "dao_fruit_progress": int(row["dao_fruit_progress"]),
                     "domain_key": row["domain_key"],

@@ -12,7 +12,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
 from ..utils.assets import grant_player_assets, grant_player_items
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 from .secret_realm_models import SecretRealmPreviewRecord, SecretRealmRunRecord
 from .secret_realm_rules import (
     DEFINITIONS,
@@ -81,7 +81,7 @@ class SecretRealmRepositoryMixin:
                 return self._run_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["location_key"]) != definition.location_key or not realm_at_least(
-                str(player["realm_key"]), int(player["realm_layer"]), definition.required_realm, definition.required_layer
+                str(player["realm_key"]), player_integer(player, "realm_layer"), definition.required_realm, definition.required_layer
             ):
                 raise SecretRealmRequirementError("realm or location requirement is not met")
             active = connection.execute(
@@ -98,11 +98,11 @@ class SecretRealmRepositoryMixin:
             ).fetchone()
             if int(count["count"]) >= definition.quota_limit:
                 raise SecretRealmQuotaError("secret-realm quota is exhausted")
-            inventory = json_object(player["inventory_json"], {})
+            inventory = player_inventory(player)
             ticket = int(inventory.get(definition.ticket_key, 0)) if definition.ticket_key else 0
             if definition.ticket_key and ticket < definition.ticket_quantity:
                 raise SecretRealmRequirementError("secret-realm ticket is missing")
-            if int(player["stamina"]) < definition.stamina_cost:
+            if player_resource(player, "stamina") < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             change_player_state(
                 connection,
@@ -115,14 +115,14 @@ class SecretRealmRepositoryMixin:
                 ),
                 asset_mode="spend",
                 value_delta={"stamina": -definition.stamina_cost},
-                maximums={"stamina": player["stamina_max"]},
+                maximums={"stamina": player_resource(player, "stamina_max")},
             )
             run_id = uuid4().hex
             snapshot = {
                 "instance_key": definition.key,
                 "location_key": definition.location_key,
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "node_keys": list(definition.node_keys),
                 "first_clear": self._is_first_clear(connection, int(player["id"]), definition.key),
                 "resource_roll": self._resource_roll(definition.key, run_id),

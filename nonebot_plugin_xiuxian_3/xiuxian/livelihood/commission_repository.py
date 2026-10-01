@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, inventory_missing, inventory_value
+from ..utils.assets import change_player_assets, player_assets_missing
 from ..utils.json import json_object
 from ..content import bundled_content
 from ..persistence.errors import (
@@ -271,9 +271,8 @@ class CommissionRepositoryMixin:
                 )
                 raise CommissionExpiredError("commission has expired")
             snapshot = json_object(claim["snapshot_json"], {})
-            inventory = inventory_value(player["inventory_json"])
             inputs = {str(key): int(value) for key, value in dict(snapshot.get("inputs", {})).items()}
-            missing = inventory_missing(inventory, inputs)
+            missing = player_assets_missing(player, inputs)
             if missing:
                 raise CommissionMaterialInsufficientError("commission materials are insufficient")
             reward_stones = int(snapshot.get("reward_stones", 0))

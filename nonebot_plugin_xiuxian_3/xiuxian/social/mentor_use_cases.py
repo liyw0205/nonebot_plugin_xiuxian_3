@@ -75,7 +75,7 @@ class MentorApplication:
 
     async def invite_mentor(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
-            return CommandResult(False, "INVALID_MENTOR_COMMAND", "请使用 `邀请拜师 用户ID`，也可写成 `适配器:用户ID`。", context.request_id)
+            return CommandResult(False, "INVALID_MENTOR_COMMAND", "请使用 `邀请拜师 用户ID`。", context.request_id)
         operation_id = self._operation_id(context, "social.invite_mentor")
         try:
             record = await self.repository.invite_mentor(

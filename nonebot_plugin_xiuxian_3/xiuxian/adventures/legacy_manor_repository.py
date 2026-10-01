@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer, player_inventory
 from ..persistence.errors import (
     LegacyManorBusyError,
     LegacyManorNodeError,
@@ -168,14 +168,14 @@ class LegacyManorRepositoryMixin:
             if str(player["location_key"]) != definition.location_key:
                 raise LegacyManorRequirementError("player is not at the reliquary location")
             if not realm_at_least(
-                str(player["realm_key"]), int(player["realm_layer"]), definition.realm_key, definition.realm_layer
+                str(player["realm_key"]), player_integer(player, "realm_layer"), definition.realm_key, definition.realm_layer
             ):
                 raise LegacyManorRequirementError("minimum legacy-manor realm is required")
             intro = self._legacy_manor_json(player["intro_json"], {})
             flags = list(intro.get("flags", []))
             if definition.permission not in flags:
                 raise LegacyManorRequirementError("the legacy-manor permission is missing")
-            inventory = self._legacy_manor_json(player["inventory_json"], {})
+            inventory = player_inventory(player)
             if int(inventory.get(definition.clue, 0)) < 1:
                 raise LegacyManorRequirementError("the required clue is missing")
             if definition.story_flag in flags:
@@ -192,7 +192,7 @@ class LegacyManorRepositoryMixin:
                 "instance_key": definition.instance_key,
                 "location_key": definition.location_key,
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "permission": definition.permission,
                 "clue_key": definition.clue,
                 "clue_consumed": False,

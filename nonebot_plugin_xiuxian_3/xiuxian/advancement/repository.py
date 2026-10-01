@@ -200,12 +200,12 @@ from ..routine.rules import (
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import (
     inventory_json,
-    inventory_value,
     spend_player_items,
     spend_player_assets,
     assets_spend,
+    player_asset_amount,
 )
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer, player_inventory
 
 
 class AdvancementRepositoryMixin:
@@ -311,7 +311,7 @@ class AdvancementRepositoryMixin:
             if used is not None and int(used["count"]) >= definition.daily_limit:
                 raise RetreatDailyLimitError("retreat daily limit reached")
 
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             item_cost = definition.item_cost_map()
             if definition.required_item:
                 content = self.content or bundled_content()
@@ -326,7 +326,7 @@ class AdvancementRepositoryMixin:
             for item_key, quantity in item_cost.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise ResourceInsufficientError("retreat item is insufficient")
-            if int(row["energy"]) < definition.energy_cost:
+            if player_integer(row, "energy") < definition.energy_cost:
                 raise ResourceInsufficientError("energy is insufficient")
             seed = f"{definition.random_pool or definition.key}:{operation_id}"
             snapshot = {
@@ -334,12 +334,12 @@ class AdvancementRepositoryMixin:
                 "random_pool": definition.random_pool,
                 "random_seed": seed,
                 "realm_key": str(row["realm_key"]),
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "residence_key": active_residence["residence_key"] if active_residence is not None else None,
-                "energy_before": int(row["energy"]),
+                "energy_before": player_integer(row, "energy"),
                 "item_cost": item_cost,
             }
             session_id = uuid4().hex
@@ -674,7 +674,7 @@ class AdvancementRepositoryMixin:
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
                 "realm_key": row["realm_key"],
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "location_key": row["location_key"],
             }
             profile_id = uuid4().hex
@@ -834,7 +834,7 @@ class AdvancementRepositoryMixin:
                 reshape_rules = constitution_reshape_rules(self.content)
                 if now < last_reshaped_at + timedelta(seconds=int(reshape_rules["cooldown_seconds"])):
                     raise ConstitutionCooldownError("constitution reshape cooldown is active")
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             reset_item_key = str(constitution_reshape_rules(self.content)["reset_item_key"])
             if int(inventory.get(reset_item_key, 0)) < 1:
                 raise ResourceInsufficientError("constitution reset token is missing")
@@ -845,7 +845,7 @@ class AdvancementRepositoryMixin:
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
                 "realm_key": row["realm_key"],
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "location_key": row["location_key"],
             }
             reshape_count = int(profile["reshape_count"]) + 1
@@ -1086,7 +1086,7 @@ class AdvancementRepositoryMixin:
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
                 "realm_key": row["realm_key"],
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "location_key": row["location_key"],
                 "constitution_key": str(constitution["constitution_key"]) if constitution else None,
             }
@@ -1299,7 +1299,7 @@ class AdvancementRepositoryMixin:
         ).fetchall()
         if rows:
             return rows[0] if len(rows) == 1 else player
-        inventory = inventory_value(player["inventory_json"])
+        inventory = player_inventory(player)
         quantity = int(inventory.get(definition.key, 0))
         if quantity <= 0:
             return player
@@ -1363,7 +1363,7 @@ class AdvancementRepositoryMixin:
         ).fetchone()
         if instance is not None:
             return True
-        inventory = inventory_value(player["inventory_json"])
+        inventory = player_inventory(player)
         return int(inventory.get(definition.key, 0)) > 0
 
     @staticmethod
@@ -1380,7 +1380,7 @@ class AdvancementRepositoryMixin:
             raise RuntimeError("unsupported configured equipment resource")
         try:
             remaining = assets_spend(
-                player["spirit_stones"],
+                player_asset_amount(player, "spirit_stones"),
                 inventory,
                 costs,
                 currency_key="currency.spirit_stone",
@@ -1466,7 +1466,7 @@ class AdvancementRepositoryMixin:
             if not equipment_meets_realm(
                 definition,
                 str(player["realm_key"]),
-                int(player["realm_layer"]),
+                player_integer(player, "realm_layer"),
                 self.content,
             ):
                 raise EquipmentRequirementError("player realm does not meet equipment requirement")
@@ -1491,7 +1491,7 @@ class AdvancementRepositoryMixin:
             player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if player is None:
                 raise PlayerNotFoundError("player disappeared during equipment resolution")
-            inventory = inventory_value(player["inventory_json"])
+            inventory = player_inventory(player)
             inventory, stones_after, material_key, material_spent, stones_spent = self._consume_equipment_costs(
                 player, inventory, costs
             )
@@ -1653,7 +1653,7 @@ class AdvancementRepositoryMixin:
             if not equipment_meets_realm(
                 definition,
                 str(player["realm_key"]),
-                int(player["realm_layer"]),
+                player_integer(player, "realm_layer"),
                 self.content,
             ):
                 raise EquipmentRequirementError("player realm does not meet equipment requirement")
@@ -1666,7 +1666,7 @@ class AdvancementRepositoryMixin:
             player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if player is None:
                 raise PlayerNotFoundError("player disappeared during equipment resolution")
-            inventory = inventory_value(player["inventory_json"])
+            inventory = player_inventory(player)
             inventory, stones_after, material_key, material_spent, stones_spent = self._consume_equipment_costs(
                 player, inventory, costs
             )
@@ -1891,12 +1891,12 @@ class AdvancementRepositoryMixin:
                 "SELECT * FROM skill_masteries WHERE player_id = ? AND skill_key = ? LIMIT 1",
                 (row["id"], definition.key),
             ).fetchone()
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             if definition.key not in available_skill_keys(
                 str(row["path_key"]),
                 self.content,
                 realm_key=str(row["realm_key"]),
-                realm_layer=int(row["realm_layer"]),
+                realm_layer=player_integer(row, "realm_layer"),
                 inventory=inventory,
                 mastered_keys=(definition.key,) if mastery is not None else (),
             ):
@@ -1945,7 +1945,7 @@ class AdvancementRepositoryMixin:
                 "acquisition_item_key": definition.acquisition_item_key,
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "realm_key": row["realm_key"],
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "location_key": row["location_key"],
             }
             snapshot_json = json.dumps(snapshot, ensure_ascii=False, sort_keys=True)

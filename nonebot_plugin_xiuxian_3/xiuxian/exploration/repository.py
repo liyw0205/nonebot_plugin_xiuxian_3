@@ -180,8 +180,8 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import assets_spend, assets_with_delta, inventory_value
-from ..utils.player import change_player_state
+from ..utils.assets import assets_spend, assets_with_delta, player_asset_amount
+from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 
 
 class ExplorationRepositoryMixin:
@@ -245,12 +245,12 @@ class ExplorationRepositoryMixin:
             if str(row["location_key"]) != definition.location_key:
                 raise LocationRequirementError("exploration requires a specific location")
             if not exploration_meets_realm(
-                str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer
+                str(row["realm_key"]), player_integer(row, "realm_layer"), definition.required_realm, definition.required_layer
             ):
                 raise LocationRequirementError("realm requirement is not met")
-            pollution_before = int(row["pollution"])
+            pollution_before = player_resource(row, "pollution")
             pollution_after = pollution_before
-            bloodline_stability_before = int(row["bloodline_stability"])
+            bloodline_stability_before = player_resource(row, "bloodline_stability")
             bloodline_stability_after = bloodline_stability_before
             cross_realm_penalty_bp = 0
             if definition.key == "explore.demon_abyss":
@@ -281,7 +281,7 @@ class ExplorationRepositoryMixin:
                 if "guide.gather_blood_grass" not in set(intro_state.get("flags", [])):
                     raise LocationRequirementError("spring gathering requires the gathering lesson")
 
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             intro_state = self._json_object(row["intro_json"], {})
             if definition.key == "explore.demon_threshold" and DEMON_INTRO_FLAG not in intro_state.get("flags", []):
                 raise LocationRequirementError("demon gate risk briefing is required")
@@ -334,10 +334,10 @@ class ExplorationRepositoryMixin:
             ).fetchone()
             if used is not None and int(used["count"]) >= definition.daily_limit:
                 raise ExplorationQuotaExhaustedError("exploration mode reached its daily limit")
-            stamina = int(row["stamina"])
+            stamina = player_resource(row, "stamina")
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
-            energy = int(row["energy"])
+            energy = player_resource(row, "energy")
             if energy < definition.energy_cost:
                 raise EnergyInsufficientError("energy is insufficient")
 
@@ -362,7 +362,7 @@ class ExplorationRepositoryMixin:
                 "mode_key": definition.key,
                 "location_key": definition.location_key,
                 "realm_key": row["realm_key"],
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "path_key": row["path_key"],
                 "pollution_before": pollution_before,
@@ -385,8 +385,8 @@ class ExplorationRepositoryMixin:
                 "storm_roll_bp": (
                     cloud_boat_storm_roll_bp(operation_id) if definition.key == "explore.cloud_boat_trial" else None
                 ),
-                "max_hp": int(row["max_hp"]),
-                "initiative": int(row["initiative"]),
+                "max_hp": player_resource(row, "max_hp"),
+                "initiative": player_resource(row, "initiative"),
                 "constitution_effect": constitution_effect_snapshot(connection, player_id),
                 "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
                 "companions": [
@@ -401,7 +401,7 @@ class ExplorationRepositoryMixin:
                 value_delta={
                     "stamina": -definition.stamina_cost,
                     "energy": -definition.energy_cost,
-                    "pollution": pollution_after - int(row["pollution"]),
+                    "pollution": pollution_after - player_resource(row, "pollution"),
                 },
                 maximums={"pollution": 100},
             )
@@ -1183,7 +1183,7 @@ class ExplorationRepositoryMixin:
                     "storm_deadline": ends_at,
                 }
             elif effective_choice == "pay":
-                if int(row["spirit_stones"]) < CLOUD_BOAT_STORM_PAY_COST:
+                if player_asset_amount(row, "spirit_stones") < CLOUD_BOAT_STORM_PAY_COST:
                     raise CurrencyInsufficientError("cloud boat storm payment requires spirit stones")
                 result = dict(frozen_result)
                 result["cultivation"] = int(result.get("cultivation", 0)) + 200
@@ -1215,7 +1215,7 @@ class ExplorationRepositoryMixin:
             else:
                 stamina_refund = min(
                     int(session["stamina_cost"]) // 2,
-                    max(0, int(row["stamina_max"]) - int(row["stamina"])),
+                    max(0, player_resource(row, "stamina_max") - player_resource(row, "stamina")),
                 )
                 result = {"stamina_refund": stamina_refund}
                 if stamina_refund:
@@ -1224,7 +1224,7 @@ class ExplorationRepositoryMixin:
                         row,
                         updated_at=now_text,
                         value_delta={"stamina": stamina_refund},
-                        maximums={"stamina": row["stamina_max"]},
+                        maximums={"stamina": player_resource(row, "stamina_max")},
                     )
                 result_json = {
                     **stored,
@@ -1301,7 +1301,7 @@ class ExplorationRepositoryMixin:
                 row,
                 updated_at=now_text,
                 value_delta={"stamina": stamina_refund, "energy": energy_refund},
-                maximums={"stamina": row["stamina_max"], "energy": row["energy_max"]},
+                maximums={"stamina": player_resource(row, "stamina_max"), "energy": player_resource(row, "energy_max")},
             )
             connection.execute(
                 "UPDATE exploration_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ? AND status = 'created'",

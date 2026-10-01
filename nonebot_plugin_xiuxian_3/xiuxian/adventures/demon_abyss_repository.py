@@ -21,7 +21,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_intro_flags, player_object, player_reputation
+from ..utils.player import change_player_state, player_integer, player_intro_flags, player_object, player_reputation, player_resource
 from .demon_abyss_models import DemonAbyssRunRecord
 from .demon_abyss_rules import (
     DEMON_ABYSS_ENEMIES,
@@ -187,7 +187,7 @@ class DemonAbyssRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if (
                 str(player["location_key"]) != DEMON_ABYSS_LOCATION
-                or not realm_at_least(str(player["realm_key"]), int(player["realm_layer"]), "foundation", 1)
+                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "foundation", 1)
             ):
                 raise DemonAbyssRequirementError("realm or location requirement is not met")
             intro = self._json_object(player["intro_json"], {})
@@ -211,7 +211,7 @@ class DemonAbyssRepositoryMixin:
             ).fetchone()
             if int(attempts["count"]) >= DEMON_ABYSS_QUOTA_LIMIT:
                 raise DemonAbyssQuotaError("demon-abyss weekly quota is exhausted")
-            if int(player["stamina"]) < DEMON_ABYSS_STAMINA_COST:
+            if player_resource(player, "stamina") < DEMON_ABYSS_STAMINA_COST:
                 raise ResourceInsufficientError("stamina is insufficient")
 
             run_id = uuid4().hex
@@ -219,7 +219,7 @@ class DemonAbyssRepositoryMixin:
                 "instance_key": DEMON_ABYSS_KEY,
                 "location_key": DEMON_ABYSS_LOCATION,
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "access_flag": DEMON_ABYSS_REQUIRED_FLAG,
                 "demon_reputation": int(faction.get("demon", 0)),
                 "pollution_before": int(player["pollution"]),
