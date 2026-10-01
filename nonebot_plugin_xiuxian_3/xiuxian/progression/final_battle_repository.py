@@ -47,7 +47,7 @@ from .endgame_rules import (
     TRIAL_ORDER,
 )
 from ..utils.assets import grant_player_items, spend_player_items
-from ..utils.player import change_player_state, change_player_values
+from ..utils.player import change_player_state, change_player_values, player_combat_values
 
 FINAL_BATTLE_LOCATION = "tribulation.sky_terrace"
 
@@ -716,20 +716,21 @@ class FinalBattleRepositoryMixin:
             raise FinalBattleCooldownError("final battle retry cooldown is active")
 
     def _final_battle_member_snapshot(self, connection: sqlite3.Connection, player: sqlite3.Row, *, role: str) -> dict[str, Any]:
+        player_state = player_combat_values(player)
         equipment = self._battle_equipment_snapshot(connection, int(player["id"]))
-        qualification = self._json_object(player["qualification_json"], {})
+        qualification = player_state["qualification"]
         constitution_effect = constitution_effect_snapshot(connection, int(player["id"]))
         stats = apply_constitution_combat_effect(
-            stat_snapshot(qualification, realm_layer=int(player["realm_layer"]), equipment=equipment),
+            stat_snapshot(qualification, realm_layer=player_state["realm_layer"], equipment=equipment),
             constitution_effect,
         )
         return {
-            "player_id": str(player["player_id"]),
+            "player_id": player_state["player_id"],
             "database_id": int(player["id"]),
             "role": role,
-            "realm_key": str(player["realm_key"]),
-            "realm_layer": int(player["realm_layer"]),
-            "path_key": player["path_key"],
+            "realm_key": player_state["realm_key"],
+            "realm_layer": player_state["realm_layer"],
+            "path_key": player_state["path_key"],
             "qualification": qualification,
             "stats": stats,
             "constitution_effect": constitution_effect,

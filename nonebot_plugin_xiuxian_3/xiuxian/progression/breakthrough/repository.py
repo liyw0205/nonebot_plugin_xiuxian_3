@@ -85,7 +85,7 @@ from ...exploration.rules import (
     settlement_result,
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
-from ...utils.assets import inventory_spend, inventory_value
+from ...utils.assets import inventory_value
 from ...utils.player import change_player_state
 from ...adventures.mainline_models import (
     MainlineClaimRecord,
@@ -967,8 +967,6 @@ class BreakthroughRepositoryMixin:
                 and protection_requested
                 and int(inventory.get(protection_key, 0)) > 0
             )
-            if protection_consumed:
-                inventory = inventory_spend(inventory, {protection_key: 1})
             pity_after = next_pity_bp(definition, pity_before, success)
             weakness_until: str | None = None
             heart_demon_pending = False
@@ -1461,7 +1459,6 @@ class BreakthroughRepositoryMixin:
                     raise MaterialInsufficientError("early recovery requires a recovery pill")
                 if int(row["spirit_stones"]) < stones_cost:
                     raise CurrencyInsufficientError("early recovery requires spirit stones")
-                inventory = inventory_spend(inventory, {medicine_key: 1})
                 medicine_consumed = True
                 stones_spent = stones_cost
             change_player_state(

@@ -167,7 +167,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import assets_grant, inventory_json, inventory_value
+from ..utils.assets import grant_player_assets, inventory_value
 from ..utils.player import change_player_state
 
 
@@ -266,7 +266,6 @@ class CultivationRepositoryMixin:
             if path_key == "support" and not subprofession_key:
                 raise SubprofessionRequiredError("support path needs a sub-profession")
 
-            inventory = inventory_value(row["inventory_json"])
             reward = {
                 "spirit_stones": 200,
                 **{
@@ -274,23 +273,20 @@ class CultivationRepositoryMixin:
                     for item_key, quantity in reward_items(path_key, subprofession_key, self.content)
                 },
             }
-            assets = assets_grant(row["spirit_stones"], inventory, reward)
-            connection.execute(
-                """
-                UPDATE players
-                SET stage = 'cultivator', path_key = ?, subprofession_key = ?,
-                    realm_key = 'qi_sensing', realm_layer = 1, cultivation = 0, total_cultivation = 0,
-                    spirit_stones = ?, inventory_json = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    path_key,
-                    subprofession_key,
-                    assets.currency,
-                    inventory_json(assets.inventory),
-                    serialize_datetime(now),
-                    row["id"],
-                ),
+            grant_player_assets(
+                connection,
+                row,
+                reward,
+                serialize_datetime(now),
+                player_values={
+                    "stage": "cultivator",
+                    "path_key": path_key,
+                    "subprofession_key": subprofession_key,
+                    "realm_key": "qi_sensing",
+                    "realm_layer": 1,
+                    "cultivation": 0,
+                    "total_cultivation": 0,
+                },
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:

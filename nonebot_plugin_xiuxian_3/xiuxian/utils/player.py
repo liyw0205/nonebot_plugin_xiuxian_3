@@ -336,6 +336,12 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     values = player_values(row)
     return {
         "player_id": values["player_id"],
+        "platform": values["platform"],
+        "platform_user_id": values["platform_user_id"],
+        "scene_id": values["scene_id"],
+        "nickname": values["nickname"],
+        "stage": values["stage"],
+        "status": values["status"],
         "dao_name": values["dao_name"],
         "path_key": values["path_key"],
         "location_key": values["location_key"],

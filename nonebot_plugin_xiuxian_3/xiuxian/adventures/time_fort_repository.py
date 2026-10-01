@@ -23,7 +23,7 @@ from ..persistence.errors import (
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_TIME_FORT
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_combat_values
 from .secret_realm_rules import realm_at_least
 from .time_fort_models import TimeFortRunRecord
 from .time_fort_rules import (
@@ -175,20 +175,21 @@ class TimeFortRepositoryMixin:
                     raise TimeFortBusyError("a member already has an active time-fort run")
                 if int(connection.execute("SELECT COUNT(*) FROM time_fort_members WHERE player_id=? AND quota_key=? AND status<>'system_aborted'", (player_id, quota_key)).fetchone()[0]) >= TIME_FORT_WEEKLY_LIMIT:
                     raise TimeFortQuotaError("a member already used this UTC week")
+                player_state = player_combat_values(row)
                 equipment = self._battle_equipment_snapshot(connection, player_id)
-                qualification = self._json_object(row["qualification_json"], {})
+                qualification = player_state["qualification"]
                 constitution_effect = constitution_effect_snapshot(connection, player_id)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
                 stats = self._battle_stats_for_snapshot(
-                    qualification, int(row["max_hp"]), int(row["initiative"]), equipment,
+                    qualification, player_state["max_hp"], player_state["initiative"], equipment,
                     constitution_effect,
                 )
                 first_clear[player_id] = connection.execute("SELECT 1 FROM time_fort_members WHERE player_id=? AND status='settled' LIMIT 1", (player_id,)).fetchone() is None
                 combat_snapshots.append({
-                    "database_id": player_id, "player_id": str(row["player_id"]), "platform": str(row["platform"]),
-                    "platform_user_id": str(row["platform_user_id"]), "role": str(row["role"]),
-                    "realm_key": str(row["realm_key"]), "realm_layer": int(row["realm_layer"]), "location_key": str(row["location_key"]),
-                    "path_key": row["path_key"], "qualification": qualification, "stats": stats,
+                    "database_id": player_id, "player_id": player_state["player_id"], "platform": player_state["platform"],
+                    "platform_user_id": player_state["platform_user_id"], "role": str(row["role"]),
+                    "realm_key": player_state["realm_key"], "realm_layer": player_state["realm_layer"], "location_key": player_state["location_key"],
+                    "path_key": player_state["path_key"], "qualification": qualification, "stats": stats,
                     "constitution_effect": constitution_effect,
                     "equipment": list(equipment), "skills": skills,
                 })

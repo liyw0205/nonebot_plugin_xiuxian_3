@@ -199,12 +199,11 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import (
-    currency_spend,
     inventory_json,
-    inventory_spend,
     inventory_value,
     spend_player_items,
     spend_player_assets,
+    assets_spend,
 )
 from ..utils.player import change_player_state
 
@@ -1372,29 +1371,24 @@ class AdvancementRepositoryMixin:
         inventory: dict[str, Any],
         costs: dict[str, int],
     ) -> tuple[dict[str, Any], int, str, int, int]:
-        remaining_inventory = dict(inventory)
-        remaining_stones = int(player["spirit_stones"])
         item_keys = sorted(key for key in costs if key.startswith("item."))
         item_total = sum(int(costs[key]) for key in item_keys)
         stones_spent = int(costs.get("currency.spirit_stone", 0))
 
-        item_costs: dict[str, int] = {}
-        for resource_key, quantity in costs.items():
-            if resource_key.startswith("item."):
-                available = int(remaining_inventory.get(resource_key, 0))
-                if available < quantity:
-                    raise ResourceInsufficientError("equipment materials are insufficient")
-                item_costs[resource_key] = int(quantity)
-            elif resource_key == "currency.spirit_stone":
-                if remaining_stones < quantity:
-                    raise ResourceInsufficientError("spirit stones are insufficient")
-            else:
-                raise RuntimeError(f"unsupported configured equipment resource: {resource_key}")
-        remaining_inventory = inventory_spend(remaining_inventory, item_costs)
-        remaining_stones = currency_spend(remaining_stones, stones_spent)
+        if any(key != "currency.spirit_stone" and not key.startswith("item.") for key in costs):
+            raise RuntimeError("unsupported configured equipment resource")
+        try:
+            remaining = assets_spend(
+                player["spirit_stones"],
+                inventory,
+                costs,
+                currency_key="currency.spirit_stone",
+            )
+        except ValueError as exc:
+            raise ResourceInsufficientError("equipment materials are insufficient") from exc
 
         material_key = item_keys[0] if item_keys else ""
-        return remaining_inventory, remaining_stones, material_key, item_total, stones_spent
+        return remaining.inventory, remaining.currency, material_key, item_total, stones_spent
 
     async def temper_equipment(
         self,
@@ -1906,20 +1900,19 @@ class AdvancementRepositoryMixin:
                 mastered_keys=(definition.key,) if mastery is not None else (),
             ):
                 raise SkillNotAvailableError("skill is outside the current path, realm or acquisition requirements")
-            inventory_after = dict(inventory)
+            asset_costs: dict[str, int] = {}
             if mastery is None and definition.acquisition_item_key:
-                quantity = int(inventory_after.get(definition.acquisition_item_key, 0))
+                quantity = int(inventory.get(definition.acquisition_item_key, 0))
                 if quantity <= 0:
                     raise SkillNotAvailableError("skill inheritance item is missing")
-                inventory_after = inventory_spend(
-                    inventory_after, {definition.acquisition_item_key: 1}
-                )
+                asset_costs[definition.acquisition_item_key] = 1
             current_level = int(mastery["level"]) if mastery is not None else 0
             if current_level >= definition.max_level:
                 raise SkillAlreadyMaxedError("skill is already at maximum level")
             target_level = current_level + 1
             resource_costs = skill_cost(target_level, definition)
             resource_balances: dict[str, tuple[str, int, int]] = {}
+            asset_resource_costs: dict[str, int] = {}
             available_columns = set(row.keys())
             used_storage: set[str] = set()
             for resource_key, amount in resource_costs.items():
@@ -1934,6 +1927,10 @@ class AdvancementRepositoryMixin:
                 if balance_before < amount:
                     raise ResourceInsufficientError("skill resources are insufficient")
                 resource_balances[resource_key] = (storage, balance_before, balance_before - amount)
+                if storage == "spirit_stones":
+                    asset_resource_costs["currency.spirit_stone"] = (
+                        asset_resource_costs.get("currency.spirit_stone", 0) + int(amount)
+                    )
             effective_effect = effective_skill_effect(definition, target_level)
             snapshot = {
                 "skill_key": definition.key,
@@ -1980,16 +1977,17 @@ class AdvancementRepositoryMixin:
                     """,
                     (operation_id, target_level, snapshot_json, now_text, now_text, mastery["id"]),
                 )
-            assignments = [f'"{storage}" = ?' for storage, _, _ in resource_balances.values()]
-            values = [after for _, _, after in resource_balances.values()]
-            if mastery is None and definition.acquisition_item_key:
-                assignments.append('"inventory_json" = ?')
-                values.append(inventory_json(inventory_after))
-            if assignments:
-                connection.execute(
-                    f"UPDATE players SET {', '.join(assignments)}, updated_at = ? WHERE id = ?",
-                    (*values, now_text, row["id"]),
-                )
+            spend_player_assets(
+                connection,
+                row,
+                {**asset_costs, **asset_resource_costs},
+                now_text,
+                player_values={
+                    storage: after
+                    for storage, _, after in resource_balances.values()
+                    if storage != "spirit_stones"
+                },
+            )
             for resource_key, (storage, balance_before, balance_after) in resource_balances.items():
                 amount = resource_costs[resource_key]
                 if amount == 0:

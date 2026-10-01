@@ -171,7 +171,7 @@ from ..routine.rules import (
     tree_status,
 )
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import assets_grant, inventory_value
+from ..utils.assets import inventory_value
 from ..utils.player import change_player_state
 
 
@@ -1707,18 +1707,6 @@ class RoutineRepositoryMixin:
                 raise RedemptionCodeExhaustedError("redemption code has no remaining claims")
 
             reward = self._json_object(code_row["reward_json"], {})
-            inventory = inventory_value(row["inventory_json"])
-            balances = assets_grant(
-                row["spirit_stones"],
-                inventory,
-                {
-                    key: quantity
-                    for key, quantity in reward.items()
-                    if key not in {"energy", "local_reputation", "service_reputation"}
-                },
-            )
-            stones = balances.currency
-            inventory = balances.inventory
             energy = int(row["energy"])
             actual_reward: dict[str, int] = {}
             local_reputation = 0

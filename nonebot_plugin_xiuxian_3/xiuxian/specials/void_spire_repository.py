@@ -22,7 +22,7 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
-from ..utils.assets import AssetState, write_player_assets
+from ..utils.assets import grant_player_assets
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .void_spire_models import VoidSpirePreviewRecord, VoidSpireRewardRecord, VoidSpireRunRecord
 from .void_spire_rules import (
@@ -332,16 +332,15 @@ class VoidSpireRepositoryMixin:
                     raise TowerAlreadyClaimedError("void spire reward was already claimed")
                 raise TowerRewardNotAvailableError("no void spire reward is pending")
             reward = {str(key): int(value) for key, value in json.loads(run["reward_json"]).items()}
-            inventory = self._json_object(player["inventory_json"], {})
-            stones = int(player["spirit_stones"])
             local_updates: dict[str, int] = {}
+            asset_reward: dict[str, int] = {}
             for key, value in reward.items():
                 if key == "spirit_stones":
-                    stones += value
+                    asset_reward[key] = value
                 elif key.startswith("local."):
                     local_updates[key] = local_updates.get(key, 0) + value
                 else:
-                    inventory[key] = int(inventory.get(key, 0)) + value
+                    asset_reward[key] = value
             if local_updates:
                 reputation = connection.execute(
                     "SELECT local_json,service_reputation FROM player_reputations WHERE player_id=?",
@@ -356,7 +355,7 @@ class VoidSpireRepositoryMixin:
                     "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,updated_at=excluded.updated_at",
                     (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
                 )
-            write_player_assets(connection, int(player["id"]), AssetState(stones, inventory), now_text)
+            grant_player_assets(connection, player, asset_reward, now_text)
             snapshot = {
                 "source": TOWER_KEY,
                 "floor_no": int(run["floor_no"]),

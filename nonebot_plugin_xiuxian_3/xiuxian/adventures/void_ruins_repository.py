@@ -24,7 +24,7 @@ from ..persistence.errors import (
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_VOID_RUINS
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.assets import grant_player_assets, spend_player_items
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_combat_values
 from .secret_realm_rules import realm_at_least
 from .void_ruins_models import VoidRuinsRunRecord
 from .void_ruins_rules import (
@@ -210,12 +210,13 @@ class VoidRuinsRepositoryMixin:
                     except ValueError:
                         unstable = False
                 instability[player_id] = unstable
+                player_state = player_combat_values(row)
                 equipment = self._battle_equipment_snapshot(connection, player_id)
-                qualification = self._json_object(row["qualification_json"], {})
+                qualification = player_state["qualification"]
                 constitution_effect = constitution_effect_snapshot(connection, player_id)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
                 stats = player_stat_snapshot(
-                    qualification, max_hp=int(row["max_hp"]), initiative=int(row["initiative"]), equipment=equipment,
+                    qualification, max_hp=player_state["max_hp"], initiative=player_state["initiative"], equipment=equipment,
                     constitution_effect=constitution_effect,
                 )
                 first_clear[player_id] = connection.execute(
@@ -223,14 +224,14 @@ class VoidRuinsRepositoryMixin:
                 ).fetchone() is None
                 combat_snapshots.append({
                     "database_id": player_id,
-                    "player_id": str(row["player_id"]),
-                    "platform": str(row["platform"]),
-                    "platform_user_id": str(row["platform_user_id"]),
+                    "player_id": player_state["player_id"],
+                    "platform": player_state["platform"],
+                    "platform_user_id": player_state["platform_user_id"],
                     "role": str(row["role"]),
-                    "realm_key": str(row["realm_key"]),
-                    "realm_layer": int(row["realm_layer"]),
-                    "location_key": str(row["location_key"]),
-                    "path_key": row["path_key"],
+                    "realm_key": player_state["realm_key"],
+                    "realm_layer": player_state["realm_layer"],
+                    "location_key": player_state["location_key"],
+                    "path_key": player_state["path_key"],
                     "qualification": qualification,
                     "stats": stats,
                     "constitution_effect": constitution_effect,

@@ -25,7 +25,7 @@ from ..social.party_rules import PARTY_TYPE_SECRET_REALM_ANCIENT
 from ..specials.codex_projection import record_codex_discovery
 from ..combat.rules import player_stat_snapshot
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_combat_values
 from .ancient_domain_models import AncientDomainRunRecord
 from .ancient_domain_rules import (
     ANCIENT_DOMAIN_EXPIRY_SECONDS,
@@ -163,14 +163,15 @@ class AncientDomainRepositoryMixin:
                 ).fetchone():
                     raise AncientDomainQuotaError("a member already used this UTC week")
 
+                player_state = player_combat_values(row)
                 equipment = self._battle_equipment_snapshot(connection, player_id)
-                qualification = self._ancient_json(row["qualification_json"])
+                qualification = player_state["qualification"]
                 constitution_effect = constitution_effect_snapshot(connection, player_id)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
                 stats = player_stat_snapshot(
                     qualification,
-                    max_hp=int(row["max_hp"]),
-                    initiative=int(row["initiative"]),
+                    max_hp=player_state["max_hp"],
+                    initiative=player_state["initiative"],
                     equipment=equipment,
                     constitution_effect=constitution_effect,
                 )
@@ -180,29 +181,29 @@ class AncientDomainRepositoryMixin:
                 ).fetchone() is None
                 member_combat_snapshots.append({
                     "database_id": player_id,
-                    "player_id": str(row["player_id"]),
-                    "platform": str(row["platform"]),
-                    "platform_user_id": str(row["platform_user_id"]),
+                    "player_id": player_state["player_id"],
+                    "platform": player_state["platform"],
+                    "platform_user_id": player_state["platform_user_id"],
                     "role": str(row["role"]),
-                    "realm_key": str(row["realm_key"]),
-                    "realm_layer": int(row["realm_layer"]),
-                    "location_key": str(row["location_key"]),
-                    "path_key": row["path_key"],
+                    "realm_key": player_state["realm_key"],
+                    "realm_layer": player_state["realm_layer"],
+                    "location_key": player_state["location_key"],
+                    "path_key": player_state["path_key"],
                     "qualification": qualification,
                     "stats": stats,
                     "constitution_effect": constitution_effect,
                     "equipment": list(equipment),
                     "skills": skills,
-                    "soul_power": int(row["soul_power"]),
-                    "pollution": int(row["pollution"]),
-                    "bloodline_stability": int(row["bloodline_stability"]),
-                    "cross_realm_penalty_bp": int(row["cross_realm_penalty_bp"]),
-                    "faction_reputation": self._ancient_json(row["faction_reputation_json"]),
+                    "soul_power": player_state["soul_power"],
+                    "pollution": player_state["pollution"],
+                    "bloodline_stability": player_state["bloodline_stability"],
+                    "cross_realm_penalty_bp": player_state["cross_realm_penalty_bp"],
+                    "faction_reputation": player_state["faction_reputation"],
                     "alliance_key": self._alliance_key_from_row(row),
-                    "domain_key": row["domain_key"],
-                    "domain_charge": int(row["domain_charge"]),
-                    "domain_charge_max": int(row["domain_charge_max"]),
-                    "domain_power": int(row["domain_power"]),
+                    "domain_key": player_state["domain_key"],
+                    "domain_charge": player_state["domain_charge"],
+                    "domain_charge_max": player_state["domain_charge_max"],
+                    "domain_power": player_state["domain_power"],
                 })
 
             run_id = f"ancient-domain-{uuid4().hex}"

@@ -33,7 +33,7 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
-from ..utils.assets import AssetState, write_player_assets
+from ..utils.assets import grant_player_assets
 
 
 class TowerRepositoryMixin:
@@ -307,16 +307,15 @@ class TowerRepositoryMixin:
                     raise TowerAlreadyClaimedError("tower reward was already claimed")
                 raise TowerRewardNotAvailableError("no tower reward is pending")
             reward = {str(key): int(value) for key, value in json.loads(run["reward_json"]).items()}
-            inventory = self._json_object(player["inventory_json"], {})
-            stones = int(player["spirit_stones"])
             local_reputation = 0
+            asset_reward: dict[str, int] = {}
             for key, value in reward.items():
                 if key == "spirit_stones":
-                    stones += value
+                    asset_reward[key] = value
                 elif key == "local_reputation":
                     local_reputation += value
                 else:
-                    inventory[key] = int(inventory.get(key, 0)) + value
+                    asset_reward[key] = value
             if local_reputation:
                 row = connection.execute(
                     "SELECT local_json, service_reputation FROM player_reputations WHERE player_id=?",
@@ -329,7 +328,7 @@ class TowerRepositoryMixin:
                     "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) VALUES (?,?,?,?) ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,service_reputation=excluded.service_reputation,updated_at=excluded.updated_at",
                     (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
                 )
-            write_player_assets(connection, int(player["id"]), AssetState(stones, inventory), now_text)
+            grant_player_assets(connection, player, asset_reward, now_text)
             record_material_discoveries(
                 connection, player_id=int(player["id"]), operation_id=operation_id,
                 occurred_at=now, reward=reward, snapshot={"source": TOWER_KEY, "floor_no": int(run["floor_no"])},

@@ -40,13 +40,7 @@ from ..production.models import (
 )
 from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
 from ..utils.equipment import create_equipment_instances
-from ..utils.assets import (
-    AssetState,
-    inventory_grant,
-    inventory_value,
-    spend_player_assets,
-    write_player_assets,
-)
+from ..utils.assets import grant_player_assets, inventory_value, spend_player_assets
 from ..progression.breakthrough.models import (
     BreakthroughSettlementRecord,
     BreakthroughSessionRecord,
@@ -600,7 +594,7 @@ class ProductionRepositoryMixin:
             currency_spent = int(snapshot.get("currency_cost", recipe.currency_cost))
             quality = self._production_quality_from_snapshot(snapshot)
             success = quality >= int(snapshot.get("success_threshold_bp", QUALITY_SUCCESS_THRESHOLD_BP))
-            inventory = inventory_value(row["inventory_json"])
+            asset_rewards: dict[str, int] = {}
             durability = self._json_object(row["durability_json"], {})
             outputs: dict[str, int] = {}
             refunds: dict[str, int] = {}
@@ -620,7 +614,7 @@ class ProductionRepositoryMixin:
                     try:
                         equipment = equipment_definition(item_key, self.content)
                     except ValueError:
-                        inventory = inventory_grant(inventory, {item_key: quantity})
+                        asset_rewards[item_key] = asset_rewards.get(item_key, 0) + quantity
                         continue
                     durability_bp = equipment_initial_durability_bp(quality, equipment)
                     durability[item_key] = durability_bp
@@ -646,7 +640,7 @@ class ProductionRepositoryMixin:
                 for item_key, quantity in failure_refunds.items():
                     if quantity > 0:
                         refunds[item_key] = quantity
-                        inventory = inventory_grant(inventory, {item_key: quantity})
+                        asset_rewards[item_key] = asset_rewards.get(item_key, 0) + quantity
             tool_durability = snapshot.get("tool_durability_after")
             binding_expires_at: str | None = None
             if success and snapshot.get("binding_kind") and int(snapshot.get("binding_duration_seconds", 0)) > 0:
@@ -654,10 +648,10 @@ class ProductionRepositoryMixin:
                     now + timedelta(seconds=int(snapshot["binding_duration_seconds"]))
                 )
             status = "completed" if success else "failed"
-            write_player_assets(
+            grant_player_assets(
                 connection,
-                int(row["id"]),
-                AssetState(int(row["spirit_stones"]), inventory),
+                row,
+                asset_rewards,
                 now_text,
                 player_values={
                     "durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True),
