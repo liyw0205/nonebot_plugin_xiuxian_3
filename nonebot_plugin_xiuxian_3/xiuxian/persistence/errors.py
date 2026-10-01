@@ -932,6 +932,10 @@ class ProjectContributionRequirementError(RuntimeError):
     """The selected resource cannot contribute to this public project."""
 
 
+class ProjectSourceAlreadyUsedError(RuntimeError):
+    """The same settled service operation has already contributed."""
+
+
 class ProjectAlreadyCompleteError(RuntimeError):
     """The public project has already reached its contribution requirements."""
 

@@ -10,7 +10,7 @@ from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import enemy_definition
 from nonebot_plugin_xiuxian_3.xiuxian.specials.three_realms_tower_rules import (
     MAX_FLOOR,
-    V03_MAX_FLOOR,
+    NASCENT_SOUL_MAX_FLOOR,
     enemy_key_for,
     floor_definition,
     rebuild_reputation_total,
@@ -55,7 +55,7 @@ def _make_eligible(runtime, adapter: str, user: str, faction: str) -> None:
 
 def test_three_realms_tower_rules_are_faction_specific() -> None:
     assert MAX_FLOOR == 40
-    assert V03_MAX_FLOOR == 20
+    assert NASCENT_SOUL_MAX_FLOOR == 20
     assert floor_definition(1).stamina_cost == 12
     assert floor_definition(20).weekly_limit == 2
     assert floor_definition(21).required_realm == "soul_transformation"
@@ -74,7 +74,7 @@ def test_three_realms_tower_rules_are_faction_specific() -> None:
             assert enemy.location_key == "tower.three_realms"
             assert enemy.required_realm == "mortal"
             assert enemy.reward == {}
-            if floor_no > V03_MAX_FLOOR:
+            if floor_no > NASCENT_SOUL_MAX_FLOOR:
                 assert enemy.random_pool == f"battle.{enemy.key}"
         assert enemy_key_for(10, faction) == f"enemy.three_realms_tower.{faction}.floor_10_boss"
         assert enemy_key_for(20, faction) == f"enemy.three_realms_tower.{faction}.floor_20_boss"
@@ -84,7 +84,7 @@ def test_three_realms_tower_rules_are_faction_specific() -> None:
         assert enemy_key_for(40, faction).endswith(".floor_40_boss")
 
 
-def _seed_v03_tower_completion(runtime, adapter: str, user: str) -> None:
+def _seed_tower_completion(runtime, adapter: str, user: str) -> None:
     with sqlite3.connect(runtime.settings.database_path) as db:
         player_id = db.execute(
             "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
@@ -93,11 +93,11 @@ def _seed_v03_tower_completion(runtime, adapter: str, user: str) -> None:
             "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,starts_at,"
             "result_json,reward_json,created_at,updated_at) "
             "VALUES(?,?,'tower.three_realms',20,'claimed',1,?,'{}','{}',?,?)",
-            (f"fixture-v03-{adapter}-{user}", player_id, "2026-09-28T00:00:00+00:00", "2026-09-28T00:00:00+00:00", "2026-09-28T00:00:00+00:00"),
+            (f"fixture-history-{adapter}-{user}", player_id, "2026-09-28T00:00:00+00:00", "2026-09-28T00:00:00+00:00", "2026-09-28T00:00:00+00:00"),
         )
 
 
-def _make_v04_eligible(
+def _make_tower_eligible(
     runtime, adapter: str, user: str, faction: str, *, realm: str, rebuild_reputation: int = 0
 ) -> None:
     with sqlite3.connect(runtime.settings.database_path) as db:
@@ -129,20 +129,20 @@ def _make_v04_eligible(
         )
 
 
-def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> None:
+def test_three_realms_tower_progression_on_qq_and_onebot(monkeypatch) -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
             for adapter, user, faction, realm, reputation in (
-                ("qq.official", "three-tower-v04-qq", "xuantian", "soul_transformation", 0),
-                ("onebot.v11", "three-tower-v04-onebot", "beast", "nascent_soul", 499),
+                ("qq.official", "three-tower-gate-qq", "xuantian", "soul_transformation", 0),
+                ("onebot.v11", "three-tower-gate-onebot", "beast", "nascent_soul", 499),
             ):
                 prefix = adapter.replace(".", "-")
                 assert (await _send(runtime, adapter, user, f"{prefix}-create", "开始修仙")).ok
-                _make_v04_eligible(
+                _make_tower_eligible(
                     runtime, adapter, user, faction, realm=realm, rebuild_reputation=reputation
                 )
-                _seed_v03_tower_completion(runtime, adapter, user)
+                _seed_tower_completion(runtime, adapter, user)
                 preview = await _send(runtime, adapter, user, f"{prefix}-preview", "三界塔")
                 assert preview.code == "THREE_REALMS_TOWER_PREVIEW"
                 assert preview.data["next_floor"] == 21
@@ -179,7 +179,7 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                             (adapter, user),
                         ).fetchone()[0] == 10000
                     # The mainline permit cannot bypass the rebuild threshold.
-                    _make_v04_eligible(
+                    _make_tower_eligible(
                         runtime, adapter, user, faction, realm="nascent_soul", rebuild_reputation=500
                     )
 
@@ -193,7 +193,7 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                     loss = await _send(runtime, adapter, user, f"{prefix}-loss-21", "挑战三界塔 21")
                     assert loss.code == "THREE_REALMS_TOWER_CHALLENGE_SETTLED"
                     assert loss.data["outcome"] != "won"
-                    _make_v04_eligible(
+                    _make_tower_eligible(
                         runtime, adapter, user, faction, realm="nascent_soul", rebuild_reputation=500
                     )
 
@@ -282,7 +282,7 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                 )
                 assert title["acquired"] is True
                 with sqlite3.connect(runtime.settings.database_path) as db:
-                    v04_floors = db.execute(
+                    high_floor_count = db.execute(
                         "SELECT COUNT(*) FROM tower_reward_claims c JOIN players p ON p.id=c.player_id "
                         "WHERE p.platform=? AND p.platform_user_id=? AND c.floor_no BETWEEN 21 AND 40",
                         (adapter, user),
@@ -293,7 +293,7 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                         "AND t.tower_key='tower.three_realms' AND b.reward_status<>'none'",
                         (adapter, user),
                     ).fetchone()[0]
-                assert v04_floors == 20 + (adapter == "qq.official")
+                assert high_floor_count == 20 + (adapter == "qq.official")
                 assert battles_with_rewards == 0
             await runtime.close()
 
@@ -331,7 +331,7 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
 
                 locked = await _send(runtime, adapter, user, f"{prefix}-locked", "挑战三界塔 2")
                 assert locked.code == "THREE_REALMS_TOWER_FLOOR_LOCKED"
-                for floor_no in range(1, V03_MAX_FLOOR + 1):
+                for floor_no in range(1, NASCENT_SOUL_MAX_FLOOR + 1):
                     operation = f"{prefix}-floor-{floor_no}"
                     challenged = await _send(
                         runtime, adapter, user, operation, f"挑战三界塔 {floor_no}"
@@ -454,14 +454,14 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                         (adapter, user),
                     ).fetchone()
                     assert player[0] == 0
-                    assert player[1] == 60 * V03_MAX_FLOOR
+                    assert player[1] == 60 * NASCENT_SOUL_MAX_FLOOR
                     inventory = json.loads(player[2])
-                    assert inventory["item.mat.array_sand"] >= 2 * V03_MAX_FLOOR
+                    assert inventory["item.mat.array_sand"] >= 2 * NASCENT_SOUL_MAX_FLOOR
                     assert db.execute(
                         "SELECT COUNT(*) FROM tower_runs WHERE player_id=(SELECT id FROM players "
                         "WHERE platform=? AND platform_user_id=?) AND tower_key='tower.three_realms'",
                         (adapter, user),
-                    ).fetchone()[0] == V03_MAX_FLOOR + 1
+                    ).fetchone()[0] == NASCENT_SOUL_MAX_FLOOR + 1
                     assert db.execute(
                         "SELECT COUNT(*) FROM battle_sessions b JOIN tower_runs t ON t.battle_id=b.battle_id "
                         "WHERE t.player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) "
@@ -473,7 +473,7 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                         "WHERE p.platform=? AND p.platform_user_id=? "
                         "AND c.entry_key LIKE 'codex.challenge.three_realms.floor_%'",
                         (adapter, user),
-                    ).fetchone()[0] == V03_MAX_FLOOR
+                    ).fetchone()[0] == NASCENT_SOUL_MAX_FLOOR
 
             # A completed three-realms story permits a below-Yuan-ying character.
             adapter, user = "onebot.v11", "three-tower-story-permit"

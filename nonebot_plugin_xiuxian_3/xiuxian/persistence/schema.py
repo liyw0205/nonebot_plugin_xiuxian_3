@@ -354,17 +354,24 @@ CREATE TABLE IF NOT EXISTS livelihood_project_contributions (
     project_id TEXT NOT NULL REFERENCES livelihood_projects(project_id),
     player_id INTEGER NOT NULL REFERENCES players(id),
     operation_id TEXT NOT NULL UNIQUE,
+    source_operation_id TEXT NOT NULL,
+    contribution_kind TEXT NOT NULL DEFAULT 'resource' CHECK (contribution_kind IN ('resource', 'service')),
+    service_key TEXT NOT NULL DEFAULT '',
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
     resource_key TEXT NOT NULL,
     resource_amount INTEGER NOT NULL CHECK (resource_amount > 0),
     contribution_points INTEGER NOT NULL CHECK (contribution_points > 0),
     created_at TEXT NOT NULL,
-    UNIQUE (project_id, player_id, operation_id)
+    UNIQUE (project_id, player_id, operation_id),
+    UNIQUE (project_id, player_id, source_operation_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_livelihood_project_contributions_player
     ON livelihood_project_contributions(player_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_livelihood_project_contributions_project
     ON livelihood_project_contributions(project_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_livelihood_project_contributions_source
+    ON livelihood_project_contributions(player_id, source_operation_id);
 
 CREATE TABLE IF NOT EXISTS livelihood_project_rewards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

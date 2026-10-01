@@ -15,6 +15,7 @@ from ..utils.assets import (
     spend_player_assets,
 )
 from ..utils.assets import player_currency
+from ..utils.operations import player_operation
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     OperationConflictError,
@@ -24,6 +25,7 @@ from ..persistence.errors import (
     ProjectContentClosedError,
     ProjectNotFoundError,
     ProjectNotReadyError,
+    ProjectSourceAlreadyUsedError,
     ResourceInsufficientError,
 )
 from ..utils.json import json_object
@@ -32,6 +34,7 @@ from .rules import (
     PUBLIC_PROJECT_DEFINITIONS,
     PublicProjectDefinition,
     project_definition,
+    project_service_source,
     weekly_project_key,
 )
 
@@ -81,6 +84,7 @@ class ProjectRepositoryMixin:
         resource_key: str | None,
         amount: int,
         operation_id: str,
+        source_operation_id: str | None = None,
     ) -> ProjectContributionRecord:
         await self.initialize()
         async with self._inflight:
@@ -92,6 +96,7 @@ class ProjectRepositoryMixin:
                 resource_key,
                 amount,
                 operation_id,
+                source_operation_id,
             )
 
     def _contribute_project_once(
@@ -102,17 +107,22 @@ class ProjectRepositoryMixin:
         resource_key: str | None,
         amount: int,
         operation_id: str,
+        source_operation_id: str | None,
     ) -> ProjectContributionRecord:
         try:
             definition = project_definition(project_key) if project_key else None
         except ValueError as exc:
             raise ProjectContentClosedError("unsupported project") from exc
-        try:
-            points = int(amount)
-        except (TypeError, ValueError) as exc:
-            raise ProjectContributionLimitError("contribution amount is invalid") from exc
-        if points <= 0 or points > 30:
-            raise ProjectContributionLimitError("one contribution is capped at 30 points")
+        if source_operation_id and definition is None:
+            raise ProjectContentClosedError("service contributions require an explicit project")
+        points = 0
+        if not source_operation_id:
+            try:
+                points = int(amount)
+            except (TypeError, ValueError) as exc:
+                raise ProjectContributionLimitError("contribution amount is invalid") from exc
+            if points <= 0 or points > 30:
+                raise ProjectContributionLimitError("one contribution is capped at 30 points")
         operation_name = "livelihood.contribute_project"
         request_hash = self._request_hash(
             operation_name,
@@ -122,6 +132,7 @@ class ProjectRepositoryMixin:
                 "project_key": definition.key if definition else "",
                 "resource_key": resource_key or "",
                 "amount": points,
+                "source_operation_id": source_operation_id or "",
             },
         )
         now = self._now()
@@ -152,6 +163,18 @@ class ProjectRepositoryMixin:
             if str(project["status"]) in {"active", "maintenance_due", "inactive"}:
                 raise ProjectAlreadyCompleteError("project is already complete")
             resource = self._resolve_resource(definition, resource_key)
+            if source_operation_id:
+                return self._contribute_service_once(
+                    connection,
+                    player,
+                    project,
+                    definition,
+                    source_operation_id,
+                    operation_id,
+                    request_hash,
+                    now,
+                    now_text,
+                )
             if resource not in definition.contribution_resources:
                 raise ProjectContributionRequirementError("resource cannot contribute to this project")
             cost_key, resource_amount = self._resource_cost(resource, points)
@@ -212,10 +235,22 @@ class ProjectRepositoryMixin:
                 """
                 INSERT INTO livelihood_project_contributions(
                     contribution_id, project_id, player_id, operation_id,
+                    source_operation_id, contribution_kind, service_key, quantity,
                     resource_key, resource_amount, contribution_points, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, 'resource', '', ?, ?, ?, ?, ?)
                 """,
-                (contribution_id, project["project_id"], player["id"], operation_id, cost_key, resource_amount, points, now_text),
+                (
+                    contribution_id,
+                    project["project_id"],
+                    player["id"],
+                    operation_id,
+                    operation_id,
+                    resource_amount,
+                    cost_key,
+                    resource_amount,
+                    points,
+                    now_text,
+                ),
             )
             updated_project = connection.execute("SELECT * FROM livelihood_projects WHERE id = ?", (project["id"],)).fetchone()
             updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
@@ -225,9 +260,148 @@ class ProjectRepositoryMixin:
                 "resource_key": cost_key,
                 "resource_amount": resource_amount,
                 "contribution_points": points,
+                "source_operation_id": operation_id,
+                "service_key": "",
+                "quantity": resource_amount,
             }
             self._record_project_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._contribution_from_payload(payload)
+
+    def _contribute_service_once(
+        self,
+        connection: Any,
+        player: Any,
+        project: Any,
+        definition: PublicProjectDefinition,
+        source_operation_id: str,
+        operation_id: str,
+        request_hash: str,
+        now: datetime,
+        now_text: str,
+    ) -> ProjectContributionRecord:
+        evidence = player_operation(connection, source_operation_id, player_id=int(player["id"]))
+        if evidence is None:
+            raise ProjectContributionRequirementError("service source is unavailable")
+        operation_name, source_payload = evidence
+        source = project_service_source(definition.key, operation_name)
+        if source is None:
+            raise ProjectContributionRequirementError("service source cannot contribute to this project")
+        self._validate_project_service_source(
+            connection,
+            player,
+            source_operation_id,
+            operation_name,
+            source_payload,
+        )
+        used = connection.execute(
+            "SELECT 1 FROM livelihood_project_contributions WHERE player_id = ? AND source_operation_id = ? LIMIT 1",
+            (player["id"], source_operation_id),
+        ).fetchone()
+        if used is not None:
+            raise ProjectSourceAlreadyUsedError("service source has already contributed")
+        self._require_project_day_quota(connection, project, player, now, source.contribution_points)
+        contribution_points = int(project["contribution_points"]) + source.contribution_points
+        connection.execute(
+            "UPDATE livelihood_projects SET contribution_points = ?, updated_at = ? WHERE id = ?",
+            (contribution_points, now_text, project["id"]),
+        )
+        contribution_id = uuid4().hex
+        connection.execute(
+            """
+            INSERT INTO livelihood_project_contributions(
+                contribution_id, project_id, player_id, operation_id,
+                source_operation_id, contribution_kind, service_key, quantity,
+                resource_key, resource_amount, contribution_points, created_at
+            ) VALUES (?, ?, ?, ?, ?, 'service', ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                contribution_id,
+                project["project_id"],
+                player["id"],
+                operation_id,
+                source_operation_id,
+                source.service_key,
+                source.quantity,
+                source.service_key,
+                source.quantity,
+                source.contribution_points,
+                now_text,
+            ),
+        )
+        updated_project = connection.execute("SELECT * FROM livelihood_projects WHERE id = ?", (project["id"],)).fetchone()
+        updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+        if updated_project is None or updated_player is None:
+            raise RuntimeError("service contribution returned no state")
+        payload = {
+            "player": self._player_payload(self._row_to_player(updated_player)),
+            "project": self._project_payload(updated_project),
+            "resource_key": source.service_key,
+            "resource_amount": source.quantity,
+            "contribution_points": source.contribution_points,
+            "source_operation_id": source_operation_id,
+            "service_key": source.service_key,
+            "quantity": source.quantity,
+        }
+        self._record_project_operation(connection, operation_id, "livelihood.contribute_project", int(player["id"]), request_hash, payload, now_text)
+        return self._contribution_from_payload(payload)
+
+    @staticmethod
+    def _validate_project_service_source(
+        connection: Any,
+        player: Any,
+        source_operation_id: str,
+        operation_name: str,
+        payload: dict[str, Any],
+    ) -> None:
+        if operation_name == "livelihood.settle_route":
+            row = connection.execute(
+                "SELECT status, player_id, settle_operation_id, result_json "
+                "FROM livelihood_trade_routes WHERE settle_operation_id = ?",
+                (source_operation_id,),
+            ).fetchone()
+            if row is None or int(row["player_id"]) != int(player["id"]) or str(row["status"]) != "settled":
+                raise ProjectContributionRequirementError("transport source is not settled")
+            if str(row["settle_operation_id"]) != source_operation_id or str(payload.get("status")) != "settled":
+                raise ProjectContributionRequirementError("transport source is not settled")
+            return
+        if operation_name == "production.purify_pollution":
+            reduced = payload.get("pollution_reduced")
+            before = payload.get("pollution_before")
+            after = payload.get("pollution_after")
+            event = connection.execute(
+                "SELECT 1 FROM activity_events WHERE player_id = ? AND event_key = ? AND source_operation_id = ? LIMIT 1",
+                (player["id"], operation_name, source_operation_id),
+            ).fetchone()
+            if (
+                event is None
+                or any(isinstance(value, bool) or not isinstance(value, int) for value in (before, after, reduced))
+                or reduced <= 0
+            ):
+                raise ProjectContributionRequirementError("purification source is not settled")
+            if after >= before or reduced != before - after:
+                raise ProjectContributionRequirementError("purification source is not settled")
+            return
+        if operation_name in {"companion.bond", "companion.feed", "companion.rest"}:
+            companion = payload.get("companion")
+            if payload.get("changed") is not True or not isinstance(companion, dict):
+                raise ProjectContributionRequirementError("companion source is not settled")
+            instance_id = str(companion.get("instance_id", "")).strip()
+            if not instance_id or str(companion.get("kind")) not in {"beast", "mount"}:
+                raise ProjectContributionRequirementError("companion source is not settled")
+            if str(companion.get("status")) not in {"active", "available"}:
+                raise ProjectContributionRequirementError("companion source is not settled")
+            row = connection.execute(
+                "SELECT player_id, kind FROM companion_instances WHERE instance_id = ?",
+                (instance_id,),
+            ).fetchone()
+            if (
+                row is None
+                or int(row["player_id"]) != int(player["id"])
+                or str(row["kind"]) != str(companion["kind"])
+            ):
+                raise ProjectContributionRequirementError("companion source is not settled")
+            return
+        raise ProjectContributionRequirementError("unsupported service source")
 
     async def settle_project(
         self,
@@ -548,6 +722,9 @@ class ProjectRepositoryMixin:
             resource_key=str(payload["resource_key"]),
             resource_amount=int(payload["resource_amount"]),
             contribution_points=int(payload["contribution_points"]),
+            source_operation_id=str(payload.get("source_operation_id", "")),
+            service_key=str(payload.get("service_key", "")),
+            quantity=int(payload.get("quantity", payload.get("resource_amount", 0))),
             already_completed=replay,
         )
 
@@ -577,7 +754,13 @@ class ProjectRepositoryMixin:
             return None
         if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return json.loads(existing["result_json"])
+        try:
+            payload = json.loads(existing["result_json"])
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationConflictError("operation result is not valid JSON") from exc
+        if not isinstance(payload, dict):
+            raise OperationConflictError("operation result must be a JSON object")
+        return payload
 
     @staticmethod
     def _record_project_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:

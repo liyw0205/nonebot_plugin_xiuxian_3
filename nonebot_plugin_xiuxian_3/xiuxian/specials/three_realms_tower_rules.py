@@ -1,4 +1,4 @@
-"""Versioned rules for the single-player three-realms tower."""
+"""Rules for the single-player three-realms tower."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from datetime import timedelta
 
 
 TOWER_KEY = "tower.three_realms"
-V03_MAX_FLOOR = 20
+NASCENT_SOUL_MAX_FLOOR = 20
 MAX_FLOOR = 40
 WEEKLY_ATTEMPT_LIMIT = 2
 FACTIONS = ("xuantian", "demon", "beast")
@@ -34,7 +34,7 @@ def floor_definition(floor_no: int) -> ThreeRealmsTowerFloorDefinition:
         raise ValueError(f"three-realms tower floor must be between 1 and {MAX_FLOOR}")
     return ThreeRealmsTowerFloorDefinition(
         floor_no=floor_no,
-        required_realm="nascent_soul" if floor_no <= V03_MAX_FLOOR else "soul_transformation",
+        required_realm="nascent_soul" if floor_no <= NASCENT_SOUL_MAX_FLOOR else "soul_transformation",
         required_layer=1,
         stamina_cost=12,
         weekly_limit=WEEKLY_ATTEMPT_LIMIT,
@@ -92,7 +92,7 @@ __all__ = [
     "REBUILD_REPUTATION_KEYS",
     "TOWER_KEY",
     "WEEKLY_ATTEMPT_LIMIT",
-    "V03_MAX_FLOOR",
+    "NASCENT_SOUL_MAX_FLOOR",
     "ThreeRealmsTowerFloorDefinition",
     "enemy_key_for",
     "floor_definition",

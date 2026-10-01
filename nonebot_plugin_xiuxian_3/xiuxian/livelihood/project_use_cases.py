@@ -13,6 +13,7 @@ from ..persistence.errors import (
     ProjectContentClosedError,
     ProjectNotFoundError,
     ProjectNotReadyError,
+    ProjectSourceAlreadyUsedError,
     RepositoryBusyError,
     ResourceInsufficientError,
 )
@@ -25,6 +26,13 @@ class ProjectApplication:
 
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
+
+    _SERVICE_LABELS = {
+        "service.transport": "运输协助",
+        "service.purification": "污染净化",
+        "service.taming": "灵兽驯养",
+        "service.repair": "灵兽修复",
+    }
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -54,6 +62,10 @@ class ProjectApplication:
             "阵砂": "item.mat.array_sand",
             "疗伤丹": "item.pill.healing_low",
         }.get((value or "").strip(), value)
+
+    @staticmethod
+    def _service_marker(value: str | None) -> bool:
+        return (value or "").strip() in {"服务", "来源", "运输", "净化", "驯养", "修复"}
 
     async def list_projects(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -101,28 +113,38 @@ class ProjectApplication:
     async def contribute(self, context: CommandContext) -> CommandResult:
         args = context.command_args
         if not args:
-            return CommandResult(False, "INVALID_PROJECT_CONTRIBUTION", "可用 `贡献公共项目 <点数>` 或 `贡献公共项目 <项目键> <资源> <点数>`。", context.request_id)
+            return CommandResult(False, "INVALID_PROJECT_CONTRIBUTION", "请说明贡献数量，或提供已完成事务的结算凭证。", context.request_id)
         project_key: str | None = None
         resource_key: str | None = None
         amount_text: str | None = None
+        source_operation_id: str | None = None
         if self._project_key(args[0]) is not None:
             project_key = self._project_key(args[0])
             if len(args) == 2:
                 amount_text = args[1]
             elif len(args) == 3:
-                resource_key, amount_text = args[1], args[2]
+                if self._service_marker(args[1]):
+                    source_operation_id = args[2]
+                else:
+                    resource_key, amount_text = args[1], args[2]
             else:
                 return CommandResult(False, "INVALID_PROJECT_CONTRIBUTION", "贡献参数数量不正确。", context.request_id)
         elif len(args) == 1:
             amount_text = args[0]
         elif len(args) == 2:
-            resource_key, amount_text = args
+            if self._service_marker(args[0]):
+                source_operation_id = args[1]
+            else:
+                resource_key, amount_text = args
         else:
             return CommandResult(False, "INVALID_PROJECT_CONTRIBUTION", "贡献参数数量不正确。", context.request_id)
-        try:
-            amount = int(amount_text or "")
-        except ValueError:
-            return CommandResult(False, "INVALID_PROJECT_CONTRIBUTION", "贡献点数必须是正整数。", context.request_id)
+        if source_operation_id:
+            amount = 0
+        else:
+            try:
+                amount = int(amount_text or "")
+            except ValueError:
+                return CommandResult(False, "INVALID_PROJECT_CONTRIBUTION", "贡献点数必须是正整数。", context.request_id)
         operation_id = self._operation_id(context, "livelihood.contribute_project")
         try:
             record = await self.repository.contribute_project(
@@ -132,13 +154,16 @@ class ProjectApplication:
                 resource_key=self._resource_key(resource_key),
                 amount=amount,
                 operation_id=operation_id,
+                source_operation_id=source_operation_id,
             )
         except ProjectContentClosedError:
             return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该公共项目暂未开放。", context.request_id, operation_id)
         except ProjectContributionLimitError:
             return CommandResult(False, "PROJECT_CONTRIBUTION_LIMIT", "单次公共项目贡献最多 30 点。", context.request_id, operation_id)
         except ProjectContributionRequirementError:
-            return CommandResult(False, "PROJECT_RESOURCE_INVALID", "该资源不能用于当前公共项目。", context.request_id, operation_id)
+            return CommandResult(False, "PROJECT_SOURCE_INVALID" if source_operation_id else "PROJECT_RESOURCE_INVALID", "这份结算凭证不符合当前公共项目要求。" if source_operation_id else "该资源不能用于当前公共项目。", context.request_id, operation_id)
+        except ProjectSourceAlreadyUsedError:
+            return CommandResult(False, "PROJECT_SOURCE_ALREADY_USED", "这份结算凭证已经贡献过公共项目。", context.request_id, operation_id)
         except ProjectAlreadyCompleteError:
             return CommandResult(False, "PROJECT_ALREADY_COMPLETE", "本周公共项目已经完成。", context.request_id, operation_id)
         except ResourceInsufficientError:
@@ -156,10 +181,12 @@ class ProjectApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         project = record.project
+        contribution_label = "服务" if record.service_key else "资源"
+        contribution_name = self._SERVICE_LABELS.get(record.service_key, record.resource_key)
         return CommandResult(
             True,
             "PROJECT_CONTRIBUTED",
-            f"## 公共项目贡献完成\n\n已向**{project.label}**贡献 **{record.contribution_points} 点**。\n\n- **资源**：{record.resource_key} ×{record.resource_amount}\n- **项目进度**：{project.contribution_points}/{project.target_points}\n- **状态**：{project.status}",
+            f"## 公共项目贡献完成\n\n已向**{project.label}**贡献 **{record.contribution_points} 点**。\n\n- **{contribution_label}**：{contribution_name} ×{record.quantity or record.resource_amount}\n- **项目进度**：{project.contribution_points}/{project.target_points}\n- **状态**：{project.status}",
             context.request_id,
             operation_id,
             data={
@@ -171,6 +198,9 @@ class ProjectApplication:
                 "target_points": project.target_points,
                 "resource_key": record.resource_key,
                 "resource_amount": record.resource_amount,
+                "quantity": record.quantity,
+                "service_key": record.service_key,
+                "source_operation_id": record.source_operation_id,
                 "progress": project.progress,
                 "idempotent_replay": record.already_completed,
             },

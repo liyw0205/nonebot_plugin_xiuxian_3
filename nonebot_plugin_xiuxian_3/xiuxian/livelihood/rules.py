@@ -304,6 +304,52 @@ class PublicProjectDefinition:
     required_access_key: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ProjectServiceSource:
+    """A settled operation that can add contribution without another cost."""
+
+    project_key: str
+    service_key: str
+    operation_names: tuple[str, ...]
+    contribution_points: int
+    quantity: int = 1
+
+
+PROJECT_SERVICE_SOURCES = (
+    ProjectServiceSource(
+        project_key=PROJECT_DOMAIN_REFUGE,
+        service_key="service.transport",
+        operation_names=("livelihood.settle_route",),
+        contribution_points=20,
+    ),
+    ProjectServiceSource(
+        project_key=PROJECT_ABYSS_PURIFICATION,
+        service_key="service.purification",
+        operation_names=("production.purify_pollution",),
+        contribution_points=15,
+    ),
+    ProjectServiceSource(
+        project_key=PROJECT_ANCESTRAL_HABITAT,
+        service_key="service.taming",
+        operation_names=("companion.bond", "companion.feed"),
+        contribution_points=15,
+    ),
+    ProjectServiceSource(
+        project_key=PROJECT_ANCESTRAL_HABITAT,
+        service_key="service.repair",
+        operation_names=("companion.rest",),
+        contribution_points=15,
+    ),
+)
+
+
+def project_service_source(project_key: str, operation_name: str) -> ProjectServiceSource | None:
+    for source in PROJECT_SERVICE_SOURCES:
+        if source.project_key == project_key and operation_name in source.operation_names:
+            return source
+    return None
+
+
 PUBLIC_PROJECT_DEFINITIONS = {
     PROJECT_TOWN_WELL: PublicProjectDefinition(
         key=PROJECT_TOWN_WELL,
@@ -441,8 +487,11 @@ __all__ = [
     "PROJECT_TOWN_WELL",
     "CONSTRUCTION_COUPON",
     "PUBLIC_PROJECT_DEFINITIONS",
+    "PROJECT_SERVICE_SOURCES",
+    "ProjectServiceSource",
     "PublicProjectDefinition",
     "TRANSPORT_TICKET",
     "project_definition",
+    "project_service_source",
     "weekly_project_key",
 ]

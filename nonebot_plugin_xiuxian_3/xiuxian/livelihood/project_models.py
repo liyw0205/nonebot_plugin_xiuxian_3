@@ -29,6 +29,9 @@ class ProjectContributionRecord:
     resource_key: str
     resource_amount: int
     contribution_points: int
+    source_operation_id: str = ""
+    service_key: str = ""
+    quantity: int = 0
     already_completed: bool = False
 
 

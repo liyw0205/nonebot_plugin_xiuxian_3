@@ -125,8 +125,8 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 raise TowerRequirementError("tower duo members must share a location")
             for row in members:
                 if not self._meets_realm_values(str(row["realm_key"]), player_integer(row, "realm_layer"), definition.required_realm, definition.required_layer):
-                    has_v03_permit = floor_no <= 20 and self._intro_flag(row, "story.mainline.three_realms")
-                    if not has_v03_permit and rebuild_reputation_total(self._local_reputations(connection, int(row["id"]))) < 500:
+                    has_story_permit = floor_no <= 20 and self._intro_flag(row, "story.mainline.three_realms")
+                    if not has_story_permit and rebuild_reputation_total(self._local_reputations(connection, int(row["id"]))) < 500:
                         raise TowerRequirementError("tower duo member lacks realm or reconstruction reputation")
                 used = connection.execute(
                     "SELECT COUNT(*) FROM three_realms_tower_duo_member_runs WHERE player_id=? AND floor_no=? AND status<>'aborted' AND substr(created_at,1,10)>=?",

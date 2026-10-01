@@ -35,7 +35,7 @@ from .three_realms_tower_models import (
 from .three_realms_tower_rules import (
     FACTIONS,
     MAX_FLOOR,
-    V03_MAX_FLOOR,
+    NASCENT_SOUL_MAX_FLOOR,
     TOWER_KEY,
     enemy_key_for,
     floor_definition,
@@ -162,7 +162,7 @@ class ThreeRealmsTowerRepositoryMixin:
                 definition.required_realm,
                 definition.required_layer,
             )
-            if floor_no <= V03_MAX_FLOOR:
+            if floor_no <= NASCENT_SOUL_MAX_FLOOR:
                 if not meets_realm and not has_story_permit:
                     raise TowerRequirementError("nascent-soul rank or three-realms story permit is required")
             elif not meets_realm:
