@@ -28,7 +28,7 @@ from .three_realms import (
     three_realms_definition,
 )
 from .three_realms_models import ThreeRealmsLaneProgress, ThreeRealmsStatusRecord
-from ..utils.player import change_player_state
+from ..utils.player import grant_player_state
 
 
 class ThreeRealmsRepositoryMixin:
@@ -241,16 +241,15 @@ class ThreeRealmsRepositoryMixin:
             if first_clear and definition.stage == 5 and THREE_REALMS_STORY_KEY not in flags:
                 flags.append(THREE_REALMS_STORY_KEY)
             flags_state["flags"] = flags
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={
+                rewards={
                     str(key): int(value)
                     for key, value in reward.items()
                     if str(key).startswith("item.")
                 },
-                asset_mode="grant",
                 player_values={
                     "faction_reputation_json": json.dumps(reputation, ensure_ascii=False, sort_keys=True),
                     "intro_json": json.dumps(flags_state, ensure_ascii=False, sort_keys=True),

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from ...contracts import serialize_datetime
 from .models import ResourceRecoveryRecord
-from ..utils.player import change_player_state, player_integer
+from ..utils.player import change_player_state, player_numeric_values
 
 
 class ProgressionRepositoryMixin:
@@ -80,17 +80,21 @@ class ProgressionRepositoryMixin:
                 last_update = now
             elapsed = max(0, int((now - last_update).total_seconds()))
             periods = elapsed // RECOVERY_PERIOD_SECONDS
-            stamina_before = player_integer(row, "stamina")
-            energy_before = player_integer(row, "energy")
-            stamina_after = min(player_integer(row, "stamina_max"), stamina_before + periods)
-            energy_after = min(player_integer(row, "energy_max"), energy_before + periods)
+            resources = player_numeric_values(
+                row,
+                ("stamina", "stamina_max", "energy", "energy_max", "void_power", "void_power_max"),
+            )
+            stamina_before = resources["stamina"]
+            energy_before = resources["energy"]
+            stamina_after = min(resources["stamina_max"], stamina_before + periods)
+            energy_after = min(resources["energy_max"], energy_before + periods)
             recovered_stamina = stamina_after - stamina_before
             recovered_energy = energy_after - energy_before
-            void_before = player_integer(row, "void_power")
+            void_before = resources["void_power"]
             void_after = void_before
             recovered_void_power = 0
-            if player_integer(row, "void_power_max") > 0 and str(row["void_power_reset_date"] or "") != now.date().isoformat():
-                void_after = player_integer(row, "void_power_max")
+            if resources["void_power_max"] > 0 and str(row["void_power_reset_date"] or "") != now.date().isoformat():
+                void_after = resources["void_power_max"]
                 recovered_void_power = max(0, void_after - void_before)
             changed = recovered_stamina > 0 or recovered_energy > 0 or recovered_void_power > 0
             if periods > 0:
@@ -103,7 +107,7 @@ class ProgressionRepositoryMixin:
                         "stamina": recovered_stamina,
                         "energy": recovered_energy,
                     },
-                    maximums={"stamina": row["stamina_max"], "energy": row["energy_max"]},
+                    maximums={"stamina": resources["stamina_max"], "energy": resources["energy_max"]},
                     player_values={
                         "void_power": void_after,
                         "void_power_reset_date": now.date().isoformat(),

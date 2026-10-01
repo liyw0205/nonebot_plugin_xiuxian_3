@@ -168,7 +168,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_grant, inventory_json
-from ..utils.player import change_player_state, player_integer
+from ..utils.player import change_player_state, grant_player_state, player_integer
 from ..utils.json import json_object
 from ..utils.player import player_field, player_reputation, player_values
 
@@ -611,16 +611,15 @@ class PlayerRepositoryMixin:
             stage_advanced = row["stage"] == STAGE_MORTAL and intro_complete(flags)
             stage = "seeker" if stage_advanced else row["stage"]
             intro_state = {"flags": sorted(set(flags)), "selected_service": selected}
-            change_player_state(
+            grant_player_state(
                 connection,
                 row,
                 updated_at=serialize_datetime(now),
-                asset_values=(
+                rewards=(
                     {"item.herb.blood_grass": item_quantity}
                     if item_quantity
                     else None
                 ),
-                asset_mode="grant",
                 value_delta={
                     "stamina": stamina - player_integer(row, "stamina"),
                     "energy": energy - player_integer(row, "energy"),

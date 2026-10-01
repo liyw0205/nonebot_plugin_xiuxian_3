@@ -206,7 +206,7 @@ from ..utils.assets import (
     assets_spend,
     player_currency,
 )
-from ..utils.player import change_player_state, player_integer, player_inventory
+from ..utils.player import change_player_state, player_integer, player_inventory, spend_player_state
 
 
 class AdvancementRepositoryMixin:
@@ -346,12 +346,11 @@ class AdvancementRepositoryMixin:
             session_id = uuid4().hex
             starts_at = now_text
             ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values=item_cost,
-                asset_mode="spend",
+                costs=item_cost,
                 value_delta={"energy": -definition.energy_cost},
             )
             connection.execute(
@@ -1979,12 +1978,11 @@ class AdvancementRepositoryMixin:
                     """,
                     (operation_id, target_level, snapshot_json, now_text, now_text, mastery["id"]),
                 )
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={**asset_costs, **asset_resource_costs},
-                asset_mode="spend",
+                costs={**asset_costs, **asset_resource_costs},
                 value_delta={
                     storage: after - before
                     for storage, before, after in resource_balances.values()

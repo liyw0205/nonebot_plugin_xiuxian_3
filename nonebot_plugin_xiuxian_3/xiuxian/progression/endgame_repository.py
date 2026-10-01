@@ -28,7 +28,7 @@ from .endgame_rules import (
     TRIAL_ORDER,
 )
 from ..utils.assets import inventory_amount, player_currency
-from ..utils.player import change_player_state, player_integer, player_inventory
+from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, spend_player_state
 
 
 class EndgameRepositoryMixin:
@@ -98,15 +98,14 @@ class EndgameRepositoryMixin:
             flags.add("endgame.dao_union")
             flags.update({"fruit.clue.body", "fruit.clue.spell", "fruit.clue.support"})
             intro["flags"] = sorted(flags)
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={
+                costs={
                     "spirit_stones": DAO_UNION_STONE_COST,
                     "item.dao_fruit_fragment": DAO_UNION_FRAGMENT_COST,
                 },
-                asset_mode="spend",
                 value_delta={"world_merit": -DAO_UNION_MERIT_COST},
                 player_values={
                     "realm_key": "dao_union",
@@ -238,12 +237,11 @@ class EndgameRepositoryMixin:
             raise AscensionRequirementError("remain in world requires a locked dao fruit")
         status = ASCENDED_STATUS if ending_key == "ascend" else REMAINED_IN_WORLD_STATUS
         title_quantity = 0 if inventory_amount(player_inventory(row), "item.title.ascended") else 1
-        change_player_state(
+        grant_player_state(
             connection,
             row,
             updated_at=now_text,
-            asset_values={"item.title.ascended": title_quantity} if title_quantity else None,
-            asset_mode="grant",
+            rewards={"item.title.ascended": title_quantity} if title_quantity else None,
             player_values={"endgame_status": status, "ending_key": ending_key},
         )
         updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()

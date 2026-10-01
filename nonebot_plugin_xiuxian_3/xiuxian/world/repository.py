@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount
-from ..utils.player import change_player_state, player_has_values, player_inventory, player_integer
+from ..utils.player import change_player_state, player_has_values, player_inventory, player_integer, spend_player_state
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
     VOID_INSTABILITY_SECONDS,
@@ -148,12 +148,11 @@ class WorldRepositoryMixin:
             if not player_has_values(row, {"stamina": definition.stamina_cost}):
                 raise ResourceInsufficientError("stamina is insufficient")
             try:
-                change_player_state(
+                spend_player_state(
                     connection,
                     row,
                     updated_at=now_text,
-                    asset_values={"item.void_anchor": anchor_cost},
-                    asset_mode="spend",
+                    costs={"item.void_anchor": anchor_cost},
                     preserve_zero=True,
                     value_delta={"stamina": -definition.stamina_cost},
                     player_values={"void_instability_until": instability_until},

@@ -71,6 +71,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_values_missing,
     player_realm_values,
     player_profile_values,
+    player_resource_bars,
+    player_state_values,
     player_status_values,
     player_projection,
     player_view_values,
@@ -534,6 +536,32 @@ def test_player_profile_and_status_projections_are_detached_and_consistent() -> 
     assert player_view_values(row, "combat")["inventory"] == {"item.herb": 2}
     with pytest.raises(ValueError, match="unsupported player view"):
         player_view_values(row, "unknown")  # type: ignore[arg-type]
+
+
+def test_player_state_reader_and_resource_bars_share_one_normalized_source() -> None:
+    row = {
+        "player_id": "p1",
+        "spirit_stones": "12",
+        "stamina": "8",
+        "stamina_max": "10",
+        "energy": 4,
+        "energy_max": 6,
+        "soul_power": "3",
+        "soul_power_max": "9",
+        "inventory_json": '{"item.herb": "2"}',
+    }
+    full = player_state_values(row)
+    assert full == player_values(row)
+    assert player_state_values(row, "profile")["spirit_stones"] == 12
+    assert player_state_values(row, "status")["stamina"] == 8
+    assert player_state_values(row, "combat")["inventory"] == {"item.herb": 2}
+    assert player_resource_bars(row) == {
+        "stamina": {"current": 8, "maximum": 10},
+        "energy": {"current": 4, "maximum": 6},
+        "soul_power": {"current": 3, "maximum": 9},
+        "domain_charge": {"current": 0, "maximum": 0},
+        "void_power": {"current": 0, "maximum": 0},
+    }
 
 
 def test_player_numeric_projection_and_delta_share_resource_validation() -> None:

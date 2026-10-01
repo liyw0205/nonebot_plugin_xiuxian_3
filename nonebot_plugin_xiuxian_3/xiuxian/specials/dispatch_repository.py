@@ -40,7 +40,7 @@ from .dispatch_rules import (
     reward_for,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.player import change_player_state, player_integer, player_inventory
+from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, spend_player_state
 
 
 class DispatchRepositoryMixin:
@@ -226,12 +226,11 @@ class DispatchRepositoryMixin:
                 "duration_seconds": definition.duration_seconds,
                 "ends_at": serialize_datetime(ends_at),
             }
-            change_player_state(
+            spend_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={key: amount for key, amount in costs.items() if str(key).startswith("item.")} or None,
-                asset_mode="spend",
+                costs={key: amount for key, amount in costs.items() if str(key).startswith("item.")} or None,
                 value_delta={
                     key: -int(amount)
                     for key, amount in costs.items()
@@ -440,12 +439,11 @@ class DispatchRepositoryMixin:
                         now_text,
                     ),
                 )
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values=asset_rewards or None,
-                asset_mode="grant",
+                rewards=asset_rewards or None,
                 value_delta={"stamina": stamina_refund, "energy": energy_refund},
                 maximums={"stamina": player["stamina_max"], "energy": player["energy_max"]},
             )
@@ -541,12 +539,11 @@ class DispatchRepositoryMixin:
             if now > datetime.fromisoformat(str(assignment["cancel_until"])):
                 raise DispatchCancellationExpiredError("dispatch confirmation window expired")
             costs = self._json_object(assignment["costs_json"], {})
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={key: int(amount) for key, amount in costs.items() if str(key).startswith("item.")} or None,
-                asset_mode="grant",
+                rewards={key: int(amount) for key, amount in costs.items() if str(key).startswith("item.")} or None,
                 value_delta={
                     "stamina": int(costs.get("stamina", 0)),
                     "energy": int(costs.get("energy", 0)),

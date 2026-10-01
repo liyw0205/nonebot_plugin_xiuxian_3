@@ -48,6 +48,7 @@ from .endgame_rules import (
 )
 from ..utils.assets import grant_player_items, inventory_amount, spend_player_items
 from ..utils.player import (
+    grant_player_state,
     change_player_state,
     change_player_values,
     player_combat_values,
@@ -595,12 +596,11 @@ class FinalBattleRepositoryMixin:
                     },
                 )
             elif failed:
-                change_player_state(
+                grant_player_state(
                     connection,
                     actor,
                     updated_at=now_text,
-                    asset_values={ASCENSION_CERTIFICATE_KEY: 1},
-                    asset_mode="grant",
+                    rewards={ASCENSION_CERTIFICATE_KEY: 1},
                     value_delta={"tribulation_debt": debt_delta},
                 )
             result.update({"outcome": outcome, "reason": result.get("reason", "final_battle_ended"), "debt_delta": debt_delta, "cooldown_until": cooldown_until, "rewards": reward_map, "settled_at": now_text})

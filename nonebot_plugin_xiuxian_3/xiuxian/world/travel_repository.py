@@ -167,7 +167,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
-from ..utils.player import change_player_state, player_inventory, player_integer
+from ..utils.player import change_player_state, player_inventory, player_integer, spend_player_state
 
 
 class TravelRepositoryMixin:
@@ -484,12 +484,11 @@ class TravelRepositoryMixin:
             costs: dict[str, int] = {"spirit_stones": definition.currency_cost}
             if pass_key and not definition.consume_pass_on_arrival:
                 costs[pass_key] = pass_quantity
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=serialize_datetime(now),
-                asset_values=costs,
-                asset_mode="spend",
+                costs=costs,
                 value_delta={"stamina": -definition.stamina_cost},
                 maximums={"stamina": row["stamina_max"]},
             )
@@ -591,12 +590,11 @@ class TravelRepositoryMixin:
                     inventory.pop(pass_key, None)
                 pass_consumed = True
             updated_at = serialize_datetime(now)
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=updated_at,
-                asset_values=({pass_key: pass_quantity} if pass_consumed and pass_key else None),
-                asset_mode="spend",
+                costs=({pass_key: pass_quantity} if pass_consumed and pass_key else None),
                 player_values={"location_key": session["destination"]},
             )
             connection.execute(

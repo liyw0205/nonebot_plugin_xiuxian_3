@@ -9,7 +9,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import spend_player_items
-from ..utils.player import change_player_state
+from ..utils.player import grant_player_state
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -249,12 +249,11 @@ class CrossRealmEventRepositoryMixin:
                 if key.startswith("faction_reputation."):
                     faction_key = key.removeprefix("faction_reputation.")
                     faction[faction_key] = int(faction.get(faction_key, 0)) + value
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values=asset_reward,
-                asset_mode="grant",
+                rewards=asset_reward,
                 value_delta={"world_merit": int(reward.get("world_merit", 0))},
                 player_values={
                     "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),

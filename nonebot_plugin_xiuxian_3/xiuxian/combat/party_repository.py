@@ -81,7 +81,7 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_DAMAGE_BP,
     TIME_FORT_STORM_INTERVAL,
 )
-from ..utils.player import change_player_state, player_combat_values, player_integer, player_intro_flags, player_object, player_reputation
+from ..utils.player import grant_player_state, change_player_state, player_combat_values, player_integer, player_intro_flags, player_object, player_reputation
 from ..utils.assets import inventory_amount, inventory_spend, spend_player_assets
 
 
@@ -1371,12 +1371,11 @@ class PartyCombatRepositoryMixin:
                         if item_key.startswith("faction_reputation."):
                             faction_key = item_key.removeprefix("faction_reputation.")
                             faction[faction_key] = int(faction.get(faction_key, 0)) + int(quantity)
-                    change_player_state(
+                    grant_player_state(
                         connection,
                         player,
                         updated_at=now_text,
-                        asset_values=asset_reward or None,
-                        asset_mode="grant",
+                        rewards=asset_reward or None,
                         value_delta={
                             "cultivation": int(reward.get("cultivation", 0)),
                             "total_cultivation": int(reward.get("cultivation", 0)),

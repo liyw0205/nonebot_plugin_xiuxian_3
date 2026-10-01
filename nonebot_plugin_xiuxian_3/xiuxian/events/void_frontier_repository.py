@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from typing import Any, Mapping
 
 from ...contracts import serialize_datetime
-from ..utils.player import change_player_state
+from ..utils.player import grant_player_state
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -151,7 +151,7 @@ class VoidFrontierRepositoryMixin:
             if pending is None:
                 raise VoidFrontierWeeklyNotAvailableError("no pending void-frontier weekly reward")
             reward = json_object(pending["reward_json"], {"void_merit": 20, "alliance_points": 10})
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
@@ -214,16 +214,15 @@ class VoidFrontierRepositoryMixin:
                 raise VoidFrontierRewardAlreadyClaimedError("void-frontier reward already claimed")
             rank = int(ranking["rank"])
             reward = reward_for_rank(rank)
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={
+                rewards={
                     key: value
                     for key, value in reward.items()
                     if key == "spirit_stones" or key.startswith("item.")
                 },
-                asset_mode="grant",
                 value_delta={"void_merit": int(reward.get("void_merit", 0))},
             )
             connection.execute(

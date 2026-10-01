@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount
-from ..utils.player import change_player_state, player_inventory
+from ..utils.player import change_player_state, spend_player_state, player_inventory
 from ..persistence.errors import (
     EndgameRecipeAlreadyCreatedError,
     EndgameRecipeBusyError,
@@ -160,12 +160,11 @@ class EndgameProductionRepositoryMixin:
                 "progress_before": int(player["dao_fruit_progress"]),
                 "roll_bp": roll_bp,
             }
-            change_player_state(
+            spend_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values=recipe.inputs,
-                asset_mode="spend",
+                costs=recipe.inputs,
                 value_delta={"world_merit": -recipe.world_merit_cost},
             )
             connection.execute(

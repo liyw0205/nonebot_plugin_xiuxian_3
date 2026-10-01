@@ -12,7 +12,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
 from ..utils.assets import grant_player_assets, grant_player_items, inventory_amount
-from ..utils.player import change_player_state, player_integer, player_inventory
+from ..utils.player import change_player_state, spend_player_state, player_integer, player_inventory
 from .secret_realm_models import SecretRealmPreviewRecord, SecretRealmRunRecord
 from .secret_realm_rules import (
     DEFINITIONS,
@@ -104,16 +104,15 @@ class SecretRealmRepositoryMixin:
                 raise SecretRealmRequirementError("secret-realm ticket is missing")
             if player_integer(player, "stamina") < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
-            change_player_state(
+            spend_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values=(
+                costs=(
                     {definition.ticket_key: definition.ticket_quantity}
                     if definition.ticket_key
                     else None
                 ),
-                asset_mode="spend",
                 value_delta={"stamina": -definition.stamina_cost},
                 maximums={"stamina": player_integer(player, "stamina_max")},
             )

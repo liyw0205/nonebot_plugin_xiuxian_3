@@ -86,7 +86,7 @@ from ...exploration.rules import (
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from ...utils.assets import inventory_amount, player_currency
-from ...utils.player import change_player_state, player_integer, player_inventory
+from ...utils.player import change_player_state, grant_player_state, spend_player_state, player_integer, player_inventory
 from ...adventures.mainline_models import (
     MainlineClaimRecord,
     MainlineStageView,
@@ -609,12 +609,11 @@ class BreakthroughRepositoryMixin:
                 value_delta["soul_power"] = -200
             if is_void_refining:
                 value_delta["domain_charge"] = -100
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={"spirit_stones": definition.currency_cost, **material_costs},
-                asset_mode="spend",
+                costs={"spirit_stones": definition.currency_cost, **material_costs},
                 value_delta=value_delta,
                 player_values={"heart_demon_bonus_bp": 0} if is_nascent else None,
                 preserve_zero=is_void_refining,
@@ -814,12 +813,11 @@ class BreakthroughRepositoryMixin:
             domain_key = str(session["domain_key"])
             pollution_delta = 15 if domain_key == "domain.abyss_shadow" else 0
             bloodline_delta = -10 if domain_key == "domain.ancestral_wild" else 0
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={"item.domain_core": 1, "spirit_stones": 10_000},
-                asset_mode="spend",
+                costs={"item.domain_core": 1, "spirit_stones": 10_000},
                 value_delta={"pollution": pollution_delta, "bloodline_stability": bloodline_delta},
                 maximums={"pollution": 100},
                 player_values={"domain_key": domain_key},
@@ -882,16 +880,15 @@ class BreakthroughRepositoryMixin:
                     raise CurrencyInsufficientError("early domain recovery requires spirit stones")
                 stones_spent = 2000
                 medicine_consumed = True
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values=(
+                costs=(
                     {"item.pill.domain_restore": 1, "spirit_stones": stones_spent}
                     if medicine_consumed
                     else None
                 ),
-                asset_mode="spend",
                 player_values={"domain_crack_until": None},
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
@@ -1055,12 +1052,11 @@ class BreakthroughRepositoryMixin:
                             "carry_capacity": player_integer(row, "carry_capacity") + 100,
                         }
                     )
-                change_player_state(
+                grant_player_state(
                     connection,
                     row,
                     updated_at=now_text,
-                    asset_values={"spirit_stones": definition.reward_currency, **reward_items},
-                    asset_mode="grant",
+                    rewards={"spirit_stones": definition.reward_currency, **reward_items},
                     value_delta=value_delta,
                     maximums={"stamina": player_integer(row, "stamina_max")},
                     player_values=player_values,
@@ -1122,12 +1118,11 @@ class BreakthroughRepositoryMixin:
                 else:
                     weakness_until = serialize_datetime(now + timedelta(seconds=weakness_seconds))
                     player_values = {"cultivation": cultivation_after, "weakness_until": weakness_until}
-                change_player_state(
+                spend_player_state(
                     connection,
                     row,
                     updated_at=now_text,
-                    asset_values={protection_key: 1} if protection_consumed else None,
-                    asset_mode="spend",
+                    costs={protection_key: 1} if protection_consumed else None,
                     value_delta={"breakthrough_pity_bp": pity_after - pity_before},
                     player_values=player_values,
                     preserve_zero=is_void_refining,
@@ -1295,12 +1290,11 @@ class BreakthroughRepositoryMixin:
                 fatigue_hours = 12
                 bonus_after = 600
             fatigue_until = serialize_datetime(now + timedelta(hours=fatigue_hours))
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={"item.pill.soul_restore": 1} if effective_choice == "heart_demon.purify" else None,
-                asset_mode="spend",
+                costs={"item.pill.soul_restore": 1} if effective_choice == "heart_demon.purify" else None,
                 value_delta={
                     "pollution": pollution_after - pollution_before,
                     "world_merit": merit_gain,
@@ -1486,16 +1480,15 @@ class BreakthroughRepositoryMixin:
                     raise CurrencyInsufficientError("early recovery requires spirit stones")
                 medicine_consumed = True
                 stones_spent = stones_cost
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values=(
+                costs=(
                     {"spirit_stones": stones_cost, medicine_key: 1}
                     if medicine_consumed
                     else None
                 ),
-                asset_mode="spend",
                 player_values={"weakness_until": None},
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()

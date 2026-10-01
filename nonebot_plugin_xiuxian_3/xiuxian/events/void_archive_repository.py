@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_items
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, grant_player_state
 from ..persistence.errors import (
     OperationConflictError,
     VoidArchiveGuardAlreadySettledError,
@@ -299,12 +299,11 @@ class VoidArchiveRepositoryMixin:
             if progress < target:
                 raise VoidArchiveTaskNotCompleteError("archive task evidence is incomplete")
             reward = dict(TASK_REWARDS[task_key])
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values=reward,
-                asset_mode="grant",
+                rewards=reward,
                 value_delta={"void_merit": TASK_VOID_MERIT},
             )
             connection.execute(

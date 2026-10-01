@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_currency
-from ..utils.player import change_player_state, player_integer
+from ..utils.player import change_player_state, player_integer, spend_player_state
 from .cloud_models import (
     ArrayHallRecord,
     BeastHistoryRecord,
@@ -109,12 +109,11 @@ class CloudRepositoryMixin:
             if definition.pass_key:
                 asset_costs[definition.pass_key] = definition.pass_quantity
             try:
-                change_player_state(
+                spend_player_state(
                     connection,
                     player,
                     updated_at=now_text,
-                    asset_values=asset_costs,
-                    asset_mode="spend",
+                    costs=asset_costs,
                     value_delta={"stamina": -definition.stamina_cost},
                 )
             except ValueError as exc:
@@ -359,12 +358,11 @@ class CloudRepositoryMixin:
                 if flag not in flags:
                     flags.append(flag)
             intro["flags"] = flags
-            change_player_state(
+            spend_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={"spirit_stones": 100},
-                asset_mode="spend",
+                costs={"spirit_stones": 100},
                 player_values={
                     "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
                     "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
@@ -533,12 +531,11 @@ class CloudRepositoryMixin:
             flags = {str(item) for item in intro.get("flags", [])}
             flags.update({BEAST_INTRO_QUEST, BEAST_INTRO_FLAG})
             intro["flags"] = sorted(flags)
-            change_player_state(
+            spend_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={"spirit_stones": 100},
-                asset_mode="spend",
+                costs={"spirit_stones": 100},
                 player_values={
                     "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
                     "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),

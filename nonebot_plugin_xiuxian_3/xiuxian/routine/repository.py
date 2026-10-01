@@ -172,7 +172,7 @@ from ..routine.rules import (
 )
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
-from ..utils.player import change_player_state, player_inventory, player_integer
+from ..utils.player import change_player_state, grant_player_state, player_inventory, player_integer
 
 
 class RoutineRepositoryMixin:
@@ -275,16 +275,15 @@ class RoutineRepositoryMixin:
                     continue
                 applied_reward[key] = int(quantity)
 
-            change_player_state(
+            grant_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={
+                rewards={
                     key: quantity
                     for key, quantity in requested_reward.items()
                     if key != "energy"
                 },
-                asset_mode="grant",
                 value_delta={"energy": energy_gain},
                 maximums={"energy": player_integer(row, "energy_max")},
             )
@@ -729,16 +728,15 @@ class RoutineRepositoryMixin:
             )
             cooldown = now + timedelta(hours=24)
             cooldown_text = serialize_datetime(cooldown)
-            change_player_state(
+            grant_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={
+                rewards={
                     key: quantity
                     for key, quantity in reward.items()
                     if key != "local_reputation"
                 },
-                asset_mode="grant",
             )
             result = {
                 "pool_key": "tree.harvest",
@@ -1117,16 +1115,15 @@ class RoutineRepositoryMixin:
                     """,
                     (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
                 )
-            change_player_state(
+            grant_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={
+                rewards={
                     key: quantity
                     for key, quantity in reward.items()
                     if key != "local_reputation"
                 },
-                asset_mode="grant",
             )
             connection.execute(
                 """
@@ -1746,16 +1743,15 @@ class RoutineRepositoryMixin:
                     """,
                     (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
                 )
-            change_player_state(
+            grant_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={
+                rewards={
                     key: quantity
                     for key, quantity in reward.items()
                     if key not in {"energy", "local_reputation", "service_reputation"}
                 },
-                asset_mode="grant",
                 value_delta={"energy": energy - player_integer(row, "energy")},
                 maximums={"energy": player_integer(row, "energy_max")},
             )
@@ -2501,12 +2497,11 @@ class RoutineRepositoryMixin:
                 """,
                 (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
             )
-        change_player_state(
+        grant_player_state(
             connection,
             player,
             updated_at=now_text,
-            asset_values=asset_rewards,
-            asset_mode="grant",
+            rewards=asset_rewards,
             value_delta={"energy": energy_gain},
             maximums={"energy": player_integer(player, "energy_max")},
         )

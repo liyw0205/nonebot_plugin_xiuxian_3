@@ -10,7 +10,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount, spend_player_items
-from ..utils.player import change_player_state, player_inventory
+from ..utils.player import grant_player_state, player_inventory
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
     DaoOriginTaskRequirementError,
@@ -309,15 +309,14 @@ class EndgameQuestRepositoryMixin:
             flags = set(str(item) for item in flags_state.get("flags", []))
             flags.add(DAO_UNION_QUEST)
             flags_state["flags"] = sorted(flags)
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={
+                rewards={
                     "item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD,
                     "item.tribulation_token": DAO_UNION_TRIBULATION_TOKEN_REWARD,
                 },
-                asset_mode="grant",
                 player_values={"intro_json": json.dumps(flags_state, ensure_ascii=False, sort_keys=True)},
             )
             self._upsert_progress(
@@ -384,12 +383,11 @@ class EndgameQuestRepositoryMixin:
             reward = dict(DAO_ORIGIN_REWARDS[task_key]) if count == DAO_ORIGIN_TARGET else {}
             world_merit_reward = DAO_ORIGIN_WORLD_MERIT[task_key] if count == DAO_ORIGIN_TARGET else 0
             token_reward = int(reward.get("item.tribulation_token", 0))
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={"item.tribulation_token": token_reward},
-                asset_mode="grant",
+                rewards={"item.tribulation_token": token_reward},
                 value_delta={
                     "dao_fruit_progress": int(reward.get("dao_fruit_progress", 0)),
                     "ascension_merit": int(reward.get("ascension_merit", 0)),

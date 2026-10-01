@@ -203,6 +203,14 @@ PLAYER_VIEW_FIELDS: dict[PlayerViewKind, tuple[str, ...]] = {
     "combat": PLAYER_COMBAT_PROJECTION_FIELDS,
 }
 
+PLAYER_RESOURCE_BARS = (
+    ("stamina", "stamina_max"),
+    ("energy", "energy_max"),
+    ("soul_power", "soul_power_max"),
+    ("domain_charge", "domain_charge_max"),
+    ("void_power", "void_power_max"),
+)
+
 
 @dataclass(frozen=True, slots=True)
 class PlayerStateChange:
@@ -479,16 +487,48 @@ def player_view_values(
     return projection
 
 
+def player_state_values(
+    row: Mapping[str, Any] | Any,
+    view: PlayerViewKind | None = None,
+) -> dict[str, Any]:
+    """Read the canonical player state, optionally narrowed to one view.
+
+    A full read and the profile/status/combat projections all pass through the
+    same normalizer.  Callers choose a view for transport size, never for a
+    different conversion or fallback rule.
+    """
+
+    if view is None:
+        return player_values(row)
+    return player_view_values(row, view)
+
+
+def player_resource_bars(
+    row: Mapping[str, Any] | Any,
+    resources: tuple[tuple[str, str], ...] = PLAYER_RESOURCE_BARS,
+) -> dict[str, dict[str, int]]:
+    """Return current/max resource pairs from the shared numeric reader."""
+
+    values = player_values(row)
+    return {
+        current: {
+            "current": int(values[current]),
+            "maximum": int(values[maximum]),
+        }
+        for current, maximum in resources
+    }
+
+
 def player_status_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     """Return the shared read-only status projection used by status commands."""
 
-    return player_view_values(row, "status")
+    return player_state_values(row, "status")
 
 
 def player_profile_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     """Return the shared public profile projection used by profile commands."""
 
-    return player_view_values(row, "profile")
+    return player_state_values(row, "profile")
 
 
 def player_realm_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
@@ -630,7 +670,7 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     companion and equipment modifiers are added by their own snapshot readers.
     """
 
-    return player_view_values(row, "combat")
+    return player_state_values(row, "combat")
 
 
 __all__ = [
@@ -642,6 +682,7 @@ __all__ = [
     "PLAYER_PROFILE_FIELDS",
     "PLAYER_RESOURCE_FIELDS",
     "PLAYER_STATUS_FIELDS",
+    "PLAYER_RESOURCE_BARS",
     "PLAYER_VIEW_FIELDS",
     "PlayerViewKind",
     "player_field",
@@ -657,6 +698,8 @@ __all__ = [
     "player_numeric_values",
     "player_projection",
     "player_view_values",
+    "player_state_values",
+    "player_resource_bars",
     "player_profile_values",
     "player_status_values",
     "player_object",

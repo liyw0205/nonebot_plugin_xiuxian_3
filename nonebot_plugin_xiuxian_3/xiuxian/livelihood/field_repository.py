@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_assets, inventory_amount
-from ..utils.player import change_player_state, player_inventory, player_integer
+from ..utils.player import change_player_state, spend_player_state, player_inventory, player_integer
 from ..persistence.errors import (
     CropContentClosedError,
     CropDailyLimitError,
@@ -109,12 +109,11 @@ class FieldPlotRepositoryMixin:
                         "array_sand_roll": spirit_leaf_array_sand_roll(operation_id),
                     }
                 )
-            change_player_state(
+            spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                asset_values={crop.seed_key: 1},
-                asset_mode="spend",
+                costs={crop.seed_key: 1},
                 value_delta={"energy": -crop.maintenance_energy},
             )
             connection.execute(

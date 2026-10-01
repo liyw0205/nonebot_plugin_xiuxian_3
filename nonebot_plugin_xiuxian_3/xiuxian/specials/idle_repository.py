@@ -36,7 +36,7 @@ from .idle_rules import (
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from ..utils.assets import inventory_amount
-from ..utils.player import change_player_state, player_integer, player_inventory
+from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, spend_player_state
 
 
 class IdleRepositoryMixin:
@@ -195,12 +195,11 @@ class IdleRepositoryMixin:
                 "location_key": str(player["location_key"]),
                 "random_seed": uuid4().hex,
             }
-            change_player_state(
+            spend_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={str(tool["tool_key"]): 1} if tool else None,
-                asset_mode="spend",
+                costs={str(tool["tool_key"]): 1} if tool else None,
                 value_delta={
                     "stamina": -definition.stamina_cost,
                     "energy": -definition.energy_cost,
@@ -330,12 +329,11 @@ class IdleRepositoryMixin:
                     """,
                     (player["id"], json.dumps({**local_map, definition.reputation_key: local}, ensure_ascii=False, sort_keys=True), service, now_text),
                 )
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values=asset_rewards,
-                asset_mode="grant",
+                rewards=asset_rewards,
                 player_values={"durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True)},
             )
             if "codex.route.town_road" in reward:
@@ -423,12 +421,11 @@ class IdleRepositoryMixin:
             cost = self._json_object(assignment["cost_json"], {})
             snapshot = self._json_object(assignment["snapshot_json"], {})
             tool_key = snapshot.get("tool_key")
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={str(tool_key): 1} if tool_key else None,
-                asset_mode="grant",
+                rewards={str(tool_key): 1} if tool_key else None,
                 value_delta={
                     "stamina": int(cost.get("stamina", 0)),
                     "energy": int(cost.get("energy", 0)),
