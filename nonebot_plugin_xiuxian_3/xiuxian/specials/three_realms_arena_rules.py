@@ -14,10 +14,9 @@ from ..utils.assets import inventory_amount
 from ..utils.player import (
     player_field,
     player_integer,
-    player_intro_flags,
     player_inventory,
     player_object,
-    player_reputation,
+    player_combat_values,
 )
 
 THREE_REALMS_ARENA_MODE_KEY = "arena.three_realms"
@@ -28,7 +27,7 @@ THREE_REALMS = ("xuantian", "demon", "beast")
 
 
 def intro_flags(player: Mapping[str, Any]) -> set[str]:
-    return set(player_intro_flags(player))
+    return set(player_combat_values(player)["intro_flags"])
 
 
 def player_faction(player: Mapping[str, Any]) -> str:
@@ -40,8 +39,10 @@ def player_faction(player: Mapping[str, Any]) -> str:
             direct = direct.split(".", 1)[1]
         if direct in THREE_REALMS:
             return direct
+    combat = player_combat_values(player)
     qualification = player_object(player, "qualification_json")
     intro = player_object(player, "intro_json")
+    intro_flags = set(combat["intro_flags"])
     for source in (qualification, intro):
         for key in ("cross_realm_alliance", "alliance_key", "alliance", "盟约"):
             value = str(source.get(key) or "").strip().lower()
@@ -49,11 +50,11 @@ def player_faction(player: Mapping[str, Any]) -> str:
                 value = value.split(".", 1)[1]
             if value in THREE_REALMS:
                 return value
-    flags = {str(value).strip().lower() for value in intro.get("flags", ())}
+    flags = {str(value).strip().lower() for value in intro_flags}
     for faction in THREE_REALMS:
         if f"alliance.{faction}" in flags:
             return faction
-    reputation = player_reputation(player)
+    reputation = combat["faction_reputation"]
     ranked = sorted(
         ((faction, int(reputation.get(faction, 0))) for faction in THREE_REALMS),
         key=lambda item: (-item[1], THREE_REALMS.index(item[0])),

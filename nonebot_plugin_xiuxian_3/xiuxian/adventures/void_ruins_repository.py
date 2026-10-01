@@ -29,6 +29,7 @@ from ..utils.player import (
     player_combat_values,
     player_integer,
     player_inventory,
+    player_object,
 )
 from .secret_realm_rules import realm_at_least
 from .void_ruins_models import VoidRuinsRunRecord
@@ -538,8 +539,9 @@ class VoidRuinsRepositoryMixin:
                     reward = dict(VOID_RUINS_REPEAT_REWARD)
                     if first:
                         first_clear_members.append(stable_id)
-                    intro = self._json_object(member["intro_json"], {})
-                    flags = list(intro.get("flags", []))
+                    player_state = player_combat_values(member)
+                    flags = list(player_state["intro_flags"])
+                    intro = player_object(member, "intro_json")
                     if first and VOID_RUINS_ROUTE_PERMISSION not in flags:
                         flags.append(VOID_RUINS_ROUTE_PERMISSION)
                     intro["flags"] = flags

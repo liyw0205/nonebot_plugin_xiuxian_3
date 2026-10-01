@@ -619,6 +619,22 @@ def test_player_profile_and_status_projections_are_detached_and_consistent() -> 
         player_view_values(row, "unknown")  # type: ignore[arg-type]
 
 
+def test_combat_projection_reuses_normalized_flags_and_reputation() -> None:
+    row = {
+        "player_id": "p1",
+        "qualification_json": '{"cross_realm_alliance": "alliance.demon", "body": 12}',
+        "intro_json": '{"flags": ["access.demon.fallen_ruins", "alliance.beast"]}',
+        "faction_reputation_json": '{"demon": "240", "beast": 80}',
+        "inventory_json": "{}",
+    }
+
+    combat = player_combat_values(row)
+
+    assert combat["qualification"] == {"body": 12}
+    assert combat["intro_flags"] == ("access.demon.fallen_ruins", "alliance.beast")
+    assert combat["faction_reputation"] == {"demon": 240, "beast": 80}
+
+
 def test_player_state_reader_and_resource_bars_share_one_normalized_source() -> None:
     row = {
         "player_id": "p1",

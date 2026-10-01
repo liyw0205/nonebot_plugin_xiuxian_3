@@ -81,7 +81,7 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_DAMAGE_BP,
     TIME_FORT_STORM_INTERVAL,
 )
-from ..utils.player import grant_player_state, change_player_state, player_combat_values, player_integer, player_intro_flags, player_object, player_reputation
+from ..utils.player import grant_player_state, change_player_state, player_combat_values, player_integer, player_object
 from ..utils.assets import inventory_amount, inventory_spend, spend_player_assets
 
 
@@ -1447,20 +1447,25 @@ class PartyCombatRepositoryMixin:
 
     @staticmethod
     def _alliance_key_from_row(row: Any) -> str | None:
+        combat = player_combat_values(row)
         qualification = player_object(row, "qualification_json")
         intro = player_object(row, "intro_json")
         for source in (qualification, intro):
             for key in ("cross_realm_alliance", "alliance_key", "alliance", "盟约"):
-                value = source.get(key)
+                value = source.get(key) if isinstance(source, dict) else None
                 if value:
                     return str(value)
+        for flag in combat["intro_flags"]:
+            value = str(flag)
+            if value.startswith("alliance."):
+                return value.split(".", 1)[1]
         return None
 
     @staticmethod
     def _boundary_mainline_ready(connection: sqlite3.Connection, row: Any) -> bool:
         """Accept either the explicit quest row or its projected access flag."""
 
-        if "story.mainline.three_realms" in set(player_intro_flags(row)):
+        if "story.mainline.three_realms" in set(player_combat_values(row)["intro_flags"]):
             return True
         progress = connection.execute(
             "SELECT status FROM quest_progress WHERE player_id = ? AND quest_key = ?",
@@ -1470,11 +1475,11 @@ class PartyCombatRepositoryMixin:
 
     @staticmethod
     def _intro_flag(row: Any, flag: str) -> bool:
-        return flag in set(player_intro_flags(row))
+        return flag in set(player_combat_values(row)["intro_flags"])
 
     @staticmethod
     def _faction_reputation(row: Any, faction: str) -> int:
-        return player_reputation(row).get(faction, 0)
+        return int(player_combat_values(row)["faction_reputation"].get(faction, 0))
 
     @staticmethod
     def _party_battle_record_operation(connection: sqlite3.Connection, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:

@@ -22,7 +22,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..combat.rules import MAX_TURNS
-from ..utils.player import change_player_state, player_integer
+from ..utils.player import change_player_state, player_combat_values, player_integer, player_object
 from .ancestral_hall_models import AncestralHallRunRecord
 from .ancestral_hall_rules import (
     ANCESTRAL_HALL_ENEMY,
@@ -182,7 +182,8 @@ class AncestralHallRepositoryMixin:
                 or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "soul_transformation", 1)
             ):
                 raise AncestralHallRequirementError("realm or location requirement is not met")
-            faction = self._json_object(player["faction_reputation_json"], {})
+            combat = player_combat_values(player)
+            faction = combat["faction_reputation"]
             if int(faction.get("beast", 0)) < 3000 or player_integer(player, "bloodline_stability") < 50:
                 raise AncestralHallRequirementError("beast reputation or bloodline stability is too low")
             if connection.execute(
@@ -201,7 +202,6 @@ class AncestralHallRepositoryMixin:
             if player_integer(player, "stamina") < ANCESTRAL_HALL_STAMINA_COST:
                 raise ResourceInsufficientError("stamina is insufficient")
 
-            intro = self._json_object(player["intro_json"], {})
             run_id = f"ancestral-hall-{uuid4().hex}"
             expires_at = serialize_datetime(now + timedelta(seconds=ANCESTRAL_HALL_EXPIRY_SECONDS))
             snapshot = {
@@ -212,7 +212,7 @@ class AncestralHallRepositoryMixin:
                 "beast_reputation": int(faction.get("beast", 0)),
                 "bloodline_stability": player_integer(player, "bloodline_stability"),
                 "node_keys": list(ANCESTRAL_HALL_NODES),
-                "first_clear": ANCESTRAL_HALL_STORY_FLAG not in set(intro.get("flags", [])),
+                "first_clear": ANCESTRAL_HALL_STORY_FLAG not in set(combat["intro_flags"]),
             }
             try:
                 change_player_state(
@@ -463,8 +463,8 @@ class AncestralHallRepositoryMixin:
                 status = "expired"
                 result["outcome"] = "expired"
             if status == "cleared":
-                intro = self._json_object(player["intro_json"], {})
-                flags = list(intro.get("flags", []))
+                intro = player_object(player, "intro_json")
+                flags = list(player_combat_values(player)["intro_flags"])
                 first_clear = ANCESTRAL_HALL_STORY_FLAG not in flags
                 if first_clear:
                     flags.append(ANCESTRAL_HALL_STORY_FLAG)

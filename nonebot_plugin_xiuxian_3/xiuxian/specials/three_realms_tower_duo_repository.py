@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_integer
+from ..utils.player import change_player_state, player_combat_values, player_integer
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -261,10 +261,10 @@ class ThreeRealmsTowerDuoRepositoryMixin:
         return json.loads(row[0]) if row and row[0] else {}
 
     def _tower_run_faction_for_player(self, connection, player_id: int) -> str:
-        row = connection.execute("SELECT intro_json FROM players WHERE id=?", (player_id,)).fetchone()
-        intro = self._json_object(row[0], {}) if row else {}
+        row = connection.execute("SELECT * FROM players WHERE id=?", (player_id,)).fetchone()
+        intro_flags = set(player_combat_values(row)["intro_flags"]) if row else set()
         for faction in ("xuantian", "demon", "beast"):
-            if f"alliance.{faction}" in intro.get("flags", []):
+            if f"alliance.{faction}" in intro_flags:
                 return faction
         return "xuantian"
 

@@ -23,7 +23,7 @@ from ..persistence.errors import (
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_TIME_FORT
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_combat_values, player_integer
+from ..utils.player import change_player_state, player_combat_values, player_integer, player_object
 from .secret_realm_rules import realm_at_least
 from .time_fort_models import TimeFortRunRecord
 from .time_fort_rules import (
@@ -160,11 +160,11 @@ class TimeFortRepositoryMixin:
             first_clear: dict[int, bool] = {}
             for row in members:
                 player_id = int(row["id"])
-                intro = self._json_object(row["intro_json"], {})
+                player_state = player_combat_values(row)
                 if (
                     str(row["location_key"]) != TIME_FORT_LOCATION
                     or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1)
-                    or TIME_FORT_PERMISSION not in {str(flag) for flag in intro.get("flags", [])}
+                    or TIME_FORT_PERMISSION not in set(player_state["intro_flags"])
                 ):
                     raise TimeFortRequirementError("a member lacks time-fort permission or archive location")
                 if self._has_active_long_action(connection, player_id):
@@ -175,7 +175,6 @@ class TimeFortRepositoryMixin:
                     raise TimeFortBusyError("a member already has an active time-fort run")
                 if int(connection.execute("SELECT COUNT(*) FROM time_fort_members WHERE player_id=? AND quota_key=? AND status<>'system_aborted'", (player_id, quota_key)).fetchone()[0]) >= TIME_FORT_WEEKLY_LIMIT:
                     raise TimeFortQuotaError("a member already used this UTC week")
-                player_state = player_combat_values(row)
                 equipment = self._battle_equipment_snapshot(connection, player_id)
                 qualification = player_state["qualification"]
                 constitution_effect = constitution_effect_snapshot(connection, player_id)
@@ -405,8 +404,8 @@ class TimeFortRepositoryMixin:
                     stable_id = str(member["stable_player_id"])
                     first = bool(member["first_clear"])
                     reward = dict(TIME_FORT_FIRST_REWARD if first else TIME_FORT_REPEAT_REWARD)
-                    intro = self._json_object(member["intro_json"], {})
-                    flags = list(intro.get("flags", []))
+                    intro = player_object(member, "intro_json")
+                    flags = list(player_combat_values(member)["intro_flags"])
                     if first:
                         first_clear_members.append(stable_id)
                         if TIME_FORT_STORY_FLAG not in flags:

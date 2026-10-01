@@ -179,6 +179,8 @@ PLAYER_COMBAT_PROJECTION_FIELDS = (
     "realm_layer",
     "qualification",
     "inventory",
+    "intro_flags",
+    "faction_reputation",
     "stamina",
     "stamina_max",
     "energy",

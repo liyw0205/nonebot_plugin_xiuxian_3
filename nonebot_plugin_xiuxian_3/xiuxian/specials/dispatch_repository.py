@@ -40,7 +40,7 @@ from .dispatch_rules import (
     reward_for,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, spend_player_state
+from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, player_intro_flags, spend_player_state
 
 
 class DispatchRepositoryMixin:
@@ -75,15 +75,12 @@ class DispatchRepositoryMixin:
         stage_order = {"new_user": 0, "mortal": 1, "seeker": 2, "cultivator": 3, "suspended": -1}
         if stage_order.get(str(player["stage"]), 0) < stage_order["mortal"]:
             missing.append("需要凡人角色")
+        intro_flags = set(player_intro_flags(player))
         if definition.key == HERB_SEARCH:
-            intro = self._json_object(player["intro_json"], {})
-            flags = {str(value) for value in intro.get("flags", [])}
-            if "guide.gather_blood_grass" not in flags:
+            if "guide.gather_blood_grass" not in intro_flags:
                 missing.append("需要完成教学采集")
         if definition.key == WORKSHOP_HELP:
-            intro = self._json_object(player["intro_json"], {})
-            flags = {str(value) for value in intro.get("flags", [])}
-            if "guide.choose_service" not in flags:
+            if "guide.choose_service" not in intro_flags:
                 missing.append("需要完成任一教学服务")
         if definition.key == DAO_SERVICE:
             reputation = connection.execute(

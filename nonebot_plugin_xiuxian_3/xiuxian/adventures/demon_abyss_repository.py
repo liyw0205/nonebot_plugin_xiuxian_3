@@ -21,7 +21,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_integer, player_intro_flags, player_object, player_reputation
+from ..utils.player import change_player_state, player_combat_values, player_integer, player_intro_flags, player_object, player_reputation
 from .demon_abyss_models import DemonAbyssRunRecord
 from .demon_abyss_rules import (
     DEMON_ABYSS_ENEMIES,
@@ -190,10 +190,10 @@ class DemonAbyssRepositoryMixin:
                 or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "foundation", 1)
             ):
                 raise DemonAbyssRequirementError("realm or location requirement is not met")
-            intro = self._json_object(player["intro_json"], {})
-            if DEMON_ABYSS_REQUIRED_FLAG not in set(intro.get("flags", [])):
+            combat = player_combat_values(player)
+            if DEMON_ABYSS_REQUIRED_FLAG not in set(combat["intro_flags"]):
                 raise DemonAbyssRequirementError("demon-abyss gate access is missing")
-            faction = self._json_object(player["faction_reputation_json"], {})
+            faction = combat["faction_reputation"]
             if int(faction.get("demon", 0)) < 200:
                 raise DemonAbyssRequirementError("demon reputation is too low")
             active_run = connection.execute(
