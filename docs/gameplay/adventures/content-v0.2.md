@@ -8,7 +8,7 @@
 | 悬赏 | `bounty.elite_hunt`：金丹 L1、洞天二层 | 雾隐精英胜 1；4h；二层凭证 1、云城名望 +12；失败不计进度 |
 | 秘境 | `instance.secret_realm.mist_depth_2`：金丹 L1、`item.cave_pass_advanced` | 5 节点、15 体力；首通 `item.weapon.cloud_sword` 或图鉴线索；每周 1 |
 | 秘境 | `instance.secret_realm.cloud_boat`：云舟票 | 3 节点、12 体力；首通航路图鉴/名望；每周 2 |
-| 主线 | `story.mainline.xuantian.chapter_2` | `cloud_city`、`cloud_mine`、`formation_hall` 三章；每章 3 关；首通给地图/服务/生产线索 |
+| 主线 | `story.mainline.xuantian.chapter_2` | `chapter.2.stage.2-3` 云城、`chapter.3.stage.1-3` 云铁、`chapter.4.stage.1-3` 阵堂；每段 3 关；首通给地图、服务和生产线索 |
 | 斗法留影 | `combat.replay.v0.2` | 保留 60 天/300 场；支持按战斗、塔、秘境筛选；分享仍 24h |
 
 金丹/高阶悬赏奖励不直接发元婴突破材料；秘境重复收益受周上限。主线分支选定后保存，不能通过重试切换另一分支；关闭后已开始实例按 v0.2 池结算。

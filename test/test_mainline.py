@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
@@ -19,7 +20,10 @@ def _context(operation_id: str) -> CommandContext:
 def test_mainline_first_clear_retry_and_operation_replay() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            runtime = create_runtime(
+                data_dir=data_dir,
+                clock=lambda: datetime(2026, 9, 22, tzinfo=timezone.utc),
+            )
             await runtime.dispatch(_context("create"), "开始修仙")
             await runtime.dispatch(_context("seek"), "寻仙问道")
 
@@ -67,7 +71,10 @@ def test_mainline_first_clear_retry_and_operation_replay() -> None:
 def test_mainline_stage_prerequisites_and_reward_assets() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            runtime = create_runtime(
+                data_dir=data_dir,
+                clock=lambda: datetime(2026, 9, 22, tzinfo=timezone.utc),
+            )
             await runtime.dispatch(_context("create"), "开始修仙")
             await runtime.dispatch(_context("seek"), "寻仙问道")
             await runtime.dispatch(_context("stage1-start"), "开始主线 初入玄天")
@@ -116,7 +123,10 @@ def test_mainline_stage_prerequisites_and_reward_assets() -> None:
 def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            runtime = create_runtime(
+                data_dir=data_dir,
+                clock=lambda: datetime(2026, 9, 22, tzinfo=timezone.utc),
+            )
             await runtime.dispatch(_context("create"), "开始修仙")
             await runtime.dispatch(_context("seek"), "寻仙问道")
             assert (await runtime.dispatch(_context("stage1-start"), "开始主线 1")).ok
@@ -179,7 +189,10 @@ def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None
 def test_mainline_town_commission_runs_through_qq_and_onebot_adapters() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            runtime = create_runtime(
+                data_dir=data_dir,
+                clock=lambda: datetime(2026, 9, 22, tzinfo=timezone.utc),
+            )
             for adapter, user in (("qq.official", "mainline-qq"), ("onebot.v11", "mainline-onebot")):
                 def context(operation_id: str) -> CommandContext:
                     return CommandContext(

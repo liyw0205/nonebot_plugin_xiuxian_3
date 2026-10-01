@@ -89,6 +89,8 @@ from ..adventures.mainline_models import (
     MainlineStatusRecord,
 )
 from ..adventures.mainline import (
+    MAINLINE_NUMERIC_REWARD_KEYS,
+    MAINLINE_REWARD_PREFIXES,
     MAINLINE_DEFINITIONS,
     MAINLINE_LOCKED,
     MAINLINE_REWARD_PENDING,
@@ -96,11 +98,13 @@ from ..adventures.mainline import (
     MAINLINE_STORY_KEY,
     MAINLINE_TOWN_COMMISSION_DELIVERED,
     mainline_definition,
+    mainline_definitions,
     mainline_first_clear_key,
     mainline_prerequisites_met,
     mainline_reward,
     mainline_stage_status,
     resolve_mainline,
+    MainlineStageDefinition,
 )
 from ..adventures.rules import (
     bounty_definition,
@@ -792,7 +796,7 @@ class AdventuresRepositoryMixin:
     ) -> MainlineStatusRecord:
         with self._connect() as connection:
             row = self._require_player(connection, platform, platform_user_id, writable=False)
-            return self._mainline_status_from_connection(connection, row)
+            return self._mainline_status_from_connection(connection, row, content=self.content)
 
     @staticmethod
     def _mainline_completed_events(
@@ -822,6 +826,7 @@ class AdventuresRepositoryMixin:
         connection: sqlite3.Connection,
         player: sqlite3.Row,
         *,
+        content=None,
         replay: bool = False,
     ) -> MainlineStatusRecord:
         runs = {
@@ -838,8 +843,13 @@ class AdventuresRepositoryMixin:
         }
         completed_events = AdventuresRepositoryMixin._mainline_completed_events(connection, player)
         views: list[MainlineStageView] = []
-        for definition in MAINLINE_STAGES:
-            run = runs.get(definition.key)
+        for current_definition in mainline_definitions(content):
+            run = runs.get(current_definition.key)
+            definition = (
+                AdventuresRepositoryMixin._mainline_definition_from_snapshot(run, current_definition)
+                if run is not None
+                else None
+            ) or current_definition
             prerequisites_met = mainline_prerequisites_met(
                 definition,
                 completed_stages=completed_stages,
@@ -847,6 +857,7 @@ class AdventuresRepositoryMixin:
                 flags=completed_events,
                 realm_key=str(player["realm_key"]),
                 realm_layer=player_integer(player, "realm_layer"),
+                content=content,
             )
             run_status = str(run["status"]) if run is not None else ""
             status = mainline_stage_status(
@@ -938,7 +949,7 @@ class AdventuresRepositoryMixin:
         stage_key: str,
         operation_id: str,
     ) -> MainlineStartRecord:
-        definition = mainline_definition(stage_key)
+        definition = mainline_definition(stage_key, content=self.content)
         operation_name = "mainline.start_stage"
         request_hash = self._request_hash(
             operation_name,
@@ -964,7 +975,7 @@ class AdventuresRepositoryMixin:
             if definition.runtime_status != "open":
                 raise MainlineContentClosedError("mainline stage is not open")
             row = self._require_player(connection, platform, platform_user_id)
-            status_record = self._mainline_status_from_connection(connection, row)
+            status_record = self._mainline_status_from_connection(connection, row, content=self.content)
             stage_view = next(item for item in status_record.stages if item.key == definition.key)
             completed_events = self._mainline_completed_events(connection, row)
             if not mainline_prerequisites_met(
@@ -976,6 +987,7 @@ class AdventuresRepositoryMixin:
                 flags=completed_events,
                 realm_key=str(row["realm_key"]),
                 realm_layer=player_integer(row, "realm_layer"),
+                content=self.content,
             ):
                 raise MainlineRequirementError("mainline prerequisites are not met")
             run = connection.execute(
@@ -995,6 +1007,17 @@ class AdventuresRepositoryMixin:
                 "realm_layer": int(row["realm_layer"]),
                 "location_key": str(row["location_key"]),
                 "intro_flags": list(SQLitePlayerRepository._json_object(row["intro_json"], {}).get("flags", [])),
+                "definition": {
+                    "key": definition.key,
+                    "story_key": definition.story_key,
+                    "chapter": definition.chapter,
+                    "stage": definition.stage,
+                    "label": definition.label,
+                    "description": definition.description,
+                    "first_clear_reward": definition.first_clear_reward_map(),
+                    "repeat_reward": definition.repeat_reward_map(),
+                    "reputation_key": definition.reputation_key,
+                },
             }
             if run is None:
                 connection.execute(
@@ -1108,7 +1131,7 @@ class AdventuresRepositoryMixin:
         stage_key: str,
         operation_id: str,
     ) -> MainlineClaimRecord:
-        definition = mainline_definition(stage_key)
+        definition = mainline_definition(stage_key, content=self.content)
         operation_name = "mainline.claim_first_clear"
         request_hash = self._request_hash(
             operation_name,
@@ -1131,8 +1154,6 @@ class AdventuresRepositoryMixin:
                 return self._mainline_claim_from_payload(
                     json.loads(existing["result_json"]), replay=True
                 )
-            if definition.runtime_status != "open":
-                raise MainlineContentClosedError("mainline stage is not open")
             row = self._require_player(connection, platform, platform_user_id)
             run = connection.execute(
                 "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ? AND stage_key = ?",
@@ -1140,8 +1161,15 @@ class AdventuresRepositoryMixin:
             ).fetchone()
             if run is None or str(run["status"]) != "running":
                 raise MainlineNotStartedError("mainline stage has not been started")
+            if definition.runtime_status != "open":
+                frozen = self._mainline_definition_from_snapshot(run, definition)
+                if frozen is None:
+                    raise MainlineContentClosedError("mainline stage is not open")
+                definition = frozen
+            else:
+                definition = self._mainline_definition_from_snapshot(run, definition) or definition
             first_clear = not bool(run["first_clear_claimed"])
-            reward = mainline_reward(definition, first_clear=first_clear)
+            reward = mainline_reward(definition, first_clear=first_clear, content=self.content)
             connection.execute(
                 "UPDATE mainline_runs SET status = ?, updated_at = ? WHERE id = ?",
                 (MAINLINE_REWARD_PENDING, now_text, run["id"]),
@@ -1204,6 +1232,71 @@ class AdventuresRepositoryMixin:
             return self._mainline_claim_from_payload(payload)
 
     @staticmethod
+    def _mainline_definition_from_snapshot(
+        run: sqlite3.Row,
+        current: MainlineStageDefinition,
+    ) -> MainlineStageDefinition | None:
+        try:
+            snapshot = json.loads(run["snapshot_json"] or "{}")
+            payload = snapshot.get("definition")
+            if not isinstance(payload, dict):
+                return None
+            first_clear = payload["first_clear_reward"]
+            repeat = payload["repeat_reward"]
+            def valid_reward(reward: object) -> bool:
+                if not isinstance(reward, dict) or not reward:
+                    return False
+                for reward_key, value in reward.items():
+                    if not isinstance(reward_key, str) or not reward_key:
+                        return False
+                    if reward_key == "title_key":
+                        if not isinstance(value, str) or not value.strip():
+                            return False
+                    elif reward_key in MAINLINE_NUMERIC_REWARD_KEYS or (
+                        reward_key.startswith(MAINLINE_REWARD_PREFIXES)
+                        and reward_key not in MAINLINE_REWARD_PREFIXES
+                    ):
+                        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                            return False
+                    else:
+                        return False
+                return True
+            if (
+                payload.get("key") != current.key
+                or payload.get("story_key") != current.story_key
+                or payload.get("chapter") != current.chapter
+                or payload.get("stage") != current.stage
+                or not isinstance(payload.get("label"), str)
+                or not isinstance(payload.get("description"), str)
+                or not valid_reward(first_clear)
+                or not valid_reward(repeat)
+                or (
+                    payload.get("reputation_key") is not None
+                    and not isinstance(payload.get("reputation_key"), str)
+                )
+            ):
+                return None
+            return MainlineStageDefinition(
+                key=current.key,
+                story_key=current.story_key,
+                chapter=current.chapter,
+                stage=current.stage,
+                label=payload["label"].strip(),
+                description=payload["description"].strip(),
+                prerequisites=current.prerequisites,
+                alternative_prerequisites=current.alternative_prerequisites,
+                required_realm=current.required_realm,
+                required_layer=current.required_layer,
+                first_clear_reward=tuple((str(key), value) for key, value in first_clear.items()),
+                repeat_reward=tuple((str(key), value) for key, value in repeat.items()),
+                runtime_status="open",
+                aliases=current.aliases,
+                reputation_key=payload.get("reputation_key"),
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    @staticmethod
     def _apply_mainline_reward(
         connection: sqlite3.Connection,
         player: sqlite3.Row,
@@ -1263,7 +1356,11 @@ class AdventuresRepositoryMixin:
                 (player["id"],),
             ).fetchone()
             local = SQLitePlayerRepository._json_object(reputation["local_json"], {}) if reputation else {}
-            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_delta
+            if local_delta:
+                if not definition.reputation_key:
+                    raise ValueError("mainline local reputation requires a configured reputation key")
+                reputation_key = definition.reputation_key
+                local[reputation_key] = int(local.get(reputation_key, 0)) + local_delta
             service = int(reputation["service_reputation"]) if reputation else 0
             service = min(100, service + service_delta)
             connection.execute(

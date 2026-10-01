@@ -686,14 +686,14 @@ class XiuxianApplication:
         return await self._invoke(
             context,
             lambda: self.mainline.start_stage(context),
-            write_message="当前事件不允许开始主线。",
+            write_message="此刻无缘踏入这段主线。",
         )
 
     async def claim_mainline_reward(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,
             lambda: self.mainline.claim_reward(context),
-            write_message="当前事件不允许领取主线奖励。",
+            write_message="此刻无缘收取这段主线所得。",
         )
 
     async def preview_secret_realms(self, context: CommandContext) -> CommandResult:

@@ -1,9 +1,12 @@
-"""玄天主线的纯规则。"""
+"""玄天主线规则与内容包解析。"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable, Mapping
+
+from ..content import ContentBundle, ContentError, bundled_content
+from ..routine.rules import honor_title
 
 
 MAINLINE_STORY_KEY = "story.mainline.xuantian"
@@ -24,6 +27,8 @@ MAINLINE_STATUSES = (
     MAINLINE_CLAIMED,
 )
 
+_DEFAULT_CONTENT = bundled_content()
+
 
 @dataclass(frozen=True, slots=True)
 class MainlineStageDefinition:
@@ -40,107 +45,19 @@ class MainlineStageDefinition:
     first_clear_reward: tuple[tuple[str, int | str], ...] = ()
     repeat_reward: tuple[tuple[str, int | str], ...] = ()
     runtime_status: str = "open"
+    aliases: tuple[str, ...] = ()
+    reputation_key: str | None = None
 
     def first_clear_reward_map(self) -> dict[str, int | str]:
-        return {str(key): value if isinstance(value, str) else int(value) for key, value in self.first_clear_reward}
+        return dict(self.first_clear_reward)
 
     def repeat_reward_map(self) -> dict[str, int | str]:
-        return {str(key): value if isinstance(value, str) else int(value) for key, value in self.repeat_reward}
+        return dict(self.repeat_reward)
 
 
-# Keep a short definition name available alongside the explicit stage name.
 MainlineDefinition = MainlineStageDefinition
 
 
-MAINLINE_STAGES: tuple[MainlineStageDefinition, ...] = (
-    MainlineStageDefinition(
-        key="chapter.1.stage.1",
-        story_key=MAINLINE_STORY_KEY,
-        chapter=1,
-        stage=1,
-        label="初入玄天",
-        description="完成寻仙问道，踏入玄天近郊。",
-        prerequisites=("player.start_seeking",),
-        first_clear_reward=(
-            ("access.xuantian.outskirts", 1),
-            ("codex.place.outskirts", 1),
-            ("local_reputation", 3),
-        ),
-        repeat_reward=(("spirit_stones", 5),),
-    ),
-    MainlineStageDefinition(
-        key="chapter.1.stage.2",
-        story_key=MAINLINE_STORY_KEY,
-        chapter=1,
-        stage=2,
-        label="灵泉取叶",
-        description="沿近郊线索前往灵泉谷，取得第一片灵叶。",
-        prerequisites=("chapter.1.stage.1",),
-        alternative_prerequisites=("guide.gather_blood_grass",),
-        required_realm="qi_sensing",
-        required_layer=1,
-        first_clear_reward=(
-            ("access.xuantian.spirit_field", 1),
-            ("item.herb.spirit_leaf", 2),
-        ),
-        repeat_reward=(("item.herb.spirit_leaf", 1),),
-    ),
-    MainlineStageDefinition(
-        key="chapter.1.stage.3",
-        story_key=MAINLINE_STORY_KEY,
-        chapter=1,
-        stage=3,
-        label="雾中守门",
-        description="在雾隐入口完成守门试炼，取得秘境线索。",
-        prerequisites=("chapter.1.stage.2",),
-        required_realm="qi_sensing",
-        required_layer=3,
-        first_clear_reward=(
-            ("access.instance.secret_realm", 1),
-            ("title_key", "title.mist_watcher"),
-        ),
-        repeat_reward=(("codex.observation", 1),),
-    ),
-    MainlineStageDefinition(
-        key="chapter.2.stage.1",
-        story_key=MAINLINE_STORY_KEY,
-        chapter=2,
-        stage=1,
-        label="城镇委托",
-        description="完成一项常驻经营委托，开启玄天商路。",
-        prerequisites=("chapter.1.stage.3", MAINLINE_TOWN_COMMISSION_DELIVERED),
-        first_clear_reward=(
-            ("access.xuantian.trade_route", 1),
-            ("service_reputation", 5),
-        ),
-        repeat_reward=(("spirit_stones", 10),),
-    ),
-)
-MAINLINE_STAGE_COUNT = len(MAINLINE_STAGES)
-
-MAINLINE_DEFINITIONS: Mapping[str, MainlineStageDefinition] = {
-    definition.key: definition for definition in MAINLINE_STAGES
-}
-DEFINITIONS = MAINLINE_DEFINITIONS
-
-MAINLINE_ALIASES: Mapping[str, str] = {
-    "初入玄天": "chapter.1.stage.1",
-    "灵泉取叶": "chapter.1.stage.2",
-    "雾中守门": "chapter.1.stage.3",
-    "城镇委托": "chapter.2.stage.1",
-}
-
-_REALM_RANK = {
-    "mortal": 0,
-    "qi_sensing": 1,
-    "qi_gathering": 2,
-    "foundation": 3,
-    "golden_core": 4,
-    "nascent_soul": 5,
-    "soul_transformation": 6,
-}
-
-# 主线奖励只能影响当前章节允许的展示和资产，不得改写境界或终局状态。
 MAINLINE_FORBIDDEN_REWARD_KEYS = frozenset(
     {
         "path_key",
@@ -161,16 +78,168 @@ MAINLINE_FORBIDDEN_REWARD_KEYS = frozenset(
         "tribulation_debt",
     }
 )
+MAINLINE_REWARD_PREFIXES = ("item.", "access.", "codex.")
+MAINLINE_NUMERIC_REWARD_KEYS = frozenset(
+    {"spirit_stones", "local_reputation", "service_reputation"}
+)
 
 
-def _stage_key(value: str | int, chapter: int = 1) -> str:
+def _content(content: ContentBundle | None) -> ContentBundle:
+    return content if content is not None else _DEFAULT_CONTENT
+
+
+def _string_tuple(value: object, field: str, key: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
+        raise ContentError(f"mainline {key} {field} must be a string list")
+    return tuple(str(item).strip() for item in value)
+
+
+def _reward_map(bundle: ContentBundle, value: object, field: str, key: str) -> tuple[tuple[str, int | str], ...]:
+    if not isinstance(value, dict) or not value:
+        raise ContentError(f"mainline {key} {field} must be a non-empty object")
+    result: list[tuple[str, int | str]] = []
+    for reward_key, reward_value in value.items():
+        if not isinstance(reward_key, str) or not reward_key:
+            raise ContentError(f"mainline {key} {field} contains an invalid reward key")
+        if isinstance(reward_value, bool) or not isinstance(reward_value, (int, str)):
+            raise ContentError(f"mainline {key} {field}.{reward_key} has an invalid value")
+        if reward_key == "title_key":
+            if not isinstance(reward_value, str) or not reward_value.strip():
+                raise ContentError(f"mainline {key} {field}.{reward_key} must be a non-empty string")
+        elif reward_key in MAINLINE_NUMERIC_REWARD_KEYS or (
+            reward_key.startswith(MAINLINE_REWARD_PREFIXES)
+            and reward_key not in MAINLINE_REWARD_PREFIXES
+        ):
+            if not isinstance(reward_value, int) or reward_value <= 0:
+                raise ContentError(f"mainline {key} {field}.{reward_key} must be a positive integer")
+        else:
+            raise ContentError(f"mainline {key} contains unsupported reward {reward_key}")
+        if reward_key in MAINLINE_FORBIDDEN_REWARD_KEYS:
+            raise ContentError(f"mainline {key} contains forbidden reward {reward_key}")
+        if reward_key.startswith("item."):
+            try:
+                bundle.require("item", reward_key, include_locked=False)
+            except KeyError as exc:
+                raise ContentError(f"mainline {key} references unknown item {reward_key}") from exc
+        if reward_key == "title_key":
+            if not isinstance(reward_value, str):
+                raise ContentError(f"mainline {key} title_key must be a string")
+            try:
+                honor_title(reward_value)
+            except ValueError as exc:
+                raise ContentError(f"mainline {key} references unknown title {reward_value}") from exc
+        if reward_key.startswith("codex.") and bundle.get("codex_entry", reward_key, include_locked=False) is None:
+            if reward_key != "codex.observation":
+                raise ContentError(f"mainline {key} references unknown codex entry {reward_key}")
+        result.append((reward_key, reward_value))
+    return tuple(result)
+
+
+def mainline_definitions(content: ContentBundle | None = None) -> tuple[MainlineStageDefinition, ...]:
+    """Parse and validate all mainline stages from the current content bundle."""
+
+    bundle = _content(content)
+    rows = bundle.list("mainline", include_locked=True)
+    definitions: list[MainlineStageDefinition] = []
+    for row in rows:
+        key = row.get("key")
+        if not isinstance(key, str) or not key:
+            raise ContentError("mainline record requires key")
+        story_key = row.get("story_key")
+        if story_key != MAINLINE_STORY_KEY:
+            raise ContentError(f"mainline {key} must belong to {MAINLINE_STORY_KEY}")
+        chapter = row.get("chapter")
+        stage = row.get("stage")
+        if isinstance(chapter, bool) or not isinstance(chapter, int) or chapter < 1:
+            raise ContentError(f"mainline {key} chapter must be a positive integer")
+        if isinstance(stage, bool) or not isinstance(stage, int) or stage < 1:
+            raise ContentError(f"mainline {key} stage must be a positive integer")
+        name = row.get("name")
+        description = row.get("desc")
+        if not isinstance(name, str) or not name.strip() or not isinstance(description, str) or not description.strip():
+            raise ContentError(f"mainline {key} requires name and desc")
+        prerequisites = _string_tuple(row.get("prerequisites", []), "prerequisites", key)
+        alternatives = _string_tuple(row.get("alternative_prerequisites", []), "alternative_prerequisites", key)
+        required_realm = row.get("required_realm")
+        if required_realm is not None:
+            if not isinstance(required_realm, str) or not required_realm:
+                raise ContentError(f"mainline {key} required_realm must be a string")
+            try:
+                bundle.require("realm", required_realm, include_locked=False)
+            except KeyError as exc:
+                raise ContentError(f"mainline {key} references unknown realm {required_realm}") from exc
+        required_layer = row.get("required_layer", 0)
+        if isinstance(required_layer, bool) or not isinstance(required_layer, int) or required_layer < 0:
+            raise ContentError(f"mainline {key} required_layer must be a non-negative integer")
+        aliases = _string_tuple(row.get("aliases", []), "aliases", key)
+        runtime_status = row.get("status", "locked")
+        if runtime_status not in {"open", "active", "locked"}:
+            raise ContentError(f"mainline {key} has unsupported status {runtime_status}")
+        reputation_key = row.get("reputation_key")
+        if reputation_key is not None and (not isinstance(reputation_key, str) or not reputation_key.strip()):
+            raise ContentError(f"mainline {key} reputation_key must be a non-empty string")
+        first_clear_reward = _reward_map(bundle, row.get("first_clear_reward"), "first_clear_reward", key)
+        repeat_reward = _reward_map(bundle, row.get("repeat_reward"), "repeat_reward", key)
+        if ("local_reputation" in dict(first_clear_reward) or "local_reputation" in dict(repeat_reward)) and reputation_key is None:
+            raise ContentError(f"mainline {key} requires reputation_key for local_reputation")
+        definitions.append(
+            MainlineStageDefinition(
+                key=key,
+                story_key=story_key,
+                chapter=chapter,
+                stage=stage,
+                label=name.strip(),
+                description=description.strip(),
+                prerequisites=prerequisites,
+                alternative_prerequisites=alternatives,
+                required_realm=required_realm,
+                required_layer=required_layer,
+                first_clear_reward=first_clear_reward,
+                repeat_reward=repeat_reward,
+                runtime_status="open" if runtime_status == "active" else str(runtime_status),
+                aliases=aliases,
+                reputation_key=reputation_key,
+            )
+        )
+    definitions.sort(key=lambda item: (item.chapter, item.stage, item.key))
+    if not definitions:
+        raise ContentError("mainline content must contain at least one stage")
+    keys = {item.key for item in definitions}
+    aliases: set[str] = set()
+    for definition in definitions:
+        for prerequisite in definition.prerequisites:
+            if prerequisite.startswith("chapter.") and prerequisite not in keys:
+                raise ContentError(f"mainline {definition.key} references unknown prerequisite {prerequisite}")
+        for alias in definition.aliases:
+            if alias in keys:
+                raise ContentError(f"mainline alias conflicts with stage key {alias}")
+            if alias in aliases:
+                raise ContentError(f"duplicate mainline alias {alias}")
+            aliases.add(alias)
+    return tuple(definitions)
+
+
+MAINLINE_STAGES = mainline_definitions()
+MAINLINE_STAGE_COUNT = len(MAINLINE_STAGES)
+MAINLINE_DEFINITIONS: Mapping[str, MainlineStageDefinition] = {
+    definition.key: definition for definition in MAINLINE_STAGES
+}
+DEFINITIONS = MAINLINE_DEFINITIONS
+MAINLINE_ALIASES: Mapping[str, str] = {
+    alias: definition.key for definition in MAINLINE_STAGES for alias in definition.aliases
+}
+
+
+def _stage_key(value: str | int, chapter: int = 1, *, content: ContentBundle | None = None) -> str:
     if isinstance(value, bool):
         raise ValueError("mainline stage must be an integer or stable key")
+    definitions = mainline_definitions(content)
+    aliases = {alias: definition.key for definition in definitions for alias in definition.aliases}
     if isinstance(value, int):
         return f"chapter.{int(chapter)}.stage.{value}"
     candidate = str(value).strip()
-    if candidate in MAINLINE_ALIASES:
-        return MAINLINE_ALIASES[candidate]
+    if candidate in aliases:
+        return aliases[candidate]
     if candidate.isdigit():
         return f"chapter.{int(chapter)}.stage.{int(candidate)}"
     if candidate.startswith(f"{MAINLINE_STORY_KEY}:"):
@@ -182,56 +251,63 @@ def _stage_key(value: str | int, chapter: int = 1) -> str:
 
 
 def mainline_stage_key(chapter: int, stage: int) -> str:
-    """Return the stable chapter/stage key used by snapshots and operations."""
-
-    if isinstance(chapter, bool) or isinstance(stage, bool):
+    if isinstance(chapter, bool) or isinstance(stage, bool) or int(chapter) < 1 or int(stage) < 1:
         raise ValueError("chapter and stage must be positive integers")
-    if int(chapter) < 1 or int(stage) < 1:
-        raise ValueError("chapter and stage must be positive")
     return f"chapter.{int(chapter)}.stage.{int(stage)}"
 
 
 def mainline_first_clear_key(chapter: int, stage: int, player_id: str) -> str:
-    """Return the per-player idempotency key for a first-clear reward."""
-
-    if isinstance(chapter, bool) or isinstance(stage, bool):
-        raise ValueError("chapter and stage must be positive integers")
-    if not str(player_id):
-        raise ValueError("player_id is required")
+    if isinstance(chapter, bool) or isinstance(stage, bool) or not str(player_id):
+        raise ValueError("chapter, stage and player_id are required")
     return f"{MAINLINE_STORY_KEY}:{int(chapter)}:{int(stage)}:{player_id}"
 
 
-def resolve_mainline(value: str | int, *, chapter: int = 1) -> str | None:
-    key = _stage_key(value, chapter)
-    return key if key in MAINLINE_DEFINITIONS else None
+def resolve_mainline(value: str | int, *, chapter: int = 1, content: ContentBundle | None = None) -> str | None:
+    key = _stage_key(value, chapter, content=content)
+    return key if key in {item.key for item in mainline_definitions(content)} else None
 
 
-def mainline_definition(value: str | int, *, chapter: int = 1) -> MainlineStageDefinition:
-    key = _stage_key(value, chapter)
+def mainline_definition(
+    value: str | int,
+    *,
+    chapter: int = 1,
+    content: ContentBundle | None = None,
+) -> MainlineStageDefinition:
+    key = _stage_key(value, chapter, content=content)
+    definitions = {item.key: item for item in mainline_definitions(content)}
     try:
-        return MAINLINE_DEFINITIONS[key]
+        return definitions[key]
     except KeyError as exc:
         raise ValueError(f"unsupported mainline stage: {value}") from exc
 
 
-def mainline_stage(stage: int, *, chapter: int = 1) -> MainlineStageDefinition:
-    return mainline_definition(stage, chapter=chapter)
+def mainline_stage(stage: int, *, chapter: int = 1, content: ContentBundle | None = None) -> MainlineStageDefinition:
+    return mainline_definition(stage, chapter=chapter, content=content)
 
 
-def _contains_stage(values: Iterable[str], key: str) -> bool:
-    target = _stage_key(key)
-    return any(_stage_key(str(value)) == target for value in values)
+def _contains_stage(values: Iterable[str], key: str, content: ContentBundle | None = None) -> bool:
+    target = _stage_key(key, content=content)
+    return target in {_stage_key(str(value), content=content) for value in values}
 
 
-def realm_rank(realm_key: str) -> int:
-    return _REALM_RANK.get(str(realm_key), -1)
+def realm_rank(realm_key: str, content: ContentBundle | None = None) -> int:
+    row = _content(content).get("realm", str(realm_key))
+    if row is None or not isinstance(row.get("rank"), int) or isinstance(row.get("rank"), bool):
+        return -1
+    return int(row["rank"])
 
 
-def meets_realm(realm_key: str | None, layer: int, required_realm: str | None, required_layer: int) -> bool:
+def meets_realm(
+    realm_key: str | None,
+    layer: int,
+    required_realm: str | None,
+    required_layer: int,
+    content: ContentBundle | None = None,
+) -> bool:
     if required_realm is None:
         return True
-    return (realm_rank(str(realm_key)), int(layer)) >= (
-        realm_rank(required_realm),
+    return (realm_rank(str(realm_key), content), int(layer)) >= (
+        realm_rank(required_realm, content),
         int(required_layer),
     )
 
@@ -245,44 +321,41 @@ def mainline_prerequisites_met(
     flags: Iterable[str] = (),
     realm_key: str | None = None,
     realm_layer: int = 0,
+    content: ContentBundle | None = None,
 ) -> bool:
-    """在不访问持久化的情况下判断主线前置快照。"""
-
     if state is not None:
         completed_stages = state.get("completed_stages", completed_stages)  # type: ignore[assignment]
         completed_events = state.get("completed_events", completed_events)  # type: ignore[assignment]
         flags = state.get("flags", flags)  # type: ignore[assignment]
         realm_key = state.get("realm_key", realm_key)  # type: ignore[assignment]
         realm_layer = state.get("realm_layer", realm_layer)  # type: ignore[assignment]
-    definition = value if isinstance(value, MainlineStageDefinition) else mainline_definition(value)
+    definition = value if isinstance(value, MainlineStageDefinition) else mainline_definition(value, content=content)
     stages = tuple(str(item) for item in completed_stages)
     events = {str(item) for item in completed_events}
     events.update(str(item) for item in flags)
-
     for prerequisite in definition.prerequisites:
         if prerequisite.startswith("chapter."):
-            if not _contains_stage(stages, prerequisite):
+            if not _contains_stage(stages, prerequisite, content):
                 return False
         elif prerequisite not in events:
             return False
-
-    # Stage 2 accepts either the qi-sensing threshold or the completed mortal
-    # gathering lesson.  Stage 3 has only the qi-sensing threshold.
     if definition.alternative_prerequisites:
         has_alternative_event = any(item in events for item in definition.alternative_prerequisites)
         has_realm = meets_realm(
             realm_key,
-            realm_layer,
+            int(realm_layer),
             definition.required_realm,
             definition.required_layer,
+            content,
         )
         if not (has_alternative_event or has_realm):
             return False
     elif not meets_realm(
         realm_key,
-        realm_layer,
+        int(realm_layer),
         definition.required_realm,
         definition.required_layer,
+        content,
     ):
         return False
     return definition.runtime_status == "open"
@@ -296,10 +369,9 @@ def mainline_stage_status(
     cleared: bool = False,
     reward_pending: bool = False,
     claimed: bool = False,
+    content: ContentBundle | None = None,
 ) -> str:
-    """Project a run snapshot into the documented mainline state machine."""
-
-    definition = value if isinstance(value, MainlineStageDefinition) else mainline_definition(value)
+    definition = value if isinstance(value, MainlineStageDefinition) else mainline_definition(value, content=content)
     if definition.runtime_status != "open":
         return MAINLINE_LOCKED
     if claimed:
@@ -314,36 +386,36 @@ def mainline_stage_status(
 
 
 def _checked_reward(reward: Mapping[str, int | str]) -> dict[str, int | str]:
-    result = {
-        str(key): value if isinstance(value, str) else int(value)
-        for key, value in reward.items()
-    }
+    result = {str(key): value if isinstance(value, str) else int(value) for key, value in reward.items()}
     forbidden = MAINLINE_FORBIDDEN_REWARD_KEYS.intersection(result)
     if forbidden:
         raise ValueError(f"mainline reward contains forbidden keys: {sorted(forbidden)}")
     return result
 
 
-def mainline_reward(value: str | int | MainlineStageDefinition, *, first_clear: bool = True) -> dict[str, int | str]:
-    definition = value if isinstance(value, MainlineStageDefinition) else mainline_definition(value)
+def mainline_reward(
+    value: str | int | MainlineStageDefinition,
+    *,
+    first_clear: bool = True,
+    content: ContentBundle | None = None,
+) -> dict[str, int | str]:
+    definition = value if isinstance(value, MainlineStageDefinition) else mainline_definition(value, content=content)
     reward = definition.first_clear_reward_map() if first_clear else definition.repeat_reward_map()
     return _checked_reward(reward)
 
 
-def mainline_first_clear_reward(value: str | int | MainlineStageDefinition) -> dict[str, int | str]:
-    return mainline_reward(value, first_clear=True)
+def mainline_first_clear_reward(value: str | int | MainlineStageDefinition, *, content: ContentBundle | None = None) -> dict[str, int | str]:
+    return mainline_reward(value, first_clear=True, content=content)
 
 
-def mainline_repeat_reward(value: str | int | MainlineStageDefinition) -> dict[str, int | str]:
-    return mainline_reward(value, first_clear=False)
+def mainline_repeat_reward(value: str | int | MainlineStageDefinition, *, content: ContentBundle | None = None) -> dict[str, int | str]:
+    return mainline_reward(value, first_clear=False, content=content)
 
 
 def reward_map(definition: MainlineStageDefinition) -> dict[str, int | str]:
     return mainline_first_clear_reward(definition)
 
 
-# Naming aliases keep the rules module convenient for callers that use the
-# existing ``*_definition`` naming convention in other adventure modules.
 mainline_stage_definition = mainline_definition
 mainline_status = mainline_stage_status
 mainline_prerequisite_met = mainline_prerequisites_met
@@ -357,21 +429,24 @@ __all__ = [
     "MAINLINE_CLEARED",
     "MAINLINE_DEFINITIONS",
     "MAINLINE_FORBIDDEN_REWARD_KEYS",
+    "MAINLINE_NUMERIC_REWARD_KEYS",
+    "MAINLINE_REWARD_PREFIXES",
     "MAINLINE_LOCKED",
     "MAINLINE_REWARD_PENDING",
     "MAINLINE_RUNNING",
-    "MAINLINE_STATUSES",
-    "MAINLINE_STAGES",
     "MAINLINE_STAGE_COUNT",
+    "MAINLINE_STAGES",
+    "MAINLINE_STATUSES",
     "MAINLINE_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",
     "mainline_definition",
+    "mainline_definitions",
     "mainline_first_clear_key",
     "mainline_first_clear_reward",
-    "mainline_prerequisites_met",
     "mainline_prerequisite_met",
+    "mainline_prerequisites_met",
     "mainline_repeat_reward",
     "mainline_reward",
     "mainline_stage",

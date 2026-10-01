@@ -1,0 +1,225 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "mainline",
+  "records": [
+    {
+      "key": "chapter.1.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 1,
+      "stage": 1,
+      "name": "初入玄天",
+      "desc": "完成寻仙问道，踏入玄天近郊。",
+      "status": "open",
+      "aliases": ["初入玄天"],
+      "reputation_key": "local.xuantian.new_town",
+      "prerequisites": ["player.start_seeking"],
+      "first_clear_reward": {
+        "access.xuantian.outskirts": 1,
+        "codex.place.outskirts": 1,
+        "local_reputation": 3
+      },
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "chapter.1.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 1,
+      "stage": 2,
+      "name": "灵泉取叶",
+      "desc": "沿近郊线索前往灵泉谷，取得第一片灵叶。",
+      "status": "open",
+      "aliases": ["灵泉取叶"],
+      "prerequisites": ["chapter.1.stage.1"],
+      "alternative_prerequisites": ["guide.gather_blood_grass"],
+      "required_realm": "qi_sensing",
+      "required_layer": 1,
+      "first_clear_reward": {
+        "access.xuantian.spirit_field": 1,
+        "item.herb.spirit_leaf": 2
+      },
+      "repeat_reward": {"item.herb.spirit_leaf": 1}
+    },
+    {
+      "key": "chapter.1.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 1,
+      "stage": 3,
+      "name": "雾中守门",
+      "desc": "在雾隐入口完成守门试炼，取得秘境线索。",
+      "status": "open",
+      "aliases": ["雾中守门"],
+      "prerequisites": ["chapter.1.stage.2"],
+      "required_realm": "qi_sensing",
+      "required_layer": 3,
+      "first_clear_reward": {
+        "access.instance.secret_realm": 1,
+        "title_key": "title.mist_watcher"
+      },
+      "repeat_reward": {"codex.observation": 1}
+    },
+    {
+      "key": "chapter.2.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 2,
+      "stage": 1,
+      "name": "城镇委托",
+      "desc": "完成一项常驻经营委托，开启玄天商路。",
+      "status": "open",
+      "aliases": ["城镇委托"],
+      "reputation_key": "local.xuantian.new_town",
+      "prerequisites": ["chapter.1.stage.3", "livelihood.town_commission.delivered"],
+      "first_clear_reward": {
+        "access.xuantian.trade_route": 1,
+        "service_reputation": 5
+      },
+      "repeat_reward": {"spirit_stones": 10}
+    },
+    {
+      "key": "chapter.2.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 2,
+      "stage": 2,
+      "name": "云城初见",
+      "desc": "循着商路抵达云城，辨认玄天中层的灵脉与市集。",
+      "status": "open",
+      "aliases": ["云城初见"],
+      "reputation_key": "local.xuantian.cloud_city",
+      "prerequisites": ["chapter.2.stage.1"],
+      "required_realm": "foundation",
+      "required_layer": 1,
+      "first_clear_reward": {
+        "access.xuantian.cloud_city": 1,
+        "codex.place.cloud_city": 1,
+        "local_reputation": 5
+      },
+      "repeat_reward": {"spirit_stones": 15}
+    },
+    {
+      "key": "chapter.2.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 2,
+      "stage": 3,
+      "name": "商会听潮",
+      "desc": "在云城商会核对货单，听见云舟将启的消息。",
+      "status": "open",
+      "aliases": ["商会听潮"],
+      "prerequisites": ["chapter.2.stage.2"],
+      "required_realm": "foundation",
+      "required_layer": 3,
+      "first_clear_reward": {
+        "access.xuantian.floating_boat": 1,
+        "service_reputation": 8
+      },
+      "repeat_reward": {"spirit_stones": 18}
+    },
+    {
+      "key": "chapter.3.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 3,
+      "stage": 1,
+      "name": "云铁入山",
+      "desc": "沿云城北侧山道进入矿区，寻得云铁灵脉的入口。",
+      "status": "open",
+      "aliases": ["云铁入山"],
+      "reputation_key": "local.xuantian.cloud_city",
+      "prerequisites": ["chapter.2.stage.3"],
+      "required_realm": "foundation",
+      "required_layer": 4,
+      "first_clear_reward": {
+        "access.xuantian.cloud_mine": 1,
+        "local_reputation": 5
+      },
+      "repeat_reward": {"item.material.cloud_iron": 1}
+    },
+    {
+      "key": "chapter.3.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 3,
+      "stage": 2,
+      "name": "矿兽试锋",
+      "desc": "守住云铁矿脉，取得一块完整云铁作为凭证。",
+      "status": "open",
+      "aliases": ["矿兽试锋"],
+      "prerequisites": ["chapter.3.stage.1"],
+      "required_realm": "foundation",
+      "required_layer": 6,
+      "first_clear_reward": {
+        "item.material.cloud_iron": 3,
+        "codex.material.cloud_iron": 1
+      },
+      "repeat_reward": {"item.material.cloud_iron": 1}
+    },
+    {
+      "key": "chapter.3.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 3,
+      "stage": 3,
+      "name": "云舟试航",
+      "desc": "以云铁为引登上云舟，确认通往洞天深处的航路。",
+      "status": "open",
+      "aliases": ["云舟试航"],
+      "prerequisites": ["chapter.3.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {
+        "access.xuantian.floating_boat": 1,
+        "service_reputation": 8
+      },
+      "repeat_reward": {"spirit_stones": 25}
+    },
+    {
+      "key": "chapter.4.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 4,
+      "stage": 1,
+      "name": "阵堂初会",
+      "desc": "在阵堂前递上云铁凭证，获准旁观护城阵纹。",
+      "status": "open",
+      "aliases": ["阵堂初会"],
+      "prerequisites": ["chapter.3.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {
+        "access.xuantian.array_hall": 1,
+        "service_reputation": 5
+      },
+      "repeat_reward": {"spirit_stones": 25}
+    },
+    {
+      "key": "chapter.4.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 4,
+      "stage": 2,
+      "name": "阵纹试炼",
+      "desc": "补全一段护城阵纹，留下属于自己的阵砂印记。",
+      "status": "open",
+      "aliases": ["阵纹试炼"],
+      "prerequisites": ["chapter.4.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 3,
+      "first_clear_reward": {
+        "item.mat.array_sand": 2,
+        "service_reputation": 5
+      },
+      "repeat_reward": {"item.mat.array_sand": 1}
+    },
+    {
+      "key": "chapter.4.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 4,
+      "stage": 3,
+      "name": "玄天新章",
+      "desc": "把云城、矿区与阵堂的线索合入商路，开启玄天中层的新篇。",
+      "status": "open",
+      "aliases": ["玄天新章"],
+      "prerequisites": ["chapter.4.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 6,
+      "first_clear_reward": {
+        "access.xuantian.trade_route": 1,
+        "service_reputation": 10
+      },
+      "repeat_reward": {"spirit_stones": 30}
+    }
+  ]
+}
