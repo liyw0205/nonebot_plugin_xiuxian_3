@@ -32,7 +32,7 @@ from ..persistence.errors import (
 )
 from .purchase_order_models import PurchaseOrderRecord
 from .bindings import active_binding_totals
-from ..utils.assets import change_player_assets, grant_player_assets, inventory_amount, spend_player_assets, player_currency
+from ..utils.assets import apply_player_asset_transition, inventory_amount, player_currency
 from ..utils.player import player_inventory, player_qualification
 from .purchase_order_rules import (
     PURCHASE_ORDER_TTL_SECONDS,
@@ -220,7 +220,9 @@ class PurchaseOrderRepositoryMixin:
                 "INSERT INTO purchase_order_funds(order_id, buyer_player_id, amount, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
                 (order_id, buyer["id"], escrow, now_text, now_text),
             )
-            spend_player_assets(connection, buyer, {"spirit_stones": escrow}, now_text)
+            buyer_transition = apply_player_asset_transition(
+                connection, buyer, {"spirit_stones": escrow}, now_text, mode="spend"
+            )
             self._purchase_ledger(
                 connection,
                 operation_id,
@@ -230,8 +232,8 @@ class PurchaseOrderRepositoryMixin:
                 "purchase.escrow_lock",
                 "lock",
                 escrow,
-                player_currency(buyer),
-                player_currency(buyer) - escrow,
+                buyer_transition.before.currency,
+                buyer_transition.after.currency,
                 order_id,
                 now_text,
             )
@@ -395,25 +397,24 @@ class PurchaseOrderRepositoryMixin:
                 capacity = int(buyer["carry_capacity"] or 0)
                 if capacity > 0 and sum(int(value) for value in buyer_inventory.values()) + quantity > capacity:
                     raise PurchaseBuyerCapacityInsufficientError("buyer inventory capacity is insufficient")
-                seller_item_before = inventory_amount(seller_inventory, str(order["item_key"]))
-                buyer_item_before = inventory_amount(buyer_inventory, str(order["item_key"]))
-                seller_currency_before = player_currency(seller)
-                change_player_assets(
+                seller_transition = apply_player_asset_transition(
                     connection,
                     seller,
                     {str(order["item_key"]): -quantity, "spirit_stones": int(order["total_price"])},
                     now_text,
                 )
-                grant_player_assets(connection, buyer, {str(order["item_key"]): quantity}, now_text)
+                buyer_transition = apply_player_asset_transition(
+                    connection, buyer, {str(order["item_key"]): quantity}, now_text, mode="grant"
+                )
                 connection.execute("DELETE FROM purchase_item_locks WHERE order_id=?", (order_id,))
                 connection.execute("DELETE FROM purchase_order_funds WHERE order_id=?", (order_id,))
                 connection.execute(
                     "UPDATE purchase_orders SET status='settled', delivery_deadline=NULL, result_json=?, updated_at=? WHERE order_id=?",
                     (json.dumps({"notice": "settled", "platform_fee": int(order["purchase_fee"])}, ensure_ascii=False, sort_keys=True), now_text, order_id),
                 )
-                self._purchase_ledger(connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone", "purchase.sale", "credit", int(order["total_price"]), seller_currency_before, seller_currency_before + int(order["total_price"]), order_id, now_text)
-                self._purchase_ledger(connection, operation_id, int(seller["id"]), "item", str(order["item_key"]), "purchase.sale", "debit", quantity, seller_item_before, seller_item_before - quantity, order_id, now_text)
-                self._purchase_ledger(connection, operation_id, int(buyer["id"]), "item", str(order["item_key"]), "purchase.delivery", "credit", quantity, buyer_item_before, buyer_item_before + quantity, order_id, now_text)
+                self._purchase_ledger(connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone", "purchase.sale", "credit", int(order["total_price"]), seller_transition.before.currency, seller_transition.after.currency, order_id, now_text)
+                self._purchase_ledger(connection, operation_id, int(seller["id"]), "item", str(order["item_key"]), "purchase.sale", "debit", quantity, inventory_amount(seller_transition.before.inventory, order["item_key"]), inventory_amount(seller_transition.after.inventory, order["item_key"]), order_id, now_text)
+                self._purchase_ledger(connection, operation_id, int(buyer["id"]), "item", str(order["item_key"]), "purchase.delivery", "credit", quantity, inventory_amount(buyer_transition.before.inventory, order["item_key"]), inventory_amount(buyer_transition.after.inventory, order["item_key"]), order_id, now_text)
                 payload = self._purchase_payload(connection, order_id)
                 self._record_purchase_operation(connection, operation_id, operation_name, int(seller_actor["id"]), request_hash, payload, now_text)
         return self._purchase_record_from_payload(payload)
@@ -514,9 +515,11 @@ class PurchaseOrderRepositoryMixin:
         if buyer is None:
             raise PlayerNotFoundError("purchase buyer does not exist")
         amount = int(funds["amount"])
-        grant_player_assets(connection, buyer, {"spirit_stones": amount}, now_text)
+        transition = apply_player_asset_transition(
+            connection, buyer, {"spirit_stones": amount}, now_text, mode="grant"
+        )
         connection.execute("DELETE FROM purchase_order_funds WHERE order_id=?", (order["order_id"],))
-        self._purchase_ledger(connection, operation_id, int(buyer["id"]), "currency", "currency.spirit_stone", "purchase.escrow_release", "release", amount, player_currency(buyer), player_currency(buyer) + amount, str(order["order_id"]), now_text)
+        self._purchase_ledger(connection, operation_id, int(buyer["id"]), "currency", "currency.spirit_stone", "purchase.escrow_release", "release", amount, transition.before.currency, transition.after.currency, str(order["order_id"]), now_text)
 
     def _release_item_lock(self, connection: Any, order: Any, item_lock: Any, operation_id: str, now_text: str) -> None:
         connection.execute("DELETE FROM purchase_item_locks WHERE order_id=?", (order["order_id"],))

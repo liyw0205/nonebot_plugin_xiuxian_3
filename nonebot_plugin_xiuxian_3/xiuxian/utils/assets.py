@@ -40,6 +40,15 @@ class AssetState:
     inventory: dict[str, int]
 
 
+@dataclass(frozen=True, slots=True)
+class AssetTransition:
+    """The validated before/after states for one asset mutation."""
+
+    before: AssetState
+    after: AssetState
+    mode: str
+
+
 CURRENCY_ASSET_KEYS = frozenset({"spirit_stones", "currency.spirit_stone"})
 
 
@@ -340,28 +349,76 @@ def apply_player_assets(
     place prevents callers from drifting in their inventory/currency handling.
     """
 
-    current = player_asset_state(row, preserve_zero=preserve_zero)
+    return apply_player_asset_transition(
+        connection,
+        row,
+        values,
+        updated_at,
+        mode=mode,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+    ).after
+
+
+def asset_transition(
+    currency: Any,
+    inventory: Mapping[str, Any],
+    values: Mapping[str, Any],
+    *,
+    mode: str = "delta",
+    preserve_zero: bool = False,
+) -> AssetTransition:
+    """Validate one asset operation and expose both sides of the change."""
+
+    before = AssetState(
+        currency=currency_with_delta(currency, 0),
+        inventory=inventory_value(inventory, keep_zero=preserve_zero),
+    )
     if mode == "grant":
-        next_assets = assets_grant(current.currency, current.inventory, values)
+        after = assets_grant(before.currency, before.inventory, values)
     elif mode == "spend":
-        next_assets = assets_spend(
-            current.currency,
-            current.inventory,
+        after = assets_spend(
+            before.currency,
+            before.inventory,
             values,
             preserve_zero=preserve_zero,
         )
     elif mode == "delta":
-        next_assets = assets_with_delta(current.currency, current.inventory, values)
+        after = assets_with_delta(before.currency, before.inventory, values)
     else:
         raise ValueError(f"unsupported asset operation: {mode!r}")
-    return write_player_assets(
+    return AssetTransition(before=before, after=after, mode=mode)
+
+
+def apply_player_asset_transition(
+    connection: Any,
+    row: Any,
+    values: Mapping[str, Any],
+    updated_at: str,
+    *,
+    mode: str = "delta",
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+) -> AssetTransition:
+    """Persist one asset operation and return its validated before/after states."""
+
+    current = player_asset_state(row, preserve_zero=preserve_zero)
+    transition = asset_transition(
+        current.currency,
+        current.inventory,
+        values,
+        mode=mode,
+        preserve_zero=preserve_zero,
+    )
+    write_player_assets(
         connection,
         player_database_id(row),
-        next_assets,
+        transition.after,
         updated_at,
         preserve_zero=preserve_zero,
         player_values=player_values,
     )
+    return transition
 
 
 def _asset_delta_parts(
@@ -668,9 +725,12 @@ def currency_spend(balance: Any, amount: Any) -> int:
 
 __all__ = [
     "AssetState",
+    "AssetTransition",
     "AssetDeltaError",
     "CURRENCY_ASSET_KEYS",
     "apply_player_assets",
+    "apply_player_asset_transition",
+    "asset_transition",
     "asset_state_amount",
     "assets_grant",
     "assets_spend",

@@ -334,7 +334,7 @@ class PlayerApplication:
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(values['intro_flags']))}/3"
             ),
             request_id=context.request_id,
-            data=player_profile_values(player),
+            data=values,
         )
 
     async def rename_player(self, context: CommandContext) -> CommandResult:

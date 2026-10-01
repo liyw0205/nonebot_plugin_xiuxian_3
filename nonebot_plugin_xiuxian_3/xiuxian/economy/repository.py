@@ -27,6 +27,7 @@ from ..persistence.errors import (
     PlayerSuspendedError,
 )
 from ..utils.assets import (
+    apply_player_asset_transition,
     change_player_assets,
     grant_player_assets,
     inventory_amount,
@@ -353,10 +354,13 @@ class EconomyRepositoryMixin:
                 """,
                 (order_id, player["id"], item.key, quantity, now_text, now_text),
             )
-            spend_player_assets(connection, player, {"spirit_stones": fee}, now_text)
+            fee_transition = apply_player_asset_transition(
+                connection, player, {"spirit_stones": fee}, now_text, mode="spend"
+            )
             self._market_ledger(
                 connection, operation_id, int(player["id"]), "currency", "currency.spirit_stone",
-                "market.listing_fee", "debit", fee, player_currency(player), player_currency(player) - fee,
+                "market.listing_fee", "debit", fee, fee_transition.before.currency,
+                fee_transition.after.currency,
                 order_id, now_text,
             )
             self._market_ledger(
@@ -432,19 +436,15 @@ class EconomyRepositoryMixin:
             fee = trade_fee(total)
             if player_currency(buyer) < total:
                 raise BalanceInsufficientError("buyer balance is insufficient")
-            seller_before = player_currency(seller)
-            buyer_before = player_currency(buyer)
-            buyer_after = player_currency(buyer) - total
-            seller_after = player_currency(seller) + total - fee
             new_remaining = remaining - quantity
             new_status = "settled" if new_remaining == 0 else "listed"
-            change_player_assets(
+            buyer_transition = apply_player_asset_transition(
                 connection,
                 buyer,
                 {str(order["item_key"]): quantity, "spirit_stones": -total},
                 now_text,
             )
-            change_player_assets(
+            seller_transition = apply_player_asset_transition(
                 connection,
                 seller,
                 {str(order["item_key"]): -quantity, "spirit_stones": total - fee},
@@ -463,25 +463,30 @@ class EconomyRepositoryMixin:
             )
             self._market_ledger(
                 connection, operation_id, int(buyer["id"]), "currency", "currency.spirit_stone",
-                "market.purchase", "debit", total, buyer_before, buyer_before - total, order_id, now_text,
+                "market.purchase", "debit", total, buyer_transition.before.currency,
+                buyer_transition.after.currency, order_id, now_text,
             )
             self._market_ledger(
                 connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone",
-                "market.sale", "credit", total, seller_before, seller_before + total, order_id, now_text,
+                "market.sale", "credit", total, seller_transition.before.currency,
+                seller_transition.before.currency + total, order_id, now_text,
             )
             self._market_ledger(
                 connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone",
-                "market.trade_fee", "debit", fee, seller_before + total, seller_before + total - fee, order_id, now_text,
+                "market.trade_fee", "debit", fee, seller_transition.before.currency + total,
+                seller_transition.after.currency, order_id, now_text,
             )
             self._market_ledger(
                 connection, operation_id, int(seller["id"]), "item", str(order["item_key"]),
-                "market.sale", "debit", quantity, inventory_amount(seller_inventory, order["item_key"]) + quantity,
-                inventory_amount(seller_inventory, order["item_key"]), order_id, now_text,
+                "market.sale", "debit", quantity,
+                inventory_amount(seller_transition.before.inventory, order["item_key"]),
+                inventory_amount(seller_transition.after.inventory, order["item_key"]), order_id, now_text,
             )
             self._market_ledger(
                 connection, operation_id, int(buyer["id"]), "item", str(order["item_key"]),
-                "market.purchase", "credit", quantity, inventory_amount(buyer_inventory, order["item_key"]),
-                inventory_amount(buyer_inventory, order["item_key"]) + quantity, order_id, now_text,
+                "market.purchase", "credit", quantity,
+                inventory_amount(buyer_transition.before.inventory, order["item_key"]),
+                inventory_amount(buyer_transition.after.inventory, order["item_key"]), order_id, now_text,
             )
             if not new_remaining:
                 self._market_ledger(
@@ -778,7 +783,6 @@ class EconomyRepositoryMixin:
                 }
                 if missing:
                     raise CommissionRequirementError("publisher materials are insufficient")
-                inventory = inventory_spend(inventory, publisher_inputs)
             commission_id = f"commission-{uuid4().hex}"
             snapshot = {
                 "recipe_key": recipe.key,
@@ -816,11 +820,12 @@ class EconomyRepositoryMixin:
                     self._commission_insert_lock(
                         connection, commission_id, int(publisher["id"]), "item", key, quantity, now_text
                     )
-            spend_player_assets(
+            publisher_transition = apply_player_asset_transition(
                 connection,
                 publisher,
                 {"spirit_stones": reward, **publisher_inputs},
                 now_text,
+                mode="spend",
             )
             self._commission_ledger(
                 connection,
@@ -831,8 +836,8 @@ class EconomyRepositoryMixin:
                 "commission.escrow",
                 "debit",
                 reward,
-                player_currency(publisher),
-                player_currency(publisher) - reward,
+                publisher_transition.before.currency,
+                publisher_transition.after.currency,
                 commission_id,
                 now_text,
             )
@@ -846,8 +851,8 @@ class EconomyRepositoryMixin:
                     "commission.material_lock",
                     "lock",
                     quantity,
-                    inventory_amount(inventory, key) + quantity,
-                    inventory_amount(inventory, key),
+                    inventory_amount(publisher_transition.before.inventory, key),
+                    inventory_amount(publisher_transition.after.inventory, key),
                     commission_id,
                     now_text,
                 )
@@ -1203,13 +1208,15 @@ class EconomyRepositoryMixin:
             producer = connection.execute("SELECT * FROM players WHERE id = ?", (order["producer_player_id"],)).fetchone()
             if producer is None:
                 raise CommissionNotFoundError("producer does not exist")
-            publisher_inventory = player_inventory(publisher)
             reward = int(order["reward_stones"])
             payment = reward - commission_platform_fee(reward)
             fee = reward - payment
-            producer_before = player_currency(producer)
-            grant_player_assets(connection, publisher, outputs, now_text)
-            grant_player_assets(connection, producer, {"spirit_stones": payment}, now_text)
+            publisher_transition = apply_player_asset_transition(
+                connection, publisher, outputs, now_text, mode="grant"
+            )
+            producer_transition = apply_player_asset_transition(
+                connection, producer, {"spirit_stones": payment}, now_text, mode="grant"
+            )
             for key, quantity in outputs.items():
                 self._commission_ledger(
                     connection,
@@ -1220,8 +1227,8 @@ class EconomyRepositoryMixin:
                     "commission.settlement",
                     "credit",
                     int(quantity),
-                    inventory_amount(publisher_inventory, key),
-                    inventory_amount(publisher_inventory, key) + int(quantity),
+                    inventory_amount(publisher_transition.before.inventory, key),
+                    inventory_amount(publisher_transition.after.inventory, key),
                     commission_id,
                     now_text,
                 )
@@ -1234,8 +1241,8 @@ class EconomyRepositoryMixin:
                 "commission.settlement",
                 "credit",
                 payment,
-                producer_before,
-                producer_before + payment,
+                producer_transition.before.currency,
+                producer_transition.after.currency,
                 commission_id,
                 now_text,
             )
@@ -1451,14 +1458,15 @@ class EconomyRepositoryMixin:
         player = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
         if player is None:
             return
+        transition = apply_player_asset_transition(connection, player, refunds, now_text, mode="grant")
         for key, quantity in refunds.items():
-            before = inventory_amount(player_inventory(player), key)
+            before = inventory_amount(transition.before.inventory, key)
+            after = inventory_amount(transition.after.inventory, key)
             self._commission_ledger(
                 connection, operation_id, player_id, "item", key,
-                "commission.failure_material_refund", "credit", int(quantity), before, before + int(quantity),
+                "commission.failure_material_refund", "credit", int(quantity), before, after,
                 commission_id, now_text,
             )
-        grant_player_assets(connection, player, refunds, now_text)
         self._commission_delete_locks(connection, commission_id)
 
     def _commission_refund_escrow(
@@ -1476,11 +1484,13 @@ class EconomyRepositoryMixin:
         publisher = connection.execute("SELECT * FROM players WHERE id = ?", (order["publisher_player_id"],)).fetchone()
         if publisher is None:
             return
-        before = player_currency(publisher)
-        grant_player_assets(connection, publisher, {"spirit_stones": amount}, now_text)
+        transition = apply_player_asset_transition(
+            connection, publisher, {"spirit_stones": amount}, now_text, mode="grant"
+        )
         self._commission_ledger(
             connection, operation_id, int(publisher["id"]), "currency", "currency.spirit_stone",
-            reason, "credit", amount, before, before + amount, str(order["commission_id"]), now_text,
+            reason, "credit", amount, transition.before.currency, transition.after.currency,
+            str(order["commission_id"]), now_text,
         )
 
     def _commission_expire_row(self, connection: Any, order: Any, operation_id: str, now_text: str) -> None:

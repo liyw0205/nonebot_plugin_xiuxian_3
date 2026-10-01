@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, inventory_amount, inventory_with_delta, player_currency
+from ..utils.assets import apply_player_asset_transition, inventory_amount, player_currency
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     CrossRealmTradeCurrencyInsufficientError,
@@ -100,12 +100,6 @@ class CrossRealmTradeRepositoryMixin:
             if player_currency(player) < definition.currency_cost:
                 raise CrossRealmTradeCurrencyInsufficientError("trade currency is insufficient")
 
-            input_before = {key: inventory_amount(inventory, key) for key in definition.input_items}
-            inventory_after_inputs = inventory_with_delta(
-                inventory,
-                {key: -int(quantity) for key, quantity in definition.input_items.items()},
-            )
-            output_before = {key: inventory_amount(inventory_after_inputs, key) for key in definition.output_items}
             binding_expires_at = serialize_datetime(now + timedelta(seconds=definition.binding_seconds))
             trade_id = f"trade-{uuid4().hex}"
             snapshot = {
@@ -122,7 +116,7 @@ class CrossRealmTradeRepositoryMixin:
                 "required_reputation": definition.required_reputation,
                 "required_reputations": required_reputations,
             }
-            change_player_assets(
+            transition = apply_player_asset_transition(
                 connection,
                 player,
                 {
@@ -176,8 +170,8 @@ class CrossRealmTradeRepositoryMixin:
                     "cross_realm_trade.input",
                     "debit",
                     quantity,
-                    input_before[item_key],
-                    input_before[item_key] - quantity,
+                    inventory_amount(transition.before.inventory, item_key),
+                    inventory_amount(transition.after.inventory, item_key),
                     trade_id,
                     now_text,
                 )
@@ -190,8 +184,8 @@ class CrossRealmTradeRepositoryMixin:
                 "cross_realm_trade.input",
                 "debit",
                 definition.currency_cost,
-                player_currency(player),
-                player_currency(player) - definition.currency_cost,
+                transition.before.currency,
+                transition.after.currency,
                 trade_id,
                 now_text,
             )
@@ -205,8 +199,8 @@ class CrossRealmTradeRepositoryMixin:
                     "cross_realm_trade.output",
                     "credit",
                     quantity,
-                    output_before[item_key],
-                    output_before[item_key] + quantity,
+                    inventory_amount(transition.before.inventory, item_key),
+                    inventory_amount(transition.after.inventory, item_key),
                     trade_id,
                     now_text,
                 )

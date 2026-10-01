@@ -9,7 +9,9 @@ import pytest
 from nonebot_plugin_xiuxian_3.xiuxian.utils.database import connect_sqlite
 from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     AssetState,
+    AssetTransition,
     AssetDeltaError,
+    apply_player_asset_transition,
     grant_player_currency,
     apply_player_assets,
     change_player_currency,
@@ -17,6 +19,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     assets_grant,
     assets_spend,
     assets_with_delta,
+    asset_transition,
     currency_grant,
     currency_spend,
     currency_with_delta,
@@ -67,6 +70,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_profile_values,
     player_status_values,
     player_projection,
+    player_view_values,
 )
 
 
@@ -232,6 +236,21 @@ def test_asset_state_applies_currency_and_items_together() -> None:
         assets_grant(0, {}, {"spirit_stones": -1})
 
 
+def test_asset_transition_exposes_one_validated_before_after_pair() -> None:
+    transition = asset_transition(
+        "100",
+        {"item.herb": "2"},
+        {"spirit_stones": -25, "item.herb": -1, "item.sand": 3},
+    )
+    assert transition == AssetTransition(
+        before=AssetState(100, {"item.herb": 2}),
+        after=AssetState(75, {"item.herb": 1, "item.sand": 3}),
+        mode="delta",
+    )
+    with pytest.raises(AssetDeltaError):
+        asset_transition(0, {}, {"spirit_stones": -1}, mode="delta")
+
+
 def test_player_asset_mutations_share_transactional_persistence() -> None:
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
@@ -283,6 +302,30 @@ def test_player_asset_operation_dispatch_keeps_one_transaction_kernel() -> None:
     assert apply_player_assets(connection, row, {"spirit_stones": -3}, "after-delta", mode="delta").currency == 12
     with pytest.raises(ValueError, match="unsupported asset operation"):
         apply_player_assets(connection, row, {}, "after-invalid", mode="unknown")
+    connection.close()
+
+
+def test_player_asset_transition_persists_and_returns_the_same_states() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, updated_at) VALUES (1, 40, ?, 'before')",
+        ('{"item.herb": 2}',),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    transition = apply_player_asset_transition(
+        connection,
+        row,
+        {"spirit_stones": 10, "item.herb": -1, "item.sand": 2},
+        "after",
+    )
+    assert transition.before == AssetState(40, {"item.herb": 2})
+    assert transition.after == AssetState(50, {"item.herb": 1, "item.sand": 2})
+    stored = connection.execute("SELECT spirit_stones, inventory_json, updated_at FROM players WHERE id = 1").fetchone()
+    assert tuple(stored) == (50, '{"item.herb": 1, "item.sand": 2}', "after")
     connection.close()
 
 
@@ -458,11 +501,18 @@ def test_player_profile_and_status_projections_are_detached_and_consistent() -> 
     }
     profile = player_profile_values(row)
     status = player_status_values(row)
+    profile_view = player_view_values(row, "profile")
+    status_view = player_view_values(row, "status")
     assert profile["realm_key"] == status["realm_key"] == "foundation"
     assert profile["inventory"] == status["inventory"] == {"item.herb": 2}
+    assert profile_view == profile
+    assert status_view == status
     profile["inventory"]["item.herb"] = 99
     assert status["inventory"] == {"item.herb": 2}
     assert player_projection(row, ("spirit_stones", "energy")) == {"spirit_stones": 12, "energy": 4}
+    assert player_view_values(row, "combat")["inventory"] == {"item.herb": 2}
+    with pytest.raises(ValueError, match="unsupported player view"):
+        player_view_values(row, "unknown")  # type: ignore[arg-type]
 
 
 def test_player_numeric_projection_and_delta_share_resource_validation() -> None:

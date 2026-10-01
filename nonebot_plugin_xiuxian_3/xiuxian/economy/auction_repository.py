@@ -20,7 +20,7 @@ from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
 )
-from ..utils.assets import grant_player_assets, inventory_amount, inventory_grant, inventory_spend, spend_player_assets, player_currency
+from ..utils.assets import apply_player_asset_transition, inventory_amount, player_currency
 from ..utils.player import player_inventory
 from .auction_models import AuctionRecord
 from .bindings import active_binding_totals
@@ -187,15 +187,15 @@ class AuctionRepositoryMixin:
                 connection.execute("UPDATE auction_bids SET status='outbid' WHERE id=?", (previous["id"],))
                 previous_player = connection.execute("SELECT * FROM players WHERE id=?", (previous["bidder_player_id"],)).fetchone()
                 if previous_player is not None:
-                    grant_player_assets(
+                    refund_transition = apply_player_asset_transition(
                         connection,
                         previous_player,
                         {"spirit_stones": previous["bid_amount"]},
                         now_text,
                     )
-                    self._auction_ledger(connection, operation_id, int(previous_player["id"]), "currency", "currency.spirit_stone", "auction.outbid_refund", "credit", int(previous["bid_amount"]), player_currency(previous_player), player_currency(previous_player) + int(previous["bid_amount"]), auction_id, now_text)
+                    self._auction_ledger(connection, operation_id, int(previous_player["id"]), "currency", "currency.spirit_stone", "auction.outbid_refund", "credit", int(previous["bid_amount"]), refund_transition.before.currency, refund_transition.after.currency, auction_id, now_text)
             bidder_before = player_currency(bidder) + (refund if previous is not None and int(previous["bidder_player_id"]) == int(bidder["id"]) else 0)
-            spend_player_assets(
+            bidder_transition = apply_player_asset_transition(
                 connection,
                 {
                     "id": bidder["id"],
@@ -204,6 +204,7 @@ class AuctionRepositoryMixin:
                 },
                 {"spirit_stones": bid_amount},
                 now_text,
+                mode="spend",
             )
             bid_id = f"auction-bid-{uuid4().hex}"
             connection.execute(
@@ -211,7 +212,7 @@ class AuctionRepositoryMixin:
                 (bid_id, auction_id, bidder["id"], int(bid_amount), operation_id, now_text, now_text),
             )
             connection.execute("UPDATE auction_lots SET current_bid=?, current_bidder_player_id=?, updated_at=? WHERE auction_id=?", (int(bid_amount), bidder["id"], now_text, auction_id))
-            self._auction_ledger(connection, operation_id, int(bidder["id"]), "currency", "currency.spirit_stone", "auction.bid_lock", "lock", int(bid_amount), bidder_before, bidder_before - int(bid_amount), auction_id, now_text)
+            self._auction_ledger(connection, operation_id, int(bidder["id"]), "currency", "currency.spirit_stone", "auction.bid_lock", "lock", int(bid_amount), bidder_transition.before.currency, bidder_transition.after.currency, auction_id, now_text)
             payload = self._auction_payload(connection, auction_id)
             self._record_auction_operation(connection, operation_id, operation_name, int(bidder["id"]), request_hash, payload, now_text)
             return self._auction_from_payload(payload)
@@ -256,26 +257,16 @@ class AuctionRepositoryMixin:
                 if seller is None or winner is None or lock is None:
                     raise AuctionItemLockedError("auction settlement lock is missing")
                 seller_inventory = player_inventory(seller)
-                winner_inventory = player_inventory(winner)
                 quantity = int(lock["quantity"])
                 if inventory_amount(seller_inventory, lock["item_key"]) < quantity:
                     raise AuctionItemLockedError("seller inventory no longer contains auction item")
-                seller_inventory = inventory_spend(seller_inventory, {str(lock["item_key"]): quantity})
-                winner_inventory = inventory_grant(winner_inventory, {str(lock["item_key"]): quantity})
-                spend_player_assets(
+                seller_transition = apply_player_asset_transition(
                     connection,
                     seller,
-                    {str(lock["item_key"]): quantity},
+                    {str(lock["item_key"]): -quantity, "spirit_stones": active["bid_amount"]},
                     now_text,
                 )
-                seller_after = connection.execute("SELECT * FROM players WHERE id=?", (seller["id"],)).fetchone()
-                grant_player_assets(
-                    connection,
-                    seller_after,
-                    {"spirit_stones": active["bid_amount"]},
-                    now_text,
-                )
-                grant_player_assets(
+                winner_transition = apply_player_asset_transition(
                     connection,
                     winner,
                     {str(lock["item_key"]): quantity},
@@ -284,9 +275,9 @@ class AuctionRepositoryMixin:
                 connection.execute("UPDATE auction_bids SET status='won', updated_at=? WHERE id=?", (now_text, active["id"]))
                 connection.execute("DELETE FROM auction_item_locks WHERE auction_id=?", (auction_id,))
                 connection.execute("UPDATE auction_lots SET status='settled', updated_at=? WHERE auction_id=?", (now_text, auction_id))
-                self._auction_ledger(connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone", "auction.sale", "credit", int(active["bid_amount"]), player_currency(seller), player_currency(seller) + int(active["bid_amount"]), auction_id, now_text)
-                self._auction_ledger(connection, operation_id, int(seller["id"]), "item", str(lock["item_key"]), "auction.sale", "debit", quantity, inventory_amount(seller_inventory, lock["item_key"]) + quantity, inventory_amount(seller_inventory, lock["item_key"]), auction_id, now_text)
-                self._auction_ledger(connection, operation_id, int(winner["id"]), "item", str(lock["item_key"]), "auction.purchase", "credit", quantity, inventory_amount(winner_inventory, lock["item_key"]) - quantity, inventory_amount(winner_inventory, lock["item_key"]), auction_id, now_text)
+                self._auction_ledger(connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone", "auction.sale", "credit", int(active["bid_amount"]), seller_transition.before.currency, seller_transition.after.currency, auction_id, now_text)
+                self._auction_ledger(connection, operation_id, int(seller["id"]), "item", str(lock["item_key"]), "auction.sale", "debit", quantity, inventory_amount(seller_transition.before.inventory, lock["item_key"]), inventory_amount(seller_transition.after.inventory, lock["item_key"]), auction_id, now_text)
+                self._auction_ledger(connection, operation_id, int(winner["id"]), "item", str(lock["item_key"]), "auction.purchase", "credit", quantity, inventory_amount(winner_transition.before.inventory, lock["item_key"]), inventory_amount(winner_transition.after.inventory, lock["item_key"]), auction_id, now_text)
             payload = self._auction_payload(connection, auction_id)
             self._record_auction_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
             return self._auction_from_payload(payload)
@@ -301,14 +292,14 @@ class AuctionRepositoryMixin:
         player = connection.execute("SELECT * FROM players WHERE id=?", (bid["bidder_player_id"],)).fetchone()
         if player is None:
             raise PlayerNotFoundError("bidder does not exist")
-        grant_player_assets(
+        transition = apply_player_asset_transition(
             connection,
             player,
             {"spirit_stones": bid["bid_amount"]},
             now_text,
         )
         connection.execute("UPDATE auction_bids SET status='refunded', updated_at=? WHERE id=?", (now_text, bid["id"]))
-        self._auction_ledger(connection, operation_id, int(player["id"]), "currency", "currency.spirit_stone", "auction.refund", "credit", int(bid["bid_amount"]), player_currency(player), player_currency(player) + int(bid["bid_amount"]), str(bid["auction_id"]), now_text)
+        self._auction_ledger(connection, operation_id, int(player["id"]), "currency", "currency.spirit_stone", "auction.refund", "credit", int(bid["bid_amount"]), transition.before.currency, transition.after.currency, str(bid["auction_id"]), now_text)
 
     def _release_auction_item(self, connection: Any, lot: Any, operation_id: str, now_text: str) -> None:
         lock = connection.execute("SELECT * FROM auction_item_locks WHERE auction_id=?", (lot["auction_id"],)).fetchone()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from .assets import inventory_value, player_database_id
 from .json import json_object
@@ -156,6 +156,13 @@ PLAYER_COMBAT_PROJECTION_FIELDS = (
     "domain_charge_max",
     "domain_power",
 )
+
+PlayerViewKind = Literal["profile", "status", "combat"]
+PLAYER_VIEW_FIELDS: dict[PlayerViewKind, tuple[str, ...]] = {
+    "profile": PLAYER_PROFILE_FIELDS,
+    "status": PLAYER_STATUS_FIELDS,
+    "combat": PLAYER_COMBAT_PROJECTION_FIELDS,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,21 +363,35 @@ def player_projection(
     return projection
 
 
+def player_view_values(
+    row: Mapping[str, Any] | Any,
+    view: PlayerViewKind,
+) -> dict[str, Any]:
+    """Read one detached player view from the canonical normalized projection."""
+
+    try:
+        fields = PLAYER_VIEW_FIELDS[view]
+    except KeyError as exc:
+        raise ValueError(f"unsupported player view: {view!r}") from exc
+    projection = player_projection(row, fields)
+    if view == "profile":
+        for field in ("soul_fatigue_until", "domain_crack_until", "void_instability_until"):
+            value = projection[field]
+            if value is not None and hasattr(value, "isoformat"):
+                projection[field] = value.isoformat()
+    return projection
+
+
 def player_status_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     """Return the shared read-only status projection used by status commands."""
 
-    return player_projection(row, PLAYER_STATUS_FIELDS)
+    return player_view_values(row, "status")
 
 
 def player_profile_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     """Return the shared public profile projection used by profile commands."""
 
-    projection = player_projection(row, PLAYER_PROFILE_FIELDS)
-    for field in ("soul_fatigue_until", "domain_crack_until", "void_instability_until"):
-        value = projection[field]
-        if value is not None and hasattr(value, "isoformat"):
-            projection[field] = value.isoformat()
-    return projection
+    return player_view_values(row, "profile")
 
 
 def player_realm_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
@@ -534,7 +555,7 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     companion and equipment modifiers are added by their own snapshot readers.
     """
 
-    return player_projection(row, PLAYER_COMBAT_PROJECTION_FIELDS)
+    return player_view_values(row, "combat")
 
 
 __all__ = [
@@ -544,6 +565,8 @@ __all__ = [
     "PLAYER_PROFILE_FIELDS",
     "PLAYER_RESOURCE_FIELDS",
     "PLAYER_STATUS_FIELDS",
+    "PLAYER_VIEW_FIELDS",
+    "PlayerViewKind",
     "player_field",
     "player_database_id",
     "player_integer",
@@ -554,6 +577,7 @@ __all__ = [
     "change_player_state",
     "player_numeric_values",
     "player_projection",
+    "player_view_values",
     "player_profile_values",
     "player_status_values",
     "player_object",
