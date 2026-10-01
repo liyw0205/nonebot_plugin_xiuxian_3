@@ -1,4 +1,4 @@
-"""玄天主线的玩家用例。"""
+"""内容驱动主线的玩家用例。"""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from ..repository import (
     RepositoryBusyError,
     SQLitePlayerRepository,
 )
-from .mainline import resolve_mainline
+from .mainline import MAINLINE_STORY_KEY, resolve_mainline
 from ..routine.rules import honor_title
 from ..specials.codex_rules import label_for_entry
 
@@ -40,6 +40,9 @@ REWARD_LABELS = {
     "access.xuantian.floating_boat": "云舟通行资格",
     "access.xuantian.array_hall": "阵堂通行资格",
     "access.instance.secret_realm": "秘境试炼资格",
+    "access.project.domain_refuge": "领域避难所权限",
+    "access.project.abyss_purification": "魔渊净化权限",
+    "access.project.ancestral_habitat": "祖灵栖地权限",
     "codex.observation": "图鉴观察记录",
     "title_key": "称号",
 }
@@ -48,8 +51,20 @@ REWARD_LABELS = {
 class AdventuresMainlineApplication:
     """Coordinate mainline status, start and reward commands."""
 
-    def __init__(self, repository: SQLitePlayerRepository):
+    def __init__(
+        self,
+        repository: SQLitePlayerRepository,
+        *,
+        story_key: str = MAINLINE_STORY_KEY,
+        title: str = "主线道途",
+        start_command: str = "开始主线",
+        claim_command: str = "领取主线奖励",
+    ):
         self.repository = repository
+        self.story_key = story_key
+        self.title = title
+        self.start_command = start_command
+        self.claim_command = claim_command
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -101,15 +116,16 @@ class AdventuresMainlineApplication:
     def _stage_key(self, args: tuple[str, ...]) -> str | None:
         if len(args) != 1:
             return None
-        return resolve_mainline(args[0], content=self.repository.content)
+        return resolve_mainline(args[0], story_key=self.story_key, content=self.repository.content)
 
     async def get_status(self, context: CommandContext) -> CommandResult:
         if context.command_args:
-            return CommandResult(False, "INVALID_MAINLINE_COMMAND", "查看主线道途无需附加参数。", context.request_id)
+            return CommandResult(False, "INVALID_MAINLINE_COMMAND", f"查看{self.title}无需附加参数。", context.request_id)
         try:
             record = await self.repository.get_mainline_status(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
+                story_key=self.story_key,
             )
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
@@ -120,7 +136,7 @@ class AdventuresMainlineApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         lines = [
-            "## 主线道途",
+            f"## {self.title}",
             "",
             f"**{self._display_name(record.player)}** · 第 {record.chapter} 章 · {STATUS_LABELS.get(record.status, record.status)}",
             "",
@@ -142,7 +158,7 @@ class AdventuresMainlineApplication:
         lines.extend(
             [
                 "",
-                "> 可发送 `开始主线 序号` 开始当前关卡，完成后发送 `领取主线奖励 序号`。",
+                f"> 可发送 `{self.start_command} 序号` 开始当前关卡，完成后发送 `{self.claim_command} 序号`。",
                 "> 前置未成时只会静候于主线，不会耗损灵力与灵石。",
             ]
         )
@@ -157,7 +173,7 @@ class AdventuresMainlineApplication:
     async def start_stage(self, context: CommandContext) -> CommandResult:
         stage_key = self._stage_key(context.command_args)
         if stage_key is None:
-            return CommandResult(False, "INVALID_MAINLINE_COMMAND", "请使用 `开始主线 序号`，或直接输入关卡名称。", context.request_id)
+            return CommandResult(False, "INVALID_MAINLINE_COMMAND", f"请使用 `{self.start_command} 序号`，或直接输入关卡名称。", context.request_id)
         operation_id = self._operation_id(context, "mainline.start_stage")
         try:
             record = await self.repository.start_mainline(
@@ -165,6 +181,7 @@ class AdventuresMainlineApplication:
                 platform_user_id=context.user_id,
                 stage_key=stage_key,
                 operation_id=operation_id,
+                story_key=self.story_key,
             )
         except MainlineContentClosedError:
             return CommandResult(False, "CONTENT_CLOSED", "这段天路尚未显现，暂不可踏入。", context.request_id, operation_id)
@@ -186,12 +203,12 @@ class AdventuresMainlineApplication:
             True,
             "MAINLINE_STARTED",
             (
-                f"## 主线已开始 · {record.label}\n\n"
+                f"## {self.title}已开始 · {record.label}\n\n"
                 f"**{self._display_name(record.player)}**，你已开始第 **{record.stage}** 关。\n\n"
                 f"- **章节**：第 {record.chapter} 章\n"
                 f"- **状态**：进行中\n"
                 f"- **剧情**：{record.description}\n\n"
-                "> 此关试炼已由仙缘簿记下，发送 `领取主线奖励 {record.stage}` 收取所得。"
+                f"> 此关试炼已由仙缘簿记下，发送 `{self.claim_command} {record.stage_key}` 收取所得。"
             ),
             context.request_id,
             operation_id,
@@ -201,7 +218,7 @@ class AdventuresMainlineApplication:
     async def claim_reward(self, context: CommandContext) -> CommandResult:
         stage_key = self._stage_key(context.command_args)
         if stage_key is None:
-            return CommandResult(False, "INVALID_MAINLINE_COMMAND", "请使用 `领取主线奖励 序号`，或直接输入关卡名称。", context.request_id)
+            return CommandResult(False, "INVALID_MAINLINE_COMMAND", f"请使用 `{self.claim_command} 序号`，或直接输入关卡名称。", context.request_id)
         operation_id = self._operation_id(context, "mainline.claim_first_clear")
         try:
             record = await self.repository.claim_mainline(
@@ -209,6 +226,7 @@ class AdventuresMainlineApplication:
                 platform_user_id=context.user_id,
                 stage_key=stage_key,
                 operation_id=operation_id,
+                story_key=self.story_key,
             )
         except MainlineContentClosedError:
             return CommandResult(False, "CONTENT_CLOSED", "这段天路尚未显现，暂不结算所得。", context.request_id, operation_id)
@@ -229,10 +247,10 @@ class AdventuresMainlineApplication:
             True,
             "MAINLINE_REWARD_CLAIMED",
             (
-                f"## 主线结算完成 · {record.label}\n\n"
+                f"## {self.title}结算完成 · {record.label}\n\n"
                 f"**{self._display_name(record.player)}**完成了第 **{record.stage}** 关，获得 **{reward_kind}**。\n\n"
                 f"- **获得**：{self._reward_text(record.reward)}\n\n"
-                "> 首通所得只取一次；若再入此关，请重新发送 `开始主线 序号`。"
+                f"> 首通所得只取一次；若再入此关，请重新发送 `{self.start_command} 序号`。"
             ),
             context.request_id,
             operation_id,

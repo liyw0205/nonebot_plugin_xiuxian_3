@@ -10,6 +10,7 @@ from .mainline_models import (
 from .mainline import (
     MAINLINE_STAGE_COUNT,
     MAINLINE_STORY_KEY,
+    DOMAIN_FRONTIER_STORY_KEY,
     MainlineDefinition,
     mainline_definition,
     mainline_first_clear_key,
@@ -40,6 +41,7 @@ __all__ = [
     "MainlineStatusRecord",
     "MAINLINE_STAGE_COUNT",
     "MAINLINE_STORY_KEY",
+    "DOMAIN_FRONTIER_STORY_KEY",
     "MainlineDefinition",
     "bounty_definition",
     "mainline_definition",

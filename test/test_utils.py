@@ -612,6 +612,7 @@ def test_player_numeric_projection_and_delta_share_resource_validation() -> None
         "stamina": 80
     }
     assert player_numeric_delta(row, {"pollution": -3}) == {"pollution": 0}
+    assert player_numeric_delta(row, {"stamina": -9}, clamp_minimum=True) == {"stamina": 0}
     with pytest.raises(ValueError, match="cannot be below"):
         player_numeric_delta(row, {"stamina": -9})
 

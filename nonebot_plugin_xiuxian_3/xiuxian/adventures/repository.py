@@ -780,6 +780,7 @@ class AdventuresRepositoryMixin:
         *,
         platform: str,
         platform_user_id: str,
+        story_key: str = MAINLINE_STORY_KEY,
     ) -> MainlineStatusRecord:
         await self.initialize()
         async with self._inflight:
@@ -787,16 +788,18 @@ class AdventuresRepositoryMixin:
                 self._get_mainline_status_sync,
                 platform,
                 platform_user_id,
+                story_key,
             )
 
     def _get_mainline_status_sync(
         self,
         platform: str,
         platform_user_id: str,
+        story_key: str,
     ) -> MainlineStatusRecord:
         with self._connect() as connection:
             row = self._require_player(connection, platform, platform_user_id, writable=False)
-            return self._mainline_status_from_connection(connection, row, content=self.content)
+            return self._mainline_status_from_connection(connection, row, story_key=story_key, content=self.content)
 
     @staticmethod
     def _mainline_completed_events(
@@ -819,6 +822,37 @@ class AdventuresRepositoryMixin:
             (player["id"],),
         ).fetchone() is not None:
             events.add(MAINLINE_TOWN_COMMISSION_DELIVERED)
+        if connection.execute(
+            "SELECT 1 FROM domain_front_participants WHERE player_id = ? LIMIT 1",
+            (player["id"],),
+        ).fetchone() is not None:
+            events.add("event.domain_front.joined")
+        if connection.execute(
+            "SELECT 1 FROM domain_front_battles WHERE player_id = ? AND status = 'settled' AND outcome = 'won' LIMIT 1",
+            (player["id"],),
+        ).fetchone() is not None:
+            events.add("event.domain_front.battle")
+        if connection.execute(
+            "SELECT 1 FROM domain_front_contributions WHERE player_id = ? LIMIT 1",
+            (player["id"],),
+        ).fetchone() is not None:
+            events.add("event.domain_front.contribution")
+        if connection.execute(
+            "SELECT 1 FROM domain_front_claims WHERE player_id = ? LIMIT 1",
+            (player["id"],),
+        ).fetchone() is not None:
+            events.add("event.domain_front.claimed")
+        project_rows = connection.execute(
+            """
+            SELECT DISTINCT p.project_key
+            FROM livelihood_project_rewards r
+            JOIN livelihood_projects p ON p.project_id = r.project_id
+            WHERE r.player_id = ? AND r.eligible = 1
+            """,
+            (player["id"],),
+        ).fetchall()
+        for project in project_rows:
+            events.add(f"livelihood.project.{project['project_key']}.completed")
         return events
 
     @staticmethod
@@ -826,6 +860,7 @@ class AdventuresRepositoryMixin:
         connection: sqlite3.Connection,
         player: sqlite3.Row,
         *,
+        story_key: str = MAINLINE_STORY_KEY,
         content=None,
         replay: bool = False,
     ) -> MainlineStatusRecord:
@@ -833,7 +868,7 @@ class AdventuresRepositoryMixin:
             str(item["stage_key"]): item
             for item in connection.execute(
                 "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ?",
-                (player["id"], MAINLINE_STORY_KEY),
+                (player["id"], story_key),
             ).fetchall()
         }
         completed_stages = {
@@ -843,7 +878,7 @@ class AdventuresRepositoryMixin:
         }
         completed_events = AdventuresRepositoryMixin._mainline_completed_events(connection, player)
         views: list[MainlineStageView] = []
-        for current_definition in mainline_definitions(content):
+        for current_definition in mainline_definitions(content, story_key=story_key):
             run = runs.get(current_definition.key)
             definition = (
                 AdventuresRepositoryMixin._mainline_definition_from_snapshot(run, current_definition)
@@ -891,7 +926,7 @@ class AdventuresRepositoryMixin:
             overall = MAINLINE_REWARD_PENDING
         return MainlineStatusRecord(
             player=SQLitePlayerRepository._row_to_player(player),
-            story_key=MAINLINE_STORY_KEY,
+            story_key=story_key,
             chapter=current.chapter,
             current_stage=current.stage,
             status=overall,
@@ -906,6 +941,7 @@ class AdventuresRepositoryMixin:
         platform_user_id: str,
         stage_key: str,
         operation_id: str,
+        story_key: str = MAINLINE_STORY_KEY,
     ) -> MainlineStartRecord:
         await self.initialize()
         async with self._inflight:
@@ -915,6 +951,7 @@ class AdventuresRepositoryMixin:
                 platform_user_id,
                 stage_key,
                 operation_id,
+                story_key,
             )
 
     def _start_mainline_sync(
@@ -923,6 +960,7 @@ class AdventuresRepositoryMixin:
         platform_user_id: str,
         stage_key: str,
         operation_id: str,
+        story_key: str,
     ) -> MainlineStartRecord:
         last_error: Exception | None = None
         for attempt in range(5):
@@ -932,6 +970,7 @@ class AdventuresRepositoryMixin:
                     platform_user_id,
                     stage_key,
                     operation_id,
+                    story_key,
                 )
             except sqlite3.OperationalError as exc:
                 if "locked" not in str(exc).lower():
@@ -948,8 +987,9 @@ class AdventuresRepositoryMixin:
         platform_user_id: str,
         stage_key: str,
         operation_id: str,
+        story_key: str,
     ) -> MainlineStartRecord:
-        definition = mainline_definition(stage_key, content=self.content)
+        definition = mainline_definition(stage_key, story_key=story_key, content=self.content)
         operation_name = "mainline.start_stage"
         request_hash = self._request_hash(
             operation_name,
@@ -957,6 +997,7 @@ class AdventuresRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "stage_key": definition.key,
+                "story_key": story_key,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -975,7 +1016,7 @@ class AdventuresRepositoryMixin:
             if definition.runtime_status != "open":
                 raise MainlineContentClosedError("mainline stage is not open")
             row = self._require_player(connection, platform, platform_user_id)
-            status_record = self._mainline_status_from_connection(connection, row, content=self.content)
+            status_record = self._mainline_status_from_connection(connection, row, story_key=story_key, content=self.content)
             stage_view = next(item for item in status_record.stages if item.key == definition.key)
             completed_events = self._mainline_completed_events(connection, row)
             if not mainline_prerequisites_met(
@@ -992,14 +1033,14 @@ class AdventuresRepositoryMixin:
                 raise MainlineRequirementError("mainline prerequisites are not met")
             run = connection.execute(
                 "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ? AND stage_key = ?",
-                (row["id"], MAINLINE_STORY_KEY, definition.key),
+                (row["id"], story_key, definition.key),
             ).fetchone()
             if run is not None and str(run["status"]) == "running":
                 raise MainlineAlreadyRunningError("mainline stage is already running")
             first_key = (
                 str(run["first_clear_key"])
                 if run is not None
-                else mainline_first_clear_key(definition.chapter, definition.stage, str(row["player_id"]))
+                else mainline_first_clear_key(definition.chapter, definition.stage, str(row["player_id"]), story_key=story_key)
             )
             snapshot = {
                 "stage": str(row["stage"]),
@@ -1030,7 +1071,7 @@ class AdventuresRepositoryMixin:
                     ) VALUES (?, ?, ?, ?, ?, 'running', 1, 0, ?, ?, ?, ?, ?)
                     """,
                     (
-                        row["id"], MAINLINE_STORY_KEY, definition.chapter, definition.stage,
+                        row["id"], story_key, definition.chapter, definition.stage,
                         definition.key, first_key, operation_id,
                         json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                         now_text, now_text,
@@ -1059,7 +1100,7 @@ class AdventuresRepositoryMixin:
                 raise RuntimeError("mainline start returned no player")
             payload = {
                 "player": self._player_payload(self._row_to_player(updated)),
-                "story_key": MAINLINE_STORY_KEY,
+                "story_key": story_key,
                 "chapter": definition.chapter,
                 "stage": definition.stage,
                 "stage_key": definition.key,
@@ -1088,6 +1129,7 @@ class AdventuresRepositoryMixin:
         platform_user_id: str,
         stage_key: str,
         operation_id: str,
+        story_key: str = MAINLINE_STORY_KEY,
     ) -> MainlineClaimRecord:
         await self.initialize()
         async with self._inflight:
@@ -1097,6 +1139,7 @@ class AdventuresRepositoryMixin:
                 platform_user_id,
                 stage_key,
                 operation_id,
+                story_key,
             )
 
     def _claim_mainline_sync(
@@ -1105,6 +1148,7 @@ class AdventuresRepositoryMixin:
         platform_user_id: str,
         stage_key: str,
         operation_id: str,
+        story_key: str,
     ) -> MainlineClaimRecord:
         last_error: Exception | None = None
         for attempt in range(5):
@@ -1114,6 +1158,7 @@ class AdventuresRepositoryMixin:
                     platform_user_id,
                     stage_key,
                     operation_id,
+                    story_key,
                 )
             except sqlite3.OperationalError as exc:
                 if "locked" not in str(exc).lower():
@@ -1130,8 +1175,9 @@ class AdventuresRepositoryMixin:
         platform_user_id: str,
         stage_key: str,
         operation_id: str,
+        story_key: str,
     ) -> MainlineClaimRecord:
-        definition = mainline_definition(stage_key, content=self.content)
+        definition = mainline_definition(stage_key, story_key=story_key, content=self.content)
         operation_name = "mainline.claim_first_clear"
         request_hash = self._request_hash(
             operation_name,
@@ -1139,6 +1185,7 @@ class AdventuresRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "stage_key": definition.key,
+                "story_key": story_key,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -1157,7 +1204,7 @@ class AdventuresRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             run = connection.execute(
                 "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ? AND stage_key = ?",
-                (row["id"], MAINLINE_STORY_KEY, definition.key),
+                (row["id"], story_key, definition.key),
             ).fetchone()
             if run is None or str(run["status"]) != "running":
                 raise MainlineNotStartedError("mainline stage has not been started")
@@ -1208,7 +1255,7 @@ class AdventuresRepositoryMixin:
                 raise RuntimeError("mainline claim returned no player")
             payload = {
                 "player": self._player_payload(self._row_to_player(updated)),
-                "story_key": MAINLINE_STORY_KEY,
+                "story_key": story_key,
                 "chapter": definition.chapter,
                 "stage": definition.stage,
                 "stage_key": definition.key,

@@ -1301,6 +1301,7 @@ class BreakthroughRepositoryMixin:
                     "breakthrough_pity_bp": pity_after - player_integer(row, "breakthrough_pity_bp"),
                 },
                 maximums={"pollution": 100, "breakthrough_pity_bp": 1200},
+                preserve_zero=True,
                 player_values={"heart_demon_bonus_bp": bonus_after, "soul_fatigue_until": fatigue_until},
             )
             result = {

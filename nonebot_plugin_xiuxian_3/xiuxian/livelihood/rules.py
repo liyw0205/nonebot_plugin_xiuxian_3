@@ -301,6 +301,7 @@ class PublicProjectDefinition:
     required_faction: str | None = None
     required_faction_reputation: int = 0
     required_sect_level: int = 0
+    required_access_key: str | None = None
 
 
 PUBLIC_PROJECT_DEFINITIONS = {
@@ -347,6 +348,7 @@ PUBLIC_PROJECT_DEFINITIONS = {
         reward={"local_reputation": 8, "service_reputation": 3, "item": CONSTRUCTION_COUPON},
         local_reputation_key="local.domain_refuge",
         required_sect_level=4,
+        required_access_key="access.project.domain_refuge",
     ),
     PROJECT_ABYSS_PURIFICATION: PublicProjectDefinition(
         key=PROJECT_ABYSS_PURIFICATION,
@@ -358,6 +360,7 @@ PUBLIC_PROJECT_DEFINITIONS = {
         local_reputation_key="local.abyss_outpost",
         required_faction="demon",
         required_faction_reputation=300,
+        required_access_key="access.project.abyss_purification",
     ),
     PROJECT_ANCESTRAL_HABITAT: PublicProjectDefinition(
         key=PROJECT_ANCESTRAL_HABITAT,
@@ -369,6 +372,7 @@ PUBLIC_PROJECT_DEFINITIONS = {
         local_reputation_key="local.ancestral_habitat",
         required_faction="beast",
         required_faction_reputation=300,
+        required_access_key="access.project.ancestral_habitat",
     ),
 }
 

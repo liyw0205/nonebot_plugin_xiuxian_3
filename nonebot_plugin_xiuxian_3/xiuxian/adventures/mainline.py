@@ -1,4 +1,4 @@
-"""玄天主线规则与内容包解析。"""
+"""内容驱动的主线规则与解析。"""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from ..routine.rules import honor_title
 
 
 MAINLINE_STORY_KEY = "story.mainline.xuantian"
+DOMAIN_FRONTIER_STORY_KEY = "story.mainline.domain_frontier"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -135,7 +136,11 @@ def _reward_map(bundle: ContentBundle, value: object, field: str, key: str) -> t
     return tuple(result)
 
 
-def mainline_definitions(content: ContentBundle | None = None) -> tuple[MainlineStageDefinition, ...]:
+def mainline_definitions(
+    content: ContentBundle | None = None,
+    *,
+    story_key: str | None = None,
+) -> tuple[MainlineStageDefinition, ...]:
     """Parse and validate all mainline stages from the current content bundle."""
 
     bundle = _content(content)
@@ -145,9 +150,11 @@ def mainline_definitions(content: ContentBundle | None = None) -> tuple[Mainline
         key = row.get("key")
         if not isinstance(key, str) or not key:
             raise ContentError("mainline record requires key")
-        story_key = row.get("story_key")
-        if story_key != MAINLINE_STORY_KEY:
-            raise ContentError(f"mainline {key} must belong to {MAINLINE_STORY_KEY}")
+        record_story_key = row.get("story_key")
+        if not isinstance(record_story_key, str) or not record_story_key.strip():
+            raise ContentError(f"mainline {key} requires story_key")
+        if story_key is not None and record_story_key != story_key:
+            continue
         chapter = row.get("chapter")
         stage = row.get("stage")
         if isinstance(chapter, bool) or not isinstance(chapter, int) or chapter < 1:
@@ -185,7 +192,7 @@ def mainline_definitions(content: ContentBundle | None = None) -> tuple[Mainline
         definitions.append(
             MainlineStageDefinition(
                 key=key,
-                story_key=story_key,
+                story_key=record_story_key,
                 chapter=chapter,
                 stage=stage,
                 label=name.strip(),
@@ -203,7 +210,8 @@ def mainline_definitions(content: ContentBundle | None = None) -> tuple[Mainline
         )
     definitions.sort(key=lambda item: (item.chapter, item.stage, item.key))
     if not definitions:
-        raise ContentError("mainline content must contain at least one stage")
+        scope = f" for {story_key}" if story_key else ""
+        raise ContentError(f"mainline content must contain at least one stage{scope}")
     keys = {item.key for item in definitions}
     aliases: set[str] = set()
     for definition in definitions:
@@ -219,7 +227,7 @@ def mainline_definitions(content: ContentBundle | None = None) -> tuple[Mainline
     return tuple(definitions)
 
 
-MAINLINE_STAGES = mainline_definitions()
+MAINLINE_STAGES = mainline_definitions(story_key=MAINLINE_STORY_KEY)
 MAINLINE_STAGE_COUNT = len(MAINLINE_STAGES)
 MAINLINE_DEFINITIONS: Mapping[str, MainlineStageDefinition] = {
     definition.key: definition for definition in MAINLINE_STAGES
@@ -230,10 +238,16 @@ MAINLINE_ALIASES: Mapping[str, str] = {
 }
 
 
-def _stage_key(value: str | int, chapter: int = 1, *, content: ContentBundle | None = None) -> str:
+def _stage_key(
+    value: str | int,
+    chapter: int = 1,
+    *,
+    story_key: str | None = MAINLINE_STORY_KEY,
+    content: ContentBundle | None = None,
+) -> str:
     if isinstance(value, bool):
         raise ValueError("mainline stage must be an integer or stable key")
-    definitions = mainline_definitions(content)
+    definitions = mainline_definitions(content, story_key=story_key)
     aliases = {alias: definition.key for definition in definitions for alias in definition.aliases}
     if isinstance(value, int):
         return f"chapter.{int(chapter)}.stage.{value}"
@@ -242,7 +256,7 @@ def _stage_key(value: str | int, chapter: int = 1, *, content: ContentBundle | N
         return aliases[candidate]
     if candidate.isdigit():
         return f"chapter.{int(chapter)}.stage.{int(candidate)}"
-    if candidate.startswith(f"{MAINLINE_STORY_KEY}:"):
+    if story_key and candidate.startswith(f"{story_key}:"):
         candidate = candidate.split(":", 1)[1]
         parts = candidate.split(":")
         if len(parts) == 2 and all(part.isdigit() for part in parts):
@@ -256,38 +270,59 @@ def mainline_stage_key(chapter: int, stage: int) -> str:
     return f"chapter.{int(chapter)}.stage.{int(stage)}"
 
 
-def mainline_first_clear_key(chapter: int, stage: int, player_id: str) -> str:
+def mainline_first_clear_key(
+    chapter: int,
+    stage: int,
+    player_id: str,
+    *,
+    story_key: str = MAINLINE_STORY_KEY,
+) -> str:
     if isinstance(chapter, bool) or isinstance(stage, bool) or not str(player_id):
         raise ValueError("chapter, stage and player_id are required")
-    return f"{MAINLINE_STORY_KEY}:{int(chapter)}:{int(stage)}:{player_id}"
+    if not isinstance(story_key, str) or not story_key.strip():
+        raise ValueError("story_key is required")
+    return f"{story_key}:{int(chapter)}:{int(stage)}:{player_id}"
 
 
-def resolve_mainline(value: str | int, *, chapter: int = 1, content: ContentBundle | None = None) -> str | None:
-    key = _stage_key(value, chapter, content=content)
-    return key if key in {item.key for item in mainline_definitions(content)} else None
+def resolve_mainline(
+    value: str | int,
+    *,
+    chapter: int = 1,
+    story_key: str | None = MAINLINE_STORY_KEY,
+    content: ContentBundle | None = None,
+) -> str | None:
+    key = _stage_key(value, chapter, story_key=story_key, content=content)
+    return key if key in {item.key for item in mainline_definitions(content, story_key=story_key)} else None
 
 
 def mainline_definition(
     value: str | int,
     *,
     chapter: int = 1,
+    story_key: str | None = MAINLINE_STORY_KEY,
     content: ContentBundle | None = None,
 ) -> MainlineStageDefinition:
-    key = _stage_key(value, chapter, content=content)
-    definitions = {item.key: item for item in mainline_definitions(content)}
+    key = _stage_key(value, chapter, story_key=story_key, content=content)
+    definitions = {item.key: item for item in mainline_definitions(content, story_key=story_key)}
     try:
         return definitions[key]
     except KeyError as exc:
         raise ValueError(f"unsupported mainline stage: {value}") from exc
 
 
-def mainline_stage(stage: int, *, chapter: int = 1, content: ContentBundle | None = None) -> MainlineStageDefinition:
-    return mainline_definition(stage, chapter=chapter, content=content)
+def mainline_stage(
+    stage: int,
+    *,
+    chapter: int = 1,
+    story_key: str | None = MAINLINE_STORY_KEY,
+    content: ContentBundle | None = None,
+) -> MainlineStageDefinition:
+    return mainline_definition(stage, chapter=chapter, story_key=story_key, content=content)
 
 
 def _contains_stage(values: Iterable[str], key: str, content: ContentBundle | None = None) -> bool:
-    target = _stage_key(key, content=content)
-    return target in {_stage_key(str(value), content=content) for value in values}
+    target = _stage_key(key, story_key=None, content=content)
+    return target in {_stage_key(str(value), story_key=None, content=content) for value in values}
 
 
 def realm_rank(realm_key: str, content: ContentBundle | None = None) -> int:
@@ -333,8 +368,9 @@ def mainline_prerequisites_met(
     stages = tuple(str(item) for item in completed_stages)
     events = {str(item) for item in completed_events}
     events.update(str(item) for item in flags)
+    stage_keys = {item.key for item in mainline_definitions(content, story_key=definition.story_key)}
     for prerequisite in definition.prerequisites:
-        if prerequisite.startswith("chapter."):
+        if prerequisite.startswith("chapter.") or prerequisite in stage_keys:
             if not _contains_stage(stages, prerequisite, content):
                 return False
         elif prerequisite not in events:
@@ -438,6 +474,7 @@ __all__ = [
     "MAINLINE_STAGES",
     "MAINLINE_STATUSES",
     "MAINLINE_STORY_KEY",
+    "DOMAIN_FRONTIER_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

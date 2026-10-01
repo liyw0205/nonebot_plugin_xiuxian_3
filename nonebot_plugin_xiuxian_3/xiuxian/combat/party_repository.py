@@ -1402,6 +1402,7 @@ class PartyCombatRepositoryMixin:
                         current_player,
                         updated_at=now_text,
                         value_delta={"soul_power": -2000},
+                        clamp_minimum=True,
                         player_values={"soul_fatigue_until": fatigue_until},
                     )
                 connection.execute(

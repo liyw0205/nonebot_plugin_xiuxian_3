@@ -321,12 +321,15 @@ def player_numeric_delta(
     *,
     minimum: int = 0,
     maximums: Mapping[str, Any] | None = None,
+    clamp_minimum: bool = False,
 ) -> dict[str, int]:
     """Calculate validated numeric player values after one signed change.
 
-    Resource updates use this pure helper before persistence.  It keeps the
+    Resource updates use this pure helper before persistence. It keeps the
     non-negative and capped-value rules identical for profile, status and
     battle-related transactions without embedding SQL in the projection layer.
+    Callers may opt into ``clamp_minimum`` for effects that intentionally stop
+    at the lower bound instead of rejecting an already depleted value.
     """
 
     caps = maximums or {}
@@ -342,7 +345,9 @@ def player_numeric_delta(
         value = player_integer(row, key) + change
         floor = int(minimum)
         if value < floor:
-            raise ValueError(f"player value for {key!r} cannot be below {floor}")
+            if not clamp_minimum:
+                raise ValueError(f"player value for {key!r} cannot be below {floor}")
+            value = floor
         # A cap limits recovery only. Costs and penalties must still apply
         # when an older row has a stale or missing maximum value.
         if key in caps and change > 0:
@@ -360,6 +365,7 @@ def change_player_values(
     updated_at: str,
     *,
     maximums: Mapping[str, Any] | None = None,
+    clamp_minimum: bool = False,
 ) -> dict[str, int]:
     """Persist one validated numeric player delta in the current transaction."""
 
@@ -369,6 +375,7 @@ def change_player_values(
         updated_at=updated_at,
         value_delta=delta,
         maximums=maximums,
+        clamp_minimum=clamp_minimum,
     ).values
 
 
@@ -381,19 +388,26 @@ def change_player_state(
     asset_mode: str = "delta",
     value_delta: Mapping[str, Any] | None = None,
     maximums: Mapping[str, Any] | None = None,
+    clamp_minimum: bool = False,
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
     """Commit assets and numeric player values through one transaction kernel.
 
     ``asset_values`` uses the same ``grant``/``spend``/``delta`` modes as
-    :func:`apply_player_assets`.  ``value_delta`` is validated with the shared
-    numeric projection and can be capped by ``maximums``.  Callers that only
-    change numeric values may omit ``asset_values``; callers changing assets
-    and values together get one SQL update and one validation boundary.
+    :func:`apply_player_assets`. ``value_delta`` is validated with the shared
+    numeric projection and can be capped by ``maximums`` or clamped at the
+    lower bound with ``clamp_minimum``. Callers that only change numeric values
+    may omit ``asset_values``; callers changing assets and values together get
+    one SQL update and one validation boundary.
     """
 
-    numeric_values = player_numeric_delta(row, value_delta or {}, maximums=maximums)
+    numeric_values = player_numeric_delta(
+        row,
+        value_delta or {},
+        maximums=maximums,
+        clamp_minimum=clamp_minimum,
+    )
     if player_values:
         if set(player_values) & set(numeric_values):
             raise ValueError("player value is supplied more than once")
@@ -429,6 +443,7 @@ def grant_player_state(
     *,
     value_delta: Mapping[str, Any] | None = None,
     maximums: Mapping[str, Any] | None = None,
+    clamp_minimum: bool = False,
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
@@ -442,6 +457,7 @@ def grant_player_state(
         asset_mode="grant",
         value_delta=value_delta,
         maximums=maximums,
+        clamp_minimum=clamp_minimum,
         preserve_zero=preserve_zero,
         player_values=player_values,
     )
@@ -455,6 +471,7 @@ def spend_player_state(
     *,
     value_delta: Mapping[str, Any] | None = None,
     maximums: Mapping[str, Any] | None = None,
+    clamp_minimum: bool = False,
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
@@ -468,6 +485,7 @@ def spend_player_state(
         asset_mode="spend",
         value_delta=value_delta,
         maximums=maximums,
+        clamp_minimum=clamp_minimum,
         preserve_zero=preserve_zero,
         player_values=player_values,
     )

@@ -380,6 +380,12 @@ class ProjectRepositoryMixin:
     def _project_available(connection: Any, player: Any, definition: PublicProjectDefinition) -> bool:
         """Check project authority without granting it implicitly."""
 
+        has_access = False
+        if definition.required_access_key:
+            has_access = connection.execute(
+                "SELECT 1 FROM activity_events WHERE player_id = ? AND event_key = ? LIMIT 1",
+                (player["id"], definition.required_access_key),
+            ).fetchone() is not None
         if definition.required_faction:
             faction = json_object(player["faction_reputation_json"], {})
             if int(faction.get(definition.required_faction, 0)) < definition.required_faction_reputation:
@@ -390,7 +396,7 @@ class ProjectRepositoryMixin:
                 (player["id"],),
             ).fetchone()
             local = json_object(reputation["local_json"], {}) if reputation else {}
-            city_authorized = int(local.get("local.domain_refuge_authorized", 0)) > 0
+            city_authorized = int(local.get("local.domain_refuge_authorized", 0)) > 0 or has_access
             sect_authorized = connection.execute(
                 """
                 SELECT 1
