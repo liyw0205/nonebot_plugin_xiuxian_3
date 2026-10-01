@@ -9,7 +9,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount, spend_player_assets
-from ..utils.player import player_inventory, player_resource
+from ..utils.player import player_inventory, player_integer
 from ..persistence.errors import (
     HeartDemonPendingError,
     MaterialInsufficientError,
@@ -86,7 +86,7 @@ class PollutionRepositoryMixin:
             if pending is not None:
                 raise HeartDemonPendingError("heart demon must be resolved before pollution purification")
 
-            pollution_before = player_resource(row, "pollution")
+            pollution_before = player_integer(row, "pollution")
             if pollution_before <= 0:
                 raise PollutionAlreadyClearError("pollution is already clear")
             inventory = player_inventory(row)

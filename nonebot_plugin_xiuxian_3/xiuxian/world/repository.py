@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount
-from ..utils.player import change_player_state, player_has_values, player_inventory, player_resource
+from ..utils.player import change_player_state, player_has_values, player_inventory, player_integer
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
     VOID_INSTABILITY_SECONDS,
@@ -88,7 +88,7 @@ class WorldRepositoryMixin:
                 )
             row = self._require_player(connection, platform, platform_user_id)
             realm_key = str(row["realm_key"])
-            realm_layer = player_resource(row, "realm_layer")
+            realm_layer = player_integer(row, "realm_layer")
             if realm_key == "soul_transformation" and realm_layer >= 1:
                 if route_key == "void.archive_ruins":
                     trial_count = connection.execute(

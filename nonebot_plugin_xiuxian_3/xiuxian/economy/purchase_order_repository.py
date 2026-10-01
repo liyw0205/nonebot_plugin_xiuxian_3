@@ -33,7 +33,7 @@ from ..persistence.errors import (
 from .purchase_order_models import PurchaseOrderRecord
 from .bindings import active_binding_totals
 from ..utils.assets import change_player_assets, grant_player_assets, inventory_amount, spend_player_assets, player_currency
-from ..utils.player import player_inventory
+from ..utils.player import player_inventory, player_qualification
 from .purchase_order_rules import (
     PURCHASE_ORDER_TTL_SECONDS,
     PURCHASE_MAX_LISTINGS,
@@ -495,10 +495,7 @@ class PurchaseOrderRepositoryMixin:
 
     @staticmethod
     def _alliance_key(player: Any) -> str | None:
-        try:
-            qualification = json.loads(str(player["qualification_json"] or "{}"))
-        except (TypeError, ValueError, json.JSONDecodeError):
-            qualification = {}
+        qualification = player_qualification(player)
         for key in ("cross_realm_alliance", "alliance_key", "alliance", "盟约"):
             value = qualification.get(key)
             if value:

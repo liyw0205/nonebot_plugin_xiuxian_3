@@ -168,7 +168,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
+from ..utils.player import change_player_state, player_integer, player_inventory
 
 
 class CultivationRepositoryMixin:
@@ -497,7 +497,7 @@ class CultivationRepositoryMixin:
                 ).fetchone()
                 if used is not None and int(used["count"]) >= mode.daily_limit:
                     raise CultivationDailyLimitError("cultivation mode reached its daily limit")
-            if player_resource(row, "stamina") < mode.stamina_cost or player_resource(row, "energy") < mode.energy_cost:
+            if player_integer(row, "stamina") < mode.stamina_cost or player_integer(row, "energy") < mode.energy_cost:
                 raise ResourceInsufficientError("cultivation resources are insufficient")
 
             session_id = uuid4().hex
@@ -1338,7 +1338,7 @@ class CultivationRepositoryMixin:
             realm_key = str(row["realm_key"])
             if layer >= 10 or next_layer_threshold(realm_key, layer) is None:
                 raise RealmLayerInvalidError("realm is already at its maximum layer")
-            if not can_advance_layer(realm_key, layer, player_resource(row, "cultivation")):
+            if not can_advance_layer(realm_key, layer, player_integer(row, "cultivation")):
                 raise RealmCultivationInsufficientError("realm cultivation is insufficient")
             if realm_key == "tribulation" and layer in {3, 6, 9}:
                 completed = {

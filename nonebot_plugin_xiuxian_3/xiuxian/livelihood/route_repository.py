@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import add_player_currency, inventory_amount, spend_player_items
+from ..utils.assets import grant_player_currency, inventory_amount, spend_player_items
 from ..utils.player import player_integer, player_inventory
 from ..utils.json import json_object
 from ..persistence.errors import (
@@ -421,7 +421,7 @@ class RouteRepositoryMixin:
             local_before = int(local.get(local_key, 0))
             local_after = min(1000, local_before + int(snapshot.get("local_reputation", 0)))
             local[local_key] = local_after
-            add_player_currency(
+            grant_player_currency(
                 connection,
                 player,
                 int(snapshot.get("reward_stones", route["reward_stones"])),

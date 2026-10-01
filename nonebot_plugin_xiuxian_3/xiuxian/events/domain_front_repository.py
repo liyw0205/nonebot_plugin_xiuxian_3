@@ -16,7 +16,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..content import bundled_content
 from ..utils.assets import change_player_assets, grant_player_assets
-from ..utils.player import change_player_state, player_resource
+from ..utils.player import change_player_state, player_integer
 from ..specials.codex_projection import record_codex_discovery
 from ..persistence.errors import (
     DomainCrackActiveError,
@@ -166,7 +166,7 @@ class DomainFrontRepositoryMixin:
             )
             if member_count >= PARTICIPANT_CAP:
                 raise DomainEventParticipantCapError("sect participant cap reached")
-            if player_resource(player, "stamina") < JOIN_STAMINA_COST:
+            if player_integer(player, "stamina") < JOIN_STAMINA_COST:
                 raise ResourceInsufficientError("domain-front stamina is insufficient")
             snapshot = {
                 "realm_key": str(player["realm_key"]),
@@ -302,7 +302,7 @@ class DomainFrontRepositoryMixin:
                 player,
                 {"item.domain_core_fragment": reward["item.domain_core_fragment"]},
                 now_text,
-                player_values={"world_merit": player_resource(player, "world_merit") + reward["world_merit"]},
+                player_values={"world_merit": player_integer(player, "world_merit") + reward["world_merit"]},
             )
             connection.execute("INSERT INTO domain_front_claims(round_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (round_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
             content = self.content or bundled_content()
@@ -378,7 +378,7 @@ class DomainFrontRepositoryMixin:
                     if key == "spirit_stones" or key.startswith("item.")
                 },
                 now_text,
-                player_values={"world_merit": player_resource(player, "world_merit") + reward.get("world_merit", 0)},
+                player_values={"world_merit": player_integer(player, "world_merit") + reward.get("world_merit", 0)},
             )
             connection.execute("INSERT INTO domain_war_claims(season_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (canonical_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
             payload = {"season_id": canonical_id, "rank": int(standing["rank"]), "reward": reward}

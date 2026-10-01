@@ -22,7 +22,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..combat.rules import MAX_TURNS
-from ..utils.player import change_player_state, player_integer, player_resource
+from ..utils.player import change_player_state, player_integer
 from .ancestral_hall_models import AncestralHallRunRecord
 from .ancestral_hall_rules import (
     ANCESTRAL_HALL_ENEMY,
@@ -183,7 +183,7 @@ class AncestralHallRepositoryMixin:
             ):
                 raise AncestralHallRequirementError("realm or location requirement is not met")
             faction = self._json_object(player["faction_reputation_json"], {})
-            if int(faction.get("beast", 0)) < 3000 or player_resource(player, "bloodline_stability") < 50:
+            if int(faction.get("beast", 0)) < 3000 or player_integer(player, "bloodline_stability") < 50:
                 raise AncestralHallRequirementError("beast reputation or bloodline stability is too low")
             if connection.execute(
                 "SELECT 1 FROM ancestral_hall_runs WHERE player_id=? AND status IN ('routing','combat_pending','cleared') LIMIT 1",
@@ -198,7 +198,7 @@ class AncestralHallRepositoryMixin:
             ).fetchone()
             if int(attempts["count"]) >= 1:
                 raise AncestralHallQuotaError("ancestral-hall weekly quota is exhausted")
-            if player_resource(player, "stamina") < ANCESTRAL_HALL_STAMINA_COST:
+            if player_integer(player, "stamina") < ANCESTRAL_HALL_STAMINA_COST:
                 raise ResourceInsufficientError("stamina is insufficient")
 
             intro = self._json_object(player["intro_json"], {})
@@ -210,7 +210,7 @@ class AncestralHallRepositoryMixin:
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": player_integer(player, "realm_layer"),
                 "beast_reputation": int(faction.get("beast", 0)),
-                "bloodline_stability": player_resource(player, "bloodline_stability"),
+                "bloodline_stability": player_integer(player, "bloodline_stability"),
                 "node_keys": list(ANCESTRAL_HALL_NODES),
                 "first_clear": ANCESTRAL_HALL_STORY_FLAG not in set(intro.get("flags", [])),
             }
@@ -556,7 +556,7 @@ class AncestralHallRepositoryMixin:
                     player,
                     updated_at=now_text,
                     value_delta={"stamina": int(run["stamina_cost"])},
-                    maximums={"stamina": player_resource(player, "stamina_max")},
+                    maximums={"stamina": player_integer(player, "stamina_max")},
                 )
             result = {"outcome": "system_aborted", "stamina_refunded": int(run["stamina_cost"]), "quota_released": True}
             connection.execute(

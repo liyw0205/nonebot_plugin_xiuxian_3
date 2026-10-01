@@ -16,7 +16,7 @@ from ..utils.assets import (
     spend_player_assets,
     player_currency,
 )
-from ..utils.player import player_inventory, player_resource
+from ..utils.player import player_inventory, player_integer
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -290,7 +290,7 @@ class ServiceRepositoryMixin:
             inputs = json_object(snapshot.get("provider_inputs", {}), {})
             inventory = player_inventory(provider)
             missing = inventory_missing(inventory, inputs)
-            if missing or player_resource(provider, "stamina") < definition.provider_stamina or player_resource(provider, "energy") < definition.provider_energy:
+            if missing or player_integer(provider, "stamina") < definition.provider_stamina or player_integer(provider, "energy") < definition.provider_energy:
                 raise ResourceInsufficientError("service resources are insufficient")
             spend_player_assets(
                 connection,
@@ -298,8 +298,8 @@ class ServiceRepositoryMixin:
                 inputs,
                 now_text,
                 player_values={
-                    "stamina": player_resource(provider, "stamina") - definition.provider_stamina,
-                    "energy": player_resource(provider, "energy") - definition.provider_energy,
+                    "stamina": player_integer(provider, "stamina") - definition.provider_stamina,
+                    "energy": player_integer(provider, "energy") - definition.provider_energy,
                 },
             )
             connection.execute(
@@ -429,8 +429,8 @@ class ServiceRepositoryMixin:
                     provider_refunds,
                     now_text,
                     player_values={
-                        "stamina": player_resource(provider, "stamina") + stamina_refund,
-                        "energy": player_resource(provider, "energy") + (int(snapshot.get("provider_energy", 0)) if expired else 0),
+                        "stamina": player_integer(provider, "stamina") + stamina_refund,
+                        "energy": player_integer(provider, "energy") + (int(snapshot.get("provider_energy", 0)) if expired else 0),
                     },
                 )
                 status = "expired" if expired else "failed"

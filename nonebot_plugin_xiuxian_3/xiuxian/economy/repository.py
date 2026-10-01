@@ -34,7 +34,7 @@ from ..utils.assets import (
     spend_player_assets,
     player_currency,
 )
-from ..utils.player import player_inventory, player_resource
+from ..utils.player import player_inventory, player_integer
 from .models import MarketOrderRecord
 from .bindings import active_binding_totals
 from .commission_models import ProductionCommissionRecord
@@ -943,7 +943,7 @@ class EconomyRepositoryMixin:
                 inventory = inventory_spend(inventory, producer_inputs)
             energy_cost = int(recipe.energy_cost)
             locked_energy = self._commission_locked_quantity(connection, int(producer["id"]), "energy", "energy")
-            if player_resource(producer, "energy") - locked_energy < energy_cost:
+            if player_integer(producer, "energy") - locked_energy < energy_cost:
                 raise CommissionRequirementError("producer energy is insufficient")
             tool_before = None
             tool_after = None
@@ -991,7 +991,7 @@ class EconomyRepositoryMixin:
                 producer_inputs,
                 now_text,
                 player_values={
-                    "energy": player_resource(producer, "energy") - energy_cost,
+                    "energy": player_integer(producer, "energy") - energy_cost,
                     "durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True),
                 },
             )
@@ -1021,8 +1021,8 @@ class EconomyRepositoryMixin:
                 "commission.resource_lock",
                 "lock",
                 energy_cost,
-                player_resource(producer, "energy"),
-                player_resource(producer, "energy") - energy_cost,
+                player_integer(producer, "energy"),
+                player_integer(producer, "energy") - energy_cost,
                 commission_id,
                 now_text,
             )
@@ -1410,7 +1410,7 @@ class EconomyRepositoryMixin:
                     commission_id, now_text,
                 )
             elif kind == "energy" and key == "energy":
-                before = player_resource(player, "energy")
+                before = player_integer(player, "energy")
                 change_player_assets(connection, player, {}, now_text, player_values={"energy": before + quantity})
                 self._commission_ledger(
                     connection, operation_id, int(player["id"]), "resource", key,

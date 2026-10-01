@@ -172,7 +172,7 @@ from ..routine.rules import (
 )
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
-from ..utils.player import change_player_state, player_inventory, player_resource
+from ..utils.player import change_player_state, player_inventory, player_integer
 
 
 class RoutineRepositoryMixin:
@@ -263,10 +263,10 @@ class RoutineRepositoryMixin:
                 cursor -= timedelta(days=1)
             streak_after = streak_before + 1
             requested_reward = checkin_reward(streak_after)
-            current_energy = player_resource(row, "energy")
+            current_energy = player_integer(row, "energy")
             energy_gain = min(
                 int(requested_reward.get("energy", 0)),
-                max(0, player_resource(row, "energy_max") - current_energy),
+                max(0, player_integer(row, "energy_max") - current_energy),
             )
             applied_reward: dict[str, int] = {"spirit_stones": int(requested_reward.get("spirit_stones", 0))}
             applied_reward["energy"] = energy_gain
@@ -286,7 +286,7 @@ class RoutineRepositoryMixin:
                 },
                 asset_mode="grant",
                 value_delta={"energy": energy_gain},
-                maximums={"energy": player_resource(row, "energy_max")},
+                maximums={"energy": player_integer(row, "energy_max")},
             )
             connection.execute(
                 """
@@ -418,10 +418,10 @@ class RoutineRepositoryMixin:
                 raise CurrencyInsufficientError("makeup requires 30 spirit stones")
 
             requested_reward = makeup_reward()
-            current_energy = player_resource(row, "energy")
+            current_energy = player_integer(row, "energy")
             energy_gain = min(
                 int(requested_reward.get("energy", 0)),
-                max(0, player_resource(row, "energy_max") - current_energy),
+                max(0, player_integer(row, "energy_max") - current_energy),
             )
             applied_reward = {
                 "spirit_stones": int(requested_reward.get("spirit_stones", 0)),
@@ -434,7 +434,7 @@ class RoutineRepositoryMixin:
                 asset_values={"spirit_stones": -30 + applied_reward["spirit_stones"]},
                 asset_mode="delta",
                 value_delta={"energy": energy_gain},
-                maximums={"energy": player_resource(row, "energy_max")},
+                maximums={"energy": player_integer(row, "energy_max")},
             )
             connection.execute(
                 """
@@ -577,7 +577,7 @@ class RoutineRepositoryMixin:
             ).fetchone()
             if duplicate is not None:
                 raise SpiritTreeWateredError("spirit tree already watered today")
-            if player_resource(row, "energy") < 2:
+            if player_integer(row, "energy") < 2:
                 raise ResourceInsufficientError("watering requires two energy")
             water_count = int(tree["water_count"]) + 1
             cycle_started_at = tree["cycle_started_at"] or now_text
@@ -1707,7 +1707,7 @@ class RoutineRepositoryMixin:
                 raise RedemptionCodeExhaustedError("redemption code has no remaining claims")
 
             reward = self._json_object(code_row["reward_json"], {})
-            energy = player_resource(row, "energy")
+            energy = player_integer(row, "energy")
             actual_reward: dict[str, int] = {}
             local_reputation = 0
             service_reputation = 0
@@ -1716,7 +1716,7 @@ class RoutineRepositoryMixin:
                 if key == "spirit_stones":
                     actual_reward[key] = quantity
                 elif key == "energy":
-                    gained = min(quantity, max(0, player_resource(row, "energy_max") - energy))
+                    gained = min(quantity, max(0, player_integer(row, "energy_max") - energy))
                     energy += gained
                     actual_reward[key] = gained
                 elif key == "local_reputation":
@@ -1756,8 +1756,8 @@ class RoutineRepositoryMixin:
                     if key not in {"energy", "local_reputation", "service_reputation"}
                 },
                 asset_mode="grant",
-                value_delta={"energy": energy - player_resource(row, "energy")},
-                maximums={"energy": player_resource(row, "energy_max")},
+                value_delta={"energy": energy - player_integer(row, "energy")},
+                maximums={"energy": player_integer(row, "energy_max")},
             )
             connection.execute(
                 """
@@ -2472,7 +2472,7 @@ class RoutineRepositoryMixin:
             if key == "spirit_stones":
                 actual[key] = quantity
             elif key == "energy":
-                gained = min(quantity, max(0, player_resource(player, "energy_max") - player_resource(player, "energy") - energy_gain))
+                gained = min(quantity, max(0, player_integer(player, "energy_max") - player_integer(player, "energy") - energy_gain))
                 energy_gain += gained
                 actual[key] = gained
             elif key == "local_reputation":
@@ -2508,7 +2508,7 @@ class RoutineRepositoryMixin:
             asset_values=asset_rewards,
             asset_mode="grant",
             value_delta={"energy": energy_gain},
-            maximums={"energy": player_resource(player, "energy_max")},
+            maximums={"energy": player_integer(player, "energy_max")},
         )
         return actual
 

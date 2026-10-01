@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_currency
-from ..utils.player import change_player_state, player_resource
+from ..utils.player import change_player_state, player_integer
 from .cloud_models import (
     ArrayHallRecord,
     BeastHistoryRecord,
@@ -93,14 +93,14 @@ class CloudRepositoryMixin:
             source = str(player["location_key"])
             if source not in definition.source_locations:
                 raise LocationRequirementError("cloud route source is not available")
-            if not self._cloud_meets_realm(str(player["realm_key"]), player_resource(player, "realm_layer"), definition.required_realm, definition.required_layer):
+            if not self._cloud_meets_realm(str(player["realm_key"]), player_integer(player, "realm_layer"), definition.required_realm, definition.required_layer):
                 raise CloudRouteLockedError("cloud route realm requirement is not met")
             if definition.required_quest and not self._cloud_quest_completed(connection, player_id, definition.required_quest):
                 raise CloudRouteLockedError("cloud route quest requirement is not met")
             if self._has_active_long_action(connection, player_id):
                 raise CloudBoatBusyError("another long action is active")
 
-            stamina = player_resource(player, "stamina")
+            stamina = player_integer(player, "stamina")
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             if player_currency(player) < definition.currency_cost:
@@ -511,7 +511,7 @@ class CloudRepositoryMixin:
             if progress is not None and str(progress["status"]) in {"completed", "claimed"}:
                 raise BeastIntroAlreadyCompletedError("beast introduction already completed")
             if not self._cloud_meets_realm(
-                str(player["realm_key"]), player_resource(player, "realm_layer"), "foundation", 1
+                str(player["realm_key"]), player_integer(player, "realm_layer"), "foundation", 1
             ):
                 raise BeastIntroRequirementError("beast introduction requires foundation")
             history = connection.execute(
@@ -656,12 +656,12 @@ class CloudRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["location_key"]) != "xuantian.array_hall":
                 raise ArrayHallPermissionDeniedError("array hall location is required")
-            if not self._cloud_meets_realm(str(player["realm_key"]), player_resource(player, "realm_layer"), "qi_gathering", 1):
+            if not self._cloud_meets_realm(str(player["realm_key"]), player_integer(player, "realm_layer"), "qi_gathering", 1):
                 raise ArrayHallPermissionDeniedError("array hall requires qi gathering")
             permission = array_hall_permission(connection, player)
             if permission is None:
                 raise ArrayHallPermissionDeniedError("array hall permission is not granted")
-            if player_resource(player, "stamina") < 3:
+            if player_integer(player, "stamina") < 3:
                 raise ResourceInsufficientError("array hall requires 3 stamina")
             change_player_state(
                 connection,

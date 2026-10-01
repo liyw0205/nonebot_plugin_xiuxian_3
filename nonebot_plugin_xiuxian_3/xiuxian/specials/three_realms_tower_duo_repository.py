@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_integer, player_resource
+from ..utils.player import change_player_state, player_integer
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -134,7 +134,7 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 ).fetchone()[0]
                 if int(used) >= definition.weekly_limit:
                     raise TowerQuotaError("tower duo member weekly quota exhausted")
-                if player_resource(row, "stamina") < TOWER_DUO_STAMINA_COST:
+                if player_integer(row, "stamina") < TOWER_DUO_STAMINA_COST:
                     raise ResourceInsufficientError("tower duo member lacks stamina")
                 highest = connection.execute(
                     "SELECT COALESCE(MAX(floor_no),0) FROM three_realms_tower_duo_member_runs WHERE player_id=? AND status='claimed'",

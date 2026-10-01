@@ -29,7 +29,6 @@ from ..utils.player import (
     player_combat_values,
     player_integer,
     player_inventory,
-    player_resource,
 )
 from .secret_realm_rules import realm_at_least
 from .void_ruins_models import VoidRuinsRunRecord
@@ -173,7 +172,7 @@ class VoidRuinsRepositoryMixin:
             ).fetchall()
             if not VOID_RUINS_MIN_MEMBERS <= len(members) <= VOID_RUINS_MAX_MEMBERS or any(not row["confirmed_at"] for row in members):
                 raise VoidRuinsRequirementError("two to five confirmed members are required")
-            if player_resource(leader, "stamina") < VOID_RUINS_STAMINA_COST:
+            if player_integer(leader, "stamina") < VOID_RUINS_STAMINA_COST:
                 raise ResourceInsufficientError("party leader lacks entry stamina")
 
             combat_snapshots: list[dict[str, Any]] = []

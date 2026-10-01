@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 from .milestone_rules import due_milestones
 from .models import LayerUnlock
-from ..utils.player import player_integer, player_reputation, player_resource
+from ..utils.player import player_integer, player_reputation
 
 
 def record_due_milestones(
@@ -26,13 +26,13 @@ def record_due_milestones(
         (int(value) for value in faction_reputation.values()),
         default=0,
     )
-    domain_level = player_resource(player, "domain_level")
-    void_route_count = player_resource(player, "void_route_count")
+    domain_level = player_integer(player, "domain_level")
+    void_route_count = player_integer(player, "void_route_count")
     unlocks: list[LayerUnlock] = []
     for definition in due_milestones(
         realm_key=str(player["realm_key"]),
         realm_layer=player_integer(player, "realm_layer"),
-        total_cultivation=player_resource(player, "total_cultivation"),
+        total_cultivation=player_integer(player, "total_cultivation"),
         maximum_faction_reputation=maximum_faction_reputation,
         domain_level=domain_level,
         void_route_count=void_route_count,
@@ -40,7 +40,7 @@ def record_due_milestones(
         snapshot = {
             "realm_key": str(player["realm_key"]),
             "realm_layer": player_integer(player, "realm_layer"),
-            "total_cultivation": player_resource(player, "total_cultivation"),
+            "total_cultivation": player_integer(player, "total_cultivation"),
             "required_realm": definition.required_realm,
             "required_layer": definition.required_layer,
             "required_total_cultivation": definition.required_total_cultivation,

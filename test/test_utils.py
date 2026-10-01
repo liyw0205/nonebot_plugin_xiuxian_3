@@ -10,7 +10,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.database import connect_sqlite
 from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     AssetState,
     AssetDeltaError,
-    add_player_currency,
+    grant_player_currency,
     apply_player_assets,
     change_player_currency,
     change_player_items,
@@ -61,8 +61,6 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_reputation,
     player_values,
     player_numeric_values,
-    player_resource_values,
-    player_resource,
     player_has_values,
     player_values_missing,
     player_realm_values,
@@ -303,7 +301,7 @@ def test_asset_shortcuts_share_the_same_player_transaction_kernel() -> None:
     row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
     spend_player_items(connection, row, {"item.herb": 1}, "items-spent")
     row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
-    add_player_currency(connection, row, 5, "currency-added", player_values={"energy": 9})
+    grant_player_currency(connection, row, 5, "currency-added", player_values={"energy": 9})
     row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
     spend_player_currency(connection, row, 3, "currency-spent")
     stored = connection.execute("SELECT spirit_stones, inventory_json, energy, updated_at FROM players WHERE id = 1").fetchone()
@@ -434,9 +432,9 @@ def test_player_state_helpers_share_json_and_inventory_normalization() -> None:
     assert player_reputation(row) == {"demon": 20, "beast": 5}
 
 
-def test_player_resource_projection_is_shared_by_profile_and_combat_reads() -> None:
+def test_player_integer_projection_is_shared_by_profile_and_combat_reads() -> None:
     row = {"spirit_stones": "12", "stamina": "8", "energy": 4, "world_merit": "2"}
-    resources = player_resource_values(row)
+    resources = player_numeric_values(row)
     assert resources["spirit_stones"] == 12
     assert resources["stamina"] == 8
     assert player_numeric_values(row, ("energy", "world_merit")) == {"energy": 4, "world_merit": 2}
@@ -475,7 +473,7 @@ def test_player_numeric_projection_and_delta_share_resource_validation() -> None
         "stamina_max": 10,
         "pollution": 3,
     }
-    assert player_resource(row, "stamina") == 8
+    assert player_integer(row, "stamina") == 8
     assert player_realm_values(row) == {
         "stage": "new_user",
         "status": "active",

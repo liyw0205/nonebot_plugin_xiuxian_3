@@ -28,7 +28,7 @@ from .endgame_rules import (
     TRIAL_ORDER,
 )
 from ..utils.assets import inventory_amount, player_currency
-from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
+from ..utils.player import change_player_state, player_integer, player_inventory
 
 
 class EndgameRepositoryMixin:
@@ -70,7 +70,7 @@ class EndgameRepositoryMixin:
                 raise PlayerSuspendedError("player is not active")
             if str(row["realm_key"]) != "void_refining" or player_integer(row, "realm_layer") != 10:
                 raise DaoUnionRequirementError("dao union requires void refining L10")
-            if player_resource(row, "total_cultivation") < DAO_UNION_TOTAL_CULTIVATION:
+            if player_integer(row, "total_cultivation") < DAO_UNION_TOTAL_CULTIVATION:
                 raise DaoUnionRequirementError("total cultivation is insufficient")
             flags = set(str(item) for item in self._json_object(row["intro_json"], {}).get("flags", []))
             if "quest.dao_union" not in flags:
@@ -354,7 +354,7 @@ class EndgameRepositoryMixin:
                 raise PlayerSuspendedError("player is not active")
             if str(row["realm_key"]) != "dao_union" or player_integer(row, "realm_layer") != 10:
                 raise TribulationEntryRequirementError("tribulation requires dao union L10")
-            if player_resource(row, "total_cultivation") < TRIBULATION_TOTAL_CULTIVATION:
+            if player_integer(row, "total_cultivation") < TRIBULATION_TOTAL_CULTIVATION:
                 raise TribulationEntryRequirementError("total cultivation is insufficient")
             change_player_state(
                 connection,

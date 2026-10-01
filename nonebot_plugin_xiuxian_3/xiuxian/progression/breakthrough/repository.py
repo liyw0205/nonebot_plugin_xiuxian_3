@@ -86,7 +86,7 @@ from ...exploration.rules import (
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from ...utils.assets import inventory_amount, player_currency
-from ...utils.player import change_player_state, player_integer, player_inventory, player_resource
+from ...utils.player import change_player_state, player_integer, player_inventory
 from ...adventures.mainline_models import (
     MainlineClaimRecord,
     MainlineStageView,
@@ -199,7 +199,7 @@ class BreakthroughRepositoryMixin:
                 payload = json.loads(existing["result_json"])
                 return NascentSoulPreparationRecord(player=self._row_to_player(payload["player"]), already_completed=True)
             row = self._require_player(connection, platform, platform_user_id)
-            if row["realm_key"] != "golden_core" or player_integer(row, "realm_layer") != 10 or player_resource(row, "total_cultivation") < 58960:
+            if row["realm_key"] != "golden_core" or player_integer(row, "realm_layer") != 10 or player_integer(row, "total_cultivation") < 58960:
                 raise BreakthroughRequirementError("golden core preparation requirement is missing")
             if int(row["foundation_quality"]) < 5500:
                 raise FoundationQualityInsufficientError("foundation quality is insufficient")
@@ -325,7 +325,7 @@ class BreakthroughRepositoryMixin:
                 if target_realm == "soul_transformation":
                     raise RealmMismatchError("only the current realm's L10 can break through")
                 raise BreakthroughRequirementError("only the current realm's L10 can break through")
-            if player_resource(row, "total_cultivation") < definition.required_total_cultivation:
+            if player_integer(row, "total_cultivation") < definition.required_total_cultivation:
                 if target_realm == "soul_transformation":
                     raise CultivationInsufficientError("total cultivation is insufficient")
                 raise BreakthroughRequirementError("total cultivation is insufficient")
@@ -366,12 +366,12 @@ class BreakthroughRepositoryMixin:
                 flags = {str(item) for item in intro_state.get("flags", [])}
                 if "quest.prepare_nascent_soul" not in flags:
                     raise QuestRequirementError("nascent soul preparation quest is missing")
-                if player_resource(row, "world_merit") < 100:
+                if player_integer(row, "world_merit") < 100:
                     raise CurrencyInsufficientError("world merit is insufficient")
             if is_soul_transformation:
-                if player_resource(row, "soul_power") < 200:
+                if player_integer(row, "soul_power") < 200:
                     raise SoulPowerInsufficientError("soul power is insufficient")
-                if player_resource(row, "world_merit") < 500:
+                if player_integer(row, "world_merit") < 500:
                     raise CurrencyInsufficientError("world merit is insufficient")
                 intro_state = self._json_object(row["intro_json"], {})
                 if "quest.soul_transformation" not in {str(item) for item in intro_state.get("flags", [])}:
@@ -398,7 +398,7 @@ class BreakthroughRepositoryMixin:
                 flags = {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])}
                 if "quest.break_void" not in flags:
                     raise VoidQuestMissingError("void refining quest is missing")
-                if player_resource(row, "world_merit") < 500 or player_resource(row, "domain_charge") < 100:
+                if player_integer(row, "world_merit") < 500 or player_integer(row, "domain_charge") < 100:
                     raise VoidResourceInsufficientError("void refining resources are insufficient")
                 if protection:
                     raise BreakthroughRequirementError("void refining has no protection item")
@@ -471,7 +471,7 @@ class BreakthroughRepositoryMixin:
             if player_currency(row) < definition.currency_cost:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
 
-            pity_before = player_resource(row, "breakthrough_pity_bp")
+            pity_before = player_integer(row, "breakthrough_pity_bp")
             foundation_quality = int(row["foundation_quality"])
             quality_bonus_bp = 0
             if definition.quality_bonus_divisor:
@@ -503,7 +503,7 @@ class BreakthroughRepositoryMixin:
             )
             preparation_bp = quality_bonus_bp + technique_bonus_bp + formation_bonus_bp + location_bonus_bp + support_bonus_bp
             soul_prepare_bp = reputation_prepare_bp = quest_prepare_bp = 0
-            heart_demon_bonus_bp = player_resource(row, "heart_demon_bonus_bp") if is_nascent else 0
+            heart_demon_bonus_bp = player_integer(row, "heart_demon_bonus_bp") if is_nascent else 0
             cross_realm_risk_bp = 0
             if is_nascent and not str(row["location_key"]).startswith("xuantian."):
                 world = str(row["location_key"]).split(".", 1)[0]
@@ -532,14 +532,14 @@ class BreakthroughRepositoryMixin:
                     for key, value in self._json_object(reputation_row["local_json"], {}).items():
                         if str(key).startswith("faction."):
                             faction[str(key).split(".", 1)[1]] = int(value)
-                soul_prepare_bp = min(1000, max(0, player_resource(row, "soul_power") - 200) * 4)
+                soul_prepare_bp = min(1000, max(0, player_integer(row, "soul_power") - 200) * 4)
                 reputation_prepare_bp = min(1000, max(0, max((int(value) for value in faction.values()), default=0) - 2000) // 2)
                 quest_prepare_bp = 600 if "quest.soul_transformation" in {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])} else 0
                 preparation_bp = soul_prepare_bp + reputation_prepare_bp + quest_prepare_bp + technique_bonus_bp
                 final_success_bp = max(6500, min(9000, 6500 + preparation_bp + pity_before))
             elif is_void_refining:
-                route_bonus_bp = min(600, max(0, player_resource(row, "void_route_count")) * 200)
-                domain_bonus_bp = min(500, max(0, player_resource(row, "domain_power")) // 10)
+                route_bonus_bp = min(600, max(0, player_integer(row, "void_route_count")) * 200)
+                domain_bonus_bp = min(500, max(0, player_integer(row, "domain_power")) // 10)
                 preparation_bp = route_bonus_bp + domain_bonus_bp + technique_bonus_bp
                 final_success_bp = max(7500, min(9200, 7500 + preparation_bp + min(750, pity_before)))
             else:
@@ -558,8 +558,8 @@ class BreakthroughRepositoryMixin:
                 "source_realm": definition.source_realm,
                 "realm_key": row["realm_key"],
                 "realm_layer": player_integer(row, "realm_layer"),
-                "cultivation": player_resource(row, "cultivation"),
-                "total_cultivation": player_resource(row, "total_cultivation"),
+                "cultivation": player_integer(row, "cultivation"),
+                "total_cultivation": player_integer(row, "total_cultivation"),
                 "location_key": row["location_key"],
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
@@ -586,18 +586,18 @@ class BreakthroughRepositoryMixin:
                 "random_seed": operation_id,
                 "cross_realm_risk_bp": cross_realm_risk_bp,
                 "heart_demon_bonus_bp": heart_demon_bonus_bp,
-                "pollution": player_resource(row, "pollution"),
-                "cross_realm_penalty_bp": player_resource(row, "cross_realm_penalty_bp"),
-                "soul_power_before": player_resource(row, "soul_power"),
-                "world_merit_before": player_resource(row, "world_merit"),
+                "pollution": player_integer(row, "pollution"),
+                "cross_realm_penalty_bp": player_integer(row, "cross_realm_penalty_bp"),
+                "soul_power_before": player_integer(row, "soul_power"),
+                "world_merit_before": player_integer(row, "world_merit"),
                 "soul_prepare_bp": soul_prepare_bp,
                 "reputation_prepare_bp": reputation_prepare_bp,
                 "quest_prepare_bp": quest_prepare_bp,
-                "route_count": player_resource(row, "void_route_count"),
-                "domain_power": player_resource(row, "domain_power"),
-                "domain_charge_before": player_resource(row, "domain_charge"),
-                "void_power_before": player_resource(row, "void_power"),
-                "space_resistance_bp": player_resource(row, "space_resistance_bp"),
+                "route_count": player_integer(row, "void_route_count"),
+                "domain_power": player_integer(row, "domain_power"),
+                "domain_charge_before": player_integer(row, "domain_charge"),
+                "void_power_before": player_integer(row, "void_power"),
+                "space_resistance_bp": player_integer(row, "space_resistance_bp"),
                 "void_instability_until": row["void_instability_until"],
             }
             value_delta = {
@@ -973,8 +973,8 @@ class BreakthroughRepositoryMixin:
             roll_bp = breakthrough_roll_bp(str(snapshot.get("random_seed", session["operation_id"])))
             final_success_bp = int(snapshot.get("success_bp", definition.base_success_bp))
             success = roll_bp < final_success_bp
-            cultivation_before = int(snapshot.get("cultivation", player_resource(row, "cultivation")))
-            pity_before = int(snapshot.get("pity_before_bp", player_resource(row, "breakthrough_pity_bp")))
+            cultivation_before = int(snapshot.get("cultivation", player_integer(row, "cultivation")))
+            pity_before = int(snapshot.get("pity_before_bp", player_integer(row, "breakthrough_pity_bp")))
             protection_requested = bool(snapshot.get("protection_requested", False))
             is_nascent = str(snapshot.get("target_realm", session["target_realm"])) == "nascent_soul"
             is_soul_transformation = str(snapshot.get("target_realm", session["target_realm"])) == "soul_transformation"
@@ -993,8 +993,8 @@ class BreakthroughRepositoryMixin:
             if success:
                 cultivation_after = 0
                 stamina_after = min(
-                    player_resource(row, "stamina_max"),
-                    player_resource(row, "stamina") + definition.reward_stamina,
+                    player_integer(row, "stamina_max"),
+                    player_integer(row, "stamina") + definition.reward_stamina,
                 )
                 reward_items = dict(definition.reward_items or {})
                 player_values: dict[str, Any] = {
@@ -1005,7 +1005,7 @@ class BreakthroughRepositoryMixin:
                     "weakness_until": None,
                 }
                 value_delta = {
-                    "stamina": stamina_after - player_resource(row, "stamina"),
+                    "stamina": stamina_after - player_integer(row, "stamina"),
                     "world_merit": definition.reward_world_merit,
                 }
                 if is_nascent:
@@ -1016,10 +1016,10 @@ class BreakthroughRepositoryMixin:
                             "domain_charge": 100,
                             "domain_charge_max": 100,
                             "cross_realm_penalty_bp": 0 if str(row["location_key"]).startswith("xuantian.") else 1000,
-                            "max_hp": player_resource(row, "max_hp") + 600,
-                            "max_mp": player_resource(row, "max_mp") + 480,
-                            "carry_capacity": player_resource(row, "carry_capacity") + 50,
-                            "exploration_efficiency_bp": player_resource(row, "exploration_efficiency_bp") + 1500,
+                            "max_hp": player_integer(row, "max_hp") + 600,
+                            "max_mp": player_integer(row, "max_mp") + 480,
+                            "carry_capacity": player_integer(row, "carry_capacity") + 50,
+                            "exploration_efficiency_bp": player_integer(row, "exploration_efficiency_bp") + 1500,
                             "heart_demon_bonus_bp": 0,
                             "soul_fatigue_until": None,
                         }
@@ -1027,7 +1027,7 @@ class BreakthroughRepositoryMixin:
                 elif is_soul_transformation:
                     player_values.update(
                         {
-                            "stamina_max": player_resource(row, "stamina_max") + 20,
+                            "stamina_max": player_integer(row, "stamina_max") + 20,
                             "domain_key": None,
                             "domain_power": 100,
                             "domain_charge": 150,
@@ -1035,9 +1035,9 @@ class BreakthroughRepositoryMixin:
                             "domain_charge_reset_date": now.date().isoformat(),
                             "realm_resistance_bp": 1000,
                             "domain_crack_until": None,
-                            "max_hp": player_resource(row, "max_hp") + 1000,
-                            "max_mp": player_resource(row, "max_mp") + 800,
-                            "initiative": player_resource(row, "initiative") + 20,
+                            "max_hp": player_integer(row, "max_hp") + 1000,
+                            "max_mp": player_integer(row, "max_mp") + 800,
+                            "initiative": player_integer(row, "initiative") + 20,
                         }
                     )
                 elif is_void_refining:
@@ -1050,9 +1050,9 @@ class BreakthroughRepositoryMixin:
                             "void_instability_until": None,
                             "void_anchor_capacity": 20,
                             "void_power_reset_date": now.date().isoformat(),
-                            "max_hp": player_resource(row, "max_hp") + 1500,
-                            "max_mp": player_resource(row, "max_mp") + 1200,
-                            "carry_capacity": player_resource(row, "carry_capacity") + 100,
+                            "max_hp": player_integer(row, "max_hp") + 1500,
+                            "max_mp": player_integer(row, "max_mp") + 1200,
+                            "carry_capacity": player_integer(row, "carry_capacity") + 100,
                         }
                     )
                 change_player_state(
@@ -1062,7 +1062,7 @@ class BreakthroughRepositoryMixin:
                     asset_values={"spirit_stones": definition.reward_currency, **reward_items},
                     asset_mode="grant",
                     value_delta=value_delta,
-                    maximums={"stamina": player_resource(row, "stamina_max")},
+                    maximums={"stamina": player_integer(row, "stamina_max")},
                     player_values=player_values,
                     preserve_zero=is_void_refining,
                 )
@@ -1175,7 +1175,7 @@ class BreakthroughRepositoryMixin:
                     "breakthrough_operation_id": operation_id,
                     "target_realm": "nascent_soul",
                     "expires_at": serialize_datetime(now + timedelta(hours=24)),
-                    "pollution_before": player_resource(row, "pollution"),
+                    "pollution_before": player_integer(row, "pollution"),
                     "pity_before_bp": pity_before,
                 }
                 connection.execute(
@@ -1273,18 +1273,18 @@ class BreakthroughRepositoryMixin:
             except ValueError:
                 expired = False
             effective_choice = "heart_demon.face" if expired else choice_key
-            if effective_choice == "heart_demon.bargain" and str(row["path_key"] or "") != "demonic" and player_resource(row, "pollution") < 20:
+            if effective_choice == "heart_demon.bargain" and str(row["path_key"] or "") != "demonic" and player_integer(row, "pollution") < 20:
                 raise BreakthroughRequirementError("bargain requires a demonic path or pollution 20")
             inventory = player_inventory(row)
             if effective_choice == "heart_demon.purify":
                 if inventory_amount(inventory, "item.pill.soul_restore") < 1:
                     raise MaterialInsufficientError("soul restore pill is missing")
-            pollution_before = player_resource(row, "pollution")
+            pollution_before = player_integer(row, "pollution")
             pollution_after = pollution_before
             merit_gain = 0
             fatigue_hours = 8
-            pity_after = min(1200, player_resource(row, "breakthrough_pity_bp") + 400)
-            bonus_after = player_resource(row, "heart_demon_bonus_bp")
+            pity_after = min(1200, player_integer(row, "breakthrough_pity_bp") + 400)
+            bonus_after = player_integer(row, "heart_demon_bonus_bp")
             if effective_choice == "heart_demon.face":
                 merit_gain = 50
             elif effective_choice == "heart_demon.purify":
@@ -1304,7 +1304,7 @@ class BreakthroughRepositoryMixin:
                 value_delta={
                     "pollution": pollution_after - pollution_before,
                     "world_merit": merit_gain,
-                    "breakthrough_pity_bp": pity_after - player_resource(row, "breakthrough_pity_bp"),
+                    "breakthrough_pity_bp": pity_after - player_integer(row, "breakthrough_pity_bp"),
                 },
                 maximums={"pollution": 100, "breakthrough_pity_bp": 1200},
                 player_values={"heart_demon_bonus_bp": bonus_after, "soul_fatigue_until": fatigue_until},

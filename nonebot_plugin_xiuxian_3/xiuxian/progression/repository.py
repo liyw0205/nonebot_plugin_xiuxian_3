@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from ...contracts import serialize_datetime
 from .models import ResourceRecoveryRecord
-from ..utils.player import change_player_state, player_resource
+from ..utils.player import change_player_state, player_integer
 
 
 class ProgressionRepositoryMixin:
@@ -80,17 +80,17 @@ class ProgressionRepositoryMixin:
                 last_update = now
             elapsed = max(0, int((now - last_update).total_seconds()))
             periods = elapsed // RECOVERY_PERIOD_SECONDS
-            stamina_before = player_resource(row, "stamina")
-            energy_before = player_resource(row, "energy")
-            stamina_after = min(player_resource(row, "stamina_max"), stamina_before + periods)
-            energy_after = min(player_resource(row, "energy_max"), energy_before + periods)
+            stamina_before = player_integer(row, "stamina")
+            energy_before = player_integer(row, "energy")
+            stamina_after = min(player_integer(row, "stamina_max"), stamina_before + periods)
+            energy_after = min(player_integer(row, "energy_max"), energy_before + periods)
             recovered_stamina = stamina_after - stamina_before
             recovered_energy = energy_after - energy_before
-            void_before = player_resource(row, "void_power")
+            void_before = player_integer(row, "void_power")
             void_after = void_before
             recovered_void_power = 0
-            if player_resource(row, "void_power_max") > 0 and str(row["void_power_reset_date"] or "") != now.date().isoformat():
-                void_after = player_resource(row, "void_power_max")
+            if player_integer(row, "void_power_max") > 0 and str(row["void_power_reset_date"] or "") != now.date().isoformat():
+                void_after = player_integer(row, "void_power_max")
                 recovered_void_power = max(0, void_after - void_before)
             changed = recovered_stamina > 0 or recovered_energy > 0 or recovered_void_power > 0
             if periods > 0:

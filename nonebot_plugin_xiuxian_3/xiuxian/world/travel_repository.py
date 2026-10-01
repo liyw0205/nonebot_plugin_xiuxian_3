@@ -167,7 +167,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
-from ..utils.player import change_player_state, player_inventory, player_resource
+from ..utils.player import change_player_state, player_inventory, player_integer
 
 
 class TravelRepositoryMixin:
@@ -436,7 +436,7 @@ class TravelRepositoryMixin:
             if retreat is not None:
                 raise TravelBusyError("retreat is already running")
 
-            stamina = player_resource(row, "stamina")
+            stamina = player_integer(row, "stamina")
             stones = player_currency(row)
             inventory = player_inventory(row)
             pass_key = definition.pass_key

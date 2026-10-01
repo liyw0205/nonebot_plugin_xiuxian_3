@@ -41,7 +41,7 @@ from ..production.models import (
 from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
 from ..utils.equipment import create_equipment_instances
 from ..utils.assets import grant_player_assets, inventory_amount, player_assets_missing
-from ..utils.player import change_player_state, player_inventory, player_resource
+from ..utils.player import change_player_state, player_inventory, player_integer
 from ..progression.breakthrough.models import (
     BreakthroughSettlementRecord,
     BreakthroughSessionRecord,
@@ -379,7 +379,7 @@ class ProductionRepositoryMixin:
             )
             if missing_assets:
                 raise MaterialInsufficientError("recipe inputs or spirit stones are insufficient")
-            if player_resource(row, "energy") < recipe.energy_cost:
+            if player_integer(row, "energy") < recipe.energy_cost:
                 raise EnergyInsufficientError("energy is insufficient")
 
             durability = self._json_object(row["durability_json"], {})

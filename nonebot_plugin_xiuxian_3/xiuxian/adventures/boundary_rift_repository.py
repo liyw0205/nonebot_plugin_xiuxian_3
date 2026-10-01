@@ -24,7 +24,7 @@ from ..persistence.errors import (
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_BOUNDARY
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.assets import grant_player_assets, inventory_amount, spend_player_items
-from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
+from ..utils.player import change_player_state, player_integer, player_inventory
 from .boundary_rift_models import BoundaryRiftRunRecord
 from .boundary_rift_rules import (
     BOUNDARY_RIFT_EXPIRY_SECONDS,
@@ -144,7 +144,7 @@ class BoundaryRiftRepositoryMixin:
                     or REQUIRED_FLAG not in flags
                 ):
                     raise BoundaryRiftRequirementError("a member lacks location, realm, or three-realms evidence")
-                if player_resource(row, "stamina") < BOUNDARY_RIFT_STAMINA_COST:
+                if player_integer(row, "stamina") < BOUNDARY_RIFT_STAMINA_COST:
                     raise ResourceInsufficientError("a party member lacks entry stamina")
                 if self._has_active_long_action(connection, int(row["id"])):
                     raise BoundaryRiftBusyError("a party member has another active action")

@@ -25,7 +25,7 @@ from ..social.party_rules import PARTY_TYPE_SECRET_REALM_ANCIENT
 from ..specials.codex_projection import record_codex_discovery
 from ..combat.rules import player_stat_snapshot
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_combat_values, player_integer, player_resource
+from ..utils.player import change_player_state, player_combat_values, player_integer
 from .ancient_domain_models import AncientDomainRunRecord
 from .ancient_domain_rules import (
     ANCIENT_DOMAIN_EXPIRY_SECONDS,
@@ -120,7 +120,7 @@ class AncientDomainRepositoryMixin:
             ).fetchall()
             if len(members) != 3 or any(not row["confirmed_at"] for row in members):
                 raise AncientDomainRequirementError("exactly three confirmed members are required")
-            if player_resource(leader, "stamina") < ANCIENT_DOMAIN_STAMINA_COST:
+            if player_integer(leader, "stamina") < ANCIENT_DOMAIN_STAMINA_COST:
                 raise ResourceInsufficientError("party leader lacks entry stamina")
 
             first_clear: dict[int, bool] = {}

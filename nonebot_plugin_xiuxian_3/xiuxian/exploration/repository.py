@@ -181,7 +181,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_spend, assets_with_delta, player_currency
-from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
+from ..utils.player import change_player_state, player_integer, player_inventory
 
 
 class ExplorationRepositoryMixin:
@@ -248,9 +248,9 @@ class ExplorationRepositoryMixin:
                 str(row["realm_key"]), player_integer(row, "realm_layer"), definition.required_realm, definition.required_layer
             ):
                 raise LocationRequirementError("realm requirement is not met")
-            pollution_before = player_resource(row, "pollution")
+            pollution_before = player_integer(row, "pollution")
             pollution_after = pollution_before
-            bloodline_stability_before = player_resource(row, "bloodline_stability")
+            bloodline_stability_before = player_integer(row, "bloodline_stability")
             bloodline_stability_after = bloodline_stability_before
             cross_realm_penalty_bp = 0
             if definition.key == "explore.demon_abyss":
@@ -334,10 +334,10 @@ class ExplorationRepositoryMixin:
             ).fetchone()
             if used is not None and int(used["count"]) >= definition.daily_limit:
                 raise ExplorationQuotaExhaustedError("exploration mode reached its daily limit")
-            stamina = player_resource(row, "stamina")
+            stamina = player_integer(row, "stamina")
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
-            energy = player_resource(row, "energy")
+            energy = player_integer(row, "energy")
             if energy < definition.energy_cost:
                 raise EnergyInsufficientError("energy is insufficient")
 
@@ -385,8 +385,8 @@ class ExplorationRepositoryMixin:
                 "storm_roll_bp": (
                     cloud_boat_storm_roll_bp(operation_id) if definition.key == "explore.cloud_boat_trial" else None
                 ),
-                "max_hp": player_resource(row, "max_hp"),
-                "initiative": player_resource(row, "initiative"),
+                "max_hp": player_integer(row, "max_hp"),
+                "initiative": player_integer(row, "initiative"),
                 "constitution_effect": constitution_effect_snapshot(connection, player_id),
                 "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
                 "companions": [
@@ -401,7 +401,7 @@ class ExplorationRepositoryMixin:
                 value_delta={
                     "stamina": -definition.stamina_cost,
                     "energy": -definition.energy_cost,
-                    "pollution": pollution_after - player_resource(row, "pollution"),
+                    "pollution": pollution_after - player_integer(row, "pollution"),
                 },
                 maximums={"pollution": 100},
             )
@@ -1215,7 +1215,7 @@ class ExplorationRepositoryMixin:
             else:
                 stamina_refund = min(
                     int(session["stamina_cost"]) // 2,
-                    max(0, player_resource(row, "stamina_max") - player_resource(row, "stamina")),
+                    max(0, player_integer(row, "stamina_max") - player_integer(row, "stamina")),
                 )
                 result = {"stamina_refund": stamina_refund}
                 if stamina_refund:
@@ -1224,7 +1224,7 @@ class ExplorationRepositoryMixin:
                         row,
                         updated_at=now_text,
                         value_delta={"stamina": stamina_refund},
-                        maximums={"stamina": player_resource(row, "stamina_max")},
+                        maximums={"stamina": player_integer(row, "stamina_max")},
                     )
                 result_json = {
                     **stored,
@@ -1301,7 +1301,7 @@ class ExplorationRepositoryMixin:
                 row,
                 updated_at=now_text,
                 value_delta={"stamina": stamina_refund, "energy": energy_refund},
-                maximums={"stamina": player_resource(row, "stamina_max"), "energy": player_resource(row, "energy_max")},
+                maximums={"stamina": player_integer(row, "stamina_max"), "energy": player_integer(row, "energy_max")},
             )
             connection.execute(
                 "UPDATE exploration_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ? AND status = 'created'",

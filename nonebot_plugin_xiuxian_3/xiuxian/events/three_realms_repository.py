@@ -9,7 +9,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_assets
-from ..utils.player import player_resource
+from ..utils.player import player_integer
 from ..persistence.errors import (
     OperationConflictError,
     ThreeRealmsRankingNotFinalizedError,
@@ -100,7 +100,7 @@ class ThreeRealmsSeasonRepositoryMixin:
                     if key == "spirit_stones" or key.startswith("item.")
                 },
                 now_text,
-                player_values={"world_merit": player_resource(player, "world_merit") + reward.get("world_merit", 0)},
+                player_values={"world_merit": player_integer(player, "world_merit") + reward.get("world_merit", 0)},
             )
             binding_until = "9999-12-31T23:59:59+00:00"
             for item_key, value in reward.items():

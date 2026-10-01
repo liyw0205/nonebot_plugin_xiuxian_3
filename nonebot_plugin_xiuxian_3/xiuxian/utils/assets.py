@@ -284,7 +284,7 @@ def spend_player_items(
     )
 
 
-def add_player_currency(
+def grant_player_currency(
     connection: Any,
     row: Any,
     amount: Any,
@@ -678,7 +678,7 @@ __all__ = [
     "change_player_assets",
     "change_player_currency",
     "change_player_items",
-    "add_player_currency",
+    "grant_player_currency",
     "currency_grant",
     "currency_spend",
     "currency_with_delta",

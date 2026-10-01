@@ -188,12 +188,6 @@ def player_integer(row: Mapping[str, Any] | Any, key: str, default: int = 0) -> 
     return int(raw)
 
 
-def player_resource(row: Mapping[str, Any] | Any, key: str, default: int = 0) -> int:
-    """Read one shared numeric player value through the same validation path."""
-
-    return player_integer(row, key, default)
-
-
 def player_values_missing(
     row: Mapping[str, Any] | Any,
     requirements: Mapping[str, Any],
@@ -274,11 +268,13 @@ def change_player_values(
 ) -> dict[str, int]:
     """Persist one validated numeric player delta in the current transaction."""
 
-    values = player_numeric_delta(row, delta, maximums=maximums)
-    from .assets import write_player_values
-
-    write_player_values(connection, player_database_id(row), values, updated_at)
-    return values
+    return change_player_state(
+        connection,
+        row,
+        updated_at=updated_at,
+        value_delta=delta,
+        maximums=maximums,
+    ).values
 
 
 def change_player_state(
@@ -377,12 +373,6 @@ def player_profile_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     return projection
 
 
-def player_resource_values(row: Mapping[str, Any] | Any) -> dict[str, int]:
-    """Return the shared resource projection used by views and transactions."""
-
-    return player_numeric_values(row)
-
-
 def player_realm_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     """Return the shared realm/location portion used by views and battles."""
 
@@ -475,7 +465,7 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     qualification = player_qualification(row)
     inventory = player_inventory(row)
     intro = player_object(row, "intro_json")
-    resources = player_resource_values(row)
+    resources = player_numeric_values(row)
     realm = player_realm_values(row)
     return {
         "player_id": str(player_field(row, "player_id", player_field(row, "id", ""))),
@@ -568,8 +558,6 @@ __all__ = [
     "player_status_values",
     "player_object",
     "player_inventory",
-    "player_resource_values",
-    "player_resource",
     "player_realm_values",
     "player_qualification",
     "player_intro_flags",
