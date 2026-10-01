@@ -26,7 +26,7 @@ from .rules import (
     round_id_for,
     scheduled_start,
 )
-from ..utils.player import change_player_state
+from ..utils.player import grant_player_state
 
 
 class EventsRepositoryMixin:
@@ -142,12 +142,11 @@ class EventsRepositoryMixin:
             faction_after = faction_before + reward.get("faction_reputation.xuantian", 0)
             if success:
                 faction["xuantian"] = faction_after
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
+                rewards={"spirit_stones": reward["spirit_stones"]},
                 updated_at=now_text,
-                asset_values={"spirit_stones": reward["spirit_stones"]},
-                asset_mode="grant",
                 value_delta={
                     "cultivation": reward["cultivation"],
                     "total_cultivation": reward["cultivation"],

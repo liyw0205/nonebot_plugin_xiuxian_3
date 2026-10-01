@@ -65,7 +65,7 @@ from .spectator_rules import (
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.player import change_player_state, player_combat_values
+from ..utils.player import grant_player_state, player_combat_values
 
 
 class CombatRepositoryMixin:
@@ -1256,12 +1256,11 @@ class CombatRepositoryMixin:
                 raise BattleRewardNotAvailableError("battle has no claimable reward")
             asset_reward = {key: quantity for key, quantity in reward.items() if key != "cultivation"}
             cultivation_reward = int(reward.get("cultivation", 0))
-            change_player_state(
+            grant_player_state(
                 connection,
                 player,
+                rewards=asset_reward or None,
                 updated_at=now_text,
-                asset_values=asset_reward or None,
-                asset_mode="grant",
                 value_delta={
                     "cultivation": cultivation_reward,
                     "total_cultivation": cultivation_reward,

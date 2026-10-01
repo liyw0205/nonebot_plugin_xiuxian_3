@@ -29,6 +29,45 @@ PLAYER_RESOURCE_FIELDS = (
     "bloodline_stability",
 )
 
+# Every integer stored on ``players`` that can be exposed to an application
+# projection.  Keeping this list beside the projection reader prevents a new
+# view from quietly gaining a different conversion/default rule.
+PLAYER_NUMERIC_FIELDS = tuple(
+    dict.fromkeys(
+        (
+            *PLAYER_RESOURCE_FIELDS,
+            "foundation_quality",
+            "arena_rating",
+            "arena_wins",
+            "arena_losses",
+            "arena_draws",
+            "max_hp",
+            "max_mp",
+            "carry_capacity",
+            "initiative",
+            "cross_realm_penalty_bp",
+            "realm_resistance_bp",
+            "exploration_efficiency_bp",
+            "heart_demon_bonus_bp",
+            "breakthrough_pity_bp",
+            "domain_level",
+            "domain_charge",
+            "domain_charge_max",
+            "domain_power",
+            "void_power",
+            "void_power_max",
+            "space_resistance_bp",
+            "void_route_count",
+            "void_anchor_capacity",
+            "dao_fruit_progress",
+            "ascension_merit",
+            "tribulation_debt",
+        )
+    )
+)
+
+PLAYER_NUMERIC_DEFAULTS = {"arena_rating": 1000}
+
 PLAYER_COMBAT_FIELDS = (
     "max_hp",
     "initiative",
@@ -333,13 +372,71 @@ def change_player_state(
     return PlayerStateChange(values=numeric_values, assets=assets)
 
 
+def grant_player_state(
+    connection: Any,
+    row: Mapping[str, Any] | Any,
+    rewards: Mapping[str, Any] | None,
+    updated_at: str,
+    *,
+    value_delta: Mapping[str, Any] | None = None,
+    maximums: Mapping[str, Any] | None = None,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+) -> PlayerStateChange:
+    """Grant assets and numeric rewards through the shared state boundary."""
+
+    return change_player_state(
+        connection,
+        row,
+        updated_at=updated_at,
+        asset_values=rewards,
+        asset_mode="grant",
+        value_delta=value_delta,
+        maximums=maximums,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+    )
+
+
+def spend_player_state(
+    connection: Any,
+    row: Mapping[str, Any] | Any,
+    costs: Mapping[str, Any] | None,
+    updated_at: str,
+    *,
+    value_delta: Mapping[str, Any] | None = None,
+    maximums: Mapping[str, Any] | None = None,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+) -> PlayerStateChange:
+    """Spend assets and numeric resources through the shared state boundary."""
+
+    return change_player_state(
+        connection,
+        row,
+        updated_at=updated_at,
+        asset_values=costs,
+        asset_mode="spend",
+        value_delta=value_delta,
+        maximums=maximums,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+    )
+
+
 def player_numeric_values(
     row: Mapping[str, Any] | Any,
     fields: tuple[str, ...] = PLAYER_RESOURCE_FIELDS,
+    *,
+    defaults: Mapping[str, Any] | None = None,
 ) -> dict[str, int]:
     """Read a consistent set of non-negative player numeric projections."""
 
-    return {field: player_integer(row, field) for field in fields}
+    fallback = defaults or {}
+    return {
+        field: player_integer(row, field, int(fallback[field]) if field in fallback else 0)
+        for field in fields
+    }
 
 
 def player_projection(
@@ -486,7 +583,11 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     qualification = player_qualification(row)
     inventory = player_inventory(row)
     intro = player_object(row, "intro_json")
-    resources = player_numeric_values(row)
+    numeric = player_numeric_values(
+        row,
+        PLAYER_NUMERIC_FIELDS,
+        defaults=PLAYER_NUMERIC_DEFAULTS,
+    )
     realm = player_realm_values(row)
     return {
         "player_id": str(player_field(row, "player_id", player_field(row, "id", ""))),
@@ -511,37 +612,11 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
             if intro.get("selected_service") is not None
             else player_field(row, "selected_service")
         ),
-        **resources,
-        "foundation_quality": player_integer(row, "foundation_quality"),
-        "arena_rating": player_integer(row, "arena_rating", 1000),
-        "arena_wins": player_integer(row, "arena_wins"),
-        "arena_losses": player_integer(row, "arena_losses"),
-        "arena_draws": player_integer(row, "arena_draws"),
-        "max_hp": player_integer(row, "max_hp"),
-        "max_mp": player_integer(row, "max_mp"),
-        "carry_capacity": player_integer(row, "carry_capacity"),
-        "initiative": player_integer(row, "initiative"),
-        "cross_realm_penalty_bp": player_integer(row, "cross_realm_penalty_bp"),
+        **numeric,
         "soul_fatigue_until": player_field(row, "soul_fatigue_until"),
-        "realm_resistance_bp": player_integer(row, "realm_resistance_bp"),
-        "exploration_efficiency_bp": player_integer(row, "exploration_efficiency_bp"),
-        "heart_demon_bonus_bp": player_integer(row, "heart_demon_bonus_bp"),
-        "breakthrough_pity_bp": player_integer(row, "breakthrough_pity_bp"),
         "domain_key": player_field(row, "domain_key"),
-        "domain_level": player_integer(row, "domain_level"),
-        "domain_charge": player_integer(row, "domain_charge"),
-        "domain_charge_max": player_integer(row, "domain_charge_max"),
-        "domain_power": player_integer(row, "domain_power"),
         "domain_crack_until": player_field(row, "domain_crack_until"),
-        "void_power": player_integer(row, "void_power"),
-        "void_power_max": player_integer(row, "void_power_max"),
-        "space_resistance_bp": player_integer(row, "space_resistance_bp"),
         "void_instability_until": player_field(row, "void_instability_until"),
-        "void_route_count": player_integer(row, "void_route_count"),
-        "void_anchor_capacity": player_integer(row, "void_anchor_capacity"),
-        "dao_fruit_progress": player_integer(row, "dao_fruit_progress"),
-        "ascension_merit": player_integer(row, "ascension_merit"),
-        "tribulation_debt": player_integer(row, "tribulation_debt"),
         "dao_fruit_key": player_field(row, "dao_fruit_key"),
         "endgame_status": str(player_field(row, "endgame_status", "none") or "none"),
         "ending_key": player_field(row, "ending_key"),
@@ -562,6 +637,8 @@ __all__ = [
     "PlayerStateChange",
     "PLAYER_COMBAT_FIELDS",
     "PLAYER_COMBAT_PROJECTION_FIELDS",
+    "PLAYER_NUMERIC_DEFAULTS",
+    "PLAYER_NUMERIC_FIELDS",
     "PLAYER_PROFILE_FIELDS",
     "PLAYER_RESOURCE_FIELDS",
     "PLAYER_STATUS_FIELDS",
@@ -575,6 +652,8 @@ __all__ = [
     "player_has_values",
     "change_player_values",
     "change_player_state",
+    "grant_player_state",
+    "spend_player_state",
     "player_numeric_values",
     "player_projection",
     "player_view_values",

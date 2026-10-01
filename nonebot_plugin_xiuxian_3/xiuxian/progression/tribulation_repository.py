@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount, spend_player_items
-from ..utils.player import change_player_state, player_integer, player_inventory
+from ..utils.player import grant_player_state, player_integer, player_inventory
 from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..combat.rules import apply_constitution_combat_effect, MAX_TURNS, TURN_TIMEOUT_SECONDS
 from ..combat.tribulation_rules import (
@@ -407,12 +407,11 @@ class TribulationTrialRepositoryMixin:
             reward_assets = dict(reward_items)
             if guard_refund:
                 reward_assets["item.tribulation_guard"] = 1
-            change_player_state(
+            grant_player_state(
                 connection,
                 row,
+                rewards=reward_assets,
                 updated_at=now_text,
-                asset_values=reward_assets,
-                asset_mode="grant",
                 value_delta={
                     "dao_fruit_progress": progress,
                     "ascension_merit": merit,

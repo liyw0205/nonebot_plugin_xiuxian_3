@@ -181,7 +181,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_spend, assets_with_delta, player_currency
-from ..utils.player import change_player_state, player_integer, player_inventory
+from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory
 
 
 class ExplorationRepositoryMixin:
@@ -637,16 +637,15 @@ class ExplorationRepositoryMixin:
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, int(row["soul_power"]))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
-            change_player_state(
+            grant_player_state(
                 connection,
                 row,
-                updated_at=now_text,
-                asset_values={
+                rewards={
                     key: quantity
                     for key, quantity in result.items()
                     if key != "cultivation" and not key.startswith("faction_reputation.")
                 },
-                asset_mode="grant",
+                updated_at=now_text,
                 value_delta={
                     "cultivation": cultivation_gain,
                     "total_cultivation": cultivation_gain,
@@ -941,16 +940,15 @@ class ExplorationRepositoryMixin:
                     if key.startswith("faction_reputation."):
                         faction_key = key.removeprefix("faction_reputation.")
                         faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + int(quantity)
-                change_player_state(
+                grant_player_state(
                     connection,
                     row,
-                    updated_at=now_text,
-                    asset_values={
+                    rewards={
                         key: quantity
                         for key, quantity in result.items()
                         if key != "cultivation" and not key.startswith("faction_reputation.")
                     },
-                    asset_mode="grant",
+                    updated_at=now_text,
                     value_delta={
                         "cultivation": cultivation_gain,
                         "total_cultivation": cultivation_gain,

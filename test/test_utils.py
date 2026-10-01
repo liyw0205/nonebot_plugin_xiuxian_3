@@ -51,11 +51,14 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
     read_json_cached,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
+    PLAYER_NUMERIC_FIELDS,
     player_field,
     player_integer,
     player_numeric_delta,
     change_player_state,
     change_player_values,
+    grant_player_state,
+    spend_player_state,
     player_object,
     player_inventory,
     player_qualification,
@@ -484,6 +487,24 @@ def test_player_integer_projection_is_shared_by_profile_and_combat_reads() -> No
     assert player_values(row)["spirit_stones"] == resources["spirit_stones"]
 
 
+def test_player_projection_uses_one_numeric_field_table() -> None:
+    row = {
+        "spirit_stones": "12",
+        "stamina": "8",
+        "arena_rating": None,
+        "domain_power": "17",
+        "dao_fruit_progress": "4",
+    }
+    values = player_values(row)
+
+    assert "domain_power" in PLAYER_NUMERIC_FIELDS
+    assert "dao_fruit_progress" in PLAYER_NUMERIC_FIELDS
+    assert values["spirit_stones"] == 12
+    assert values["arena_rating"] == 1000
+    assert values["domain_power"] == 17
+    assert values["dao_fruit_progress"] == 4
+
+
 def test_player_profile_and_status_projections_are_detached_and_consistent() -> None:
     row = {
         "player_id": "p1",
@@ -584,6 +605,45 @@ def test_change_player_state_commits_assets_and_numeric_values_together() -> Non
         "SELECT spirit_stones, inventory_json, stamina, world_merit, updated_at FROM players WHERE id=1"
     ).fetchone()
     assert tuple(stored) == (125, '{"item.herb": 3, "item.sand": 2}', 10, 17, "after")
+    connection.close()
+
+
+def test_grant_and_spend_player_state_use_the_same_asset_numeric_kernel() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, energy INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, energy, updated_at) VALUES (1, 20, ?, 4, 'before')",
+        ('{"item.herb": 1}',),
+    )
+
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    granted = grant_player_state(
+        connection,
+        row,
+        {"spirit_stones": 10, "item.sand": 2},
+        "grant",
+        value_delta={"energy": 3},
+    )
+    assert granted.assets == AssetState(30, {"item.herb": 1, "item.sand": 2})
+    assert granted.values == {"energy": 7}
+
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    spent = spend_player_state(
+        connection,
+        row,
+        {"spirit_stones": 5, "item.herb": 1},
+        "spend",
+        value_delta={"energy": -2},
+    )
+    assert spent.assets == AssetState(25, {"item.sand": 2})
+    assert spent.values == {"energy": 5}
+    stored = connection.execute(
+        "SELECT spirit_stones, inventory_json, energy, updated_at FROM players WHERE id=1"
+    ).fetchone()
+    assert tuple(stored) == (25, '{"item.sand": 2}', 5, "spend")
     connection.close()
 
 
