@@ -38,6 +38,7 @@ from .rules import (
     segment_for_layer,
 )
 from ..player.rules import REALM_LABELS, realm_display_name
+from ..utils.player import player_status_values
 
 
 class ProgressionApplication:
@@ -475,13 +476,7 @@ class ProgressionApplication:
             context.request_id,
             operation_id,
             data={
-                "dao_name": player.dao_name,
-                "stamina": player.stamina,
-                "stamina_max": player.stamina_max,
-                "energy": player.energy,
-                "energy_max": player.energy_max,
-                "void_power": player.void_power,
-                "void_power_max": player.void_power_max,
+                **player_status_values(player),
                 "recovered_stamina": record.recovered_stamina,
                 "recovered_energy": record.recovered_energy,
                 "recovered_void_power": record.recovered_void_power,

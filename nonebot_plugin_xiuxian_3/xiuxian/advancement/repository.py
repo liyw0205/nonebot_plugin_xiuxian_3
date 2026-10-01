@@ -203,7 +203,7 @@ from ..utils.assets import (
     spend_player_items,
     spend_player_assets,
     assets_spend,
-    player_asset_amount,
+    player_currency,
 )
 from ..utils.player import change_player_state, player_integer, player_inventory
 
@@ -1380,7 +1380,7 @@ class AdvancementRepositoryMixin:
             raise RuntimeError("unsupported configured equipment resource")
         try:
             remaining = assets_spend(
-                player_asset_amount(player, "spirit_stones"),
+                player_currency(player),
                 inventory,
                 costs,
                 currency_key="currency.spirit_stone",

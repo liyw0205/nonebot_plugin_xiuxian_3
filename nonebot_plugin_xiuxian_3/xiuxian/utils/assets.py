@@ -40,6 +40,24 @@ class AssetState:
     inventory: dict[str, int]
 
 
+CURRENCY_ASSET_KEYS = frozenset({"spirit_stones", "currency.spirit_stone"})
+
+
+def is_currency_asset_key(key: Any) -> bool:
+    """Return whether a stable asset key addresses the spirit-stone balance."""
+
+    return str(key) in CURRENCY_ASSET_KEYS
+
+
+def asset_state_amount(state: AssetState, key: Any) -> int:
+    """Read one normalized balance from a detached asset state."""
+
+    normalized_key = str(key)
+    if is_currency_asset_key(normalized_key):
+        return state.currency
+    return inventory_amount(state.inventory, normalized_key)
+
+
 def _row_value(row: Any, key: str, default: Any = None) -> Any:
     """Read a stored column or a detached projection attribute."""
 
@@ -188,6 +206,46 @@ def change_player_assets(
     )
 
 
+def change_player_currency(
+    connection: Any,
+    row: Any,
+    delta: Any,
+    updated_at: str,
+    *,
+    player_values: Mapping[str, Any] | None = None,
+) -> AssetState:
+    """Apply a signed spirit-stone change through the shared asset kernel."""
+
+    return change_player_assets(
+        connection,
+        row,
+        {"spirit_stones": delta},
+        updated_at,
+        player_values=player_values,
+    )
+
+
+def change_player_items(
+    connection: Any,
+    row: Any,
+    delta: Mapping[str, Any],
+    updated_at: str,
+    *,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+) -> AssetState:
+    """Apply signed stackable-item changes through the shared asset kernel."""
+
+    return change_player_assets(
+        connection,
+        row,
+        delta,
+        updated_at,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+    )
+
+
 def grant_player_items(
     connection: Any,
     row: Any,
@@ -318,9 +376,7 @@ def _asset_delta_parts(
     item_delta: dict[str, Any] = {}
     for raw_key, raw_value in delta.items():
         key = str(raw_key)
-        if key == currency_key or (
-            currency_key == "spirit_stones" and key == "currency.spirit_stone"
-        ):
+        if key == currency_key or (currency_key == "spirit_stones" and is_currency_asset_key(key)):
             if currency_seen:
                 raise AssetDeltaError("currency delta must use one key")
             currency_delta = raw_value
@@ -431,13 +487,27 @@ def inventory_amount(inventory: Mapping[str, Any], key: str) -> int:
 def player_asset_amount(row: Any, key: str) -> int:
     """Read one currency or item balance through the shared asset rules."""
 
-    if key in {"spirit_stones", "currency.spirit_stone"}:
+    if is_currency_asset_key(key):
         currency = _row_value(row, "spirit_stones")
         if currency is None:
             raise AssetDeltaError("player row does not contain currency columns")
         return currency_with_delta(currency, 0)
     state = player_asset_state(row)
-    return inventory_amount(state.inventory, str(key))
+    return asset_state_amount(state, key)
+
+
+def player_currency(row: Any) -> int:
+    """Read the player's spirit-stone balance through the shared asset rules."""
+
+    return player_asset_amount(row, "spirit_stones")
+
+
+def player_item_amount(row: Any, key: str) -> int:
+    """Read one player's stackable-item balance through the shared rules."""
+
+    if is_currency_asset_key(key):
+        raise AssetDeltaError("item key cannot address currency")
+    return player_asset_amount(row, key)
 
 
 def player_asset_amounts(row: Any, keys: tuple[str, ...] | list[str] | None = None) -> dict[str, int]:
@@ -446,9 +516,7 @@ def player_asset_amounts(row: Any, keys: tuple[str, ...] | list[str] | None = No
     state = player_asset_state(row)
     selected = keys or tuple(["spirit_stones", *state.inventory.keys()])
     return {
-        str(key): state.currency
-        if str(key) in {"spirit_stones", "currency.spirit_stone"}
-        else inventory_amount(state.inventory, str(key))
+        str(key): asset_state_amount(state, key)
         for key in selected
     }
 
@@ -599,11 +667,15 @@ def currency_spend(balance: Any, amount: Any) -> int:
 __all__ = [
     "AssetState",
     "AssetDeltaError",
+    "CURRENCY_ASSET_KEYS",
     "apply_player_assets",
+    "asset_state_amount",
     "assets_grant",
     "assets_spend",
     "assets_with_delta",
     "change_player_assets",
+    "change_player_currency",
+    "change_player_items",
     "add_player_currency",
     "currency_grant",
     "currency_spend",
@@ -621,7 +693,10 @@ __all__ = [
     "player_asset_amounts",
     "player_assets_missing",
     "player_asset_state",
+    "player_currency",
     "player_database_id",
+    "player_item_amount",
+    "is_currency_asset_key",
     "spend_player_assets",
     "spend_player_currency",
     "spend_player_items",

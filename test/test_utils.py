@@ -12,6 +12,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     AssetDeltaError,
     add_player_currency,
     apply_player_assets,
+    change_player_currency,
+    change_player_items,
     assets_grant,
     assets_spend,
     assets_with_delta,
@@ -30,6 +32,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     player_asset_amount,
     player_asset_amounts,
     player_assets_missing,
+    player_currency,
+    player_item_amount,
     spend_player_assets,
     spend_player_currency,
     spend_player_items,
@@ -59,6 +63,9 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_resource_values,
     player_resource,
     player_realm_values,
+    player_profile_values,
+    player_status_values,
+    player_projection,
 )
 
 
@@ -178,10 +185,14 @@ def test_player_asset_reads_share_row_and_projection_shapes() -> None:
 
 def test_player_asset_reads_allow_partial_currency_rows_and_preserve_zero_items() -> None:
     assert player_asset_amount({"spirit_stones": "42"}, "currency.spirit_stone") == 42
+    assert player_currency({"spirit_stones": "42"}) == 42
     assert player_inventory({"inventory_json": '{"item.herb": 2, "item.empty": 0}'}, keep_zero=True) == {
         "item.herb": 2,
         "item.empty": 0,
     }
+    assert player_item_amount({"spirit_stones": 42, "inventory_json": '{"item.herb": 2}'}, "item.herb") == 2
+    with pytest.raises(AssetDeltaError, match="item key cannot address currency"):
+        player_item_amount({"spirit_stones": 42, "inventory_json": "{}"}, "spirit_stones")
 
 
 def test_asset_state_applies_currency_and_items_together() -> None:
@@ -280,6 +291,33 @@ def test_asset_shortcuts_share_the_same_player_transaction_kernel() -> None:
     connection.close()
 
 
+def test_signed_currency_and_item_changes_share_the_same_kernel() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, updated_at) VALUES (1, 30, ?, 'before')",
+        ('{"item.herb": 3}',),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    change_player_currency(connection, row, -10, "currency-changed")
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    change_player_items(connection, row, {"item.herb": -2, "item.sand": 1}, "items-changed")
+    stored = connection.execute("SELECT spirit_stones, inventory_json, updated_at FROM players WHERE id = 1").fetchone()
+    assert tuple(stored) == (20, '{"item.herb": 1, "item.sand": 1}', "items-changed")
+    with pytest.raises(AssetDeltaError):
+        change_player_currency(
+            connection,
+            connection.execute("SELECT * FROM players WHERE id = 1").fetchone(),
+            -21,
+            "rejected",
+        )
+    assert connection.execute("SELECT spirit_stones FROM players WHERE id = 1").fetchone()[0] == 20
+    connection.close()
+
+
 def test_player_asset_mutation_can_commit_other_player_values_atomically() -> None:
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
@@ -347,6 +385,11 @@ def test_player_values_normalizes_full_and_partial_rows() -> None:
     combat = player_combat_values(row)
     assert combat["qualification"] == values["qualification"]
     assert combat["inventory"] == values["inventory"]
+    assert combat["max_hp"] == values["max_hp"]
+    assert combat["initiative"] == values["initiative"]
+    assert combat["pollution"] == values["pollution"]
+    combat["inventory"]["item.herb"] = 99
+    assert values["inventory"] == {"item.herb": 2}
     partial = player_values({"player_id": "p2", "qualification_json": "{}"})
     assert partial["realm_key"] == "mortal"
     assert partial["spirit_stones"] == 0
@@ -378,6 +421,30 @@ def test_player_resource_projection_is_shared_by_profile_and_combat_reads() -> N
     assert resources["stamina"] == 8
     assert player_numeric_values(row, ("energy", "world_merit")) == {"energy": 4, "world_merit": 2}
     assert player_values(row)["spirit_stones"] == resources["spirit_stones"]
+
+
+def test_player_profile_and_status_projections_are_detached_and_consistent() -> None:
+    row = {
+        "player_id": "p1",
+        "dao_name": "玄尘",
+        "stage": "cultivator",
+        "realm_key": "foundation",
+        "realm_layer": 3,
+        "spirit_stones": 12,
+        "stamina": 8,
+        "stamina_max": 10,
+        "energy": 4,
+        "energy_max": 6,
+        "inventory_json": '{"item.herb": 2}',
+        "qualification_json": '{"body": 12}',
+    }
+    profile = player_profile_values(row)
+    status = player_status_values(row)
+    assert profile["realm_key"] == status["realm_key"] == "foundation"
+    assert profile["inventory"] == status["inventory"] == {"item.herb": 2}
+    profile["inventory"]["item.herb"] = 99
+    assert status["inventory"] == {"item.herb": 2}
+    assert player_projection(row, ("spirit_stones", "energy")) == {"spirit_stones": 12, "energy": 4}
 
 
 def test_player_numeric_projection_and_delta_share_resource_validation() -> None:

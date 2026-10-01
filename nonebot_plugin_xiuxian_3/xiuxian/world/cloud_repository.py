@@ -13,7 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import player_asset_amount
+from ..utils.assets import player_currency
 from ..utils.player import change_player_state, player_resource
 from .cloud_models import (
     ArrayHallRecord,
@@ -103,7 +103,7 @@ class CloudRepositoryMixin:
             stamina = player_resource(player, "stamina")
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
-            if player_asset_amount(player, "spirit_stones") < definition.currency_cost:
+            if player_currency(player) < definition.currency_cost:
                 raise CloudFareInsufficientError("cloud fare is insufficient")
             asset_costs = {"spirit_stones": definition.currency_cost}
             if definition.pass_key:
@@ -349,7 +349,7 @@ class CloudRepositoryMixin:
             ).fetchone()
             if progress is not None and str(progress["status"]) in {"completed", "claimed"}:
                 raise DemonIntroAlreadyCompletedError("demon introduction already completed")
-            if player_asset_amount(player, "spirit_stones") < 100:
+            if player_currency(player) < 100:
                 raise ResourceInsufficientError("demon introduction requires 100 spirit stones")
             faction = self._json_object(player["faction_reputation_json"], {})
             faction["demon"] = int(faction.get("demon", 0)) + 20
@@ -524,7 +524,7 @@ class CloudRepositoryMixin:
             observation = self._valid_beast_observation(connection, player_id)
             if observation is None:
                 raise BeastIntroRequirementError("outskirts beast observation is incomplete")
-            if player_asset_amount(player, "spirit_stones") < 100:
+            if player_currency(player) < 100:
                 raise ResourceInsufficientError("beast introduction requires 100 spirit stones")
 
             faction = self._json_object(player["faction_reputation_json"], {})

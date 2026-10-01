@@ -14,7 +14,7 @@ from ..utils.assets import (
     grant_player_assets,
     inventory_missing,
     spend_player_assets,
-    player_asset_amount,
+    player_currency,
 )
 from ..utils.player import player_inventory, player_resource
 from ..utils.json import json_object
@@ -91,7 +91,7 @@ class ServiceRepositoryMixin:
             if existing is not None:
                 return self._order_from_payload(existing, replay=True)
             publisher = self._require_player(connection, platform, platform_user_id)
-            if player_asset_amount(publisher, "spirit_stones") < reward:
+            if player_currency(publisher) < reward:
                 raise ResourceInsufficientError("publisher reward is insufficient")
             spend_player_assets(connection, publisher, {"spirit_stones": reward}, now_text)
             order_id = uuid4().hex

@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, inventory_with_delta, player_asset_amount
+from ..utils.assets import change_player_assets, inventory_with_delta, player_currency
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     CrossRealmTradeCurrencyInsufficientError,
@@ -97,7 +97,7 @@ class CrossRealmTradeRepositoryMixin:
             for item_key, quantity in definition.input_items.items():
                 if int(inventory.get(item_key, 0)) < quantity:
                     raise CrossRealmTradeInputInsufficientError(f"missing trade input: {item_key}")
-            if player_asset_amount(player, "spirit_stones") < definition.currency_cost:
+            if player_currency(player) < definition.currency_cost:
                 raise CrossRealmTradeCurrencyInsufficientError("trade currency is insufficient")
 
             input_before = {key: int(inventory.get(key, 0)) for key in definition.input_items}
@@ -190,8 +190,8 @@ class CrossRealmTradeRepositoryMixin:
                 "cross_realm_trade.input",
                 "debit",
                 definition.currency_cost,
-                player_asset_amount(player, "spirit_stones"),
-                player_asset_amount(player, "spirit_stones") - definition.currency_cost,
+                player_currency(player),
+                player_currency(player) - definition.currency_cost,
                 trade_id,
                 now_text,
             )

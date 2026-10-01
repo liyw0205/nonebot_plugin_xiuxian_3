@@ -171,7 +171,7 @@ from ..routine.rules import (
     tree_status,
 )
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import player_asset_amount
+from ..utils.assets import player_currency
 from ..utils.player import change_player_state, player_inventory, player_resource
 
 
@@ -414,7 +414,7 @@ class RoutineRepositoryMixin:
             ).fetchone()
             if int(used["count"]) >= 2:
                 raise RoutineMakeupLimitError("monthly makeup limit reached")
-            if player_asset_amount(row, "spirit_stones") < 30:
+            if player_currency(row) < 30:
                 raise CurrencyInsufficientError("makeup requires 30 spirit stones")
 
             requested_reward = makeup_reward()

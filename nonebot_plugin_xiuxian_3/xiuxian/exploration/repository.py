@@ -180,7 +180,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import assets_spend, assets_with_delta, player_asset_amount
+from ..utils.assets import assets_spend, assets_with_delta, player_currency
 from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 
 
@@ -1183,7 +1183,7 @@ class ExplorationRepositoryMixin:
                     "storm_deadline": ends_at,
                 }
             elif effective_choice == "pay":
-                if player_asset_amount(row, "spirit_stones") < CLOUD_BOAT_STORM_PAY_COST:
+                if player_currency(row) < CLOUD_BOAT_STORM_PAY_COST:
                     raise CurrencyInsufficientError("cloud boat storm payment requires spirit stones")
                 result = dict(frozen_result)
                 result["cultivation"] = int(result.get("cultivation", 0)) + 200

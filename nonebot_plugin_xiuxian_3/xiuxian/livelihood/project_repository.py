@@ -13,7 +13,7 @@ from ..utils.assets import (
     grant_player_assets,
     spend_player_assets,
 )
-from ..utils.assets import player_asset_amount
+from ..utils.assets import player_currency
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     OperationConflictError,
@@ -156,7 +156,7 @@ class ProjectRepositoryMixin:
             cost_key, resource_amount = self._resource_cost(resource, points)
             inventory = player_inventory(player)
             if cost_key == "currency.spirit_stone":
-                available = player_asset_amount(player, "spirit_stones")
+                available = player_currency(player)
             else:
                 available = int(inventory.get(cost_key, 0))
             if available < resource_amount:

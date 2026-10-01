@@ -38,7 +38,7 @@ from .sect_rules import (
     validate_sect_motto,
     validate_sect_name,
 )
-from ..utils.assets import spend_player_currency, player_asset_amount
+from ..utils.assets import spend_player_currency, player_currency
 from ..utils.player import change_player_state
 
 
@@ -108,7 +108,7 @@ class SectRepositoryMixin:
                 "tribulation",
             }:
                 raise SectRequirementError("sect creation requires foundation realm")
-            if player_asset_amount(player, "spirit_stones") < SECT_DEFINITION.create_cost:
+            if player_currency(player) < SECT_DEFINITION.create_cost:
                 raise ResourceInsufficientError("sect creation cost is insufficient")
             name_key = normalize_sect_name_key(normalized_name)
             if connection.execute(
@@ -538,7 +538,7 @@ class SectRepositoryMixin:
             "member_count": int(count["count"]) if count is not None else 0,
             "max_members": int(sect["max_members"]),
             "construction": int(sect["construction"]),
-            "spirit_stones": player_asset_amount(player, "spirit_stones") if player is not None else 0,
+            "spirit_stones": player_currency(player) if player is not None else 0,
             "created_at": str(sect["created_at"]),
             "player_id": str(player_id),
         }

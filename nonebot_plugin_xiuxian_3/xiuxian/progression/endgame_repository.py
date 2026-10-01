@@ -27,7 +27,7 @@ from .endgame_rules import (
     TRIBULATION_TOTAL_CULTIVATION,
     TRIAL_ORDER,
 )
-from ..utils.assets import player_asset_amount
+from ..utils.assets import player_currency
 from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 
 
@@ -92,7 +92,7 @@ class EndgameRepositoryMixin:
                 raise MaterialInsufficientError("dao fruit fragments are insufficient")
             if int(row["world_merit"]) < DAO_UNION_MERIT_COST:
                 raise DaoUnionRequirementError("world merit is insufficient")
-            if player_asset_amount(row, "spirit_stones") < DAO_UNION_STONE_COST:
+            if player_currency(row) < DAO_UNION_STONE_COST:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
             intro = self._json_object(row["intro_json"], {})
             flags.add("endgame.dao_union")

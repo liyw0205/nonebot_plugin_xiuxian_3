@@ -9,7 +9,7 @@ from datetime import date
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_amount, spend_player_assets, player_asset_amount
+from ..utils.assets import inventory_amount, spend_player_assets, player_currency
 from ..utils.player import player_inventory
 from .facility_models import FacilityMaintenanceRecord, FacilitySlotRecord
 from .facility_rules import FACILITY_DURATION_BONUS_BP, FACILITY_MAINTENANCE_FEE, resolve_facility
@@ -186,7 +186,7 @@ class FacilityRepositoryMixin:
                 if existing_maintenance is not None:
                     records.append(self._maintenance_record(existing_maintenance, replay=True))
                     continue
-                paid = player_asset_amount(player, "spirit_stones") >= FACILITY_MAINTENANCE_FEE
+                paid = player_currency(player) >= FACILITY_MAINTENANCE_FEE
                 if paid:
                     spend_player_assets(connection, player, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
                     player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
@@ -239,7 +239,7 @@ class FacilityRepositoryMixin:
                 paid = False
                 if owner_type == "personal":
                     owner = connection.execute("SELECT * FROM players WHERE id = ? AND status = 'active'", (owner_id,)).fetchone()
-                    if owner is not None and player_asset_amount(owner, "spirit_stones") >= FACILITY_MAINTENANCE_FEE:
+                    if owner is not None and player_currency(owner) >= FACILITY_MAINTENANCE_FEE:
                         spend_player_assets(connection, owner, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
                         paid = True
                 else:

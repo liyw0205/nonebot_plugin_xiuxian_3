@@ -41,6 +41,122 @@ PLAYER_COMBAT_FIELDS = (
     "domain_power",
 )
 
+PLAYER_STATUS_FIELDS = (
+    "player_id",
+    "dao_name",
+    "stage",
+    "status",
+    "location_key",
+    "realm_key",
+    "realm_layer",
+    "spirit_stones",
+    "stamina",
+    "stamina_max",
+    "energy",
+    "energy_max",
+    "cultivation",
+    "total_cultivation",
+    "inventory",
+    "world_merit",
+    "void_merit",
+    "alliance_points",
+    "pollution",
+    "bloodline_stability",
+    "soul_power",
+    "soul_power_max",
+    "domain_charge",
+    "domain_charge_max",
+    "void_power",
+    "void_power_max",
+)
+
+PLAYER_PROFILE_FIELDS = (
+    "player_id",
+    "dao_name",
+    "platform",
+    "stage",
+    "status",
+    "location_key",
+    "realm_key",
+    "realm_layer",
+    "cultivation",
+    "total_cultivation",
+    "foundation_quality",
+    "world_merit",
+    "void_merit",
+    "alliance_points",
+    "spirit_stones",
+    "stamina",
+    "stamina_max",
+    "energy",
+    "energy_max",
+    "inventory",
+    "intro_flags",
+    "selected_service",
+    "qualification",
+    "path_key",
+    "subprofession_key",
+    "soul_power",
+    "soul_power_max",
+    "domain_charge",
+    "domain_charge_max",
+    "pollution",
+    "bloodline_stability",
+    "cross_realm_penalty_bp",
+    "soul_fatigue_until",
+    "domain_key",
+    "domain_power",
+    "realm_resistance_bp",
+    "domain_crack_until",
+    "initiative",
+    "domain_level",
+    "faction_reputation",
+    "void_power",
+    "void_power_max",
+    "space_resistance_bp",
+    "void_instability_until",
+    "void_route_count",
+    "void_anchor_capacity",
+    "dao_fruit_progress",
+    "ascension_merit",
+    "tribulation_debt",
+    "dao_fruit_key",
+    "endgame_status",
+    "ending_key",
+)
+
+PLAYER_COMBAT_PROJECTION_FIELDS = (
+    "player_id",
+    "platform",
+    "platform_user_id",
+    "scene_id",
+    "nickname",
+    "stage",
+    "status",
+    "dao_name",
+    "path_key",
+    "location_key",
+    "realm_key",
+    "realm_layer",
+    "qualification",
+    "inventory",
+    "stamina",
+    "stamina_max",
+    "energy",
+    "energy_max",
+    "max_hp",
+    "initiative",
+    "pollution",
+    "bloodline_stability",
+    "cross_realm_penalty_bp",
+    "faction_reputation",
+    "soul_power",
+    "domain_key",
+    "domain_charge",
+    "domain_charge_max",
+    "domain_power",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class PlayerStateChange:
@@ -191,6 +307,44 @@ def player_numeric_values(
     return {field: player_integer(row, field) for field in fields}
 
 
+def player_projection(
+    row: Mapping[str, Any] | Any,
+    fields: tuple[str, ...],
+) -> dict[str, Any]:
+    """Return one detached projection from the canonical player value reader."""
+
+    values = player_values(row)
+    projection: dict[str, Any] = {}
+    for field in fields:
+        value = values[field]
+        if isinstance(value, dict):
+            projection[field] = dict(value)
+        elif isinstance(value, list):
+            projection[field] = list(value)
+        elif isinstance(value, tuple):
+            projection[field] = tuple(value)
+        else:
+            projection[field] = value
+    return projection
+
+
+def player_status_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
+    """Return the shared read-only status projection used by status commands."""
+
+    return player_projection(row, PLAYER_STATUS_FIELDS)
+
+
+def player_profile_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
+    """Return the shared public profile projection used by profile commands."""
+
+    projection = player_projection(row, PLAYER_PROFILE_FIELDS)
+    for field in ("soul_fatigue_until", "domain_crack_until", "void_instability_until"):
+        value = projection[field]
+        if value is not None and hasattr(value, "isoformat"):
+            projection[field] = value.isoformat()
+    return projection
+
+
 def player_resource_values(row: Mapping[str, Any] | Any) -> dict[str, int]:
     """Return the shared resource projection used by views and transactions."""
 
@@ -325,6 +479,7 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
         "carry_capacity": player_integer(row, "carry_capacity"),
         "initiative": player_integer(row, "initiative"),
         "cross_realm_penalty_bp": player_integer(row, "cross_realm_penalty_bp"),
+        "soul_fatigue_until": player_field(row, "soul_fatigue_until"),
         "realm_resistance_bp": player_integer(row, "realm_resistance_bp"),
         "exploration_efficiency_bp": player_integer(row, "exploration_efficiency_bp"),
         "heart_demon_bonus_bp": player_integer(row, "heart_demon_bonus_bp"),
@@ -334,9 +489,11 @@ def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
         "domain_charge": player_integer(row, "domain_charge"),
         "domain_charge_max": player_integer(row, "domain_charge_max"),
         "domain_power": player_integer(row, "domain_power"),
+        "domain_crack_until": player_field(row, "domain_crack_until"),
         "void_power": player_integer(row, "void_power"),
         "void_power_max": player_integer(row, "void_power_max"),
         "space_resistance_bp": player_integer(row, "space_resistance_bp"),
+        "void_instability_until": player_field(row, "void_instability_until"),
         "void_route_count": player_integer(row, "void_route_count"),
         "void_anchor_capacity": player_integer(row, "void_anchor_capacity"),
         "dao_fruit_progress": player_integer(row, "dao_fruit_progress"),
@@ -355,44 +512,16 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     companion and equipment modifiers are added by their own snapshot readers.
     """
 
-    values = player_values(row)
-    return {
-        "player_id": values["player_id"],
-        "platform": values["platform"],
-        "platform_user_id": values["platform_user_id"],
-        "scene_id": values["scene_id"],
-        "nickname": values["nickname"],
-        "stage": values["stage"],
-        "status": values["status"],
-        "dao_name": values["dao_name"],
-        "path_key": values["path_key"],
-        "location_key": values["location_key"],
-        "realm_key": values["realm_key"],
-        "realm_layer": values["realm_layer"],
-        "qualification": dict(values["qualification"]),
-        "inventory": dict(values["inventory"]),
-        "stamina": values["stamina"],
-        "stamina_max": values["stamina_max"],
-        "energy": values["energy"],
-        "energy_max": values["energy_max"],
-        "max_hp": values["max_hp"],
-        "initiative": values["initiative"],
-        "pollution": values["pollution"],
-        "bloodline_stability": values["bloodline_stability"],
-        "cross_realm_penalty_bp": values["cross_realm_penalty_bp"],
-        "faction_reputation": dict(values["faction_reputation"]),
-        "soul_power": values["soul_power"],
-        "domain_key": values["domain_key"],
-        "domain_charge": values["domain_charge"],
-        "domain_charge_max": values["domain_charge_max"],
-        "domain_power": values["domain_power"],
-    }
+    return player_projection(row, PLAYER_COMBAT_PROJECTION_FIELDS)
 
 
 __all__ = [
     "PlayerStateChange",
     "PLAYER_COMBAT_FIELDS",
+    "PLAYER_COMBAT_PROJECTION_FIELDS",
+    "PLAYER_PROFILE_FIELDS",
     "PLAYER_RESOURCE_FIELDS",
+    "PLAYER_STATUS_FIELDS",
     "player_field",
     "player_database_id",
     "player_integer",
@@ -400,6 +529,9 @@ __all__ = [
     "change_player_values",
     "change_player_state",
     "player_numeric_values",
+    "player_projection",
+    "player_profile_values",
+    "player_status_values",
     "player_object",
     "player_inventory",
     "player_resource_values",

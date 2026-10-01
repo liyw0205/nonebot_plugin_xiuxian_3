@@ -91,8 +91,8 @@ class DemonAbyssRepositoryMixin:
             first_clear=bool(result.get("first_clear", snapshot.get("first_clear", False))),
             outcome=result.get("outcome"),
             expires_at=str(run["expires_at"]),
-            pollution_before=int(risk.get("pollution_before", snapshot.get("pollution_before", player["pollution"]))),
-            pollution_after=int(result.get("pollution_after", risk.get("pollution_after", player["pollution"]))),
+            pollution_before=int(risk.get("pollution_before", snapshot.get("pollution_before", player_resource(player, "pollution")))),
+            pollution_after=int(result.get("pollution_after", risk.get("pollution_after", player_resource(player, "pollution")))),
             risk_roll_bp=(int(risk["roll_bp"]) if "roll_bp" in risk else None),
             system_aborted=result.get("outcome") == "system_aborted",
         )
@@ -222,7 +222,7 @@ class DemonAbyssRepositoryMixin:
                 "realm_layer": player_integer(player, "realm_layer"),
                 "access_flag": DEMON_ABYSS_REQUIRED_FLAG,
                 "demon_reputation": int(faction.get("demon", 0)),
-                "pollution_before": int(player["pollution"]),
+                "pollution_before": player_resource(player, "pollution"),
                 "pollution_delta": 0,
                 "risk_base_bp": DEMON_ABYSS_RISK_BASE_BP,
                 "risk_modifier_bp": DEMON_ABYSS_RISK_MODIFIER_BP,
@@ -309,7 +309,7 @@ class DemonAbyssRepositoryMixin:
                 modifier_bp = int(snapshot["risk_modifier_bp"])
                 risk_bp = max(0, min(10_000, base_bp + modifier_bp))
                 roll_bp = demon_abyss_risk_roll_bp(f"{snapshot['random_seed']}:{node_key}")
-                pollution_before = int(player["pollution"])
+                pollution_before = player_resource(player, "pollution")
                 polluted = demon_abyss_risk_applies(roll_bp, risk_bp)
                 pollution_after = min(100, pollution_before + (1 if polluted else 0))
                 if pollution_after != pollution_before:
@@ -615,7 +615,7 @@ class DemonAbyssRepositoryMixin:
                 player,
                 updated_at=now_text,
                 value_delta={"stamina": int(run["stamina_locked"]), "pollution": -pollution_delta},
-                maximums={"stamina": player["stamina_max"]},
+                maximums={"stamina": player_resource(player, "stamina_max")},
             )
             quota_key = f"system_aborted:{run_id}"
             result = {
@@ -625,7 +625,7 @@ class DemonAbyssRepositoryMixin:
                 "stamina_refunded": int(run["stamina_locked"]),
                 "quota_released": True,
                 "pollution_rolled_back": pollution_delta,
-                "pollution_after": max(0, int(player["pollution"]) - pollution_delta),
+                "pollution_after": max(0, player_resource(player, "pollution") - pollution_delta),
             }
             connection.execute(
                 "UPDATE secret_realm_runs SET status='settled', quota_key=?, result_json=?, updated_at=? WHERE id=?",
