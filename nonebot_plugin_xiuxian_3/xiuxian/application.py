@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from ..contracts import CommandContext, CommandResult, strip_runtime_metadata, validate_command_identity
+from ..contracts import CommandContext, CommandResult, validate_command_identity
 from .content import ContentBundle
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
@@ -171,7 +171,7 @@ class XiuxianApplication:
             message=result.message,
             request_id=result.request_id,
             operation_id=result.operation_id,
-            data=strip_runtime_metadata(result.data),
+            data=result.data,
             retryable=result.retryable,
         )
 

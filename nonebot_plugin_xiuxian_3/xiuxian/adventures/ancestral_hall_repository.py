@@ -22,15 +22,14 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..combat.rules import MAX_TURNS
+from ..utils.player import change_player_state
 from .ancestral_hall_models import AncestralHallRunRecord
 from .ancestral_hall_rules import (
-    ANCESTRAL_HALL_CONTENT_VERSION,
     ANCESTRAL_HALL_ENEMY,
     ANCESTRAL_HALL_EXPIRY_SECONDS,
     ANCESTRAL_HALL_KEY,
     ANCESTRAL_HALL_LOCATION,
     ANCESTRAL_HALL_NODES,
-    ANCESTRAL_HALL_RULE_VERSION,
     ANCESTRAL_HALL_STAMINA_COST,
     ANCESTRAL_HALL_STORY_FLAG,
     ANCESTRAL_HALL_CODEX_ENTRY,
@@ -214,21 +213,22 @@ class AncestralHallRepositoryMixin:
                 "bloodline_stability": int(player["bloodline_stability"]),
                 "node_keys": list(ANCESTRAL_HALL_NODES),
                 "first_clear": ANCESTRAL_HALL_STORY_FLAG not in set(intro.get("flags", [])),
-                "content_version": ANCESTRAL_HALL_CONTENT_VERSION,
-                "rule_version": ANCESTRAL_HALL_RULE_VERSION,
             }
-            connection.execute(
-                "UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=? AND stamina>=?",
-                (ANCESTRAL_HALL_STAMINA_COST, now_text, player["id"], ANCESTRAL_HALL_STAMINA_COST),
-            )
-            if connection.execute("SELECT changes()").fetchone()[0] != 1:
+            try:
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"stamina": -ANCESTRAL_HALL_STAMINA_COST},
+                )
+            except ValueError:
                 raise ResourceInsufficientError("stamina changed during entry")
             connection.execute(
-                "INSERT INTO ancestral_hall_runs(run_id, player_id, status, node_index, battle_id, quota_key, starts_at, expires_at, stamina_cost, snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
+                "INSERT INTO ancestral_hall_runs(run_id, player_id, status, node_index, battle_id, quota_key, starts_at, expires_at, stamina_cost, snapshot_json, result_json, entry_operation_id, created_at, updated_at) "
+                "VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, ?, '{}', ?, ?, ?)",
                 (run_id, player["id"], quota_key, now_text, expires_at, ANCESTRAL_HALL_STAMINA_COST,
                  json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id,
-                 ANCESTRAL_HALL_CONTENT_VERSION, ANCESTRAL_HALL_RULE_VERSION, now_text, now_text),
+                 now_text, now_text),
             )
             run = connection.execute("SELECT * FROM ancestral_hall_runs WHERE run_id=?", (run_id,)).fetchone()
             payload = self._hall_payload(run, snapshot, {})
@@ -545,10 +545,17 @@ class AncestralHallRepositoryMixin:
                 battle = connection.execute("SELECT status FROM battle_sessions WHERE battle_id=?", (run["battle_id"],)).fetchone()
                 if battle is not None and str(battle["status"]) in {"created", "running"}:
                     raise AncestralHallNotReadyError("active automatic battle was not terminated")
-            connection.execute(
-                "UPDATE players SET stamina=MIN(stamina_max, stamina+?), updated_at=? WHERE id=?",
-                (int(run["stamina_cost"]), now_text, run["player_id"]),
-            )
+            player = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (run["player_id"],)
+            ).fetchone()
+            if player is not None:
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"stamina": int(run["stamina_cost"])},
+                    maximums={"stamina": player["stamina_max"]},
+                )
             result = {"outcome": "system_aborted", "stamina_refunded": int(run["stamina_cost"]), "quota_released": True}
             connection.execute(
                 "UPDATE ancestral_hall_runs SET status='system_aborted', result_json=?, updated_at=? WHERE id=?",

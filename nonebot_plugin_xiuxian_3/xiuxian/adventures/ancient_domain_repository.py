@@ -24,9 +24,10 @@ from ..persistence.errors import (
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_ANCIENT
 from ..specials.codex_projection import record_codex_discovery
 from ..combat.rules import player_stat_snapshot
+from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state
 from .ancient_domain_models import AncientDomainRunRecord
 from .ancient_domain_rules import (
-    ANCIENT_DOMAIN_CONTENT_VERSION,
     ANCIENT_DOMAIN_EXPIRY_SECONDS,
     ANCIENT_DOMAIN_FIRST_REWARD,
     ANCIENT_DOMAIN_KEY,
@@ -34,7 +35,6 @@ from .ancient_domain_rules import (
     ANCIENT_DOMAIN_NODES,
     ANCIENT_DOMAIN_PARTY_TYPE,
     ANCIENT_DOMAIN_REPEAT_REWARD,
-    ANCIENT_DOMAIN_RULE_VERSION,
     ANCIENT_DOMAIN_STAMINA_COST,
     resolve_ancient_domain_node,
 )
@@ -223,21 +223,22 @@ class AncientDomainRepositoryMixin:
                 "member_combat_snapshots": member_combat_snapshots,
                 "first_clear_by_player": {str(key): value for key, value in first_clear.items()},
                 "entry_cost": {"leader_stamina": ANCIENT_DOMAIN_STAMINA_COST},
-                "content_version": ANCIENT_DOMAIN_CONTENT_VERSION,
-                "rule_version": ANCIENT_DOMAIN_RULE_VERSION,
             }
-            connection.execute(
-                "UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=? AND stamina>=?",
-                (ANCIENT_DOMAIN_STAMINA_COST, now_text, leader["id"], ANCIENT_DOMAIN_STAMINA_COST),
-            )
-            if connection.execute("SELECT changes()").fetchone()[0] != 1:
+            try:
+                change_player_state(
+                    connection,
+                    leader,
+                    updated_at=now_text,
+                    value_delta={"stamina": -ANCIENT_DOMAIN_STAMINA_COST},
+                )
+            except ValueError:
                 raise ResourceInsufficientError("party leader stamina changed during entry")
             connection.execute(
-                "INSERT INTO ancient_domain_runs(run_id, party_id, status, node_index, battle_id, quota_key, starts_at, expires_at, snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
+                "INSERT INTO ancient_domain_runs(run_id, party_id, status, node_index, battle_id, quota_key, starts_at, expires_at, snapshot_json, result_json, entry_operation_id, created_at, updated_at) "
+                "VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, '{}', ?, ?, ?)",
                 (run_id, party["party_id"], quota_key, now_text, expires_at,
                  json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id,
-                 ANCIENT_DOMAIN_CONTENT_VERSION, ANCIENT_DOMAIN_RULE_VERSION, now_text, now_text),
+                 now_text, now_text),
             )
             for index, row in enumerate(members):
                 connection.execute(
@@ -397,7 +398,7 @@ class AncientDomainRepositoryMixin:
                 self._expire_ancient_domain(connection, run, now_text)
                 return self._ancient_record_from_row(connection, run["run_id"])
             members = connection.execute(
-                "SELECT m.*, p.player_id AS stable_player_id, p.inventory_json "
+                "SELECT m.*, p.id AS database_id, p.player_id AS stable_player_id, p.spirit_stones, p.inventory_json "
                 "FROM ancient_domain_members m JOIN players p ON p.id=m.player_id "
                 "WHERE m.run_id=? ORDER BY m.member_order",
                 (run["run_id"],),
@@ -407,9 +408,6 @@ class AncientDomainRepositoryMixin:
             for member in members:
                 reward = dict(ANCIENT_DOMAIN_FIRST_REWARD if bool(member["first_clear"]) else ANCIENT_DOMAIN_REPEAT_REWARD)
                 rewards[str(member["player_id"])] = reward
-                inventory = self._ancient_json(member["inventory_json"])
-                for key, quantity in reward.items():
-                    inventory[key] = int(inventory.get(key, 0)) + quantity
                 if bool(member["first_clear"]):
                     first_clear_members.append(str(member["stable_player_id"]))
                     record_codex_discovery(
@@ -420,9 +418,11 @@ class AncientDomainRepositoryMixin:
                         occurred_at=now,
                         snapshot={"run_id": str(run["run_id"]), "instance_key": ANCIENT_DOMAIN_KEY},
                     )
-                connection.execute(
-                    "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, member["player_id"]),
+                grant_player_assets(
+                    connection,
+                    member,
+                    reward,
+                    now_text,
                 )
                 connection.execute(
                     "UPDATE ancient_domain_members SET status='cleared', reward_json=?, updated_at=? WHERE run_id=? AND player_id=?",
@@ -518,19 +518,33 @@ class AncientDomainRepositoryMixin:
             party = connection.execute("SELECT leader_id, current_session_id FROM parties WHERE party_id=?", (run["party_id"],)).fetchone()
             if party is None:
                 raise AncientDomainNotFoundError("ancient-domain party no longer exists")
-            connection.execute(
-                "UPDATE players SET stamina=MIN(stamina_max, stamina+?), updated_at=? WHERE id=?",
-                (ANCIENT_DOMAIN_STAMINA_COST, now_text, party["leader_id"]),
-            )
+            leader = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (party["leader_id"],)
+            ).fetchone()
+            if leader is not None:
+                change_player_state(
+                    connection,
+                    leader,
+                    updated_at=now_text,
+                    value_delta={"stamina": ANCIENT_DOMAIN_STAMINA_COST},
+                    maximums={"stamina": leader["stamina_max"]},
+                )
             energy_rows = connection.execute(
                 "SELECT player_id, SUM(amount) AS amount FROM ancient_domain_energy_events WHERE run_id=? GROUP BY player_id",
                 (run_id,),
             ).fetchall()
             for row in energy_rows:
-                connection.execute(
-                    "UPDATE players SET domain_charge=MIN(domain_charge_max, domain_charge+?), updated_at=? WHERE id=?",
-                    (int(row["amount"]), now_text, row["player_id"]),
-                )
+                player = connection.execute(
+                    "SELECT * FROM players WHERE id = ?", (row["player_id"],)
+                ).fetchone()
+                if player is not None:
+                    change_player_state(
+                        connection,
+                        player,
+                        updated_at=now_text,
+                        value_delta={"domain_charge": int(row["amount"])},
+                        maximums={"domain_charge": player["domain_charge_max"]},
+                    )
             if party["current_session_id"]:
                 battle_id = str(party["current_session_id"])
                 result = {"outcome": "system_aborted", "reason": "instance_compensated"}

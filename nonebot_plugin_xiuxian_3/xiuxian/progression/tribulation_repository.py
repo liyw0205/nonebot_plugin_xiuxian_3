@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import inventory_value, spend_player_items
+from ..utils.player import change_player_state
 from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..combat.rules import apply_constitution_combat_effect, MAX_TURNS, TURN_TIMEOUT_SECONDS
 from ..combat.tribulation_rules import (
@@ -162,16 +163,14 @@ class TribulationTrialRepositoryMixin:
                 if row["dao_fruit_key"]:
                     raise DaoFruitChoiceError("dao fruit is already locked")
             inventory = inventory_value(row["inventory_json"])
+            guard_used = int(inventory.get("item.tribulation_guard", 0)) > 0
+            costs = {"item.tribulation_token": definition.token_cost}
+            if guard_used:
+                costs["item.tribulation_guard"] = 1
             try:
-                inventory = inventory_spend(
-                    inventory,
-                    {"item.tribulation_token": definition.token_cost},
-                )
+                spend_player_items(connection, row, costs, now_text)
             except ValueError as exc:
                 raise TribulationTokenInsufficientError("tribulation token is insufficient") from exc
-            guard_used = int(inventory.get("item.tribulation_guard", 0)) > 0
-            if guard_used:
-                inventory = inventory_spend(inventory, {"item.tribulation_guard": 1})
 
             equipment = self._battle_equipment_snapshot(connection, int(row["id"]))
             qualification = self._json_object(row["qualification_json"], {})
@@ -257,10 +256,6 @@ class TribulationTrialRepositoryMixin:
                 "debt_shield_bp": shield_bp,
             }
             ends_at = serialize_datetime(now + timedelta(seconds=TRIBULATION_TRIAL_DURATION_SECONDS))
-            connection.execute(
-                "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                (inventory_json(inventory), now_text, row["id"]),
-            )
             connection.execute(
                 "INSERT INTO tribulation_trial_sessions(session_id, player_id, operation_id, trial_key, choice_key, status, starts_at, ends_at, snapshot_json, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, 'preparing', ?, ?, ?, ?, ?)",
@@ -401,24 +396,32 @@ class TribulationTrialRepositoryMixin:
             merit = definition.merit_reward if success else 0
             world_merit = TRIBULATION_WORLD_MERIT_REWARD[trial_key] if success else 0
             reward_items = {"item.dao_fruit_fragment": 1} if success and trial_key == "trial.body_and_mind" else {}
-            inventory = inventory_value(row["inventory_json"])
-            if success and snapshot.get("tribulation", {}).get("guard_used", snapshot.get("guard_used")):
-                inventory = inventory_grant(inventory, {"item.tribulation_guard": 1})
-            inventory = inventory_grant(inventory, reward_items)
+            guard_refund = bool(
+                success
+                and snapshot.get("tribulation", {}).get("guard_used", snapshot.get("guard_used"))
+            )
             fruit_key = str(snapshot.get("tribulation", {}).get("choice_key", snapshot.get("choice_key"))) if success and trial_key == "trial.dao_choice" else None
             new_progress = min(1300, int(row["dao_fruit_progress"]) + progress)
             new_debt = int(row["tribulation_debt"]) + debt_delta
             cooldown_until = serialize_datetime(now + timedelta(seconds=definition.cooldown_seconds)) if not success else None
-            if success and fruit_key:
-                connection.execute(
-                    "UPDATE players SET dao_fruit_progress=?, ascension_merit=ascension_merit+?, world_merit=world_merit+?, dao_fruit_key=?, inventory_json=?, updated_at=? WHERE id=?",
-                    (new_progress, merit, world_merit, fruit_key, inventory_json(inventory), now_text, row["id"]),
-                )
-            else:
-                connection.execute(
-                    "UPDATE players SET dao_fruit_progress=?, ascension_merit=ascension_merit+?, world_merit=world_merit+?, tribulation_debt=?, inventory_json=?, updated_at=? WHERE id=?",
-                    (new_progress, merit, world_merit, new_debt, inventory_json(inventory), now_text, row["id"]),
-                )
+            reward_assets = dict(reward_items)
+            if guard_refund:
+                reward_assets["item.tribulation_guard"] = 1
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values=reward_assets,
+                asset_mode="grant",
+                value_delta={
+                    "dao_fruit_progress": progress,
+                    "ascension_merit": merit,
+                    "world_merit": world_merit,
+                    "tribulation_debt": debt_delta,
+                },
+                maximums={"dao_fruit_progress": 1300},
+                player_values={"dao_fruit_key": fruit_key} if fruit_key else None,
+            )
             result = {
                 "success": success,
                 "battle_id": battle_id,

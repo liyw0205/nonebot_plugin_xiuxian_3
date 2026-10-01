@@ -11,7 +11,8 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
-from ..utils.assets import AssetState, write_player_assets
+from ..utils.assets import grant_player_assets, grant_player_items
+from ..utils.player import change_player_state
 from .secret_realm_models import SecretRealmPreviewRecord, SecretRealmRunRecord
 from .secret_realm_rules import (
     DEFINITIONS,
@@ -103,17 +104,18 @@ class SecretRealmRepositoryMixin:
                 raise SecretRealmRequirementError("secret-realm ticket is missing")
             if int(player["stamina"]) < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
-            if definition.ticket_key:
-                inventory[definition.ticket_key] = ticket - definition.ticket_quantity
-            connection.execute(
-                "UPDATE players SET stamina=stamina-?, inventory_json=?, updated_at=? WHERE id=? AND stamina>=?",
-                (
-                    definition.stamina_cost,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    player["id"],
-                    definition.stamina_cost,
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values=(
+                    {definition.ticket_key: definition.ticket_quantity}
+                    if definition.ticket_key
+                    else None
                 ),
+                asset_mode="spend",
+                value_delta={"stamina": -definition.stamina_cost},
+                maximums={"stamina": player["stamina_max"]},
             )
             run_id = uuid4().hex
             snapshot = {
@@ -389,9 +391,12 @@ class SecretRealmRepositoryMixin:
             elif status == "expired":
                 self._refund_ticket(connection, player, run, now_text)
                 result = {"reward": {}, "outcome": "expired", "ticket_refunded": bool(run["ticket_key"]), "stamina_refunded": int(run["stamina_locked"])}
-                connection.execute(
-                    "UPDATE players SET stamina=MIN(stamina_max, stamina+?), updated_at=? WHERE id=?",
-                    (int(run["stamina_locked"]), now_text, player["id"]),
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"stamina": int(run["stamina_locked"])},
+                    maximums={"stamina": player["stamina_max"]},
                 )
             elif status == "cleared":
                 first_clear = bool(snapshot.get("first_clear"))
@@ -514,18 +519,18 @@ class SecretRealmRepositoryMixin:
         key = run["ticket_key"]
         if not key:
             return
-        inventory = json_object(player["inventory_json"], {})
-        inventory[str(key)] = int(inventory.get(str(key), 0)) + int(run["ticket_locked"])
-        connection.execute("UPDATE players SET inventory_json=?, updated_at=? WHERE id=?", (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]))
+        grant_player_items(
+            connection,
+            player,
+            {str(key): int(run["ticket_locked"])},
+            now_text,
+        )
 
     @staticmethod
     def _apply_reward(connection: sqlite3.Connection, player: sqlite3.Row, reward: dict[str, int], now_text: str) -> None:
-        inventory = json_object(player["inventory_json"], {})
-        stones = int(player["spirit_stones"])
+        asset_reward: dict[str, int] = {}
         for key, value in reward.items():
-            if key == "spirit_stones":
-                stones += int(value)
-            elif key == "local_reputation":
+            if key == "local_reputation":
                 rep = connection.execute("SELECT local_json FROM player_reputations WHERE player_id=?", (player["id"],)).fetchone()
                 local = json_object(rep["local_json"], {}) if rep else {}
                 local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + int(value)
@@ -543,8 +548,8 @@ class SecretRealmRepositoryMixin:
                 ):
                     raise RuntimeError(f"equipment definition disappeared: {key}")
             else:
-                inventory[key] = int(inventory.get(key, 0)) + int(value)
-        write_player_assets(connection, int(player["id"]), AssetState(stones, inventory), now_text)
+                asset_reward[key] = int(value)
+        grant_player_assets(connection, player, asset_reward, now_text)
 
     def _run_payload(self, player: sqlite3.Row, definition, *, run_id: str, status: str, node_index: int, snapshot: dict[str, Any], battle_id: str | None = None, reward: dict[str, int] | None = None, first_clear: bool | None = None, ticket_locked: int = 0, stamina_locked: int = 0) -> dict[str, Any]:
         nodes = tuple(str(item) for item in snapshot.get("node_keys", definition.node_keys))

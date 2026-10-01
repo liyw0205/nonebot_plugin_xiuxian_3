@@ -15,8 +15,6 @@ class LegacyManorDefinition:
     permission: str
     clue: str
     expiry_seconds: int
-    content_version: str
-    rule_version: str
     story_flag: str
     node_labels: tuple[tuple[str, str], ...]
 
@@ -38,8 +36,6 @@ _DEMON_RELIQUARY = LegacyManorDefinition(
     permission="access.demon.fallen_ruins",
     clue="item.clue.demon_contract",
     expiry_seconds=60 * 60,
-    content_version="",
-    rule_version="",
     story_flag="story.legacy.demon_reliquary",
     node_labels=(
         ("reliquary_seal", "遗府封印"),
@@ -57,8 +53,6 @@ _DEMON_ABYSS_ECHO = LegacyManorDefinition(
     permission="access.demon_abyss_gate",
     clue="item.clue.demon_abyss_echo",
     expiry_seconds=60 * 60,
-    content_version="",
-    rule_version="",
     story_flag="story.legacy.demon_abyss_echo",
     node_labels=(
         ("echo_threshold", "残响门庭"),
@@ -93,8 +87,6 @@ LEGACY_MANOR_LOCATION = _DEMON_RELIQUARY.location_key
 LEGACY_MANOR_PERMISSION = _DEMON_RELIQUARY.permission
 LEGACY_MANOR_CLUE = _DEMON_RELIQUARY.clue
 LEGACY_MANOR_EXPIRY_SECONDS = _DEMON_RELIQUARY.expiry_seconds
-LEGACY_MANOR_CONTENT_VERSION = ""
-LEGACY_MANOR_RULE_VERSION = ""
 LEGACY_MANOR_STORY_FLAG = _DEMON_RELIQUARY.story_flag
 LEGACY_MANOR_NODES = _DEMON_RELIQUARY.nodes
 LEGACY_MANOR_NODE_LABELS = _DEMON_RELIQUARY.labels
@@ -102,7 +94,6 @@ LEGACY_MANOR_NODE_LABELS = _DEMON_RELIQUARY.labels
 
 __all__ = [
     "LEGACY_MANOR_CLUE",
-    "LEGACY_MANOR_CONTENT_VERSION",
     "LEGACY_MANOR_DEFINITIONS",
     "LEGACY_MANOR_EXPIRY_SECONDS",
     "LEGACY_MANOR_KEY",
@@ -110,7 +101,6 @@ __all__ = [
     "LEGACY_MANOR_NODE_LABELS",
     "LEGACY_MANOR_NODES",
     "LEGACY_MANOR_PERMISSION",
-    "LEGACY_MANOR_RULE_VERSION",
     "LEGACY_MANOR_STORY_FLAG",
     "LegacyManorDefinition",
     "get_legacy_manor_definition",

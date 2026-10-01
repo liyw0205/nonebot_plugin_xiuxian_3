@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 DEMON_MAINLINE = "quest.demon_main_1"
-DEMON_MAINLINE_CONTENT_VERSION = ""
-DEMON_MAINLINE_RULE_VERSION = ""
 DEMON_MAINLINE_EXPLORATION = "explore.demon_abyss"
 DEMON_MAINLINE_EXPLORATION_TARGET = 2
 DEMON_MAINLINE_REQUIRED_REPUTATION = 200
@@ -30,10 +28,8 @@ def demon_mainline_realm_ready(realm_key: str, layer: int) -> bool:
 __all__ = [
     "DEMON_MAINLINE",
     "DEMON_MAINLINE_ACCESS_FLAG",
-    "DEMON_MAINLINE_CONTENT_VERSION",
     "DEMON_MAINLINE_EXPLORATION",
     "DEMON_MAINLINE_EXPLORATION_TARGET",
     "DEMON_MAINLINE_REQUIRED_REPUTATION",
-    "DEMON_MAINLINE_RULE_VERSION",
     "demon_mainline_realm_ready",
 ]

@@ -38,6 +38,7 @@ from .sect_rules import (
     validate_sect_motto,
     validate_sect_name,
 )
+from ..utils.assets import spend_player_currency
 
 
 class SectRepositoryMixin:
@@ -143,10 +144,7 @@ class SectRepositoryMixin:
                 """,
                 (sect_id, player["id"], now_text, now_text, now_text, now_text),
             )
-            connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE id = ?",
-                (SECT_DEFINITION.create_cost, now_text, player["id"]),
-            )
+            spend_player_currency(connection, player, SECT_DEFINITION.create_cost, now_text)
             payload = self._sect_payload(connection, sect_id, player_id=int(player["id"]), role="leader")
             self._sect_record_operation(
                 connection,

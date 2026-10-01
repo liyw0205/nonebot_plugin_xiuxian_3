@@ -132,12 +132,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -156,18 +154,13 @@ from ..routine.gacha import (
 )
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -181,6 +174,8 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.assets import grant_player_assets, spend_player_items
+from ..utils.player import change_player_state
 
 
 class AdventuresRepositoryMixin:
@@ -629,38 +624,37 @@ class AdventuresRepositoryMixin:
             if progress < definition.target_amount:
                 raise BountyIncompleteError("bounty target is incomplete")
 
-            inventory = self._json_object(row["inventory_json"], {})
             if definition.consume_target and definition.target_key:
+                inventory = self._json_object(row["inventory_json"], {})
                 quantity = int(inventory.get(definition.target_key, 0))
                 if quantity < definition.target_amount:
                     raise BountyIncompleteError("delivery inventory is insufficient")
-                remaining = quantity - definition.target_amount
-                if remaining:
-                    inventory[definition.target_key] = remaining
-                else:
-                    inventory.pop(definition.target_key, None)
-            stones = int(row["spirit_stones"])
-            cultivation = int(row["cultivation"])
-            total_cultivation = int(row["total_cultivation"])
-            energy = int(row["energy"])
+                spend_player_items(
+                    connection,
+                    row,
+                    {definition.target_key: definition.target_amount},
+                    now_text,
+                )
             snapshot = self._json_object(offer["snapshot_json"], {})
             rewards = {str(key): int(value) for key, value in dict(snapshot["reward"]).items()}
             actual_rewards: dict[str, int] = {}
+            asset_rewards: dict[str, int] = {}
+            cultivation_gain = 0
+            energy_gain = 0
             local_reputation = 0
             service_reputation = 0
             faction_reputation = self._json_object(row["faction_reputation_json"], {})
             for key, quantity in rewards.items():
                 quantity = int(quantity)
                 if key == "spirit_stones":
-                    stones += quantity
+                    asset_rewards[key] = quantity
                     actual_rewards[key] = quantity
                 elif key == "cultivation":
-                    cultivation += quantity
-                    total_cultivation += quantity
+                    cultivation_gain += quantity
                     actual_rewards[key] = quantity
                 elif key == "energy":
-                    gained = min(quantity, max(0, int(row["energy_max"]) - energy))
-                    energy += gained
+                    gained = min(quantity, max(0, int(row["energy_max"]) - int(row["energy"]) - energy_gain))
+                    energy_gain += gained
                     actual_rewards[key] = gained
                 elif key == "local_reputation":
                     local_reputation += quantity
@@ -692,7 +686,7 @@ class AdventuresRepositoryMixin:
                 ):
                     actual_rewards[key] = quantity
                 else:
-                    inventory[key] = int(inventory.get(key, 0)) + quantity
+                    asset_rewards[key] = quantity
                     actual_rewards[key] = quantity
 
             reputation = connection.execute(
@@ -713,23 +707,23 @@ class AdventuresRepositoryMixin:
                 """,
                 (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
             )
-            connection.execute(
-                """
-                UPDATE players
-                SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, energy = ?,
-                    inventory_json = ?, faction_reputation_json = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    stones,
-                    cultivation,
-                    total_cultivation,
-                    energy,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                    json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    row["id"],
-                ),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values=asset_rewards,
+                asset_mode="grant",
+                value_delta={
+                    "cultivation": cultivation_gain,
+                    "total_cultivation": cultivation_gain,
+                    "energy": energy_gain,
+                },
+                maximums={"energy": row["energy_max"]},
+                player_values={
+                    "faction_reputation_json": json.dumps(
+                        faction_reputation, ensure_ascii=False, sort_keys=True
+                    )
+                },
             )
             result_json = {
                 "status": "claimed",
@@ -1200,8 +1194,7 @@ class AdventuresRepositoryMixin:
         now_text: str,
         definition: Any,
     ) -> dict[str, int | str]:
-        inventory = SQLitePlayerRepository._json_object(player["inventory_json"], {})
-        stones = int(player["spirit_stones"])
+        asset_rewards: dict[str, int] = {}
         local_delta = 0
         service_delta = 0
         actual: dict[str, int | str] = {}
@@ -1212,7 +1205,7 @@ class AdventuresRepositoryMixin:
             key = str(key)
             if key == "spirit_stones":
                 quantity = int(raw_value)
-                stones += quantity
+                asset_rewards[key] = quantity
                 actual[key] = quantity
             elif key == "local_reputation":
                 local_delta += int(raw_value)
@@ -1238,7 +1231,7 @@ class AdventuresRepositoryMixin:
                 actual[key] = title_key
             elif key.startswith("item."):
                 quantity = int(raw_value)
-                inventory[key] = int(inventory.get(key, 0)) + quantity
+                asset_rewards[key] = quantity
                 actual[key] = quantity
             elif key.startswith("access.") or key.startswith("codex."):
                 quantity = int(raw_value)
@@ -1264,10 +1257,7 @@ class AdventuresRepositoryMixin:
                 """,
                 (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
             )
-        connection.execute(
-            "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-            (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
-        )
+        grant_player_assets(connection, player, asset_rewards, now_text)
         for event_key in event_keys:
             connection.execute(
                 """

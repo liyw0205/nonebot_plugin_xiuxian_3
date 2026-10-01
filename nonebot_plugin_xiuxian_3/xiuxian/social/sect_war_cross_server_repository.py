@@ -56,6 +56,8 @@ from .sect_war_cross_server_rules import (
     current_cross_server_round,
     top_reward_for_rank,
 )
+from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state
 
 
 class SectWarCrossServerRepositoryMixin:
@@ -366,7 +368,12 @@ class SectWarCrossServerRepositoryMixin:
                 payload = {"round_id": window.round_id, "sect_id": str(member["sect_id"]), "reward": {"void_merit": CROSS_SERVER_MEMBER_MERIT}, "status": "claimed"}
                 self._cross_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
                 return self._reward_from_payload(payload, already_completed=True)
-            connection.execute("UPDATE players SET void_merit=void_merit+?, updated_at=? WHERE id=?", (CROSS_SERVER_MEMBER_MERIT, now_text, player["id"]))
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"void_merit": CROSS_SERVER_MEMBER_MERIT},
+            )
             reward["status"] = "claimed"
             connection.execute("UPDATE sect_cross_server_weekly_rewards SET reward_json=? WHERE reward_key=?", (json.dumps(reward, sort_keys=True), f"season.void_frontier.{window.week_id}:{player['id']}"))
             payload = {"round_id": window.round_id, "sect_id": str(member["sect_id"]), "reward": {"void_merit": CROSS_SERVER_MEMBER_MERIT}, "status": "claimed"}
@@ -400,9 +407,12 @@ class SectWarCrossServerRepositoryMixin:
             if replay is not None:
                 return self._reward_from_payload(replay, already_completed=True)
             distributed["item.void_crystal"] = int(distributed.get("item.void_crystal", 0)) + quantity
-            inventory = self._json_map(target["inventory_json"])
-            inventory["item.void_crystal"] = int(inventory.get("item.void_crystal", 0)) + quantity
-            connection.execute("UPDATE players SET inventory_json=?, updated_at=? WHERE id=?", (json.dumps(inventory, sort_keys=True), now_text, target["id"]))
+            grant_player_assets(
+                connection,
+                target,
+                {"item.void_crystal": quantity},
+                now_text,
+            )
             connection.execute("INSERT INTO sect_cross_server_reward_allocations(box_id,player_id,operation_id,item_key,quantity,allocated_at) VALUES (?, ?, ?, 'item.void_crystal', ?, ?)", (box["box_id"], target["id"], operation_id, quantity, now_text))
             status = "distributed" if int(distributed.get("item.void_crystal", 0)) >= int(reward.get("item.void_crystal", 0)) else "partial"
             connection.execute("UPDATE sect_cross_server_reward_boxes SET distributed_json=?, status=?, updated_at=? WHERE box_id=?", (json.dumps(distributed, sort_keys=True), status, now_text, box["box_id"]))
@@ -489,7 +499,17 @@ class SectWarCrossServerRepositoryMixin:
             reward = self._json_map(row["reward_json"])
             if reward.get("status") == "claimed":
                 continue
-            connection.execute("UPDATE players SET void_merit=void_merit+?, updated_at=? WHERE id=?", (CROSS_SERVER_MEMBER_MERIT, serialize_datetime(now), row["player_id"]))
+            player = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (row["player_id"],)
+            ).fetchone()
+            if player is None:
+                continue
+            change_player_state(
+                connection,
+                player,
+                updated_at=serialize_datetime(now),
+                value_delta={"void_merit": CROSS_SERVER_MEMBER_MERIT},
+            )
             reward["status"] = "claimed"
             connection.execute("UPDATE sect_cross_server_weekly_rewards SET reward_json=?, operation_id=? WHERE reward_key=?", (json.dumps(reward, sort_keys=True), f"{row['reward_key']}:auto", row["reward_key"]))
 

@@ -85,7 +85,8 @@ from ...exploration.rules import (
     settlement_result,
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
-from ...utils.assets import currency_grant, currency_spend, inventory_grant, inventory_json, inventory_spend, inventory_value
+from ...utils.assets import inventory_spend, inventory_value
+from ...utils.player import change_player_state
 from ...adventures.mainline_models import (
     MainlineClaimRecord,
     MainlineStageView,
@@ -531,7 +532,6 @@ class BreakthroughRepositoryMixin:
             material_costs = {str(key): int(value) for key, value in definition.materials.items()}
             if alternative_material:
                 material_costs[alternative_material] = material_costs.get(alternative_material, 0) + 2
-            inventory = inventory_spend(inventory, material_costs, preserve_zero=is_void_refining)
             session_materials = dict(definition.materials)
             if alternative_material:
                 session_materials[alternative_material] = 2
@@ -585,25 +585,25 @@ class BreakthroughRepositoryMixin:
                 "space_resistance_bp": int(row["space_resistance_bp"]),
                 "void_instability_until": row["void_instability_until"],
             }
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, spirit_stones = ?, world_merit = world_merit - ?, heart_demon_bonus_bp = CASE WHEN ? = 1 THEN 0 ELSE heart_demon_bonus_bp END, updated_at = ? WHERE id = ?",
-                (
-                    inventory_json(inventory, keep_zero=is_void_refining),
-                    currency_spend(row["spirit_stones"], definition.currency_cost),
-                    100 if is_nascent else (500 if is_soul_transformation or is_void_refining else 0),
-                    1 if is_nascent else 0,
-                    now_text,
-                    row["id"],
-                ),
-            )
+            value_delta = {
+                "world_merit": -(
+                    100 if is_nascent else 500 if is_soul_transformation or is_void_refining else 0
+                )
+            }
             if is_soul_transformation:
-                connection.execute(
-                    "UPDATE players SET soul_power = soul_power - 200 WHERE id = ?", (row["id"],)
-                )
+                value_delta["soul_power"] = -200
             if is_void_refining:
-                connection.execute(
-                    "UPDATE players SET domain_charge = domain_charge - 100 WHERE id = ?", (row["id"],)
-                )
+                value_delta["domain_charge"] = -100
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={"spirit_stones": definition.currency_cost, **material_costs},
+                asset_mode="spend",
+                value_delta=value_delta,
+                player_values={"heart_demon_bonus_bp": 0} if is_nascent else None,
+                preserve_zero=is_void_refining,
+            )
             connection.execute(
                 """
                 INSERT INTO breakthrough_sessions(
@@ -790,12 +790,20 @@ class BreakthroughRepositoryMixin:
                 raise MaterialInsufficientError("domain core is missing")
             if int(row["spirit_stones"]) < 10_000:
                 raise CurrencyInsufficientError("domain selection requires spirit stones")
-            inventory = inventory_spend(inventory, {"item.domain_core": 1})
             snapshot = self._json_object(session["snapshot_json"], {})
             domain_key = str(session["domain_key"])
             pollution_delta = 15 if domain_key == "domain.abyss_shadow" else 0
             bloodline_delta = -10 if domain_key == "domain.ancestral_wild" else 0
-            connection.execute("UPDATE players SET domain_key = ?, inventory_json = ?, spirit_stones = ?, pollution = pollution + ?, bloodline_stability = MAX(0, bloodline_stability + ?), updated_at = ? WHERE id = ?", (domain_key, inventory_json(inventory), currency_spend(row["spirit_stones"], 10000), pollution_delta, bloodline_delta, now_text, row["id"]))
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={"item.domain_core": 1, "spirit_stones": 10_000},
+                asset_mode="spend",
+                value_delta={"pollution": pollution_delta, "bloodline_stability": bloodline_delta},
+                maximums={"pollution": 100},
+                player_values={"domain_key": domain_key},
+            )
             connection.execute("UPDATE domain_selection_sessions SET status = 'confirmed', result_json = ?, updated_at = ? WHERE id = ?", (json.dumps({"domain_key": domain_key, "pollution_delta": pollution_delta, "bloodline_delta": bloodline_delta}, ensure_ascii=False, sort_keys=True), now_text, session["id"]))
             content = self.content or bundled_content()
             path_key = str(snapshot["path_key"])
@@ -852,10 +860,20 @@ class BreakthroughRepositoryMixin:
                     raise MaterialInsufficientError("domain restore pill is missing")
                 if int(row["spirit_stones"]) < 2000:
                     raise CurrencyInsufficientError("early domain recovery requires spirit stones")
-                inventory = inventory_spend(inventory, {"item.pill.domain_restore": 1})
                 stones_spent = 2000
                 medicine_consumed = True
-            connection.execute("UPDATE players SET domain_crack_until = NULL, inventory_json = ?, spirit_stones = ?, updated_at = ? WHERE id = ?", (inventory_json(inventory), currency_spend(row["spirit_stones"], stones_spent), now_text, row["id"]))
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values=(
+                    {"item.pill.domain_restore": 1, "spirit_stones": stones_spent}
+                    if medicine_consumed
+                    else None
+                ),
+                asset_mode="spend",
+                player_values={"domain_crack_until": None},
+            )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             payload = {"player": self._player_payload(self._row_to_player(updated)), "early": early, "spirit_stones_spent": stones_spent, "medicine_consumed": medicine_consumed}
             connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
@@ -961,66 +979,86 @@ class BreakthroughRepositoryMixin:
                     int(row["stamina"]) + definition.reward_stamina,
                 )
                 reward_items = dict(definition.reward_items or {})
-                inventory = inventory_grant(inventory, reward_items)
+                player_values: dict[str, Any] = {
+                    "realm_key": definition.target_realm,
+                    "realm_layer": 1,
+                    "cultivation": cultivation_after,
+                    "breakthrough_pity_bp": 0,
+                    "weakness_until": None,
+                }
+                value_delta = {
+                    "stamina": stamina_after - int(row["stamina"]),
+                    "world_merit": definition.reward_world_merit,
+                }
                 if is_nascent:
-                    connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, soul_power = 100, soul_power_max = 300, domain_charge = 100, domain_charge_max = 100, cross_realm_penalty_bp = ?, max_hp = max_hp + 600, max_mp = max_mp + 480, carry_capacity = carry_capacity + 50, exploration_efficiency_bp = exploration_efficiency_bp + 1500, heart_demon_bonus_bp = 0, soul_fatigue_until = NULL, updated_at = ? WHERE id = ?",
-                        (
-                            definition.target_realm,
-                            currency_grant(row["spirit_stones"], definition.reward_currency),
-                            stamina_after,
-                            definition.reward_world_merit,
-                            inventory_json(inventory, keep_zero=is_void_refining),
-                            0 if str(row["location_key"]).startswith("xuantian.") else 1000,
-                            now_text,
-                            row["id"],
-                        ),
+                    player_values.update(
+                        {
+                            "soul_power": 100,
+                            "soul_power_max": 300,
+                            "domain_charge": 100,
+                            "domain_charge_max": 100,
+                            "cross_realm_penalty_bp": 0 if str(row["location_key"]).startswith("xuantian.") else 1000,
+                            "max_hp": int(row["max_hp"]) + 600,
+                            "max_mp": int(row["max_mp"]) + 480,
+                            "carry_capacity": int(row["carry_capacity"]) + 50,
+                            "exploration_efficiency_bp": int(row["exploration_efficiency_bp"]) + 1500,
+                            "heart_demon_bonus_bp": 0,
+                            "soul_fatigue_until": None,
+                        }
                     )
                 elif is_soul_transformation:
-                    connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = ?, stamina = ?, stamina_max = stamina_max + 20, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_key = NULL, domain_power = 100, domain_charge = 150, domain_charge_max = 150, domain_charge_reset_date = ?, realm_resistance_bp = 1000, domain_crack_until = NULL, max_hp = max_hp + 1000, max_mp = max_mp + 800, initiative = initiative + 20, updated_at = ? WHERE id = ?",
-                        (
-                            definition.target_realm,
-                            currency_grant(row["spirit_stones"], definition.reward_currency),
-                            stamina_after,
-                            definition.reward_world_merit,
-                            inventory_json(inventory, keep_zero=is_void_refining),
-                            now.date().isoformat(),
-                            now_text,
-                            row["id"],
-                        ),
+                    player_values.update(
+                        {
+                            "stamina_max": int(row["stamina_max"]) + 20,
+                            "domain_key": None,
+                            "domain_power": 100,
+                            "domain_charge": 150,
+                            "domain_charge_max": 150,
+                            "domain_charge_reset_date": now.date().isoformat(),
+                            "realm_resistance_bp": 1000,
+                            "domain_crack_until": None,
+                            "max_hp": int(row["max_hp"]) + 1000,
+                            "max_mp": int(row["max_mp"]) + 800,
+                            "initiative": int(row["initiative"]) + 20,
+                        }
                     )
                 elif is_void_refining:
-                    connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, domain_crack_until = NULL, void_power = 200, void_power_max = 200, space_resistance_bp = 1500, void_instability_until = NULL, void_anchor_capacity = 20, void_power_reset_date = ?, max_hp = max_hp + 1500, max_mp = max_mp + 1200, carry_capacity = carry_capacity + 100, updated_at = ? WHERE id = ?",
-                        (
-                            definition.target_realm,
-                            currency_grant(row["spirit_stones"], definition.reward_currency),
-                            stamina_after,
-                            definition.reward_world_merit,
-                            inventory_json(inventory, keep_zero=is_void_refining),
-                            now.date().isoformat(),
-                            now_text,
-                            row["id"],
-                        ),
+                    player_values.update(
+                        {
+                            "domain_crack_until": None,
+                            "void_power": 200,
+                            "void_power_max": 200,
+                            "space_resistance_bp": 1500,
+                            "void_instability_until": None,
+                            "void_anchor_capacity": 20,
+                            "void_power_reset_date": now.date().isoformat(),
+                            "max_hp": int(row["max_hp"]) + 1500,
+                            "max_mp": int(row["max_mp"]) + 1200,
+                            "carry_capacity": int(row["carry_capacity"]) + 100,
+                        }
                     )
-                else:
-                    connection.execute(
-                        "UPDATE players SET realm_key = ?, realm_layer = 1, cultivation = 0, spirit_stones = ?, stamina = ?, world_merit = world_merit + ?, breakthrough_pity_bp = 0, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
-                        (
-                            definition.target_realm,
-                            currency_grant(row["spirit_stones"], definition.reward_currency),
-                            stamina_after,
-                            definition.reward_world_merit,
-                            inventory_json(inventory, keep_zero=is_void_refining),
-                            now_text,
-                            row["id"],
-                        ),
-                    )
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    asset_values={"spirit_stones": definition.reward_currency, **reward_items},
+                    asset_mode="grant",
+                    value_delta=value_delta,
+                    maximums={"stamina": row["stamina_max"]},
+                    player_values=player_values,
+                    preserve_zero=is_void_refining,
+                )
                 if definition.target_realm == "foundation":
-                    connection.execute(
-                        "UPDATE players SET foundation_quality = MAX(foundation_quality, ?) WHERE id = ?",
-                        (int(snapshot.get("foundation_quality_on_success") or 5500), row["id"]),
+                    change_player_state(
+                        connection,
+                        row,
+                        updated_at=now_text,
+                        player_values={
+                            "foundation_quality": max(
+                                int(row["foundation_quality"]),
+                                int(snapshot.get("foundation_quality_on_success") or 5500),
+                            )
+                        },
                     )
                 if definition.reward_local_reputation:
                     reputation = connection.execute(
@@ -1051,56 +1089,31 @@ class BreakthroughRepositoryMixin:
                 if is_nascent:
                     pity_after = pity_before
                     heart_demon_pending = True
-                    connection.execute(
-                        "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
-                        (
-                            cultivation_after,
-                            pity_after,
-                            inventory_json(inventory),
-                            now_text,
-                            row["id"],
-                        ),
-                    )
+                    player_values = {"cultivation": cultivation_after, "weakness_until": None}
                 elif is_soul_transformation:
                     domain_crack_until = serialize_datetime(now + timedelta(seconds=weakness_seconds or 24 * 60 * 60))
-                    connection.execute(
-                        "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, domain_crack_until = ?, updated_at = ? WHERE id = ?",
-                        (
-                            cultivation_after,
-                            pity_after,
-                            inventory_json(inventory),
-                            domain_crack_until,
-                            now_text,
-                            row["id"],
-                        ),
-                    )
+                    player_values = {"cultivation": cultivation_after, "domain_crack_until": domain_crack_until}
                     weakness_until = domain_crack_until
                 elif is_void_refining:
                     weakness_until = serialize_datetime(now + timedelta(seconds=48 * 60 * 60))
-                    connection.execute(
-                        "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, void_instability_until = ?, weakness_until = NULL, updated_at = ? WHERE id = ?",
-                        (
-                            cultivation_after,
-                            pity_after,
-                            inventory_json(inventory, keep_zero=True),
-                            weakness_until,
-                            now_text,
-                            row["id"],
-                        ),
-                    )
+                    player_values = {
+                        "cultivation": cultivation_after,
+                        "void_instability_until": weakness_until,
+                        "weakness_until": None,
+                    }
                 else:
                     weakness_until = serialize_datetime(now + timedelta(seconds=weakness_seconds))
-                    connection.execute(
-                        "UPDATE players SET cultivation = ?, breakthrough_pity_bp = ?, inventory_json = ?, weakness_until = ?, updated_at = ? WHERE id = ?",
-                        (
-                            cultivation_after,
-                            pity_after,
-                            inventory_json(inventory),
-                            weakness_until,
-                            now_text,
-                            row["id"],
-                        ),
-                    )
+                    player_values = {"cultivation": cultivation_after, "weakness_until": weakness_until}
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    asset_values={protection_key: 1} if protection_consumed else None,
+                    asset_mode="spend",
+                    value_delta={"breakthrough_pity_bp": pity_after - pity_before},
+                    player_values=player_values,
+                    preserve_zero=is_void_refining,
+                )
                 status = "failed"
             result = {
                 "success": success,
@@ -1248,7 +1261,6 @@ class BreakthroughRepositoryMixin:
             if effective_choice == "heart_demon.purify":
                 if int(inventory.get("item.pill.soul_restore", 0)) < 1:
                     raise MaterialInsufficientError("soul restore pill is missing")
-                inventory = inventory_spend(inventory, {"item.pill.soul_restore": 1})
             pollution_before = int(row["pollution"])
             pollution_after = pollution_before
             merit_gain = 0
@@ -1265,18 +1277,19 @@ class BreakthroughRepositoryMixin:
                 fatigue_hours = 12
                 bonus_after = 600
             fatigue_until = serialize_datetime(now + timedelta(hours=fatigue_hours))
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, pollution = ?, world_merit = world_merit + ?, breakthrough_pity_bp = ?, heart_demon_bonus_bp = ?, soul_fatigue_until = ?, updated_at = ? WHERE id = ?",
-                (
-                    inventory_json(inventory),
-                    pollution_after,
-                    merit_gain,
-                    pity_after,
-                    bonus_after,
-                    fatigue_until,
-                    now_text,
-                    row["id"],
-                ),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={"item.pill.soul_restore": 1} if effective_choice == "heart_demon.purify" else None,
+                asset_mode="spend",
+                value_delta={
+                    "pollution": pollution_after - pollution_before,
+                    "world_merit": merit_gain,
+                    "breakthrough_pity_bp": pity_after - int(row["breakthrough_pity_bp"]),
+                },
+                maximums={"pollution": 100, "breakthrough_pity_bp": 1200},
+                player_values={"heart_demon_bonus_bp": bonus_after, "soul_fatigue_until": fatigue_until},
             )
             result = {
                 "session_id": str(session["session_id"]),
@@ -1451,9 +1464,17 @@ class BreakthroughRepositoryMixin:
                 inventory = inventory_spend(inventory, {medicine_key: 1})
                 medicine_consumed = True
                 stones_spent = stones_cost
-            connection.execute(
-                "UPDATE players SET weakness_until = NULL, inventory_json = ?, spirit_stones = ?, updated_at = ? WHERE id = ?",
-                (inventory_json(inventory), currency_spend(row["spirit_stones"], stones_spent), now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values=(
+                    {"spirit_stones": stones_cost, medicine_key: 1}
+                    if medicine_consumed
+                    else None
+                ),
+                asset_mode="spend",
+                player_values={"weakness_until": None},
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:

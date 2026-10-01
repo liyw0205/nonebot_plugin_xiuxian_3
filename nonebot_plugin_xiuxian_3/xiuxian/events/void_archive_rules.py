@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 ARCHIVE_EVENT_KEY = "event.archive_unlock"
 ARCHIVE_ROUTE_KEY = "void.archive_ruins"
 ARCHIVE_ENEMY_KEY = "enemy.archive_keeper"
@@ -49,8 +47,6 @@ __all__ = [
     "ARCHIVE_REWARD",
     "ARCHIVE_ROUTE_KEY",
     "ARCHIVE_WEEKLY_CAP",
-    "CONTENT_VERSION",
-    "RULE_VERSION",
     "TASK_REWARDS",
     "TASK_TARGETS",
     "TASKS",

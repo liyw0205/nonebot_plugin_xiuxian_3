@@ -14,9 +14,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
     DAO_ORIGIN_REWARDS,
     DAO_ORIGIN_TASKS,
-    DAO_UNION_MAINLINE_CONTENT_VERSION,
     DAO_UNION_MAINLINE_LANES,
-    DAO_UNION_MAINLINE_RULE_VERSION,
     DAO_UNION_MAINLINE_STAGE_KEYS,
     DAO_UNION_MAINLINE_STORY_KEY,
 )
@@ -86,8 +84,8 @@ def _insert_origin_evidence(
         else:
             apprentice_id = apprentice_ids[index % len(apprentice_ids)]
             connection.execute(
-                "INSERT INTO mentor_relations(relation_id, master_id, apprentice_id, status, expires_at, invited_at, graduated_at, graduate_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, ?, 'graduated', ?, ?, ?, ?, '', '', ?, ?)",
+                "INSERT INTO mentor_relations(relation_id, master_id, apprentice_id, status, expires_at, invited_at, graduated_at, graduate_operation_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, 'graduated', ?, ?, ?, ?, ?, ?)",
                 (f"relation-{source}", player_id, apprentice_id, now_text, now_text, now_text, f"graduate-op-{source}", now_text, now_text),
             )
 
@@ -187,25 +185,9 @@ def test_dao_origin_resource_closure_and_qq_onebot_task_producers() -> None:
                         "WHERE players.platform = ? AND players.platform_user_id = ? AND quest_key = 'event.dao_origin'",
                         (adapter, user),
                     ).fetchone()[0]
-                    event_versions = connection.execute(
-                        "SELECT DISTINCT quest_events.content_version, quest_events.rule_version FROM quest_events "
-                        "JOIN players ON players.id = quest_events.player_id "
-                        "WHERE players.platform = ? AND players.platform_user_id = ? "
-                        "AND quest_key IN ('event.dao_origin', 'task.dao_origin.guard', 'task.dao_origin.build', 'task.dao_origin.teach')",
-                        (adapter, user),
-                    ).fetchall()
-                    progress_versions = connection.execute(
-                        "SELECT DISTINCT quest_progress.content_version, quest_progress.rule_version FROM quest_progress "
-                        "JOIN players ON players.id = quest_progress.player_id "
-                        "WHERE players.platform = ? AND players.platform_user_id = ? "
-                        "AND quest_key IN ('task.dao_origin.guard', 'task.dao_origin.build', 'task.dao_origin.teach')",
-                        (adapter, user),
-                    ).fetchall()
                 assert resources[:3] == (470, 450, 1_000)
                 assert json.loads(resources[3]).get("item.tribulation_token") == 3
                 assert event_count == 9
-                assert {tuple(row) for row in event_versions} == {("", "")}
-                assert {tuple(row) for row in progress_versions} == {("", "")}
 
                 clock.advance(days=36)
                 season_id, _, _ = final_heaven_season_window(clock.value)
@@ -522,8 +504,8 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     for stage in range(1, 4):
                         connection.execute(
-                            "INSERT INTO mainline_runs(player_id, story_key, chapter, stage, stage_key, status, first_clear_key, content_version, rule_version, created_at, updated_at) "
-                            "VALUES (?, 'story.mainline.xuantian', 1, ?, ?, 'claimed', ?, 'content-test', 'rule-test', 'created', 'updated')",
+                            "INSERT INTO mainline_runs(player_id, story_key, chapter, stage, stage_key, status, first_clear_key, created_at, updated_at) "
+                            "VALUES (?, 'story.mainline.xuantian', 1, ?, ?, 'claimed', ?, 'created', 'updated')",
                             (player_id, stage, f"chapter.1.stage.{stage}", f"{user}-mainline-{stage}"),
                         )
 
@@ -541,16 +523,14 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                         for chapter, stage_key in enumerate(DAO_UNION_MAINLINE_STAGE_KEYS[lane], start=1):
                             connection.execute(
                                 "INSERT INTO mainline_runs(player_id, story_key, chapter, stage, stage_key, status, "
-                                "first_clear_key, content_version, rule_version, created_at, updated_at) "
-                                "VALUES (?, ?, ?, 1, ?, 'claimed', ?, ?, ?, 'created', 'updated')",
+                                "first_clear_key, created_at, updated_at) "
+                                "VALUES (?, ?, ?, 1, ?, 'claimed', ?, 'created', 'updated')",
                                 (
                                     player_id,
                                     DAO_UNION_MAINLINE_STORY_KEY,
                                     chapter,
                                     stage_key,
                                     f"{user}-{stage_key}",
-                                    DAO_UNION_MAINLINE_CONTENT_VERSION,
-                                    DAO_UNION_MAINLINE_RULE_VERSION,
                                 ),
                             )
 
@@ -562,16 +542,14 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                     for chapter, stage_key in enumerate(DAO_UNION_MAINLINE_STAGE_KEYS["traveler"], start=1):
                         connection.execute(
                             "INSERT INTO mainline_runs(player_id, story_key, chapter, stage, stage_key, status, "
-                            "first_clear_key, content_version, rule_version, created_at, updated_at) "
-                            "VALUES (?, ?, ?, 1, ?, 'claimed', ?, ?, ?, 'created', 'updated')",
+                            "first_clear_key, created_at, updated_at) "
+                            "VALUES (?, ?, ?, 1, ?, 'claimed', ?, 'created', 'updated')",
                             (
                                 player_id,
                                 DAO_UNION_MAINLINE_STORY_KEY,
                                 chapter,
                                 stage_key,
                                 f"{user}-{stage_key}",
-                                DAO_UNION_MAINLINE_CONTENT_VERSION,
-                                DAO_UNION_MAINLINE_RULE_VERSION,
                             ),
                         )
 
@@ -620,22 +598,10 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                     state = connection.execute(
                         "SELECT intro_json, inventory_json FROM players WHERE id = ?", (player_id,)
                     ).fetchone()
-                    event_versions = connection.execute(
-                        "SELECT DISTINCT content_version, rule_version FROM quest_events "
-                        "WHERE player_id = ? AND quest_key = 'quest.dao_union'",
-                        (player_id,),
-                    ).fetchall()
-                    progress_version = connection.execute(
-                        "SELECT content_version, rule_version FROM quest_progress "
-                        "WHERE player_id = ? AND quest_key = 'quest.dao_union'",
-                        (player_id,),
-                    ).fetchone()
                 assert "quest.dao_union" in json.loads(state[0])["flags"]
                 assert json.loads(state[1]).get("item.dao_fruit_fragment") == 12
                 assert json.loads(state[1]).get("item.tribulation_token") == 1
                 assert json.loads(state[1]).get("item.masterwork.body", 0) == 0
-                assert {tuple(row) for row in event_versions} == {("", "")}
-                assert tuple(progress_version) == ("", "")
             await runtime.close()
 
     asyncio.run(run())
@@ -881,8 +847,6 @@ def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
                     )
                 assert row == (10, "{}", "void.archive_ruins")
                 snapshot = json.loads(snapshot_json)
-                assert "rule_version" not in snapshot
-                assert "content_version" not in snapshot
                 assert snapshot["required_dao_fruit_progress"] == 470
                 assert snapshot["daily_start_limit"] == 1
                 arrived = await runtime.dispatch(

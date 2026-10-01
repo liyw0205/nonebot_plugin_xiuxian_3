@@ -270,8 +270,10 @@ def weighted_value_with_item_bonus(
 ) -> int:
     if isinstance(bonus_bp, bool) or not isinstance(bonus_bp, int) or bonus_bp < 0:
         raise ValueError("item drop weight bonus must be a non-negative integer")
+    if bonus_bp == 0:
+        return weighted_value(seed, values, weights)
     scaled_weights = tuple(
-        weight * (10_000 + bonus_bp) if value in item_values else weight
+        weight * (10_000 + bonus_bp) if value in item_values else weight * 10_000
         for value, weight in zip(values, weights, strict=True)
     )
     return weighted_value(seed, values, scaled_weights)
@@ -296,6 +298,7 @@ def settlement_result(
         result = {
             "item.herb.blood_grass": 1 + weighted_value(seed + ":blood", (0, 1, 2), (35, 45, 20)),
             "item.ore.ironstone": weighted_value(seed + ":iron", (0, 1, 2), (50, 35, 15)),
+            "item.mat.wood": weighted_value(seed + ":wood", (0, 1), (90, 10)),
         }
         return result
     if mode_key == "explore.trial_outskirts":

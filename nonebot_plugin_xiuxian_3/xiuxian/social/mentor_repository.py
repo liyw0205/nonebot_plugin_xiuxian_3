@@ -24,11 +24,9 @@ from ..persistence.errors import (
 from .mentor_models import MentorRelationRecord
 from .mentor_rules import (
     MENTOR_APPRENTICE_LOCAL_REPUTATION,
-    MENTOR_CONTENT_VERSION,
     MENTOR_CONTRIBUTION,
     MENTOR_INVITATION_TTL_SECONDS,
     MENTOR_MAX_APPRENTICES,
-    MENTOR_RULE_VERSION,
     MENTOR_SERVICE_REPUTATION,
     is_apprentice_eligible,
     is_graduation_ready,
@@ -181,8 +179,8 @@ class MentorRepositoryMixin:
                     relation_id, master_id, apprentice_id, status, expires_at,
                     invited_at, accepted_at, rejected_at, graduated_at,
                     graduate_operation_id, master_contribution,
-                    content_version, rule_version, created_at, updated_at
-                ) VALUES (?, ?, ?, 'invited', ?, ?, NULL, NULL, NULL, NULL, 0, ?, ?, ?, ?)
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, 'invited', ?, ?, NULL, NULL, NULL, NULL, 0, ?, ?)
                 """,
                 (
                     relation_id,
@@ -190,8 +188,6 @@ class MentorRepositoryMixin:
                     target["id"],
                     expires_at,
                     now_text,
-                    MENTOR_CONTENT_VERSION,
-                    MENTOR_RULE_VERSION,
                     now_text,
                     now_text,
                 ),

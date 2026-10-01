@@ -11,9 +11,7 @@ from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import trial_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
-    DAO_UNION_MAINLINE_CONTENT_VERSION,
     DAO_UNION_MAINLINE_LANES,
-    DAO_UNION_MAINLINE_RULE_VERSION,
     DAO_UNION_MAINLINE_STAGE_KEYS,
     DAO_UNION_MAINLINE_STORY_KEY,
 )
@@ -75,8 +73,6 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                         "three_realm_mainline": {
                             "source": "mainline_runs",
                             "story_key": DAO_UNION_MAINLINE_STORY_KEY,
-                            "content_version": DAO_UNION_MAINLINE_CONTENT_VERSION,
-                            "rule_version": DAO_UNION_MAINLINE_RULE_VERSION,
                             "lane_stage_keys": {
                                 lane: list(DAO_UNION_MAINLINE_STAGE_KEYS[lane]) for lane in DAO_UNION_MAINLINE_LANES
                             },
@@ -87,8 +83,8 @@ def test_qq_and_onebot_endgame_entry_and_trial_settlement() -> None:
                     for component_key, payload in payloads.items():
                         connection.execute(
                             "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
-                            "payload_json, content_version, rule_version, created_at) "
-                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, '', '', 'created')",
+                            "payload_json, created_at) "
+                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, 'created')",
                             (
                                 player_id,
                                 component_key,
@@ -177,8 +173,8 @@ def test_legacy_dao_union_flag_does_not_bypass_three_realm_mainline_evidence() -
                     for component_key, payload in evidence:
                         connection.execute(
                             "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
-                            "payload_json, content_version, rule_version, created_at) "
-                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, '', '', 'created')",
+                            "payload_json, created_at) "
+                            "VALUES (?, 'quest.dao_union', ?, ?, 'success', ?, 'created')",
                             (
                                 player_id,
                                 component_key,
@@ -201,8 +197,6 @@ def test_legacy_dao_union_flag_does_not_bypass_three_realm_mainline_evidence() -
                 valid_payload = {
                     "source": "mainline_runs",
                     "story_key": DAO_UNION_MAINLINE_STORY_KEY,
-                    "content_version": DAO_UNION_MAINLINE_CONTENT_VERSION,
-                    "rule_version": DAO_UNION_MAINLINE_RULE_VERSION,
                     "lane_stage_keys": {
                         lane: list(DAO_UNION_MAINLINE_STAGE_KEYS[lane]) for lane in DAO_UNION_MAINLINE_LANES
                     },
@@ -210,8 +204,8 @@ def test_legacy_dao_union_flag_does_not_bypass_three_realm_mainline_evidence() -
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
                         "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, "
-                        "payload_json, content_version, rule_version, created_at) "
-                        "VALUES (?, 'quest.dao_union', 'three_realm_mainline', ?, 'success', ?, '', '', 'created')",
+                        "payload_json, created_at) "
+                        "VALUES (?, 'quest.dao_union', 'three_realm_mainline', ?, 'success', ?, 'created')",
                         (
                             player_id,
                             f"{user}-valid-mainline",
@@ -364,8 +358,8 @@ def test_tribulation_l10_requires_three_events_per_origin_task_in_a_shared_seaso
                         for index in range(3):
                             event_season = season_id if index < 2 else historical_season_id
                             connection.execute(
-                                "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, content_version, rule_version, created_at) "
-                                "VALUES (?, ?, 'completed', ?, 'success', ?, '', '', 'created')",
+                                "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, created_at) "
+                                "VALUES (?, ?, 'completed', ?, 'success', ?, 'created')",
                                 (
                                     player_id,
                                     task_key,

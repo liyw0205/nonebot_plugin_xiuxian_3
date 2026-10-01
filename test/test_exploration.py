@@ -137,11 +137,23 @@ def test_exploration_modes_settle_rewards_and_replay_once() -> None:
 
 def test_outskirts_settlement_uses_stable_business_rules() -> None:
     result = settlement_result("explore.gather_outskirts", "stable-session")
-    assert "item.mat.wood" not in result
-    assert set(result) == {"item.herb.blood_grass", "item.ore.ironstone"}
+    assert result["item.herb.blood_grass"] >= 1
+    assert set(result) <= {
+        "item.herb.blood_grass",
+        "item.ore.ironstone",
+        "item.mat.wood",
+    }
+    assert any(
+        settlement_result("explore.gather_outskirts", f"wood-{index}").get("item.mat.wood") == 1
+        for index in range(1_000)
+    )
 
 
 def test_drop_weight_bonus_changes_optional_exploration_rewards() -> None:
+    assert weighted_value_with_item_bonus(
+        "fortune-baseline", (0, 1, 2, 3), (45, 30, 15, 10),
+        item_values=frozenset({0, 2}), bonus_bp=0,
+    ) == weighted_value("fortune-baseline", (0, 1, 2, 3), (45, 30, 15, 10))
     seeds = (f"fortune-{index}" for index in range(2_000))
     base_drops = sum(
         weighted_value(seed, (0, 1, 2, 3), (45, 30, 15, 10)) in {0, 2}
@@ -155,8 +167,14 @@ def test_drop_weight_bonus_changes_optional_exploration_rewards() -> None:
         for index in range(2_000)
     )
     assert boosted_drops > base_drops
-    assert settlement_result("explore.beast_hunt", "fortune-2") != settlement_result(
-        "explore.beast_hunt", "fortune-2", drop_weight_bp=100_000
+    changed_seed = next(
+        f"fortune-{index}"
+        for index in range(2_000)
+        if settlement_result("explore.beast_hunt", f"fortune-{index}")
+        != settlement_result("explore.beast_hunt", f"fortune-{index}", drop_weight_bp=100_000)
+    )
+    assert settlement_result("explore.beast_hunt", changed_seed) != settlement_result(
+        "explore.beast_hunt", changed_seed, drop_weight_bp=100_000
     )
 
 

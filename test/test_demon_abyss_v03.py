@@ -10,7 +10,17 @@ from tempfile import TemporaryDirectory
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import weighted_value
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import weighted_value_with_item_bonus
+
+
+def _demon_reward(operation_id: str) -> int:
+    return weighted_value_with_item_bonus(
+        f"{operation_id}:reward",
+        (0, 1, 2, 3),
+        (45, 30, 15, 10),
+        item_values=frozenset({0, 2}),
+        bonus_bp=0,
+    )
 
 
 def _context(adapter: str, user: str, request: str, operation: str = "") -> CommandContext:
@@ -68,7 +78,7 @@ def test_demon_abyss_success_and_replay_on_qq_and_onebot() -> None:
         operation = next(
             f"demon-success-{index}"
             for index in range(1000)
-            if weighted_value(f"demon-success-{index}:reward", (0, 1), (45, 55)) == 0
+            if _demon_reward(f"demon-success-{index}") == 0
         )
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
@@ -95,7 +105,6 @@ def test_demon_abyss_success_and_replay_on_qq_and_onebot() -> None:
                     "开始探索 魔界堕落遗迹探索",
                 )
                 assert started.code == "EXPLORATION_STARTED"
-                assert "content_version" not in started.data
                 assert started.data["pollution_before"] == 0
                 assert started.data["pollution_after"] == 10
                 assert started.data["cross_realm_penalty_bp"] == 1000
@@ -132,7 +141,7 @@ def test_demon_abyss_contract_clue_is_frozen_and_idempotent_on_both_adapters() -
         operation = next(
             f"demon-contract-{index}"
             for index in range(1000)
-            if weighted_value(f"demon-contract-{index}:reward", (0, 1, 2, 3), (45, 30, 15, 10)) == 2
+            if _demon_reward(f"demon-contract-{index}") == 2
         )
         assert ContentBundle.load(Path(__file__).parents[1] / "data").require(
             "item", "item.clue.demon_contract"
@@ -198,7 +207,7 @@ def test_demon_abyss_reputation_reward_is_snapshotted_and_projected() -> None:
         operation = next(
             f"demon-reputation-{index}"
             for index in range(1000)
-            if weighted_value(f"demon-reputation-{index}:reward", (0, 1), (45, 55)) == 1
+            if _demon_reward(f"demon-reputation-{index}") == 1
         )
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=Path(data_dir))

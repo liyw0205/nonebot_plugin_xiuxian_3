@@ -16,8 +16,6 @@ def ensure_social_recovery_schema(connection: sqlite3.Connection) -> None:
             request_id TEXT NOT NULL,
             operation_id TEXT NOT NULL,
             artifact_id TEXT NOT NULL,
-            content_version TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
             status TEXT NOT NULL CHECK (status IN ('requested', 'verified', 'snapshot_created', 'restoring', 'integrity_checked', 'active', 'failed')),
             result_json TEXT NOT NULL DEFAULT '{}',
             failure_reason TEXT NOT NULL DEFAULT '',

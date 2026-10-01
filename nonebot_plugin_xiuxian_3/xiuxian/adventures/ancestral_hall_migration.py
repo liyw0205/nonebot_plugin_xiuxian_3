@@ -22,8 +22,6 @@ def ensure_ancestral_hall_schema(connection: sqlite3.Connection) -> None:
             snapshot_json TEXT NOT NULL DEFAULT '{}',
             result_json TEXT NOT NULL DEFAULT '{}',
             entry_operation_id TEXT NOT NULL UNIQUE,
-            content_version TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )

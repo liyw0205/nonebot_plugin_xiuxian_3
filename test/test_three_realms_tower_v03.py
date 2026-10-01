@@ -218,10 +218,6 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                             ).fetchone()[0]
                         snapshot = json.loads(snapshot_json)
                         assert snapshot["enemy"]["key"] == enemy_key_for(floor_no, faction)
-                        assert "content_version" not in snapshot
-                        assert "rule_version" not in snapshot
-                        assert "content_version" not in snapshot["tower_context"]
-                        assert "rule_version" not in snapshot["tower_context"]
                         assert snapshot["tower_context"]["faction"] == faction
                         assert snapshot["tower_context"]["pollution"] == 17
                         assert snapshot["tower_context"]["bloodline_stability"] == 61
@@ -256,8 +252,6 @@ def test_three_realms_tower_v04_progression_on_qq_and_onebot(monkeypatch) -> Non
                             ).fetchone()
                         assert entry is not None
                         assert json.loads(entry[0])["faction"] == faction
-                        assert "rule_version" not in json.loads(entry[0])
-                        assert "content_version" not in json.loads(entry[0])
 
                     if floor_no == 21 and adapter == "qq.official":
                         practice = await _send(
@@ -362,8 +356,6 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                         assert snapshot["tower_context"]["pollution"] == 17
                         assert snapshot["tower_context"]["bloodline_stability"] == 61
                         assert snapshot["tower_context"]["local_reputation"]["local.xuantian.new_town"] == 23
-                        assert "content_version" not in snapshot
-                        assert "rule_version" not in snapshot
                         with sqlite3.connect(runtime.settings.database_path) as db:
                             settled = db.execute(
                                 "SELECT t.result_json,e.payload_json FROM tower_runs t "
@@ -403,8 +395,6 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                         assert json.loads(entry[0])["faction"] == faction
                         assert json.loads(entry[0])["pollution"] == 17
                         assert json.loads(entry[0])["bloodline_stability"] == 61
-                        assert "rule_version" not in json.loads(entry[0])
-                        assert "content_version" not in json.loads(entry[0])
 
                     if floor_no == 1:
                         replay = await _send(

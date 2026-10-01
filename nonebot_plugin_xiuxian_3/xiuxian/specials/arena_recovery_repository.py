@@ -23,8 +23,6 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 
 
-RECOVERY_RULE_VERSION = ""
-RECOVERY_CONTENT_VERSION = ""
 _ARTIFACT_KEY = re.compile(r"^[a-z0-9-]{1,48}$")
 _ARENA_TABLES = (
     "arena_matches",
@@ -48,8 +46,6 @@ class ArenaRecoveryArtifact:
     size_bytes: int
     schema_hash: str
     row_counts: dict[str, int]
-    content_versions: tuple[str, ...]
-    rule_versions: tuple[str, ...]
     created_at: str
 
     def as_dict(self) -> dict[str, Any]:
@@ -61,8 +57,6 @@ class ArenaRecoveryArtifact:
             "size_bytes": self.size_bytes,
             "schema_hash": self.schema_hash,
             "row_counts": dict(self.row_counts),
-            "content_versions": list(self.content_versions),
-            "rule_versions": list(self.rule_versions),
             "created_at": self.created_at,
         }
 
@@ -396,7 +390,6 @@ class ArenaRecoveryRepositoryMixin:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         schema_hash = str(checks.pop("schema_hash"))
         row_counts = {key: int(value) for key, value in checks.pop("row_counts").items()}
-        versions = self._read_versions(path)
         return ArenaRecoveryArtifact(
             artifact_id=f"arena.backup:{artifact_key}",
             artifact_key=artifact_key,
@@ -405,8 +398,6 @@ class ArenaRecoveryRepositoryMixin:
             size_bytes=path.stat().st_size,
             schema_hash=schema_hash,
             row_counts=row_counts,
-            content_versions=versions[0],
-            rule_versions=versions[1],
             created_at=created_at,
         )
 
@@ -446,7 +437,7 @@ class ArenaRecoveryRepositoryMixin:
                 if match_exists is None:
                     raise ValueError(f"arena projection references missing match: {match_id}")
                 payload = json.loads(payload_json)
-                for field in ("operation_id", "match_id", "player_id", "mode_key", "content_version", "rule_version", "result"):
+                for field in ("operation_id", "match_id", "player_id", "mode_key", "result"):
                     if field not in payload:
                         raise ValueError(f"arena projection payload missing {field}: {operation_id}")
                 if int(payload["player_id"]) != int(player_id) or str(payload["mode_key"]) != str(mode_key):
@@ -466,7 +457,7 @@ class ArenaRecoveryRepositoryMixin:
                 "SELECT match_id, operation_id, player_id, payload_json FROM arena_audit_events"
             ):
                 payload = json.loads(payload_json)
-                for field in ("request_id", "operation_id", "match_id", "player_id", "mode_key", "content_version", "rule_version", "result"):
+                for field in ("request_id", "operation_id", "match_id", "player_id", "mode_key", "result"):
                     if field not in payload:
                         raise ValueError(f"arena audit payload missing {field}: {operation_id}")
                 if str(payload["match_id"]) != str(match_id) or int(payload["player_id"]) != int(player_id):
@@ -480,23 +471,6 @@ class ArenaRecoveryRepositoryMixin:
             return {"integrity_check": integrity, "foreign_key_check": "ok", "schema_hash": schema_hash, "row_counts": row_counts}
 
     @staticmethod
-    def _read_versions(path: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        with sqlite3.connect(path) as connection:
-            content = {
-                str(row[0])
-                for table, column in (("arena_matches", "snapshot_json"), ("arena_team_matches", "snapshot_json"))
-                for row in connection.execute(f"SELECT json_extract({column}, '$.content_version') FROM {table}")
-                if row[0]
-            }
-            rules = {
-                str(row[0])
-                for table in ("arena_matches", "arena_team_matches")
-                for row in connection.execute(f"SELECT json_extract(snapshot_json, '$.rule_version') FROM {table}")
-                if row[0]
-            }
-        return tuple(sorted(content)), tuple(sorted(rules))
-
-    @staticmethod
     def _artifact_from_dict(payload: dict[str, Any]) -> ArenaRecoveryArtifact:
         return ArenaRecoveryArtifact(
             artifact_id=str(payload["artifact_id"]),
@@ -506,8 +480,6 @@ class ArenaRecoveryRepositoryMixin:
             size_bytes=int(payload["size_bytes"]),
             schema_hash=str(payload["schema_hash"]),
             row_counts={str(key): int(value) for key, value in dict(payload["row_counts"]).items()},
-            content_versions=tuple(str(value) for value in payload.get("content_versions", [])),
-            rule_versions=tuple(str(value) for value in payload.get("rule_versions", [])),
             created_at=str(payload["created_at"]),
         )
 
@@ -538,17 +510,15 @@ class ArenaRecoveryRepositoryMixin:
             """
             INSERT OR IGNORE INTO arena_recovery_events(
                 event_key, request_id, operation_id, artifact_id, mode_key,
-                content_version, rule_version, status, result_json,
+                status, result_json,
                 failure_reason, elapsed_ms, created_at
-            ) VALUES (?, ?, ?, ?, 'arena.federation', ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, 'arena.federation', ?, ?, ?, ?, ?)
             """,
             (
                 event_key,
                 request_id,
                 operation_id,
                 artifact_id,
-                RECOVERY_CONTENT_VERSION,
-                RECOVERY_RULE_VERSION,
                 status,
                 json.dumps(result, ensure_ascii=False, sort_keys=True),
                 failure_reason,
@@ -562,6 +532,4 @@ __all__ = [
     "ArenaRecoveryArtifact",
     "ArenaRecoveryReport",
     "ArenaRecoveryRepositoryMixin",
-    "RECOVERY_CONTENT_VERSION",
-    "RECOVERY_RULE_VERSION",
 ]

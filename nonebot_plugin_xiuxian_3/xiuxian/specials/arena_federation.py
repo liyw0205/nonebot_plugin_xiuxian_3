@@ -14,7 +14,6 @@ from typing import Any
 
 
 LOCAL_SHARD_KEY = "local"
-FEDERATION_RULE_VERSION = ""
 
 
 def ensure_identity_route(
@@ -93,8 +92,6 @@ def record_settlement_audit(
                     "match_id": match_id,
                     "player_id": player_id,
                     "mode_key": mode_key,
-                    "content_version": payload.get("content_version", ""),
-                    "rule_version": payload.get("rule_version", ""),
                     "result": outcome,
                 },
                 ensure_ascii=False,
@@ -127,7 +124,6 @@ def freeze_arena_season_snapshot(
             "arena_wins": int(row["arena_wins"]),
             "arena_losses": int(row["arena_losses"]),
             "arena_draws": int(row["arena_draws"]),
-            "rule_version": FEDERATION_RULE_VERSION,
         }
         connection.execute(
             """
@@ -158,7 +154,6 @@ def freeze_arena_season_snapshot(
 
 
 __all__ = [
-    "FEDERATION_RULE_VERSION",
     "LOCAL_SHARD_KEY",
     "ensure_identity_route",
     "freeze_arena_season_snapshot",

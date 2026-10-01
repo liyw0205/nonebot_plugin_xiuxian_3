@@ -13,19 +13,7 @@ from .codex_rules import category_for_entry
 
 
 def _discovery_payload(snapshot: dict[str, Any] | None) -> dict[str, Any]:
-    def clean(value: Any) -> Any:
-        if isinstance(value, dict):
-            return {
-                str(key): clean(item)
-                for key, item in value.items()
-                if not str(key).lower().endswith("_version")
-                and str(key).lower() != "version"
-            }
-        if isinstance(value, (list, tuple)):
-            return [clean(item) for item in value]
-        return value
-
-    return clean(snapshot or {})
+    return {str(key): value for key, value in (snapshot or {}).items()}
 
 
 def record_codex_discovery(

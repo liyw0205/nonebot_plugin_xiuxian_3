@@ -203,8 +203,10 @@ from ..utils.assets import (
     inventory_json,
     inventory_spend,
     inventory_value,
+    spend_player_items,
     spend_player_assets,
 )
+from ..utils.player import change_player_state
 
 
 class AdvancementRepositoryMixin:
@@ -495,18 +497,18 @@ class AdvancementRepositoryMixin:
             cycles = max(1, min(4, capped // definition.duration_seconds))
             result = retreat_reward(definition.key, str(snapshot.get("random_seed", operation_id)))
             result = {key: int(value) * cycles for key, value in result.items()}
-            inventory = inventory_value(row["inventory_json"])
-            cultivation = int(row["cultivation"])
-            total_cultivation = int(row["total_cultivation"])
-            energy = int(row["energy"])
-            if "cultivation" in result:
-                cultivation += int(result["cultivation"])
-                total_cultivation += int(result["cultivation"])
-            if "energy" in result:
-                energy = min(int(row["energy_max"]), energy + int(result["energy"]))
-            connection.execute(
-                "UPDATE players SET cultivation = ?, total_cultivation = ?, energy = ?, updated_at = ? WHERE id = ?",
-                (cultivation, total_cultivation, energy, now_text, row["id"]),
+            cultivation_gain = int(result.get("cultivation", 0))
+            energy_gain = int(result.get("energy", 0))
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                value_delta={
+                    "cultivation": cultivation_gain,
+                    "total_cultivation": cultivation_gain,
+                    "energy": energy_gain,
+                },
+                maximums={"energy": row["energy_max"]},
             )
             result_payload = {"result": result, "cycles": cycles, "expired": bool(recover), "settled_at": now_text}
             connection.execute(
@@ -1111,9 +1113,11 @@ class AdvancementRepositoryMixin:
                 ),
             )
             if definition.cost_points:
-                connection.execute(
-                    "UPDATE players SET talent_points = ?, updated_at = ? WHERE id = ?",
-                    (points_after, now_text, row["id"]),
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    player_values={"talent_points": points_after},
                 )
                 connection.execute(
                     """
@@ -1322,11 +1326,7 @@ class AdvancementRepositoryMixin:
                     now_text,
                 ),
             )
-        inventory.pop(definition.key, None)
-        connection.execute(
-            "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-            (inventory_json(inventory), now_text, player["id"]),
-        )
+        spend_player_items(connection, player, {definition.key: quantity}, now_text)
         return connection.execute(
             "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id LIMIT 1",
             (player["id"], definition.key),

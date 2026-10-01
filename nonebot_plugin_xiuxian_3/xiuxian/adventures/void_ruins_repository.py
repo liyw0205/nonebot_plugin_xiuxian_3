@@ -23,13 +23,13 @@ from ..persistence.errors import (
 )
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_VOID_RUINS
 from ..specials.codex_projection import record_codex_discovery
-from ..utils.assets import inventory_value
+from ..utils.assets import grant_player_assets, spend_player_items
+from ..utils.player import change_player_state
 from .secret_realm_rules import realm_at_least
 from .void_ruins_models import VoidRuinsRunRecord
 from .void_ruins_rules import (
     VOID_RUINS_ANCHOR_LOCK,
     VOID_RUINS_CODEX,
-    VOID_RUINS_CONTENT_VERSION,
     VOID_RUINS_ENEMIES,
     VOID_RUINS_EXPIRY_SECONDS,
     VOID_RUINS_KEY,
@@ -40,7 +40,6 @@ from .void_ruins_rules import (
     VOID_RUINS_PARTY_TYPE,
     VOID_RUINS_REPEAT_REWARD,
     VOID_RUINS_ROUTE_PERMISSION,
-    VOID_RUINS_RULE_VERSION,
     VOID_RUINS_STAMINA_COST,
     VOID_RUINS_WEEKLY_LIMIT,
 )
@@ -257,31 +256,30 @@ class VoidRuinsRepositoryMixin:
                 "instability_active_by_player": {str(key): value for key, value in instability.items()},
                 "first_clear_by_player": {str(key): value for key, value in first_clear.items()},
                 "entry_cost": {"leader_stamina": VOID_RUINS_STAMINA_COST, "void_anchor_per_member": VOID_RUINS_ANCHOR_LOCK},
-                "content_version": VOID_RUINS_CONTENT_VERSION,
-                "rule_version": VOID_RUINS_RULE_VERSION,
             }
+            try:
+                change_player_state(
+                    connection,
+                    leader,
+                    updated_at=now_text,
+                    value_delta={"stamina": -VOID_RUINS_STAMINA_COST},
+                )
+            except ValueError as exc:
+                raise ResourceInsufficientError("party leader stamina changed during entry") from exc
             connection.execute(
-                "UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=? AND stamina>=?",
-                (VOID_RUINS_STAMINA_COST, now_text, leader["id"], VOID_RUINS_STAMINA_COST),
-            )
-            if connection.execute("SELECT changes()").fetchone()[0] != 1:
-                raise ResourceInsufficientError("party leader stamina changed during entry")
-            connection.execute(
-                "INSERT INTO void_ruins_runs(run_id, party_id, status, node_index, battle_id, quota_key, starts_at, expires_at, stamina_cost, snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
+                "INSERT INTO void_ruins_runs(run_id, party_id, status, node_index, battle_id, quota_key, starts_at, expires_at, stamina_cost, snapshot_json, result_json, entry_operation_id, created_at, updated_at) "
+                "VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, ?, '{}', ?, ?, ?)",
                 (run_id, party["party_id"], quota_key, now_text, expires_at, VOID_RUINS_STAMINA_COST,
                  json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id,
-                 VOID_RUINS_CONTENT_VERSION, VOID_RUINS_RULE_VERSION, now_text, now_text),
+                 now_text, now_text),
             )
             for index, row in enumerate(members):
                 player_id = int(row["id"])
-                inventory = inventories[player_id]
-                inventory["item.void_anchor"] = int(inventory["item.void_anchor"]) - VOID_RUINS_ANCHOR_LOCK
-                if not inventory["item.void_anchor"]:
-                    inventory.pop("item.void_anchor")
-                connection.execute(
-                    "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player_id),
+                spend_player_items(
+                    connection,
+                    row,
+                    {"item.void_anchor": VOID_RUINS_ANCHOR_LOCK},
+                    now_text,
                 )
                 connection.execute(
                     "INSERT INTO void_ruins_members(run_id, player_id, quota_key, member_order, first_clear, status, anchor_status, reward_json, created_at, updated_at) "
@@ -522,7 +520,7 @@ class VoidRuinsRepositoryMixin:
             status = str(run["status"])
             if status == "cleared":
                 members = connection.execute(
-                    "SELECT m.*, p.player_id AS stable_player_id, p.inventory_json, p.intro_json "
+                    "SELECT m.*, p.id AS database_id, p.player_id AS stable_player_id, p.spirit_stones, p.inventory_json, p.intro_json "
                     "FROM void_ruins_members m JOIN players p ON p.id=m.player_id WHERE m.run_id=? ORDER BY m.member_order",
                     (run["run_id"],),
                 ).fetchall()
@@ -534,16 +532,17 @@ class VoidRuinsRepositoryMixin:
                     reward = dict(VOID_RUINS_REPEAT_REWARD)
                     if first:
                         first_clear_members.append(stable_id)
-                    inventory = self._json_object(member["inventory_json"], {})
-                    inventory["item.void_crystal"] = int(inventory.get("item.void_crystal", 0)) + 1
                     intro = self._json_object(member["intro_json"], {})
                     flags = list(intro.get("flags", []))
                     if first and VOID_RUINS_ROUTE_PERMISSION not in flags:
                         flags.append(VOID_RUINS_ROUTE_PERMISSION)
                     intro["flags"] = flags
-                    connection.execute(
-                        "UPDATE players SET inventory_json=?, intro_json=?, updated_at=? WHERE id=?",
-                        (json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, member["player_id"]),
+                    grant_player_assets(
+                        connection,
+                        member,
+                        {"item.void_crystal": 1},
+                        now_text,
+                        player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
                     )
                     if first:
                         record_codex_discovery(
@@ -683,12 +682,14 @@ class VoidRuinsRepositoryMixin:
             (run_id,),
         ).fetchall()
         for member in members:
-            inventory = inventory_value(member["inventory_json"])
-            inventory = dict(inventory) if isinstance(inventory, dict) else {}
-            inventory["item.void_anchor"] = int(inventory.get("item.void_anchor", 0)) + VOID_RUINS_ANCHOR_LOCK
-            connection.execute(
-                "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, member["player_id"]),
+            player = connection.execute("SELECT * FROM players WHERE id=?", (member["player_id"],)).fetchone()
+            if player is None:
+                continue
+            grant_player_assets(
+                connection,
+                player,
+                {"item.void_anchor": VOID_RUINS_ANCHOR_LOCK},
+                now_text,
             )
             connection.execute(
                 "UPDATE void_ruins_members SET anchor_status='released', updated_at=? WHERE run_id=? AND player_id=? AND anchor_status='locked'",
@@ -725,10 +726,15 @@ class VoidRuinsRepositoryMixin:
             ).fetchone()
             if party is None:
                 raise VoidRuinsNotFoundError("void-ruins party no longer exists")
-            connection.execute(
-                "UPDATE players SET stamina=MIN(stamina_max, stamina+?), updated_at=? WHERE id=?",
-                (int(run["stamina_cost"]), now_text, party["leader_id"]),
-            )
+            leader = connection.execute("SELECT * FROM players WHERE id=?", (party["leader_id"],)).fetchone()
+            if leader is not None:
+                change_player_state(
+                    connection,
+                    leader,
+                    updated_at=now_text,
+                    value_delta={"stamina": int(run["stamina_cost"])},
+                    maximums={"stamina": leader["stamina_max"]},
+                )
             if party["current_session_id"]:
                 battle_id = str(party["current_session_id"])
                 result = {"outcome": "system_aborted", "reason": "instance_compensated"}

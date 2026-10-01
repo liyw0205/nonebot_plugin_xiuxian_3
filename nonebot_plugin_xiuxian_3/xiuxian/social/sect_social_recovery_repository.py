@@ -22,8 +22,6 @@ from ...contracts import serialize_datetime
 from .sect_social_recovery_models import SocialRecoveryArtifact, SocialRecoveryReport
 from .sect_social_recovery_rules import (
     SOCIAL_RECOVERY_ARTIFACT_ROOT,
-    SOCIAL_RECOVERY_CONTENT_VERSION,
-    SOCIAL_RECOVERY_RULE_VERSION,
     SOCIAL_RECOVERY_TABLES,
     validate_social_recovery_artifact_key,
 )
@@ -394,15 +392,13 @@ class SectSocialRecoveryRepositoryMixin:
     ) -> None:
         connection.execute(
             "INSERT OR IGNORE INTO social_recovery_events("
-            "event_key,request_id,operation_id,artifact_id,content_version,rule_version,status,result_json,failure_reason,elapsed_ms,created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "event_key,request_id,operation_id,artifact_id,status,result_json,failure_reason,elapsed_ms,created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 event_key,
                 request_id,
                 operation_id,
                 artifact_id,
-                SOCIAL_RECOVERY_CONTENT_VERSION,
-                SOCIAL_RECOVERY_RULE_VERSION,
                 status,
                 json.dumps(result, ensure_ascii=False, sort_keys=True),
                 failure_reason,
@@ -528,7 +524,7 @@ def _check_social_references(connection: sqlite3.Connection) -> None:
 
     for row in connection.execute("SELECT event_key, operation_id, match_id, player_id, payload_json FROM arena_audit_events"):
         payload = json_object(row[4], f"arena audit:{row[0]}:{row[1]}")
-        for field in ("operation_id", "match_id", "player_id", "content_version", "rule_version", "result"):
+        for field in ("operation_id", "match_id", "player_id", "result"):
             if field not in payload:
                 raise ValueError(f"arena audit payload missing {field}: {row[1]}")
         if str(payload["operation_id"]) != str(row[1]) or str(payload["match_id"]) != str(row[2]) or int(payload["player_id"]) != int(row[3]):

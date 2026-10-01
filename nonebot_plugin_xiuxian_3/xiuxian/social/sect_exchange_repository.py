@@ -8,7 +8,8 @@ from datetime import datetime, time
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_grant, inventory_json, inventory_value
+from ..utils.assets import grant_player_items
+from ..utils.player import player_inventory
 from ..persistence.errors import (
     PlayerNotFoundError,
     SectContributionInsufficientError,
@@ -97,10 +98,9 @@ class SectExchangeRepositoryMixin:
             warehouse_quantity = int(warehouse.get(offer.item_key, 0))
             if warehouse_quantity < offer.quantity:
                 raise SectStockInsufficientError("sect warehouse stock is insufficient")
-            inventory = inventory_value(player["inventory_json"])
+            inventory = player_inventory(player)
             inventory_quantity = int(inventory.get(offer.item_key, 0)) + offer.quantity
             warehouse_quantity -= offer.quantity
-            inventory = inventory_grant(inventory, {offer.item_key: offer.quantity})
             if warehouse_quantity:
                 warehouse[offer.item_key] = warehouse_quantity
             else:
@@ -113,10 +113,7 @@ class SectExchangeRepositoryMixin:
                 "UPDATE sects SET warehouse_json=?, updated_at=? WHERE sect_id=?",
                 (json.dumps(warehouse, ensure_ascii=False, sort_keys=True), now_text, sect["sect_id"]),
             )
-            connection.execute(
-                "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                (inventory_json(inventory), now_text, player["id"]),
-            )
+            grant_player_items(connection, player, {offer.item_key: offer.quantity}, now_text)
             payload = {
                 "offer_key": offer.key,
                 "label": offer.label,

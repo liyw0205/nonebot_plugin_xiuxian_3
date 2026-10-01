@@ -16,11 +16,9 @@ from ..persistence.errors import (
 from .cross_realm_rules import (
     DEMON_MAINLINE,
     DEMON_MAINLINE_ACCESS_FLAG,
-    DEMON_MAINLINE_CONTENT_VERSION,
     DEMON_MAINLINE_EXPLORATION,
     DEMON_MAINLINE_EXPLORATION_TARGET,
     DEMON_MAINLINE_REQUIRED_REPUTATION,
-    DEMON_MAINLINE_RULE_VERSION,
     demon_mainline_realm_ready,
 )
 from .models import QuestClaimRecord
@@ -110,8 +108,6 @@ class DemonQuestRepositoryMixin:
                     outcome="won",
                     payload={"claim_operation_id": operation_id, "exploration_id": item["exploration_id"]},
                     now_text=now_text,
-                    content_version=DEMON_MAINLINE_CONTENT_VERSION,
-                    rule_version=DEMON_MAINLINE_RULE_VERSION,
                 )
             progress = {
                 DEMON_MAINLINE_EXPLORATION: DEMON_MAINLINE_EXPLORATION_TARGET,
@@ -125,8 +121,6 @@ class DemonQuestRepositoryMixin:
                 snapshot,
                 operation_id,
                 now_text,
-                content_version=DEMON_MAINLINE_CONTENT_VERSION,
-                rule_version=DEMON_MAINLINE_RULE_VERSION,
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
             payload = {

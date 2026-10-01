@@ -164,8 +164,8 @@ def test_heaven_echo_rejects_requirement_and_active_final_battle_atomically() ->
                 connection.execute("UPDATE players SET realm_key='tribulation', realm_layer=1 WHERE id=?", (player_id,))
                 now = datetime.now(timezone.utc).isoformat()
                 connection.execute(
-                    "INSERT INTO final_battle_sessions(battle_id, initiator_id, create_operation_id, status, round_no, action_sequence, starts_at, expires_at, snapshot_json, state_json, result_json, content_version, rule_version, created_at, updated_at) "
-                    "VALUES (?, ?, ?, 'lobby', 0, 0, ?, ?, '{}', '{}', '{}', 'test', 'test', ?, ?)",
+                    "INSERT INTO final_battle_sessions(battle_id, initiator_id, create_operation_id, status, round_no, action_sequence, starts_at, expires_at, snapshot_json, state_json, result_json, created_at, updated_at) "
+                    "VALUES (?, ?, ?, 'lobby', 0, 0, ?, ?, '{}', '{}', '{}', ?, ?)",
                     ("heaven-echo-final", player_id, "heaven-echo-final:create", now, "2099-01-01T00:00:00+00:00", now, now),
                 )
                 connection.execute(

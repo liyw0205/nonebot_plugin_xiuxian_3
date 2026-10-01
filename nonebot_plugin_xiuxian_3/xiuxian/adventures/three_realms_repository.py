@@ -28,6 +28,7 @@ from .three_realms import (
     three_realms_definition,
 )
 from .three_realms_models import ThreeRealmsLaneProgress, ThreeRealmsStatusRecord
+from ..utils.player import change_player_state
 
 
 class ThreeRealmsRepositoryMixin:
@@ -158,8 +159,6 @@ class ThreeRealmsRepositoryMixin:
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": int(player["realm_layer"]),
                 "location_key": str(player["location_key"]),
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
                 "repeat_pending": repeat_pending,
             }
             first_clear_key = f"{THREE_REALMS_STORY_KEY}:{definition.key}:{player['id']}"
@@ -169,12 +168,11 @@ class ThreeRealmsRepositoryMixin:
                     INSERT INTO mainline_runs(
                         player_id, story_key, chapter, stage, stage_key, status,
                         attempt_count, first_clear_claimed, first_clear_key, start_operation_id,
-                        snapshot_json, content_version, rule_version, created_at, updated_at
-                    ) VALUES (?, ?, 1, ?, ?, 'running', 1, 0, ?, ?, ?, ?, ?, ?, ?)
+                        snapshot_json, created_at, updated_at
+                    ) VALUES (?, ?, 1, ?, ?, 'running', 1, 0, ?, ?, ?, ?, ?)
                     """,
                     (player["id"], THREE_REALMS_STORY_KEY, definition.stage, definition.key, first_clear_key, operation_id,
-                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True), definition.content_version,
-                     definition.rule_version, now_text, now_text),
+                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True), now_text, now_text),
                 )
             else:
                 connection.execute(
@@ -232,13 +230,10 @@ class ThreeRealmsRepositoryMixin:
             faction = THREE_REALMS_LANE_FACTIONS[definition.lane]
             if first_clear and definition.stage == 5:
                 reward.update({"item.token.rebuild_path": 1, f"faction_reputation.{faction}": 1000})
-            inventory = self._json_object(player["inventory_json"], {})
             reputation = self._json_object(player["faction_reputation_json"], {})
             for key, raw_value in reward.items():
                 value = int(raw_value) if isinstance(raw_value, int) else raw_value
-                if key.startswith("item."):
-                    inventory[key] = int(inventory.get(key, 0)) + int(value)
-                elif key.startswith("faction_reputation."):
+                if key.startswith("faction_reputation."):
                     faction_key = key.removeprefix("faction_reputation.")
                     reputation[faction_key] = int(reputation.get(faction_key, 0)) + int(value)
             flags_state = self._json_object(player["intro_json"], {})
@@ -246,29 +241,39 @@ class ThreeRealmsRepositoryMixin:
             if first_clear and definition.stage == 5 and THREE_REALMS_STORY_KEY not in flags:
                 flags.append(THREE_REALMS_STORY_KEY)
             flags_state["flags"] = flags
-            connection.execute(
-                "UPDATE players SET inventory_json=?, faction_reputation_json=?, intro_json=?, updated_at=? WHERE id=?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(reputation, ensure_ascii=False, sort_keys=True),
-                 json.dumps(flags_state, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={
+                    str(key): int(value)
+                    for key, value in reward.items()
+                    if str(key).startswith("item.")
+                },
+                asset_mode="grant",
+                player_values={
+                    "faction_reputation_json": json.dumps(reputation, ensure_ascii=False, sort_keys=True),
+                    "intro_json": json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
+                },
             )
             connection.execute("UPDATE mainline_runs SET status='claimed', first_clear_claimed=CASE WHEN ? THEN 1 ELSE first_clear_claimed END, claim_operation_id=?, result_json=?, updated_at=? WHERE id=?",
                                (1 if first_clear else 0, operation_id, json.dumps({"reward": reward, "first_clear": first_clear}, ensure_ascii=False, sort_keys=True), now_text, run["id"]))
             connection.execute(
-                "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, content_version, rule_version, created_at) VALUES (?, ?, ?, ?, 'success', ?, ?, ?, ?)",
+                "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, created_at) VALUES (?, ?, ?, ?, 'success', ?, ?)",
                 (player["id"], THREE_REALMS_STORY_KEY, definition.key, operation_id,
                  json.dumps({"lane": definition.lane, "stage": definition.stage, "first_clear": first_clear}, ensure_ascii=False, sort_keys=True),
-                 definition.content_version, definition.rule_version, now_text),
+                 now_text),
             )
             completed = connection.execute(
                 "SELECT COUNT(*) AS count FROM quest_events WHERE player_id=? AND quest_key=? AND component_key LIKE ?",
                 (player["id"], THREE_REALMS_STORY_KEY, f"lane.{definition.lane}.chapter.%"),
             ).fetchone()["count"]
             connection.execute(
-                "INSERT INTO quest_progress(player_id, quest_key, status, progress_json, snapshot_json, source_operation_id, content_version, rule_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(player_id, quest_key) DO UPDATE SET status=excluded.status, progress_json=excluded.progress_json, snapshot_json=excluded.snapshot_json, source_operation_id=excluded.source_operation_id, updated_at=excluded.updated_at",
+                "INSERT INTO quest_progress(player_id, quest_key, status, progress_json, snapshot_json, source_operation_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(player_id, quest_key) DO UPDATE SET status=excluded.status, progress_json=excluded.progress_json, snapshot_json=excluded.snapshot_json, source_operation_id=excluded.source_operation_id, updated_at=excluded.updated_at",
                 (player["id"], THREE_REALMS_STORY_KEY, "completed" if int(completed) >= 5 else "active",
                  json.dumps({"lane": definition.lane, "completed": int(completed), "target": 5}, ensure_ascii=False, sort_keys=True),
-                 json.dumps({"lane": definition.lane, "content_version": definition.content_version, "rule_version": definition.rule_version}, ensure_ascii=False, sort_keys=True),
-                 operation_id, definition.content_version, definition.rule_version, now_text, now_text),
+                 json.dumps({"lane": definition.lane}, ensure_ascii=False, sort_keys=True),
+                 operation_id, now_text, now_text),
             )
             event_keys = [f"{THREE_REALMS_STORY_KEY}:{definition.key}"]
             if first_clear:

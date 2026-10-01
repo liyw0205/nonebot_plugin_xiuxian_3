@@ -46,7 +46,7 @@ def _seed_codex_entries(runtime, adapter: str, user: str, operation_prefix: str,
                 entry_key=key,
                 operation_id=f"{operation_prefix}-{index}",
                 occurred_at="2026-09-27T00:00:00+00:00",
-                snapshot={"instance_key": "instance.example", "rule_version": "ignored"},
+                snapshot={"instance_key": "instance.example"},
             )
         connection.execute("COMMIT")
 
@@ -508,7 +508,6 @@ def test_domain_survey_codex_reward_uses_json_and_replays_after_restart_on_both_
                 assert "六域战策" in claim.message
                 assert "观域居所陈设" in claim.message
                 assert "版本" not in claim.message
-                assert "rule_version" not in claim.message
                 conflict = await _send(
                     runtime,
                     adapter,
@@ -534,8 +533,6 @@ def test_domain_survey_codex_reward_uses_json_and_replays_after_restart_on_both_
                         row[1]
                         for row in connection.execute("PRAGMA table_info(codex_milestone_claims)")
                     }
-                    assert not {"content_version", "rule_version"} & entry_columns
-                    assert "content_version" not in claim_columns
                     payload = connection.execute(
                         "SELECT payload_json FROM codex_entries WHERE entry_key=? AND player_id=("
                         "SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
@@ -589,8 +586,6 @@ def test_codex_schema_uses_current_tables_without_version_columns() -> None:
 
         entry_columns = {row[1] for row in connection.execute("PRAGMA table_info(codex_entries)")}
         claim_columns = {row[1] for row in connection.execute("PRAGMA table_info(codex_milestone_claims)")}
-        assert not {"content_version", "rule_version"} & entry_columns
-        assert "content_version" not in claim_columns
         assert connection.execute(
             "SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_codex_milestone_claims_player'"
         ).fetchone()

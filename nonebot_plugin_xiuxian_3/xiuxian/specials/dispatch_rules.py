@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.1 dispatch tasks."""
+"""Rules for dispatch tasks."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ import hashlib
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 CANCEL_WINDOW_SECONDS = 60
 
 
@@ -24,8 +22,6 @@ class DispatchDefinition:
     requirement: str
     required_permit: str | None = None
     failure_refunds: tuple[tuple[str, int], ...] = ()
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
 
 
 TOWN_DELIVERY = "dispatch.town_delivery"
@@ -34,7 +30,6 @@ WORKSHOP_HELP = "dispatch.workshop_help"
 DEMON_RELIEF = "dispatch.demon_relief"
 BEAST_RELOCATION = "dispatch.beast_relocation"
 DAO_SERVICE = "dispatch.dao_service"
-DAO_SERVICE_VERSIONS = ("", "")
 
 DISPATCHES: dict[str, DispatchDefinition] = {
     TOWN_DELIVERY: DispatchDefinition(
@@ -78,8 +73,6 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         requirement="permit.demon_trade",
         required_permit="permit.demon_trade",
         failure_refunds=(("item.herb.blood_grass", 1), ("item.food.coarse_spirit_rice", 1)),
-        content_version="",
-        rule_version="",
     ),
     BEAST_RELOCATION: DispatchDefinition(
         key=BEAST_RELOCATION,
@@ -92,8 +85,6 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         requirement="permit.beast_trade",
         required_permit="permit.beast_trade",
         failure_refunds=(("item.herb.spirit_leaf", 1), ("item.food.coarse_spirit_rice", 1)),
-        content_version="",
-        rule_version="",
     ),
     DAO_SERVICE: DispatchDefinition(
         key=DAO_SERVICE,
@@ -104,8 +95,6 @@ DISPATCHES: dict[str, DispatchDefinition] = {
         risk_pool="dispatch.dao_service",
         risk_weights=(("success", 8500), ("partial", 1000), ("failed", 500)),
         requirement="dao_union_or_service_reputation_80",
-        content_version=DAO_SERVICE_VERSIONS[0],
-        rule_version=DAO_SERVICE_VERSIONS[1],
     ),
 }
 
@@ -196,12 +185,10 @@ __all__ = [
     "ALIASES",
     "BEAST_RELOCATION",
     "CANCEL_WINDOW_SECONDS",
-    "CONTENT_VERSION",
     "DISPATCHES",
     "DAO_SERVICE",
     "DEMON_RELIEF",
     "HERB_SEARCH",
-    "RULE_VERSION",
     "TOWN_DELIVERY",
     "WORKSHOP_HELP",
     "DispatchDefinition",

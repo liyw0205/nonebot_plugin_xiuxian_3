@@ -173,8 +173,6 @@ def test_v04_reconstruction_project_gate_and_dual_adapter_reward() -> None:
                             ("project.domain_refuge",),
                         ).fetchone()[0]
                     )
-                    assert "content_version" not in snapshot
-                    assert "rule_version" not in snapshot
                 await runtime.close()
 
     asyncio.run(run())

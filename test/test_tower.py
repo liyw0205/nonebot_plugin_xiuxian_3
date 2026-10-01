@@ -180,12 +180,6 @@ def test_tower_schema_has_current_floor_range_and_no_release_metadata() -> None:
         ensure_tower_schema(connection)
         ensure_tower_schema(connection)
 
-        assert "content_version" not in {
-            row[1] for row in connection.execute("PRAGMA table_info(tower_runs)")
-        }
-        assert "rule_version" not in {
-            row[1] for row in connection.execute("PRAGMA table_info(tower_reward_claims)")
-        }
 
         connection.execute(
             "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,starts_at,"

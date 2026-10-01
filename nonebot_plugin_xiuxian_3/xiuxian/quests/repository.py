@@ -8,7 +8,8 @@ import sqlite3
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import change_player_assets, grant_player_items, spend_player_items
+from ..utils.player import player_inventory
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
     OperationConflictError,
@@ -24,15 +25,12 @@ from .models import QuestActionRecord, QuestClaimRecord, QuestStatusRecord
 from .rules import (
     ANCIENT_DOMAIN_LINE,
     ANCIENT_DOMAIN_TARGET,
-    CONTENT_VERSION,
     CROSS_REALM_VICTORY,
     DOMAIN_COMMISSION,
     DOMAIN_COMMISSION_TARGET,
-    RULE_VERSION,
     SOUL_QUEST,
     VOID_ARCHIVE_DELIVERY,
     VOID_QUEST,
-    VOID_QUEST_RULE_VERSION,
     VOID_TRIAL_TARGET,
     VOID_TRIAL_WEEKLY_LIMIT,
     VOID_WALL_TRIAL,
@@ -242,7 +240,6 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             reward_per_event=reward,
             allow_repeats_after_target=True,
             weekly_limit=VOID_TRIAL_WEEKLY_LIMIT,
-            rule_version=VOID_QUEST_RULE_VERSION,
             payload_extra={"battle_id": battle_id},
             evidence_battle_id=battle_id,
             evidence_battle_type="pve.void_wall_trial",
@@ -266,13 +263,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 raise QuestRequirementError("archive ruins require soul transformation")
             if self._event_count(connection, int(player["id"]), VOID_QUEST, "archive_source") >= 1:
                 raise QuestAlreadyCompletedError("archive source is already claimed")
-            inventory = inventory_grant(
-                inventory_value(player["inventory_json"]), {"item.void_archive": 1}
-            )
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                (inventory_json(inventory), now_text, player["id"]),
-            )
+            grant_player_items(connection, player, {"item.void_archive": 1}, now_text)
             self._insert_quest_event(
                 connection,
                 player_id=int(player["id"]),
@@ -316,14 +307,10 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             player = self._require_player(connection, platform, platform_user_id)
             if self._event_count(connection, int(player["id"]), VOID_QUEST, VOID_WALL_TRIAL) < VOID_TRIAL_TARGET:
                 raise QuestNotCompletedError("three wall trials are required")
-            inventory = inventory_value(player["inventory_json"])
+            inventory = player_inventory(player)
             if int(inventory.get("item.void_archive", 0)) < 1:
                 raise QuestResourceInsufficientError("void archive is missing")
-            inventory = inventory_spend(inventory, {"item.void_archive": 1})
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                (inventory_json(inventory), now_text, player["id"]),
-            )
+            spend_player_items(connection, player, {"item.void_archive": 1}, now_text)
             self._insert_quest_event(
                 connection,
                 player_id=int(player["id"]),
@@ -402,7 +389,6 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         evidence_party_battle_id: str | None = None,
         allow_repeats_after_target: bool = False,
         weekly_limit: int | None = None,
-        rule_version: str = RULE_VERSION,
     ) -> QuestActionRecord:
         operation_name = quest_key if quest_key.startswith("quest.") else f"quest.{quest_key}"
         request_payload = {
@@ -501,24 +487,22 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 for key, amount in final_material_cost.items():
                     material_cost[key] = int(material_cost.get(key, 0)) + int(amount)
             if material_cost:
-                inventory = inventory_value(player["inventory_json"])
+                inventory = player_inventory(player)
                 missing = [key for key, amount in material_cost.items() if int(inventory.get(key, 0)) < amount]
                 if missing:
                     raise QuestResourceInsufficientError("quest material is missing")
-                inventory = inventory_spend(inventory, material_cost)
-            else:
-                inventory = inventory_value(player["inventory_json"])
             count += 1
             reward = dict(reward_per_event or {})
             if count >= target:
                 for key, amount in dict(reward_on_target or {}).items():
                     reward[key] = int(reward.get(key, 0)) + int(amount)
-            inventory = inventory_grant(inventory, reward)
-            if material_cost or reward:
-                connection.execute(
-                    "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (inventory_json(inventory), now_text, player["id"]),
-                )
+            asset_delta: dict[str, int] = {
+                str(key): -int(value) for key, value in material_cost.items()
+            }
+            for key, value in reward.items():
+                asset_delta[str(key)] = asset_delta.get(str(key), 0) + int(value)
+            if asset_delta:
+                change_player_assets(connection, player, asset_delta, now_text)
             self._insert_quest_event(
                 connection,
                 player_id=int(player["id"]),
@@ -528,7 +512,6 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 outcome=outcome,
                 payload={"count": count, "material_cost": material_cost, **(payload_extra or {})},
                 now_text=now_text,
-                rule_version=rule_version,
             )
             progress = {component_key: count}
             self._upsert_progress(
@@ -609,24 +592,12 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             if quest_key not in flags:
                 flags.append(quest_key)
             flags_state["flags"] = flags
-            connection.execute(
-                "UPDATE players SET intro_json = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
-                    json.dumps(
-                        {
-                            **self._json_object(player["inventory_json"], {}),
-                            **{
-                                key: int(self._json_object(player["inventory_json"], {}).get(key, 0)) + amount
-                                for key, amount in permit_rewards.items()
-                            },
-                        },
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    ),
-                    now_text,
-                    player["id"],
-                ),
+            grant_player_items(
+                connection,
+                player,
+                permit_rewards,
+                now_text,
+                player_values={"intro_json": json.dumps(flags_state, ensure_ascii=False, sort_keys=True)},
             )
             self._upsert_progress(
                 connection,
@@ -721,15 +692,13 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         outcome: str,
         payload: dict[str, object],
         now_text: str,
-        content_version: str = CONTENT_VERSION,
-        rule_version: str = RULE_VERSION,
     ) -> None:
         connection.execute(
             """
             INSERT INTO quest_events(
                 player_id, quest_key, component_key, source_operation_id, outcome,
-                payload_json, content_version, rule_version, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                payload_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 player_id,
@@ -738,8 +707,6 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 source_operation_id,
                 outcome,
                 json.dumps(payload, ensure_ascii=False, sort_keys=True),
-                content_version,
-                rule_version,
                 now_text,
             ),
         )
@@ -754,23 +721,18 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         snapshot: dict[str, object],
         source_operation_id: str,
         now_text: str,
-        *,
-        content_version: str = CONTENT_VERSION,
-        rule_version: str = RULE_VERSION,
     ) -> None:
         connection.execute(
             """
             INSERT INTO quest_progress(
                 player_id, quest_key, status, progress_json, snapshot_json,
-                source_operation_id, content_version, rule_version, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source_operation_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(player_id, quest_key) DO UPDATE SET
                 status = excluded.status,
                 progress_json = excluded.progress_json,
                 snapshot_json = excluded.snapshot_json,
                 source_operation_id = excluded.source_operation_id,
-                content_version = excluded.content_version,
-                rule_version = excluded.rule_version,
                 updated_at = excluded.updated_at
             """,
             (
@@ -780,8 +742,6 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 json.dumps(progress, ensure_ascii=False, sort_keys=True),
                 json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                 source_operation_id,
-                content_version,
-                rule_version,
                 now_text,
                 now_text,
             ),

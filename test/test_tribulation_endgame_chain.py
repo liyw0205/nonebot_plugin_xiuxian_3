@@ -171,9 +171,8 @@ def test_dao_origin_gate_accepts_same_historical_season_on_both_adapters() -> No
                             for attempt in range(3):
                                 db.execute(
                                     "INSERT INTO quest_events(player_id, quest_key, component_key, "
-                                    "source_operation_id, outcome, payload_json, content_version, "
-                                    "rule_version, created_at) VALUES (?, ?, 'completed', ?, 'success', ?, "
-                                    ", '', '', ?)",
+                                    "source_operation_id, outcome, payload_json, created_at) "
+                                    "VALUES (?, ?, 'completed', ?, 'success', ?, ?)",
                                     (
                                         player_id,
                                         task_key,

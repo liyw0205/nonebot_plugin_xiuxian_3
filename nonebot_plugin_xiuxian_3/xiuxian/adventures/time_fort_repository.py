@@ -22,10 +22,11 @@ from ..persistence.errors import (
 )
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_TIME_FORT
 from ..specials.codex_projection import record_codex_discovery
+from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state
 from .secret_realm_rules import realm_at_least
 from .time_fort_models import TimeFortRunRecord
 from .time_fort_rules import (
-    TIME_FORT_CONTENT_VERSION,
     TIME_FORT_EXPIRY_SECONDS,
     TIME_FORT_FIRST_REWARD,
     TIME_FORT_KEY,
@@ -36,7 +37,6 @@ from .time_fort_rules import (
     TIME_FORT_PARTY_TYPE,
     TIME_FORT_PERMISSION,
     TIME_FORT_REPEAT_REWARD,
-    TIME_FORT_RULE_VERSION,
     TIME_FORT_STAMINA_COST,
     TIME_FORT_STORY_FLAG,
     TIME_FORT_WEEKLY_LIMIT,
@@ -200,14 +200,19 @@ class TimeFortRepositoryMixin:
                 "members": [{"database_id": item["database_id"], "player_id": item["player_id"], "role": item["role"]} for item in combat_snapshots],
                 "member_combat_snapshots": combat_snapshots, "first_clear_by_player": {str(key): value for key, value in first_clear.items()},
                 "entry_cost": {"leader_stamina": TIME_FORT_STAMINA_COST}, "time_storm": {"interval_rounds": 3, "damage_bp": 500},
-                "content_version": TIME_FORT_CONTENT_VERSION, "rule_version": TIME_FORT_RULE_VERSION,
             }
-            connection.execute("UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=? AND stamina>=?", (TIME_FORT_STAMINA_COST, now_text, leader["id"], TIME_FORT_STAMINA_COST))
-            if connection.execute("SELECT changes()").fetchone()[0] != 1:
-                raise ResourceInsufficientError("party leader stamina changed during entry")
+            try:
+                change_player_state(
+                    connection,
+                    leader,
+                    updated_at=now_text,
+                    value_delta={"stamina": -TIME_FORT_STAMINA_COST},
+                )
+            except ValueError as exc:
+                raise ResourceInsufficientError("party leader stamina changed during entry") from exc
             connection.execute(
-                "INSERT INTO time_fort_runs(run_id, party_id, status, node_index, battle_id, quota_key, starts_at, expires_at, stamina_cost, snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
-                (run_id, party["party_id"], quota_key, now_text, expires_at, TIME_FORT_STAMINA_COST, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, TIME_FORT_CONTENT_VERSION, TIME_FORT_RULE_VERSION, now_text, now_text),
+                "INSERT INTO time_fort_runs(run_id, party_id, status, node_index, battle_id, quota_key, starts_at, expires_at, stamina_cost, snapshot_json, result_json, entry_operation_id, created_at, updated_at) VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, ?, '{}', ?, ?, ?)",
+                (run_id, party["party_id"], quota_key, now_text, expires_at, TIME_FORT_STAMINA_COST, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, now_text, now_text),
             )
             for index, row in enumerate(members):
                 connection.execute(
@@ -392,16 +397,13 @@ class TimeFortRepositoryMixin:
             result = self._time_fort_json(run["result_json"])
             status = str(run["status"])
             if status == "cleared":
-                members = connection.execute("SELECT m.*, p.player_id AS stable_player_id, p.inventory_json, p.intro_json FROM time_fort_members m JOIN players p ON p.id=m.player_id WHERE m.run_id=? ORDER BY m.member_order", (run["run_id"],)).fetchall()
+                members = connection.execute("SELECT m.*, p.id AS database_id, p.player_id AS stable_player_id, p.spirit_stones, p.inventory_json, p.intro_json FROM time_fort_members m JOIN players p ON p.id=m.player_id WHERE m.run_id=? ORDER BY m.member_order", (run["run_id"],)).fetchall()
                 rewards: dict[str, dict[str, int]] = {}
                 first_clear_members: list[str] = []
                 for member in members:
                     stable_id = str(member["stable_player_id"])
                     first = bool(member["first_clear"])
                     reward = dict(TIME_FORT_FIRST_REWARD if first else TIME_FORT_REPEAT_REWARD)
-                    inventory = self._json_object(member["inventory_json"], {})
-                    for key, value in reward.items():
-                        inventory[key] = int(inventory.get(key, 0)) + int(value)
                     intro = self._json_object(member["intro_json"], {})
                     flags = list(intro.get("flags", []))
                     if first:
@@ -409,7 +411,13 @@ class TimeFortRepositoryMixin:
                         if TIME_FORT_STORY_FLAG not in flags:
                             flags.append(TIME_FORT_STORY_FLAG)
                     intro["flags"] = flags
-                    connection.execute("UPDATE players SET inventory_json=?, intro_json=?, updated_at=? WHERE id=?", (json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, member["player_id"]))
+                    grant_player_assets(
+                        connection,
+                        member,
+                        reward,
+                        now_text,
+                        player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
+                    )
                     rewards[stable_id] = reward
                     connection.execute("UPDATE time_fort_members SET status='settled', reward_json=?, updated_at=? WHERE run_id=? AND player_id=?", (json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text, run["run_id"], member["player_id"]))
                 result = {"outcome": "won", "rewards": rewards, "first_clear_members": first_clear_members}
@@ -506,7 +514,15 @@ class TimeFortRepositoryMixin:
             party = connection.execute("SELECT leader_id, current_session_id FROM parties WHERE party_id=?", (run["party_id"],)).fetchone()
             if party is None:
                 raise TimeFortNotFoundError("time-fort party no longer exists")
-            connection.execute("UPDATE players SET stamina=MIN(stamina_max, stamina+?), updated_at=? WHERE id=?", (int(run["stamina_cost"]), now_text, party["leader_id"]))
+            leader = connection.execute("SELECT * FROM players WHERE id=?", (party["leader_id"],)).fetchone()
+            if leader is not None:
+                change_player_state(
+                    connection,
+                    leader,
+                    updated_at=now_text,
+                    value_delta={"stamina": int(run["stamina_cost"])},
+                    maximums={"stamina": leader["stamina_max"]},
+                )
             if party["current_session_id"]:
                 battle_id = str(party["current_session_id"])
                 connection.execute("UPDATE party_battle_sessions SET status='settled', result_json=?, updated_at=? WHERE battle_id=? AND status IN ('created','running','won','lost','expired')", (json.dumps({"outcome": "system_aborted", "reason": "instance_compensated"}), now_text, battle_id))

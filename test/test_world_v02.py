@@ -102,7 +102,6 @@ def test_cloud_boat_route_is_idempotent_and_qq_onebot_compatible() -> None:
                     ).fetchone()
                 assert state[0] == "cave.mist_grotto_2"
                 assert snapshot[0] == "arrived"
-                assert "rule_version" not in json.loads(snapshot[1])
                 bypass = await runtime.dispatch(
                     _context(adapter, user, f"bypass-{adapter}", f"bypass-{adapter}"),
                     "前往 雾隐洞天二层",

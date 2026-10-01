@@ -167,7 +167,8 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import assets_grant, inventory_grant, inventory_json, inventory_value
+from ..utils.assets import assets_grant, inventory_json
+from ..utils.player import change_player_state
 from ..utils.json import json_object
 from ..utils.player import player_field, player_reputation, player_values
 
@@ -586,7 +587,6 @@ class PlayerRepositoryMixin:
             item_quantity = 0
             stamina = int(row["stamina"])
             energy = int(row["energy"])
-            inventory = inventory_value(row["inventory_json"])
             if changed:
                 if guide_key == "guide.gather_blood_grass":
                     if row["location_key"] != "xuantian.outskirts":
@@ -595,10 +595,6 @@ class PlayerRepositoryMixin:
                         raise ResourceInsufficientError("stamina is insufficient")
                     stamina -= 2
                     item_quantity = 1 + (hashlib.blake2b(operation_id.encode("utf-8"), digest_size=1).digest()[0] % 2)
-                    inventory = inventory_grant(
-                        inventory,
-                        {"item.herb.blood_grass": item_quantity},
-                    )
                 elif guide_key == "guide.choose_service":
                     if energy < 2:
                         raise ResourceInsufficientError("energy is insufficient")
@@ -615,23 +611,25 @@ class PlayerRepositoryMixin:
             stage_advanced = row["stage"] == STAGE_MORTAL and intro_complete(flags)
             stage = "seeker" if stage_advanced else row["stage"]
             intro_state = {"flags": sorted(set(flags)), "selected_service": selected}
-            connection.execute(
-                """
-                UPDATE players
-                SET stage = ?, stamina = ?, energy = ?, inventory_json = ?, intro_json = ?,
-                    selected_service = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    stage,
-                    stamina,
-                    energy,
-                    inventory_json(inventory),
-                    json.dumps(intro_state, ensure_ascii=False, sort_keys=True),
-                    selected,
-                    serialize_datetime(now),
-                    row["id"],
+            change_player_state(
+                connection,
+                row,
+                updated_at=serialize_datetime(now),
+                asset_values=(
+                    {"item.herb.blood_grass": item_quantity}
+                    if item_quantity
+                    else None
                 ),
+                asset_mode="grant",
+                value_delta={
+                    "stamina": stamina - int(row["stamina"]),
+                    "energy": energy - int(row["energy"]),
+                },
+                player_values={
+                    "stage": stage,
+                    "intro_json": json.dumps(intro_state, ensure_ascii=False, sort_keys=True),
+                    "selected_service": selected,
+                },
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:

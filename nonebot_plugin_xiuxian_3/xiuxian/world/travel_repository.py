@@ -124,12 +124,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -148,18 +146,13 @@ from ..routine.gacha import (
 )
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -173,6 +166,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.player import change_player_state
 
 
 class TravelRepositoryMixin:
@@ -460,12 +454,6 @@ class TravelRepositoryMixin:
             ) >= definition.daily_start_limit:
                 raise LocationRequirementError("destination daily visit limit is reached")
 
-            if pass_key and not definition.consume_pass_on_arrival:
-                remaining = inventory.get(pass_key, 0) - pass_quantity
-                if remaining:
-                    inventory[pass_key] = remaining
-                else:
-                    inventory.pop(pass_key, None)
             session_id = uuid4().hex
             ends_at = now + timedelta(seconds=definition.duration_seconds)
             snapshot = {
@@ -492,14 +480,17 @@ class TravelRepositoryMixin:
                     if current_reputation >= definition.required_faction_reputation
                     else "intro_flag"
                 )
-            connection.execute(
-                """
-                UPDATE players
-                SET stamina = ?, spirit_stones = ?, inventory_json = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (stamina - definition.stamina_cost, stones - definition.currency_cost,
-                 json.dumps(inventory, ensure_ascii=False, sort_keys=True), serialize_datetime(now), player_id),
+            costs: dict[str, int] = {"spirit_stones": definition.currency_cost}
+            if pass_key and not definition.consume_pass_on_arrival:
+                costs[pass_key] = pass_quantity
+            change_player_state(
+                connection,
+                row,
+                updated_at=serialize_datetime(now),
+                asset_values=costs,
+                asset_mode="spend",
+                value_delta={"stamina": -definition.stamina_cost},
+                maximums={"stamina": row["stamina_max"]},
             )
             connection.execute(
                 """
@@ -599,16 +590,14 @@ class TravelRepositoryMixin:
                     inventory.pop(pass_key, None)
                 pass_consumed = True
             updated_at = serialize_datetime(now)
-            if pass_consumed:
-                connection.execute(
-                    "UPDATE players SET location_key = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (session["destination"], json.dumps(inventory, ensure_ascii=False, sort_keys=True), updated_at, row["id"]),
-                )
-            else:
-                connection.execute(
-                    "UPDATE players SET location_key = ?, updated_at = ? WHERE id = ?",
-                    (session["destination"], updated_at, row["id"]),
-                )
+            change_player_state(
+                connection,
+                row,
+                updated_at=updated_at,
+                asset_values=({pass_key: pass_quantity} if pass_consumed and pass_key else None),
+                asset_mode="spend",
+                player_values={"location_key": session["destination"]},
+            )
             connection.execute(
                 "UPDATE travel_sessions SET status = 'arrived', result_json = ?, updated_at = ? WHERE id = ? AND status = 'running'",
                 (json.dumps({"arrived": True, "pass_consumed": pass_consumed, "settled_at": updated_at}, ensure_ascii=False, sort_keys=True), updated_at, session["id"]),

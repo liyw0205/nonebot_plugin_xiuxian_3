@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
-from .assets import inventory_value
+from .assets import inventory_value, player_database_id
 from .json import json_object
 
 
@@ -39,6 +40,14 @@ PLAYER_COMBAT_FIELDS = (
     "domain_charge_max",
     "domain_power",
 )
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerStateChange:
+    """Validated result of one player asset and numeric state transaction."""
+
+    values: dict[str, Any]
+    assets: Any | None = None
 
 
 def player_field(row: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
@@ -118,8 +127,57 @@ def change_player_values(
     values = player_numeric_delta(row, delta, maximums=maximums)
     from .assets import write_player_values
 
-    write_player_values(connection, int(row["id"]), values, updated_at)
+    write_player_values(connection, player_database_id(row), values, updated_at)
     return values
+
+
+def change_player_state(
+    connection: Any,
+    row: Mapping[str, Any] | Any,
+    *,
+    updated_at: str,
+    asset_values: Mapping[str, Any] | None = None,
+    asset_mode: str = "delta",
+    value_delta: Mapping[str, Any] | None = None,
+    maximums: Mapping[str, Any] | None = None,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+) -> PlayerStateChange:
+    """Commit assets and numeric player values through one transaction kernel.
+
+    ``asset_values`` uses the same ``grant``/``spend``/``delta`` modes as
+    :func:`apply_player_assets`.  ``value_delta`` is validated with the shared
+    numeric projection and can be capped by ``maximums``.  Callers that only
+    change numeric values may omit ``asset_values``; callers changing assets
+    and values together get one SQL update and one validation boundary.
+    """
+
+    numeric_values = player_numeric_delta(row, value_delta or {}, maximums=maximums)
+    if player_values:
+        if set(player_values) & set(numeric_values):
+            raise ValueError("player value is supplied more than once")
+        numeric_values.update(dict(player_values))
+
+    if asset_values is None:
+        if not numeric_values:
+            raise ValueError("player state change cannot be empty")
+        from .assets import write_player_values
+
+        write_player_values(connection, player_database_id(row), numeric_values, updated_at)
+        return PlayerStateChange(values=numeric_values)
+
+    from .assets import apply_player_assets
+
+    assets = apply_player_assets(
+        connection,
+        row,
+        asset_values,
+        updated_at,
+        mode=asset_mode,
+        preserve_zero=preserve_zero,
+        player_values=numeric_values or None,
+    )
+    return PlayerStateChange(values=numeric_values, assets=assets)
 
 
 def player_numeric_values(
@@ -300,12 +358,15 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
 
 
 __all__ = [
+    "PlayerStateChange",
     "PLAYER_COMBAT_FIELDS",
     "PLAYER_RESOURCE_FIELDS",
     "player_field",
+    "player_database_id",
     "player_integer",
     "player_numeric_delta",
     "change_player_values",
+    "change_player_state",
     "player_numeric_values",
     "player_object",
     "player_inventory",

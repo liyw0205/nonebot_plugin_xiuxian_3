@@ -28,11 +28,9 @@ from .dispatch_models import (
 )
 from .dispatch_rules import (
     CANCEL_WINDOW_SECONDS,
-    CONTENT_VERSION,
     DAO_SERVICE,
     DISPATCHES,
     HERB_SEARCH,
-    RULE_VERSION,
     TOWN_DELIVERY,
     WORKSHOP_HELP,
     DispatchDefinition,
@@ -41,6 +39,7 @@ from .dispatch_rules import (
     reward_for,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
+from ..utils.player import change_player_state, player_inventory
 
 
 class DispatchRepositoryMixin:
@@ -103,7 +102,7 @@ class DispatchRepositoryMixin:
             missing.append("体力不足")
         if int(player["energy"]) < costs.get("energy", 0):
             missing.append("精力不足")
-        inventory = self._json_object(player["inventory_json"], {})
+        inventory = player_inventory(player)
         for key, amount in costs.items():
             if key.startswith("item.") and int(inventory.get(key, 0)) < amount:
                 missing.append(f"{key} 不足")
@@ -225,26 +224,18 @@ class DispatchRepositoryMixin:
                 "random_seed": seed,
                 "duration_seconds": definition.duration_seconds,
                 "ends_at": serialize_datetime(ends_at),
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
-            inventory = self._json_object(player["inventory_json"], {})
-            for key, amount in costs.items():
-                if key.startswith("item."):
-                    left = int(inventory.get(key, 0)) - amount
-                    if left:
-                        inventory[key] = left
-                    else:
-                        inventory.pop(key, None)
-            connection.execute(
-                "UPDATE players SET stamina = stamina - ?, energy = energy - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    costs.get("stamina", 0),
-                    costs.get("energy", 0),
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    player["id"],
-                ),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={key: amount for key, amount in costs.items() if str(key).startswith("item.")} or None,
+                asset_mode="spend",
+                value_delta={
+                    key: -int(amount)
+                    for key, amount in costs.items()
+                    if key in {"stamina", "energy"}
+                },
             )
             connection.execute(
                 """
@@ -384,21 +375,22 @@ class DispatchRepositoryMixin:
                     refunded["stamina"] = 2
                 elif str(assignment["dispatch_key"]) == WORKSHOP_HELP:
                     refunded["item.mat.wood"] = 1
-            inventory = self._json_object(player["inventory_json"], {})
-            stones = int(player["spirit_stones"])
+            asset_rewards = {
+                str(key): int(amount)
+                for key, amount in reward.items()
+                if key == "spirit_stones" or key.startswith("item.")
+            }
             local_map = self._dispatch_local_map(connection, int(player["id"]))
             local_updates: dict[str, int] = {}
             service_reputation_delta = int(reward.get("service_reputation", 0))
             for key, amount in reward.items():
                 if amount <= 0:
                     continue
-                if key == "spirit_stones":
-                    stones += amount
-                elif key == "service_reputation":
+                if key == "spirit_stones" or key.startswith("item."):
                     continue
-                elif key.startswith("item."):
-                    inventory[key] = int(inventory.get(key, 0)) + amount
-                elif key.startswith("local."):
+                if key == "service_reputation":
+                    continue
+                if key.startswith("local."):
                     local_map[key] = min(1000, max(0, int(local_map.get(key, 0)) + amount))
                     local_updates[key] = amount
                 elif key.startswith("codex."):
@@ -422,11 +414,9 @@ class DispatchRepositoryMixin:
             )
             for key, amount in refunded.items():
                 if key.startswith("item."):
-                    inventory[key] = int(inventory.get(key, 0)) + amount
+                    asset_rewards[key] = asset_rewards.get(key, 0) + amount
             stamina_refund = min(int(costs.get("stamina", 0)), int(refunded.get("stamina", 0)))
             energy_refund = min(int(costs.get("energy", 0)), int(refunded.get("energy", 0)))
-            updated_stamina = min(int(player["stamina_max"]), int(player["stamina"]) + stamina_refund)
-            updated_energy = min(int(player["energy_max"]), int(player["energy"]) + energy_refund)
             rep = connection.execute(
                 "SELECT service_reputation FROM player_reputations WHERE player_id = ?", (player["id"],)
             ).fetchone()
@@ -449,24 +439,20 @@ class DispatchRepositoryMixin:
                         now_text,
                     ),
                 )
-            connection.execute(
-                "UPDATE players SET stamina = ?, energy = ?, spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    updated_stamina,
-                    updated_energy,
-                    stones,
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    player["id"],
-                ),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values=asset_rewards or None,
+                asset_mode="grant",
+                value_delta={"stamina": stamina_refund, "energy": energy_refund},
+                maximums={"stamina": player["stamina_max"], "energy": player["energy_max"]},
             )
             result = {
                 "outcome": outcome,
                 "reward": reward,
                 "refunded": refunded,
                 "settled_at": now_text,
-                "content_version": str(snapshot.get("content_version", CONTENT_VERSION)),
-                "rule_version": str(snapshot.get("rule_version", RULE_VERSION)),
             }
             connection.execute(
                 "UPDATE dispatch_assignments SET status = 'settled', settle_operation_id = ?, result_json = ?, settled_at = ?, updated_at = ? WHERE id = ? AND status IN ('accepted', 'running')",
@@ -493,8 +479,6 @@ class DispatchRepositoryMixin:
                             "assignment_id": str(assignment["assignment_id"]),
                             "dispatch_key": str(assignment["dispatch_key"]),
                             "outcome": outcome,
-                            "content_version": str(snapshot.get("content_version", CONTENT_VERSION)),
-                            "rule_version": str(snapshot.get("rule_version", RULE_VERSION)),
                         },
                         ensure_ascii=False,
                         sort_keys=True,
@@ -556,19 +540,17 @@ class DispatchRepositoryMixin:
             if now > datetime.fromisoformat(str(assignment["cancel_until"])):
                 raise DispatchCancellationExpiredError("dispatch confirmation window expired")
             costs = self._json_object(assignment["costs_json"], {})
-            inventory = self._json_object(player["inventory_json"], {})
-            for key, amount in costs.items():
-                if str(key).startswith("item."):
-                    inventory[str(key)] = int(inventory.get(str(key), 0)) + int(amount)
-            connection.execute(
-                "UPDATE players SET stamina = MIN(stamina_max, stamina + ?), energy = MIN(energy_max, energy + ?), inventory_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    int(costs.get("stamina", 0)),
-                    int(costs.get("energy", 0)),
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    player["id"],
-                ),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={key: int(amount) for key, amount in costs.items() if str(key).startswith("item.")} or None,
+                asset_mode="grant",
+                value_delta={
+                    "stamina": int(costs.get("stamina", 0)),
+                    "energy": int(costs.get("energy", 0)),
+                },
+                maximums={"stamina": player["stamina_max"], "energy": player["energy_max"]},
             )
             connection.execute(
                 "UPDATE dispatch_assignments SET status = 'cancelled', cancel_operation_id = ?, result_json = ?, updated_at = ? WHERE id = ? AND status = 'accepted'",

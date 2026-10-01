@@ -1,4 +1,4 @@
-"""Pure, versioned rules for the v0.1 routine slice."""
+"""Pure routine rules."""
 
 from __future__ import annotations
 
@@ -10,19 +10,12 @@ from dataclasses import dataclass
 from typing import Any
 
 
-RULE_VERSION = ""
-CONTENT_VERSION = ""
 CHECKIN_ACTIVITY = "ritual.checkin.daily"
 MAKEUP_ACTIVITY = "ritual.makeup.daily"
 TREE_WATER_ACTIVITY = "ritual.spirit_tree.water"
 TREE_HARVEST_ACTIVITY = "ritual.spirit_tree.harvest"
 FATE_TICKET = "item.ticket.fate_basic"
 TREE_SEED = "item.seed.spirit_tree"
-SEVEN_DAY_CONTENT_VERSION = ""
-SEVEN_DAY_RULE_VERSION = ""
-HONOR_RULE_VERSION = ""
-REDEMPTION_RULE_VERSION = ""
-DAO_CONTRACT_RULE_VERSION = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,8 +109,6 @@ class RedemptionCodeDefinition:
     starts_on: str | None = None
     ends_on: str | None = None
     revoked: bool = False
-    content_version: str = CONTENT_VERSION
-    rule_version: str = REDEMPTION_RULE_VERSION
 
     def reward_map(self) -> dict[str, int]:
         return {key: int(value) for key, value in self.reward}
@@ -142,8 +133,6 @@ class DaoContractDefinition:
     activation_reward: tuple[tuple[str, int], ...] = ()
     reputation_every_days: int | None = None
     reputation_reward: int = 0
-    content_version: str = CONTENT_VERSION
-    rule_version: str = DAO_CONTRACT_RULE_VERSION
 
     def daily_reward_map(self) -> dict[str, int]:
         return {key: int(value) for key, value in self.daily_reward}
@@ -292,8 +281,6 @@ def redemption_code_definition(
     starts_on: str | None = None,
     ends_on: str | None = None,
     revoked: bool = False,
-    content_version: str = CONTENT_VERSION,
-    rule_version: str = REDEMPTION_RULE_VERSION,
 ) -> RedemptionCodeDefinition:
     if not isinstance(code_key, str) or not code_key.startswith("code."):
         raise ValueError("redemption code key must start with code.")
@@ -329,8 +316,6 @@ def redemption_code_definition(
         starts_on=starts_on,
         ends_on=ends_on,
         revoked=bool(revoked),
-        content_version=content_version,
-        rule_version=rule_version,
     )
 
 
@@ -360,8 +345,6 @@ def redemption_codes_from_config(value: Any) -> tuple[RedemptionCodeDefinition, 
             starts_on=item.get("starts_on"),
             ends_on=item.get("ends_on"),
             revoked=item.get("revoked", False),
-            content_version=str(item.get("content_version", CONTENT_VERSION)),
-            rule_version=str(item.get("rule_version", REDEMPTION_RULE_VERSION)),
         )
         if definition.code_key in keys or definition.code_hash in hashes:
             raise ValueError("redemption code keys and values must be unique")
@@ -472,19 +455,12 @@ def next_date(value: date) -> date:
 
 __all__ = [
     "CHECKIN_ACTIVITY",
-    "CONTENT_VERSION",
     "FATE_TICKET",
     "MAKEUP_ACTIVITY",
-    "RULE_VERSION",
     "TREE_HARVEST_ACTIVITY",
     "TREE_SEED",
     "TREE_WATER_ACTIVITY",
-    "SEVEN_DAY_CONTENT_VERSION",
     "SEVEN_DAY_GOALS",
-    "SEVEN_DAY_RULE_VERSION",
-    "HONOR_RULE_VERSION",
-    "REDEMPTION_RULE_VERSION",
-    "DAO_CONTRACT_RULE_VERSION",
     "HONOR_TITLES",
     "ACHIEVEMENTS",
     "HonorTitleDefinition",

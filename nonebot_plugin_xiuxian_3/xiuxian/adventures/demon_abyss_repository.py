@@ -20,8 +20,8 @@ from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
 )
-from ..utils.assets import inventory_grant, inventory_json, inventory_value
-from ..utils.player import player_intro_flags, player_object, player_reputation
+from ..utils.assets import grant_player_assets
+from ..utils.player import change_player_state, player_intro_flags, player_object, player_reputation
 from .demon_abyss_models import DemonAbyssRunRecord
 from .demon_abyss_rules import (
     DEMON_ABYSS_ENEMIES,
@@ -231,10 +231,15 @@ class DemonAbyssRepositoryMixin:
                 "first_clear": self._is_first_clear(connection, int(player["id"]), DEMON_ABYSS_KEY),
             }
             expires_at = serialize_datetime(now + timedelta(seconds=DEMON_ABYSS_EXPIRY_SECONDS))
-            connection.execute(
-                "UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=? AND stamina>=?",
-                (DEMON_ABYSS_STAMINA_COST, now_text, player["id"], DEMON_ABYSS_STAMINA_COST),
-            )
+            try:
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"stamina": -DEMON_ABYSS_STAMINA_COST},
+                )
+            except ValueError as exc:
+                raise ResourceInsufficientError("stamina changed during entry") from exc
             connection.execute(
                 """
                 INSERT INTO secret_realm_runs(
@@ -308,9 +313,12 @@ class DemonAbyssRepositoryMixin:
                 polluted = demon_abyss_risk_applies(roll_bp, risk_bp)
                 pollution_after = min(100, pollution_before + (1 if polluted else 0))
                 if pollution_after != pollution_before:
-                    connection.execute(
-                        "UPDATE players SET pollution=?, updated_at=? WHERE id=?",
-                        (pollution_after, now_text, player["id"]),
+                    change_player_state(
+                        connection,
+                        player,
+                        updated_at=now_text,
+                        value_delta={"pollution": pollution_after - pollution_before},
+                        maximums={"pollution": 100},
                     )
                     snapshot["pollution_delta"] = int(snapshot.get("pollution_delta", 0)) + pollution_after - pollution_before
                 snapshot["pollution_risk"] = {
@@ -544,27 +552,27 @@ class DemonAbyssRepositoryMixin:
 
     @staticmethod
     def _demon_apply_reward(connection, player, reward: dict[str, int], now_text: str) -> None:
-        inventory = inventory_value(player["inventory_json"])
         intro = player_object(player, "intro_json")
         faction = player_reputation(player)
         flags = list(player_intro_flags(player))
+        assets: dict[str, int] = {}
         for key, quantity in reward.items():
             if key == "faction_reputation.demon":
                 faction["demon"] = int(faction.get("demon", 0)) + int(quantity)
             elif key.startswith("item."):
-                inventory = inventory_grant(inventory, {key: quantity})
+                assets[key] = int(quantity)
             elif key.startswith("story.") and key not in flags:
                 flags.append(key)
         intro["flags"] = flags
-        connection.execute(
-            "UPDATE players SET inventory_json=?, intro_json=?, faction_reputation_json=?, updated_at=? WHERE id=?",
-            (
-                inventory_json(inventory),
-                json.dumps(intro, ensure_ascii=False, sort_keys=True),
-                json.dumps(faction, ensure_ascii=False, sort_keys=True),
-                now_text,
-                player["id"],
-            ),
+        grant_player_assets(
+            connection,
+            player,
+            assets,
+            now_text,
+            player_values={
+                "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
+                "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
+            },
         )
 
     async def compensate_demon_abyss_system_failure(
@@ -602,9 +610,12 @@ class DemonAbyssRepositoryMixin:
             player = connection.execute("SELECT * FROM players WHERE id=?", (run["player_id"],)).fetchone()
             snapshot = self._json_object(run["snapshot_json"], {})
             pollution_delta = int(snapshot.get("pollution_delta", 0))
-            connection.execute(
-                "UPDATE players SET stamina=MIN(stamina_max, stamina+?), pollution=MAX(0, pollution-?), updated_at=? WHERE id=?",
-                (int(run["stamina_locked"]), pollution_delta, now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"stamina": int(run["stamina_locked"]), "pollution": -pollution_delta},
+                maximums={"stamina": player["stamina_max"]},
             )
             quota_key = f"system_aborted:{run_id}"
             result = {

@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from typing import Any, Mapping
 
 from ...contracts import serialize_datetime
-from ..utils.assets import assets_grant, inventory_json, inventory_value
+from ..utils.player import change_player_state
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -151,9 +151,14 @@ class VoidFrontierRepositoryMixin:
             if pending is None:
                 raise VoidFrontierWeeklyNotAvailableError("no pending void-frontier weekly reward")
             reward = json_object(pending["reward_json"], {"void_merit": 20, "alliance_points": 10})
-            connection.execute(
-                "UPDATE players SET void_merit=void_merit+?, alliance_points=alliance_points+?, updated_at=? WHERE id=?",
-                (int(reward.get("void_merit", 20)), int(reward.get("alliance_points", 10)), now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={
+                    "void_merit": int(reward.get("void_merit", 20)),
+                    "alliance_points": int(reward.get("alliance_points", 10)),
+                },
             )
             connection.execute(
                 "UPDATE void_frontier_weekly_rewards SET status='claimed', claim_operation_id=?, claimed_at=? WHERE id=?",
@@ -209,18 +214,17 @@ class VoidFrontierRepositoryMixin:
                 raise VoidFrontierRewardAlreadyClaimedError("void-frontier reward already claimed")
             rank = int(ranking["rank"])
             reward = reward_for_rank(rank)
-            assets = assets_grant(
-                player["spirit_stones"],
-                inventory_value(player["inventory_json"]),
-                {
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={
                     key: value
                     for key, value in reward.items()
                     if key == "spirit_stones" or key.startswith("item.")
                 },
-            )
-            connection.execute(
-                "UPDATE players SET spirit_stones=?, inventory_json=?, void_merit=void_merit+?, updated_at=? WHERE id=?",
-                (assets.currency, inventory_json(assets.inventory), int(reward.get("void_merit", 0)), now_text, player["id"]),
+                asset_mode="grant",
+                value_delta={"void_merit": int(reward.get("void_merit", 0))},
             )
             connection.execute(
                 "INSERT INTO void_frontier_claims(season_id,player_id,operation_id,reward_json,rank,claimed_at) VALUES (?,?,?,?,?,?)",
@@ -383,7 +387,15 @@ class VoidFrontierRepositoryMixin:
             for row in rows:
                 reward = json_object(row["reward_json"], {})
                 merit = int(reward.get("void_merit", 20))
-                connection.execute("UPDATE players SET void_merit=void_merit+?,updated_at=? WHERE id=?", (merit, now_text, row["player_id"]))
+                player = connection.execute("SELECT * FROM players WHERE id=?", (row["player_id"],)).fetchone()
+                if player is None:
+                    continue
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"void_merit": merit},
+                )
                 reward["bound"] = True
                 reward.pop("alliance_points", None)
                 connection.execute("UPDATE void_frontier_weekly_rewards SET status='converted',reward_json=?,claimed_at=? WHERE id=?", (json.dumps(reward, sort_keys=True), now_text, row["id"]))

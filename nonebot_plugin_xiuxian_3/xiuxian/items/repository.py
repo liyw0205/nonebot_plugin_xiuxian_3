@@ -11,7 +11,8 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import inventory_json, inventory_spend, inventory_value
+from ..utils.assets import spend_player_items
+from ..utils.player import player_inventory
 from .models import ItemUseRecord
 from .rules import (
     resolve_item,
@@ -118,7 +119,7 @@ class ItemRepositoryMixin:
                 return self._item_use_from_payload(json.loads(existing["result_json"]), replay=True)
 
             row = self._require_player(connection, platform, platform_user_id)
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             if int(inventory.get(definition.key, 0)) < 1:
                 raise ItemInsufficientError("item is missing")
 
@@ -127,15 +128,19 @@ class ItemRepositoryMixin:
                 effects = self._json_object(row["item_effects_json"], {})
                 if int(effects.get("cloud_tea_state_bp", 0)) > 0 or effects.get("cloud_tea_operation_id"):
                     raise ItemEffectAlreadyPendingError("cloud tea effect is already pending")
-                inventory = inventory_spend(inventory, {definition.key: 1})
                 effects = {
                     "cloud_tea_state_bp": definition.effect_value,
                     "cloud_tea_operation_id": operation_id,
                     "consumed_at": now_text,
                 }
-                connection.execute(
-                    "UPDATE players SET inventory_json = ?, item_effects_json = ?, updated_at = ? WHERE id = ?",
-                    (inventory_json(inventory), json.dumps(effects, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+                spend_player_items(
+                    connection,
+                    row,
+                    {definition.key: 1},
+                    now_text,
+                    player_values={
+                        "item_effects_json": json.dumps(effects, ensure_ascii=False, sort_keys=True)
+                    },
                 )
                 effect = {
                     "type": definition.effect_type,
@@ -158,7 +163,6 @@ class ItemRepositoryMixin:
                 ).fetchone()
                 if active is not None:
                     raise ItemEffectAlreadyActiveError("a mist barrier is already active at this location")
-                inventory = inventory_spend(inventory, {definition.key: 1})
                 barrier_id = uuid4().hex
                 duration_seconds = definition.duration_seconds
                 if duration_seconds is None:
@@ -168,10 +172,7 @@ class ItemRepositoryMixin:
                     "INSERT INTO mist_barrier_instances(barrier_id, player_id, operation_id, location_key, status, starts_at, expires_at, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)",
                     (barrier_id, row["id"], operation_id, target, now_text, expires_at, json.dumps({"risk_reduction_bp": definition.effect_value}, ensure_ascii=False, sort_keys=True), now_text, now_text),
                 )
-                connection.execute(
-                    "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (inventory_json(inventory), now_text, row["id"]),
-                )
+                spend_player_items(connection, row, {definition.key: 1}, now_text)
                 effect = {"type": definition.effect_type, "barrier_id": barrier_id, "location_key": target, "risk_reduction_bp": definition.effect_value, "expires_at": expires_at}
             else:
                 raise ItemNotUsableError("item has no active use effect")

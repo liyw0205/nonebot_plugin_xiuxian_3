@@ -69,8 +69,6 @@ def test_fixed_demon_trade_caps_binding_and_replays_on_qq_and_onebot() -> None:
                 )
                 assert first.code == "CROSS_REALM_TRADE_COMPLETED"
                 assert first.data["output_items"] == {"item.demon_core": 1}
-                assert "content_version" not in first.data
-                assert "rule_version" not in first.data
                 replay = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "trade-first-replay", f"{adapter}-trade-first"),

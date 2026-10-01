@@ -130,12 +130,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -154,18 +152,13 @@ from ..routine.gacha import (
 )
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -178,7 +171,8 @@ from ..routine.rules import (
     tree_status,
 )
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import assets_grant, assets_spend, inventory_json, inventory_value
+from ..utils.assets import assets_grant, inventory_value
+from ..utils.player import change_player_state
 
 
 class RoutineRepositoryMixin:
@@ -202,8 +196,6 @@ class RoutineRepositoryMixin:
         request_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
-            "content_version": ROUTINE_CONTENT_VERSION,
-            "rule_version": ROUTINE_RULE_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         for attempt in range(5):
@@ -271,24 +263,11 @@ class RoutineRepositoryMixin:
                 cursor -= timedelta(days=1)
             streak_after = streak_before + 1
             requested_reward = checkin_reward(streak_after)
-            inventory = inventory_value(row["inventory_json"])
-            balances = assets_grant(
-                row["spirit_stones"],
-                inventory,
-                {
-                    key: quantity
-                    for key, quantity in requested_reward.items()
-                    if key != "energy"
-                },
-            )
-            stones = balances.currency
-            inventory = balances.inventory
             current_energy = int(row["energy"])
             energy_gain = min(
                 int(requested_reward.get("energy", 0)),
                 max(0, int(row["energy_max"]) - current_energy),
             )
-            energy = current_energy + energy_gain
             applied_reward: dict[str, int] = {"spirit_stones": int(requested_reward.get("spirit_stones", 0))}
             applied_reward["energy"] = energy_gain
             for key, quantity in requested_reward.items():
@@ -296,23 +275,31 @@ class RoutineRepositoryMixin:
                     continue
                 applied_reward[key] = int(quantity)
 
-            connection.execute(
-                "UPDATE players SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones, energy, inventory_json(inventory), now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={
+                    key: quantity
+                    for key, quantity in requested_reward.items()
+                    if key != "energy"
+                },
+                asset_mode="grant",
+                value_delta={"energy": energy_gain},
+                maximums={"energy": row["energy_max"]},
             )
             connection.execute(
                 """
                 INSERT INTO routine_checkins(
                     player_id, activity_key, target_date, claim_kind, month_key, operation_id,
                     status, cost_json, reward_json, streak_before, streak_after,
-                    content_version, rule_version, created_at, settled_at
-                ) VALUES (?, ?, ?, 'daily', ?, ?, 'claimed', '{}', ?, ?, ?, ?, ?, ?, ?)
+                    created_at, settled_at
+                ) VALUES (?, ?, ?, 'daily', ?, ?, 'claimed', '{}', ?, ?, ?, ?, ?)
                 """,
                 (
                     row["id"], CHECKIN_ACTIVITY, target_date, month_key, operation_id,
                     json.dumps(applied_reward, ensure_ascii=False, sort_keys=True),
-                    streak_before, streak_after, ROUTINE_CONTENT_VERSION, ROUTINE_RULE_VERSION,
-                    now_text, now_text,
+                    streak_before, streak_after, now_text, now_text,
                 ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
@@ -328,8 +315,6 @@ class RoutineRepositoryMixin:
                 "consecutive_days": streak_after,
                 "streak_before": streak_before,
                 "makeup": False,
-                "content_version": ROUTINE_CONTENT_VERSION,
-                "rule_version": ROUTINE_RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -366,8 +351,6 @@ class RoutineRepositoryMixin:
             "platform": platform,
             "platform_user_id": platform_user_id,
             "target_date": target_date,
-            "content_version": ROUTINE_CONTENT_VERSION,
-            "rule_version": ROUTINE_RULE_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         for attempt in range(5):
@@ -444,24 +427,28 @@ class RoutineRepositoryMixin:
                 "spirit_stones": int(requested_reward.get("spirit_stones", 0)),
                 "energy": energy_gain,
             }
-            stones = int(row["spirit_stones"]) - 30 + applied_reward["spirit_stones"]
-            connection.execute(
-                "UPDATE players SET spirit_stones = ?, energy = ?, updated_at = ? WHERE id = ?",
-                (stones, current_energy + energy_gain, now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={"spirit_stones": -30 + applied_reward["spirit_stones"]},
+                asset_mode="delta",
+                value_delta={"energy": energy_gain},
+                maximums={"energy": row["energy_max"]},
             )
             connection.execute(
                 """
                 INSERT INTO routine_checkins(
                     player_id, activity_key, target_date, claim_kind, month_key, operation_id,
                     status, cost_json, reward_json, streak_before, streak_after,
-                    content_version, rule_version, created_at, settled_at
-                ) VALUES (?, ?, ?, 'makeup', ?, ?, 'claimed', ?, ?, 0, 0, ?, ?, ?, ?)
+                    created_at, settled_at
+                ) VALUES (?, ?, ?, 'makeup', ?, ?, 'claimed', ?, ?, 0, 0, ?, ?)
                 """,
                 (
                     row["id"], MAKEUP_ACTIVITY, canonical_target, month_key, operation_id,
                     json.dumps({"spirit_stones": 30}, ensure_ascii=False, sort_keys=True),
                     json.dumps(applied_reward, ensure_ascii=False, sort_keys=True),
-                    ROUTINE_CONTENT_VERSION, ROUTINE_RULE_VERSION, now_text, now_text,
+                    now_text, now_text,
                 ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
@@ -478,8 +465,6 @@ class RoutineRepositoryMixin:
                 "consecutive_days": 0,
                 "streak_before": 0,
                 "makeup": True,
-                "content_version": ROUTINE_CONTENT_VERSION,
-                "rule_version": ROUTINE_RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -528,8 +513,6 @@ class RoutineRepositoryMixin:
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "content_version": ROUTINE_CONTENT_VERSION,
-                "rule_version": ROUTINE_RULE_VERSION,
             },
         )
         for attempt in range(5):
@@ -574,8 +557,8 @@ class RoutineRepositoryMixin:
             ).fetchone()
             if tree is None:
                 connection.execute(
-                    "INSERT INTO spirit_trees(player_id, cycle_no, water_count, content_version, rule_version, updated_at) VALUES (?, 1, 0, ?, ?, ?)",
-                    (row["id"], ROUTINE_CONTENT_VERSION, ROUTINE_RULE_VERSION, now_text),
+                    "INSERT INTO spirit_trees(player_id, cycle_no, water_count, updated_at) VALUES (?, 1, 0, ?)",
+                    (row["id"], now_text),
                 )
                 tree = connection.execute(
                     "SELECT * FROM spirit_trees WHERE player_id = ?", (row["id"],)
@@ -598,15 +581,17 @@ class RoutineRepositoryMixin:
                 raise ResourceInsufficientError("watering requires two energy")
             water_count = int(tree["water_count"]) + 1
             cycle_started_at = tree["cycle_started_at"] or now_text
-            connection.execute(
-                "UPDATE players SET energy = energy - 2, updated_at = ? WHERE id = ?",
-                (now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                value_delta={"energy": -2},
             )
             connection.execute(
                 "INSERT INTO spirit_tree_waterings(player_id, cycle_no, business_date, operation_id, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     row["id"], cycle_no, today, operation_id,
-                    json.dumps({"water_count": water_count, "energy_spent": 2, "content_version": ROUTINE_CONTENT_VERSION, "rule_version": ROUTINE_RULE_VERSION}, ensure_ascii=False, sort_keys=True),
+                    json.dumps({"water_count": water_count, "energy_spent": 2}, ensure_ascii=False, sort_keys=True),
                     now_text,
                 ),
             )
@@ -632,8 +617,6 @@ class RoutineRepositoryMixin:
                 "reward": {},
                 "cooldown_until": None,
                 "cycle_no": cycle_no,
-                "content_version": ROUTINE_CONTENT_VERSION,
-                "rule_version": ROUTINE_RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -666,8 +649,6 @@ class RoutineRepositoryMixin:
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "content_version": ROUTINE_CONTENT_VERSION,
-                "rule_version": ROUTINE_RULE_VERSION,
             },
         )
         for attempt in range(5):
@@ -721,18 +702,6 @@ class RoutineRepositoryMixin:
             digest = hashlib.blake2b(
                 f"tree.harvest:{operation_id}".encode("utf-8"), digest_size=16
             ).hexdigest()
-            inventory = inventory_value(row["inventory_json"])
-            balances = assets_grant(
-                row["spirit_stones"],
-                inventory,
-                {
-                    key: quantity
-                    for key, quantity in reward.items()
-                    if key != "local_reputation"
-                },
-            )
-            stones = balances.currency
-            inventory = balances.inventory
             actual_reward: dict[str, int] = {}
             for key, quantity in reward.items():
                 quantity = int(quantity)
@@ -760,16 +729,21 @@ class RoutineRepositoryMixin:
             )
             cooldown = now + timedelta(hours=24)
             cooldown_text = serialize_datetime(cooldown)
-            connection.execute(
-                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones, inventory_json(inventory), now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={
+                    key: quantity
+                    for key, quantity in reward.items()
+                    if key != "local_reputation"
+                },
+                asset_mode="grant",
             )
             result = {
                 "pool_key": "tree.harvest",
                 "seed": digest,
                 "reward": actual_reward,
-                "content_version": ROUTINE_CONTENT_VERSION,
-                "rule_version": ROUTINE_RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO spirit_tree_harvests(player_id, cycle_no, operation_id, pool_key, seed, reward_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -868,13 +842,12 @@ class RoutineRepositoryMixin:
         connection.execute(
             """
             INSERT INTO seven_day_campaigns(
-                player_id, start_date, status, content_version, rule_version,
+                player_id, start_date, status,
                 created_at, updated_at
-            ) VALUES (?, ?, 'active', ?, ?, ?, ?)
+            ) VALUES (?, ?, 'active', ?, ?)
             """,
             (
-                player["id"], start_date, SEVEN_DAY_CONTENT_VERSION,
-                SEVEN_DAY_RULE_VERSION, now_text, now_text,
+                player["id"], start_date, now_text, now_text,
             ),
         )
         created = connection.execute(
@@ -1060,8 +1033,6 @@ class RoutineRepositoryMixin:
             "platform": platform,
             "platform_user_id": platform_user_id,
             "day_number": day_number,
-            "content_version": SEVEN_DAY_CONTENT_VERSION,
-            "rule_version": SEVEN_DAY_RULE_VERSION,
         }
         request_hash = self._request_hash(operation_name, request_payload)
         for attempt in range(5):
@@ -1125,18 +1096,6 @@ class RoutineRepositoryMixin:
             if source_operation_id is None:
                 raise SevenDayGoalNotCompletedError("seven-day goal is not completed")
             reward = seven_day_reward(definition)
-            inventory = inventory_value(row["inventory_json"])
-            balances = assets_grant(
-                row["spirit_stones"],
-                inventory,
-                {
-                    key: quantity
-                    for key, quantity in reward.items()
-                    if key != "local_reputation"
-                },
-            )
-            stones = balances.currency
-            inventory = balances.inventory
             local_reputation = 0
             for key, quantity in reward.items():
                 if key == "local_reputation":
@@ -1158,21 +1117,28 @@ class RoutineRepositoryMixin:
                     """,
                     (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
                 )
-            connection.execute(
-                "UPDATE players SET spirit_stones = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones, inventory_json(inventory), now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={
+                    key: quantity
+                    for key, quantity in reward.items()
+                    if key != "local_reputation"
+                },
+                asset_mode="grant",
             )
             connection.execute(
                 """
                 INSERT INTO seven_day_goal_claims(
                     player_id, day_number, goal_key, target_date, source_operation_id,
-                    operation_id, reward_json, content_version, rule_version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    operation_id, reward_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row["id"], day_number, definition.key, target_date, source_operation_id,
                     operation_id, json.dumps(reward, ensure_ascii=False, sort_keys=True),
-                    SEVEN_DAY_CONTENT_VERSION, SEVEN_DAY_RULE_VERSION, now_text,
+                    now_text,
                 ),
             )
             total_claimed = connection.execute(
@@ -1196,8 +1162,6 @@ class RoutineRepositoryMixin:
                 "reward": reward,
                 "source_operation_id": source_operation_id,
                 "campaign_complete": campaign_complete,
-                "content_version": SEVEN_DAY_CONTENT_VERSION,
-                "rule_version": SEVEN_DAY_RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1524,13 +1488,13 @@ class RoutineRepositoryMixin:
                 """
                 INSERT INTO achievement_claims(
                     player_id, achievement_key, source_operation_id, operation_id,
-                    reward_json, content_version, rule_version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    reward_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row["id"], definition.key, source_operation_id, operation_id,
                     json.dumps(reward, ensure_ascii=False, sort_keys=True),
-                    ROUTINE_CONTENT_VERSION, HONOR_RULE_VERSION, now_text,
+                    now_text,
                 ),
             )
             updated = connection.execute(
@@ -1544,8 +1508,6 @@ class RoutineRepositoryMixin:
                 "label": definition.label,
                 "reward": reward,
                 "source_operation_id": source_operation_id,
-                "content_version": ROUTINE_CONTENT_VERSION,
-                "rule_version": HONOR_RULE_VERSION,
             }
             connection.execute(
                 """
@@ -1796,25 +1758,30 @@ class RoutineRepositoryMixin:
                     """,
                     (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
                 )
-            connection.execute(
-                """
-                UPDATE players
-                SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (stones, energy, inventory_json(inventory), now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={
+                    key: quantity
+                    for key, quantity in reward.items()
+                    if key not in {"energy", "local_reputation", "service_reputation"}
+                },
+                asset_mode="grant",
+                value_delta={"energy": energy - int(row["energy"])},
+                maximums={"energy": row["energy_max"]},
             )
             connection.execute(
                 """
                 INSERT INTO redemption_claims(
                     player_id, code_id, code_key, operation_id, reward_json,
-                    content_version, rule_version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row["id"], code_row["id"], code_row["code_key"], operation_id,
                     json.dumps(actual_reward, ensure_ascii=False, sort_keys=True),
-                    code_row["content_version"], code_row["rule_version"], now_text,
+                    now_text,
                 ),
             )
             connection.execute(
@@ -1828,8 +1795,6 @@ class RoutineRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "code_key": str(code_row["code_key"]),
                 "reward": actual_reward,
-                "content_version": str(code_row["content_version"]),
-                "rule_version": str(code_row["rule_version"]),
             }
             connection.execute(
                 """
@@ -1913,20 +1878,15 @@ class RoutineRepositoryMixin:
                 raise FatePoolNotOpenError("fate pity state is invalid")
 
             inventory = inventory_value(row["inventory_json"])
-            stones = int(row["spirit_stones"])
+            asset_delta: dict[str, int] = {}
             if draw_count == 1 and int(inventory.get(FATE_TICKET, 0)) > 0:
                 cost_kind = "ticket"
                 cost_quantity = 1
-                balances = assets_spend(stones, inventory, {FATE_TICKET: 1})
-                stones, inventory = balances.currency, balances.inventory
+                asset_delta[FATE_TICKET] = -1
             else:
                 cost_kind = "spirit_stones"
                 cost_quantity = FATE_SINGLE_COST if draw_count == 1 else FATE_TEN_COST
-                try:
-                    balances = assets_spend(stones, inventory, {"spirit_stones": cost_quantity})
-                except ValueError as exc:
-                    raise FateDrawInsufficientError("fate draw cost is insufficient") from exc
-                stones, inventory = balances.currency, balances.inventory
+                asset_delta["spirit_stones"] = -cost_quantity
 
             draws, pity_after, seed_hash = roll_fate_pool(
                 operation_id,
@@ -1934,21 +1894,18 @@ class RoutineRepositoryMixin:
                 pity_before=pity_before,
             )
             reward = reward_totals(draws)
-            balances = assets_grant(stones, inventory, reward)
-            stones, inventory = balances.currency, balances.inventory
-            connection.execute(
-                """
-                UPDATE players
-                SET spirit_stones = ?, inventory_json = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    stones,
-                    inventory_json(inventory),
-                    now_text,
-                    row["id"],
-                ),
-            )
+            for key, quantity in reward.items():
+                asset_delta[str(key)] = asset_delta.get(str(key), 0) + int(quantity)
+            try:
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    asset_values=asset_delta,
+                    asset_mode="delta",
+                )
+            except ValueError as exc:
+                raise FateDrawInsufficientError("fate draw cost is insufficient") from exc
             total_draws = (int(pool["total_draws"]) if pool is not None else 0) + draw_count
             connection.execute(
                 """
@@ -2086,8 +2043,6 @@ class RoutineRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "pass_key": WAYFARING_PASS_KEY,
-                "content_version": WAYFARING_CONTENT_VERSION,
-                "rule_version": WAYFARING_RULE_VERSION,
             },
         )
         now = self._now()
@@ -2122,14 +2077,14 @@ class RoutineRepositoryMixin:
                 INSERT INTO wayfaring_passes(
                     player_id, pass_key, cycle_start, cycle_end, status,
                     total_points, daily_date, daily_points, week_start, weekly_points,
-                    claimed_free_json, claimed_paid_json, content_version, rule_version,
+                    claimed_free_json, claimed_paid_json,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'active', 0, ?, 0, ?, 0, '[]', '[]', ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, 'active', 0, ?, 0, ?, 0, '[]', '[]', ?, ?)
                 """,
                 (
                     player["id"], WAYFARING_PASS_KEY, cycle_start.isoformat(), cycle_end.isoformat(),
                     cycle_start.isoformat(), wayfaring_week_start(cycle_start).isoformat(),
-                    WAYFARING_CONTENT_VERSION, WAYFARING_RULE_VERSION, now_text, now_text,
+                    now_text, now_text,
                 ),
             )
             pass_row = connection.execute(
@@ -2235,8 +2190,6 @@ class RoutineRepositoryMixin:
                 "pass_key": WAYFARING_PASS_KEY,
                 "level": level,
                 "track": track,
-                "content_version": WAYFARING_CONTENT_VERSION,
-                "rule_version": WAYFARING_RULE_VERSION,
             },
         )
         now = self._now()
@@ -2282,7 +2235,7 @@ class RoutineRepositoryMixin:
             if track == "paid":
                 active_contract = connection.execute(
                     """
-                    SELECT id, starts_on, ends_on, content_version, rule_version
+                    SELECT id, starts_on, ends_on
                     FROM dao_contracts
                     WHERE player_id = ? AND contract_key = 'dao_contract.monthly'
                       AND status = 'active' AND starts_on <= ? AND ends_on >= ?
@@ -2302,8 +2255,6 @@ class RoutineRepositoryMixin:
                     "contract_key": "dao_contract.monthly",
                     "starts_on": str(active_contract["starts_on"]),
                     "ends_on": str(active_contract["ends_on"]),
-                    "content_version": str(active_contract["content_version"]),
-                    "rule_version": str(active_contract["rule_version"]),
                 }
             actual_reward = self._apply_dao_reward(connection, player, reward, now_text)
             claimed.add(level)
@@ -2331,8 +2282,6 @@ class RoutineRepositoryMixin:
                 "reward": actual_reward,
                 "total_points": int(pass_row["total_points"]),
                 "entitlement_snapshot": entitlement_snapshot,
-                "content_version": WAYFARING_CONTENT_VERSION,
-                "rule_version": WAYFARING_RULE_VERSION,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -2374,8 +2323,6 @@ class RoutineRepositoryMixin:
             "weekly_points": int(pass_row["weekly_points"]),
             "claimed_free": [int(item) for item in SQLitePlayerRepository._json_array(pass_row["claimed_free_json"])],
             "claimed_paid": [int(item) for item in SQLitePlayerRepository._json_array(pass_row["claimed_paid_json"])],
-            "content_version": WAYFARING_CONTENT_VERSION,
-            "rule_version": WAYFARING_RULE_VERSION,
         }
 
     @staticmethod
@@ -2523,29 +2470,22 @@ class RoutineRepositoryMixin:
         reward: dict[str, int],
         now_text: str,
     ) -> dict[str, int]:
-        inventory = inventory_value(player["inventory_json"])
-        balances = assets_grant(
-            player["spirit_stones"],
-            inventory,
-            {
-                key: value
-                for key, value in reward.items()
-                if key not in {"energy", "local_reputation", "service_reputation"}
-            },
-        )
-        stones = balances.currency
-        inventory = balances.inventory
-        energy = int(player["energy"])
+        asset_rewards = {
+            str(key): int(value)
+            for key, value in reward.items()
+            if key not in {"energy", "local_reputation", "service_reputation"}
+        }
         actual: dict[str, int] = {}
         local_reputation = 0
         service_reputation = 0
+        energy_gain = 0
         for key, raw_quantity in reward.items():
             quantity = int(raw_quantity)
             if key == "spirit_stones":
                 actual[key] = quantity
             elif key == "energy":
-                gained = min(quantity, max(0, int(player["energy_max"]) - energy))
-                energy += gained
+                gained = min(quantity, max(0, int(player["energy_max"]) - int(player["energy"]) - energy_gain))
+                energy_gain += gained
                 actual[key] = gained
             elif key == "local_reputation":
                 local_reputation += quantity
@@ -2573,13 +2513,14 @@ class RoutineRepositoryMixin:
                 """,
                 (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
             )
-        connection.execute(
-            """
-            UPDATE players
-            SET spirit_stones = ?, energy = ?, inventory_json = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (stones, energy, inventory_json(inventory), now_text, player["id"]),
+        change_player_state(
+            connection,
+            player,
+            updated_at=now_text,
+            asset_values=asset_rewards,
+            asset_mode="grant",
+            value_delta={"energy": energy_gain},
+            maximums={"energy": player["energy_max"]},
         )
         return actual
 
@@ -2735,14 +2676,14 @@ class RoutineRepositoryMixin:
                 """
                 INSERT INTO dao_contracts(
                     player_id, contract_key, receipt_id, receipt_hash, subject,
-                    starts_on, ends_on, status, content_version, rule_version,
+                    starts_on, ends_on, status,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
                 """,
                 (
                     row["id"], definition.key, receipt.receipt_id, receipt.payload_hash,
                     receipt.subject, starts.isoformat(), ends.isoformat(),
-                    definition.content_version, definition.rule_version, now_text, now_text,
+                    now_text, now_text,
                 ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
@@ -2756,8 +2697,6 @@ class RoutineRepositoryMixin:
                 "starts_on": starts.isoformat(),
                 "ends_on": ends.isoformat(),
                 "activation_reward": activation_reward,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             connection.execute(
                 """
@@ -2860,13 +2799,13 @@ class RoutineRepositoryMixin:
                 """
                 INSERT INTO dao_contract_claims(
                     player_id, contract_id, contract_key, business_date, operation_id,
-                    reward_json, content_version, rule_version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reward_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row["id"], contract_row["id"], definition.key, today.isoformat(), operation_id,
                     json.dumps(actual_reward, ensure_ascii=False, sort_keys=True),
-                    definition.content_version, definition.rule_version, now_text,
+                    now_text,
                 ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
@@ -2878,8 +2817,6 @@ class RoutineRepositoryMixin:
                 "label": definition.label,
                 "business_date": today.isoformat(),
                 "reward": actual_reward,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             connection.execute(
                 """

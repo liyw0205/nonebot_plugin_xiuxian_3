@@ -26,6 +26,7 @@ from .rules import (
     round_id_for,
     scheduled_start,
 )
+from ..utils.player import change_player_state
 
 
 class EventsRepositoryMixin:
@@ -141,21 +142,19 @@ class EventsRepositoryMixin:
             faction_after = faction_before + reward.get("faction_reputation.xuantian", 0)
             if success:
                 faction["xuantian"] = faction_after
-            connection.execute(
-                """
-                UPDATE players
-                SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?,
-                    spirit_stones = spirit_stones + ?, faction_reputation_json = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    reward["cultivation"],
-                    reward["cultivation"],
-                    reward["spirit_stones"],
-                    json.dumps(faction, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    player["id"],
-                ),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={"spirit_stones": reward["spirit_stones"]},
+                asset_mode="grant",
+                value_delta={
+                    "cultivation": reward["cultivation"],
+                    "total_cultivation": reward["cultivation"],
+                },
+                player_values={
+                    "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
+                },
             )
             connection.execute(
                 """

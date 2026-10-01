@@ -110,20 +110,27 @@ def test_modified_constitution_json_changes_frozen_combat_stats(tmp_path: Path) 
         assert selected.ok
         with sqlite3.connect(runtime.settings.database_path) as connection:
             player = connection.execute(
-                "SELECT max_hp, qualification_json FROM players WHERE platform_user_id = ?",
+                "SELECT max_hp, qualification_json, spirit_stones, cultivation, total_cultivation, stamina, energy "
+                "FROM players WHERE platform_user_id = ?",
                 (user,),
             ).fetchone()
         body = json.loads(player[1]).get("body", 0)
-        base_hp = max(100 + body * 4, player[0])
+        before = player[2:]
 
         started = await runtime.dispatch(
             _context(user, "battle", operation_id="constitution-combat-start"), "开始训练战"
         )
-        assert started.code == "BATTLE_SETTLED"
-        replay = await runtime.dispatch(_context(user, "replay"), "战斗回放")
-        player_snapshot = replay.data["snapshot"]["player"]
-        assert player_snapshot["constitution_effect"] == {"type": "max_hp_bp", "value": 1_250}
-        assert player_snapshot["stats"]["max_hp"] == base_hp + base_hp * 1_250 // 10_000
+        assert started.code == "TRAINING_SPECTATOR"
+        assert started.data["status"] == "spectator"
+        assert started.data["actions"]
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            current = connection.execute(
+                "SELECT max_hp, spirit_stones, cultivation, total_cultivation, stamina, energy "
+                "FROM players WHERE platform_user_id = ?",
+                (user,),
+            ).fetchone()
+        assert current[0] == player[0]
+        assert current[1:] == before
         await runtime.close()
 
     asyncio.run(run())

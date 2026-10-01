@@ -13,7 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import spend_player_assets
+from ..utils.player import change_player_state
 from .cloud_models import (
     ArrayHallRecord,
     BeastHistoryRecord,
@@ -108,7 +108,14 @@ class CloudRepositoryMixin:
             if definition.pass_key:
                 asset_costs[definition.pass_key] = definition.pass_quantity
             try:
-                spend_player_assets(connection, player, asset_costs, now_text)
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    asset_values=asset_costs,
+                    asset_mode="spend",
+                    value_delta={"stamina": -definition.stamina_cost},
+                )
             except ValueError as exc:
                 if definition.pass_key and "inventory" in str(exc):
                     raise AdvancedCavePassMissingError("advanced cave pass is missing") from exc
@@ -127,10 +134,6 @@ class CloudRepositoryMixin:
                 "required_layer": definition.required_layer,
                 "required_quest": definition.required_quest,
             }
-            connection.execute(
-                "UPDATE players SET stamina = ?, updated_at = ? WHERE id = ?",
-                (stamina - definition.stamina_cost, now_text, player_id),
-            )
             connection.execute(
                 """
                 INSERT INTO cloud_boat_sessions(
@@ -351,9 +354,16 @@ class CloudRepositoryMixin:
                 if flag not in flags:
                     flags.append(flag)
             intro["flags"] = flags
-            connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - 100, faction_reputation_json = ?, intro_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(faction, ensure_ascii=False, sort_keys=True), json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, player_id),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={"spirit_stones": 100},
+                asset_mode="spend",
+                player_values={
+                    "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
+                    "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
+                },
             )
             self._insert_quest_event(
                 connection,
@@ -518,10 +528,16 @@ class CloudRepositoryMixin:
             flags = {str(item) for item in intro.get("flags", [])}
             flags.update({BEAST_INTRO_QUEST, BEAST_INTRO_FLAG})
             intro["flags"] = sorted(flags)
-            connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones - 100, faction_reputation_json = ?, "
-                "intro_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(faction, ensure_ascii=False, sort_keys=True), json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, player_id),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={"spirit_stones": 100},
+                asset_mode="spend",
+                player_values={
+                    "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
+                    "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
+                },
             )
             self._insert_quest_event(
                 connection,
@@ -642,8 +658,11 @@ class CloudRepositoryMixin:
                 raise ArrayHallPermissionDeniedError("array hall permission is not granted")
             if int(player["stamina"]) < 3:
                 raise ResourceInsufficientError("array hall requires 3 stamina")
-            connection.execute(
-                "UPDATE players SET stamina = stamina - 3, updated_at = ? WHERE id = ?", (now_text, player["id"])
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                value_delta={"stamina": -3},
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             payload = {

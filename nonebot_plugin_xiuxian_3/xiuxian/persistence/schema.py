@@ -920,8 +920,6 @@ CREATE TABLE IF NOT EXISTS mentor_relations (
     graduated_at TEXT,
     graduate_operation_id TEXT UNIQUE,
     master_contribution INTEGER NOT NULL DEFAULT 0 CHECK (master_contribution >= 0),
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     CHECK (master_id <> apprentice_id)
@@ -1362,7 +1360,6 @@ CREATE TABLE IF NOT EXISTS routine_checkins (
     reward_json TEXT NOT NULL DEFAULT '{}',
     streak_before INTEGER NOT NULL DEFAULT 0 CHECK (streak_before >= 0),
     streak_after INTEGER NOT NULL DEFAULT 0 CHECK (streak_after >= 0),
-    content_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     settled_at TEXT NOT NULL,
     UNIQUE (player_id, target_date)
@@ -1382,8 +1379,6 @@ CREATE TABLE IF NOT EXISTS spirit_trees (
     cooldown_until TEXT,
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     result_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 
@@ -1518,8 +1513,6 @@ CREATE TABLE IF NOT EXISTS arena_recovery_events (
     match_id TEXT NOT NULL DEFAULT '',
     player_id INTEGER REFERENCES players(id),
     mode_key TEXT NOT NULL DEFAULT 'arena.federation',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('requested', 'verified', 'snapshot_created', 'restoring', 'integrity_checked', 'active', 'failed')),
     result_json TEXT NOT NULL DEFAULT '{}',
     failure_reason TEXT NOT NULL DEFAULT '',
@@ -1537,8 +1530,6 @@ CREATE TABLE IF NOT EXISTS social_recovery_events (
     request_id TEXT NOT NULL,
     operation_id TEXT NOT NULL,
     artifact_id TEXT NOT NULL,
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('requested', 'verified', 'snapshot_created', 'restoring', 'integrity_checked', 'active', 'failed')),
     result_json TEXT NOT NULL DEFAULT '{}',
     failure_reason TEXT NOT NULL DEFAULT '',
@@ -1612,8 +1603,6 @@ CREATE TABLE IF NOT EXISTS seven_day_campaigns (
     player_id INTEGER PRIMARY KEY REFERENCES players(id),
     start_date TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'closed')),
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -1627,8 +1616,6 @@ CREATE TABLE IF NOT EXISTS seven_day_goal_claims (
     source_operation_id TEXT NOT NULL,
     operation_id TEXT NOT NULL UNIQUE,
     reward_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE (player_id, day_number),
     UNIQUE (player_id, source_operation_id)
@@ -1663,8 +1650,6 @@ CREATE TABLE IF NOT EXISTS achievement_claims (
     source_operation_id TEXT NOT NULL,
     operation_id TEXT NOT NULL UNIQUE,
     reward_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE (player_id, achievement_key),
     UNIQUE (player_id, source_operation_id)
@@ -1683,8 +1668,6 @@ CREATE TABLE IF NOT EXISTS redemption_codes (
     ends_on TEXT,
     status TEXT NOT NULL CHECK (status IN ('active', 'revoked')),
     reward_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -1696,8 +1679,6 @@ CREATE TABLE IF NOT EXISTS redemption_claims (
     code_key TEXT NOT NULL,
     operation_id TEXT NOT NULL UNIQUE,
     reward_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE (player_id, code_id)
 );
@@ -1747,8 +1728,6 @@ CREATE TABLE IF NOT EXISTS wayfaring_passes (
     weekly_points INTEGER NOT NULL DEFAULT 0 CHECK (weekly_points >= 0),
     claimed_free_json TEXT NOT NULL DEFAULT '[]',
     claimed_paid_json TEXT NOT NULL DEFAULT '[]',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (player_id, pass_key, cycle_start)
@@ -1800,8 +1779,6 @@ CREATE TABLE IF NOT EXISTS dao_contracts (
     ends_on TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('active', 'revoked', 'expired')),
     revoke_reason TEXT,
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (player_id, contract_key, starts_on)
@@ -1818,8 +1795,6 @@ CREATE TABLE IF NOT EXISTS dao_contract_claims (
     business_date TEXT NOT NULL,
     operation_id TEXT NOT NULL UNIQUE,
     reward_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE (contract_id, business_date)
 );
@@ -2592,8 +2567,6 @@ CREATE TABLE IF NOT EXISTS quest_progress (
     progress_json TEXT NOT NULL DEFAULT '{}',
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     source_operation_id TEXT,
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (player_id, quest_key)
@@ -2610,8 +2583,6 @@ CREATE TABLE IF NOT EXISTS quest_events (
     source_operation_id TEXT NOT NULL,
     outcome TEXT NOT NULL,
     payload_json TEXT NOT NULL DEFAULT '{}',
-    content_version TEXT NOT NULL,
-    rule_version TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE (player_id, quest_key, component_key, source_operation_id)
 );

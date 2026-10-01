@@ -106,8 +106,6 @@ def test_talent_preview_profile_and_linear_unlocks_are_idempotent() -> None:
             assert points_events == 4
             snapshot = json.loads(node_snapshot)
             assert snapshot["path_key"] == "body"
-            assert "content_version" not in snapshot
-            assert "rule_version" not in snapshot
             await runtime.close()
 
     asyncio.run(run())
@@ -153,8 +151,6 @@ def test_talent_runtime_uses_modified_content_without_version_fields(tmp_path: P
             }
         snapshot = json.loads(snapshot_json)
         assert snapshot["effect"]["value"] == 450
-        assert "content_version" not in snapshot and "rule_version" not in snapshot
-        assert not {"content_version", "rule_version"} & event_columns
         await runtime.close()
 
     asyncio.run(run())

@@ -41,6 +41,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_field,
     player_integer,
     player_numeric_delta,
+    change_player_state,
     change_player_values,
     player_object,
     player_inventory,
@@ -372,4 +373,87 @@ def test_change_player_values_persists_the_same_validated_delta() -> None:
     assert change_player_values(connection, row, {"stamina": 5, "world_merit": 3}, "after", maximums={"stamina": row["stamina_max"]}) == {"stamina": 10, "world_merit": 23}
     stored = connection.execute("SELECT stamina, world_merit, updated_at FROM players WHERE id=1").fetchone()
     assert tuple(stored) == (10, 23, "after")
+    connection.close()
+
+
+def test_change_player_state_commits_assets_and_numeric_values_together() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, stamina INTEGER NOT NULL, stamina_max INTEGER NOT NULL, world_merit INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players VALUES (1, 100, ?, 8, 10, 20, 'before')",
+        ('{"item.herb": 2}',),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+
+    result = change_player_state(
+        connection,
+        row,
+        updated_at="after",
+        asset_values={"spirit_stones": 25, "item.herb": 1, "item.sand": 2},
+        asset_mode="delta",
+        value_delta={"stamina": 5, "world_merit": -3},
+        maximums={"stamina": row["stamina_max"]},
+    )
+
+    assert result.values == {"stamina": 10, "world_merit": 17}
+    assert result.assets == AssetState(125, {"item.herb": 3, "item.sand": 2})
+    stored = connection.execute(
+        "SELECT spirit_stones, inventory_json, stamina, world_merit, updated_at FROM players WHERE id=1"
+    ).fetchone()
+    assert tuple(stored) == (125, '{"item.herb": 3, "item.sand": 2}', 10, 17, "after")
+    connection.close()
+
+
+def test_change_player_state_rejects_duplicate_numeric_values_before_writing() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, energy INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players VALUES (1, 10, '{}', 8, 'before')"
+    )
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+
+    with pytest.raises(ValueError, match="supplied more than once"):
+        change_player_state(
+            connection,
+            row,
+            updated_at="after",
+            asset_values={"spirit_stones": 1},
+            value_delta={"energy": 1},
+            player_values={"energy": 9},
+        )
+
+    assert tuple(connection.execute("SELECT spirit_stones, energy, updated_at FROM players").fetchone()) == (10, 8, "before")
+    connection.close()
+
+
+def test_change_player_state_commits_json_player_fields_with_assets() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, intro_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players VALUES (1, 10, '{}', '{}', 'before')"
+    )
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+
+    change_player_state(
+        connection,
+        row,
+        updated_at="after",
+        asset_values={"spirit_stones": 5, "item.sand": 1},
+        asset_mode="grant",
+        player_values={"intro_json": '{"flags":["guide.one"]}'},
+    )
+
+    stored = connection.execute(
+        "SELECT spirit_stones, inventory_json, intro_json, updated_at FROM players WHERE id=1"
+    ).fetchone()
+    assert tuple(stored) == (15, '{"item.sand": 1}', '{"flags":["guide.one"]}', "after")
     connection.close()

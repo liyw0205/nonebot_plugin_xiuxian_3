@@ -197,11 +197,11 @@ def test_void_ruins_full_route_handoff_restart_and_first_clear(leader_adapter, m
 
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 runs = connection.execute(
-                    "SELECT status, content_version, rule_version FROM void_ruins_runs WHERE party_id=?",
+                    "SELECT status FROM void_ruins_runs WHERE party_id=?",
                     (party_id,),
                 ).fetchall()
                 battles = connection.execute(
-                    "SELECT enemy_key, rule_version FROM party_battle_sessions WHERE party_id=? ORDER BY id",
+                    "SELECT enemy_key FROM party_battle_sessions WHERE party_id=? ORDER BY id",
                     (party_id,),
                 ).fetchall()
                 claimed = connection.execute(
@@ -217,11 +217,10 @@ def test_void_ruins_full_route_handoff_restart_and_first_clear(leader_adapter, m
                     "WHERE c.entry_key='codex.void.route_ruins' AND p.platform_user_id IN (?, ?)",
                     (leader[1], member[1]),
                 ).fetchone()[0]
-            assert runs == [("settled", "", "")]
+            assert runs == [("settled",)]
             assert [battle[0] for battle in battles] == [
                 "enemy.void_ruins_sentinel_unstable", "enemy.void_ruins_keeper_unstable"
             ]
-            assert all(battle[1] == "" for battle in battles)
             assert claimed == 0
             assert codex_count == 2
             for user, stamina, inventory_json, intro_json in players:

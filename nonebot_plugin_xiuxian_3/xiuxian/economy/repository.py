@@ -478,8 +478,8 @@ class EconomyRepositoryMixin:
             )
             self._market_ledger(
                 connection, operation_id, int(buyer["id"]), "item", str(order["item_key"]),
-                "market.purchase", "credit", quantity, int(buyer_inventory.get(order["item_key"], 0)) - quantity,
-                int(buyer_inventory.get(order["item_key"], 0)), order_id, now_text,
+                "market.purchase", "credit", quantity, int(buyer_inventory.get(order["item_key"], 0)),
+                int(buyer_inventory.get(order["item_key"], 0)) + quantity, order_id, now_text,
             )
             if not new_remaining:
                 self._market_ledger(

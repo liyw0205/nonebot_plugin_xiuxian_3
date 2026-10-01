@@ -5,8 +5,6 @@ from __future__ import annotations
 import re
 
 
-SOCIAL_RECOVERY_RULE_VERSION = ""
-SOCIAL_RECOVERY_CONTENT_VERSION = ""
 SOCIAL_RECOVERY_ARTIFACT_ROOT = "backups/social"
 SOCIAL_RECOVERY_ARTIFACT_KEY = re.compile(r"^[a-z0-9-]{1,48}$")
 
@@ -43,8 +41,6 @@ def validate_social_recovery_artifact_key(value: str) -> str:
 __all__ = [
     "SOCIAL_RECOVERY_ARTIFACT_KEY",
     "SOCIAL_RECOVERY_ARTIFACT_ROOT",
-    "SOCIAL_RECOVERY_CONTENT_VERSION",
-    "SOCIAL_RECOVERY_RULE_VERSION",
     "SOCIAL_RECOVERY_TABLES",
     "validate_social_recovery_artifact_key",
 ]

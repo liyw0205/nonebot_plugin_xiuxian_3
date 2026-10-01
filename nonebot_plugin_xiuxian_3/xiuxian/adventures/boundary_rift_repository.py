@@ -23,9 +23,10 @@ from ..persistence.errors import (
 )
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_BOUNDARY
 from ..specials.codex_projection import record_codex_discovery
+from ..utils.assets import grant_player_assets, spend_player_items
+from ..utils.player import change_player_state
 from .boundary_rift_models import BoundaryRiftRunRecord
 from .boundary_rift_rules import (
-    BOUNDARY_RIFT_CONTENT_VERSION,
     BOUNDARY_RIFT_EXPIRY_SECONDS,
     BOUNDARY_RIFT_FIRST_REWARD,
     BOUNDARY_RIFT_KEY,
@@ -34,7 +35,6 @@ from .boundary_rift_rules import (
     BOUNDARY_RIFT_NODES,
     BOUNDARY_RIFT_PARTY_TYPE,
     BOUNDARY_RIFT_REPEAT_REWARD,
-    BOUNDARY_RIFT_RULE_VERSION,
     BOUNDARY_RIFT_STAMINA_COST,
     BOUNDARY_RIFT_TICKET,
     BOUNDARY_RIFT_TICKET_COST,
@@ -197,9 +197,6 @@ class BoundaryRiftRepositoryMixin:
             leader_inventory = self._rift_json(leader["inventory_json"])
             if int(leader_inventory.get(BOUNDARY_RIFT_TICKET, 0)) < BOUNDARY_RIFT_TICKET_COST:
                 raise BoundaryRiftRequirementError("the party leader lacks one soul crystal")
-            leader_inventory[BOUNDARY_RIFT_TICKET] = int(leader_inventory[BOUNDARY_RIFT_TICKET]) - BOUNDARY_RIFT_TICKET_COST
-            if leader_inventory[BOUNDARY_RIFT_TICKET] <= 0:
-                leader_inventory.pop(BOUNDARY_RIFT_TICKET, None)
             run_id = f"boundary-rift-{uuid4().hex}"
             expires_at = serialize_datetime(now + timedelta(seconds=BOUNDARY_RIFT_EXPIRY_SECONDS))
             snapshot = {
@@ -211,9 +208,6 @@ class BoundaryRiftRepositoryMixin:
                 "current_node": BOUNDARY_RIFT_NODES[0],
                 "members": snapshots,
                 "first_clear_by_player": {str(key): value for key, value in first_clear_by_player.items()},
-                "content_version": BOUNDARY_RIFT_CONTENT_VERSION,
-                "rule_version": BOUNDARY_RIFT_RULE_VERSION,
-                "combat_rule_version": "",
                 "entry_cost": {
                     "stamina_each": BOUNDARY_RIFT_STAMINA_COST,
                     "ticket": {BOUNDARY_RIFT_TICKET: BOUNDARY_RIFT_TICKET_COST},
@@ -221,20 +215,25 @@ class BoundaryRiftRepositoryMixin:
                 "random_seed": operation_id,
             }
             for row in members:
-                connection.execute(
-                    "UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=? AND stamina>=?",
-                    (BOUNDARY_RIFT_STAMINA_COST, now_text, row["id"], BOUNDARY_RIFT_STAMINA_COST),
-                )
-                if connection.execute("SELECT changes()").fetchone()[0] != 1:
-                    raise ResourceInsufficientError("party stamina changed during entry")
-            connection.execute(
-                "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                (json.dumps(leader_inventory, ensure_ascii=False, sort_keys=True), now_text, leader["id"]),
+                try:
+                    change_player_state(
+                        connection,
+                        row,
+                        updated_at=now_text,
+                        value_delta={"stamina": -BOUNDARY_RIFT_STAMINA_COST},
+                    )
+                except ValueError as exc:
+                    raise ResourceInsufficientError("party stamina changed during entry") from exc
+            spend_player_items(
+                connection,
+                leader,
+                {BOUNDARY_RIFT_TICKET: BOUNDARY_RIFT_TICKET_COST},
+                now_text,
             )
             connection.execute(
-                "INSERT INTO boundary_rift_runs(run_id, party_id, status, node_index, battle_id, quota_key, starts_at, expires_at, snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
-                (run_id, party["party_id"], quota_key, now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, BOUNDARY_RIFT_CONTENT_VERSION, BOUNDARY_RIFT_RULE_VERSION, now_text, now_text),
+                "INSERT INTO boundary_rift_runs(run_id, party_id, status, node_index, battle_id, quota_key, starts_at, expires_at, snapshot_json, result_json, entry_operation_id, created_at, updated_at) "
+                "VALUES (?, ?, 'routing', 0, NULL, ?, ?, ?, ?, '{}', ?, ?, ?)",
+                (run_id, party["party_id"], quota_key, now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, now_text, now_text),
             )
             for index, row in enumerate(members):
                 connection.execute(
@@ -456,7 +455,7 @@ class BoundaryRiftRepositoryMixin:
                 raise BoundaryRiftNotReadyError("boundary-rift run has expired")
             snapshot = self._rift_json(run["snapshot_json"])
             members = connection.execute(
-                "SELECT m.*, p.player_id AS stable_player_id, p.inventory_json, p.intro_json "
+                "SELECT m.*, p.id AS database_id, p.player_id AS stable_player_id, p.spirit_stones, p.inventory_json, p.intro_json "
                 "FROM boundary_rift_members m JOIN players p ON p.id=m.player_id "
                 "WHERE m.run_id=? ORDER BY m.member_order",
                 (run["run_id"],),
@@ -466,9 +465,6 @@ class BoundaryRiftRepositoryMixin:
             for member in members:
                 reward = dict(BOUNDARY_RIFT_FIRST_REWARD if bool(member["first_clear"]) else BOUNDARY_RIFT_REPEAT_REWARD)
                 reward_map[str(member["player_id"])] = reward
-                inventory = self._rift_json(member["inventory_json"])
-                for key, amount in reward.items():
-                    inventory[key] = int(inventory.get(key, 0)) + int(amount)
                 intro = self._rift_json(member["intro_json"])
                 flags = {str(value) for value in intro.get("flags", [])}
                 if bool(member["first_clear"]):
@@ -483,9 +479,12 @@ class BoundaryRiftRepositoryMixin:
                         snapshot={"run_id": str(run["run_id"]), "instance_key": BOUNDARY_RIFT_KEY},
                     )
                 intro["flags"] = sorted(flags)
-                connection.execute(
-                    "UPDATE players SET inventory_json=?, intro_json=?, updated_at=? WHERE id=?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(intro, ensure_ascii=False, sort_keys=True), now_text, member["player_id"]),
+                grant_player_assets(
+                    connection,
+                    member,
+                    reward,
+                    now_text,
+                    player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
                 )
                 connection.execute(
                     "UPDATE boundary_rift_members SET status='cleared', reward_json=?, updated_at=? WHERE run_id=? AND player_id=?",
@@ -609,22 +608,28 @@ class BoundaryRiftRepositoryMixin:
                 (run_id,),
             ).fetchall()
             for member in members:
-                connection.execute(
-                    "UPDATE players SET stamina=MIN(stamina_max, stamina+?), updated_at=? WHERE id=?",
-                    (BOUNDARY_RIFT_STAMINA_COST, now_text, member["player_id"]),
-                )
+                player = connection.execute("SELECT * FROM players WHERE id=?", (member["player_id"],)).fetchone()
+                if player is not None:
+                    change_player_state(
+                        connection,
+                        player,
+                        updated_at=now_text,
+                        value_delta={"stamina": BOUNDARY_RIFT_STAMINA_COST},
+                        maximums={"stamina": player["stamina_max"]},
+                    )
                 connection.execute(
                     "UPDATE boundary_rift_members SET status='failed', quota_key=?, updated_at=? WHERE run_id=? AND player_id=?",
                     (f"released:{run_id}", now_text, run_id, member["player_id"]),
                 )
             if party is not None and members:
-                leader = connection.execute("SELECT inventory_json FROM players WHERE id=?", (party["leader_id"],)).fetchone()
-                inventory = self._rift_json(leader["inventory_json"])
-                inventory[BOUNDARY_RIFT_TICKET] = int(inventory.get(BOUNDARY_RIFT_TICKET, 0)) + BOUNDARY_RIFT_TICKET_COST
-                connection.execute(
-                    "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, party["leader_id"]),
-                )
+                leader = connection.execute("SELECT * FROM players WHERE id=?", (party["leader_id"],)).fetchone()
+                if leader is not None:
+                    grant_player_assets(
+                        connection,
+                        leader,
+                        {BOUNDARY_RIFT_TICKET: BOUNDARY_RIFT_TICKET_COST},
+                        now_text,
+                    )
             result = {"outcome": "failed", "reason": "battle_start_failed", "entry_cost_refunded": True}
             connection.execute(
                 "UPDATE boundary_rift_runs SET status='failed', result_json=?, updated_at=? WHERE run_id=?",

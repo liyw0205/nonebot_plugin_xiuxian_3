@@ -919,12 +919,9 @@ def test_story_endings_run_through_qq_and_onebot_v11_adapters() -> None:
                         assert ending_snapshot["choice"]["source_operation_ids"] == list(reversed(evidence_ids))
                         assert later_evidence[0] not in ending_snapshot["choice"]["source_operation_ids"]
                         assert json.loads(reward_json) == {"local_reputation": 10}
-                        assert "content_version" not in ending_snapshot["choice"]
-                        assert "rule_version" not in ending_snapshot["choice"]
                         story_columns = {
                             row[1] for row in connection.execute("PRAGMA table_info(story_ending_claims)")
                         }
-                        assert not {"content_version", "rule_version"} & story_columns
                         assert connection.execute(
                             "SELECT COUNT(*) FROM codex_entries c JOIN players p ON p.id=c.player_id "
                             "WHERE p.platform=? AND p.platform_user_id=? AND c.entry_key=?",

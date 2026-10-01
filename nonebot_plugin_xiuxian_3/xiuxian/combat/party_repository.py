@@ -81,7 +81,7 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_DAMAGE_BP,
     TIME_FORT_STORM_INTERVAL,
 )
-from ..utils.player import player_combat_values, player_intro_flags, player_object, player_reputation
+from ..utils.player import change_player_state, player_combat_values, player_intro_flags, player_object, player_reputation
 from ..utils.assets import grant_player_assets, inventory_spend, spend_player_assets
 
 
@@ -528,9 +528,11 @@ class PartyCombatRepositoryMixin:
                 )
                 # All validation above happens before this atomic resource debit.
                 for row in members:
-                    connection.execute(
-                        "UPDATE players SET stamina = stamina - ?, updated_at = ? WHERE id = ?",
-                        (BOUNDARY_REALM_STAMINA_COST, now_text, row["database_player_id"]),
+                    change_player_state(
+                        connection,
+                        row,
+                        updated_at=now_text,
+                        value_delta={"stamina": -BOUNDARY_REALM_STAMINA_COST},
                     )
                 spend_player_assets(
                     connection,
@@ -548,12 +550,12 @@ class PartyCombatRepositoryMixin:
                     raise CrossRealmPartyRequirementError("cross-realm party location is invalid")
                 stamina_cost = DEMON_REALM_STAMINA_COST if demon_party else BEAST_REALM_STAMINA_COST
                 for row in members:
-                    connection.execute(
-                        "UPDATE players SET stamina = stamina - ?, updated_at = ? WHERE id = ? AND stamina >= ?",
-                        (stamina_cost, now_text, row["database_player_id"], stamina_cost),
+                    change_player_state(
+                        connection,
+                        row,
+                        updated_at=now_text,
+                        value_delta={"stamina": -stamina_cost},
                     )
-                    if connection.execute("SELECT changes()").fetchone()[0] != 1:
-                        raise CrossRealmPartyRequirementError("party stamina changed during start")
             dungeon_reward = (
                 DEMON_REALM_REWARD
                 if demon_party
@@ -1015,9 +1017,17 @@ class PartyCombatRepositoryMixin:
                 for member in members:
                     player_id = str(member["player_id"])
                     member_pollution[player_id] = min(100, member_pollution.get(player_id, 0) + 8)
-                    connection.execute(
-                        "UPDATE players SET pollution=MIN(100, pollution+8), updated_at=? WHERE id=?",
-                        (now_text, member["database_id"]),
+                    current = connection.execute(
+                        "SELECT * FROM players WHERE id = ?", (member["database_id"],)
+                    ).fetchone()
+                    if current is None:
+                        raise PartyBattleNotFoundError("party member disappeared during battle")
+                    change_player_state(
+                        connection,
+                        current,
+                        updated_at=now_text,
+                        value_delta={"pollution": 8},
+                        maximums={"pollution": 100},
                     )
                 sequence += 1
                 actions.append(

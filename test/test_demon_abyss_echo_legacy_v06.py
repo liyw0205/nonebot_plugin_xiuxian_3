@@ -179,13 +179,13 @@ def test_legacy_manor_schema_migration_tags_existing_rows_as_first_manor() -> No
             "status TEXT NOT NULL CHECK (status IN ('routing','cleared','expired','settled','system_aborted')), "
             "node_index INTEGER NOT NULL CHECK (node_index >= 0), starts_at TEXT NOT NULL, expires_at TEXT NOT NULL, "
             "snapshot_json TEXT NOT NULL, result_json TEXT NOT NULL DEFAULT '{}', "
-            "entry_operation_id TEXT NOT NULL UNIQUE, content_version TEXT NOT NULL, rule_version TEXT NOT NULL, "
+            "entry_operation_id TEXT NOT NULL UNIQUE, "
             "created_at TEXT NOT NULL, updated_at TEXT NOT NULL);"
         )
         connection.execute(
             "INSERT INTO legacy_manor_runs(run_id,player_id,status,node_index,starts_at,expires_at,snapshot_json,"
-            "entry_operation_id,content_version,rule_version,created_at,updated_at) "
-            "VALUES ('old-run',1,'settled',3,'2026-01-01','2026-01-01','{}','old-op','','',"
+            "entry_operation_id,created_at,updated_at) "
+            "VALUES ('old-run',1,'settled',3,'2026-01-01','2026-01-01','{}','old-op',"
             "'2026-01-01','2026-01-01')"
         )
         ensure_legacy_manor_schema(connection)

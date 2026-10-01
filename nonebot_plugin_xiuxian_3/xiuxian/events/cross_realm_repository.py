@@ -8,7 +8,8 @@ from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import assets_grant, assets_spend, inventory_json, inventory_value
+from ..utils.assets import spend_player_items
+from ..utils.player import change_player_state
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -156,17 +157,9 @@ class CrossRealmEventRepositoryMixin:
             if source.get("consume_item"):
                 item_key = str(source["consume_item"])
                 try:
-                    inventory = assets_spend(
-                        player["spirit_stones"],
-                        inventory_value(player["inventory_json"]),
-                        {item_key: 1},
-                    ).inventory
+                    spend_player_items(connection, player, {item_key: 1}, now_text)
                 except ValueError as exc:
                     raise EventSourceNotEligibleError("required event item is missing") from exc
-                connection.execute(
-                    "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                    (inventory_json(inventory), now_text, player["id"]),
-                )
             quantity = int(source["quantity"])
             connection.execute(
                 "INSERT INTO world_event_contribution_events(round_id, player_id, source_operation_id, quantity, applied_quantity, occurred_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -246,30 +239,26 @@ class CrossRealmEventRepositoryMixin:
             ).fetchone() is not None:
                 raise EventRewardAlreadyClaimedError("cross-realm event reward already claimed")
             reward = {str(key): int(value) for key, value in dict(definition["reward"]).items()}
-            assets = assets_grant(
-                player["spirit_stones"],
-                inventory_value(player["inventory_json"]),
-                {
-                    key: value
-                    for key, value in reward.items()
-                    if key == "spirit_stones" or key.startswith("item.")
-                },
-            )
+            asset_reward = {
+                key: value
+                for key, value in reward.items()
+                if key == "spirit_stones" or key.startswith("item.")
+            }
             faction = self._json_object(player["faction_reputation_json"], {})
             for key, value in reward.items():
                 if key.startswith("faction_reputation."):
                     faction_key = key.removeprefix("faction_reputation.")
                     faction[faction_key] = int(faction.get(faction_key, 0)) + value
-            connection.execute(
-                "UPDATE players SET spirit_stones=?, inventory_json=?, faction_reputation_json=?, world_merit=world_merit+?, updated_at=? WHERE id=?",
-                (
-                    assets.currency,
-                    inventory_json(assets.inventory),
-                    json.dumps(faction, ensure_ascii=False, sort_keys=True),
-                    int(reward.get("world_merit", 0)),
-                    now_text,
-                    player["id"],
-                ),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values=asset_reward,
+                asset_mode="grant",
+                value_delta={"world_merit": int(reward.get("world_merit", 0))},
+                player_values={
+                    "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
+                },
             )
             connection.execute(
                 "INSERT INTO world_event_claims(round_id, player_id, operation_id, reward_json, claimed_at) VALUES (?, ?, ?, ?, ?)",

@@ -156,8 +156,8 @@ def test_void_refining_failure_replays_and_recovers_after_instability_expires() 
                     ).fetchone()[0]
                     for index in range(3):
                         db.execute(
-                            "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, content_version, rule_version, created_at) "
-                            "VALUES (?, 'quest.break_void', 'void_wall_trial', ?, 'success', '{}', '', '', 'created')",
+                            "INSERT INTO quest_events(player_id, quest_key, component_key, source_operation_id, outcome, payload_json, created_at) "
+                            "VALUES (?, 'quest.break_void', 'void_wall_trial', ?, 'success', '{}', 'created')",
                             (player_id, f"{user}-wall-trial-{index}"),
                         )
 
@@ -726,7 +726,6 @@ def test_higher_realms_can_reenter_archive_route_on_both_adapters() -> None:
                         "SELECT snapshot_json FROM void_route_sessions WHERE session_id=?",
                         (started.data["session_id"],),
                     ).fetchone()[0]
-                assert "rule_version" not in json.loads(snapshot_json)
             await runtime.close()
 
     asyncio.run(run())

@@ -75,30 +75,6 @@ def validate_command_identity(
     return None
 
 
-_RUNTIME_METADATA_KEYS = frozenset({
-    "content_version",
-    "rule_version",
-    "schema_version",
-    "generated_at",
-})
-
-
-def strip_runtime_metadata(value: Any) -> Any:
-    """Remove release metadata from adapter-facing result data."""
-
-    if isinstance(value, dict):
-        return {
-            key: strip_runtime_metadata(item)
-            for key, item in value.items()
-            if key not in _RUNTIME_METADATA_KEYS
-        }
-    if isinstance(value, list):
-        return [strip_runtime_metadata(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(strip_runtime_metadata(item) for item in value)
-    return value
-
-
 @dataclass(frozen=True, slots=True)
 class PlayerView:
     player_id: str

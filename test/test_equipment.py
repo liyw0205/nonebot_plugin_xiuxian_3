@@ -393,7 +393,6 @@ def test_equipment_refinement_pity_and_resource_zero_change() -> None:
                     ("equipment-refine-pity",),
                 ).fetchone()
                 assert event is not None
-                assert "rule_version" not in json.loads(event[0])
             await runtime.close()
 
     asyncio.run(run())

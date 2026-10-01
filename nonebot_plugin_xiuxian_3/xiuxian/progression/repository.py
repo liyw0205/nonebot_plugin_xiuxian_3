@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from ...contracts import serialize_datetime
 from .models import ResourceRecoveryRecord
+from ..utils.player import change_player_state
 
 
 class ProgressionRepositoryMixin:
@@ -94,21 +95,29 @@ class ProgressionRepositoryMixin:
             changed = recovered_stamina > 0 or recovered_energy > 0 or recovered_void_power > 0
             if periods > 0:
                 advanced_update = last_update + timedelta(seconds=periods * RECOVERY_PERIOD_SECONDS)
-                connection.execute(
-                    "UPDATE players SET stamina = ?, energy = ?, void_power = ?, void_power_reset_date = ?, updated_at = ? WHERE id = ?",
-                    (
-                        stamina_after,
-                        energy_after,
-                        void_after,
-                        now.date().isoformat(),
-                        serialize_datetime(advanced_update),
-                        row["id"],
-                    ),
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=serialize_datetime(advanced_update),
+                    value_delta={
+                        "stamina": recovered_stamina,
+                        "energy": recovered_energy,
+                    },
+                    maximums={"stamina": row["stamina_max"], "energy": row["energy_max"]},
+                    player_values={
+                        "void_power": void_after,
+                        "void_power_reset_date": now.date().isoformat(),
+                    },
                 )
             elif recovered_void_power > 0:
-                connection.execute(
-                    "UPDATE players SET void_power = ?, void_power_reset_date = ?, updated_at = ? WHERE id = ?",
-                    (void_after, now.date().isoformat(), now_text, row["id"]),
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    player_values={
+                        "void_power": void_after,
+                        "void_power_reset_date": now.date().isoformat(),
+                    },
                 )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:

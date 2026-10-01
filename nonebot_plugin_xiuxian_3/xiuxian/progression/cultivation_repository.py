@@ -125,12 +125,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_CONTENT_VERSION,
     WAYFARING_DAILY_POINT_CAP,
     WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
     WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_RULE_VERSION,
     WAYFARING_WEEKLY_POINT_CAP,
     wayfaring_free_reward,
     wayfaring_paid_reward,
@@ -149,18 +147,13 @@ from ..routine.gacha import (
 )
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
-    CONTENT_VERSION as ROUTINE_CONTENT_VERSION,
     FATE_TICKET,
     MAKEUP_ACTIVITY,
-    RULE_VERSION as ROUTINE_RULE_VERSION,
     checkin_reward,
     makeup_reward,
     parse_past_date,
-    SEVEN_DAY_CONTENT_VERSION,
     SEVEN_DAY_GOALS,
-    SEVEN_DAY_RULE_VERSION,
     ACHIEVEMENTS,
-    HONOR_RULE_VERSION,
     HONOR_TITLES,
     achievement,
     achievement_reward,
@@ -175,6 +168,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_grant, inventory_json, inventory_value
+from ..utils.player import change_player_state
 
 
 class CultivationRepositoryMixin:
@@ -551,20 +545,22 @@ class CultivationRepositoryMixin:
                 "manual_cultivation_gain_bp": int(manual_effects["cultivation_gain_bp"]),
                 "soul_power_gain": mode.soul_power_gain,
             }
-            connection.execute(
-                "UPDATE players SET stamina = stamina - ?, energy = energy - ?, soul_power_max = ?, item_effects_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    mode.stamina_cost,
-                    mode.energy_cost,
-                    max(
+            change_player_state(
+                connection,
+                row,
+                updated_at=serialize_datetime(now),
+                value_delta={
+                    "stamina": -mode.stamina_cost,
+                    "energy": -mode.energy_cost,
+                },
+                player_values={
+                    "soul_power_max": max(
                         int(row["soul_power_max"]),
                         int(row["soul_power"]),
                         SOUL_REFINEMENT_SOUL_POWER_MAX if mode.soul_power_gain else 0,
                     ),
-                    json.dumps(item_effects, ensure_ascii=False, sort_keys=True),
-                    serialize_datetime(now),
-                    row["id"],
-                ),
+                    "item_effects_json": json.dumps(item_effects, ensure_ascii=False, sort_keys=True),
+                },
             )
             connection.execute(
                 """
@@ -740,9 +736,16 @@ class CultivationRepositoryMixin:
                 manual_bonus_bp=int(snapshot.get("manual_cultivation_gain_bp", 0)),
             )
             soul_power_gain = int(snapshot.get("soul_power_gain", 0))
-            connection.execute(
-                "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, soul_power = MIN(soul_power_max, soul_power + ?), updated_at = ? WHERE id = ?",
-                (gain, gain, soul_power_gain, now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                value_delta={
+                    "cultivation": gain,
+                    "total_cultivation": gain,
+                    "soul_power": soul_power_gain,
+                },
+                maximums={"soul_power": row["soul_power_max"]},
             )
             settlement_result = {
                 "cultivation_gain": gain,
@@ -878,9 +881,16 @@ class CultivationRepositoryMixin:
                 manual_bonus_bp=int(snapshot.get("manual_cultivation_gain_bp", 0)),
             )
             soul_power_gain = int(snapshot.get("soul_power_gain", 0))
-            connection.execute(
-                "UPDATE players SET cultivation = cultivation + ?, total_cultivation = total_cultivation + ?, soul_power = MIN(soul_power_max, soul_power + ?), updated_at = ? WHERE id = ?",
-                (gain, gain, soul_power_gain, now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                value_delta={
+                    "cultivation": gain,
+                    "total_cultivation": gain,
+                    "soul_power": soul_power_gain,
+                },
+                maximums={"soul_power": row["soul_power_max"]},
             )
             connection.execute(
                 "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
@@ -1033,9 +1043,12 @@ class CultivationRepositoryMixin:
             snapshot = self._json_object(session["snapshot_json"], {})
             refund = int(session["stamina_cost"])
             energy_refund = int(snapshot.get("energy_cost", 0))
-            connection.execute(
-                "UPDATE players SET stamina = MIN(stamina_max, stamina + ?), energy = MIN(energy_max, energy + ?), updated_at = ? WHERE id = ?",
-                (refund, energy_refund, now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                value_delta={"stamina": refund, "energy": energy_refund},
+                maximums={"stamina": row["stamina_max"], "energy": row["energy_max"]},
             )
             connection.execute(
                 "UPDATE cultivation_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ?",
@@ -1370,9 +1383,11 @@ class CultivationRepositoryMixin:
                     if not eligible_seasons:
                         raise TrialSequenceError("dao origin tasks are incomplete")
             layer_unlocks_reached = layer_unlocks(realm_key, layer + 1)
-            connection.execute(
-                "UPDATE players SET realm_layer = realm_layer + 1, updated_at = ? WHERE id = ?",
-                (now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                value_delta={"realm_layer": 1},
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:

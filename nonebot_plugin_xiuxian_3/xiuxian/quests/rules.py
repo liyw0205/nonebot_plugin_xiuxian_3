@@ -5,9 +5,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
-VOID_QUEST_RULE_VERSION = ""
 
 SOUL_QUEST = "quest.soul_transformation"
 DOMAIN_COMMISSION = "quest.domain_material_commission"
@@ -34,21 +31,15 @@ def utc_week_bounds(value: datetime) -> tuple[date, date]:
 DAO_UNION_QUEST = "quest.dao_union"
 DAO_UNION_FRAGMENT_REWARD = 12
 DAO_UNION_TRIBULATION_TOKEN_REWARD = 1
-DAO_UNION_CONTENT_VERSION = ""
-DAO_UNION_RULE_VERSION = ""
 DAO_UNION_MAINLINE = "three_realm_mainline"
 DAO_UNION_CHALLENGE = "cross_server_challenge"
 DAO_UNION_WORK = "endgame_work"
 DAO_UNION_MAINLINE_STORY_KEY = "story.mainline.dao_echoes"
-DAO_UNION_MAINLINE_CONTENT_VERSION = ""
-DAO_UNION_MAINLINE_RULE_VERSION = ""
 DAO_UNION_MAINLINE_LANES = ("builder", "witness", "traveler")
 DAO_UNION_MAINLINE_STAGE_KEYS = {
     lane: tuple(f"lane.{lane}.chapter.{chapter:02d}" for chapter in range(1, 11))
     for lane in DAO_UNION_MAINLINE_LANES
 }
-DAO_ORIGIN_CONTENT_VERSION = ""
-DAO_ORIGIN_RULE_VERSION = ""
 DAO_ORIGIN_GUARD = "task.dao_origin.guard"
 DAO_ORIGIN_BUILD = "task.dao_origin.build"
 DAO_ORIGIN_TEACH = "task.dao_origin.teach"
@@ -89,39 +80,30 @@ def meets_realm(realm_key: str, layer: int, required_realm: str, required_layer:
 __all__ = [
     "ANCIENT_DOMAIN_LINE",
     "ANCIENT_DOMAIN_TARGET",
-    "CONTENT_VERSION",
     "CROSS_REALM_VICTORY",
     "DOMAIN_COMMISSION",
     "DOMAIN_COMMISSION_TARGET",
-    "RULE_VERSION",
     "SOUL_QUEST",
     "VOID_ARCHIVE_DELIVERY",
     "VOID_QUEST",
-    "VOID_QUEST_RULE_VERSION",
     "VOID_TRIAL_TARGET",
     "VOID_TRIAL_WEEKLY_LIMIT",
     "VOID_WALL_TRIAL",
     "DAO_ORIGIN_BUILD",
-    "DAO_ORIGIN_CONTENT_VERSION",
     "DAO_ORIGIN_GUARD",
     "DAO_ORIGIN_REWARDS",
-    "DAO_ORIGIN_RULE_VERSION",
     "DAO_ORIGIN_TARGET",
     "DAO_ORIGIN_TASKS",
     "DAO_ORIGIN_TEACH",
     "DAO_ORIGIN_WORLD_MERIT",
     "DAO_UNION_CHALLENGE",
     "DAO_UNION_FRAGMENT_REWARD",
-    "DAO_UNION_CONTENT_VERSION",
     "DAO_UNION_MAINLINE",
-    "DAO_UNION_MAINLINE_CONTENT_VERSION",
     "DAO_UNION_MAINLINE_LANES",
-    "DAO_UNION_MAINLINE_RULE_VERSION",
     "DAO_UNION_MAINLINE_STAGE_KEYS",
     "DAO_UNION_MAINLINE_STORY_KEY",
     "DAO_UNION_QUEST",
     "DAO_UNION_TRIBULATION_TOKEN_REWARD",
-    "DAO_UNION_RULE_VERSION",
     "DAO_UNION_WORK",
     "meets_realm",
     "utc_week_bounds",

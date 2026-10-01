@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_grant, inventory_json, inventory_spend, inventory_value
+from ..utils.assets import spend_player_items
+from ..utils.player import change_player_state, player_inventory
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
     DaoOriginTaskRequirementError,
@@ -20,23 +21,17 @@ from ..persistence.errors import (
 )
 from .models import DaoUnionQualificationRecord, QuestActionRecord
 from .rules import (
-    DAO_ORIGIN_CONTENT_VERSION,
     DAO_ORIGIN_REWARDS,
-    DAO_ORIGIN_RULE_VERSION,
     DAO_ORIGIN_TARGET,
     DAO_ORIGIN_TASKS,
     DAO_ORIGIN_WORLD_MERIT,
     DAO_UNION_CHALLENGE,
-    DAO_UNION_CONTENT_VERSION,
     DAO_UNION_FRAGMENT_REWARD,
     DAO_UNION_MAINLINE,
-    DAO_UNION_MAINLINE_CONTENT_VERSION,
     DAO_UNION_MAINLINE_LANES,
-    DAO_UNION_MAINLINE_RULE_VERSION,
     DAO_UNION_MAINLINE_STAGE_KEYS,
     DAO_UNION_MAINLINE_STORY_KEY,
     DAO_UNION_QUEST,
-    DAO_UNION_RULE_VERSION,
     DAO_UNION_TRIBULATION_TOKEN_REWARD,
     DAO_UNION_WORK,
     meets_realm,
@@ -51,8 +46,6 @@ class EndgameQuestRepositoryMixin:
         if (
             payload.get("source") != "mainline_runs"
             or payload.get("story_key") != DAO_UNION_MAINLINE_STORY_KEY
-            or payload.get("content_version") != DAO_UNION_MAINLINE_CONTENT_VERSION
-            or payload.get("rule_version") != DAO_UNION_MAINLINE_RULE_VERSION
         ):
             return False
         lane_stage_keys = payload.get("lane_stage_keys")
@@ -182,13 +175,10 @@ class EndgameQuestRepositoryMixin:
             source: dict[str, object]
             if component_key == DAO_UNION_MAINLINE:
                 rows = connection.execute(
-                    "SELECT stage_key FROM mainline_runs WHERE player_id=? AND story_key=? AND status='claimed' "
-                    "AND content_version=? AND rule_version=?",
+                    "SELECT stage_key FROM mainline_runs WHERE player_id=? AND story_key=? AND status='claimed'",
                     (
                         player["id"],
                         DAO_UNION_MAINLINE_STORY_KEY,
-                        DAO_UNION_MAINLINE_CONTENT_VERSION,
-                        DAO_UNION_MAINLINE_RULE_VERSION,
                     ),
                 ).fetchall()
                 claimed = {str(row["stage_key"]) for row in rows}
@@ -204,8 +194,6 @@ class EndgameQuestRepositoryMixin:
                 source = {
                     "source": "mainline_runs",
                     "story_key": DAO_UNION_MAINLINE_STORY_KEY,
-                    "content_version": DAO_UNION_MAINLINE_CONTENT_VERSION,
-                    "rule_version": DAO_UNION_MAINLINE_RULE_VERSION,
                     "lane_stage_keys": lane_stage_keys,
                 }
             elif component_key == DAO_UNION_WORK:
@@ -218,14 +206,10 @@ class EndgameQuestRepositoryMixin:
                     "beast": "item.masterwork.beast",
                     "support": "item.masterwork.support",
                 }.get(path_key)
-                inventory = inventory_value(player["inventory_json"])
+                inventory = player_inventory(player)
                 if not work_key or int(inventory.get(work_key, 0)) < 1:
                     raise QuestResourceInsufficientError("profession endgame work is missing")
-                inventory = inventory_spend(inventory, {work_key: 1})
-                connection.execute(
-                    "UPDATE players SET inventory_json = ?, updated_at = ? WHERE id = ?",
-                    (inventory_json(inventory), now_text, player["id"]),
-                )
+                spend_player_items(connection, player, {work_key: 1}, now_text)
                 source = {"source": "inventory_delivery", "item_key": work_key, "path_key": path_key}
             elif component_key == DAO_UNION_CHALLENGE:
                 battle = connection.execute(
@@ -254,8 +238,6 @@ class EndgameQuestRepositoryMixin:
                 outcome="success",
                 payload=source,
                 now_text=now_text,
-                content_version=DAO_UNION_CONTENT_VERSION,
-                rule_version=DAO_UNION_RULE_VERSION,
             )
             progress = {component_key: 1}
             self._upsert_progress(
@@ -267,8 +249,6 @@ class EndgameQuestRepositoryMixin:
                 {"last_component": component_key, "source": source},
                 operation_id,
                 now_text,
-                content_version=DAO_UNION_CONTENT_VERSION,
-                rule_version=DAO_UNION_RULE_VERSION,
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             payload = self._action_payload(updated, DAO_UNION_QUEST, component_key, progress, {}, status="active")
@@ -324,28 +304,21 @@ class EndgameQuestRepositoryMixin:
                 "realm_layer": int(player["realm_layer"]),
                 "components": progress,
                 "reward": qualification_reward,
-                "content_version": DAO_UNION_CONTENT_VERSION,
-                "rule_version": DAO_UNION_RULE_VERSION,
             }
-            inventory = inventory_grant(
-                inventory_value(player["inventory_json"]),
-                {
-                    "item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD,
-                    "item.tribulation_token": DAO_UNION_TRIBULATION_TOKEN_REWARD,
-                },
-            )
             flags_state = self._json_object(player["intro_json"], {})
             flags = set(str(item) for item in flags_state.get("flags", []))
             flags.add(DAO_UNION_QUEST)
             flags_state["flags"] = sorted(flags)
-            connection.execute(
-                "UPDATE players SET inventory_json = ?, intro_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    inventory_json(inventory),
-                    json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    player["id"],
-                ),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={
+                    "item.dao_fruit_fragment": DAO_UNION_FRAGMENT_REWARD,
+                    "item.tribulation_token": DAO_UNION_TRIBULATION_TOKEN_REWARD,
+                },
+                asset_mode="grant",
+                player_values={"intro_json": json.dumps(flags_state, ensure_ascii=False, sort_keys=True)},
             )
             self._upsert_progress(
                 connection,
@@ -356,8 +329,6 @@ class EndgameQuestRepositoryMixin:
                 snapshot,
                 operation_id,
                 now_text,
-                content_version=DAO_UNION_CONTENT_VERSION,
-                rule_version=DAO_UNION_RULE_VERSION,
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             payload = {
@@ -412,23 +383,18 @@ class EndgameQuestRepositoryMixin:
             count += 1
             reward = dict(DAO_ORIGIN_REWARDS[task_key]) if count == DAO_ORIGIN_TARGET else {}
             world_merit_reward = DAO_ORIGIN_WORLD_MERIT[task_key] if count == DAO_ORIGIN_TARGET else 0
-            inventory = inventory_value(player["inventory_json"])
             token_reward = int(reward.get("item.tribulation_token", 0))
-            if token_reward:
-                inventory = inventory_grant(
-                    inventory,
-                    {"item.tribulation_token": token_reward},
-                )
-            connection.execute(
-                "UPDATE players SET dao_fruit_progress = dao_fruit_progress + ?, ascension_merit = ascension_merit + ?, world_merit = world_merit + ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    int(reward.get("dao_fruit_progress", 0)),
-                    int(reward.get("ascension_merit", 0)),
-                    world_merit_reward,
-                    inventory_json(inventory),
-                    now_text,
-                    player["id"],
-                ),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={"item.tribulation_token": token_reward},
+                asset_mode="grant",
+                value_delta={
+                    "dao_fruit_progress": int(reward.get("dao_fruit_progress", 0)),
+                    "ascension_merit": int(reward.get("ascension_merit", 0)),
+                    "world_merit": world_merit_reward,
+                },
             )
             if world_merit_reward:
                 reward["world_merit"] = world_merit_reward
@@ -441,8 +407,6 @@ class EndgameQuestRepositoryMixin:
                 outcome="success",
                 payload={"count": count, "reward": reward, "event_key": "event.dao_origin", **source},
                 now_text=now_text,
-                content_version=DAO_ORIGIN_CONTENT_VERSION,
-                rule_version=DAO_ORIGIN_RULE_VERSION,
             )
             self._insert_quest_event(
                 connection,
@@ -453,8 +417,6 @@ class EndgameQuestRepositoryMixin:
                 outcome="success",
                 payload={"count": count, "reward": reward, **source},
                 now_text=now_text,
-                content_version=DAO_ORIGIN_CONTENT_VERSION,
-                rule_version=DAO_ORIGIN_RULE_VERSION,
             )
             progress = {"completed": count}
             self._upsert_progress(
@@ -471,8 +433,6 @@ class EndgameQuestRepositoryMixin:
                 },
                 operation_id,
                 now_text,
-                content_version=DAO_ORIGIN_CONTENT_VERSION,
-                rule_version=DAO_ORIGIN_RULE_VERSION,
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             payload = self._action_payload(

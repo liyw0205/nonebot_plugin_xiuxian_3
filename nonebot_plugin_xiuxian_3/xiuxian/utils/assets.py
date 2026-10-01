@@ -15,6 +15,23 @@ class AssetDeltaError(ValueError):
     """Raised when an asset balance or delta is invalid."""
 
 
+def player_database_id(row: Any) -> int:
+    """Resolve the database id from a player row or a joined player projection."""
+
+    for key in ("database_id", "database_player_id", "id"):
+        try:
+            value = row[key]
+        except (IndexError, KeyError, TypeError):
+            value = None
+        if value is not None:
+            return int(value)
+    try:
+        value = row["player_id"]
+        return int(value)
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise AssetDeltaError("player row does not contain a database id") from exc
+
+
 @dataclass(frozen=True, slots=True)
 class AssetState:
     """A detached player balance containing currency and stackable items."""
@@ -273,7 +290,7 @@ def apply_player_assets(
         raise ValueError(f"unsupported asset operation: {mode!r}")
     return write_player_assets(
         connection,
-        int(row["id"]),
+        player_database_id(row),
         next_assets,
         updated_at,
         preserve_zero=preserve_zero,
@@ -552,6 +569,7 @@ __all__ = [
     "inventory_value",
     "inventory_with_delta",
     "player_asset_state",
+    "player_database_id",
     "spend_player_assets",
     "spend_player_currency",
     "spend_player_items",

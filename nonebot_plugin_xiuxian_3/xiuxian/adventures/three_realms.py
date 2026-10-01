@@ -6,8 +6,6 @@ from dataclasses import dataclass
 
 
 THREE_REALMS_STORY_KEY = "story.mainline.three_realms"
-THREE_REALMS_CONTENT_VERSION = ""
-THREE_REALMS_RULE_VERSION = ""
 THREE_REALMS_LANES = ("mediation", "contract", "symbiosis")
 THREE_REALMS_LANE_LABELS = {
     "mediation": "调停",
@@ -38,8 +36,6 @@ class ThreeRealmsStage:
     description: str
     codex_flag: str
     prerequisites: tuple[str, ...] = ()
-    content_version: str = THREE_REALMS_CONTENT_VERSION
-    rule_version: str = THREE_REALMS_RULE_VERSION
     runtime_status: str = "open"
 
 
@@ -108,12 +104,10 @@ def three_realms_definition(lane: str, stage: int | str) -> ThreeRealmsStage:
 
 
 __all__ = [
-    "THREE_REALMS_CONTENT_VERSION",
     "THREE_REALMS_DEFINITIONS",
     "THREE_REALMS_LANE_FACTIONS",
     "THREE_REALMS_LANE_LABELS",
     "THREE_REALMS_LANES",
-    "THREE_REALMS_RULE_VERSION",
     "THREE_REALMS_STAGES",
     "THREE_REALMS_STORY_KEY",
     "ThreeRealmsStage",

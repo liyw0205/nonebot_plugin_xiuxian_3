@@ -1,4 +1,4 @@
-"""Pure, versioned rules for the v0.1 idle-reward routes."""
+"""Pure rules for the idle-reward routes."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ import hashlib
 from dataclasses import dataclass
 
 
-CONTENT_VERSION = ""
-RULE_VERSION = ""
 MAX_CLAIM_EXTENSION_SECONDS = 24 * 60 * 60
 ABSOLUTE_MAX_SECONDS = 48 * 60 * 60
 CANCEL_WINDOW_SECONDS = 60
@@ -23,8 +21,6 @@ class IdleRouteDefinition:
     energy_cost: int
     daily_limit: int
     pool_key: str
-    content_version: str = CONTENT_VERSION
-    rule_version: str = RULE_VERSION
     required_stage: str = "mortal"
     required_location: str | None = None
     required_reputation: int = 0
@@ -147,13 +143,11 @@ __all__ = [
     "ABSOLUTE_MAX_SECONDS",
     "ALIASES",
     "CANCEL_WINDOW_SECONDS",
-    "CONTENT_VERSION",
     "HERB_WATCH",
     "IdleRouteDefinition",
     "MAX_CLAIM_EXTENSION_SECONDS",
     "ROUTES",
     "ROUTE_SCOUT",
-    "RULE_VERSION",
     "TOWN_ERRAND",
     "WORKSHOP_CARE",
     "resolve_route",

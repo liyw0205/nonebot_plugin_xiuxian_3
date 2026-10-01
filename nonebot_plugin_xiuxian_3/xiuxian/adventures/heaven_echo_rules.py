@@ -1,4 +1,4 @@
-"""Versioned contract for the v0.6 heaven-echo solo secret realm."""
+"""Rules for the heaven-echo solo secret realm."""
 
 from __future__ import annotations
 
@@ -22,8 +22,6 @@ HEAVEN_ECHO_NODE_ALIASES = {
     **{str(index + 1): key for index, key in enumerate(HEAVEN_ECHO_NODES)},
 }
 HEAVEN_ECHO_EXPIRY_SECONDS = 60 * 60
-HEAVEN_ECHO_CONTENT_VERSION = ""
-HEAVEN_ECHO_RULE_VERSION = ""
 HEAVEN_ECHO_STORY_FLAG = "story.heaven_echo"
 
 
@@ -32,12 +30,10 @@ def resolve_heaven_echo_node(value: str) -> str | None:
 
 
 __all__ = [
-    "HEAVEN_ECHO_CONTENT_VERSION",
     "HEAVEN_ECHO_EXPIRY_SECONDS",
     "HEAVEN_ECHO_KEY",
     "HEAVEN_ECHO_NODE_LABELS",
     "HEAVEN_ECHO_NODES",
-    "HEAVEN_ECHO_RULE_VERSION",
     "HEAVEN_ECHO_STORY_FLAG",
     "resolve_heaven_echo_node",
 ]

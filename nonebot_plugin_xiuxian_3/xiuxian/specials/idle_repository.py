@@ -28,16 +28,14 @@ from .idle_models import (
 from .idle_rules import (
     ABSOLUTE_MAX_SECONDS,
     CANCEL_WINDOW_SECONDS,
-    CONTENT_VERSION,
     MAX_CLAIM_EXTENSION_SECONDS,
     ROUTES,
-    RULE_VERSION,
     IdleRouteDefinition,
     reward_for,
     resolve_route,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.assets import inventory_value
+from ..utils.player import change_player_state, player_inventory
 
 
 class IdleRepositoryMixin:
@@ -118,8 +116,6 @@ class IdleRepositoryMixin:
                 "required_tool_keys": list(definition.required_tool_keys),
                 "facility_kind": definition.facility_kind,
                 "pool_key": definition.pool_key,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             },
         )
 
@@ -197,19 +193,17 @@ class IdleRepositoryMixin:
                 "facility_slot_key": str(facility["slot_key"]) if facility else None,
                 "location_key": str(player["location_key"]),
                 "random_seed": uuid4().hex,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             }
-            inventory = self._json_object(player["inventory_json"], {})
-            if tool:
-                remaining = int(inventory[str(tool["tool_key"])]) - 1
-                if remaining:
-                    inventory[str(tool["tool_key"])] = remaining
-                else:
-                    inventory.pop(str(tool["tool_key"]), None)
-            connection.execute(
-                "UPDATE players SET stamina = stamina - ?, energy = energy - ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (definition.stamina_cost, definition.energy_cost, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={str(tool["tool_key"]): 1} if tool else None,
+                asset_mode="spend",
+                value_delta={
+                    "stamina": -definition.stamina_cost,
+                    "energy": -definition.energy_cost,
+                },
             )
             connection.execute(
                 """
@@ -302,14 +296,14 @@ class IdleRepositoryMixin:
             fallback = now > expected_max_claim_at
             definition = resolve_route(str(assignment["route_key"]))
             reward = reward_for(definition, str(snapshot.get("random_seed", assignment["operation_id"])), fallback=fallback)
-            inventory = self._json_object(player["inventory_json"], {})
             tool_key = snapshot.get("tool_key")
+            asset_rewards = {
+                str(key): int(quantity)
+                for key, quantity in reward.items()
+                if key == "spirit_stones" or key.startswith("item.")
+            }
             if tool_key:
-                inventory[str(tool_key)] = int(inventory.get(str(tool_key), 0)) + 1
-            for key, quantity in reward.items():
-                if key.startswith("item."):
-                    inventory[key] = int(inventory.get(key, 0)) + int(quantity)
-            stones = int(reward.get("spirit_stones", 0))
+                asset_rewards[str(tool_key)] = asset_rewards.get(str(tool_key), 0) + 1
             local_map = self._idle_local_map(connection, int(player["id"]))
             local = int(local_map.get("local.xuantian.new_town", 0))
             if definition.reputation_key:
@@ -335,9 +329,13 @@ class IdleRepositoryMixin:
                     """,
                     (player["id"], json.dumps({**local_map, definition.reputation_key: local}, ensure_ascii=False, sort_keys=True), service, now_text),
                 )
-            connection.execute(
-                "UPDATE players SET spirit_stones = spirit_stones + ?, inventory_json = ?, durability_json = ?, updated_at = ? WHERE id = ?",
-                (stones, json.dumps(inventory, ensure_ascii=False, sort_keys=True), json.dumps(durability, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values=asset_rewards,
+                asset_mode="grant",
+                player_values={"durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True)},
             )
             if "codex.route.town_road" in reward:
                 record_codex_discovery(
@@ -362,8 +360,6 @@ class IdleRepositoryMixin:
                 "claimed_at": now_text,
                 "tool_durability_before": durability_before,
                 "tool_durability_after": durability_after,
-                "content_version": CONTENT_VERSION,
-                "rule_version": RULE_VERSION,
             }
             settled_status = "expired" if fallback else "claimed"
             connection.execute(
@@ -425,13 +421,21 @@ class IdleRepositoryMixin:
                 raise IdleCancellationExpiredError("idle cancellation window expired")
             cost = self._json_object(assignment["cost_json"], {})
             snapshot = self._json_object(assignment["snapshot_json"], {})
-            inventory = self._json_object(player["inventory_json"], {})
             tool_key = snapshot.get("tool_key")
-            if tool_key:
-                inventory[str(tool_key)] = int(inventory.get(str(tool_key), 0)) + 1
-            connection.execute(
-                "UPDATE players SET stamina = MIN(stamina_max, stamina + ?), energy = MIN(energy_max, energy + ?), inventory_json = ?, updated_at = ? WHERE id = ?",
-                (int(cost.get("stamina", 0)), int(cost.get("energy", 0)), json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            change_player_state(
+                connection,
+                player,
+                updated_at=now_text,
+                asset_values={str(tool_key): 1} if tool_key else None,
+                asset_mode="grant",
+                value_delta={
+                    "stamina": int(cost.get("stamina", 0)),
+                    "energy": int(cost.get("energy", 0)),
+                },
+                maximums={
+                    "stamina": player["stamina_max"],
+                    "energy": player["energy_max"],
+                },
             )
             connection.execute(
                 "UPDATE idle_assignments SET status = 'cancelled', cancel_operation_id = ?, result_json = ?, updated_at = ? WHERE id = ? AND status = 'running'",
@@ -495,7 +499,7 @@ class IdleRepositoryMixin:
     def _idle_select_tool(connection: sqlite3.Connection, player: sqlite3.Row, definition: IdleRouteDefinition, requested: str | None) -> dict[str, object] | None:
         if not definition.required_tool_keys:
             return None
-        inventory = inventory_value(player["inventory_json"])
+        inventory = player_inventory(player)
         if requested and requested.startswith("facility."):
             return None
         if requested and requested not in definition.required_tool_keys:

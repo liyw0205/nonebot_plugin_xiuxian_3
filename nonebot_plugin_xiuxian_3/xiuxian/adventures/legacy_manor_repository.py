@@ -197,14 +197,12 @@ class LegacyManorRepositoryMixin:
                 "clue_consumed": False,
                 "node_keys": list(definition.nodes),
                 "first_clear": True,
-                "content_version": definition.content_version,
-                "rule_version": definition.rule_version,
             }
             connection.execute(
                 "INSERT INTO legacy_manor_runs(run_id, player_id, instance_key, status, node_index, starts_at, expires_at, "
-                "snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, ?, 'routing', 0, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
-                (run_id, player["id"], definition.instance_key, now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, definition.content_version, definition.rule_version, now_text, now_text),
+                "snapshot_json, result_json, entry_operation_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, 'routing', 0, ?, ?, ?, '{}', ?, ?, ?)",
+                (run_id, player["id"], definition.instance_key, now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, now_text, now_text),
             )
             run = connection.execute("SELECT * FROM legacy_manor_runs WHERE run_id=?", (run_id,)).fetchone()
             payload = self._legacy_manor_payload(run, snapshot, {})

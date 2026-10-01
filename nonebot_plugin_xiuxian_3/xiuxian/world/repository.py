@@ -13,7 +13,8 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, inventory_value, spend_player_assets
+from ..utils.assets import change_player_assets, inventory_value
+from ..utils.player import change_player_state, player_inventory
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
     VOID_INSTABILITY_SECONDS,
@@ -135,7 +136,7 @@ class WorldRepositoryMixin:
                 raise VoidTravelBusyError("void travel is busy")
             if self._has_active_long_action(connection, int(row["id"])):
                 raise VoidTravelBusyError("another long action is active")
-            inventory = inventory_value(row["inventory_json"])
+            inventory = player_inventory(row)
             available_anchor = int(inventory.get("item.void_anchor", 0))
             anchor_cost = navigation_anchor_cost(definition.anchor_cost, int(row["space_resistance_bp"]), unstable)
             beacon_discount = 0
@@ -147,12 +148,15 @@ class WorldRepositoryMixin:
             if int(row["stamina"]) < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             try:
-                spend_player_assets(
+                change_player_state(
                     connection,
                     row,
-                    {"item.void_anchor": anchor_cost},
-                    now_text,
+                    updated_at=now_text,
+                    asset_values={"item.void_anchor": anchor_cost},
+                    asset_mode="spend",
                     preserve_zero=True,
+                    value_delta={"stamina": -definition.stamina_cost},
+                    player_values={"void_instability_until": instability_until},
                 )
             except ValueError as exc:
                 raise VoidAnchorInsufficientError("void anchors are insufficient") from exc
@@ -169,10 +173,6 @@ class WorldRepositoryMixin:
                 "beacon_discount": beacon_discount,
                 "stamina_cost": definition.stamina_cost,
             }
-            connection.execute(
-                "UPDATE players SET stamina = stamina - ?, void_instability_until = ?, updated_at = ? WHERE id = ?",
-                (definition.stamina_cost, instability_until, now_text, row["id"]),
-            )
             connection.execute(
                 "INSERT INTO void_route_sessions(session_id, player_id, operation_id, route_key, status, starts_at, ends_at, anchor_cost, stamina_cost, snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)",
                 (

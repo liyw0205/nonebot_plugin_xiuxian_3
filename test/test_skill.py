@@ -345,8 +345,6 @@ def test_skill_growth_configuration_changes_preview_and_settlement() -> None:
         snapshot = json.loads(mastery[1])
         assert "max_level" not in mastery_columns
         assert "path_key" not in mastery_columns
-        assert "content_version" not in snapshot
-        assert "rule_version" not in snapshot
         assert mastery[0] == 4
         await runtime.close()
 

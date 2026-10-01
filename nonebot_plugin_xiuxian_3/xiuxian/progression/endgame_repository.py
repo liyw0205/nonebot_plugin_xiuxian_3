@@ -27,6 +27,7 @@ from .endgame_rules import (
     TRIBULATION_TOTAL_CULTIVATION,
     TRIAL_ORDER,
 )
+from ..utils.player import change_player_state
 
 
 class EndgameRepositoryMixin:
@@ -92,23 +93,27 @@ class EndgameRepositoryMixin:
                 raise DaoUnionRequirementError("world merit is insufficient")
             if int(row["spirit_stones"]) < DAO_UNION_STONE_COST:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
-            inventory["item.dao_fruit_fragment"] = int(inventory["item.dao_fruit_fragment"]) - DAO_UNION_FRAGMENT_COST
-            if inventory["item.dao_fruit_fragment"] == 0:
-                inventory.pop("item.dao_fruit_fragment")
             intro = self._json_object(row["intro_json"], {})
             flags.add("endgame.dao_union")
             flags.update({"fruit.clue.body", "fruit.clue.spell", "fruit.clue.support"})
             intro["flags"] = sorted(flags)
-            connection.execute(
-                "UPDATE players SET realm_key='dao_union', realm_layer=1, cultivation=0, inventory_json=?, world_merit=world_merit-?, spirit_stones=spirit_stones-?, intro_json=?, endgame_status='dao_union', updated_at=? WHERE id=?",
-                (
-                    json.dumps(inventory, ensure_ascii=False, sort_keys=True),
-                    DAO_UNION_MERIT_COST,
-                    DAO_UNION_STONE_COST,
-                    json.dumps(intro, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                    row["id"],
-                ),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={
+                    "spirit_stones": DAO_UNION_STONE_COST,
+                    "item.dao_fruit_fragment": DAO_UNION_FRAGMENT_COST,
+                },
+                asset_mode="spend",
+                value_delta={"world_merit": -DAO_UNION_MERIT_COST},
+                player_values={
+                    "realm_key": "dao_union",
+                    "realm_layer": 1,
+                    "cultivation": 0,
+                    "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
+                    "endgame_status": "dao_union",
+                },
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
@@ -226,11 +231,14 @@ class EndgameRepositoryMixin:
         if ending_key == "remain_in_world" and not fruit_key:
             raise AscensionRequirementError("remain in world requires a locked dao fruit")
         status = ASCENDED_STATUS if ending_key == "ascend" else REMAINED_IN_WORLD_STATUS
-        inventory = self._json_object(row["inventory_json"], {})
-        inventory["item.title.ascended"] = max(1, int(inventory.get("item.title.ascended", 0)))
-        connection.execute(
-            "UPDATE players SET endgame_status = ?, ending_key = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-            (status, ending_key, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, row["id"]),
+        title_quantity = 0 if int(self._json_object(row["inventory_json"], {}).get("item.title.ascended", 0)) else 1
+        change_player_state(
+            connection,
+            row,
+            updated_at=now_text,
+            asset_values={"item.title.ascended": title_quantity} if title_quantity else None,
+            asset_mode="grant",
+            player_values={"endgame_status": status, "ending_key": ending_key},
         )
         updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
         if updated is None:
@@ -342,9 +350,16 @@ class EndgameRepositoryMixin:
                 raise TribulationEntryRequirementError("tribulation requires dao union L10")
             if int(row["total_cultivation"]) < TRIBULATION_TOTAL_CULTIVATION:
                 raise TribulationEntryRequirementError("total cultivation is insufficient")
-            connection.execute(
-                "UPDATE players SET realm_key='tribulation', realm_layer=1, cultivation=0, endgame_status='tribulation', updated_at=? WHERE id=?",
-                (now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                player_values={
+                    "realm_key": "tribulation",
+                    "realm_layer": 1,
+                    "cultivation": 0,
+                    "endgame_status": "tribulation",
+                },
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:

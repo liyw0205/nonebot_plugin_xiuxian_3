@@ -180,7 +180,8 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import assets_spend, assets_with_delta, grant_player_assets, inventory_json, inventory_value
+from ..utils.assets import assets_spend, assets_with_delta, inventory_value
+from ..utils.player import change_player_state
 
 
 class ExplorationRepositoryMixin:
@@ -393,9 +394,16 @@ class ExplorationRepositoryMixin:
                     for item in self.companion_battle_snapshot(connection, player_id).companions
                 ],
             }
-            connection.execute(
-                "UPDATE players SET stamina = ?, energy = ?, pollution = ?, updated_at = ? WHERE id = ?",
-                (stamina - definition.stamina_cost, energy - definition.energy_cost, pollution_after, starts_at, player_id),
+            change_player_state(
+                connection,
+                row,
+                updated_at=starts_at,
+                value_delta={
+                    "stamina": -definition.stamina_cost,
+                    "energy": -definition.energy_cost,
+                    "pollution": pollution_after - int(row["pollution"]),
+                },
+                maximums={"pollution": 100},
             )
             connection.execute(
                 """
@@ -617,25 +625,11 @@ class ExplorationRepositoryMixin:
             }
             result = frozen_result if battle_outcome == "won" else {}
             faction_reputation = self._json_object(row["faction_reputation_json"], {})
-            cultivation = int(row["cultivation"])
-            total_cultivation = int(row["total_cultivation"])
             soul_power_loss = 0
             soul_fatigue_until = row["soul_fatigue_until"]
             snapshot = self._json_object(session["snapshot_json"], {})
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
-            grant_player_assets(
-                connection,
-                row,
-                {
-                    key: quantity
-                    for key, quantity in result.items()
-                    if key != "cultivation" and not key.startswith("faction_reputation.")
-                },
-                now_text,
-            )
             cultivation_gain = int(result.get("cultivation", 0))
-            cultivation += cultivation_gain
-            total_cultivation += cultivation_gain
             for key, quantity in result.items():
                 if key.startswith("faction_reputation."):
                     faction_key = key.removeprefix("faction_reputation.")
@@ -643,9 +637,27 @@ class ExplorationRepositoryMixin:
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, int(row["soul_power"]))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
-            connection.execute(
-                "UPDATE players SET cultivation=?, total_cultivation=?, faction_reputation_json=?, soul_power=?, soul_fatigue_until=?, bloodline_stability=?, updated_at=? WHERE id=?",
-                (cultivation, total_cultivation, json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True), max(0, int(row["soul_power"]) - soul_power_loss), soul_fatigue_until, bloodline_stability_after, now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                asset_values={
+                    key: quantity
+                    for key, quantity in result.items()
+                    if key != "cultivation" and not key.startswith("faction_reputation.")
+                },
+                asset_mode="grant",
+                value_delta={
+                    "cultivation": cultivation_gain,
+                    "total_cultivation": cultivation_gain,
+                    "soul_power": -soul_power_loss,
+                },
+                player_values={
+                    "faction_reputation_json": json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
+                    "soul_fatigue_until": soul_fatigue_until,
+                    "bloodline_stability": bloodline_stability_after,
+                },
+                maximums={"soul_power": row["soul_power_max"]},
             )
             result_json = {
                 "status": "settled",
@@ -922,41 +934,31 @@ class ExplorationRepositoryMixin:
                     status = "combat_pending"
 
             faction_reputation = self._json_object(row["faction_reputation_json"], {})
-            cultivation = int(row["cultivation"])
-            total_cultivation = int(row["total_cultivation"])
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             if status == "settled":
-                grant_player_assets(
-                    connection,
-                    row,
-                    {
-                        key: quantity
-                        for key, quantity in result.items()
-                        if key != "cultivation" and not key.startswith("faction_reputation.")
-                    },
-                    now_text,
-                )
                 cultivation_gain = int(result.get("cultivation", 0))
-                cultivation += cultivation_gain
-                total_cultivation += cultivation_gain
                 for key, quantity in result.items():
                     if key.startswith("faction_reputation."):
                         faction_key = key.removeprefix("faction_reputation.")
                         faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + int(quantity)
-                connection.execute(
-                    """
-                    UPDATE players
-                    SET cultivation = ?, total_cultivation = ?, faction_reputation_json = ?, bloodline_stability = ?, updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        cultivation,
-                        total_cultivation,
-                        json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
-                        bloodline_stability_after,
-                        now_text,
-                        row["id"],
-                    ),
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    asset_values={
+                        key: quantity
+                        for key, quantity in result.items()
+                        if key != "cultivation" and not key.startswith("faction_reputation.")
+                    },
+                    asset_mode="grant",
+                    value_delta={
+                        "cultivation": cultivation_gain,
+                        "total_cultivation": cultivation_gain,
+                    },
+                    player_values={
+                        "faction_reputation_json": json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
+                        "bloodline_stability": bloodline_stability_after,
+                    },
                 )
             result_json = {
                 "status": status,
@@ -1167,11 +1169,8 @@ class ExplorationRepositoryMixin:
             result: dict[str, int] = {}
             status = "settled"
             ends_at = str(session["ends_at"])
-            stones = int(row["spirit_stones"])
-            cultivation = int(row["cultivation"])
-            total_cultivation = int(row["total_cultivation"])
-            stamina = int(row["stamina"])
-            inventory = inventory_value(row["inventory_json"])
+            cultivation_gain = 0
+            stamina_refund = 0
             if effective_choice == "wait":
                 status = "running"
                 ends_at = serialize_datetime(now + timedelta(seconds=CLOUD_BOAT_STORM_WAIT_SECONDS))
@@ -1184,27 +1183,26 @@ class ExplorationRepositoryMixin:
                     "storm_deadline": ends_at,
                 }
             elif effective_choice == "pay":
-                if stones < CLOUD_BOAT_STORM_PAY_COST:
+                if int(row["spirit_stones"]) < CLOUD_BOAT_STORM_PAY_COST:
                     raise CurrencyInsufficientError("cloud boat storm payment requires spirit stones")
                 result = dict(frozen_result)
                 result["cultivation"] = int(result.get("cultivation", 0)) + 200
                 status = "settled"
-                balances = assets_with_delta(
-                    stones,
-                    inventory,
-                    {
+                cultivation_gain = int(result.get("cultivation", 0))
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    asset_values={
                         "spirit_stones": -CLOUD_BOAT_STORM_PAY_COST,
-                        **{
-                            key: quantity
-                            for key, quantity in result.items()
-                            if key != "cultivation"
-                        },
+                        **{key: quantity for key, quantity in result.items() if key != "cultivation"},
+                    },
+                    asset_mode="delta",
+                    value_delta={
+                        "cultivation": cultivation_gain,
+                        "total_cultivation": cultivation_gain,
                     },
                 )
-                stones, inventory = balances.currency, balances.inventory
-                cultivation_gain = int(result.get("cultivation", 0))
-                cultivation += cultivation_gain
-                total_cultivation += cultivation_gain
                 result_json = {
                     **stored,
                     "status": status,
@@ -1215,9 +1213,19 @@ class ExplorationRepositoryMixin:
                     "settled_at": now_text,
                 }
             else:
-                refund = min(int(session["stamina_cost"]) // 2, max(0, int(row["stamina_max"]) - stamina))
-                stamina += refund
-                result = {"stamina_refund": refund}
+                stamina_refund = min(
+                    int(session["stamina_cost"]) // 2,
+                    max(0, int(row["stamina_max"]) - int(row["stamina"])),
+                )
+                result = {"stamina_refund": stamina_refund}
+                if stamina_refund:
+                    change_player_state(
+                        connection,
+                        row,
+                        updated_at=now_text,
+                        value_delta={"stamina": stamina_refund},
+                        maximums={"stamina": row["stamina_max"]},
+                    )
                 result_json = {
                     **stored,
                     "status": status,
@@ -1227,10 +1235,6 @@ class ExplorationRepositoryMixin:
                     "storm_choice": "turn_back",
                     "settled_at": now_text,
                 }
-            connection.execute(
-                "UPDATE players SET spirit_stones = ?, cultivation = ?, total_cultivation = ?, stamina = ?, inventory_json = ?, updated_at = ? WHERE id = ?",
-                (stones, cultivation, total_cultivation, stamina, inventory_json(inventory), now_text, row["id"]),
-            )
             connection.execute(
                 "UPDATE exploration_sessions SET status = ?, ends_at = ?, result_json = ?, updated_at = ? WHERE id = ? AND status IN ('created', 'running')",
                 (status, ends_at, json.dumps(result_json, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
@@ -1292,11 +1296,12 @@ class ExplorationRepositoryMixin:
             snapshot = self._json_object(session["snapshot_json"], {})
             stamina_refund = int(session["stamina_cost"])
             energy_refund = int(snapshot.get("energy_cost", 0))
-            stamina = min(int(row["stamina_max"]), int(row["stamina"]) + stamina_refund)
-            energy = min(int(row["energy_max"]), int(row["energy"]) + energy_refund)
-            connection.execute(
-                "UPDATE players SET stamina = ?, energy = ?, updated_at = ? WHERE id = ?",
-                (stamina, energy, now_text, row["id"]),
+            change_player_state(
+                connection,
+                row,
+                updated_at=now_text,
+                value_delta={"stamina": stamina_refund, "energy": energy_refund},
+                maximums={"stamina": row["stamina_max"], "energy": row["energy_max"]},
             )
             connection.execute(
                 "UPDATE exploration_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ? AND status = 'created'",

@@ -20,17 +20,16 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..specials.codex_projection import record_codex_discovery
+from ..utils.player import change_player_state
 from .dao_origin_models import DaoOriginRunRecord
 from .dao_origin_rules import (
     DAO_ORIGIN_CODEX,
-    DAO_ORIGIN_CONTENT_VERSION,
     DAO_ORIGIN_EXPIRY_SECONDS,
     DAO_ORIGIN_KEY,
     DAO_ORIGIN_LOCATION,
     DAO_ORIGIN_NODES,
     DAO_ORIGIN_PERMISSION,
     DAO_ORIGIN_QUOTA_KEY,
-    DAO_ORIGIN_RULE_VERSION,
     DAO_ORIGIN_STAMINA_COST,
     DAO_ORIGIN_STORY_FLAG,
 )
@@ -172,15 +171,19 @@ class DaoOriginRepositoryMixin:
                 "permission": DAO_ORIGIN_PERMISSION,
                 "node_keys": list(DAO_ORIGIN_NODES),
                 "first_clear": DAO_ORIGIN_STORY_FLAG not in flags,
-                "content_version": DAO_ORIGIN_CONTENT_VERSION,
-                "rule_version": DAO_ORIGIN_RULE_VERSION,
             }
-            connection.execute("UPDATE players SET stamina=stamina-?, updated_at=? WHERE id=? AND stamina>=?", (DAO_ORIGIN_STAMINA_COST, now_text, player["id"], DAO_ORIGIN_STAMINA_COST))
-            if connection.execute("SELECT changes()").fetchone()[0] != 1:
+            try:
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"stamina": -DAO_ORIGIN_STAMINA_COST},
+                )
+            except ValueError:
                 raise ResourceInsufficientError("stamina changed during entry")
             connection.execute(
-                "INSERT INTO dao_origin_runs(run_id, player_id, status, node_index, quota_key, starts_at, expires_at, stamina_cost, snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) VALUES (?, ?, 'routing', 0, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
-                (run_id, player["id"], DAO_ORIGIN_QUOTA_KEY, now_text, expires_at, DAO_ORIGIN_STAMINA_COST, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, DAO_ORIGIN_CONTENT_VERSION, DAO_ORIGIN_RULE_VERSION, now_text, now_text),
+                "INSERT INTO dao_origin_runs(run_id, player_id, status, node_index, quota_key, starts_at, expires_at, stamina_cost, snapshot_json, result_json, entry_operation_id, created_at, updated_at) VALUES (?, ?, 'routing', 0, ?, ?, ?, ?, ?, '{}', ?, ?, ?)",
+                (run_id, player["id"], DAO_ORIGIN_QUOTA_KEY, now_text, expires_at, DAO_ORIGIN_STAMINA_COST, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, now_text, now_text),
             )
             run = connection.execute("SELECT * FROM dao_origin_runs WHERE run_id=?", (run_id,)).fetchone()
             payload = self._dao_origin_payload(run, snapshot, {})
@@ -303,7 +306,17 @@ class DaoOriginRepositoryMixin:
             run = connection.execute("SELECT * FROM dao_origin_runs WHERE run_id=?", (run_id,)).fetchone()
             if run is None or str(run["status"]) not in ACTIVE_DAO_ORIGIN_STATUSES:
                 raise DaoOriginNotReadyError("only an active dao-origin run can be compensated")
-            connection.execute("UPDATE players SET stamina=MIN(stamina_max, stamina+?), updated_at=? WHERE id=?", (int(run["stamina_cost"]), now_text, run["player_id"]))
+            player = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (run["player_id"],)
+            ).fetchone()
+            if player is not None:
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"stamina": int(run["stamina_cost"])},
+                    maximums={"stamina": player["stamina_max"]},
+                )
             result = {"outcome": "system_aborted", "stamina_refunded": int(run["stamina_cost"]), "quota_released": True}
             connection.execute("UPDATE dao_origin_runs SET status='system_aborted', result_json=?, updated_at=? WHERE id=?", (json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, run["id"]))
             updated = connection.execute("SELECT * FROM dao_origin_runs WHERE id=?", (run["id"],)).fetchone()

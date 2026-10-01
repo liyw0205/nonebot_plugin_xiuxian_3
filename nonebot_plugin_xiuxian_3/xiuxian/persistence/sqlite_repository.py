@@ -388,8 +388,8 @@ class SQLitePlayerRepository(
                 """
                 INSERT OR IGNORE INTO redemption_codes(
                     code_key, code_hash, max_claims, starts_on, ends_on, status,
-                    reward_json, content_version, rule_version, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reward_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     definition.code_key,
@@ -399,8 +399,6 @@ class SQLitePlayerRepository(
                     definition.ends_on,
                     status,
                     json.dumps(definition.reward_map(), ensure_ascii=False, sort_keys=True),
-                    definition.content_version,
-                    definition.rule_version,
                     now_text,
                     now_text,
                 ),
@@ -592,15 +590,18 @@ class SQLitePlayerRepository(
                 expires_at TEXT NOT NULL,
                 snapshot_json TEXT NOT NULL DEFAULT '{}',
                 public_json TEXT NOT NULL DEFAULT '{}',
-                content_version TEXT NOT NULL,
-                rule_version TEXT NOT NULL,
                 revoked_at TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
             """
         )
-        connection.execute("INSERT INTO arena_snapshots_new SELECT * FROM arena_snapshots")
+        connection.execute(
+            "INSERT INTO arena_snapshots_new(id, snapshot_id, player_id, status, arena_mode_key, rating, "
+            "matchable_at, expires_at, snapshot_json, public_json, revoked_at, created_at, updated_at) "
+            "SELECT id, snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, "
+            "snapshot_json, public_json, revoked_at, created_at, updated_at FROM arena_snapshots"
+        )
         connection.execute("DROP TABLE arena_snapshots")
         connection.execute("ALTER TABLE arena_snapshots_new RENAME TO arena_snapshots")
         connection.execute(

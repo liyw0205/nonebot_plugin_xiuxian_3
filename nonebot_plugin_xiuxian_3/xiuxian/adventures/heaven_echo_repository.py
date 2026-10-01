@@ -20,11 +20,9 @@ from ..persistence.errors import (
 )
 from .heaven_echo_models import HeavenEchoRunRecord
 from .heaven_echo_rules import (
-    HEAVEN_ECHO_CONTENT_VERSION,
     HEAVEN_ECHO_EXPIRY_SECONDS,
     HEAVEN_ECHO_KEY,
     HEAVEN_ECHO_NODES,
-    HEAVEN_ECHO_RULE_VERSION,
     HEAVEN_ECHO_STORY_FLAG,
 )
 from .secret_realm_rules import realm_at_least
@@ -189,13 +187,11 @@ class HeavenEchoRepositoryMixin:
                 "endgame_status": str(player["endgame_status"] or "none"),
                 "node_keys": list(HEAVEN_ECHO_NODES),
                 "first_clear": HEAVEN_ECHO_STORY_FLAG not in flags,
-                "content_version": HEAVEN_ECHO_CONTENT_VERSION,
-                "rule_version": HEAVEN_ECHO_RULE_VERSION,
             }
             connection.execute(
-                "INSERT INTO heaven_echo_runs(run_id, player_id, status, node_index, starts_at, expires_at, snapshot_json, result_json, entry_operation_id, content_version, rule_version, created_at, updated_at) "
-                "VALUES (?, ?, 'routing', 0, ?, ?, ?, '{}', ?, ?, ?, ?, ?)",
-                (run_id, player["id"], now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, HEAVEN_ECHO_CONTENT_VERSION, HEAVEN_ECHO_RULE_VERSION, now_text, now_text),
+                "INSERT INTO heaven_echo_runs(run_id, player_id, status, node_index, starts_at, expires_at, snapshot_json, result_json, entry_operation_id, created_at, updated_at) "
+                "VALUES (?, ?, 'routing', 0, ?, ?, ?, '{}', ?, ?, ?)",
+                (run_id, player["id"], now_text, expires_at, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), operation_id, now_text, now_text),
             )
             run = connection.execute("SELECT * FROM heaven_echo_runs WHERE run_id=?", (run_id,)).fetchone()
             payload = self._heaven_echo_payload(run, snapshot, {})

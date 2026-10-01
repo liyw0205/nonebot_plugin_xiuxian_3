@@ -21,8 +21,6 @@ def test_arena_mode_migration_upgrades_spar_only_tables_and_keeps_foreign_keys()
             expires_at TEXT NOT NULL,
             snapshot_json TEXT NOT NULL DEFAULT '{}',
             public_json TEXT NOT NULL DEFAULT '{}',
-            content_version TEXT NOT NULL,
-            rule_version TEXT NOT NULL,
             revoked_at TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -75,12 +73,12 @@ def test_arena_mode_migration_upgrades_spar_only_tables_and_keeps_foreign_keys()
         );
         INSERT INTO arena_snapshots(
             snapshot_id, player_id, status, arena_mode_key, rating, matchable_at,
-            expires_at, content_version, rule_version, created_at, updated_at
-        ) VALUES ('s1', 1, 'published', 'arena.spar', 1000, '2026-01-01', '2026-01-08', 'c', 'r', '2026-01-01', '2026-01-01');
+                expires_at, created_at, updated_at
+            ) VALUES ('s1', 1, 'published', 'arena.spar', 1000, '2026-01-01', '2026-01-08', '2026-01-01', '2026-01-01');
         INSERT INTO arena_snapshots(
             snapshot_id, player_id, status, arena_mode_key, rating, matchable_at,
-            expires_at, content_version, rule_version, created_at, updated_at
-        ) VALUES ('s2', 2, 'published', 'arena.spar', 1000, '2026-01-01', '2026-01-08', 'c', 'r', '2026-01-01', '2026-01-01');
+                expires_at, created_at, updated_at
+            ) VALUES ('s2', 2, 'published', 'arena.spar', 1000, '2026-01-01', '2026-01-08', '2026-01-01', '2026-01-01');
         INSERT INTO arena_matches(
             match_id, challenger_id, defender_id, challenger_snapshot_id, defender_snapshot_id,
             arena_mode_key, status, outcome, rounds, score_counted, challenger_rating_delta,
@@ -96,12 +94,12 @@ def test_arena_mode_migration_upgrades_spar_only_tables_and_keeps_foreign_keys()
     SQLitePlayerRepository._migrate_arena_mode_schema(connection)
 
     connection.execute(
-        "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, content_version, rule_version, created_at, updated_at) "
-        "VALUES ('s3', 2, 'revoked', 'arena.rank', 1000, '2026-01-01', '2026-01-08', 'c', 'r', '2026-01-01', '2026-01-01')"
+            "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, created_at, updated_at) "
+            "VALUES ('s3', 2, 'revoked', 'arena.rank', 1000, '2026-01-01', '2026-01-08', '2026-01-01', '2026-01-01')"
     )
     connection.execute(
-        "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, content_version, rule_version, created_at, updated_at) "
-        "VALUES ('s4', 2, 'revoked', 'arena.three_realms', 1000, '2026-01-01', '2026-01-08', 'c', 'r', '2026-01-01', '2026-01-01')"
+        "INSERT INTO arena_snapshots(snapshot_id, player_id, status, arena_mode_key, rating, matchable_at, expires_at, created_at, updated_at) "
+        "VALUES ('s4', 2, 'revoked', 'arena.three_realms', 1000, '2026-01-01', '2026-01-08', '2026-01-01', '2026-01-01')"
     )
     assert connection.execute("SELECT COUNT(*) FROM arena_matches").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM arena_actions WHERE match_id = 'm1'").fetchone()[0] == 1

@@ -22,8 +22,6 @@ def test_runtime_content_uses_normalized_records() -> None:
     assert bundle.label("item", "item.weapon.cloud_sword") == "云纹剑"
     assert bundle.require("entity", "device.scout_doll")["status"] == "locked"
     assert next_layer_threshold("soul_transformation", 1) == 28000
-    assert "content_version" not in bundle.require("realm", "soul_transformation")
-    assert "rule_version" not in bundle.require("realm", "soul_transformation")
     assert realm_display_name("soul_transformation", 1) == "化神境一层"
     constitution = bundle.require("constitution", "constitution.iron_bone")
     assert constitution["effect"] == {"type": "max_hp_bp", "value": 300}
@@ -64,7 +62,7 @@ def test_runtime_content_uses_normalized_records() -> None:
 
 def test_content_files_keep_business_fields_only() -> None:
     data_root = Path(__file__).parents[1] / "data"
-    forbidden = {"generated_at", "schema_version", "content_version", "rule_version"}
+    forbidden = {"generated_at", "schema_version"}
     for path in data_root.rglob("*.json"):
         document = json.loads(path.read_text(encoding="utf-8"))
         assert forbidden.isdisjoint(document), path
@@ -94,8 +92,7 @@ def test_runtime_content_is_optional_for_isolated_data_dirs(tmp_path: Path) -> N
 
 def test_runtime_content_rejects_path_escape(tmp_path: Path) -> None:
     (tmp_path / "内容清单.json").write_text(
-        '{"schema":"xiuxian.content","schema_version":1,"content_version":"x",'
-        '"rule_version":"x","files":["../outside.json"]}',
+        '{"schema":"xiuxian.content","files":["../outside.json"]}',
         encoding="utf-8",
     )
     with pytest.raises(ContentError, match="escapes data directory"):

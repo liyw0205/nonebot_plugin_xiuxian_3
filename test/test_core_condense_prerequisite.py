@@ -86,7 +86,6 @@ def test_foundation_player_produces_bound_core_condense_before_breakthrough() ->
                     snapshot = json.loads(connection.execute(
                         "SELECT snapshot_json FROM production_orders WHERE order_id=?", (started.data["order_id"],),
                     ).fetchone()[0])
-                    assert "rule_version" not in snapshot
                     inventory = json.loads(connection.execute(
                         "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?", (adapter, user),
                     ).fetchone()[0])

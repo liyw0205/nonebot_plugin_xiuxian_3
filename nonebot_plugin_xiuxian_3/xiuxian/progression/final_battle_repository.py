@@ -46,6 +46,8 @@ from .endgame_rules import (
     FINAL_BATTLE_MIN_PROGRESS,
     TRIAL_ORDER,
 )
+from ..utils.assets import grant_player_items, spend_player_items
+from ..utils.player import change_player_state, change_player_values
 
 FINAL_BATTLE_LOCATION = "tribulation.sky_terrace"
 
@@ -190,10 +192,13 @@ class FinalBattleRepositoryMixin:
                     raise FinalBattleBusyError("initiator already has an unresolved final battle")
                 expired_snapshot = self._json_object(active["snapshot_json"], {})
                 escrow = expired_snapshot.get("certificate_escrow", {})
-                inventory = self._json_object(player["inventory_json"], {})
                 item_key = str(escrow.get("item_key", ASCENSION_CERTIFICATE_KEY))
-                inventory[item_key] = int(inventory.get(item_key, 0)) + int(escrow.get("quantity", 1))
-                connection.execute("UPDATE players SET inventory_json=?, updated_at=? WHERE id=?", (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]))
+                grant_player_items(
+                    connection,
+                    player,
+                    {item_key: int(escrow.get("quantity", 1))},
+                    now_text,
+                )
                 connection.execute("UPDATE final_battle_members SET asset_lock_status='released', updated_at=? WHERE battle_id=?", (now_text, active["battle_id"]))
                 connection.execute("UPDATE final_battle_sessions SET status='expired', result_json=?, updated_at=? WHERE battle_id=?", (json.dumps({"outcome": "expired", "reason": "lobby_timeout"}, ensure_ascii=False, sort_keys=True), now_text, active["battle_id"]))
                 player = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
@@ -205,9 +210,6 @@ class FinalBattleRepositoryMixin:
             inventory = self._json_object(player["inventory_json"], {})
             if int(inventory.get(ASCENSION_CERTIFICATE_KEY, 0)) < 1:
                 raise FinalBattleRequirementError("ascension certificate is missing")
-            inventory[ASCENSION_CERTIFICATE_KEY] = int(inventory[ASCENSION_CERTIFICATE_KEY]) - 1
-            if inventory[ASCENSION_CERTIFICATE_KEY] == 0:
-                inventory.pop(ASCENSION_CERTIFICATE_KEY)
 
             battle_id = f"final-battle-{uuid4().hex}"
             initiator_snapshot = self._final_battle_member_snapshot(connection, player, role="initiator")
@@ -229,9 +231,11 @@ class FinalBattleRepositoryMixin:
                 "random_seed": operation_id,
             }
             expires_at = serialize_datetime(now + timedelta(seconds=FINAL_BATTLE_LOBBY_SECONDS))
-            connection.execute(
-                "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-                (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            spend_player_items(
+                connection,
+                player,
+                {ASCENSION_CERTIFICATE_KEY: 1},
+                now_text,
             )
             connection.execute(
                 "INSERT INTO final_battle_sessions(battle_id, initiator_id, create_operation_id, status, round_no, action_sequence, starts_at, expires_at, snapshot_json, state_json, result_json, created_at, updated_at) "
@@ -562,19 +566,37 @@ class FinalBattleRepositoryMixin:
                     merit = min(FINAL_BATTLE_ASSIST_MERIT_CAP, int(member["contribution_damage"]) // FINAL_BATTLE_ASSIST_MERIT_PER_DAMAGE)
                     if merit:
                         reward["world_merit"] = merit
-                        connection.execute("UPDATE players SET world_merit=world_merit+?, updated_at=? WHERE id=?", (merit, now_text, member["database_player_id"]))
+                        helper = connection.execute(
+                            "SELECT * FROM players WHERE id=?", (member["database_player_id"],)
+                        ).fetchone()
+                        if helper is None:
+                            raise FinalBattleNotFoundError("final battle helper disappeared")
+                        change_player_values(connection, helper, {"world_merit": merit}, now_text)
                 reward_map[player_id] = reward
                 connection.execute(
                     "INSERT INTO final_battle_rewards(battle_id, player_id, reward_json, status, operation_id, claimed_at) VALUES (?, ?, ?, ?, ?, ?)",
                     (battle_id, member["database_player_id"], json.dumps(reward, ensure_ascii=False, sort_keys=True), "claimed" if reward else "none", f"{operation_id}:{player_id}", now_text),
                 )
                 connection.execute("UPDATE final_battle_members SET asset_lock_status='released', reward_json=?, updated_at=? WHERE id=?", (json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text, member["member_row_id"]))
-            inventory = self._json_object(actor["inventory_json"], {})
             if success:
-                connection.execute("UPDATE players SET endgame_status=?, location_key='ascension.heaven_path', inventory_json=?, updated_at=? WHERE id=?", (ASCENSION_READY_STATUS, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, actor["id"]))
+                change_player_state(
+                    connection,
+                    actor,
+                    updated_at=now_text,
+                    player_values={
+                        "endgame_status": ASCENSION_READY_STATUS,
+                        "location_key": "ascension.heaven_path",
+                    },
+                )
             elif failed:
-                inventory[ASCENSION_CERTIFICATE_KEY] = int(inventory.get(ASCENSION_CERTIFICATE_KEY, 0)) + 1
-                connection.execute("UPDATE players SET tribulation_debt=tribulation_debt+?, inventory_json=?, updated_at=? WHERE id=?", (debt_delta, json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, actor["id"]))
+                change_player_state(
+                    connection,
+                    actor,
+                    updated_at=now_text,
+                    asset_values={ASCENSION_CERTIFICATE_KEY: 1},
+                    asset_mode="grant",
+                    value_delta={"tribulation_debt": debt_delta},
+                )
             result.update({"outcome": outcome, "reason": result.get("reason", "final_battle_ended"), "debt_delta": debt_delta, "cooldown_until": cooldown_until, "rewards": reward_map, "settled_at": now_text})
             connection.execute("UPDATE final_battle_sessions SET status='settled', cooldown_until=?, result_json=?, updated_at=? WHERE battle_id=?", (cooldown_until, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, battle_id))
             payload = {"battle_id": battle_id, "status": "settled", "outcome": outcome, "round_no": int(session["round_no"]), "debt_delta": debt_delta, "cooldown_until": cooldown_until, "rewards": reward_map}
@@ -605,11 +627,14 @@ class FinalBattleRepositoryMixin:
                 raise FinalBattleNotReadyError("only a lobby can be cancelled")
             snapshot = self._json_object(session["snapshot_json"], {})
             initiator = connection.execute("SELECT * FROM players WHERE id=?", (actor["id"],)).fetchone()
-            inventory = self._json_object(initiator["inventory_json"], {})
             escrow = snapshot.get("certificate_escrow", {})
             item_key = str(escrow.get("item_key", ASCENSION_CERTIFICATE_KEY))
-            inventory[item_key] = int(inventory.get(item_key, 0)) + int(escrow.get("quantity", 1))
-            connection.execute("UPDATE players SET inventory_json=?, updated_at=? WHERE id=?", (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, actor["id"]))
+            grant_player_items(
+                connection,
+                initiator,
+                {item_key: int(escrow.get("quantity", 1))},
+                now_text,
+            )
             connection.execute("UPDATE final_battle_members SET asset_lock_status='released', updated_at=? WHERE battle_id=?", (now_text, session["battle_id"]))
             connection.execute("UPDATE final_battle_sessions SET status='expired', result_json=?, updated_at=? WHERE battle_id=?", (json.dumps({"outcome": "cancelled", "reason": "initiator_cancelled", "settled_at": now_text}, ensure_ascii=False, sort_keys=True), now_text, session["battle_id"]))
             payload = {"battle_id": str(session["battle_id"]), "status": "expired", "member_player_ids": [str(row[0]) for row in connection.execute("SELECT p.player_id FROM final_battle_members m JOIN players p ON p.id=m.player_id WHERE m.battle_id=? ORDER BY m.id", (session["battle_id"],)).fetchall()], "expires_at": str(session["expires_at"])}
@@ -660,12 +685,12 @@ class FinalBattleRepositoryMixin:
         initiator = connection.execute("SELECT * FROM players WHERE id=?", (session["initiator_id"],)).fetchone()
         if initiator is None:
             raise FinalBattleNotFoundError("initiator disappeared")
-        inventory = self._json_object(initiator["inventory_json"], {})
         item_key = str(escrow.get("item_key", ASCENSION_CERTIFICATE_KEY))
-        inventory[item_key] = int(inventory.get(item_key, 0)) + int(escrow.get("quantity", 1))
-        connection.execute(
-            "UPDATE players SET inventory_json=?, updated_at=? WHERE id=?",
-            (json.dumps(inventory, ensure_ascii=False, sort_keys=True), now_text, initiator["id"]),
+        grant_player_items(
+            connection,
+            initiator,
+            {item_key: int(escrow.get("quantity", 1))},
+            now_text,
         )
         connection.execute("UPDATE final_battle_members SET asset_lock_status='released', updated_at=? WHERE battle_id=?", (now_text, session["battle_id"]))
         connection.execute(

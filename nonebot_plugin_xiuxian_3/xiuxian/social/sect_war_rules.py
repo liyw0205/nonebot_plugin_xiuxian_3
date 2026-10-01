@@ -16,8 +16,6 @@ SECT_WAR_MEMBER_THRESHOLD = 20
 SECT_WAR_SECT_REWARD = 100
 SECT_WAR_MEMBER_REWARD = 30
 SECT_WAR_CLAIM_HOURS = 24
-SECT_WAR_CONTENT_VERSION = ""
-SECT_WAR_RULE_VERSION = ""
 
 
 def _week_start(value: datetime) -> datetime:
@@ -68,7 +66,6 @@ def contribution_value(action_key: str, source_quantity: int) -> int:
 
 __all__ = [
     "SECT_WAR_CLAIM_HOURS",
-    "SECT_WAR_CONTENT_VERSION",
     "SECT_WAR_DURATION_MINUTES",
     "SECT_WAR_KEY",
     "SECT_WAR_MEMBER_REWARD",
@@ -76,7 +73,6 @@ __all__ = [
     "SECT_WAR_MAX_PARTICIPANTS",
     "SECT_WAR_MIN_LEVEL",
     "SECT_WAR_REGISTRATION_FEE",
-    "SECT_WAR_RULE_VERSION",
     "SECT_WAR_SECT_REWARD",
     "contribution_value",
     "sect_war_round_for_id",
