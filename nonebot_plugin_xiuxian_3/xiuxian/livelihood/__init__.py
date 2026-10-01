@@ -24,9 +24,9 @@ from .rules import (
     PROJECT_HERB_GARDEN,
     PROJECT_MARKET_ROAD,
     PROJECT_TOWN_WELL,
-    PROJECT_SERVICE_SOURCES,
     ProjectServiceSource,
     project_definition,
+    public_project_definitions,
     project_service_source,
 )
 
@@ -61,8 +61,8 @@ __all__ = [
     "PROJECT_HERB_GARDEN",
     "PROJECT_MARKET_ROAD",
     "PROJECT_TOWN_WELL",
-    "PROJECT_SERVICE_SOURCES",
     "ProjectServiceSource",
     "project_definition",
+    "public_project_definitions",
     "project_service_source",
 ]

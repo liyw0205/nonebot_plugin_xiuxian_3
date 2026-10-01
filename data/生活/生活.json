@@ -347,6 +347,153 @@
       "key": "route.new_town_outskirts",
       "record_type": "route",
       "status": "active"
+    },
+    {
+      "name": "新镇灵井",
+      "desc": "汇聚木材修复灵井，使新镇委托得到更多库存。",
+      "aliases": ["灵井"],
+      "requirements": {
+        "item.mat.wood": 100
+      },
+      "contribution_resources": ["item.mat.wood"],
+      "effect_key": "town_commission.stock_bonus",
+      "reward": {
+        "spirit_stones": 30,
+        "local_reputation": 5
+      },
+      "key": "project.town_well",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "商路修缮",
+      "desc": "补齐云铁与灵石，令往来商路少受风沙阻滞。",
+      "aliases": ["商路"],
+      "requirements": {
+        "item.material.cloud_iron": 60,
+        "currency.spirit_stone": 3000
+      },
+      "contribution_resources": ["item.material.cloud_iron", "currency.spirit_stone"],
+      "effect_key": "route.delay_weight_reduction",
+      "reward": {
+        "service_reputation": 3,
+        "item": "item.token.transport_coupon"
+      },
+      "key": "project.market_road",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "百草园",
+      "desc": "整饬灵田与药圃，让灵草委托收成更丰。",
+      "aliases": ["灵草园"],
+      "requirements": {
+        "item.herb.spirit_leaf": 120
+      },
+      "contribution_resources": ["item.herb.spirit_leaf"],
+      "effect_key": "town_commission.herb_reward_bonus",
+      "reward": {
+        "item": "item.seed.herb_bundle"
+      },
+      "key": "project.herb_garden",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "领域避难所",
+      "desc": "修筑避难所，守护领域内的百姓与行旅。",
+      "requirements": {
+        "item.mat.wood": 60,
+        "item.food.coarse_spirit_rice": 60,
+        "item.pill.healing_low": 20
+      },
+      "contribution_resources": [
+        "item.mat.wood",
+        "item.food.coarse_spirit_rice",
+        "item.pill.healing_low"
+      ],
+      "effect_key": "domain_refuge.low_risk_stock_bonus",
+      "reward": {
+        "local_reputation": 8,
+        "service_reputation": 3,
+        "item": "item.token.construction_coupon"
+      },
+      "local_reputation_key": "local.domain_refuge",
+      "required_sect_level": 4,
+      "required_access_key": "access.project.domain_refuge",
+      "service_sources": [
+        {
+          "service_key": "service.transport",
+          "operation_names": ["livelihood.settle_route"],
+          "contribution_points": 20
+        }
+      ],
+      "key": "project.domain_refuge",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "魔渊净化工程",
+      "desc": "以血草和阵砂净化魔渊边缘的侵蚀。",
+      "requirements": {
+        "item.herb.blood_grass": 60,
+        "item.mat.array_sand": 60
+      },
+      "contribution_resources": ["item.herb.blood_grass", "item.mat.array_sand"],
+      "effect_key": "abyss_purification.route_delay_reduction",
+      "reward": {
+        "local_reputation": 8,
+        "service_reputation": 3,
+        "item": "item.token.construction_coupon"
+      },
+      "local_reputation_key": "local.abyss_outpost",
+      "required_faction": "demon",
+      "required_faction_reputation": 300,
+      "required_access_key": "access.project.abyss_purification",
+      "service_sources": [
+        {
+          "service_key": "service.purification",
+          "operation_names": ["production.purify_pollution"],
+          "contribution_points": 15
+        }
+      ],
+      "key": "project.abyss_purification",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "祖灵栖地修复",
+      "desc": "补足灵米与灵叶，修复祖灵栖地的生息之地。",
+      "requirements": {
+        "item.food.coarse_spirit_rice": 60,
+        "item.herb.spirit_leaf": 60
+      },
+      "contribution_resources": ["item.food.coarse_spirit_rice", "item.herb.spirit_leaf"],
+      "effect_key": "ancestral_habitat.commission_stock_bonus",
+      "reward": {
+        "local_reputation": 8,
+        "service_reputation": 3,
+        "item": "item.token.construction_coupon"
+      },
+      "local_reputation_key": "local.ancestral_habitat",
+      "required_faction": "beast",
+      "required_faction_reputation": 300,
+      "required_access_key": "access.project.ancestral_habitat",
+      "service_sources": [
+        {
+          "service_key": "service.taming",
+          "operation_names": ["companion.bond", "companion.feed"],
+          "contribution_points": 15
+        },
+        {
+          "service_key": "service.repair",
+          "operation_names": ["companion.rest"],
+          "contribution_points": 15
+        }
+      ],
+      "key": "project.ancestral_habitat",
+      "record_type": "public_project",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

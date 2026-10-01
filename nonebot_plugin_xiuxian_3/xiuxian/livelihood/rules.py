@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
 
@@ -302,6 +303,8 @@ class PublicProjectDefinition:
     required_faction_reputation: int = 0
     required_sect_level: int = 0
     required_access_key: str | None = None
+    aliases: tuple[str, ...] = ()
+    service_sources: tuple["ProjectServiceSource", ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,138 +318,140 @@ class ProjectServiceSource:
     quantity: int = 1
 
 
-PROJECT_SERVICE_SOURCES = (
-    ProjectServiceSource(
-        project_key=PROJECT_DOMAIN_REFUGE,
-        service_key="service.transport",
-        operation_names=("livelihood.settle_route",),
-        contribution_points=20,
-    ),
-    ProjectServiceSource(
-        project_key=PROJECT_ABYSS_PURIFICATION,
-        service_key="service.purification",
-        operation_names=("production.purify_pollution",),
-        contribution_points=15,
-    ),
-    ProjectServiceSource(
-        project_key=PROJECT_ANCESTRAL_HABITAT,
-        service_key="service.taming",
-        operation_names=("companion.bond", "companion.feed"),
-        contribution_points=15,
-    ),
-    ProjectServiceSource(
-        project_key=PROJECT_ANCESTRAL_HABITAT,
-        service_key="service.repair",
-        operation_names=("companion.rest",),
-        contribution_points=15,
-    ),
-)
+@lru_cache(maxsize=1)
+def _default_livelihood_content() -> ContentBundle:
+    return bundled_content()
 
 
-def project_service_source(project_key: str, operation_name: str) -> ProjectServiceSource | None:
-    for source in PROJECT_SERVICE_SOURCES:
-        if source.project_key == project_key and operation_name in source.operation_names:
+def _positive_mapping(row: dict[str, Any], field: str, bundle: ContentBundle, key: str) -> dict[str, int]:
+    value = row.get(field)
+    if not isinstance(value, dict) or not value:
+        raise ContentError(f"public project {key} has invalid {field}")
+    result: dict[str, int] = {}
+    for raw_key, raw_amount in value.items():
+        if not isinstance(raw_key, str) or not raw_key:
+            raise ContentError(f"public project {key} has invalid {field} key")
+        if isinstance(raw_amount, bool) or not isinstance(raw_amount, int) or raw_amount <= 0:
+            raise ContentError(f"public project {key} has invalid {field} amount")
+        if raw_key != "currency.spirit_stone" and not bundle.has("item", raw_key, include_locked=False):
+            raise ContentError(f"public project {key} references unknown item {raw_key}")
+        result[raw_key] = raw_amount
+    return result
+
+
+def public_project_definitions(content: ContentBundle | None = None) -> dict[str, PublicProjectDefinition]:
+    bundle = content if content is not None else _default_livelihood_content()
+    result: dict[str, PublicProjectDefinition] = {}
+    selectors: set[str] = set()
+    for row in bundle.list("livelihood", include_locked=False):
+        if row.get("record_type") != "public_project":
+            continue
+        key, label, desc = row.get("key"), row.get("name"), row.get("desc")
+        if not isinstance(key, str) or not key or not isinstance(label, str) or not label.strip() or not isinstance(desc, str) or not desc.strip():
+            raise ContentError(f"public project {key!r} requires key, name and desc")
+        requirements = _positive_mapping(row, "requirements", bundle, key)
+        resources = row.get("contribution_resources")
+        if not isinstance(resources, list) or not resources or any(item not in requirements for item in resources):
+            raise ContentError(f"public project {key} has invalid contribution_resources")
+        effect_key = row.get("effect_key")
+        if not isinstance(effect_key, str) or not effect_key:
+            raise ContentError(f"public project {key} has invalid effect_key")
+        reward = row.get("reward")
+        if not isinstance(reward, dict):
+            raise ContentError(f"public project {key} has invalid reward")
+        normalized_reward: dict[str, int | str] = {}
+        for reward_key, reward_value in reward.items():
+            if reward_key == "item":
+                if not isinstance(reward_value, str) or not bundle.has("item", reward_value, include_locked=False):
+                    raise ContentError(f"public project {key} has invalid reward item")
+                normalized_reward[reward_key] = reward_value
+            elif reward_key in {"spirit_stones", "local_reputation", "service_reputation"}:
+                if isinstance(reward_value, bool) or not isinstance(reward_value, int) or reward_value < 0:
+                    raise ContentError(f"public project {key} has invalid reward amount")
+                normalized_reward[reward_key] = reward_value
+            else:
+                raise ContentError(f"public project {key} has unsupported reward {reward_key}")
+        aliases = row.get("aliases", [])
+        if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
+            raise ContentError(f"public project {key} aliases must be non-empty strings")
+        permission_fields = {
+            "local_reputation_key": row.get("local_reputation_key", "local.xuantian.new_town"),
+            "required_faction": row.get("required_faction"),
+            "required_access_key": row.get("required_access_key"),
+        }
+        if not isinstance(permission_fields["local_reputation_key"], str) or not permission_fields["local_reputation_key"]:
+            raise ContentError(f"public project {key} has invalid local_reputation_key")
+        for field in ("required_faction", "required_access_key"):
+            if permission_fields[field] is not None and (not isinstance(permission_fields[field], str) or not permission_fields[field]):
+                raise ContentError(f"public project {key} has invalid {field}")
+        numeric = {
+            "required_faction_reputation": row.get("required_faction_reputation", 0),
+            "required_sect_level": row.get("required_sect_level", 0),
+        }
+        if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in numeric.values()):
+            raise ContentError(f"public project {key} has invalid permission threshold")
+        service_rows = row.get("service_sources", [])
+        if not isinstance(service_rows, list):
+            raise ContentError(f"public project {key} service_sources must be a list")
+        service_sources: list[ProjectServiceSource] = []
+        for source in service_rows:
+            if not isinstance(source, dict):
+                raise ContentError(f"public project {key} has invalid service source")
+            operation_names = source.get("operation_names")
+            service_key = source.get("service_key")
+            points, quantity = source.get("contribution_points"), source.get("quantity", 1)
+            if (
+                not isinstance(operation_names, list) or not operation_names
+                or any(not isinstance(name, str) or not name for name in operation_names)
+                or not isinstance(service_key, str) or not service_key
+                or any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in (points, quantity))
+            ):
+                raise ContentError(f"public project {key} has invalid service source")
+            service_sources.append(ProjectServiceSource(key, service_key, tuple(operation_names), points, quantity))
+        selector_values = {key, label.strip(), *(alias.strip() for alias in aliases)}
+        if selectors & selector_values or key in result:
+            raise ContentError(f"public project {key} has duplicate key or alias")
+        selectors.update(selector_values)
+        result[key] = PublicProjectDefinition(
+            key=key,
+            label=label.strip(),
+            requirements=requirements,
+            contribution_resources=tuple(str(item) for item in resources),
+            effect_key=effect_key,
+            reward=normalized_reward,
+            local_reputation_key=permission_fields["local_reputation_key"],
+            required_faction=permission_fields["required_faction"],
+            required_faction_reputation=numeric["required_faction_reputation"],
+            required_sect_level=numeric["required_sect_level"],
+            required_access_key=permission_fields["required_access_key"],
+            aliases=tuple(alias.strip() for alias in aliases),
+            service_sources=tuple(service_sources),
+        )
+    if not result:
+        raise ContentError("no active public project content records")
+    return result
+
+
+def project_service_source(
+    project_key: str,
+    operation_name: str,
+    content: ContentBundle | None = None,
+) -> ProjectServiceSource | None:
+    definition = public_project_definitions(content).get(project_key)
+    if definition is None:
+        return None
+    for source in definition.service_sources:
+        if operation_name in source.operation_names:
             return source
     return None
 
 
-PUBLIC_PROJECT_DEFINITIONS = {
-    PROJECT_TOWN_WELL: PublicProjectDefinition(
-        key=PROJECT_TOWN_WELL,
-        label="新镇灵井",
-        requirements={"item.mat.wood": 100},
-        contribution_resources=("item.mat.wood",),
-        effect_key="town_commission.stock_bonus",
-        reward={"spirit_stones": 30, "local_reputation": 5},
-    ),
-    PROJECT_MARKET_ROAD: PublicProjectDefinition(
-        key=PROJECT_MARKET_ROAD,
-        label="商路修缮",
-        requirements={"item.material.cloud_iron": 60, "currency.spirit_stone": 3000},
-        contribution_resources=("item.material.cloud_iron", "currency.spirit_stone"),
-        effect_key="route.delay_weight_reduction",
-        reward={"service_reputation": 3, "item": TRANSPORT_TICKET},
-    ),
-    PROJECT_HERB_GARDEN: PublicProjectDefinition(
-        key=PROJECT_HERB_GARDEN,
-        label="百草园",
-        requirements={"item.herb.spirit_leaf": 120},
-        contribution_resources=("item.herb.spirit_leaf",),
-        effect_key="town_commission.herb_reward_bonus",
-        reward={"item": HERB_SEED_BUNDLE},
-    ),
-    # Authority-gated projects are materialized on demand; the weekly rotation
-    # remains limited to the original three projects.
-    PROJECT_DOMAIN_REFUGE: PublicProjectDefinition(
-        key=PROJECT_DOMAIN_REFUGE,
-        label="领域避难所",
-        requirements={
-            "item.mat.wood": 60,
-            "item.food.coarse_spirit_rice": 60,
-            "item.pill.healing_low": 20,
-        },
-        contribution_resources=(
-            "item.mat.wood",
-            "item.food.coarse_spirit_rice",
-            "item.pill.healing_low",
-        ),
-        effect_key="domain_refuge.low_risk_stock_bonus",
-        reward={"local_reputation": 8, "service_reputation": 3, "item": CONSTRUCTION_COUPON},
-        local_reputation_key="local.domain_refuge",
-        required_sect_level=4,
-        required_access_key="access.project.domain_refuge",
-    ),
-    PROJECT_ABYSS_PURIFICATION: PublicProjectDefinition(
-        key=PROJECT_ABYSS_PURIFICATION,
-        label="魔渊净化工程",
-        requirements={"item.herb.blood_grass": 60, "item.mat.array_sand": 60},
-        contribution_resources=("item.herb.blood_grass", "item.mat.array_sand"),
-        effect_key="abyss_purification.route_delay_reduction",
-        reward={"local_reputation": 8, "service_reputation": 3, "item": CONSTRUCTION_COUPON},
-        local_reputation_key="local.abyss_outpost",
-        required_faction="demon",
-        required_faction_reputation=300,
-        required_access_key="access.project.abyss_purification",
-    ),
-    PROJECT_ANCESTRAL_HABITAT: PublicProjectDefinition(
-        key=PROJECT_ANCESTRAL_HABITAT,
-        label="祖灵栖地修复",
-        requirements={"item.food.coarse_spirit_rice": 60, "item.herb.spirit_leaf": 60},
-        contribution_resources=("item.food.coarse_spirit_rice", "item.herb.spirit_leaf"),
-        effect_key="ancestral_habitat.commission_stock_bonus",
-        reward={"local_reputation": 8, "service_reputation": 3, "item": CONSTRUCTION_COUPON},
-        local_reputation_key="local.ancestral_habitat",
-        required_faction="beast",
-        required_faction_reputation=300,
-        required_access_key="access.project.ancestral_habitat",
-    ),
-}
-
-PROJECT_ALIASES = {
-    "灵井": PROJECT_TOWN_WELL,
-    "新镇灵井": PROJECT_TOWN_WELL,
-    "project.town_well": PROJECT_TOWN_WELL,
-    "商路": PROJECT_MARKET_ROAD,
-    "商路修缮": PROJECT_MARKET_ROAD,
-    "project.market_road": PROJECT_MARKET_ROAD,
-    "百草园": PROJECT_HERB_GARDEN,
-    "灵草园": PROJECT_HERB_GARDEN,
-    "project.herb_garden": PROJECT_HERB_GARDEN,
-    "领域避难所": PROJECT_DOMAIN_REFUGE,
-    "project.domain_refuge": PROJECT_DOMAIN_REFUGE,
-    "魔渊净化工程": PROJECT_ABYSS_PURIFICATION,
-    "project.abyss_purification": PROJECT_ABYSS_PURIFICATION,
-    "祖灵栖地修复": PROJECT_ANCESTRAL_HABITAT,
-    "project.ancestral_habitat": PROJECT_ANCESTRAL_HABITAT,
-}
-
-
-def project_definition(value: str | None = None) -> PublicProjectDefinition:
-    key = PROJECT_ALIASES.get((value or "").strip(), (value or "").strip())
-    try:
-        return PUBLIC_PROJECT_DEFINITIONS[key]
-    except KeyError as exc:
-        raise ValueError(f"unsupported project key: {value}") from exc
+def project_definition(value: str | None = None, content: ContentBundle | None = None) -> PublicProjectDefinition:
+    normalized = (value or "").strip()
+    for definition in public_project_definitions(content).values():
+        if normalized in {definition.key, definition.label, *definition.aliases}:
+            return definition
+    raise ValueError(f"unsupported project key: {value}")
 
 
 def weekly_project_key(week_key: str) -> str:
@@ -478,7 +483,6 @@ __all__ = [
     "town_commission_definitions",
     "residence_definition",
     "HERB_SEED_BUNDLE",
-    "PROJECT_ALIASES",
     "PROJECT_DOMAIN_REFUGE",
     "PROJECT_ABYSS_PURIFICATION",
     "PROJECT_ANCESTRAL_HABITAT",
@@ -486,8 +490,7 @@ __all__ = [
     "PROJECT_MARKET_ROAD",
     "PROJECT_TOWN_WELL",
     "CONSTRUCTION_COUPON",
-    "PUBLIC_PROJECT_DEFINITIONS",
-    "PROJECT_SERVICE_SOURCES",
+    "public_project_definitions",
     "ProjectServiceSource",
     "PublicProjectDefinition",
     "TRANSPORT_TICKET",

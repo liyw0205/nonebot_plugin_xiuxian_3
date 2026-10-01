@@ -40,12 +40,11 @@ class ProjectApplication:
             return context.operation_id
         return f"{operation_name}:{context.adapter}:{context.user_id}:{context.message_id or context.request_id}"
 
-    @staticmethod
-    def _project_key(value: str | None) -> str | None:
+    def _project_key(self, value: str | None) -> str | None:
         if value is None:
             return None
         try:
-            return project_definition(value).key
+            return project_definition(value, self.repository.content).key
         except ValueError:
             return None
 

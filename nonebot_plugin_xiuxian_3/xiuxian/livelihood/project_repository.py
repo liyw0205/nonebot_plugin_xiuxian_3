@@ -31,8 +31,8 @@ from ..persistence.errors import (
 from ..utils.json import json_object
 from .project_models import ProjectContributionRecord, ProjectSettlementRecord, PublicProjectView
 from .rules import (
-    PUBLIC_PROJECT_DEFINITIONS,
     PublicProjectDefinition,
+    public_project_definitions,
     project_definition,
     project_service_source,
     weekly_project_key,
@@ -58,7 +58,7 @@ class ProjectRepositoryMixin:
             # Authority-gated reconstruction projects are independent rows in
             # the same weekly ledger and are materialized only for eligible
             # players.
-            for definition in PUBLIC_PROJECT_DEFINITIONS.values():
+            for definition in public_project_definitions(self.content).values():
                 if not (definition.required_faction or definition.required_sect_level):
                     continue
                 if self._project_available(connection, player, definition):
@@ -110,7 +110,7 @@ class ProjectRepositoryMixin:
         source_operation_id: str | None,
     ) -> ProjectContributionRecord:
         try:
-            definition = project_definition(project_key) if project_key else None
+            definition = project_definition(project_key, self.content) if project_key else None
         except ValueError as exc:
             raise ProjectContentClosedError("unsupported project") from exc
         if source_operation_id and definition is None:
@@ -153,7 +153,7 @@ class ProjectRepositoryMixin:
             )
             if definition is not None and definition.key != str(project["project_key"]):
                 raise ProjectContentClosedError("project is not in this week's rotation")
-            definition = project_definition(str(project["project_key"]))
+            definition = project_definition(str(project["project_key"]), self.content)
             if definition.required_faction or definition.required_sect_level:
                 self._require_project_day_quota(connection, project, player, now, points)
             self._refresh_status(project, connection, now, now_text)
@@ -283,7 +283,7 @@ class ProjectRepositoryMixin:
         if evidence is None:
             raise ProjectContributionRequirementError("service source is unavailable")
         operation_name, source_payload = evidence
-        source = project_service_source(definition.key, operation_name)
+        source = project_service_source(definition.key, operation_name, self.content)
         if source is None:
             raise ProjectContributionRequirementError("service source cannot contribute to this project")
         self._validate_project_service_source(
@@ -478,7 +478,7 @@ class ProjectRepositoryMixin:
             reward: dict[str, int] = {}
             updated_player = player
             if eligible:
-                definition = project_definition(str(project["project_key"]))
+                definition = project_definition(str(project["project_key"]), self.content)
                 reward = self._grant_reward(connection, player, definition, now_text, project["project_id"], operation_id)
                 updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
                 connection.execute(
@@ -508,7 +508,7 @@ class ProjectRepositoryMixin:
         player: Any | None = None,
     ) -> Any:
         key = weekly_project_key(week) if project_key is None else project_key
-        definition = project_definition(key)
+        definition = project_definition(key, self.content)
         if definition.required_faction or definition.required_sect_level:
             if player is None or not self._project_available(connection, player, definition):
                 raise ProjectContentClosedError("project authority is not available")

@@ -136,6 +136,48 @@
       "requirements": [],
       "status": "active",
       "key": "item.token.faction_seal"
+    },
+    {
+      "name": "短途运输券",
+      "desc": "地方商路修缮后发放的通行凭证，可用于短途运输。",
+      "item_type": "token",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.token.transport_coupon"
+    },
+    {
+      "name": "灵田种子包",
+      "desc": "百草园整饬后分发的种子包，可用于灵田播种。",
+      "item_type": "token",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.seed.herb_bundle"
+    },
+    {
+      "name": "建设券",
+      "desc": "参与地方建设后获得的凭券，可用于后续公共工程。",
+      "item_type": "token",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.token.construction_coupon"
     }
   ],
   "category": "凭证",
