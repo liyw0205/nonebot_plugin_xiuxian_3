@@ -8,7 +8,7 @@ from datetime import datetime, time
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import grant_player_items
+from ..utils.assets import grant_player_items, inventory_amount
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     PlayerNotFoundError,
@@ -99,7 +99,7 @@ class SectExchangeRepositoryMixin:
             if warehouse_quantity < offer.quantity:
                 raise SectStockInsufficientError("sect warehouse stock is insufficient")
             inventory = player_inventory(player)
-            inventory_quantity = int(inventory.get(offer.item_key, 0)) + offer.quantity
+            inventory_quantity = inventory_amount(inventory, offer.item_key) + offer.quantity
             warehouse_quantity -= offer.quantity
             if warehouse_quantity:
                 warehouse[offer.item_key] = warehouse_quantity

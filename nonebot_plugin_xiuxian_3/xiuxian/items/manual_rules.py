@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..content import ContentBundle, ContentError, bundled_content
+from ..utils.assets import inventory_amount
 
 _MANUAL_EFFECTS = {
     "cultivation_permission",
@@ -20,7 +21,7 @@ def _owned_manual_effects(
     bundle = content or bundled_content()
     for item in bundle.list("item", include_locked=False):
         item_key = item.get("key")
-        if item.get("item_type") != "manual" or int(inventory.get(str(item_key), 0)) <= 0:
+        if item.get("item_type") != "manual" or inventory_amount(inventory, str(item_key)) <= 0:
             continue
         effects = item.get("effects")
         if not isinstance(effects, list):

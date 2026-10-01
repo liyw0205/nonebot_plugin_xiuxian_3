@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..content import bundled_content
+from ..utils.assets import inventory_amount
 from ..repository import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -132,7 +133,7 @@ class SkillApplication:
             locked = (
                 definition.acquisition_item_key
                 and mastery is None
-                and int(record.player.inventory.get(definition.acquisition_item_key, 0)) <= 0
+                and inventory_amount(record.player.inventory, definition.acquisition_item_key) <= 0
             )
             status = (
                 f"未获{content.label('item', definition.acquisition_item_key)}"

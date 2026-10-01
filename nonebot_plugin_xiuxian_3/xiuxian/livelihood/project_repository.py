@@ -11,6 +11,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..utils.assets import (
     grant_player_assets,
+    inventory_amount,
     spend_player_assets,
 )
 from ..utils.assets import player_currency
@@ -158,7 +159,7 @@ class ProjectRepositoryMixin:
             if cost_key == "currency.spirit_stone":
                 available = player_currency(player)
             else:
-                available = int(inventory.get(cost_key, 0))
+                available = inventory_amount(inventory, cost_key)
             if available < resource_amount:
                 raise ResourceInsufficientError("project resource is insufficient")
             progress = json_object(project["progress_json"], {})

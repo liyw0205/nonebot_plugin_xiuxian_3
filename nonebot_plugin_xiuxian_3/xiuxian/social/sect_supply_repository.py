@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import spend_player_assets, player_currency
+from ..utils.assets import inventory_amount, spend_player_assets, player_currency
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     OperationConflictError,
@@ -169,7 +169,7 @@ class SectSupplyRepositoryMixin:
                 balance = int(sect["spirit_stones"]) + quantity
             else:
                 inventory = player_inventory(player)
-                if int(inventory.get(item_key, 0)) < quantity:
+                if inventory_amount(inventory, item_key) < quantity:
                     raise ResourceInsufficientError("not enough items")
                 if item_key not in warehouse and len(warehouse) >= int(sect["warehouse_capacity"]):
                     raise SectWarehouseFullError("warehouse has no free slots")

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import spend_player_items
+from ..utils.assets import inventory_amount, spend_player_items
 from ..utils.player import change_player_state, player_inventory
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
@@ -207,7 +207,7 @@ class EndgameQuestRepositoryMixin:
                     "support": "item.masterwork.support",
                 }.get(path_key)
                 inventory = player_inventory(player)
-                if not work_key or int(inventory.get(work_key, 0)) < 1:
+                if not work_key or inventory_amount(inventory, work_key) < 1:
                     raise QuestResourceInsufficientError("profession endgame work is missing")
                 spend_player_items(connection, player, {work_key: 1}, now_text)
                 source = {"source": "inventory_delivery", "item_key": work_key, "path_key": path_key}

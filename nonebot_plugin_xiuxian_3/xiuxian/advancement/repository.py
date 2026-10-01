@@ -199,6 +199,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import (
+    inventory_amount,
     inventory_json,
     spend_player_items,
     spend_player_assets,
@@ -324,7 +325,7 @@ class AdvancementRepositoryMixin:
                 if not permissions or not manual_grants_permission(inventory, str(permissions[0]), content):
                     raise ResourceInsufficientError("retreat cultivation manual is missing")
             for item_key, quantity in item_cost.items():
-                if int(inventory.get(item_key, 0)) < quantity:
+                if inventory_amount(inventory, item_key) < quantity:
                     raise ResourceInsufficientError("retreat item is insufficient")
             if player_integer(row, "energy") < definition.energy_cost:
                 raise ResourceInsufficientError("energy is insufficient")
@@ -836,7 +837,7 @@ class AdvancementRepositoryMixin:
                     raise ConstitutionCooldownError("constitution reshape cooldown is active")
             inventory = player_inventory(row)
             reset_item_key = str(constitution_reshape_rules(self.content)["reset_item_key"])
-            if int(inventory.get(reset_item_key, 0)) < 1:
+            if inventory_amount(inventory, reset_item_key) < 1:
                 raise ResourceInsufficientError("constitution reset token is missing")
             snapshot = {
                 "constitution_key": definition.key,
@@ -1300,7 +1301,7 @@ class AdvancementRepositoryMixin:
         if rows:
             return rows[0] if len(rows) == 1 else player
         inventory = player_inventory(player)
-        quantity = int(inventory.get(definition.key, 0))
+        quantity = inventory_amount(inventory, definition.key)
         if quantity <= 0:
             return player
         durability = SQLitePlayerRepository._json_object(player["durability_json"], {})
@@ -1364,7 +1365,7 @@ class AdvancementRepositoryMixin:
         if instance is not None:
             return True
         inventory = player_inventory(player)
-        return int(inventory.get(definition.key, 0)) > 0
+        return inventory_amount(inventory, definition.key) > 0
 
     @staticmethod
     def _consume_equipment_costs(
@@ -1903,7 +1904,7 @@ class AdvancementRepositoryMixin:
                 raise SkillNotAvailableError("skill is outside the current path, realm or acquisition requirements")
             asset_costs: dict[str, int] = {}
             if mastery is None and definition.acquisition_item_key:
-                quantity = int(inventory.get(definition.acquisition_item_key, 0))
+                quantity = inventory_amount(inventory, definition.acquisition_item_key)
                 if quantity <= 0:
                     raise SkillNotAvailableError("skill inheritance item is missing")
                 asset_costs[definition.acquisition_item_key] = 1

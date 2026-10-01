@@ -32,7 +32,7 @@ from ..persistence.errors import (
 )
 from .purchase_order_models import PurchaseOrderRecord
 from .bindings import active_binding_totals
-from ..utils.assets import change_player_assets, grant_player_assets, spend_player_assets, player_currency
+from ..utils.assets import change_player_assets, grant_player_assets, inventory_amount, spend_player_assets, player_currency
 from ..utils.player import player_inventory
 from .purchase_order_rules import (
     PURCHASE_ORDER_TTL_SECONDS,
@@ -278,7 +278,7 @@ class PurchaseOrderRepositoryMixin:
                 "SELECT COALESCE(SUM(quantity),0) FROM purchase_item_locks WHERE seller_player_id=? AND item_key=?",
                 (seller["id"], item_key),
             ).fetchone()[0]
-            available = int(inventory.get(item_key, 0)) - int(locked_market) - int(locked_auction) - int(locked_purchase)
+            available = inventory_amount(inventory, item_key) - int(locked_market) - int(locked_auction) - int(locked_purchase)
             if available < quantity:
                 raise PurchaseItemLockedError("seller inventory is unavailable")
             bound_quantity, first_binding = active_binding_totals(connection, int(seller["id"]), item_key, now_text)
@@ -382,7 +382,7 @@ class PurchaseOrderRepositoryMixin:
                 seller_inventory = player_inventory(seller)
                 buyer_inventory = player_inventory(buyer)
                 quantity = int(order["quantity"])
-                if int(seller_inventory.get(order["item_key"], 0)) < quantity:
+                if inventory_amount(seller_inventory, order["item_key"]) < quantity:
                     self._release_item_lock(connection, order, item_lock, operation_id, now_text)
                     self._refund_funds(connection, order, operation_id, now_text)
                     connection.execute(
@@ -395,8 +395,8 @@ class PurchaseOrderRepositoryMixin:
                 capacity = int(buyer["carry_capacity"] or 0)
                 if capacity > 0 and sum(int(value) for value in buyer_inventory.values()) + quantity > capacity:
                     raise PurchaseBuyerCapacityInsufficientError("buyer inventory capacity is insufficient")
-                seller_item_before = int(seller_inventory.get(str(order["item_key"]), 0))
-                buyer_item_before = int(buyer_inventory.get(str(order["item_key"]), 0))
+                seller_item_before = inventory_amount(seller_inventory, str(order["item_key"]))
+                buyer_item_before = inventory_amount(buyer_inventory, str(order["item_key"]))
                 seller_currency_before = player_currency(seller)
                 change_player_assets(
                     connection,

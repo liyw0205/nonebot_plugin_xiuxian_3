@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import spend_player_items
+from ..utils.assets import inventory_amount, spend_player_items
 from ..utils.player import change_player_state, player_integer, player_inventory
 from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..combat.rules import apply_constitution_combat_effect, MAX_TURNS, TURN_TIMEOUT_SECONDS
@@ -163,7 +163,7 @@ class TribulationTrialRepositoryMixin:
                 if row["dao_fruit_key"]:
                     raise DaoFruitChoiceError("dao fruit is already locked")
             inventory = player_inventory(row)
-            guard_used = int(inventory.get("item.tribulation_guard", 0)) > 0
+            guard_used = inventory_amount(inventory, "item.tribulation_guard") > 0
             costs = {"item.tribulation_token": definition.token_cost}
             if guard_used:
                 costs["item.tribulation_guard"] = 1

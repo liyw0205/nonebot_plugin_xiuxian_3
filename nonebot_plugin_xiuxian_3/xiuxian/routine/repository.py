@@ -171,7 +171,7 @@ from ..routine.rules import (
     tree_status,
 )
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import player_currency
+from ..utils.assets import inventory_amount, player_currency
 from ..utils.player import change_player_state, player_inventory, player_resource
 
 
@@ -1867,7 +1867,7 @@ class RoutineRepositoryMixin:
 
             inventory = player_inventory(row)
             asset_delta: dict[str, int] = {}
-            if draw_count == 1 and int(inventory.get(FATE_TICKET, 0)) > 0:
+            if draw_count == 1 and inventory_amount(inventory, FATE_TICKET) > 0:
                 cost_kind = "ticket"
                 cost_quantity = 1
                 asset_delta[FATE_TICKET] = -1

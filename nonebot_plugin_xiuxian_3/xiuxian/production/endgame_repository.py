@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_amount
 from ..utils.player import change_player_state, player_inventory
 from ..persistence.errors import (
     EndgameRecipeAlreadyCreatedError,
@@ -144,7 +145,7 @@ class EndgameProductionRepositoryMixin:
 
             inventory = player_inventory(player)
             for item_key, quantity in recipe.inputs.items():
-                if int(inventory.get(item_key, 0)) < quantity:
+                if inventory_amount(inventory, item_key) < quantity:
                     raise MaterialInsufficientError(f"missing {item_key}")
             session_id = uuid4().hex
             roll_bp = recipe_roll_bp(operation_id)

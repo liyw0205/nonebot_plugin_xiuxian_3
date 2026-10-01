@@ -27,7 +27,7 @@ from .endgame_rules import (
     TRIBULATION_TOTAL_CULTIVATION,
     TRIAL_ORDER,
 )
-from ..utils.assets import player_currency
+from ..utils.assets import inventory_amount, player_currency
 from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 
 
@@ -88,7 +88,7 @@ class EndgameRepositoryMixin:
             if any(count < 1 for count in qualification_counts.values()):
                 raise DaoUnionRequirementError("dao union evidence is incomplete or invalid")
             inventory = player_inventory(row)
-            if int(inventory.get("item.dao_fruit_fragment", 0)) < DAO_UNION_FRAGMENT_COST:
+            if inventory_amount(inventory, "item.dao_fruit_fragment") < DAO_UNION_FRAGMENT_COST:
                 raise MaterialInsufficientError("dao fruit fragments are insufficient")
             if int(row["world_merit"]) < DAO_UNION_MERIT_COST:
                 raise DaoUnionRequirementError("world merit is insufficient")
@@ -237,7 +237,7 @@ class EndgameRepositoryMixin:
         if ending_key == "remain_in_world" and not fruit_key:
             raise AscensionRequirementError("remain in world requires a locked dao fruit")
         status = ASCENDED_STATUS if ending_key == "ascend" else REMAINED_IN_WORLD_STATUS
-        title_quantity = 0 if int(player_inventory(row).get("item.title.ascended", 0)) else 1
+        title_quantity = 0 if inventory_amount(player_inventory(row), "item.title.ascended") else 1
         change_player_state(
             connection,
             row,
@@ -314,7 +314,7 @@ class EndgameRepositoryMixin:
                 missing.append("ASCENSION_MERIT_INSUFFICIENT")
             if int(row["tribulation_debt"]) >= 100:
                 missing.append("TRIBULATION_DEBT_BLOCKED")
-            certificate_count = int(inventory.get(ASCENSION_CERTIFICATE_KEY, 0))
+            certificate_count = inventory_amount(inventory, ASCENSION_CERTIFICATE_KEY)
             if certificate_count < 1:
                 missing.append("ASCENSION_CERTIFICATE_MISSING")
             if str(row["endgame_status"] or "none") == ASCENSION_READY_STATUS:

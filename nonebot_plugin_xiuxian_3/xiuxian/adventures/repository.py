@@ -175,7 +175,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import grant_player_assets
+from ..utils.assets import grant_player_assets, inventory_amount
 from ..utils.player import change_player_state, player_integer, player_inventory
 
 
@@ -312,7 +312,7 @@ class AdventuresRepositoryMixin:
             inventory = player_inventory(row)
             item_key = str(condition.get("item_key", ""))
             quantity = int(condition.get("quantity", 1))
-            return bool(item_key) and int(inventory.get(item_key, 0)) >= quantity
+            return bool(item_key) and inventory_amount(inventory, item_key) >= quantity
         if condition_type == "permit":
             player_id = int(row["id"] if isinstance(row, sqlite3.Row) else row.get("id", 0))
             return bool(
@@ -328,7 +328,7 @@ class AdventuresRepositoryMixin:
         snapshot = SQLitePlayerRepository._json_object(offer["snapshot_json"], {})
         if definition.target_kind == "inventory_gain":
             inventory = player_inventory(row)
-            current = int(inventory.get(str(definition.target_key), 0))
+            current = inventory_amount(inventory, str(definition.target_key))
             baseline = int(snapshot.get("baseline_quantity", 0))
             return max(0, min(definition.target_amount, current - baseline))
         if definition.target_kind == "production_completed":
@@ -499,7 +499,7 @@ class AdventuresRepositoryMixin:
                 "reputation_key": definition.reputation_key,
                 "required_intro_flag": definition.required_intro_flag,
                 "consume_target": definition.consume_target,
-                "baseline_quantity": int(inventory.get(str(definition.target_key), 0)) if definition.target_key else 0,
+                "baseline_quantity": inventory_amount(inventory, str(definition.target_key)) if definition.target_key else 0,
                 "baseline_completed_orders": int(completed_orders["count"]),
                 "baseline_exploration_battle_wins": int(battle_wins["count"]),
                 "baseline_dispatch_assignment_ids": baseline_dispatch_ids,
@@ -627,7 +627,7 @@ class AdventuresRepositoryMixin:
             consumed_target: tuple[str, int] | None = None
             if definition.consume_target and definition.target_key:
                 inventory = player_inventory(row)
-                quantity = int(inventory.get(definition.target_key, 0))
+                quantity = inventory_amount(inventory, definition.target_key)
                 if quantity < definition.target_amount:
                     raise BountyIncompleteError("delivery inventory is insufficient")
                 consumed_target = (definition.target_key, definition.target_amount)

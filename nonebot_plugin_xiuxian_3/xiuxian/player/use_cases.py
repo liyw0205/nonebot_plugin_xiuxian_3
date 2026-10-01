@@ -274,34 +274,35 @@ class PlayerApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         if player is None:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送“开始修仙”。", context.request_id)
+        values = player_profile_values(player)
         soul_summary = (
-            f"- **神魂**：{player.soul_power}/{player.soul_power_max}\n"
-            f"- **领域能量**：{player.domain_charge}/{player.domain_charge_max}\n"
-            f"- **污染**：{player.pollution}\n"
-            if player.realm_key in {"nascent_soul", "soul_transformation", "void_refining"}
+            f"- **神魂**：{values['soul_power']}/{values['soul_power_max']}\n"
+            f"- **领域能量**：{values['domain_charge']}/{values['domain_charge_max']}\n"
+            f"- **污染**：{values['pollution']}\n"
+            if values["realm_key"] in {"nascent_soul", "soul_transformation", "void_refining"}
             else ""
         )
         domain_summary = (
-            f"- **领域**：{player.domain_key or '未选择'}\n"
-            f"- **领域力量**：{player.domain_power}\n"
-            f"- **领域抵抗**：{player.realm_resistance_bp} bp\n"
-            f"- **领域裂痕**：{player.domain_crack_until.isoformat() if player.domain_crack_until else '无'}\n"
-            if player.realm_key in {"soul_transformation", "void_refining"}
+            f"- **领域**：{values['domain_key'] or '未选择'}\n"
+            f"- **领域力量**：{values['domain_power']}\n"
+            f"- **领域抵抗**：{values['realm_resistance_bp']} bp\n"
+            f"- **领域裂痕**：{values['domain_crack_until'] or '无'}\n"
+            if values["realm_key"] in {"soul_transformation", "void_refining"}
             else ""
         )
         void_summary = (
-            f"- **虚力**：{player.void_power}/{player.void_power_max}\n"
-            f"- **空间抗性**：{player.space_resistance_bp} bp\n"
-            f"- **虚空航道发现**：{player.void_route_count}\n"
-            f"- **虚空不稳定**：{player.void_instability_until.isoformat() if player.void_instability_until else '无'}\n"
-            if player.realm_key == "void_refining" else ""
+            f"- **虚力**：{values['void_power']}/{values['void_power_max']}\n"
+            f"- **空间抗性**：{values['space_resistance_bp']} bp\n"
+            f"- **虚空航道发现**：{values['void_route_count']}\n"
+            f"- **虚空不稳定**：{values['void_instability_until'] or '无'}\n"
+            if values["realm_key"] == "void_refining" else ""
         )
         endgame_summary = (
-            f"- **道果进度**：{player.dao_fruit_progress}\n"
-            f"- **道源功勋**：{player.ascension_merit}\n"
-            f"- **天劫债**：{player.tribulation_debt}\n"
-            f"- **道果**：{player.dao_fruit_key or '未锁定'}\n"
-            if player.realm_key in {"dao_union", "tribulation"} or player.endgame_status != "none"
+            f"- **道果进度**：{values['dao_fruit_progress']}\n"
+            f"- **道源功勋**：{values['ascension_merit']}\n"
+            f"- **天劫债**：{values['tribulation_debt']}\n"
+            f"- **道果**：{values['dao_fruit_key'] or '未锁定'}\n"
+            if values["realm_key"] in {"dao_union", "tribulation"} or values["endgame_status"] != "none"
             else ""
         )
         return CommandResult(
@@ -310,27 +311,27 @@ class PlayerApplication:
             message=(
                 "## 我的修仙信息\n\n"
                 f"- **道号**：{self._display_name(player)}\n"
-                f"- **阶段**：{self._stage_text(player.stage)}\n"
-                f"- **状态**：{self._status_text(player.status)}\n"
-                f"- **位置**：{self._location_text(player.location_key)}\n"
-                f"- **境界**：{self._realm_text(player.realm_key, player.realm_layer, content=self.content)}\n"
-                f"- **灵石**：{player.spirit_stones}\n"
-                f"- **体力**：{player.stamina}/{player.stamina_max}\n"
-                f"- **精力**：{player.energy}/{player.energy_max}\n"
-                f"- **道途**：{self._path_text(player.path_key, player.subprofession_key)}\n"
-                f"- **境内修为**：{player.cultivation}\n"
-                f"- **总修为**：{player.total_cultivation}\n"
-                f"- **道基质量**：{player.foundation_quality}\n"
-                f"- **世界功勋**：{player.world_merit}\n"
-                f"- **虚空功勋**：{player.void_merit}\n"
-                f"- **联盟积分**：{player.alliance_points}\n"
+                f"- **阶段**：{self._stage_text(values['stage'])}\n"
+                f"- **状态**：{self._status_text(values['status'])}\n"
+                f"- **位置**：{self._location_text(values['location_key'])}\n"
+                f"- **境界**：{self._realm_text(values['realm_key'], values['realm_layer'], content=self.content)}\n"
+                f"- **灵石**：{values['spirit_stones']}\n"
+                f"- **体力**：{values['stamina']}/{values['stamina_max']}\n"
+                f"- **精力**：{values['energy']}/{values['energy_max']}\n"
+                f"- **道途**：{self._path_text(values['path_key'], values['subprofession_key'])}\n"
+                f"- **境内修为**：{values['cultivation']}\n"
+                f"- **总修为**：{values['total_cultivation']}\n"
+                f"- **道基质量**：{values['foundation_quality']}\n"
+                f"- **世界功勋**：{values['world_merit']}\n"
+                f"- **虚空功勋**：{values['void_merit']}\n"
+                f"- **联盟积分**：{values['alliance_points']}\n"
                 f"{soul_summary}"
                 f"{domain_summary}"
                 f"{void_summary}"
                 f"{endgame_summary}"
                 "\n### 六项资质\n\n"
-                f"{self._qualification_text(player.qualification)}"
-                f"\n\n### 凡人引导\n\n- **进度**：{len(set(player.intro_flags))}/3"
+                f"{self._qualification_text(values['qualification'])}"
+                f"\n\n### 凡人引导\n\n- **进度**：{len(set(values['intro_flags']))}/3"
             ),
             request_id=context.request_id,
             data=player_profile_values(player),

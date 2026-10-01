@@ -29,6 +29,7 @@ from ..persistence.errors import (
 from ..utils.assets import (
     change_player_assets,
     grant_player_assets,
+    inventory_amount,
     inventory_spend,
     spend_player_assets,
     player_currency,
@@ -312,7 +313,7 @@ class EconomyRepositoryMixin:
             inventory = player_inventory(player)
             market_locked = self._market_locked_quantity(connection, int(player["id"]), item.key)
             bound_quantity, _ = active_binding_totals(connection, int(player["id"]), item.key, now_text)
-            unbound_inventory = int(inventory.get(item.key, 0)) - market_locked
+            unbound_inventory = inventory_amount(inventory, item.key) - market_locked
             available = unbound_inventory - bound_quantity
             if unbound_inventory < quantity:
                 raise MarketItemLockedError("not enough unlocked inventory")
@@ -422,7 +423,7 @@ class EconomyRepositoryMixin:
                 raise PlayerNotFoundError("seller does not exist")
             seller_inventory = player_inventory(seller)
             buyer_inventory = player_inventory(buyer)
-            if int(seller_inventory.get(order["item_key"], 0)) < quantity:
+            if inventory_amount(seller_inventory, order["item_key"]) < quantity:
                 raise MarketItemLockedError("seller inventory no longer contains locked item")
             capacity = int(buyer["carry_capacity"] or 0)
             if capacity > 0 and sum(int(value) for value in buyer_inventory.values()) + quantity > capacity:
@@ -474,13 +475,13 @@ class EconomyRepositoryMixin:
             )
             self._market_ledger(
                 connection, operation_id, int(seller["id"]), "item", str(order["item_key"]),
-                "market.sale", "debit", quantity, int(seller_inventory.get(order["item_key"], 0)) + quantity,
-                int(seller_inventory.get(order["item_key"], 0)), order_id, now_text,
+                "market.sale", "debit", quantity, inventory_amount(seller_inventory, order["item_key"]) + quantity,
+                inventory_amount(seller_inventory, order["item_key"]), order_id, now_text,
             )
             self._market_ledger(
                 connection, operation_id, int(buyer["id"]), "item", str(order["item_key"]),
-                "market.purchase", "credit", quantity, int(buyer_inventory.get(order["item_key"], 0)),
-                int(buyer_inventory.get(order["item_key"], 0)) + quantity, order_id, now_text,
+                "market.purchase", "credit", quantity, inventory_amount(buyer_inventory, order["item_key"]),
+                inventory_amount(buyer_inventory, order["item_key"]) + quantity, order_id, now_text,
             )
             if not new_remaining:
                 self._market_ledger(
@@ -771,9 +772,9 @@ class EconomyRepositoryMixin:
             publisher_inputs = dict(recipe.inputs) if mode == "publisher_supplies" else {}
             if publisher_inputs:
                 missing = {
-                    key: quantity - int(inventory.get(key, 0))
+                    key: quantity - inventory_amount(inventory, key)
                     for key, quantity in publisher_inputs.items()
-                    if int(inventory.get(key, 0)) < quantity
+                    if inventory_amount(inventory, key) < quantity
                 }
                 if missing:
                     raise CommissionRequirementError("publisher materials are insufficient")
@@ -845,8 +846,8 @@ class EconomyRepositoryMixin:
                     "commission.material_lock",
                     "lock",
                     quantity,
-                    int(inventory.get(key, 0)) + quantity,
-                    int(inventory.get(key, 0)),
+                    inventory_amount(inventory, key) + quantity,
+                    inventory_amount(inventory, key),
                     commission_id,
                     now_text,
                 )
@@ -934,7 +935,7 @@ class EconomyRepositoryMixin:
             producer_inputs = dict(recipe.inputs) if mode == "producer_supplies" else {}
             if producer_inputs:
                 for key, quantity in producer_inputs.items():
-                    available = int(inventory.get(key, 0)) - self._commission_locked_quantity(
+                    available = inventory_amount(inventory, key) - self._commission_locked_quantity(
                         connection, int(producer["id"]), "item", key
                     )
                     if available < quantity:
@@ -947,7 +948,7 @@ class EconomyRepositoryMixin:
             tool_before = None
             tool_after = None
             if recipe.tool_key:
-                if int(inventory.get(recipe.tool_key, 0)) < 1:
+                if inventory_amount(inventory, recipe.tool_key) < 1:
                     raise CommissionRequirementError("producer tool is missing")
                 tool_before = int(durability.get(recipe.tool_key, TOOL_MAX_DURABILITY_BP))
                 if tool_before < recipe.tool_cost_bp:
@@ -1035,8 +1036,8 @@ class EconomyRepositoryMixin:
                     "commission.material_lock",
                     "lock",
                     quantity,
-                    int(inventory.get(key, 0)) + quantity,
-                    int(inventory.get(key, 0)),
+                    inventory_amount(inventory, key) + quantity,
+                    inventory_amount(inventory, key),
                     commission_id,
                     now_text,
                 )
@@ -1219,8 +1220,8 @@ class EconomyRepositoryMixin:
                     "commission.settlement",
                     "credit",
                     int(quantity),
-                    int(publisher_inventory.get(key, 0)),
-                    int(publisher_inventory.get(key, 0)) + int(quantity),
+                    inventory_amount(publisher_inventory, key),
+                    inventory_amount(publisher_inventory, key) + int(quantity),
                     commission_id,
                     now_text,
                 )
@@ -1401,7 +1402,7 @@ class EconomyRepositoryMixin:
             key = str(lock["asset_key"])
             if kind == "item":
                 inventory = player_inventory(player)
-                before = int(inventory.get(key, 0))
+                before = inventory_amount(inventory, key)
                 grant_player_assets(connection, player, {key: quantity}, now_text)
                 self._commission_ledger(
                     connection, operation_id, int(player["id"]), "item", key,
@@ -1451,7 +1452,7 @@ class EconomyRepositoryMixin:
         if player is None:
             return
         for key, quantity in refunds.items():
-            before = player_inventory(player).get(key, 0)
+            before = inventory_amount(player_inventory(player), key)
             self._commission_ledger(
                 connection, operation_id, player_id, "item", key,
                 "commission.failure_material_refund", "credit", int(quantity), before, before + int(quantity),

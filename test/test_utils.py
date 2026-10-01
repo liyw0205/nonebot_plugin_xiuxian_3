@@ -32,6 +32,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     player_asset_amount,
     player_asset_amounts,
     player_assets_missing,
+    player_has_assets,
     player_currency,
     player_item_amount,
     spend_player_assets,
@@ -62,6 +63,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_numeric_values,
     player_resource_values,
     player_resource,
+    player_has_values,
+    player_values_missing,
     player_realm_values,
     player_profile_values,
     player_status_values,
@@ -193,6 +196,23 @@ def test_player_asset_reads_allow_partial_currency_rows_and_preserve_zero_items(
     assert player_item_amount({"spirit_stones": 42, "inventory_json": '{"item.herb": 2}'}, "item.herb") == 2
     with pytest.raises(AssetDeltaError, match="item key cannot address currency"):
         player_item_amount({"spirit_stones": 42, "inventory_json": "{}"}, "spirit_stones")
+
+
+def test_player_requirement_helpers_share_asset_and_numeric_reading() -> None:
+    row = {
+        "spirit_stones": 80,
+        "inventory_json": '{"item.herb": 2}',
+        "stamina": 4,
+    }
+    assert player_has_assets(row, {"spirit_stones": 80, "item.herb": 2})
+    assert not player_has_assets(row, {"spirit_stones": 81})
+    assert player_values_missing(row, {"stamina": 6, "energy": 1}) == {
+        "stamina": 2,
+        "energy": 1,
+    }
+    assert player_has_values(row, {"stamina": 4})
+    with pytest.raises(ValueError, match="must be non-negative"):
+        player_values_missing(row, {"stamina": -1})
 
 
 def test_asset_state_applies_currency_and_items_together() -> None:

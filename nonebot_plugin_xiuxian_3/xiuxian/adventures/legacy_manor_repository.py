@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.assets import inventory_amount
 from ..utils.player import change_player_state, player_integer, player_inventory
 from ..persistence.errors import (
     LegacyManorBusyError,
@@ -176,7 +177,7 @@ class LegacyManorRepositoryMixin:
             if definition.permission not in flags:
                 raise LegacyManorRequirementError("the legacy-manor permission is missing")
             inventory = player_inventory(player)
-            if int(inventory.get(definition.clue, 0)) < 1:
+            if inventory_amount(inventory, definition.clue) < 1:
                 raise LegacyManorRequirementError("the required clue is missing")
             if definition.story_flag in flags:
                 raise LegacyManorQuotaError("the legacy manor has already been cleared")

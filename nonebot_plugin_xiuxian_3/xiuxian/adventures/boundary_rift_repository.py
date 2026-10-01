@@ -23,7 +23,7 @@ from ..persistence.errors import (
 )
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_BOUNDARY
 from ..specials.codex_projection import record_codex_discovery
-from ..utils.assets import grant_player_assets, spend_player_items
+from ..utils.assets import grant_player_assets, inventory_amount, spend_player_items
 from ..utils.player import change_player_state, player_integer, player_inventory, player_resource
 from .boundary_rift_models import BoundaryRiftRunRecord
 from .boundary_rift_rules import (
@@ -195,7 +195,7 @@ class BoundaryRiftRepositoryMixin:
                     }
                 )
             leader_inventory = player_inventory(leader)
-            if int(leader_inventory.get(BOUNDARY_RIFT_TICKET, 0)) < BOUNDARY_RIFT_TICKET_COST:
+            if inventory_amount(leader_inventory, BOUNDARY_RIFT_TICKET) < BOUNDARY_RIFT_TICKET_COST:
                 raise BoundaryRiftRequirementError("the party leader lacks one soul crystal")
             run_id = f"boundary-rift-{uuid4().hex}"
             expires_at = serialize_datetime(now + timedelta(seconds=BOUNDARY_RIFT_EXPIRY_SECONDS))

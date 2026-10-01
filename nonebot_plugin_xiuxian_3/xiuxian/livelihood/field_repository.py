@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import grant_player_assets
+from ..utils.assets import grant_player_assets, inventory_amount
 from ..utils.player import change_player_state, player_inventory, player_resource
 from ..persistence.errors import (
     CropContentClosedError,
@@ -86,7 +86,7 @@ class FieldPlotRepositoryMixin:
             if used is not None and int(used["count"]) >= crop.daily_limit:
                 raise CropDailyLimitError("crop daily limit reached")
             inventory = player_inventory(row)
-            if int(inventory.get(crop.seed_key, 0)) < 1:
+            if inventory_amount(inventory, crop.seed_key) < 1:
                 raise ResourceInsufficientError("seed is insufficient")
             if player_resource(row, "energy") < crop.maintenance_energy:
                 raise ResourceInsufficientError("energy is insufficient")

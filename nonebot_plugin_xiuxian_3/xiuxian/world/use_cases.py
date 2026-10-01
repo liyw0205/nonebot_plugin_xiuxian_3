@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..utils.assets import inventory_amount
 from ..repository import (
     CurrencyInsufficientError,
     LocationRequirementError,
@@ -548,7 +549,7 @@ class WorldApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         reward = "、".join(f"{key} ×{value}" for key, value in record.reward.items()) or "无"
         storm = "遭遇虚空风暴，额外损失锚 %d" % record.extra_anchor_lost if record.storm else "航行平稳"
-        return CommandResult(True, "VOID_ROUTE_SETTLED", f"## 虚空航道已结算\n\n- **收获**：{reward}\n- **航况**：{storm}\n- **虚空锚**：{record.player.inventory.get('item.void_anchor', 0)}\n\n> 航道快照和随机结果已固定，重复结算不会重复发放。", context.request_id, operation_id, data={"session_id": record.session_id, "route_key": record.route_key, "reward": record.reward, "storm": record.storm, "extra_anchor_lost": record.extra_anchor_lost, "idempotent_replay": record.already_completed})
+        return CommandResult(True, "VOID_ROUTE_SETTLED", f"## 虚空航道已结算\n\n- **收获**：{reward}\n- **航况**：{storm}\n- **虚空锚**：{inventory_amount(record.player.inventory, 'item.void_anchor')}\n\n> 航道快照和随机结果已固定，重复结算不会重复发放。", context.request_id, operation_id, data={"session_id": record.session_id, "route_key": record.route_key, "reward": record.reward, "storm": record.storm, "extra_anchor_lost": record.extra_anchor_lost, "idempotent_replay": record.already_completed})
 
 
 __all__ = ["WorldApplication"]

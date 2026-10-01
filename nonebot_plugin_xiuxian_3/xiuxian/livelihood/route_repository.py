@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import add_player_currency, spend_player_items
+from ..utils.assets import add_player_currency, inventory_amount, spend_player_items
 from ..utils.player import player_integer, player_inventory
 from ..utils.json import json_object
 from ..persistence.errors import (
@@ -93,7 +93,7 @@ class RouteRepositoryMixin:
                 missing.append("青石镇")
             if player_integer(player, "stamina") < (mount_stamina_cost or definition.stamina_cost):
                 missing.append("体力")
-            if int(inventory.get(cargo_key, 0)) < cargo_quantity:
+            if inventory_amount(inventory, cargo_key) < cargo_quantity:
                 missing.append("货物")
             used = connection.execute(
                 "SELECT COUNT(*) AS count FROM livelihood_trade_routes WHERE player_id = ? AND business_date = ?",
@@ -204,7 +204,7 @@ class RouteRepositoryMixin:
                 raise RouteQuotaError("route daily limit reached")
             self._check_route_busy(connection, int(player["id"]))
             inventory = player_inventory(player)
-            if int(inventory.get(cargo_key, 0)) < cargo_quantity:
+            if inventory_amount(inventory, cargo_key) < cargo_quantity:
                 raise RouteCargoRequirementError("cargo is insufficient")
             effects = self._public_project_effects(connection, now)
             delay_chance_bp = max(

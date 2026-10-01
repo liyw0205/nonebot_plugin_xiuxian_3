@@ -194,6 +194,38 @@ def player_resource(row: Mapping[str, Any] | Any, key: str, default: int = 0) ->
     return player_integer(row, key, default)
 
 
+def player_values_missing(
+    row: Mapping[str, Any] | Any,
+    requirements: Mapping[str, Any],
+) -> dict[str, int]:
+    """Return the positive shortfall for required player numeric values."""
+
+    missing: dict[str, int] = {}
+    for raw_key, raw_required in requirements.items():
+        key = str(raw_key)
+        if isinstance(raw_required, bool):
+            raise ValueError(f"player requirement for {key!r} must be an integer")
+        try:
+            required = int(raw_required)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"player requirement for {key!r} must be an integer") from exc
+        if required < 0:
+            raise ValueError(f"player requirement for {key!r} must be non-negative")
+        shortfall = required - player_integer(row, key)
+        if shortfall > 0:
+            missing[key] = shortfall
+    return missing
+
+
+def player_has_values(
+    row: Mapping[str, Any] | Any,
+    requirements: Mapping[str, Any],
+) -> bool:
+    """Return whether all required player numeric values are available."""
+
+    return not player_values_missing(row, requirements)
+
+
 def player_numeric_delta(
     row: Mapping[str, Any] | Any,
     delta: Mapping[str, Any],
@@ -526,6 +558,8 @@ __all__ = [
     "player_database_id",
     "player_integer",
     "player_numeric_delta",
+    "player_values_missing",
+    "player_has_values",
     "change_player_values",
     "change_player_state",
     "player_numeric_values",

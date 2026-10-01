@@ -13,7 +13,8 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.player import change_player_state, player_inventory, player_resource
+from ..utils.assets import inventory_amount
+from ..utils.player import change_player_state, player_has_values, player_inventory, player_resource
 from .void_models import VoidRouteSettlementRecord, VoidRouteStartRecord
 from .void_rules import (
     VOID_INSTABILITY_SECONDS,
@@ -136,7 +137,7 @@ class WorldRepositoryMixin:
             if self._has_active_long_action(connection, int(row["id"])):
                 raise VoidTravelBusyError("another long action is active")
             inventory = player_inventory(row)
-            available_anchor = int(inventory.get("item.void_anchor", 0))
+            available_anchor = inventory_amount(inventory, "item.void_anchor")
             anchor_cost = navigation_anchor_cost(definition.anchor_cost, int(row["space_resistance_bp"]), unstable)
             beacon_discount = 0
             if route_key == "void.sect_fortress":
@@ -144,7 +145,7 @@ class WorldRepositoryMixin:
                 anchor_cost = max(1, anchor_cost - beacon_discount)
             if available_anchor < anchor_cost:
                 raise VoidAnchorInsufficientError("void anchors are insufficient")
-            if player_resource(row, "stamina") < definition.stamina_cost:
+            if not player_has_values(row, {"stamina": definition.stamina_cost}):
                 raise ResourceInsufficientError("stamina is insufficient")
             try:
                 change_player_state(
@@ -258,7 +259,7 @@ class WorldRepositoryMixin:
             inventory = player_inventory(row)
             extra_anchor_lost = 0
             if storm:
-                extra_anchor_lost = min(1, int(inventory.get("item.void_anchor", 0)))
+                extra_anchor_lost = min(1, inventory_amount(inventory, "item.void_anchor"))
             reward = {"item.void_crystal": 1}
             instability_until = (
                 serialize_datetime(now + timedelta(seconds=VOID_INSTABILITY_SECONDS))

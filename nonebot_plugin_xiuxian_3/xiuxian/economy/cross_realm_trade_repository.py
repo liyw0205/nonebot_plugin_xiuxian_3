@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, inventory_with_delta, player_currency
+from ..utils.assets import change_player_assets, inventory_amount, inventory_with_delta, player_currency
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     CrossRealmTradeCurrencyInsufficientError,
@@ -95,17 +95,17 @@ class CrossRealmTradeRepositoryMixin:
 
             inventory = player_inventory(player)
             for item_key, quantity in definition.input_items.items():
-                if int(inventory.get(item_key, 0)) < quantity:
+                if inventory_amount(inventory, item_key) < quantity:
                     raise CrossRealmTradeInputInsufficientError(f"missing trade input: {item_key}")
             if player_currency(player) < definition.currency_cost:
                 raise CrossRealmTradeCurrencyInsufficientError("trade currency is insufficient")
 
-            input_before = {key: int(inventory.get(key, 0)) for key in definition.input_items}
+            input_before = {key: inventory_amount(inventory, key) for key in definition.input_items}
             inventory_after_inputs = inventory_with_delta(
                 inventory,
                 {key: -int(quantity) for key, quantity in definition.input_items.items()},
             )
-            output_before = {key: int(inventory_after_inputs.get(key, 0)) for key in definition.output_items}
+            output_before = {key: inventory_amount(inventory_after_inputs, key) for key in definition.output_items}
             binding_expires_at = serialize_datetime(now + timedelta(seconds=definition.binding_seconds))
             trade_id = f"trade-{uuid4().hex}"
             snapshot = {

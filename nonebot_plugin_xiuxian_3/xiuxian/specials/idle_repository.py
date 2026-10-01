@@ -35,6 +35,7 @@ from .idle_rules import (
     resolve_route,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
+from ..utils.assets import inventory_amount
 from ..utils.player import change_player_state, player_integer, player_inventory
 
 
@@ -506,7 +507,7 @@ class IdleRepositoryMixin:
             return None
         candidates = (requested,) if requested else definition.required_tool_keys
         for key in candidates:
-            if int(inventory.get(key, 0)) > 0:
+            if inventory_amount(inventory, key) > 0:
                 raw_durability = json.loads(player["durability_json"]) if isinstance(player["durability_json"], str) else player["durability_json"]
                 durability_map = dict(raw_durability) if isinstance(raw_durability, dict) else {}
                 durability = durability_map.get(key, 10000)

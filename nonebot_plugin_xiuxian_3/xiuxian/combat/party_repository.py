@@ -82,7 +82,7 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_INTERVAL,
 )
 from ..utils.player import change_player_state, player_combat_values, player_integer, player_intro_flags, player_object, player_reputation
-from ..utils.assets import inventory_spend, spend_player_assets
+from ..utils.assets import inventory_amount, inventory_spend, spend_player_assets
 
 
 class PartyCombatRepositoryMixin:
@@ -521,7 +521,7 @@ class PartyCombatRepositoryMixin:
             if boundary_party:
                 if str(party["location_key"]) != BOUNDARY_REALM_LOCATION:
                     raise BoundaryRealmRequirementError("boundary party must use cave.boundary_realm")
-                if leader_ticket_inventory is None or int(leader_ticket_inventory.get(BOUNDARY_REALM_TICKET, 0)) < BOUNDARY_REALM_TICKET_COST:
+                if leader_ticket_inventory is None or inventory_amount(leader_ticket_inventory, BOUNDARY_REALM_TICKET) < BOUNDARY_REALM_TICKET_COST:
                     raise BoundaryRealmResourceError("boundary-realm ticket is insufficient")
                 leader_ticket_inventory = inventory_spend(
                     leader_ticket_inventory, {BOUNDARY_REALM_TICKET: BOUNDARY_REALM_TICKET_COST}

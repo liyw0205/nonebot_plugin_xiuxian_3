@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 
+from ..utils.assets import inventory_amount
 from .models import ExplorationDefinition
 
 
@@ -227,7 +228,7 @@ def has_cloud_mine_access(*, subprofession_key: str | None, inventory: dict[str,
         return True
     if CLOUD_MINE_ACCESS_FLAGS & {str(flag) for flag in intro_flags}:
         return True
-    return any(int(inventory.get(key, 0)) > 0 for key in CLOUD_MINE_ACCESS_ITEMS)
+    return any(inventory_amount(inventory, key) > 0 for key in CLOUD_MINE_ACCESS_ITEMS)
 
 
 def realm_rank(realm_key: str) -> int:

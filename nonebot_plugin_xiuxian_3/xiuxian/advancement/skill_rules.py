@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
+from ..utils.assets import inventory_amount
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,7 +279,7 @@ def available_skill_keys(
         and (
             definition.acquisition_item_key is None
             or definition.key in mastered_keys
-            or int((inventory or {}).get(definition.acquisition_item_key, 0)) > 0
+            or inventory_amount(inventory or {}, definition.acquisition_item_key) > 0
         )
         and (
             definition.min_realm_key is None

@@ -23,7 +23,7 @@ from ..persistence.errors import (
 )
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_VOID_RUINS
 from ..specials.codex_projection import record_codex_discovery
-from ..utils.assets import grant_player_assets, spend_player_items
+from ..utils.assets import grant_player_assets, inventory_amount, spend_player_items
 from ..utils.player import (
     change_player_state,
     player_combat_values,
@@ -205,7 +205,7 @@ class VoidRuinsRepositoryMixin:
                 ).fetchone()[0]) >= VOID_RUINS_WEEKLY_LIMIT:
                     raise VoidRuinsQuotaError("a member already used this UTC week")
                 inventory = player_inventory(row)
-                if int(inventory.get("item.void_anchor", 0)) < VOID_RUINS_ANCHOR_LOCK:
+                if inventory_amount(inventory, "item.void_anchor") < VOID_RUINS_ANCHOR_LOCK:
                     raise VoidRuinsRequirementError("a member lacks a void anchor to lock")
                 inventories[player_id] = inventory
                 unstable_until = row["void_instability_until"]

@@ -46,7 +46,7 @@ from .endgame_rules import (
     FINAL_BATTLE_MIN_PROGRESS,
     TRIAL_ORDER,
 )
-from ..utils.assets import grant_player_items, spend_player_items
+from ..utils.assets import grant_player_items, inventory_amount, spend_player_items
 from ..utils.player import (
     change_player_state,
     change_player_values,
@@ -214,7 +214,7 @@ class FinalBattleRepositoryMixin:
             if self._has_active_long_action(connection, int(player["id"])):
                 raise FinalBattleBusyError("initiator has another active action")
             inventory = player_inventory(player)
-            if int(inventory.get(ASCENSION_CERTIFICATE_KEY, 0)) < 1:
+            if inventory_amount(inventory, ASCENSION_CERTIFICATE_KEY) < 1:
                 raise FinalBattleRequirementError("ascension certificate is missing")
 
             battle_id = f"final-battle-{uuid4().hex}"
@@ -715,7 +715,7 @@ class FinalBattleRepositoryMixin:
         if int(player["dao_fruit_progress"]) < FINAL_BATTLE_MIN_PROGRESS or int(player["ascension_merit"]) < FINAL_BATTLE_MIN_MERIT or int(player["tribulation_debt"]) >= 100:
             raise FinalBattleRequirementError("final battle progression requirements are not met")
         inventory = player_inventory(player)
-        if int(inventory.get(ASCENSION_CERTIFICATE_KEY, 0)) < 1:
+        if inventory_amount(inventory, ASCENSION_CERTIFICATE_KEY) < 1:
             raise FinalBattleRequirementError("ascension certificate is missing")
         prior = connection.execute("SELECT cooldown_until FROM final_battle_sessions WHERE initiator_id=? AND cooldown_until IS NOT NULL ORDER BY id DESC LIMIT 1", (player["id"],)).fetchone()
         if prior is not None and str(prior["cooldown_until"]) > now_text:

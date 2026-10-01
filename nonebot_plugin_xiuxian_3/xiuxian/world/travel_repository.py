@@ -166,7 +166,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import player_currency
+from ..utils.assets import inventory_amount, player_currency
 from ..utils.player import change_player_state, player_inventory, player_resource
 
 
@@ -224,7 +224,7 @@ class TravelRepositoryMixin:
         if player.location_key in definition.pass_exempt_source_locations:
             pass_key = None
             pass_quantity = 0
-        if pass_key and player.inventory.get(pass_key, 0) < pass_quantity:
+        if pass_key and inventory_amount(player.inventory, pass_key) < pass_quantity:
             missing.append("通行物品")
         endgame_status = player.endgame_status or "none"
         if definition.required_endgame_status:
@@ -448,7 +448,7 @@ class TravelRepositoryMixin:
                 raise ResourceInsufficientError("stamina is insufficient")
             if stones < definition.currency_cost:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
-            if pass_key and inventory.get(pass_key, 0) < pass_quantity:
+            if pass_key and inventory_amount(inventory, pass_key) < pass_quantity:
                 raise LocationRequirementError("travel pass is missing")
             if definition.daily_start_limit and self._count_destination_starts_today_in(
                 connection, player_id=player_id, destination=destination, now=now
@@ -581,7 +581,7 @@ class TravelRepositoryMixin:
             inventory = player_inventory(row)
             pass_consumed = False
             if consume_pass_on_arrival and pass_key and pass_quantity:
-                available = int(inventory.get(pass_key, 0))
+                available = inventory_amount(inventory, pass_key)
                 if available < pass_quantity:
                     raise LocationRequirementError("travel pass is missing at arrival")
                 remaining = available - pass_quantity

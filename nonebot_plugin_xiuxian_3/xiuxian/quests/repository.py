@@ -8,7 +8,7 @@ import sqlite3
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, grant_player_items, spend_player_items
+from ..utils.assets import change_player_assets, grant_player_items, inventory_amount, spend_player_items
 from ..utils.player import player_inventory
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
@@ -308,7 +308,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             if self._event_count(connection, int(player["id"]), VOID_QUEST, VOID_WALL_TRIAL) < VOID_TRIAL_TARGET:
                 raise QuestNotCompletedError("three wall trials are required")
             inventory = player_inventory(player)
-            if int(inventory.get("item.void_archive", 0)) < 1:
+            if inventory_amount(inventory, "item.void_archive") < 1:
                 raise QuestResourceInsufficientError("void archive is missing")
             spend_player_items(connection, player, {"item.void_archive": 1}, now_text)
             self._insert_quest_event(
@@ -488,7 +488,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                     material_cost[key] = int(material_cost.get(key, 0)) + int(amount)
             if material_cost:
                 inventory = player_inventory(player)
-                missing = [key for key, amount in material_cost.items() if int(inventory.get(key, 0)) < amount]
+                missing = [key for key, amount in material_cost.items() if inventory_amount(inventory, key) < amount]
                 if missing:
                     raise QuestResourceInsufficientError("quest material is missing")
             count += 1

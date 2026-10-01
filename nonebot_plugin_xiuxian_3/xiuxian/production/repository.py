@@ -40,7 +40,7 @@ from ..production.models import (
 )
 from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
 from ..utils.equipment import create_equipment_instances
-from ..utils.assets import grant_player_assets, player_assets_missing
+from ..utils.assets import grant_player_assets, inventory_amount, player_assets_missing
 from ..utils.player import change_player_state, player_inventory, player_resource
 from ..progression.breakthrough.models import (
     BreakthroughSettlementRecord,
@@ -385,7 +385,7 @@ class ProductionRepositoryMixin:
             durability = self._json_object(row["durability_json"], {})
             tool_durability_before: int | None = None
             if recipe.tool_key:
-                if int(inventory.get(recipe.tool_key, 0)) < 1:
+                if inventory_amount(inventory, recipe.tool_key) < 1:
                     raise ToolMissingError("production tool is missing")
                 tool_durability_before = int(durability.get(recipe.tool_key, TOOL_MAX_DURABILITY_BP))
                 if tool_durability_before < recipe.tool_cost_bp:

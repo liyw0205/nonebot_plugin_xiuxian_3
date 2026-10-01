@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from ....contracts import CommandContext, CommandResult
+from ...utils.assets import inventory_amount
 from ...repository import (
     BreakthroughBusyError,
     BreakthroughNotFoundError,
@@ -156,7 +157,7 @@ class BreakthroughApplication:
         )
         support = (
             definition.support_bonus_bp
-            if definition.support_bonus_bp and definition.support_key and player.inventory.get(definition.support_key, 0) > 0
+            if definition.support_bonus_bp and definition.support_key and inventory_amount(player.inventory, definition.support_key) > 0
             else 0
         )
         if definition.target_realm == "nascent_soul":
@@ -203,8 +204,8 @@ class BreakthroughApplication:
             player = None
         if player is None:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
-        missing = [ITEM_LABELS.get(key, "突破材料") for key, amount in definition.materials.items() if player.inventory.get(key, 0) < amount]
-        if target == "nascent_soul" and max(player.inventory.get("item.demon_core", 0), player.inventory.get("item.beast_blood", 0)) < 2:
+        missing = [ITEM_LABELS.get(key, "突破材料") for key, amount in definition.materials.items() if inventory_amount(player.inventory, key) < amount]
+        if target == "nascent_soul" and max(inventory_amount(player.inventory, "item.demon_core"), inventory_amount(player.inventory, "item.beast_blood")) < 2:
             missing.append("魔核或兽血 ×2")
         preparation_bp = self._preparation_bp(player, definition)
         soul_prepare_bp = reputation_prepare_bp = quest_prepare_bp = 0

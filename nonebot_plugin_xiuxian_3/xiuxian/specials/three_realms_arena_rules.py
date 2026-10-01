@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from ..utils.assets import inventory_amount
 from ..utils.player import (
     player_field,
     player_integer,
@@ -64,7 +65,7 @@ def player_faction(player: Mapping[str, Any]) -> str:
 
 def has_three_realms_permit(player: Mapping[str, Any]) -> bool:
     inventory = player_inventory(player)
-    return inventory.get(THREE_REALMS_ARENA_PERMIT_KEY, 0) > 0
+    return inventory_amount(inventory, THREE_REALMS_ARENA_PERMIT_KEY) > 0
 
 
 def meets_three_realms_gate(player: Mapping[str, Any]) -> bool:

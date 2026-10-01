@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import spend_player_items
+from ..utils.assets import inventory_amount, spend_player_items
 from ..utils.player import player_inventory
 from .models import ItemUseRecord
 from .rules import (
@@ -120,7 +120,7 @@ class ItemRepositoryMixin:
 
             row = self._require_player(connection, platform, platform_user_id)
             inventory = player_inventory(row)
-            if int(inventory.get(definition.key, 0)) < 1:
+            if inventory_amount(inventory, definition.key) < 1:
                 raise ItemInsufficientError("item is missing")
 
             effect: dict[str, object]

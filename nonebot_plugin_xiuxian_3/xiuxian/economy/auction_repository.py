@@ -20,7 +20,7 @@ from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
 )
-from ..utils.assets import grant_player_assets, inventory_grant, inventory_spend, spend_player_assets, player_currency
+from ..utils.assets import grant_player_assets, inventory_amount, inventory_grant, inventory_spend, spend_player_assets, player_currency
 from ..utils.player import player_inventory
 from .auction_models import AuctionRecord
 from .bindings import active_binding_totals
@@ -115,7 +115,7 @@ class AuctionRepositoryMixin:
                 (seller["id"], item.key),
             ).fetchone()[0]
             bound, _ = active_binding_totals(connection, int(seller["id"]), item.key, now_text)
-            available = int(inventory.get(item.key, 0)) - int(locked_market) - int(locked_auction)
+            available = inventory_amount(inventory, item.key) - int(locked_market) - int(locked_auction)
             if available < int(quantity):
                 raise AuctionItemLockedError("auction item is not available")
             if available - int(bound) < int(quantity):
@@ -258,7 +258,7 @@ class AuctionRepositoryMixin:
                 seller_inventory = player_inventory(seller)
                 winner_inventory = player_inventory(winner)
                 quantity = int(lock["quantity"])
-                if int(seller_inventory.get(lock["item_key"], 0)) < quantity:
+                if inventory_amount(seller_inventory, lock["item_key"]) < quantity:
                     raise AuctionItemLockedError("seller inventory no longer contains auction item")
                 seller_inventory = inventory_spend(seller_inventory, {str(lock["item_key"]): quantity})
                 winner_inventory = inventory_grant(winner_inventory, {str(lock["item_key"]): quantity})
@@ -285,8 +285,8 @@ class AuctionRepositoryMixin:
                 connection.execute("DELETE FROM auction_item_locks WHERE auction_id=?", (auction_id,))
                 connection.execute("UPDATE auction_lots SET status='settled', updated_at=? WHERE auction_id=?", (now_text, auction_id))
                 self._auction_ledger(connection, operation_id, int(seller["id"]), "currency", "currency.spirit_stone", "auction.sale", "credit", int(active["bid_amount"]), player_currency(seller), player_currency(seller) + int(active["bid_amount"]), auction_id, now_text)
-                self._auction_ledger(connection, operation_id, int(seller["id"]), "item", str(lock["item_key"]), "auction.sale", "debit", quantity, int(seller_inventory.get(lock["item_key"], 0)) + quantity, int(seller_inventory.get(lock["item_key"], 0)), auction_id, now_text)
-                self._auction_ledger(connection, operation_id, int(winner["id"]), "item", str(lock["item_key"]), "auction.purchase", "credit", quantity, int(winner_inventory.get(lock["item_key"], 0)) - quantity, int(winner_inventory.get(lock["item_key"], 0)), auction_id, now_text)
+                self._auction_ledger(connection, operation_id, int(seller["id"]), "item", str(lock["item_key"]), "auction.sale", "debit", quantity, inventory_amount(seller_inventory, lock["item_key"]) + quantity, inventory_amount(seller_inventory, lock["item_key"]), auction_id, now_text)
+                self._auction_ledger(connection, operation_id, int(winner["id"]), "item", str(lock["item_key"]), "auction.purchase", "credit", quantity, inventory_amount(winner_inventory, lock["item_key"]) - quantity, inventory_amount(winner_inventory, lock["item_key"]), auction_id, now_text)
             payload = self._auction_payload(connection, auction_id)
             self._record_auction_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
             return self._auction_from_payload(payload)

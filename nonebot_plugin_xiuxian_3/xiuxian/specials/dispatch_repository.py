@@ -26,6 +26,7 @@ from .dispatch_models import (
     DispatchPreviewRecord,
     DispatchSettlementRecord,
 )
+from ..utils.assets import inventory_amount
 from .dispatch_rules import (
     CANCEL_WINDOW_SECONDS,
     DAO_SERVICE,
@@ -104,7 +105,7 @@ class DispatchRepositoryMixin:
             missing.append("精力不足")
         inventory = player_inventory(player)
         for key, amount in costs.items():
-            if key.startswith("item.") and int(inventory.get(key, 0)) < amount:
+            if key.startswith("item.") and inventory_amount(inventory, key) < amount:
                 missing.append(f"{key} 不足")
         if self._has_active_long_action(connection, int(player["id"])):
             missing.append("已有进行中的长时行动")

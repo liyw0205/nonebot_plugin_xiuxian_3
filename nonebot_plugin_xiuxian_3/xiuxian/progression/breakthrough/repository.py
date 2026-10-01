@@ -85,7 +85,7 @@ from ...exploration.rules import (
     settlement_result,
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
-from ...utils.assets import player_currency
+from ...utils.assets import inventory_amount, player_currency
 from ...utils.player import change_player_state, player_integer, player_inventory, player_resource
 from ...adventures.mainline_models import (
     MainlineClaimRecord,
@@ -456,17 +456,17 @@ class BreakthroughRepositoryMixin:
 
             inventory = player_inventory(row)
             for item_key, quantity in definition.materials.items():
-                if int(inventory.get(item_key, 0)) < quantity:
+                if inventory_amount(inventory, item_key) < quantity:
                     raise MaterialInsufficientError("breakthrough material is insufficient")
             alternative_material: str | None = None
             if is_nascent:
                 for candidate in ("item.demon_core", "item.beast_blood"):
-                    if int(inventory.get(candidate, 0)) >= 2:
+                    if inventory_amount(inventory, candidate) >= 2:
                         alternative_material = candidate
                         break
                 if alternative_material is None:
                     raise MaterialInsufficientError("nascent soul alternative material is insufficient")
-            if protection and int(inventory.get(definition.protection_key, 0)) < 1:
+            if protection and inventory_amount(inventory, definition.protection_key) < 1:
                 raise ProtectionItemInsufficientError("breakthrough protection item is missing")
             if player_currency(row) < definition.currency_cost:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
@@ -498,7 +498,7 @@ class BreakthroughRepositoryMixin:
                 definition.support_bonus_bp
                 if definition.support_bonus_bp
                 and definition.support_key
-                and int(inventory.get(definition.support_key, 0)) > 0
+                and inventory_amount(inventory, definition.support_key) > 0
                 else 0
             )
             preparation_bp = quality_bonus_bp + technique_bonus_bp + formation_bonus_bp + location_bonus_bp + support_bonus_bp
@@ -731,7 +731,7 @@ class BreakthroughRepositoryMixin:
                     raise DomainSelectionBusyError("domain selection is already pending")
                 connection.execute("UPDATE domain_selection_sessions SET status = 'expired', updated_at = ? WHERE id = ?", (now_text, pending["id"]))
             inventory = player_inventory(row)
-            if int(inventory.get("item.domain_core", 0)) < 1:
+            if inventory_amount(inventory, "item.domain_core") < 1:
                 raise MaterialInsufficientError("domain core is missing")
             if player_currency(row) < 10_000:
                 raise CurrencyInsufficientError("domain selection requires spirit stones")
@@ -806,7 +806,7 @@ class BreakthroughRepositoryMixin:
             if row["domain_key"]:
                 raise DomainAlreadySelectedError("domain already selected")
             inventory = player_inventory(row)
-            if int(inventory.get("item.domain_core", 0)) < 1:
+            if inventory_amount(inventory, "item.domain_core") < 1:
                 raise MaterialInsufficientError("domain core is missing")
             if player_currency(row) < 10_000:
                 raise CurrencyInsufficientError("domain selection requires spirit stones")
@@ -876,8 +876,8 @@ class BreakthroughRepositoryMixin:
             if not expired and early:
                 if str(row["location_key"]) != "xuantian.domain_front":
                     raise BreakthroughRequirementError("early domain recovery requires domain front")
-                if int(inventory.get("item.pill.domain_restore", 0)) < 1:
-                    raise MaterialInsufficientError("domain restore pill is missing")
+            if inventory_amount(inventory, "item.pill.domain_restore") < 1:
+                raise MaterialInsufficientError("domain restore pill is missing")
                 if player_currency(row) < 2000:
                     raise CurrencyInsufficientError("early domain recovery requires spirit stones")
                 stones_spent = 2000
@@ -985,7 +985,7 @@ class BreakthroughRepositoryMixin:
                 (not success)
                 and not is_nascent
                 and protection_requested
-                and int(inventory.get(protection_key, 0)) > 0
+                and inventory_amount(inventory, protection_key) > 0
             )
             pity_after = next_pity_bp(definition, pity_before, success)
             weakness_until: str | None = None
@@ -1277,7 +1277,7 @@ class BreakthroughRepositoryMixin:
                 raise BreakthroughRequirementError("bargain requires a demonic path or pollution 20")
             inventory = player_inventory(row)
             if effective_choice == "heart_demon.purify":
-                if int(inventory.get("item.pill.soul_restore", 0)) < 1:
+                if inventory_amount(inventory, "item.pill.soul_restore") < 1:
                     raise MaterialInsufficientError("soul restore pill is missing")
             pollution_before = player_resource(row, "pollution")
             pollution_after = pollution_before
@@ -1480,7 +1480,7 @@ class BreakthroughRepositoryMixin:
             if not expired and not early:
                 raise WeaknessActiveError("weakness has not expired")
             if not expired and early:
-                if int(inventory.get(medicine_key, 0)) < 1:
+                if inventory_amount(inventory, medicine_key) < 1:
                     raise MaterialInsufficientError("early recovery requires a recovery pill")
                 if player_currency(row) < stones_cost:
                     raise CurrencyInsufficientError("early recovery requires spirit stones")

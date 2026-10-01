@@ -139,10 +139,6 @@ def write_player_assets(
     return assets
 
 
-def _player_asset_state(row: Any, *, preserve_zero: bool = False) -> AssetState:
-    return player_asset_state(row, preserve_zero=preserve_zero)
-
-
 def grant_player_assets(
     connection: Any,
     row: Any,
@@ -344,7 +340,7 @@ def apply_player_assets(
     place prevents callers from drifting in their inventory/currency handling.
     """
 
-    current = _player_asset_state(row, preserve_zero=preserve_zero)
+    current = player_asset_state(row, preserve_zero=preserve_zero)
     if mode == "grant":
         next_assets = assets_grant(current.currency, current.inventory, values)
     elif mode == "spend":
@@ -535,6 +531,12 @@ def player_assets_missing(row: Any, requirements: Mapping[str, Any]) -> dict[str
     return missing
 
 
+def player_has_assets(row: Any, requirements: Mapping[str, Any]) -> bool:
+    """Return whether a player can satisfy currency and item requirements."""
+
+    return not player_assets_missing(row, requirements)
+
+
 def inventory_missing(
     inventory: Mapping[str, Any], requirements: Mapping[str, Any]
 ) -> dict[str, int]:
@@ -695,6 +697,7 @@ __all__ = [
     "player_asset_state",
     "player_currency",
     "player_database_id",
+    "player_has_assets",
     "player_item_amount",
     "is_currency_asset_key",
     "spend_player_assets",
