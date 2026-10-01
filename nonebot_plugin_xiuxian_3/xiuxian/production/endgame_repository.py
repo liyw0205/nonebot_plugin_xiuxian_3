@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount
-from ..utils.player import change_player_state, spend_player_state, player_inventory
+from ..utils.player import change_player_state, spend_player_state, player_integer, player_inventory
 from ..persistence.errors import (
     EndgameRecipeAlreadyCreatedError,
     EndgameRecipeBusyError,
@@ -134,7 +134,7 @@ class EndgameProductionRepositoryMixin:
                     raise EndgameRecipeRequirementError("dao fruit progress is insufficient")
                 if int(player["ascension_merit"]) < recipe.required_ascension_merit:
                     raise EndgameRecipeRequirementError("ascension merit is insufficient")
-                if int(player["world_merit"]) < recipe.world_merit_cost:
+                if player_integer(player, "world_merit") < recipe.world_merit_cost:
                     raise QuestResourceInsufficientError("world merit is insufficient")
                 issued = connection.execute(
                     "SELECT 1 FROM endgame_sessions WHERE player_id = ? AND session_type = ? AND status = 'succeeded' LIMIT 1",

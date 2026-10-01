@@ -90,7 +90,7 @@ class EndgameRepositoryMixin:
             inventory = player_inventory(row)
             if inventory_amount(inventory, "item.dao_fruit_fragment") < DAO_UNION_FRAGMENT_COST:
                 raise MaterialInsufficientError("dao fruit fragments are insufficient")
-            if int(row["world_merit"]) < DAO_UNION_MERIT_COST:
+            if player_integer(row, "world_merit") < DAO_UNION_MERIT_COST:
                 raise DaoUnionRequirementError("world merit is insufficient")
             if player_currency(row) < DAO_UNION_STONE_COST:
                 raise CurrencyInsufficientError("spirit stones are insufficient")

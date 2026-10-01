@@ -167,7 +167,7 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import assets_grant, inventory_json
+from ..utils.assets import inventory_json
 from ..utils.player import change_player_state, grant_player_state, player_integer
 from ..utils.json import json_object
 from ..utils.player import player_field, player_reputation, player_values
@@ -420,33 +420,29 @@ class PlayerRepositoryMixin:
             created = row["stage"] == STAGE_NEW_USER
             if created:
                 qualification = qualification_for(platform, platform_user_id)
-                starting_assets = assets_grant(
-                    row["spirit_stones"],
-                    {},
-                    {
+                grant_player_state(
+                    connection,
+                    row,
+                    updated_at=serialize_datetime(now),
+                    rewards={
                         "spirit_stones": 100,
                         "item.food.coarse_spirit_rice": 3,
                         "item.herb.blood_grass": 3,
                     },
-                )
-                connection.execute(
-                    """
-                    UPDATE players
-                    SET stage = ?, realm_key = 'mortal', realm_layer = 0, cultivation = 0, total_cultivation = 0,
-                        qualification_json = ?, spirit_stones = ?,
-                        stamina = 30, stamina_max = 30, energy = 30, energy_max = 30,
-                        inventory_json = ?, updated_at = ?
-                    WHERE id = ? AND stage = ?
-                    """,
-                    (
-                        STAGE_MORTAL,
-                        json.dumps(qualification, ensure_ascii=False, sort_keys=True),
-                        starting_assets.currency,
-                        inventory_json(starting_assets.inventory),
-                        serialize_datetime(now),
-                        row["id"],
-                        STAGE_NEW_USER,
-                    ),
+                    player_values={
+                        "stage": STAGE_MORTAL,
+                        "realm_key": "mortal",
+                        "realm_layer": 0,
+                        "cultivation": 0,
+                        "total_cultivation": 0,
+                        "qualification_json": json.dumps(
+                            qualification, ensure_ascii=False, sort_keys=True
+                        ),
+                        "stamina": 30,
+                        "stamina_max": 30,
+                        "energy": 30,
+                        "energy_max": 30,
+                    },
                 )
                 row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             else:

@@ -65,7 +65,7 @@ from .spectator_rules import (
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.player import grant_player_state, player_combat_values
+from ..utils.player import grant_player_state, player_combat_values, player_realm_values
 
 
 class CombatRepositoryMixin:
@@ -519,8 +519,9 @@ class CombatRepositoryMixin:
         max_rounds = training_dummy_preview_rounds(content)
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
+            realm = player_realm_values(player)
             if (
-                str(player["location_key"]) != enemy.location_key
+                realm["location_key"] != enemy.location_key
                 or not self._meets_enemy_requirement(player, enemy.required_realm, enemy.required_layer)
             ):
                 raise BattleRequirementError("training dummy spectator requires its configured location and realm")
@@ -1363,8 +1364,9 @@ class CombatRepositoryMixin:
 
     @staticmethod
     def _meets_enemy_requirement(player: Any, required_realm: str, required_layer: int) -> bool:
+        realm = player_realm_values(player)
         return CombatRepositoryMixin._meets_realm_values(
-            str(player["realm_key"]), int(player["realm_layer"]), required_realm, required_layer
+            realm["realm_key"], realm["realm_layer"], required_realm, required_layer
         )
 
     @staticmethod

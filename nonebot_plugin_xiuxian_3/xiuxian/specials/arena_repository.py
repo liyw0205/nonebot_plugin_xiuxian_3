@@ -14,7 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.player import change_player_state, player_combat_values
+from ..utils.player import change_player_state, player_combat_values, player_integer
 from ..persistence.errors import (
     ArenaChallengeCapError,
     ArenaMatchNotFoundError,
@@ -268,12 +268,13 @@ class ArenaRepositoryMixin:
             )
             snapshot_id = f"arena.snapshot:{uuid4().hex}"
             snapshot = self._arena_player_snapshot(connection, player, snapshot_id)
+            arena_rating = player_integer(player, "arena_rating", 1000)
             expires_at = now + timedelta(days=SNAPSHOT_VALID_DAYS)
             matchable_at = now + timedelta(seconds=SNAPSHOT_MATCH_DELAY_SECONDS)
             summary = public_summary(
                 snapshot,
                 snapshot_id=snapshot_id,
-                rating=int(player["arena_rating"]),
+                rating=arena_rating,
                 created_at=now_text,
             )
             connection.execute(
@@ -285,7 +286,7 @@ class ArenaRepositoryMixin:
                     snapshot_id,
                     player["id"],
                     mode_key,
-                    player["arena_rating"],
+                    arena_rating,
                     serialize_datetime(matchable_at),
                     serialize_datetime(expires_at),
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
@@ -299,7 +300,7 @@ class ArenaRepositoryMixin:
                 "status": "published",
                 "mode_key": mode_key,
                 "public_summary": summary,
-                "rating": int(player["arena_rating"]),
+                "rating": arena_rating,
                 "matchable_at": serialize_datetime(matchable_at),
                 "expires_at": serialize_datetime(expires_at),
                 "replaced_snapshot_ids": [str(item["snapshot_id"]) for item in old],
@@ -365,7 +366,7 @@ class ArenaRepositoryMixin:
             rows = connection.execute(
                 "SELECT * FROM arena_snapshots WHERE status = 'published' AND arena_mode_key = ? AND player_id <> ? "
                 "ORDER BY ABS(rating - ?), created_at, id LIMIT 50",
-                (mode_key, player["id"], player["arena_rating"]),
+                (mode_key, player["id"], player_integer(player, "arena_rating", 1000)),
             ).fetchall()
             return tuple(self._snapshot_from_row(row) for row in rows)
 
@@ -861,12 +862,6 @@ class ArenaRepositoryMixin:
                 "SELECT skill_key FROM skill_masteries WHERE player_id = ? ORDER BY skill_key", (player["id"],)
             ).fetchall()
         )
-        def row_value(key: str, default: object = None) -> object:
-            try:
-                return player[key]
-            except (KeyError, IndexError):
-                return default
-
         qualification_snapshot: dict[str, object] = {}
         for key, value in qualification.items():
             try:
@@ -888,8 +883,8 @@ class ArenaRepositoryMixin:
             "equipment": equipment,
             "faction_key": player_faction(player),
             "alliance_key": player_faction(player),
-            "pollution": int(row_value("pollution", 0)),
-            "bloodline_stability": int(row_value("bloodline_stability", 0)),
+            "pollution": int(player_state["pollution"]),
+            "bloodline_stability": int(player_state["bloodline_stability"]),
             "three_realms_permit": has_three_realms_permit(player),
         }
 

@@ -653,7 +653,15 @@ class AdventuresRepositoryMixin:
                     cultivation_gain += quantity
                     actual_rewards[key] = quantity
                 elif key == "energy":
-                    gained = min(quantity, max(0, int(row["energy_max"]) - int(row["energy"]) - energy_gain))
+                    gained = min(
+                        quantity,
+                        max(
+                            0,
+                            player_integer(row, "energy_max")
+                            - player_integer(row, "energy")
+                            - energy_gain,
+                        ),
+                    )
                     energy_gain += gained
                     actual_rewards[key] = gained
                 elif key == "local_reputation":

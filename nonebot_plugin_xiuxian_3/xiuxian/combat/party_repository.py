@@ -1355,6 +1355,7 @@ class PartyCombatRepositoryMixin:
                 if player is None:
                     raise PartyBattleNotFoundError("party battle member no longer exists")
                 if reward:
+                    player_state = player_combat_values(player)
                     asset_reward = {
                         key: value
                         for key, value in reward.items()
@@ -1362,11 +1363,11 @@ class PartyCombatRepositoryMixin:
                         and not key.startswith("faction_reputation.")
                     }
                     soul_power_max = max(
-                        int(player["soul_power_max"]),
-                        int(player["soul_power"]),
+                        int(player_state["soul_power_max"]),
+                        int(player_state["soul_power"]),
                         BOUNDARY_REALM_SOUL_POWER_MAX if boundary_party and reward.get("soul_power") else 0,
                     )
-                    faction = self._json_object(player["faction_reputation_json"], {})
+                    faction = dict(player_state["faction_reputation"])
                     for item_key, quantity in reward.items():
                         if item_key.startswith("faction_reputation."):
                             faction_key = item_key.removeprefix("faction_reputation.")

@@ -44,6 +44,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     write_player_values,
 )
 from nonebot_plugin_xiuxian_3.contracts import PlayerView
+from nonebot_plugin_xiuxian_3.xiuxian.combat.repository import CombatRepositoryMixin
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_object
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
     DuplicateJSONKeyError,
@@ -670,6 +671,14 @@ def test_player_numeric_projection_and_delta_share_resource_validation() -> None
     assert player_numeric_delta(row, {"stamina": -9}, clamp_minimum=True) == {"stamina": 0}
     with pytest.raises(ValueError, match="cannot be below"):
         player_numeric_delta(row, {"stamina": -9})
+
+
+def test_combat_realm_gate_uses_shared_realm_projection() -> None:
+    assert CombatRepositoryMixin._meets_enemy_requirement(
+        {"realm_key": "foundation", "realm_layer": "3"}, "foundation", 2
+    )
+    # Partial rows use the same neutral realm defaults as all other player views.
+    assert CombatRepositoryMixin._meets_enemy_requirement({}, "mortal", 0)
 
 
 def test_change_player_values_persists_the_same_validated_delta() -> None:

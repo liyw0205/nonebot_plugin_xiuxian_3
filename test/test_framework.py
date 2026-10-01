@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import sqlite3
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext, CommandResult, validate_command_identity
@@ -32,6 +34,18 @@ def test_player_creation_and_seeking_are_idempotent_under_concurrency() -> None:
             assert len({result.data["player_id"] for result in seek_results}) == 1
             assert {result.data["spirit_stones"] for result in seek_results} == {100}
             assert {result.data["stage"] for result in seek_results} == {"mortal"}
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                spirit_stones, inventory, stamina, stamina_max, energy, energy_max = connection.execute(
+                    "SELECT spirit_stones, inventory_json, stamina, stamina_max, energy, energy_max "
+                    "FROM players WHERE platform = ? AND platform_user_id = ?",
+                    ("nonebot", "same-user"),
+                ).fetchone()
+            assert spirit_stones == 100
+            assert json.loads(inventory) == {
+                "item.food.coarse_spirit_rice": 3,
+                "item.herb.blood_grass": 3,
+            }
+            assert (stamina, stamina_max, energy, energy_max) == (30, 30, 30, 30)
             await runtime.close()
 
     asyncio.run(run())
