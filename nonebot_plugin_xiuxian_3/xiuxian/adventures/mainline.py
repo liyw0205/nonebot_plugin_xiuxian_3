@@ -11,6 +11,7 @@ from ..routine.rules import honor_title
 
 MAINLINE_STORY_KEY = "story.mainline.xuantian"
 DOMAIN_FRONTIER_STORY_KEY = "story.mainline.domain_frontier"
+VOID_ARCHIVE_STORY_KEY = "story.mainline.void_archive"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -475,6 +476,7 @@ __all__ = [
     "MAINLINE_STATUSES",
     "MAINLINE_STORY_KEY",
     "DOMAIN_FRONTIER_STORY_KEY",
+    "VOID_ARCHIVE_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

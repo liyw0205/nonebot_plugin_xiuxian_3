@@ -247,6 +247,61 @@ def test_player_requirements_combine_assets_and_numeric_resources() -> None:
         player_requirements_missing(row)
 
 
+def test_player_state_kernel_persists_assets_and_shared_views_atomically() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players("
+        "id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, "
+        "inventory_json TEXT NOT NULL, energy INTEGER NOT NULL, "
+        "energy_max INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, energy, energy_max, updated_at) "
+        "VALUES (1, 80, ?, 4, 10, '')",
+        ('{"item.herb": 2}',),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    assert row is not None
+
+    grant_player_state(
+        connection,
+        row,
+        {"spirit_stones": 40, "item.herb": 3},
+        "now",
+        value_delta={"energy": 20},
+        maximums={"energy": row["energy_max"]},
+    )
+    connection.commit()
+    updated = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    assert updated is not None
+    assert player_currency(updated) == 120
+    assert player_inventory(updated) == {"item.herb": 5}
+    assert player_integer(updated, "energy") == 10
+
+    profile = player_profile_values(updated)
+    status = player_status_values(updated)
+    combat = player_combat_values(updated)
+    assert profile["spirit_stones"] == status["spirit_stones"] == 120
+    assert profile["energy"] == status["energy"] == 10
+    assert combat["energy"] == 10
+    assert player_state_values(updated)["inventory"] == {"item.herb": 5}
+
+    with pytest.raises(AssetDeltaError, match="missing items"):
+        spend_player_state(
+            connection,
+            updated,
+            {"item.herb": 99},
+            "later",
+            value_delta={"energy": -3},
+        )
+    unchanged = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    assert unchanged is not None
+    assert player_currency(unchanged) == 120
+    assert player_inventory(unchanged) == {"item.herb": 5}
+    assert player_integer(unchanged, "energy") == 10
+
+
 def test_asset_state_applies_currency_and_items_together() -> None:
     inventory = {"item.herb": 2}
 

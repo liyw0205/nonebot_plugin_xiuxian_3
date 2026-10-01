@@ -799,17 +799,32 @@ class AdventuresRepositoryMixin:
     ) -> MainlineStatusRecord:
         with self._connect() as connection:
             row = self._require_player(connection, platform, platform_user_id, writable=False)
-            return self._mainline_status_from_connection(connection, row, story_key=story_key, content=self.content)
+            return self._mainline_status_from_connection(
+                connection,
+                row,
+                story_key=story_key,
+                content=self.content,
+                now=self._now(),
+            )
 
     @staticmethod
     def _mainline_completed_events(
         connection: sqlite3.Connection,
         player: sqlite3.Row,
+        *,
+        now: datetime | None = None,
     ) -> set[str]:
         """Build server-owned evidence shared by status and start checks."""
 
         intro = SQLitePlayerRepository._json_object(player["intro_json"], {})
-        events = {str(item) for item in intro.get("flags", [])}
+        # The time-fort story flag is only a projection of a first clear.  It
+        # must be rebuilt from the settlement table so a stale flag cannot
+        # unlock the returner's route by itself.
+        events = {
+            str(item)
+            for item in intro.get("flags", [])
+            if str(item) != "story.mainline.void_archive.time_fort"
+        }
         if str(player["stage"]) != STAGE_NEW_USER:
             events.add("player.start_seeking")
         if connection.execute(
@@ -842,6 +857,26 @@ class AdventuresRepositoryMixin:
             (player["id"],),
         ).fetchone() is not None:
             events.add("event.domain_front.claimed")
+        unlock_query = (
+            "SELECT 1 FROM void_archive_unlocks "
+            "WHERE player_id = ? AND event_key = ?"
+        )
+        unlock_params: tuple[Any, ...] = (player["id"], "event.archive_unlock")
+        if now is not None:
+            unlock_query += " AND ends_at > ?"
+            unlock_params += (serialize_datetime(now),)
+        if connection.execute(unlock_query, unlock_params).fetchone() is not None:
+            events.add("event.archive_unlock")
+        if connection.execute(
+            "SELECT 1 FROM void_archive_runs WHERE player_id = ? AND outcome = 'won' LIMIT 1",
+            (player["id"],),
+        ).fetchone() is not None:
+            events.add("event.archive_guard.won")
+        if connection.execute(
+            "SELECT 1 FROM time_fort_members WHERE player_id = ? AND status = 'settled' AND first_clear = 1 LIMIT 1",
+            (player["id"],),
+        ).fetchone() is not None:
+            events.add("story.mainline.void_archive.time_fort")
         project_rows = connection.execute(
             """
             SELECT DISTINCT p.project_key
@@ -863,6 +898,7 @@ class AdventuresRepositoryMixin:
         story_key: str = MAINLINE_STORY_KEY,
         content=None,
         replay: bool = False,
+        now: datetime | None = None,
     ) -> MainlineStatusRecord:
         runs = {
             str(item["stage_key"]): item
@@ -876,7 +912,7 @@ class AdventuresRepositoryMixin:
             for item in runs.values()
             if bool(item["first_clear_claimed"])
         }
-        completed_events = AdventuresRepositoryMixin._mainline_completed_events(connection, player)
+        completed_events = AdventuresRepositoryMixin._mainline_completed_events(connection, player, now=now)
         views: list[MainlineStageView] = []
         for current_definition in mainline_definitions(content, story_key=story_key):
             run = runs.get(current_definition.key)
@@ -1000,7 +1036,8 @@ class AdventuresRepositoryMixin:
                 "story_key": story_key,
             },
         )
-        now_text = serialize_datetime(self._now())
+        now = self._now()
+        now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
@@ -1016,9 +1053,15 @@ class AdventuresRepositoryMixin:
             if definition.runtime_status != "open":
                 raise MainlineContentClosedError("mainline stage is not open")
             row = self._require_player(connection, platform, platform_user_id)
-            status_record = self._mainline_status_from_connection(connection, row, story_key=story_key, content=self.content)
+            status_record = self._mainline_status_from_connection(
+                connection,
+                row,
+                story_key=story_key,
+                content=self.content,
+                now=now,
+            )
             stage_view = next(item for item in status_record.stages if item.key == definition.key)
-            completed_events = self._mainline_completed_events(connection, row)
+            completed_events = self._mainline_completed_events(connection, row, now=now)
             if not mainline_prerequisites_met(
                 definition,
                 completed_stages={

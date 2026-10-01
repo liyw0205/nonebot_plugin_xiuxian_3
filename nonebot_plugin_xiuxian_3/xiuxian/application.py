@@ -19,7 +19,7 @@ from .exploration.use_cases import ExplorationApplication
 from .combat.use_cases import CombatApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
-from .adventures.mainline import DOMAIN_FRONTIER_STORY_KEY
+from .adventures.mainline import DOMAIN_FRONTIER_STORY_KEY, VOID_ARCHIVE_STORY_KEY
 from .adventures.dao_echoes_use_cases import DaoEchoesApplication
 from .adventures.three_realms_use_cases import ThreeRealmsApplication
 from .adventures.secret_realm_use_cases import SecretRealmApplication
@@ -94,6 +94,13 @@ class XiuxianApplication:
             title="领域前线主线",
             start_command="开始领域前线主线",
             claim_command="领取领域前线主线奖励",
+        )
+        self.void_archive_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=VOID_ARCHIVE_STORY_KEY,
+            title="虚空档案主线",
+            start_command="开始虚空档案主线",
+            claim_command="领取虚空档案主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -723,6 +730,27 @@ class XiuxianApplication:
             context,
             lambda: self.domain_frontier_mainline.claim_reward(context),
             write_message="此刻无缘收取领域前线主线所得。",
+        )
+
+    async def get_void_archive_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_archive_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_void_archive_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_archive_mainline.start_stage(context),
+            write_message="此刻无缘踏入虚空档案主线。",
+        )
+
+    async def claim_void_archive_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_archive_mainline.claim_reward(context),
+            write_message="此刻无缘收取虚空档案主线所得。",
         )
 
     async def preview_secret_realms(self, context: CommandContext) -> CommandResult:

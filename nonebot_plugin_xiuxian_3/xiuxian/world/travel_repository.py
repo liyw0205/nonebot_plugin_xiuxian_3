@@ -577,17 +577,10 @@ class TravelRepositoryMixin:
             pass_key = str(snapshot.get("pass_key") or session["pass_key"] or "") or None
             pass_quantity = int(snapshot.get("pass_quantity", session["pass_quantity"] or 0))
             consume_pass_on_arrival = bool(snapshot.get("consume_pass_on_arrival", False))
-            inventory = player_inventory(row)
             pass_consumed = False
             if consume_pass_on_arrival and pass_key and pass_quantity:
-                available = inventory_amount(inventory, pass_key)
-                if available < pass_quantity:
+                if inventory_amount(player_inventory(row), pass_key) < pass_quantity:
                     raise LocationRequirementError("travel pass is missing at arrival")
-                remaining = available - pass_quantity
-                if remaining:
-                    inventory[pass_key] = remaining
-                else:
-                    inventory.pop(pass_key, None)
                 pass_consumed = True
             updated_at = serialize_datetime(now)
             spend_player_state(
