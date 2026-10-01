@@ -1,0 +1,48 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "void_spire",
+  "records": [
+    {
+      "key": "tower.void_spire.origin",
+      "name": "道源路线",
+      "desc": "由虚空碑铭深入道源的五层路线。",
+      "status": "active",
+      "floor_min": 61,
+      "floor_max": 75,
+      "required_realm": "tribulation",
+      "required_layer": 1,
+      "stamina_cost": 30,
+      "weekly_limit": 1,
+      "route_no": 5,
+      "route_key": "origin",
+      "enemy_ranges": [{"max_floor": 67, "enemy_key": "enemy.void_spire.origin_scout"}, {"max_floor": 74, "enemy_key": "enemy.void_spire.origin_guardian"}, {"max_floor": 75, "enemy_key": "enemy.void_spire.origin_boss"}],
+      "boss_floors": [75],
+      "first_clear_reward": {"spirit_stones": 180, "item.void_crystal": 2},
+      "boss_reward": {"local.dao_service": 50, "item.void_anchor": 1},
+      "repeat_reward": {"item.void_crystal": 1},
+      "story_codex_key": "codex.story.void_spire.origin",
+      "title_key": "title.void_spire.origin"
+    },
+    {
+      "key": "tower.void_spire.ascension",
+      "name": "登临路线",
+      "desc": "由道源继续登临天门的五层路线。",
+      "status": "active",
+      "floor_min": 76,
+      "floor_max": 90,
+      "required_realm": "tribulation",
+      "required_layer": 1,
+      "stamina_cost": 30,
+      "weekly_limit": 1,
+      "route_no": 6,
+      "route_key": "ascension",
+      "enemy_ranges": [{"max_floor": 82, "enemy_key": "enemy.void_spire.ascension_watcher"}, {"max_floor": 89, "enemy_key": "enemy.void_spire.ascension_guardian"}, {"max_floor": 90, "enemy_key": "enemy.void_spire.ascension_boss"}],
+      "boss_floors": [90],
+      "first_clear_reward": {"spirit_stones": 240, "item.void_crystal": 3},
+      "boss_reward": {"local.dao_service": 80, "item.void_anchor": 2},
+      "repeat_reward": {"item.void_crystal": 2},
+      "story_codex_key": "codex.story.void_spire.ascension",
+      "title_key": "title.void_spire.ascension"
+    }
+  ]
+}

@@ -176,6 +176,16 @@ HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
         "虚空见证者",
         "specials.void_spire.floor.60",
     ),
+    HonorTitleDefinition(
+        "title.void_spire.origin",
+        "道源登塔者",
+        "specials.void_spire.floor.75",
+    ),
+    HonorTitleDefinition(
+        "title.void_spire.ascension",
+        "虚空登临者",
+        "specials.void_spire.floor.90",
+    ),
 )
 
 

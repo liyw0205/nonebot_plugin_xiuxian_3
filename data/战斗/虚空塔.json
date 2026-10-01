@@ -1,0 +1,12 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "enemy",
+  "records": [
+    {"name": "道源巡界者", "desc": "守在道源路线上的巡界者，窥探着闯塔者的道心。", "location_key": "tower.void_spire", "requirements": [{"type": "stage_min", "stage": "mortal"}], "stats": {"hp": 560, "attack": 10, "initiative": 9, "agility": 9}, "skills": ["enemy_skill.scratch"], "reward_refs": [], "key": "enemy.void_spire.origin_scout", "status": "active"},
+    {"name": "道源镇守", "desc": "镇守道源关隘的强敌，步步逼问来者的道心。", "location_key": "tower.void_spire", "requirements": [{"type": "stage_min", "stage": "mortal"}], "stats": {"hp": 620, "attack": 11, "initiative": 10, "agility": 10}, "skills": ["enemy_skill.scratch"], "reward_refs": [], "key": "enemy.void_spire.origin_guardian", "status": "active"},
+    {"name": "道源路线守关者", "desc": "立于道源路线尽头的守关者，守护着通往更高天门的道路。", "location_key": "tower.void_spire", "requirements": [{"type": "stage_min", "stage": "mortal"}], "stats": {"hp": 760, "attack": 13, "initiative": 11, "agility": 11}, "skills": ["enemy_skill.scratch"], "reward_refs": [], "key": "enemy.void_spire.origin_boss", "status": "active"},
+    {"name": "登临巡天者", "desc": "在登临路线巡天而行的守望者，试探着来者能否承受天门威压。", "location_key": "tower.void_spire", "requirements": [{"type": "stage_min", "stage": "mortal"}], "stats": {"hp": 820, "attack": 14, "initiative": 12, "agility": 12}, "skills": ["enemy_skill.scratch"], "reward_refs": [], "key": "enemy.void_spire.ascension_watcher", "status": "active"},
+    {"name": "登临天将", "desc": "守护登临天门的天将，出手之间带着不可违逆的威势。", "location_key": "tower.void_spire", "requirements": [{"type": "stage_min", "stage": "mortal"}], "stats": {"hp": 900, "attack": 15, "initiative": 13, "agility": 13}, "skills": ["enemy_skill.scratch"], "reward_refs": [], "key": "enemy.void_spire.ascension_guardian", "status": "active"},
+    {"name": "登临路线守关者", "desc": "镇守九重天门终点的守关者，考验闯塔者是否真能登临。", "location_key": "tower.void_spire", "requirements": [{"type": "stage_min", "stage": "mortal"}], "stats": {"hp": 1100, "attack": 18, "initiative": 14, "agility": 14}, "skills": ["enemy_skill.scratch"], "reward_refs": [], "key": "enemy.void_spire.ascension_boss", "status": "active"}
+  ]
+}

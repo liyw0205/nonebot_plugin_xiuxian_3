@@ -24,7 +24,7 @@ from ..persistence.errors import (
 )
 from .void_spire_repository import VoidSpireRepositoryMixin
 from .codex_rules import codex_entry_definitions
-from .void_spire_rules import DESIGN_MAX_FLOOR, MAX_FLOOR
+from .void_spire_rules import MAX_FLOOR, title_for_floor
 
 
 class VoidSpireApplication:
@@ -42,8 +42,11 @@ class VoidSpireApplication:
     def _reward_text(reward: dict[str, int]) -> str:
         labels = {
             "item.mat.array_sand": "阵砂",
+            "item.void_crystal": "虚空晶体",
+            "item.void_anchor": "虚空锚",
             "spirit_stones": "灵石",
             "local.void_supply": "虚空补给名望",
+            "local.dao_service": "道统服务名望",
         }
         return "、".join(f"{labels.get(key, key)} +{value}" for key, value in reward.items()) or "无"
 
@@ -52,7 +55,7 @@ class VoidSpireApplication:
         errors = {
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能挑战虚空塔。"),
-            TowerRequirementError: ("VOID_SPIRE_REQUIREMENT_MISSING", "1–30 层需要炼虚 L1 或虚空补给名望 600；31–60 层需要合道 L1 或道统服务名望 700。未扣体力。"),
+            TowerRequirementError: ("VOID_SPIRE_REQUIREMENT_MISSING", "1–30 层需炼虚 L1 或虚空补给名望 600；31–60 层需合道 L1 或道统服务名望 700；61–90 层需渡劫 L1 或道统服务名望 700。未扣体力。"),
             TowerBusyError: ("VOID_SPIRE_BUSY", "当前角色已有进行中的行动或待领取虚空塔奖励。"),
             TowerFloorLockedError: ("VOID_SPIRE_FLOOR_LOCKED", "请先领取上一层虚空塔首通奖励。"),
             TowerQuotaError: ("VOID_SPIRE_WEEKLY_LIMIT", "本周虚空塔挑战次数已用尽。"),
@@ -104,7 +107,7 @@ class VoidSpireApplication:
         next_floor = "已完成当前开放楼层" if record.highest_floor >= MAX_FLOOR else str(record.next_floor)
         message = (
             "## 虚空塔\n\n"
-            f"- **已开放**：1-{MAX_FLOOR}/{DESIGN_MAX_FLOOR} 层\n"
+            f"- **已开放**：1-{MAX_FLOOR} 层\n"
             f"- **最高首通**：{record.highest_floor}/{MAX_FLOOR} 层\n"
             f"- **下一层**：{next_floor}\n"
             f"- **入场体力**：{record.stamina_cost}\n"
@@ -138,7 +141,7 @@ class VoidSpireApplication:
             return CommandResult(False, "INVALID_VOID_SPIRE_COMMAND", f"请使用 `挑战虚空塔 <1-{MAX_FLOOR}>`。", context.request_id)
         floor_no = int(context.command_args[0])
         if not 1 <= floor_no <= MAX_FLOOR:
-            return CommandResult(False, "INVALID_VOID_SPIRE_COMMAND", f"当前开放楼层范围为 1 至 {MAX_FLOOR}；{MAX_FLOOR + 1}-{DESIGN_MAX_FLOOR} 尚未开放。", context.request_id)
+            return CommandResult(False, "INVALID_VOID_SPIRE_COMMAND", f"当前开放楼层范围为 1 至 {MAX_FLOOR}。", context.request_id)
         operation_id = self._operation_id(context, "specials.start_void_spire")
         try:
             record = await self.repository.start_void_spire_run(
@@ -200,13 +203,8 @@ class VoidSpireApplication:
         discoveries = "、".join(
             entry_definitions[key].label for key in record.discoveries if key in entry_definitions
         ) or "无"
-        title = next(
-            (
-                definition.label for definition in HONOR_TITLES
-                if record.first_clear and definition.source_event == f"specials.void_spire.floor.{record.floor_no}"
-            ),
-            None,
-        )
+        title_key = title_for_floor(record.floor_no, self.repository.content) if record.first_clear else None
+        title = next((definition.label for definition in HONOR_TITLES if definition.key == title_key), None)
         title_line = f"\n- **展示称号**：{title}" if title else ""
         return CommandResult(
             True,

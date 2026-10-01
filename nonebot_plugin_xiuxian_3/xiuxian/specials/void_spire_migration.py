@@ -13,7 +13,7 @@ def ensure_void_spire_schema(connection: sqlite3.Connection) -> None:
             run_id TEXT NOT NULL UNIQUE,
             player_id INTEGER NOT NULL REFERENCES players(id),
             tower_key TEXT NOT NULL,
-            floor_no INTEGER NOT NULL CHECK (floor_no BETWEEN 1 AND 60),
+            floor_no INTEGER NOT NULL CHECK (floor_no BETWEEN 1 AND 90),
             route_key TEXT NOT NULL,
             status TEXT NOT NULL CHECK (status IN ('battle_running', 'reward_pending', 'lost', 'claimed', 'aborted')),
             battle_id TEXT UNIQUE,
