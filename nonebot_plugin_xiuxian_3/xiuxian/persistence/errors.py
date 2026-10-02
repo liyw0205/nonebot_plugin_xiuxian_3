@@ -20,6 +20,42 @@ class PlayerSuspendedError(RuntimeError):
     """A suspended or deleted player cannot perform a write operation."""
 
 
+class PartnerRequirementError(RuntimeError):
+    """The players do not meet the configured partner requirements."""
+
+
+class PartnerRelationConflictError(RuntimeError):
+    """A player or pair already has a pending or active partner relation."""
+
+
+class PartnerInvitationNotFoundError(RuntimeError):
+    """The requested partner invitation is unavailable."""
+
+
+class PartnerInvitationExpiredError(RuntimeError):
+    """The requested partner invitation has expired."""
+
+
+class PartnerDissolutionNotFoundError(RuntimeError):
+    """The requested dissolution request is unavailable."""
+
+
+class PartnerDissolutionExpiredError(RuntimeError):
+    """The requested dissolution request has expired."""
+
+
+class PartnerPermissionDeniedError(RuntimeError):
+    """The actor is not allowed to perform this partner transition."""
+
+
+class PartnerBreakCooldownError(RuntimeError):
+    """The pair is still within its configured reunion cooldown."""
+
+
+class PartnerStateConflictError(RuntimeError):
+    """The partner relation is not in the required state."""
+
+
 class CompanionRequirementError(RuntimeError):
     """The player has not met the source or lifecycle requirement."""
 

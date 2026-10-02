@@ -941,6 +941,55 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mentor_relations_active_master
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mentor_relations_active_apprentice
     ON mentor_relations(apprentice_id) WHERE status = 'active';
 
+CREATE TABLE IF NOT EXISTS partner_relations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relation_id TEXT NOT NULL UNIQUE,
+    player_a_id INTEGER NOT NULL REFERENCES players(id),
+    player_b_id INTEGER NOT NULL REFERENCES players(id),
+    pair_key TEXT NOT NULL,
+    initiator_id INTEGER NOT NULL REFERENCES players(id),
+    invitee_id INTEGER NOT NULL REFERENCES players(id),
+    status TEXT NOT NULL CHECK (status IN ('invited', 'active', 'dissolution_pending', 'dissolved', 'rejected', 'expired')),
+    invited_at TEXT NOT NULL,
+    invitation_expires_at TEXT NOT NULL,
+    accepted_at TEXT,
+    rejected_at TEXT,
+    expired_at TEXT,
+    dissolution_requested_by INTEGER REFERENCES players(id),
+    dissolution_requested_at TEXT,
+    dissolution_expires_at TEXT,
+    dissolution_rejected_at TEXT,
+    dissolved_at TEXT,
+    cooldown_until TEXT,
+    invitation_operation_id TEXT UNIQUE,
+    acceptance_operation_id TEXT UNIQUE,
+    rejection_operation_id TEXT UNIQUE,
+    dissolution_request_operation_id TEXT UNIQUE,
+    dissolution_confirmation_operation_id TEXT UNIQUE,
+    dissolution_rejection_operation_id TEXT UNIQUE,
+    invitation_expiry_operation_id TEXT,
+    dissolution_expiry_operation_id TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK (player_a_id <> player_b_id),
+    CHECK (player_a_id < player_b_id),
+    CHECK (initiator_id IN (player_a_id, player_b_id)),
+    CHECK (invitee_id IN (player_a_id, player_b_id)),
+    CHECK (initiator_id <> invitee_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_partner_relations_pair
+    ON partner_relations(pair_key, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_partner_relations_player_a
+    ON partner_relations(player_a_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_partner_relations_player_b
+    ON partner_relations(player_b_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_partner_relations_current_a
+    ON partner_relations(player_a_id) WHERE status IN ('invited', 'active', 'dissolution_pending');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_partner_relations_current_b
+    ON partner_relations(player_b_id) WHERE status IN ('invited', 'active', 'dissolution_pending');
+
 CREATE TABLE IF NOT EXISTS constitution_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL UNIQUE,

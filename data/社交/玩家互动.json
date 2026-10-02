@@ -10,7 +10,20 @@
       "environment": {
         "key": "spar.neutral",
         "relation": "neutral"
-      }
+        }
+    },
+    {
+      "key": "social.partner",
+      "name": "道侣关系",
+      "desc": "双方结下道侣缘契，只记录关系，不共享修为、资产或战斗加成。",
+      "status": "active",
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "invitation_ttl_seconds": 259200,
+      "dissolution_ttl_seconds": 86400,
+      "reunion_cooldown_seconds": 259200,
+      "max_active_relations": 1,
+      "cooldown_scope": "pair"
     }
   ],
   "schema": "xiuxian.content"

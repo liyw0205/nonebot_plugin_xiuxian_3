@@ -52,6 +52,7 @@ from ..social.sect_exchange_repository import SectExchangeRepositoryMixin
 from ..social.sect_supply_repository import SectSupplyRepositoryMixin
 from ..social.party_repository import PartyRepositoryMixin
 from ..social.mentor_repository import MentorRepositoryMixin
+from ..social.partner_repository import PartnerRepositoryMixin
 from ..social.sect_war_repository import SectWarRepositoryMixin
 from ..social.sect_war_federation_repository import SectWarFederationRepositoryMixin
 from ..social.sect_war_cross_server_repository import SectWarCrossServerRepositoryMixin
@@ -150,6 +151,7 @@ class SQLitePlayerRepository(
     SectSupplyRepositoryMixin,
     PartyRepositoryMixin,
     MentorRepositoryMixin,
+    PartnerRepositoryMixin,
     SectWarRepositoryMixin,
     SectWarFederationRepositoryMixin,
     SectWarCrossServerRepositoryMixin,

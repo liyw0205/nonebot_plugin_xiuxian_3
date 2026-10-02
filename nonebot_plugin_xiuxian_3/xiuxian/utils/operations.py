@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..persistence.errors import OperationConflictError
+
 
 def player_operation(
     connection: Any,
@@ -34,4 +36,61 @@ def player_operation(
     return str(row["operation_name"]), payload
 
 
-__all__ = ["player_operation"]
+def operation_replay(
+    connection: Any,
+    operation_id: str,
+    operation_name: str,
+    request_hash: str,
+    *,
+    player_id: int,
+) -> dict[str, Any] | None:
+    """Load one operation result when its owner and input still match."""
+
+    row = connection.execute(
+        "SELECT operation_name, player_id, request_hash, result_json "
+        "FROM operations WHERE operation_id = ?",
+        (str(operation_id),),
+    ).fetchone()
+    if row is None:
+        return None
+    if int(row["player_id"]) != int(player_id):
+        raise OperationConflictError("operation belongs to another player")
+    if str(row["operation_name"]) != operation_name or str(row["request_hash"]) != request_hash:
+        raise OperationConflictError("operation input differs from its original request")
+    try:
+        payload = json.loads(str(row["result_json"]))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise OperationConflictError("operation result is malformed") from exc
+    if not isinstance(payload, dict):
+        raise OperationConflictError("operation result must be an object")
+    return payload
+
+
+def record_operation(
+    connection: Any,
+    operation_id: str,
+    operation_name: str,
+    player_id: int,
+    request_hash: str,
+    payload: dict[str, Any],
+    created_at: str,
+) -> None:
+    """Persist a JSON operation result in the caller's transaction."""
+
+    if not isinstance(payload, dict):
+        raise ValueError("operation payload must be an object")
+    connection.execute(
+        "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            str(operation_id),
+            str(operation_name),
+            int(player_id),
+            str(request_hash),
+            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+            str(created_at),
+        ),
+    )
+
+
+__all__ = ["operation_replay", "player_operation", "record_operation"]

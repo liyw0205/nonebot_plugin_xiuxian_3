@@ -3,6 +3,7 @@
 from .database import connect_sqlite
 from .json_cache import DuplicateJSONKeyError, clear_json_cache, read_json_cached
 from .json import json_object
+from .operations import operation_replay, player_operation, record_operation
 from .player import (
     PLAYER_COMBAT_FIELDS,
     PLAYER_COMBAT_PROJECTION_FIELDS,
@@ -165,6 +166,9 @@ __all__ = [
     "player_realm_values",
     "player_values",
     "read_json_cached",
+    "operation_replay",
+    "player_operation",
+    "record_operation",
     "spend_player_assets",
     "spend_player_currency",
     "spend_player_items",

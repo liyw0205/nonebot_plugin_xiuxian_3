@@ -37,6 +37,7 @@ from .livelihood.project_use_cases import ProjectApplication
 from .social.sect_use_cases import SectApplication
 from .social.party_use_cases import PartyApplication
 from .social.mentor_use_cases import MentorApplication
+from .social.partner_use_cases import PartnerApplication
 from .social.sect_war_use_cases import SectWarApplication
 from .social.sect_war_cross_server_use_cases import SectWarCrossServerApplication
 from .social.sect_beacon_use_cases import SectBeaconApplication
@@ -128,6 +129,7 @@ class XiuxianApplication:
         self.social = SectApplication(repository)
         self.party = PartyApplication(repository)
         self.mentor = MentorApplication(repository)
+        self.partner = PartnerApplication(repository)
         self.sect_war = SectWarApplication(repository)
         self.cross_server_sect_war = SectWarCrossServerApplication(repository)
         self.sect_beacon = SectBeaconApplication(repository)
@@ -1193,6 +1195,27 @@ class XiuxianApplication:
 
     async def graduate_apprentice(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.mentor.graduate_apprentice(context), write_message="当前事件不允许办理师徒毕业。")
+
+    async def invite_partner(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.partner.invite_partner(context), write_message="当前事件不允许发出结缘之请。")
+
+    async def accept_partner(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.partner.accept_partner(context), write_message="当前事件不允许接受结缘之请。")
+
+    async def reject_partner(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.partner.reject_partner(context), write_message="当前事件不允许拒绝结缘之请。")
+
+    async def get_partner(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.partner.get_partner(context), require_write=False)
+
+    async def request_partner_dissolution(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.partner.request_dissolution(context), write_message="当前事件不允许申请解除缘契。")
+
+    async def confirm_partner_dissolution(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.partner.confirm_dissolution(context), write_message="当前事件不允许确认解除缘契。")
+
+    async def reject_partner_dissolution(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.partner.reject_dissolution(context), write_message="当前事件不允许拒绝解除缘契。")
 
     async def accept_service(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
