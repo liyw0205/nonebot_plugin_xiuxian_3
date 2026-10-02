@@ -81,7 +81,14 @@ from ..adventures.time_fort_rules import (
     TIME_FORT_STORM_DAMAGE_BP,
     TIME_FORT_STORM_INTERVAL,
 )
-from ..utils.player import grant_player_state, change_player_state, player_combat_values, player_integer, player_object
+from ..utils.player import (
+    change_player_state,
+    grant_player_state,
+    player_combat_values,
+    player_integer,
+    player_object,
+    player_reputation,
+)
 from ..utils.assets import inventory_amount, inventory_spend, spend_player_assets
 
 
@@ -1479,7 +1486,7 @@ class PartyCombatRepositoryMixin:
 
     @staticmethod
     def _faction_reputation(row: Any, faction: str) -> int:
-        return int(player_combat_values(row)["faction_reputation"].get(faction, 0))
+        return int(player_reputation(row).get(faction, 0))
 
     @staticmethod
     def _party_battle_record_operation(connection: sqlite3.Connection, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
