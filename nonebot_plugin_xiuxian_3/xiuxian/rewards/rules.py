@@ -153,6 +153,20 @@ def reward_pool_battle_failure_rewards(
     )
 
 
+def reward_pool_uses_item_weight_bonus(
+    key: str,
+    content: ContentBundle | None = None,
+) -> bool:
+    """Return whether a pool opts into fortune-based item weighting."""
+
+    bundle = content or _DEFAULT_CONTENT
+    row = _reward_pool_record(key, bundle)
+    enabled = row.get("item_weight_bonus", False)
+    if not isinstance(enabled, bool):
+        raise RewardContentError(f"reward pool {key} item_weight_bonus must be a boolean")
+    return enabled
+
+
 def reward_pool_map(
     key: str,
     seed: str,
@@ -389,6 +403,7 @@ __all__ = [
     "reward_pool_battle_failure_rewards",
     "reward_pool_map",
     "reward_pool_outcomes",
+    "reward_pool_uses_item_weight_bonus",
     "reward_totals",
     "reward_value_delta",
 ]

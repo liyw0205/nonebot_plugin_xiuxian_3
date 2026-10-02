@@ -9,7 +9,11 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import weighted_value
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_map
+
+
+def _beast_reward(seed: str) -> dict[str, int]:
+    return reward_pool_map("reward_pool.exploration.beast_hunt", f"{seed}:reward")
 
 
 def _context(adapter: str, user: str, request: str, operation: str = "") -> CommandContext:
@@ -57,7 +61,7 @@ def test_beast_hills_gate_travel_and_blood_reward_are_idempotent_on_both_adapter
         operation = next(
             f"beast-blood-{index}"
             for index in range(1000)
-            if weighted_value(f"beast-blood-{index}:reward", (0, 1, 2, 3), (45, 30, 15, 10)) == 0
+            if _beast_reward(f"beast-blood-{index}") == {"item.beast_blood": 1}
         )
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
@@ -143,7 +147,7 @@ def test_beast_hills_clue_reward_uses_stable_snapshot() -> None:
         operation = next(
             f"beast-clue-{index}"
             for index in range(1000)
-            if weighted_value(f"beast-clue-{index}:reward", (0, 1, 2, 3), (45, 30, 15, 10)) == 2
+            if _beast_reward(f"beast-clue-{index}") == {"item.clue.beast_bloodline": 1}
         )
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=Path(data_dir))

@@ -370,6 +370,7 @@
       "name": "万兽山狩猎所得",
       "desc": "狩猎山间灵兽，可得兽血、妖界声望，或寻得血脉线索。",
       "pool_type": "weighted",
+      "item_weight_bonus": true,
       "outcomes": [
         {"weight": 45, "rewards": {"item.beast_blood": 1}},
         {"weight": 30, "rewards": {"faction_reputation.beast": 15}},
@@ -377,6 +378,20 @@
         {"weight": 10, "no_reward": true}
       ],
       "key": "reward_pool.exploration.beast_hunt",
+      "status": "active"
+    },
+    {
+      "name": "堕落遗迹探索所得",
+      "desc": "在遗迹中寻得魔核、契约线索，或积累魔界声望。",
+      "pool_type": "weighted",
+      "item_weight_bonus": true,
+      "outcomes": [
+        {"weight": 45, "rewards": {"item.demon_core": 1}},
+        {"weight": 30, "rewards": {"faction_reputation.demon": 15}},
+        {"weight": 15, "rewards": {"item.clue.demon_contract": 1}},
+        {"weight": 10, "no_reward": true}
+      ],
+      "key": "reward_pool.exploration.demon_abyss",
       "status": "active"
     },
     {

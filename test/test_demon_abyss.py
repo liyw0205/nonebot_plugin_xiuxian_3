@@ -13,16 +13,18 @@ import pytest
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import weighted_value_with_item_bonus
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_map
 
 
-def _demon_reward(operation_id: str) -> int:
-    return weighted_value_with_item_bonus(
+DEMON_REWARD_POOL = "reward_pool.exploration.demon_abyss"
+CONTENT = ContentBundle.load(Path(__file__).parents[1] / "data")
+
+
+def _demon_reward(operation_id: str) -> dict[str, int]:
+    return reward_pool_map(
+        DEMON_REWARD_POOL,
         f"{operation_id}:reward",
-        (0, 1, 2, 3),
-        (45, 30, 15, 10),
-        item_values=frozenset({0, 2}),
-        bonus_bp=0,
+        CONTENT,
     )
 
 
@@ -81,7 +83,7 @@ def test_demon_abyss_success_and_replay_on_qq_and_onebot() -> None:
         operation = next(
             f"demon-success-{index}"
             for index in range(1000)
-            if _demon_reward(f"demon-success-{index}") == 0
+            if _demon_reward(f"demon-success-{index}") == {"item.demon_core": 1}
         )
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
@@ -144,7 +146,7 @@ def test_demon_abyss_contract_clue_is_frozen_and_idempotent_on_both_adapters() -
         operation = next(
             f"demon-contract-{index}"
             for index in range(1000)
-            if _demon_reward(f"demon-contract-{index}") == 2
+            if _demon_reward(f"demon-contract-{index}") == {"item.clue.demon_contract": 1}
         )
         assert ContentBundle.load(Path(__file__).parents[1] / "data").require(
             "item", "item.clue.demon_contract"
@@ -178,7 +180,10 @@ def test_demon_abyss_contract_clue_is_frozen_and_idempotent_on_both_adapters() -
                         "SELECT snapshot_json FROM exploration_sessions WHERE exploration_id=?",
                         (started.data["exploration_id"],),
                     ).fetchone()[0]
-                assert json.loads(snapshot)["random_pool"] == "loot.demon.abyss"
+                snapshot = json.loads(snapshot)
+                assert snapshot["random_pool"] == "loot.demon.abyss"
+                assert snapshot["reward_pool_key"] == DEMON_REWARD_POOL
+                assert snapshot["frozen_result"] == {"item.clue.demon_contract": 1}
                 _expire(runtime, started.data["exploration_id"])
                 settled = await runtime.adapters.dispatch(
                     adapter,
@@ -210,7 +215,7 @@ def test_demon_abyss_reputation_reward_is_snapshotted_and_projected() -> None:
         operation = next(
             f"demon-reputation-{index}"
             for index in range(1000)
-            if _demon_reward(f"demon-reputation-{index}") == 1
+            if _demon_reward(f"demon-reputation-{index}") == {"faction_reputation.demon": 15}
         )
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=Path(data_dir))

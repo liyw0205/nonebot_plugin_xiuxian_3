@@ -13,9 +13,8 @@ from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
     battle_roll_bp,
     settlement_result,
-    weighted_value,
-    weighted_value_with_item_bonus,
 )
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_map
 
 
 def _context(user_id: str, request_id: str, *, operation_id: str = "") -> CommandContext:
@@ -307,20 +306,21 @@ def test_outskirts_settlement_uses_stable_business_rules() -> None:
 
 
 def test_drop_weight_bonus_changes_optional_exploration_rewards() -> None:
-    assert weighted_value_with_item_bonus(
-        "fortune-baseline", (0, 1, 2, 3), (45, 30, 15, 10),
-        item_values=frozenset({0, 2}), bonus_bp=0,
-    ) == weighted_value("fortune-baseline", (0, 1, 2, 3), (45, 30, 15, 10))
-    seeds = (f"fortune-{index}" for index in range(2_000))
+    pool_key = "reward_pool.exploration.beast_hunt"
+    baseline = reward_pool_map(pool_key, "fortune-baseline:reward")
+    assert settlement_result("explore.beast_hunt", "fortune-baseline") == baseline
+    seeds = (f"fortune-{index}:reward" for index in range(2_000))
     base_drops = sum(
-        weighted_value(seed, (0, 1, 2, 3), (45, 30, 15, 10)) in {0, 2}
+        any(key.startswith("item.") for key in reward_pool_map(pool_key, seed))
         for seed in seeds
     )
     boosted_drops = sum(
-        weighted_value_with_item_bonus(
-            f"fortune-{index}", (0, 1, 2, 3), (45, 30, 15, 10),
-            item_values=frozenset({0, 2}), bonus_bp=10_000,
-        ) in {0, 2}
+        any(
+            key.startswith("item.")
+            for key in reward_pool_map(
+                pool_key, f"fortune-{index}:reward", item_weight_bonus_bp=10_000
+            )
+        )
         for index in range(2_000)
     )
     assert boosted_drops > base_drops

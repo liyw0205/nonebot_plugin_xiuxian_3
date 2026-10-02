@@ -10,6 +10,7 @@ from ..rewards.rules import (
     RewardContentError,
     reward_pool_battle_failure_rewards,
     reward_pool_map,
+    reward_pool_uses_item_weight_bonus,
 )
 from ..utils.assets import inventory_amount
 from ..utils.player import split_player_rewards
@@ -52,6 +53,7 @@ EXPLORATION_REWARD_POOLS = {
     "explore.mist_grotto_2": "reward_pool.exploration.mist_grotto_2",
     "explore.cloud_boat_trial": "reward_pool.exploration.cloud_boat_trial",
     "explore.beast_hunt": "reward_pool.exploration.beast_hunt",
+    "explore.demon_abyss": "reward_pool.exploration.demon_abyss",
 }
 
 DEFINITIONS = {
@@ -271,37 +273,6 @@ def meets_realm(realm_key: str, layer: int, required_realm: str | None, required
     return (realm_rank(realm_key), int(layer)) >= (realm_rank(required_realm), required_layer)
 
 
-def weighted_value(seed: str, values: tuple[int, ...], weights: tuple[int, ...]) -> int:
-    if not values or len(values) != len(weights) or sum(weights) <= 0:
-        raise ValueError("invalid weighted pool")
-    roll = int.from_bytes(hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest(), "big")
-    cursor = roll % sum(weights)
-    for value, weight in zip(values, weights, strict=True):
-        if cursor < weight:
-            return value
-        cursor -= weight
-    return values[-1]
-
-
-def weighted_value_with_item_bonus(
-    seed: str,
-    values: tuple[int, ...],
-    weights: tuple[int, ...],
-    *,
-    item_values: frozenset[int],
-    bonus_bp: int,
-) -> int:
-    if isinstance(bonus_bp, bool) or not isinstance(bonus_bp, int) or bonus_bp < 0:
-        raise ValueError("item drop weight bonus must be a non-negative integer")
-    if bonus_bp == 0:
-        return weighted_value(seed, values, weights)
-    scaled_weights = tuple(
-        weight * (10_000 + bonus_bp) if value in item_values else weight * 10_000
-        for value, weight in zip(values, weights, strict=True)
-    )
-    return weighted_value(seed, values, scaled_weights)
-
-
 def battle_roll_bp(seed: str) -> int:
     digest = hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest()
     return int.from_bytes(digest, "big") % 10000
@@ -320,12 +291,12 @@ def settlement_result(
 ) -> dict[str, int]:
     reward_pool_key = exploration_reward_pool(mode_key)
     if reward_pool_key is not None:
-        is_beast_hunt = mode_key == "explore.beast_hunt"
+        uses_item_weight_bonus = reward_pool_uses_item_weight_bonus(reward_pool_key, content)
         result = reward_pool_map(
             reward_pool_key,
-            f"{seed}:reward" if is_beast_hunt else seed,
+            f"{seed}:reward" if uses_item_weight_bonus else seed,
             content,
-            item_weight_bonus_bp=drop_weight_bp if is_beast_hunt else 0,
+            item_weight_bonus_bp=drop_weight_bp if uses_item_weight_bonus else 0,
         )
         parts = split_player_rewards(result)
         if set(parts.value_delta) - {"cultivation", "total_cultivation"}:
@@ -335,21 +306,6 @@ def settlement_result(
         return result
     if mode_key == "explore.demon_threshold":
         return {"item.soul_crystal": 1, "item.demon_core": 1}
-    if mode_key == "explore.demon_abyss":
-        # Keep the pool stable in the session snapshot: the final 10% is the
-        # documented heart-demon encounter, whose separate event flow remains
-        # closed in this slice and therefore yields no asset here.
-        reward = weighted_value_with_item_bonus(
-            seed + ":reward", (0, 1, 2, 3), (45, 30, 15, 10),
-            item_values=frozenset({0, 2}), bonus_bp=drop_weight_bp,
-        )
-        if reward == 0:
-            return {"item.demon_core": 1}
-        if reward == 1:
-            return {"faction_reputation.demon": 15}
-        if reward == 2:
-            return {"item.clue.demon_contract": 1}
-        return {}
     if mode_key == "explore.ancestral_lake":
         return {
             "item.ancestral_blood": 1,
@@ -390,6 +346,4 @@ __all__ = [
     "resolve_exploration_mode",
     "settlement_failure_result",
     "settlement_result",
-    "weighted_value",
-    "weighted_value_with_item_bonus",
 ]
