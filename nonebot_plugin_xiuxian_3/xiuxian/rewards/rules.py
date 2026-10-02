@@ -96,12 +96,14 @@ def reward_pool_outcomes(
     """Load a weighted reward pool without applying it to player state."""
 
     bundle = content or _DEFAULT_CONTENT
-    try:
-        row = bundle.require("reward", key, include_locked=False)
-    except KeyError as exc:
-        raise RewardContentError(f"reward pool is not active: {key}") from exc
-    if row.get("pool_type") != "weighted":
-        raise RewardContentError(f"reward pool {key} must be weighted")
+    row = _reward_pool_record(key, bundle)
+    if "battle_failure_rewards" in row:
+        _normalize_reward_pool_map(
+            key,
+            "battle_failure_rewards",
+            row["battle_failure_rewards"],
+            bundle,
+        )
     outcomes = row.get("outcomes")
     if not isinstance(outcomes, list) or not outcomes:
         raise RewardContentError(f"reward pool {key} requires outcomes")
@@ -113,39 +115,32 @@ def reward_pool_outcomes(
         rewards = outcome.get("rewards")
         if isinstance(weight, bool) or not isinstance(weight, int) or weight <= 0:
             raise RewardContentError(f"reward pool {key} outcome {index} has invalid weight")
-        if not isinstance(rewards, dict) or not rewards:
-            raise RewardContentError(f"reward pool {key} outcome {index} requires rewards")
-        normalized_rewards: dict[str, int] = {}
-        for reward_key, quantity in rewards.items():
-            if (
-                not isinstance(reward_key, str)
-                or isinstance(quantity, bool)
-                or not isinstance(quantity, int)
-                or quantity <= 0
-            ):
-                raise RewardContentError(
-                    f"reward pool {key} outcome {index} rewards must be positive integer quantities"
-                )
-            if reward_key.startswith("item."):
-                try:
-                    bundle.require("item", reward_key, include_locked=False)
-                except KeyError as exc:
-                    raise RewardContentError(
-                        f"reward pool {key} outcome {index} references inactive item {reward_key}"
-                    ) from exc
-            elif reward_key not in {"spirit_stones", "currency.spirit_stone"}:
-                if reward_key.startswith("faction_reputation."):
-                    if not reward_key.removeprefix("faction_reputation."):
-                        raise RewardContentError(
-                            f"reward pool {key} outcome {index} requires a faction key"
-                        )
-                elif reward_key not in _REWARD_RESOURCE_FIELDS:
-                    raise RewardContentError(
-                        f"reward pool {key} outcome {index} has unsupported reward key {reward_key!r}"
-                    )
-            normalized_rewards[reward_key] = quantity
+        normalized_rewards = _normalize_reward_pool_map(
+            key,
+            f"outcome {index}",
+            rewards,
+            bundle,
+        )
         normalized.append((weight, normalized_rewards))
     return tuple(normalized)
+
+
+def reward_pool_battle_failure_rewards(
+    key: str,
+    content: ContentBundle | None = None,
+) -> dict[str, int]:
+    """Load optional rewards granted when an associated exploration battle is lost."""
+
+    bundle = content or _DEFAULT_CONTENT
+    row = _reward_pool_record(key, bundle)
+    if "battle_failure_rewards" not in row:
+        return {}
+    return _normalize_reward_pool_map(
+        key,
+        "battle_failure_rewards",
+        row["battle_failure_rewards"],
+        bundle,
+    )
 
 
 def reward_pool_map(
@@ -163,6 +158,56 @@ def reward_pool_map(
             return dict(rewards)
         cursor -= weight
     raise AssertionError("weighted reward selection fell through")
+
+
+def _reward_pool_record(key: str, bundle: ContentBundle) -> dict[str, Any]:
+    try:
+        row = bundle.require("reward", key, include_locked=False)
+    except KeyError as exc:
+        raise RewardContentError(f"reward pool is not active: {key}") from exc
+    if row.get("pool_type") != "weighted":
+        raise RewardContentError(f"reward pool {key} must be weighted")
+    return row
+
+
+def _normalize_reward_pool_map(
+    pool_key: str,
+    label: str,
+    rewards: Any,
+    bundle: ContentBundle,
+) -> dict[str, int]:
+    if not isinstance(rewards, dict) or not rewards:
+        raise RewardContentError(f"reward pool {pool_key} {label} requires rewards")
+    normalized: dict[str, int] = {}
+    for reward_key, quantity in rewards.items():
+        if (
+            not isinstance(reward_key, str)
+            or isinstance(quantity, bool)
+            or not isinstance(quantity, int)
+            or quantity <= 0
+        ):
+            raise RewardContentError(
+                f"reward pool {pool_key} {label} rewards must be positive integer quantities"
+            )
+        if reward_key.startswith("item."):
+            try:
+                bundle.require("item", reward_key, include_locked=False)
+            except KeyError as exc:
+                raise RewardContentError(
+                    f"reward pool {pool_key} {label} references inactive item {reward_key}"
+                ) from exc
+        elif reward_key not in {"spirit_stones", "currency.spirit_stone"}:
+            if reward_key.startswith("faction_reputation."):
+                if not reward_key.removeprefix("faction_reputation."):
+                    raise RewardContentError(
+                        f"reward pool {pool_key} {label} requires a faction key"
+                    )
+            elif reward_key not in _REWARD_RESOURCE_FIELDS:
+                raise RewardContentError(
+                    f"reward pool {pool_key} {label} has unsupported reward key {reward_key!r}"
+                )
+        normalized[reward_key] = quantity
+    return normalized
 
 
 def _combine_maps(*maps: dict[str, int]) -> dict[str, int]:
@@ -312,6 +357,7 @@ __all__ = [
     "RewardGrant",
     "combine_reward_grants",
     "reward_definition",
+    "reward_pool_battle_failure_rewards",
     "reward_pool_map",
     "reward_pool_outcomes",
     "reward_totals",

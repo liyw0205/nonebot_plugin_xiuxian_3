@@ -14,12 +14,16 @@ import pytest
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import settlement_result
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
+    settlement_failure_result,
+    settlement_result,
+)
 from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import (
     RewardContentError,
     RewardGrant,
     combine_reward_grants,
     reward_definition,
+    reward_pool_battle_failure_rewards,
     reward_pool_map,
     reward_pool_outcomes,
 )
@@ -268,8 +272,12 @@ def test_weighted_reward_pool_rejects_invalid_content(tmp_path: Path) -> None:
                 ),
             ),
         ),
+        (
+            "reward_pool.exploration.cloud_mine",
+            (_reward_axis("item.material.cloud_iron", {1: 25, 2: 40, 3: 25, 4: 10}),),
+        ),
     ],
-    ids=["outskirts", "spring", "mist-grotto"],
+    ids=["outskirts", "spring", "mist-grotto", "cloud-mine"],
 )
 def test_exploration_reward_pool_preserves_every_joint_probability(
     pool_key: str, axes: tuple[tuple[tuple[dict[str, int], int], ...], ...]
@@ -295,8 +303,9 @@ def test_exploration_reward_pool_preserves_every_joint_probability(
         "reward_pool.exploration.gather_outskirts",
         "reward_pool.exploration.spring_gather",
         "reward_pool.exploration.mist_grotto",
+        "reward_pool.exploration.cloud_mine",
     ],
-    ids=["outskirts", "spring", "mist-grotto"],
+    ids=["outskirts", "spring", "mist-grotto", "cloud-mine"],
 )
 def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key: str) -> None:
     content_path = Path(__file__).parents[1] / "data"
@@ -329,8 +338,12 @@ def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key:
             "reward_pool.exploration.mist_grotto",
             {"cultivation": 700, "item.ore.ironstone": 5},
         ),
+        (
+            "reward_pool.exploration.cloud_mine",
+            {"item.material.cloud_iron": 7},
+        ),
     ],
-    ids=["outskirts", "spring", "mist-grotto"],
+    ids=["outskirts", "spring", "mist-grotto", "cloud-mine"],
 )
 def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_bundle(
     tmp_path: Path, pool_key: str, rewards: dict[str, int]
@@ -358,8 +371,9 @@ def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_b
         "reward_pool.exploration.gather_outskirts",
         "reward_pool.exploration.spring_gather",
         "reward_pool.exploration.mist_grotto",
+        "reward_pool.exploration.cloud_mine",
     ],
-    ids=["outskirts", "spring", "mist-grotto"],
+    ids=["outskirts", "spring", "mist-grotto", "cloud-mine"],
 )
 @pytest.mark.parametrize(
     ("outcome", "error"),
@@ -407,6 +421,7 @@ def test_exploration_reward_pool_rejects_malformed_outcomes(
         ("explore.gather_outskirts", "reward_pool.exploration.gather_outskirts"),
         ("explore.spring_gather", "reward_pool.exploration.spring_gather"),
         ("explore.mist_grotto", "reward_pool.exploration.mist_grotto"),
+        ("explore.cloud_mine", "reward_pool.exploration.cloud_mine"),
     ],
 )
 @pytest.mark.parametrize("resource_key", ["stamina", "soul_power"])
@@ -476,3 +491,57 @@ def test_exploration_reward_pool_rejects_inactive_item_even_when_not_selected(
     bundle = ContentBundle.load(data_dir)
     with pytest.raises(RewardContentError, match=f"inactive item {item_key}"):
         reward_pool_map(pool_key, seed, bundle)
+
+
+def test_reward_pool_battle_failure_rewards_are_content_backed() -> None:
+    bundle = ContentBundle.load(Path(__file__).parents[1] / "data")
+    assert reward_pool_battle_failure_rewards(
+        "reward_pool.exploration.cloud_mine", bundle
+    ) == {"item.material.cloud_iron": 1}
+    assert reward_pool_battle_failure_rewards(
+        "reward_pool.exploration.mist_grotto", bundle
+    ) == {}
+
+
+@pytest.mark.parametrize(
+    ("failure_rewards", "error"),
+    [
+        ({"item.missing": 1}, "references inactive item"),
+        ({"item.material.cloud_iron": 0}, "positive integer quantities"),
+        ([], "requires rewards"),
+    ],
+)
+def test_reward_pool_rejects_invalid_battle_failure_rewards(
+    tmp_path: Path, failure_rewards: object, error: str
+) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    reward_file = data_dir / "奖励" / "奖励.json"
+    document = json.loads(reward_file.read_text(encoding="utf-8"))
+    pool = next(
+        item for item in document["records"] if item["key"] == "reward_pool.exploration.cloud_mine"
+    )
+    pool["battle_failure_rewards"] = failure_rewards
+    reward_file.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+
+    with pytest.raises(RewardContentError, match=error):
+        reward_pool_battle_failure_rewards("reward_pool.exploration.cloud_mine", bundle)
+    with pytest.raises(RewardContentError, match=error):
+        reward_pool_map("reward_pool.exploration.cloud_mine", "bad-failure-pool", bundle)
+
+
+def test_exploration_failure_reward_rejects_unsupported_player_values(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    reward_file = data_dir / "奖励" / "奖励.json"
+    document = json.loads(reward_file.read_text(encoding="utf-8"))
+    pool = next(
+        item for item in document["records"] if item["key"] == "reward_pool.exploration.cloud_mine"
+    )
+    pool["battle_failure_rewards"] = {"stamina": 1}
+    reward_file.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+
+    with pytest.raises(RewardContentError, match="contains unsupported state"):
+        settlement_failure_result("explore.cloud_mine", content=bundle)

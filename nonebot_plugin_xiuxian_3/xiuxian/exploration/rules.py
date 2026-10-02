@@ -6,7 +6,11 @@ from __future__ import annotations
 import hashlib
 
 from ..content import ContentBundle
-from ..rewards.rules import RewardContentError, reward_pool_map
+from ..rewards.rules import (
+    RewardContentError,
+    reward_pool_battle_failure_rewards,
+    reward_pool_map,
+)
 from ..utils.assets import inventory_amount
 from ..utils.player import split_player_rewards
 from .models import ExplorationDefinition
@@ -44,6 +48,7 @@ EXPLORATION_REWARD_POOLS = {
     "explore.trial_outskirts": "reward_pool.exploration.trial_outskirts",
     "explore.spring_gather": "reward_pool.exploration.spring_gather",
     "explore.mist_grotto": "reward_pool.exploration.mist_grotto",
+    "explore.cloud_mine": "reward_pool.exploration.cloud_mine",
 }
 
 DEFINITIONS = {
@@ -319,12 +324,6 @@ def settlement_result(
                 f"exploration reward pool {reward_pool_key} contains unsupported state"
             )
         return result
-    if mode_key == "explore.cloud_mine":
-        return {
-            "item.material.cloud_iron": weighted_value(
-                seed + ":cloud_iron", (1, 2, 3, 4), (25, 40, 25, 10)
-            )
-        }
     if mode_key == "explore.mist_grotto_2":
         return {
             "cultivation": weighted_value(seed + ":cultivation", (900, 1100, 1300), (30, 45, 25)),
@@ -374,6 +373,23 @@ def settlement_result(
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 
 
+def settlement_failure_result(
+    mode_key: str,
+    *,
+    content: ContentBundle | None = None,
+) -> dict[str, int]:
+    reward_pool_key = exploration_reward_pool(mode_key)
+    if reward_pool_key is None:
+        return {}
+    result = reward_pool_battle_failure_rewards(reward_pool_key, content)
+    parts = split_player_rewards(result)
+    if set(parts.value_delta) - {"cultivation", "total_cultivation"}:
+        raise RewardContentError(
+            f"exploration reward pool {reward_pool_key} contains unsupported state"
+        )
+    return result
+
+
 __all__ = [
     "DEFINITIONS",
     "BATTLE_ENEMY_BY_MODE",
@@ -387,6 +403,7 @@ __all__ = [
     "has_cloud_mine_access",
     "meets_realm",
     "resolve_exploration_mode",
+    "settlement_failure_result",
     "settlement_result",
     "weighted_value",
     "weighted_value_with_item_bonus",

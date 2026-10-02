@@ -94,6 +94,7 @@ from ..exploration.rules import (
     exploration_definition,
     exploration_reward_pool,
     meets_realm as exploration_meets_realm,
+    settlement_failure_result,
     settlement_result,
 )
 from ..adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
@@ -417,6 +418,12 @@ class ExplorationRepositoryMixin:
                     drop_weight_bp=drop_weight_bp,
                     content=self.content,
                 )
+                battle_failure_result = settlement_failure_result(
+                    definition.key,
+                    content=self.content,
+                )
+                if battle_failure_result:
+                    snapshot["battle_failure_result"] = battle_failure_result
             change_player_state(
                 connection,
                 row,
@@ -653,7 +660,10 @@ class ExplorationRepositoryMixin:
             if not isinstance(frozen_payload, dict):
                 raise RewardContentError("exploration combat reward snapshot is missing")
             frozen_result = dict(frozen_payload)
-            result = frozen_result if battle_outcome == "won" else {}
+            failure_result = frozen.get("battle_failure_result", {})
+            if not isinstance(failure_result, dict):
+                raise RewardContentError("exploration battle failure reward snapshot is invalid")
+            result = frozen_result if battle_outcome == "won" else dict(failure_result)
             soul_power_loss = 0
             soul_fatigue_until = row["soul_fatigue_until"]
             snapshot = self._json_object(session["snapshot_json"], {})
@@ -681,6 +691,7 @@ class ExplorationRepositoryMixin:
                 "status": "settled",
                 "result": result,
                 "frozen_result": frozen_result,
+                "battle_failure_result": failure_result,
                 "battle_pending": False,
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
@@ -978,6 +989,7 @@ class ExplorationRepositoryMixin:
                 "status": status,
                 "result": result,
                 "frozen_result": result,
+                "battle_failure_result": dict(snapshot.get("battle_failure_result", {})),
                 "battle_pending": battle_pending,
                 "expired": expired,
                 "storm_pending": False,
