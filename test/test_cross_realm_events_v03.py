@@ -62,6 +62,7 @@ def test_beast_trade_event_projects_sources_and_claims_on_both_adapters() -> Non
                 sources = _insert_trade_sources(runtime, player_id, adapter)
                 status = await runtime.adapters.dispatch(adapter, _context(adapter, user, "status"), "妖界贸易事件")
                 assert status.code == "EVENT_STATUS"
+                assert "reward_snapshot" not in status.data
                 round_id = status.data["round_id"]
                 for index, source_id in enumerate(sources):
                     result = await runtime.adapters.dispatch(

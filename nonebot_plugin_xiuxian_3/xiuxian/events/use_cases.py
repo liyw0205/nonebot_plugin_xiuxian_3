@@ -41,7 +41,7 @@ class EventsApplication:
         return ""
 
     @staticmethod
-    def _data(record) -> dict[str, object]:
+    def _data(record, **extra: object) -> dict[str, object]:
         return {
             "round_id": record.round_id,
             "event_key": record.event_key,
@@ -54,8 +54,8 @@ class EventsApplication:
             "player_contribution": record.player_contribution,
             "success": record.success,
             "reward": record.reward,
-            "reward_snapshot": record.reward_snapshot,
             "idempotent_replay": record.already_completed,
+            **extra,
         }
 
     @staticmethod
@@ -124,7 +124,7 @@ class EventsApplication:
                 f"> {success_text}；达到 10 份贡献后可在结束后领取奖励。"
             ),
             context.request_id,
-            data=self._data(record),
+            data=self._data(record, reward_snapshot=record.reward_snapshot),
         )
 
     async def get_heart_demon_event(self, context: CommandContext) -> CommandResult:
@@ -203,7 +203,7 @@ class EventsApplication:
             f"## 灵泉事件奖励已领取\n\n本轮贡献 {record.player_contribution} 份灵叶。\n\n- " + "\n- ".join(reward_lines),
             context.request_id,
             operation_id,
-            data=self._data(record),
+            data=self._data(record, reward_snapshot=record.reward_snapshot),
         )
 
     @staticmethod
