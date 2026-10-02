@@ -395,6 +395,22 @@
       "status": "active"
     },
     {
+      "name": "祖灵湖探索所得",
+      "desc": "于湖畔寻得祖灵血，并增进妖界声望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 1,
+          "rewards": {
+            "item.ancestral_blood": 1,
+            "faction_reputation.beast": 30
+          }
+        }
+      ],
+      "key": "reward_pool.exploration.ancestral_lake",
+      "status": "active"
+    },
+    {
       "name": "灵泉事件基础奖励",
       "desc": "参与灵泉谷共同行动的谢礼，包含修为与灵石。",
       "operation": "event.claim_reward",

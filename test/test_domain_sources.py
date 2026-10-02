@@ -9,7 +9,10 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
+    battle_roll_bp,
+    exploration_definition,
+)
 
 
 def _context(adapter: str, user: str, request: str, operation: str = "") -> CommandContext:
@@ -162,11 +165,15 @@ def test_ancestral_lake_and_soul_seed_recipe_work_on_qq_and_onebot() -> None:
 
                 # The first exploration is a normal settled run; choose stable operation
                 # identities without an encounter so this test covers the source directly.
+                encounter_chance_bp = exploration_definition(
+                    "explore.ancestral_lake"
+                ).battle_chance_bp
                 for index in range(2):
                     operation = next(
                         f"ancestral-{index}-{candidate}"
                         for candidate in range(1000)
-                        if battle_roll_bp(f"ancestral-{index}-{candidate}:battle") >= 3500
+                        if battle_roll_bp(f"ancestral-{index}-{candidate}:battle")
+                        >= encounter_chance_bp
                     )
                     result = await _run_exploration(
                         runtime, adapter, user, operation, "开始探索 祖灵湖探索"

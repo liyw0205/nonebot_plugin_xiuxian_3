@@ -54,6 +54,7 @@ EXPLORATION_REWARD_POOLS = {
     "explore.cloud_boat_trial": "reward_pool.exploration.cloud_boat_trial",
     "explore.beast_hunt": "reward_pool.exploration.beast_hunt",
     "explore.demon_abyss": "reward_pool.exploration.demon_abyss",
+    "explore.ancestral_lake": "reward_pool.exploration.ancestral_lake",
 }
 
 DEFINITIONS = {
@@ -306,11 +307,6 @@ def settlement_result(
         return result
     if mode_key == "explore.demon_threshold":
         return {"item.soul_crystal": 1, "item.demon_core": 1}
-    if mode_key == "explore.ancestral_lake":
-        return {
-            "item.ancestral_blood": 1,
-            "faction_reputation.beast": 30,
-        }
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 
 
