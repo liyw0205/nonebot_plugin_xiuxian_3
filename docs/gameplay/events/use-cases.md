@@ -4,6 +4,12 @@
 
 `activate_task`、`record_task_event`、`claim_task_reward`、`open_event_round`、`record_contribution`、`settle_event_round`、`freeze_ranking`、`claim_ranking_reward`、`get_final_heaven_season`、`claim_final_heaven_rewards`、`get_three_realms_season`、`claim_three_realms_rewards`、`get_heart_demon_event`。
 
+引路任务入口为 `引路簿` 与 `领取引路嘉奖 <任务名>`。查询从当前内容读取名称并检查本人进度；
+领取不接受来源 operation 或进度参数，只从 operation ledger 验证本人完成的触发来源。寻仙和入道
+分别读取角色创建后的成功 operation；采集只认 `explore.gather_outskirts` 的最终结算，遇袭败退
+不计；生产只认成功完成或成功恢复的订单结算。奖励 JSON 经共享奖励解析和角色状态事务结算，
+源 operation、任务事件、领取进度与 operation ledger 原子提交；重放不重复发放。
+
 领域前线用例为 `get_domain_front`、`join_domain_front`、`start_domain_front_battle`、
 `create_domain_front_point`、`record_domain_front_contribution`、`claim_domain_front_reward`、
 `get_domain_war_season`、`claim_domain_war_reward` 和 `redeem_domain_core`。活动参与、来源投影、个人门槛、轮次恢复、

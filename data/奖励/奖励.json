@@ -41,7 +41,7 @@
     {
       "name": "寻仙里程碑奖励",
       "desc": "完成寻仙之行后所得的谢礼，助你备好接下来的旅程。",
-      "operation": "quest.claim.first_seeking",
+      "operation": "quest.claim_guidance_reward",
       "entries": [
         {
           "kind": "currency",
@@ -61,7 +61,7 @@
     {
       "name": "入道里程碑奖励",
       "desc": "正式入道后获赠的入门功法与灵石。",
-      "operation": "quest.claim.first_cultivation",
+      "operation": "quest.claim_guidance_reward",
       "entries": [
         {
           "kind": "item",
@@ -81,7 +81,7 @@
     {
       "name": "采集里程碑奖励",
       "desc": "首次采集成功后的嘉奖，包含草药与修为积累。",
-      "operation": "quest.claim.first_gather",
+      "operation": "quest.claim_guidance_reward",
       "entries": [
         {
           "kind": "item",
@@ -101,7 +101,7 @@
     {
       "name": "生产里程碑奖励",
       "desc": "完成初次生产后的报酬，可补充灵石并赢得玄天界认可。",
-      "operation": "quest.claim.first_craft",
+      "operation": "quest.claim_guidance_reward",
       "entries": [
         {
           "kind": "currency",

@@ -626,6 +626,16 @@ class XiuxianApplication:
     async def get_advanced_quests(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.get_advanced_quests(context), require_write=False)
 
+    async def get_guidance_quests(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.quests.get_guidance_quests(context), require_write=False)
+
+    async def claim_guidance_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.quests.claim_guidance_reward(context),
+            write_message="当前事件不允许领取引路嘉奖。",
+        )
+
     async def complete_domain_material_commission(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.complete_domain_material_commission(context), write_message="当前事件不允许完成领域委托。")
 

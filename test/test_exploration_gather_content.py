@@ -400,8 +400,20 @@ def test_gather_outskirts_encounter_rewards_follow_battle_result_on_both_adapter
                         )
                         assert settled.code == "EXPLORATION_SETTLED"
                         assert settled.data["battle_outcome"] == outcome, (adapter, outcome, settled.data)
+                        guidance_claim = await runtime.adapters.dispatch(
+                            adapter,
+                            _context(adapter, user, f"{user}-gather-guidance-claim"),
+                            "领取引路嘉奖 第一次采集",
+                        )
+                        if outcome == "won":
+                            assert guidance_claim.code == "GUIDANCE_REWARD_CLAIMED"
+                        else:
+                            assert guidance_claim.code == "QUEST_REQUIREMENT_MISSING"
                         rewards = frozen_rewards if outcome == "won" else {}
                         assert settled.data["result"] == rewards
+                        expected_inventory = dict(rewards)
+                        if outcome == "won":
+                            expected_inventory["item.herb.blood_grass"] += 2
                         with sqlite3.connect(runtime.settings.database_path) as connection:
                             codex_after_settle = connection.execute(
                                 "SELECT * FROM codex_entries WHERE player_id="
@@ -432,8 +444,9 @@ def test_gather_outskirts_encounter_rewards_follow_battle_result_on_both_adapter
                                 "(SELECT id FROM players WHERE platform=? AND platform_user_id=?) ORDER BY entry_key",
                                 (adapter, user),
                             ).fetchall()
-                        assert json.loads(inventory_text) == rewards
-                        assert cultivation == stones == 0
+                        assert json.loads(inventory_text) == expected_inventory
+                        assert cultivation == (30 if outcome == "won" else 0)
+                        assert stones == 0
                         assert stamina == 27
                         assert status == "settled"
                         assert reward_status == "none"

@@ -8,6 +8,9 @@ from ..persistence.errors import (
     BattleNotReadyError,
     BattleRequirementError,
     OperationConflictError,
+    GuidanceQuestAlreadyClaimedError,
+    GuidanceQuestNotAvailableError,
+    GuidanceQuestNotCompletedError,
     DaoOriginTaskRequirementError,
     PlayerNotFoundError,
     PlayerSuspendedError,
@@ -18,6 +21,7 @@ from ..persistence.errors import (
     QuestWeeklyLimitError,
     RepositoryBusyError,
 )
+from ..rewards.rules import RewardContentError
 from .repository import QuestRepositoryMixin
 from .rules import ANCIENT_DOMAIN_LINE, DOMAIN_COMMISSION, SOUL_QUEST, VOID_QUEST, VOID_WALL_TRIAL
 
@@ -38,6 +42,10 @@ class QuestApplication:
     @staticmethod
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
         errors = {
+            GuidanceQuestNotAvailableError: ("GUIDANCE_QUEST_NOT_FOUND", "请先查看引路簿，再选择其中一项领取。"),
+            GuidanceQuestNotCompletedError: ("QUEST_REQUIREMENT_MISSING", "这份引路嘉奖尚未齐备，暂不能领取。"),
+            GuidanceQuestAlreadyClaimedError: ("QUEST_ALREADY_COMPLETED", "这份引路嘉奖已经领取。"),
+            RewardContentError: ("CONTENT_UNAVAILABLE", "引路嘉奖暂不可领取，角色状态未改变。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能推进任务。"),
             QuestRequirementError: ("QUEST_REQUIREMENT_MISSING", "当前境界或任务前置不满足，未修改进度。"),
@@ -91,6 +99,109 @@ class QuestApplication:
             context.request_id,
             data={"quests": record.quests},
         )
+
+    async def get_guidance_quests(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_QUEST_COMMAND", "查看引路簿无需附加内容。", context.request_id)
+        try:
+            record = await self.repository.get_guidance_quests(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except Exception as exc:
+            return self._error(context, "", exc)
+        labels = {
+            "active": "尚未完成",
+            "completed": "已完成，可领取",
+            "claimed": "已经领取",
+        }
+        lines = ["## 引路簿", ""]
+        entries = []
+        for key, quest in record.quests.items():
+            status = str(quest["status"])
+            name = str(quest["name"])
+            lines.append(f"- **{name}**：{labels[status]}")
+            entries.append({"quest_key": key, **quest})
+        return CommandResult(
+            True,
+            "GUIDANCE_QUEST_STATUS",
+            "\n".join(lines),
+            context.request_id,
+            data={"quests": entries},
+        )
+
+    async def claim_guidance_reward(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(
+                False,
+                "INVALID_QUEST_COMMAND",
+                "请使用 `领取引路嘉奖 任务名`。",
+                context.request_id,
+            )
+        operation_id = self._operation_id(context, "quest.claim_guidance_reward")
+        try:
+            record = await self.repository.claim_guidance_reward(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                quest_name=context.command_args[0],
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        reward_snapshot = dict(record.snapshot.get("reward", {}))
+        reward_text = self._guidance_reward_text(reward_snapshot)
+        name_value = record.snapshot.get("quest_name")
+        name = (
+            str(name_value)
+            if isinstance(name_value, str)
+            else self.repository.content.label("quest", record.quest_key)
+        )
+        replay_note = "（依旧如初）" if record.already_completed else ""
+        return CommandResult(
+            True,
+            "GUIDANCE_REWARD_CLAIMED",
+            f"## {name}嘉奖已领取{replay_note}\n\n- **所得**：{reward_text}",
+            context.request_id,
+            operation_id,
+            data={
+                "quest_key": record.quest_key,
+                "status": record.status,
+                "progress": record.progress,
+                "snapshot": record.snapshot,
+                "reward": self._guidance_reward_totals(reward_snapshot),
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    def _guidance_reward_text(self, reward: dict[str, object]) -> str:
+        totals = self._guidance_reward_totals(reward)
+        parts: list[str] = []
+        for key, quantity in totals.items():
+            if key == "spirit_stones":
+                label = "灵石"
+            elif key.startswith("item."):
+                label = self.repository.content.label("item", key)
+            elif key.startswith("faction_reputation."):
+                label = "阵营声望"
+            elif key == "cultivation":
+                label = "修为"
+            else:
+                label = key
+            parts.append(f"{label} ×{quantity}")
+        return "、".join(parts) or "一份修行嘉奖"
+
+    @staticmethod
+    def _guidance_reward_totals(reward: dict[str, object]) -> dict[str, int]:
+        totals: dict[str, int] = {}
+        for field in ("assets", "value_delta", "set_values", "reputation"):
+            values = reward.get(field, {})
+            if not isinstance(values, dict):
+                continue
+            for key, amount in values.items():
+                if key.endswith("_max"):
+                    continue
+                totals[str(key)] = totals.get(str(key), 0) + int(amount)
+        return totals
 
     async def complete_domain_material_commission(self, context: CommandContext) -> CommandResult:
         return await self._simple_action(

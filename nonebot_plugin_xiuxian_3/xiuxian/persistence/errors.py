@@ -2060,6 +2060,18 @@ class QuestNotCompletedError(RuntimeError):
     """The player has not completed all required quest components."""
 
 
+class GuidanceQuestNotCompletedError(RuntimeError):
+    """A guidance reward has no matching settled source operation."""
+
+
+class GuidanceQuestNotAvailableError(RuntimeError):
+    """The requested guidance quest is not part of active content."""
+
+
+class GuidanceQuestAlreadyClaimedError(RuntimeError):
+    """The one-time guidance reward was already claimed."""
+
+
 class QuestResourceInsufficientError(RuntimeError):
     """The player lacks a material required by a quest action."""
 

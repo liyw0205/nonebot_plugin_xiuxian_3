@@ -119,6 +119,11 @@ def test_production_failure_refunds_inputs_and_expired_recovery() -> None:
             assert failed.code == "PRODUCTION_COMPLETED"
             assert failed.data["success"] is False
             assert failed.data["refunds"] == {"item.herb.blood_grass": 1}
+            no_guidance_reward = await runtime.dispatch(
+                _context(user, "claim-failed-production"),
+                "领取引路嘉奖 第一次生产",
+            )
+            assert no_guidance_reward.code == "QUEST_REQUIREMENT_MISSING"
 
             second = await runtime.dispatch(
                 _context(user, "start-expired", operation_id="production-start-expired"),

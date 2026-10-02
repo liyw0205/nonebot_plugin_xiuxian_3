@@ -5,9 +5,10 @@
       "name": "第一次寻仙",
       "desc": "离开熟悉的日常，亲自踏出寻仙问道的第一步。",
       "status": "open",
+      "claim_group": "guidance",
       "trigger": {
-        "operation": "player.start_seeking",
-        "result": "success"
+        "operations": ["player.start_seeking"],
+        "result": {"created": true}
       },
       "reward_key": "reward.quest.first_seeking",
       "claim_policy": "once_per_player",
@@ -18,9 +19,10 @@
       "name": "第一次入道",
       "desc": "完成凡人引导，选定修行道路，正式开始修炼。",
       "status": "open",
+      "claim_group": "guidance",
       "trigger": {
-        "operation": "player.enter_cultivation",
-        "result": "success"
+        "operations": ["player.enter_cultivation"],
+        "result": {"changed": true}
       },
       "reward_key": "reward.quest.first_cultivation",
       "claim_policy": "once_per_player",
@@ -31,9 +33,14 @@
       "name": "第一次采集",
       "desc": "在近郊采下第一份灵草，熟悉山野间的采集之道。",
       "status": "open",
+      "claim_group": "guidance",
       "trigger": {
-        "operation": "explore.gather_outskirts",
-        "result": "success"
+        "operations": ["exploration.settle", "exploration.settle_combat"],
+        "result": {
+          "mode_key": "explore.gather_outskirts",
+          "status": "settled",
+          "battle_outcome": {"one_of": [null, "won"]}
+        }
       },
       "reward_key": "reward.quest.first_gather",
       "claim_policy": "once_per_player",
@@ -44,9 +51,10 @@
       "name": "第一次生产",
       "desc": "完成一份炼制订单，迈出将灵材化为成品的第一步。",
       "status": "open",
+      "claim_group": "guidance",
       "trigger": {
-        "operation_group": "production.*",
-        "result": "completed"
+        "operations": ["production.complete", "production.recover"],
+        "result": {"status": "completed", "success": true}
       },
       "reward_key": "reward.quest.first_craft",
       "claim_policy": "once_per_player",

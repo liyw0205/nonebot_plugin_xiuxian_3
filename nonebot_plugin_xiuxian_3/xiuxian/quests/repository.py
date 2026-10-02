@@ -9,9 +9,13 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import change_player_assets, grant_player_items, inventory_amount, spend_player_items
-from ..utils.player import player_inventory
+from ..utils.player import grant_player_state, player_inventory
+from ..rewards.rules import RewardContentError, reward_definition, reward_totals, reward_value_delta
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
+    GuidanceQuestAlreadyClaimedError,
+    GuidanceQuestNotAvailableError,
+    GuidanceQuestNotCompletedError,
     OperationConflictError,
     PlayerNotFoundError,
     QuestAlreadyCompletedError,
@@ -36,6 +40,9 @@ from .rules import (
     VOID_WALL_TRIAL,
     DAO_ORIGIN_TARGET,
     DAO_ORIGIN_TASKS,
+    GUIDANCE_CLAIM_OPERATION,
+    GuidanceQuestDefinition,
+    guidance_quest_definitions,
     DAO_UNION_QUEST,
     meets_realm,
     utc_week_bounds,
@@ -43,8 +50,38 @@ from .rules import (
 from .cross_realm_rules import DEMON_MAINLINE
 
 
+_MISSING = object()
+
+
 class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
     """Keep quest state separate from the compatibility repository facade."""
+
+    async def get_guidance_quests(
+        self, *, platform: str, platform_user_id: str
+    ) -> QuestStatusRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_guidance_quests_sync, platform, platform_user_id
+            )
+
+    async def claim_guidance_reward(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        quest_name: str,
+        operation_id: str,
+    ) -> QuestClaimRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_guidance_reward_sync,
+                platform,
+                platform_user_id,
+                quest_name,
+                operation_id,
+            )
 
     async def get_advanced_quests(self, *, platform: str, platform_user_id: str) -> QuestStatusRecord:
         await self.initialize()
@@ -164,6 +201,184 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 player=self._row_to_player(player),
                 quests=self._quest_status_payload(connection, int(player["id"])),
             )
+
+    def _get_guidance_quests_sync(
+        self, platform: str, platform_user_id: str
+    ) -> QuestStatusRecord:
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            quests: dict[str, dict[str, object]] = {}
+            for definition in guidance_quest_definitions(self.content):
+                status = self._quest_status_for_player(
+                    connection, int(player["id"]), definition.key
+                )
+                if status["status"] == "claimed":
+                    quest_status = "claimed"
+                    source_operation_id = status["snapshot"].get("source_operation_id")
+                else:
+                    source = self._guidance_source_operation(
+                        connection, int(player["id"]), definition
+                    )
+                    quest_status = "completed" if source is not None else "active"
+                    source_operation_id = source["operation_id"] if source else None
+                quests[definition.key] = {
+                    "name": definition.name,
+                    "description": definition.description,
+                    "status": quest_status,
+                    "progress": {"completed": int(quest_status != "active"), "target": 1},
+                    "source_operation_id": source_operation_id,
+                }
+            return QuestStatusRecord(player=self._row_to_player(player), quests=quests)
+
+    def _claim_guidance_reward_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        quest_name: str,
+        operation_id: str,
+    ) -> QuestClaimRecord:
+        operation_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "quest_name": quest_name,
+        }
+        request_hash = self._request_hash(GUIDANCE_CLAIM_OPERATION, operation_payload)
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            replay = self._quest_operation_replay(
+                connection,
+                operation_id,
+                GUIDANCE_CLAIM_OPERATION,
+                request_hash,
+            )
+            if replay is not None:
+                return self._claim_from_payload(replay, replay=True)
+
+            player = self._require_player(connection, platform, platform_user_id)
+            definition = self._guidance_quest_by_name(quest_name)
+            grant = reward_definition(
+                definition.reward_key,
+                self.content,
+                operation=GUIDANCE_CLAIM_OPERATION,
+            )
+            source = self._guidance_source_operation(
+                connection, int(player["id"]), definition
+            )
+            if source is None:
+                raise GuidanceQuestNotCompletedError("guidance quest source is not settled")
+            current = self._quest_status_for_player(
+                connection, int(player["id"]), definition.key
+            )
+            if current["status"] == "claimed" or self._event_count(
+                connection, int(player["id"]), definition.key, "completion"
+            ):
+                raise GuidanceQuestAlreadyClaimedError("guidance quest reward already claimed")
+
+            grant_player_state(
+                connection,
+                player,
+                rewards=grant.assets,
+                updated_at=now_text,
+                value_delta=reward_value_delta(grant),
+                player_values=grant.set_values or None,
+                reputation_delta=grant.reputation or None,
+            )
+            progress = {"completed": 1, "target": 1}
+            snapshot = {
+                "quest_name": definition.name,
+                "source_operation_id": source["operation_id"],
+                "source_operation_name": source["operation_name"],
+                "source_result": source["matched_result"],
+                "reward": grant.snapshot(),
+            }
+            self._insert_quest_event(
+                connection,
+                player_id=int(player["id"]),
+                quest_key=definition.key,
+                component_key="completion",
+                source_operation_id=str(source["operation_id"]),
+                outcome="success",
+                payload={"source_result": source["matched_result"]},
+                now_text=now_text,
+            )
+            self._upsert_progress(
+                connection,
+                int(player["id"]),
+                definition.key,
+                "claimed",
+                progress,
+                snapshot,
+                str(source["operation_id"]),
+                now_text,
+            )
+            updated = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (player["id"],)
+            ).fetchone()
+            if updated is None:
+                raise RuntimeError("guidance quest reward returned no player")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "quest_key": definition.key,
+                "status": "claimed",
+                "progress": progress,
+                "snapshot": snapshot,
+                "reward": reward_totals(grant),
+            }
+            self._insert_operation(
+                connection,
+                operation_id=operation_id,
+                operation_name=GUIDANCE_CLAIM_OPERATION,
+                player_id=int(player["id"]),
+                request_hash=request_hash,
+                payload=payload,
+                now_text=now_text,
+            )
+            return self._claim_from_payload(payload)
+
+    def _guidance_quest_by_name(self, quest_name: str) -> GuidanceQuestDefinition:
+        for definition in guidance_quest_definitions(self.content):
+            if definition.name == quest_name:
+                return definition
+        raise GuidanceQuestNotAvailableError("guidance quest is not available")
+
+    @staticmethod
+    def _guidance_source_operation(
+        connection: sqlite3.Connection,
+        player_id: int,
+        definition: GuidanceQuestDefinition,
+    ) -> dict[str, object] | None:
+        placeholders = ",".join("?" for _ in definition.operations)
+        rows = connection.execute(
+            f"SELECT operation_id, operation_name, result_json FROM operations "
+            f"WHERE player_id = ? AND operation_name IN ({placeholders}) "
+            "ORDER BY created_at, operation_id",
+            (player_id, *definition.operations),
+        ).fetchall()
+        for row in rows:
+            try:
+                result = json.loads(row["result_json"])
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise RewardContentError("quest source operation contains invalid result data") from exc
+            if not isinstance(result, dict):
+                raise RewardContentError("quest source operation result must be an object")
+            matched: dict[str, object] = {}
+            for field, expected in definition.result.items():
+                actual = result.get(field, _MISSING)
+                if isinstance(expected, dict):
+                    if actual not in expected["one_of"]:
+                        break
+                elif actual != expected:
+                    break
+                if actual is not _MISSING:
+                    matched[field] = actual
+            else:
+                return {
+                    "operation_id": str(row["operation_id"]),
+                    "operation_name": str(row["operation_name"]),
+                    "matched_result": matched,
+                }
+        return None
 
     def _complete_domain_material_commission_sync(
         self, platform: str, platform_user_id: str, operation_id: str

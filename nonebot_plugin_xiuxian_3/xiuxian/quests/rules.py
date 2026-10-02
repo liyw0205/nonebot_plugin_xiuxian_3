@@ -3,7 +3,96 @@
 from __future__ import annotations
 
 
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from typing import Any
+
+from ..content import ContentBundle, ContentError, bundled_content
+
+
+GUIDANCE_CLAIM_OPERATION = "quest.claim_guidance_reward"
+
+
+@dataclass(frozen=True, slots=True)
+class GuidanceQuestDefinition:
+    key: str
+    name: str
+    description: str
+    reward_key: str
+    operations: tuple[str, ...]
+    result: dict[str, Any]
+
+
+def guidance_quest_definitions(
+    content: ContentBundle | None = None,
+) -> tuple[GuidanceQuestDefinition, ...]:
+    bundle = content or bundled_content()
+    rows = [
+        row
+        for row in bundle.list("quest", include_locked=False)
+        if row.get("claim_group") == "guidance"
+    ]
+    definitions: list[GuidanceQuestDefinition] = []
+    names: set[str] = set()
+    for row in rows:
+        key = row.get("key")
+        name = row.get("name")
+        description = row.get("desc")
+        reward_key = row.get("reward_key")
+        trigger = row.get("trigger")
+        operations = trigger.get("operations") if isinstance(trigger, dict) else None
+        result = trigger.get("result") if isinstance(trigger, dict) else None
+        if (
+            not isinstance(key, str)
+            or not key.startswith("quest.")
+            or not isinstance(name, str)
+            or not name.strip()
+            or name in names
+            or not isinstance(description, str)
+            or not isinstance(reward_key, str)
+            or not reward_key.startswith("reward.")
+            or row.get("claim_policy") != "once_per_player"
+            or row.get("expires") is not False
+            or not isinstance(operations, list)
+            or not operations
+            or any(not isinstance(operation, str) or not operation for operation in operations)
+            or len(set(operations)) != len(operations)
+            or not isinstance(result, dict)
+            or not result
+        ):
+            raise ContentError(f"guidance quest definition is invalid: {key!r}")
+        for field, expected in result.items():
+            if not isinstance(field, str) or not field:
+                raise ContentError(f"guidance quest result field is invalid: {key}")
+            if isinstance(expected, dict):
+                allowed = expected.get("one_of")
+                if (
+                    set(expected) != {"one_of"}
+                    or not isinstance(allowed, list)
+                    or not allowed
+                    or any(not _is_json_scalar(value) for value in allowed)
+                ):
+                    raise ContentError(f"guidance quest result condition is invalid: {key}:{field}")
+            elif not _is_json_scalar(expected):
+                raise ContentError(f"guidance quest result value is invalid: {key}:{field}")
+        names.add(name)
+        definitions.append(
+            GuidanceQuestDefinition(
+                key=key,
+                name=name.strip(),
+                description=description.strip(),
+                reward_key=reward_key,
+                operations=tuple(operations),
+                result=dict(result),
+            )
+        )
+    if not definitions:
+        raise ContentError("no active guidance quests are registered")
+    return tuple(definitions)
+
+
+def _is_json_scalar(value: Any) -> bool:
+    return value is None or isinstance(value, (str, int, float, bool))
 
 
 SOUL_QUEST = "quest.soul_transformation"
@@ -105,6 +194,9 @@ __all__ = [
     "DAO_UNION_QUEST",
     "DAO_UNION_TRIBULATION_TOKEN_REWARD",
     "DAO_UNION_WORK",
+    "GUIDANCE_CLAIM_OPERATION",
+    "GuidanceQuestDefinition",
+    "guidance_quest_definitions",
     "meets_realm",
     "utc_week_bounds",
 ]
