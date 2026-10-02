@@ -6,6 +6,9 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from uuid import UUID
+
+import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -275,23 +278,39 @@ def test_demon_abyss_reputation_reward_is_snapshotted_and_projected() -> None:
     asyncio.run(run())
 
 
-def test_demon_abyss_failure_sets_soul_fatigue_and_guards_pollution() -> None:
+@pytest.mark.parametrize("adapter", ("qq.official", "onebot.v11"))
+def test_demon_abyss_failure_sets_soul_fatigue_and_guards_pollution(
+    adapter: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The encounter seed includes this UUID; keep the real defeat reproducible.
+    exploration_uuid = UUID(int=0)
+    monkeypatch.setattr(
+        "nonebot_plugin_xiuxian_3.xiuxian.exploration.repository.uuid4",
+        lambda: exploration_uuid,
+    )
+
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=Path(data_dir))
-            adapter, user = "onebot.v11", "demon-failure"
+            user = "demon-failure"
             await _player(runtime, adapter, user, strong=False)
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
                     "UPDATE players SET location_key='demon.fallen_ruins' WHERE platform=? AND platform_user_id=?",
                     (adapter, user),
                 )
+                assets_before = connection.execute(
+                    "SELECT inventory_json, spirit_stones, cultivation, total_cultivation, "
+                    "faction_reputation_json FROM players WHERE platform=? AND platform_user_id=?",
+                    (adapter, user),
+                ).fetchone()
             started = await runtime.adapters.dispatch(
                 adapter,
                 _context(adapter, user, "failure-start", "demon-failure-start"),
                 "开始探索 魔界堕落遗迹探索",
             )
             assert started.code == "EXPLORATION_STARTED"
+            assert started.data["exploration_id"] == exploration_uuid.hex
             _expire(runtime, started.data["exploration_id"])
             settled = await runtime.adapters.dispatch(
                 adapter,
@@ -300,15 +319,45 @@ def test_demon_abyss_failure_sets_soul_fatigue_and_guards_pollution() -> None:
             )
             assert settled.code == "EXPLORATION_SETTLED"
             assert settled.data["battle_outcome"] == "lost"
+            assert settled.data["result"] == {}
             assert settled.data["soul_power_loss"] == 20
+            replay = await runtime.adapters.dispatch(
+                adapter,
+                _context(adapter, user, "failure-replay", "demon-failure-settle"),
+                "结算探索",
+            )
+            assert replay.code == "EXPLORATION_SETTLED"
+            assert replay.data["idempotent_replay"] is True
+            assert replay.data["battle_id"] == settled.data["battle_id"]
+            assert replay.data["battle_outcome"] == "lost"
+            assert replay.data["result"] == {}
+            assert replay.data["soul_power_loss"] == 20
             with sqlite3.connect(runtime.settings.database_path) as connection:
-                soul_power, fatigue, pollution = connection.execute(
-                    "SELECT soul_power, soul_fatigue_until, pollution FROM players WHERE platform=? AND platform_user_id=?",
+                soul_power, fatigue, pollution, stamina = connection.execute(
+                    "SELECT soul_power, soul_fatigue_until, pollution, stamina "
+                    "FROM players WHERE platform=? AND platform_user_id=?",
                     (adapter, user),
                 ).fetchone()
+                assets_after = connection.execute(
+                    "SELECT inventory_json, spirit_stones, cultivation, total_cultivation, "
+                    "faction_reputation_json FROM players WHERE platform=? AND platform_user_id=?",
+                    (adapter, user),
+                ).fetchone()
+                status, reward_status, state_text, snapshot_text = connection.execute(
+                    "SELECT status, reward_status, state_json, snapshot_json FROM battle_sessions "
+                    "WHERE battle_id=?",
+                    (settled.data["battle_id"],),
+                ).fetchone()
+                assert connection.execute("SELECT COUNT(*) FROM battle_sessions").fetchone()[0] == 1
             assert soul_power == 80
             assert fatigue
             assert pollution == 10
+            assert stamina == 60 - started.data["stamina_cost"]
+            assert assets_after == assets_before
+            assert status == "settled"
+            assert reward_status == "none"
+            assert json.loads(state_text)["player_hp"] == 0
+            assert json.loads(snapshot_text)["random_seed"] == f"exploration.battle:{exploration_uuid.hex}"
             blocked = await runtime.adapters.dispatch(
                 adapter,
                 _context(adapter, user, "fatigue-block"),
