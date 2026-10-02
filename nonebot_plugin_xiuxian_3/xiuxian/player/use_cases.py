@@ -28,6 +28,8 @@ from .rules import (
     validate_dao_name,
 )
 from ..utils.player import player_profile_values, player_projection
+from ..content import ContentError
+from ..stats.rules import StatError
 
 
 class PlayerApplication:
@@ -275,6 +277,23 @@ class PlayerApplication:
         if player is None:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送“开始修仙”。", context.request_id)
         values = player_profile_values(player)
+        stats = {}
+        try:
+            stats = await self.repository.preview_stats(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except (StatError, ContentError, KeyError):
+            stats = {}
+        stats_summary = (
+            "\n\n### 派生属性\n\n"
+            f"- **气血上限**：{stats['derived_stats']['max_hp']}\n"
+            f"- **灵力上限**：{stats['derived_stats']['max_mp']}\n"
+            f"- **负重**：{stats['derived_stats']['carry_capacity']}\n"
+            f"- **先手**：{stats['derived_stats']['initiative']}"
+            if stats
+            else ""
+        )
         soul_summary = (
             f"- **神魂**：{values['soul_power']}/{values['soul_power_max']}\n"
             f"- **领域能量**：{values['domain_charge']}/{values['domain_charge_max']}\n"
@@ -331,10 +350,11 @@ class PlayerApplication:
                 f"{endgame_summary}"
                 "\n### 六项资质\n\n"
                 f"{self._qualification_text(values['qualification'])}"
+                f"{stats_summary}"
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(values['intro_flags']))}/3"
             ),
             request_id=context.request_id,
-            data=values,
+            data={**values, "stats": stats},
         )
 
     async def rename_player(self, context: CommandContext) -> CommandResult:

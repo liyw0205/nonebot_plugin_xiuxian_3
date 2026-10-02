@@ -6,7 +6,7 @@
 
 ## StatSnapshot
 
-` snapshot_id`、`player_id`、`base_stats`、`path_stats`、`derived_stats`、`source_refs`、`formula_version`、用途和创建时间。快照不可变。
+`snapshot_id`、`player_id`、`base_stats`、`path_stats`、`derived_stats`、`source_refs`、内容规则指纹、用途和创建时间。快照不可变；指纹由当前属性规则内容计算，不是运行时版本号。
 
 ## 来源
 

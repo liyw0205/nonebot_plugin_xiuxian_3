@@ -29,6 +29,7 @@ from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
 from .advancement.skill_use_cases import SkillApplication
 from .advancement.equipment_use_cases import EquipmentApplication
+from .stats.use_cases import StatsApplication
 from .companions.use_cases import CompanionApplication
 from .livelihood.use_cases import LivelihoodApplication
 from .livelihood.route_use_cases import RouteApplication
@@ -121,6 +122,7 @@ class XiuxianApplication:
         self.talent = TalentApplication(repository)
         self.skill = SkillApplication(repository)
         self.equipment = EquipmentApplication(repository)
+        self.stats = StatsApplication(repository)
         self.companions = CompanionApplication(repository)
         self.livelihood = LivelihoodApplication(repository)
         self.route = RouteApplication(repository)
@@ -208,6 +210,12 @@ class XiuxianApplication:
 
     async def get_profile(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.player.get_profile(context), require_write=False)
+
+    async def preview_stats(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.stats.preview(context), require_write=False)
+
+    async def explain_stat(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.stats.explain(context), require_write=False)
 
     async def rename_player(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

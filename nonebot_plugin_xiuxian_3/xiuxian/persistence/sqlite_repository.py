@@ -45,6 +45,8 @@ from ..production.facility_repository import FacilityRepositoryMixin
 from ..items.repository import ItemRepositoryMixin
 from ..production.endgame_repository import EndgameProductionRepositoryMixin
 from ..advancement.repository import AdvancementRepositoryMixin
+from ..stats.repository import StatsRepositoryMixin
+from ..stats.migration import ensure_stats_schema
 from ..livelihood.repository import LivelihoodRepositoryMixin
 from ..livelihood.trade_permit_migration import ensure_trade_permit_schema
 from ..social.sect_repository import SectRepositoryMixin
@@ -185,6 +187,7 @@ class SQLitePlayerRepository(
     AuctionRepositoryMixin,
     PurchaseOrderRepositoryMixin,
     AdvancementRepositoryMixin,
+    StatsRepositoryMixin,
     CultivationRepositoryMixin,
     BreakthroughRepositoryMixin,
 ):
@@ -305,6 +308,7 @@ class SQLitePlayerRepository(
             ensure_three_realms_tower_duo_schema(connection)
             ensure_story_schema(connection)
             ensure_trade_permit_schema(connection)
+            ensure_stats_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"

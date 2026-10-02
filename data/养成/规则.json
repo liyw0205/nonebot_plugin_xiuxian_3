@@ -2,6 +2,41 @@
   "kind": "advancement_rule",
   "records": [
     {
+      "key": "stats.formula",
+      "name": "角色属性推演规则",
+      "desc": "由六项资质、当前境界和层数推演修士的基础属性。",
+      "formulas": {
+        "realm_growth_per_index": 20,
+        "realm_growth_per_layer": 3,
+        "max_hp_base": 100,
+        "max_hp_body": 8,
+        "max_hp_root": 5,
+        "max_mp_base": 60,
+        "max_mp_per_index": 18,
+        "max_mp_per_layer": 2,
+        "max_mp_spirit": 10,
+        "max_mp_insight": 4,
+        "carry_base": 20,
+        "carry_body": 2,
+        "carry_per_index": 5,
+        "carry_per_layer": 1,
+        "initiative_base": 10,
+        "initiative_agility": 1,
+        "training_base_bp": 10000,
+        "training_insight_bp": 80,
+        "training_layer_bp": 25,
+        "exploration_base_bp": 10000,
+        "exploration_agility_bp": 50,
+        "exploration_layer_bp": 15,
+        "breakthrough_root_bp": 20
+      },
+      "caps": {
+        "training_rate_bp": {"permanent": 4000, "temporary": 6000},
+        "exploration_rate_bp": {"permanent": 3000, "temporary": 5000}
+      },
+      "status": "active"
+    },
+    {
       "key": "skill.mastery",
       "name": "神通参悟规则",
       "desc": "参悟等级、资源消耗和等级效果增量。",

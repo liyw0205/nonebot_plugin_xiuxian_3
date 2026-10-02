@@ -115,7 +115,7 @@
 | `path_stats` | 道途专属状态属性 |
 | `derived_stats` | 气血、灵力、伤害、防御、速度等 |
 | `source_refs` | 功法、技能、装备、环境和状态来源 |
-| `formula_version` | 公式版本 |
+| `formula_fingerprint` | 当前属性规则内容的不可变摘要，不作为玩家可见版本标识 |
 | `created_at` | 快照时间 |
 
 快照是不可变记录。装备、状态或规则变化只能生成新快照。
