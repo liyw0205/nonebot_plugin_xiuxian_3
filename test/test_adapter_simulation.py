@@ -232,6 +232,54 @@ def test_qq_and_onebot_normalization_reaches_automatic_training_battle() -> None
     asyncio.run(run())
 
 
+def test_qq_and_onebot_constitution_effect_reaches_spectator_combat_snapshot() -> None:
+    qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-spirit-root"))
+    onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3030))
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for prefix, normalized in (("qq", qq), ("onebot", onebot)):
+                base = normalized.context
+
+                async def dispatch(operation: str, text: str):
+                    return await runtime.adapters.dispatch(
+                        base.adapter,
+                        replace(base, operation_id=f"{prefix}-{operation}"),
+                        text,
+                    )
+
+                for operation, command in (
+                    ("create", "开始修仙"),
+                    ("seek", "寻仙问道"),
+                    ("read", "完成引导 阅读"),
+                    ("travel", "前往近郊"),
+                    ("gather", "完成引导 采集"),
+                    ("service", "完成引导 炼丹"),
+                    ("path", "选择道途 体修"),
+                    ("return", "返回新手城"),
+                ):
+                    assert (await dispatch(operation, command)).ok
+                selected = await dispatch("select", "选择体质 灵根")
+                assert selected.code == "CONSTITUTION_SELECTED"
+                profile = await dispatch("profile", "我的体质")
+                assert profile.data["effect"] == {"type": "max_mana_bp", "value": 300}
+                spectator = await dispatch("spectator", "开始训练战")
+                assert spectator.code == "TRAINING_SPECTATOR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.row_factory = sqlite3.Row
+                    player = connection.execute(
+                        "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (base.adapter, base.user_id),
+                    ).fetchone()
+                    snapshot, _ = runtime.repository._spectator_player_snapshot(connection, player)
+                base_mana = 80 + int(snapshot["qualification"]["spirit"]) * 10
+                assert snapshot["stats"]["max_mana"] == base_mana + base_mana * 300 // 10_000
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_qq_and_onebot_spirit_leaf_field_flow_reaches_shared_application() -> None:
     qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-spirit-leaf"))
     onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3010))

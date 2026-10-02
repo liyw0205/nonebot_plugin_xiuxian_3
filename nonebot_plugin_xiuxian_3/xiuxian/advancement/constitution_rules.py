@@ -8,7 +8,13 @@ from typing import Any
 from ..content import ContentBundle, ContentError, bundled_content
 
 CONSUMED_EFFECT_TYPES = frozenset(
-    {"max_hp_bp", "initiative_bp", "production_quality_bp", "drop_weight_bp"}
+    {
+        "max_hp_bp",
+        "max_mana_bp",
+        "initiative_bp",
+        "production_quality_bp",
+        "drop_weight_bp",
+    }
 )
 
 

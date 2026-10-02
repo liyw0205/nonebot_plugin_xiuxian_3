@@ -12,7 +12,7 @@
     },
     {
       "name": "灵根",
-      "status": "locked",
+      "status": "active",
       "desc": "灵力易感，提升灵力上限。",
       "quality": "common",
       "effect": {"type": "max_mana_bp", "value": 300},

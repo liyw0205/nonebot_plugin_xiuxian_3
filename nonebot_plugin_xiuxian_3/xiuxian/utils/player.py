@@ -190,7 +190,6 @@ PLAYER_COMBAT_PROJECTION_FIELDS = (
     "pollution",
     "bloodline_stability",
     "cross_realm_penalty_bp",
-    "faction_reputation",
     "soul_power",
     "soul_power_max",
     "domain_key",

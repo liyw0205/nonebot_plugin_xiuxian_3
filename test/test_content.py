@@ -25,7 +25,7 @@ def test_runtime_content_uses_normalized_records() -> None:
     assert realm_display_name("soul_transformation", 1) == "化神境一层"
     constitution = bundle.require("constitution", "constitution.iron_bone")
     assert constitution["effect"] == {"type": "max_hp_bp", "value": 300}
-    assert len(bundle.list("constitution", include_locked=False)) == 4
+    assert len(bundle.list("constitution", include_locked=False)) == 5
     talents = bundle.list("talent", include_locked=False)
     assert len(talents) == 30
     assert [row["cost_points"] for row in talents if row["tree_key"] == "body"] == [0, 1, 2, 3, 5]

@@ -53,6 +53,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
 )
 from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     PLAYER_NUMERIC_FIELDS,
+    PLAYER_VIEW_FIELDS,
     player_field,
     player_integer,
     player_numeric_delta,
@@ -586,6 +587,14 @@ def test_player_projection_uses_one_numeric_field_table() -> None:
     assert values["arena_rating"] == 1000
     assert values["domain_power"] == 17
     assert values["dao_fruit_progress"] == 4
+
+
+def test_player_view_field_definitions_are_unique() -> None:
+    for fields in PLAYER_VIEW_FIELDS.values():
+        assert len(fields) == len(set(fields))
+
+    combat = player_combat_values({"faction_reputation_json": '{"demon": 3}'})
+    assert combat["faction_reputation"] == {"demon": 3}
 
 
 def test_player_profile_and_status_projections_are_detached_and_consistent() -> None:

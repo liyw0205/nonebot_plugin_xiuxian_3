@@ -86,7 +86,7 @@ class ConstitutionApplication:
         for definition in constitution_options(content):
             suffix = self._effect_value(definition.effect)
             lines.append(f"- **{definition.label}**：{definition.description}{suffix}")
-        lines.extend(["", f"> 首次选择不消耗道具；重塑间隔 {self._duration(cooldown)}，且不会返还已用天赋点。"])
+        lines.extend(["", f"> 首次选择不消耗道具；重塑间隔 {self._duration(cooldown)}，只改变主质，不动修行根基。"])
         return CommandResult(True, "CONSTITUTION_PREVIEW", "\n".join(lines), context.request_id)
 
     async def select(self, context: CommandContext) -> CommandResult:
@@ -108,11 +108,11 @@ class ConstitutionApplication:
         except ConstitutionAlreadySelectedError:
             return CommandResult(False, "CONSTITUTION_ALREADY_SELECTED", "你已经选择过主质，后续请使用 `重塑体质`。", context.request_id, operation_id)
         except ConstitutionBusyError:
-            return CommandResult(False, "CONSTITUTION_BUSY", "当前有其他长时会话进行中，请先完成结算。", context.request_id, operation_id)
+            return CommandResult(False, "CONSTITUTION_BUSY", "当前仍有一段修行未了，请先完成结算。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能选择体质。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他体质操作，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此番仙契已有别的约定，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -141,7 +141,7 @@ class ConstitutionApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "缺少重塑所需凭证，无法改变主质。", context.request_id, operation_id)
         except ConstitutionBusyError:
-            return CommandResult(False, "CONSTITUTION_BUSY", "当前有其他长时会话进行中，请先完成结算。", context.request_id, operation_id)
+            return CommandResult(False, "CONSTITUTION_BUSY", "当前仍有一段修行未了，请先完成结算。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerStageConflictError:
@@ -149,7 +149,7 @@ class ConstitutionApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能重塑体质。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他体质操作，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此番仙契已有别的约定，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:

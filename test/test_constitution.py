@@ -62,8 +62,7 @@ def test_constitution_preview_selection_and_profile_are_idempotent() -> None:
             user = "constitution-select"
             preview = await runtime.dispatch(_context(user, "preview"), "体质预览")
             assert preview.ok
-            assert all(label in preview.message for label in ("铁骨", "风行", "巧手", "福缘"))
-            assert "灵根" not in preview.message
+            assert all(label in preview.message for label in ("铁骨", "灵根", "风行", "巧手", "福缘"))
             assert "御兽" not in preview.message
 
             before = await runtime.dispatch(_context(user, "before"), "选择体质 铁骨")
@@ -86,6 +85,39 @@ def test_constitution_preview_selection_and_profile_are_idempotent() -> None:
             profile = await runtime.dispatch(_context(user, "profile"), "我的体质")
             assert profile.code == "CONSTITUTION_PROFILE"
             assert profile.data["label"] == "铁骨"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_spirit_root_is_frozen_into_training_spectator_stats() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "constitution-spirit-root"
+            await _enter_cultivator(runtime, user)
+            selected = await runtime.dispatch(
+                _context(user, "select", operation_id="constitution-spirit-root-select"),
+                "选择体质 灵根",
+            )
+            assert selected.code == "CONSTITUTION_SELECTED"
+            assert selected.data["effect"] == {"type": "max_mana_bp", "value": 300}
+
+            profile = await runtime.dispatch(_context(user, "profile"), "我的体质")
+            assert profile.data["effect"] == {"type": "max_mana_bp", "value": 300}
+
+            returned = await runtime.dispatch(_context(user, "return"), "返回新手城")
+            assert returned.ok
+            preview = await runtime.dispatch(_context(user, "battle"), "开始训练战")
+            assert preview.code == "TRAINING_SPECTATOR"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.row_factory = sqlite3.Row
+                player = connection.execute(
+                    "SELECT * FROM players WHERE platform_user_id = ?", (user,)
+                ).fetchone()
+                snapshot, _ = runtime.repository._spectator_player_snapshot(connection, player)
+            base_mana = 80 + int(snapshot["qualification"]["spirit"]) * 10
+            assert snapshot["stats"]["max_mana"] == base_mana + base_mana * 300 // 10_000
             await runtime.close()
 
     asyncio.run(run())
@@ -131,6 +163,35 @@ def test_modified_constitution_json_changes_frozen_combat_stats(tmp_path: Path) 
             ).fetchone()
         assert current[0] == player[0]
         assert current[1:] == before
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_modified_spirit_root_json_changes_frozen_mana_stats(tmp_path: Path) -> None:
+    content_dir = tmp_path / "content"
+    shutil.copytree(Path(__file__).parents[1] / "data", content_dir)
+    body_path = content_dir / "养成" / "体质.json"
+    document = json.loads(body_path.read_text(encoding="utf-8"))
+    spirit_root = next(row for row in document["records"] if row["key"] == "constitution.spirit_root")
+    spirit_root["effect"]["value"] = 1_250
+    body_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    async def run() -> None:
+        runtime = create_runtime(data_dir=content_dir)
+        user = "constitution-spirit-root-config"
+        await _enter_cultivator(runtime, user)
+        assert (await runtime.dispatch(_context(user, "return"), "返回新手城")).ok
+        selected = await runtime.dispatch(_context(user, "select"), "选择体质 灵根")
+        assert selected.data["effect"] == {"type": "max_mana_bp", "value": 1_250}
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.row_factory = sqlite3.Row
+            player = connection.execute(
+                "SELECT * FROM players WHERE platform_user_id = ?", (user,)
+            ).fetchone()
+            snapshot, _ = runtime.repository._spectator_player_snapshot(connection, player)
+        base_mana = 80 + int(snapshot["qualification"]["spirit"]) * 10
+        assert snapshot["stats"]["max_mana"] == base_mana + base_mana * 1_250 // 10_000
         await runtime.close()
 
     asyncio.run(run())

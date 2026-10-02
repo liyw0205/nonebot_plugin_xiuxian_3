@@ -877,6 +877,8 @@ def apply_constitution_combat_effect(
         raise ValueError("constitution combat effect is invalid")
     if effect_type == "max_hp_bp":
         result["max_hp"] += result.get("max_hp", 0) * value // 10_000
+    elif effect_type == "max_mana_bp":
+        result["max_mana"] += result.get("max_mana", 0) * value // 10_000
     elif effect_type == "initiative_bp":
         result["initiative"] += result.get("initiative", 0) * value // 10_000
     elif effect_type not in {"production_quality_bp", "drop_weight_bp"}:
