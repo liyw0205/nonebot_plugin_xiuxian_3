@@ -67,6 +67,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_intro_flags,
     player_combat_values,
     player_reputation,
+    player_reputation_with_delta,
     player_values,
     player_numeric_values,
     player_has_values,
@@ -572,6 +573,20 @@ def test_player_state_helpers_share_json_and_inventory_normalization() -> None:
     assert player_qualification(row) == {"body": 12, "mind": 8}
     assert player_intro_flags(row) == ("story.one", "2")
     assert player_reputation(row) == {"demon": 20, "beast": 5}
+
+
+def test_player_reputation_delta_uses_stable_faction_keys_and_validation() -> None:
+    row = {"faction_reputation_json": '{"xuantian": "4"}'}
+    assert player_reputation_with_delta(
+        row,
+        {"faction_reputation.xuantian": 6, "faction_reputation.beast": 2},
+    ) == {"xuantian": 10, "beast": 2}
+    with pytest.raises(ValueError, match="unsupported reputation key"):
+        player_reputation_with_delta(row, {"xuantian": 1})
+    with pytest.raises(ValueError, match="must be an integer"):
+        player_reputation_with_delta(row, {"faction_reputation.xuantian": True})
+    with pytest.raises(ValueError, match="cannot be negative"):
+        player_reputation_with_delta(row, {"faction_reputation.xuantian": -5})
 
 
 def test_player_integer_projection_is_shared_by_profile_and_combat_reads() -> None:

@@ -1,4 +1,4 @@
-"""Pure rules for the v0.1 spirit-spring world event."""
+"""Pure rules for the spirit-spring world event."""
 
 from __future__ import annotations
 

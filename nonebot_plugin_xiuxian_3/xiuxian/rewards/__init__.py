@@ -1,5 +1,19 @@
 """Content-backed reward definitions and normalized grants."""
 
-from .rules import RewardContentError, RewardGrant, reward_definition
+from .rules import (
+    RewardContentError,
+    RewardGrant,
+    combine_reward_grants,
+    reward_definition,
+    reward_totals,
+    reward_value_delta,
+)
 
-__all__ = ["RewardContentError", "RewardGrant", "reward_definition"]
+__all__ = [
+    "RewardContentError",
+    "RewardGrant",
+    "combine_reward_grants",
+    "reward_definition",
+    "reward_totals",
+    "reward_value_delta",
+]

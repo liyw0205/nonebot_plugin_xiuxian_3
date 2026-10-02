@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import shutil
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event as normalize_onebot_event
@@ -229,6 +231,8 @@ def test_spirit_spring_event_failed_round_threshold_and_expiry_are_atomic() -> N
             )
             assert claimed.code == "EVENT_REWARD_CLAIMED"
             assert claimed.data["reward"] == {"cultivation": 150, "spirit_stones": 100}
+            assert claimed.data["reward_snapshot"]["completion"] is None
+            assert claimed.data["reward_snapshot"]["final"]["reputation"] == {}
             clock.advance(hours=25)
             expired = await runtime.dispatch(
                 _context(user, "expired-claim"), f"领取灵泉事件奖励 {status.data['round_id']}"
@@ -239,5 +243,135 @@ def test_spirit_spring_event_failed_round_threshold_and_expiry_are_atomic() -> N
             closed = await runtime.dispatch(_context(user, "closed"), "灵泉事件")
             assert closed.code == "EVENT_NOT_ACTIVE"
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_spirit_spring_reward_content_is_shared_by_adapters_and_replay() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 23, 20, 5, tzinfo=timezone.utc))
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            reward_file = data_dir / "奖励" / "奖励.json"
+            document = json.loads(reward_file.read_text(encoding="utf-8"))
+            base = next(
+                item for item in document["records"]
+                if item["key"] == "reward.event.spirit_spring.base"
+            )
+            next(entry for entry in base["entries"] if entry["kind"] == "currency")["quantity"] = 321
+            next(entry for entry in base["entries"] if entry.get("resource_key") == "cultivation")["quantity"] = 234
+            completion = next(
+                item for item in document["records"]
+                if item["key"] == "reward.event.spirit_spring.completion"
+            )
+            next(entry for entry in completion["entries"] if entry["kind"] == "reputation")["quantity"] = 17
+            reward_file.write_text(
+                json.dumps(document, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            qq, onebot = _adapter_contexts()
+            runtime = create_runtime(
+                data_dir=data_dir,
+                adapters=("qq.official", "onebot.v11"),
+                clock=clock,
+            )
+            try:
+                contexts = (("qq.official", qq, "content-qq"), ("onebot.v11", onebot, "content-ob"))
+                statuses = []
+                for adapter, context, prefix in contexts:
+                    await _create_player(runtime, context, context.user_id, prefix)
+                    status = await runtime.adapters.dispatch(
+                        adapter, replace(context, operation_id=f"{prefix}-status"), "灵泉事件"
+                    )
+                    assert status.code == "EVENT_STATUS"
+                    statuses.append(status)
+                assert {status.data["round_id"] for status in statuses} == {"20260923"}
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_ids = dict(
+                        connection.execute(
+                            "SELECT platform_user_id, id FROM players WHERE platform_user_id IN (?, ?)",
+                            (qq.user_id, onebot.user_id),
+                        ).fetchall()
+                    )
+                    for player_id in player_ids.values():
+                        connection.execute(
+                            """
+                            INSERT INTO world_event_contributions(round_id, player_id, contribution, updated_at)
+                            VALUES ('20260923', ?, 100, ?)
+                            """,
+                            (player_id, clock.value.isoformat()),
+                        )
+
+                clock.advance(minutes=31)
+                for adapter, context, prefix in contexts:
+                    claimed = await runtime.adapters.dispatch(
+                        adapter,
+                        replace(context, operation_id=f"{prefix}-claim"),
+                        "领取灵泉事件奖励 20260923",
+                    )
+                    assert claimed.code == "EVENT_REWARD_CLAIMED"
+                    assert claimed.data["reward"] == {
+                        "cultivation": 234,
+                        "faction_reputation.xuantian": 17,
+                        "spirit_stones": 321,
+                    }
+                    assert "玄天界阵营声望 +17" in claimed.message
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        row = connection.execute(
+                            "SELECT cultivation, total_cultivation, faction_reputation_json FROM players WHERE platform_user_id = ?",
+                            (context.user_id,),
+                        ).fetchone()
+                        assert row[0:2] == (234, 234)
+                        assert json.loads(row[2])["xuantian"] == 17
+                        payload = json.loads(
+                            connection.execute(
+                                "SELECT result_json FROM operations WHERE operation_id = ?",
+                                (f"{prefix}-claim",),
+                            ).fetchone()[0]
+                        )
+                    assert payload["reward_snapshot"]["final"]["value_delta"] == {
+                        "cultivation": 234
+                    }
+                    assert payload["reward_snapshot"]["completion"]["reputation"] == {
+                        "faction_reputation.xuantian": 17
+                    }
+
+                conflict = await runtime.adapters.dispatch(
+                    "qq.official",
+                    replace(qq, operation_id="content-qq-claim"),
+                    "领取灵泉事件奖励 20260922",
+                )
+                assert conflict.code == "OPERATION_CONFLICT"
+
+                await runtime.close()
+                recovered = create_runtime(
+                    data_dir=data_dir,
+                    adapters=("qq.official",),
+                    clock=clock,
+                )
+                try:
+                    replay = await recovered.adapters.dispatch(
+                        "qq.official",
+                        replace(qq, operation_id="content-qq-claim"),
+                        "领取灵泉事件奖励 20260923",
+                    )
+                    assert replay.code == "EVENT_REWARD_CLAIMED"
+                    assert replay.data["idempotent_replay"] is True
+                    assert replay.data["reward"] == {
+                        "cultivation": 234,
+                        "faction_reputation.xuantian": 17,
+                        "spirit_stones": 321,
+                    }
+                    assert replay.data["reward_snapshot"]["completion"]["reputation"] == {
+                        "faction_reputation.xuantian": 17
+                    }
+                finally:
+                    await recovered.close()
+            finally:
+                if not runtime._closed:
+                    await runtime.close()
 
     asyncio.run(run())

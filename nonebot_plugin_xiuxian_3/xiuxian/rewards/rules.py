@@ -42,6 +42,70 @@ class RewardGrant:
         }
 
 
+def combine_reward_grants(*grants: RewardGrant) -> RewardGrant:
+    """Combine fixed grants that belong to the same application operation."""
+
+    if not grants:
+        raise ValueError("at least one reward grant is required")
+    operations = {grant.operation for grant in grants}
+    if len(operations) != 1:
+        raise RewardContentError("reward grants must belong to one operation")
+    value_delta = _combine_maps(*(grant.value_delta for grant in grants))
+    set_values = _combine_set_values(*(grant.set_values for grant in grants))
+    overlap = set(value_delta) & set(set_values)
+    if overlap:
+        raise RewardContentError(
+            f"reward grants supply both delta and fixed values for {sorted(overlap)!r}"
+        )
+    return RewardGrant(
+        key="+".join(grant.key for grant in grants),
+        operation=grants[0].operation,
+        assets=_combine_maps(*(grant.assets for grant in grants)),
+        value_delta=value_delta,
+        set_values=set_values,
+        reputation=_combine_maps(*(grant.reputation for grant in grants)),
+    )
+
+
+def reward_totals(grant: RewardGrant) -> dict[str, int]:
+    """Flatten a grant into the values shown and frozen in an operation."""
+
+    totals = dict(grant.assets)
+    for values in (grant.value_delta, grant.set_values, grant.reputation):
+        for key, amount in values.items():
+            if key.endswith("_max"):
+                continue
+            totals[key] = totals.get(key, 0) + int(amount)
+    return totals
+
+
+def reward_value_delta(grant: RewardGrant) -> dict[str, int]:
+    """Return player numeric changes, including cumulative cultivation."""
+
+    values = dict(grant.value_delta)
+    if "cultivation" in values and "total_cultivation" not in values:
+        values["total_cultivation"] = values["cultivation"]
+    return values
+
+
+def _combine_maps(*maps: dict[str, int]) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for values in maps:
+        for key, amount in values.items():
+            result[key] = result.get(key, 0) + int(amount)
+    return result
+
+
+def _combine_set_values(*maps: dict[str, int]) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for values in maps:
+        for key, amount in values.items():
+            if key in result and result[key] != int(amount):
+                raise RewardContentError(f"conflicting fixed value for {key}")
+            result[key] = int(amount)
+    return result
+
+
 def reward_definition(
     key: str,
     content: ContentBundle | None = None,
@@ -114,6 +178,10 @@ def reward_definition(
                     f"reward {key} entry {index} set_max must be at least quantity"
                 )
             if set_max is not None:
+                if str(resource_key) in value_delta:
+                    raise RewardContentError(
+                        f"reward {key} supplies both delta and fixed values for {resource_key}"
+                    )
                 max_field = _RESOURCE_MAX_FIELDS.get(str(resource_key))
                 if max_field is None:
                     raise RewardContentError(
@@ -123,15 +191,23 @@ def reward_definition(
                     raise RewardContentError(
                         f"reward {key} entry {index} set_max cannot be below quantity"
                     )
-                _add(set_values, str(resource_key), quantity)
-                _add(set_values, max_field, set_max)
+                _set_value(set_values, str(resource_key), quantity)
+                _set_value(set_values, max_field, set_max)
             else:
                 _add(value_delta, str(resource_key), quantity)
         else:
             reputation_key = entry.get("reputation_key")
             if not isinstance(reputation_key, str) or not reputation_key.startswith("faction_reputation."):
                 raise RewardContentError(f"reward {key} entry {index} requires reputation_key")
+            if not reputation_key.removeprefix("faction_reputation."):
+                raise RewardContentError(f"reward {key} entry {index} requires a faction")
             _add(reputation, reputation_key, quantity)
+
+    overlap = set(value_delta) & set(set_values)
+    if overlap:
+        raise RewardContentError(
+            f"reward {key} supplies both delta and fixed values for {sorted(overlap)!r}"
+        )
 
     return RewardGrant(
         key=key,
@@ -147,4 +223,18 @@ def _add(target: dict[str, int], key: str, amount: int) -> None:
     target[key] = target.get(key, 0) + int(amount)
 
 
-__all__ = ["RewardContentError", "RewardGrant", "reward_definition"]
+def _set_value(target: dict[str, int], key: str, amount: int) -> None:
+    value = int(amount)
+    if key in target and target[key] != value:
+        raise RewardContentError(f"conflicting fixed value for {key}")
+    target[key] = value
+
+
+__all__ = [
+    "RewardContentError",
+    "RewardGrant",
+    "combine_reward_grants",
+    "reward_definition",
+    "reward_totals",
+    "reward_value_delta",
+]

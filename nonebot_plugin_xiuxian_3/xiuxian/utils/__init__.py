@@ -41,6 +41,7 @@ from .player import (
     player_intro_flags,
     player_combat_values,
     player_reputation,
+    player_reputation_with_delta,
     player_values,
 )
 from .assets import (
@@ -164,6 +165,7 @@ __all__ = [
     "player_intro_flags",
     "player_combat_values",
     "player_reputation",
+    "player_reputation_with_delta",
     "player_realm_values",
     "player_values",
     "read_json_cached",

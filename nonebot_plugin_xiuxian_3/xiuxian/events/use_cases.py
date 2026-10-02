@@ -54,6 +54,7 @@ class EventsApplication:
             "player_contribution": record.player_contribution,
             "success": record.success,
             "reward": record.reward,
+            "reward_snapshot": record.reward_snapshot,
             "idempotent_replay": record.already_completed,
         }
 
@@ -193,7 +194,9 @@ class EventsApplication:
             f"灵石 +{record.reward.get('spirit_stones', 0)}",
         ]
         if record.reward.get("faction_reputation.xuantian", 0):
-            reward_lines.append("玄天界阵营声望 +10")
+            reward_lines.append(
+                f"玄天界阵营声望 +{record.reward['faction_reputation.xuantian']}"
+            )
         return CommandResult(
             True,
             "EVENT_REWARD_CLAIMED",

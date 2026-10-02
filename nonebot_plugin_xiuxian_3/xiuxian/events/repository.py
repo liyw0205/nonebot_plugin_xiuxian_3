@@ -1,4 +1,4 @@
-"""SQLite transactions for the v0.1 world-event slice."""
+"""SQLite transactions for world events."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..content import ContentError, bundled_content
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -25,6 +26,12 @@ from .rules import (
     event_times,
     round_id_for,
     scheduled_start,
+)
+from ..rewards.rules import (
+    combine_reward_grants,
+    reward_definition,
+    reward_totals,
+    reward_value_delta,
 )
 from ..utils.player import grant_player_state
 
@@ -134,26 +141,16 @@ class EventsRepositoryMixin:
                 raise EventRewardAlreadyClaimedError("event reward has already been claimed")
 
             success = bool(self._json_object(event["result_json"], {}).get("success", False))
-            reward: dict[str, int] = {"cultivation": 150, "spirit_stones": 100}
-            faction = self._json_object(player["faction_reputation_json"], {})
-            if success:
-                reward["faction_reputation.xuantian"] = 10
-            faction_before = int(faction.get("xuantian", 0))
-            faction_after = faction_before + reward.get("faction_reputation.xuantian", 0)
-            if success:
-                faction["xuantian"] = faction_after
+            reward_grant, reward_snapshot = self._event_reward_grant(event, success=success)
+            reward = reward_totals(reward_grant)
             grant_player_state(
                 connection,
                 player,
-                rewards={"spirit_stones": reward["spirit_stones"]},
+                rewards=reward_grant.assets,
                 updated_at=now_text,
-                value_delta={
-                    "cultivation": reward["cultivation"],
-                    "total_cultivation": reward["cultivation"],
-                },
-                player_values={
-                    "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
-                },
+                value_delta=reward_value_delta(reward_grant),
+                player_values=reward_grant.set_values or None,
+                reputation_delta=reward_grant.reputation or None,
             )
             connection.execute(
                 """
@@ -180,7 +177,15 @@ class EventsRepositoryMixin:
                     "event.spirit_spring.claim",
                     operation_id,
                     now_text,
-                    json.dumps({"round_id": event["round_id"], "reward": reward}, ensure_ascii=False, sort_keys=True),
+                    json.dumps(
+                        {
+                            "round_id": event["round_id"],
+                            "reward": reward,
+                            "reward_snapshot": reward_snapshot,
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
                 ),
             )
             updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
@@ -190,6 +195,7 @@ class EventsRepositoryMixin:
                 event,
                 contribution,
                 reward,
+                reward_snapshot,
             )
             connection.execute(
                 """
@@ -206,6 +212,34 @@ class EventsRepositoryMixin:
                 ),
             )
             return self._event_record_from_payload(payload)
+
+    def _event_reward_grant(self, event: Any, *, success: bool):
+        content = self.content or bundled_content()
+        try:
+            event_definition = content.require("event", str(event["event_key"]), include_locked=False)
+            claim = event_definition["claim"]
+            base_key = claim["reward_key"]
+            if not isinstance(base_key, str) or not base_key:
+                raise ContentError("event claim requires reward_key")
+            base_grant = reward_definition(base_key, content, operation="event.claim_reward")
+            completion_grant = None
+            grants = [base_grant]
+            if success:
+                completion_key = claim.get("completion_bonus_key")
+                if not isinstance(completion_key, str) or not completion_key:
+                    raise ContentError("successful event claim requires completion_bonus_key")
+                completion_grant = reward_definition(
+                    completion_key, content, operation="event.claim_reward"
+                )
+                grants.append(completion_grant)
+            final_grant = combine_reward_grants(*grants)
+            return final_grant, {
+                "base": base_grant.snapshot(),
+                "completion": completion_grant.snapshot() if completion_grant else None,
+                "final": final_grant.snapshot(),
+            }
+        except (KeyError, TypeError) as exc:
+            raise ContentError(f"event reward configuration is invalid: {event['event_key']}") from exc
 
     def _event_select_round(
         self,
@@ -308,6 +342,7 @@ class EventsRepositoryMixin:
             player_contribution=contribution,
             success=result.get("success") if "success" in result else None,
             reward={},
+            reward_snapshot={},
         )
 
     def _event_payload(
@@ -317,6 +352,7 @@ class EventsRepositoryMixin:
         event: Any,
         contribution: int,
         reward: dict[str, int],
+        reward_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         result = self._json_object(event["result_json"], {})
         return {
@@ -332,6 +368,7 @@ class EventsRepositoryMixin:
             "player_contribution": contribution,
             "success": result.get("success"),
             "reward": reward,
+            "reward_snapshot": reward_snapshot or {},
         }
 
     @staticmethod
@@ -351,6 +388,7 @@ class EventsRepositoryMixin:
             player_contribution=int(payload.get("player_contribution", 0)),
             success=payload.get("success"),
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            reward_snapshot=dict(payload.get("reward_snapshot", {})),
             already_completed=replay,
         )
 

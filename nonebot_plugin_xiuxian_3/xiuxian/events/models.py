@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from ...contracts import PlayerView
 
@@ -21,6 +22,7 @@ class SpiritSpringEventRecord:
     player_contribution: int
     success: bool | None
     reward: dict[str, int] = field(default_factory=dict)
+    reward_snapshot: dict[str, Any] = field(default_factory=dict)
     already_completed: bool = False
 
 

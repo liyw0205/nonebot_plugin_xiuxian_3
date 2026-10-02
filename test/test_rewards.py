@@ -9,7 +9,12 @@ from tempfile import TemporaryDirectory
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
-from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError, reward_definition
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import (
+    RewardContentError,
+    RewardGrant,
+    combine_reward_grants,
+    reward_definition,
+)
 
 
 def _context(adapter: str, user: str, operation_id: str) -> CommandContext:
@@ -131,3 +136,49 @@ def test_reward_parser_rejects_invalid_quantity_and_maximum(tmp_path: Path) -> N
         assert "set_max must be positive" in str(exc)
     else:
         raise AssertionError("invalid set_max must fail content validation")
+
+
+def test_reward_parser_rejects_conflicting_resource_modes_and_empty_reputation(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    reward_file = data_dir / "奖励" / "奖励.json"
+    document = json.loads(reward_file.read_text(encoding="utf-8"))
+    base = next(item for item in document["records"] if item["key"] == "reward.event.spirit_spring.base")
+    base["entries"].append(
+        {"kind": "resource", "resource_key": "cultivation", "quantity": 1, "set_max": 1}
+    )
+    reward_file.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+    try:
+        reward_definition("reward.event.spirit_spring.base", bundle, operation="event.claim_reward")
+    except RewardContentError as exc:
+        assert "both delta and fixed values" in str(exc)
+    else:
+        raise AssertionError("conflicting resource modes must fail content validation")
+
+    document = json.loads(reward_file.read_text(encoding="utf-8"))
+    base = next(item for item in document["records"] if item["key"] == "reward.event.spirit_spring.base")
+    base["entries"].pop()
+    completion = next(
+        item for item in document["records"] if item["key"] == "reward.event.spirit_spring.completion"
+    )
+    completion["entries"][0]["reputation_key"] = "faction_reputation."
+    reward_file.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+    try:
+        reward_definition("reward.event.spirit_spring.completion", bundle, operation="event.claim_reward")
+    except RewardContentError as exc:
+        assert "requires a faction" in str(exc)
+    else:
+        raise AssertionError("empty reputation keys must fail content validation")
+
+
+def test_reward_grant_composition_rejects_cross_grant_state_conflicts() -> None:
+    delta = RewardGrant("delta", "event.claim_reward", {}, {"stamina": 1}, {}, {})
+    fixed = RewardGrant("fixed", "event.claim_reward", {}, {}, {"stamina": 10}, {})
+    try:
+        combine_reward_grants(delta, fixed)
+    except RewardContentError as exc:
+        assert "both delta and fixed values" in str(exc)
+    else:
+        raise AssertionError("cross-grant resource conflicts must fail")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import json
 from typing import Any, Literal
 
 from .assets import inventory_value, player_database_id
@@ -393,6 +394,7 @@ def change_player_state(
     clamp_minimum: bool = False,
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
+    reputation_delta: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
     """Commit assets and numeric player values through one transaction kernel.
 
@@ -400,8 +402,8 @@ def change_player_state(
     :func:`apply_player_assets`. ``value_delta`` is validated with the shared
     numeric projection and can be capped by ``maximums`` or clamped at the
     lower bound with ``clamp_minimum``. Callers that only change numeric values
-    may omit ``asset_values``; callers changing assets and values together get
-    one SQL update and one validation boundary.
+    may omit ``asset_values``; callers changing assets, values and faction
+    reputation together get one SQL update and one validation boundary.
     """
 
     numeric_values = player_numeric_delta(
@@ -410,10 +412,19 @@ def change_player_state(
         maximums=maximums,
         clamp_minimum=clamp_minimum,
     )
-    if player_values:
-        if set(player_values) & set(numeric_values):
+    all_player_values = dict(player_values or {})
+    if reputation_delta is not None:
+        if "faction_reputation_json" in all_player_values:
+            raise ValueError("faction reputation must be supplied through reputation_delta")
+        all_player_values["faction_reputation_json"] = json.dumps(
+            player_reputation_with_delta(row, reputation_delta),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    if all_player_values:
+        if set(all_player_values) & set(numeric_values):
             raise ValueError("player value is supplied more than once")
-        numeric_values.update(dict(player_values))
+        numeric_values.update(all_player_values)
 
     if asset_values is None:
         if not numeric_values:
@@ -448,6 +459,7 @@ def grant_player_state(
     clamp_minimum: bool = False,
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
+    reputation_delta: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
     """Grant assets and numeric rewards through the shared state boundary."""
 
@@ -462,6 +474,7 @@ def grant_player_state(
         clamp_minimum=clamp_minimum,
         preserve_zero=preserve_zero,
         player_values=player_values,
+        reputation_delta=reputation_delta,
     )
 
 
@@ -476,6 +489,7 @@ def spend_player_state(
     clamp_minimum: bool = False,
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
+    reputation_delta: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
     """Spend assets and numeric resources through the shared state boundary."""
 
@@ -490,6 +504,7 @@ def spend_player_state(
         clamp_minimum=clamp_minimum,
         preserve_zero=preserve_zero,
         player_values=player_values,
+        reputation_delta=reputation_delta,
     )
 
 
@@ -674,6 +689,33 @@ def player_reputation(row: Mapping[str, Any] | Any) -> dict[str, int]:
     return {str(key): player_integer({"value": value}, "value") for key, value in values.items()}
 
 
+def player_reputation_with_delta(
+    row: Mapping[str, Any] | Any,
+    delta: Mapping[str, Any],
+) -> dict[str, int]:
+    """Return faction reputation after applying stable, signed deltas."""
+
+    result = player_reputation(row)
+    for raw_key, raw_amount in delta.items():
+        key = str(raw_key)
+        if not key.startswith("faction_reputation."):
+            raise ValueError(f"unsupported reputation key: {key!r}")
+        faction = key.removeprefix("faction_reputation.")
+        if not faction:
+            raise ValueError("reputation key must name a faction")
+        if isinstance(raw_amount, bool):
+            raise ValueError(f"reputation delta for {key!r} must be an integer")
+        try:
+            amount = int(raw_amount)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"reputation delta for {key!r} must be an integer") from exc
+        next_value = result.get(faction, 0) + amount
+        if next_value < 0:
+            raise ValueError(f"reputation for {faction!r} cannot be negative")
+        result[faction] = next_value
+    return result
+
+
 def player_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
     """Return normalized identity, resources and combat inputs from a player row.
 
@@ -771,6 +813,7 @@ __all__ = [
     "player_qualification",
     "player_intro_flags",
     "player_reputation",
+    "player_reputation_with_delta",
     "player_values",
     "player_combat_values",
 ]
