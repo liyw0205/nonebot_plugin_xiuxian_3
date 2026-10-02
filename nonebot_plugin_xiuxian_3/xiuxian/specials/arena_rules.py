@@ -1,4 +1,4 @@
-"""Pure, versioned rules for the first asynchronous arena mode."""
+"""Pure, rules for the first asynchronous arena mode."""
 
 from __future__ import annotations
 

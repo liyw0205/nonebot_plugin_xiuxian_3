@@ -1,4 +1,4 @@
-"""Transactions for the v0.6 three-realm dao echoes mainline."""
+"""Transactions for the three-realm dao echoes mainline."""
 
 from __future__ import annotations
 

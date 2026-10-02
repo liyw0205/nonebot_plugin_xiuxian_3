@@ -1,4 +1,4 @@
-"""Immutable DTOs for v0.3 cross-realm public events."""
+"""Immutable DTOs for cross-realm public events."""
 
 from __future__ import annotations
 

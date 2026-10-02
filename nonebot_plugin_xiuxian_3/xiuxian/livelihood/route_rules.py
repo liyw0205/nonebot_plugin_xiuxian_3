@@ -50,8 +50,8 @@ ROUTE_ALIASES = {
     "青石镇近郊运输": ROUTE_NEW_TOWN_OUTSKIRTS,
 }
 
-# v0.1 has no market price system; these frozen unit values bound the cargo
-# snapshot without creating a second wallet or trading implementation.
+# These frozen unit values bound the cargo snapshot without depending on
+# market prices or creating a second wallet or trading implementation.
 CARGO_VALUES = {
     "item.food.coarse_spirit_rice": 5,
     "item.food.spirit_rice": 12,

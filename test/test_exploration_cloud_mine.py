@@ -32,7 +32,7 @@ def _expire(runtime, exploration_id: str) -> None:
         )
 
 
-def test_v02_cloud_mine_energy_gate_and_qq_onebot_settlement() -> None:
+def test_cloud_mine_energy_gate_and_qq_onebot_settlement() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
@@ -91,7 +91,7 @@ def test_v02_cloud_mine_energy_gate_and_qq_onebot_settlement() -> None:
     asyncio.run(run())
 
 
-def test_v02_cloud_mine_rejects_missing_access_or_energy_without_spending() -> None:
+def test_cloud_mine_rejects_missing_access_or_energy_without_spending() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
@@ -132,7 +132,7 @@ def test_v02_cloud_mine_rejects_missing_access_or_energy_without_spending() -> N
     asyncio.run(run())
 
 
-def test_v02_mist_grotto_two_requires_arrived_location_and_uses_elite_snapshot() -> None:
+def test_mist_grotto_two_requires_arrived_location_and_uses_elite_snapshot() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)

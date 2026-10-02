@@ -1,4 +1,4 @@
-"""Pure, versioned rules for the first cross-realm breakthrough."""
+"""Pure, rules for the first cross-realm breakthrough."""
 
 from __future__ import annotations
 

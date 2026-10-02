@@ -39,7 +39,7 @@ def test_qq_mist_depth_two_supports_five_nodes_and_equipment_reward() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, adapters=("qq.official",))
             adapter = "qq.official"
-            user = "qq-secret-v02-depth"
+            user = "qq-secret-depth"
             await _create_and_seek(runtime, adapter, user)
             _prepare_golden_core(runtime, adapter, user, "cave.mist_grotto_2", {"item.cave_pass_advanced": 1})
 
@@ -115,7 +115,7 @@ def test_onebot_cloud_boat_uses_ticket_and_projects_reputation() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11",))
             adapter = "onebot.v11"
-            user = "ob-secret-v02-cloud"
+            user = "ob-secret-cloud"
             await _create_and_seek(runtime, adapter, user)
             _prepare_golden_core(
                 runtime,

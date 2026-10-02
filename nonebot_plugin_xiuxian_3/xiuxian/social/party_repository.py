@@ -1,4 +1,4 @@
-"""SQLite transactions for the v0.1 two-player exploration party slice."""
+"""SQLite transactions for the two-player exploration party slice."""
 
 from __future__ import annotations
 

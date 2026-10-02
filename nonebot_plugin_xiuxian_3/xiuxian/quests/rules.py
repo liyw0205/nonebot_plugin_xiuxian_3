@@ -1,4 +1,4 @@
-"""Stable keys and thresholds for v0.4/v0.5 breakthrough permits."""
+"""Stable keys and thresholds for breakthrough permits."""
 
 from __future__ import annotations
 

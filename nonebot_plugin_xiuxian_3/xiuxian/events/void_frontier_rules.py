@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.5 void-frontier season."""
+"""Rules for the void-frontier season."""
 
 from __future__ import annotations
 

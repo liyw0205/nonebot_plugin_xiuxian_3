@@ -1,4 +1,4 @@
-"""Versioned content for the Yuan-ying three-realms mainline."""
+"""Content for the Yuan-ying three-realms mainline."""
 
 from __future__ import annotations
 

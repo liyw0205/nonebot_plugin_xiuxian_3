@@ -1,4 +1,4 @@
-"""Versioned route and reward rules for the ancient-domain party instance."""
+"""Route and reward rules for the ancient-domain party instance."""
 
 from __future__ import annotations
 

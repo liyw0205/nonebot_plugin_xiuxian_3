@@ -1,4 +1,4 @@
-"""Adapter-neutral commands for the v0.5 void archive."""
+"""Adapter-neutral commands for the void archive."""
 
 from __future__ import annotations
 

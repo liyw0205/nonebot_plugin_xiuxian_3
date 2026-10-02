@@ -1,4 +1,4 @@
-"""Application services for the v0.1 talent tree."""
+"""Application services for the talent tree."""
 
 from __future__ import annotations
 

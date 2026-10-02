@@ -1,4 +1,4 @@
-"""Pure v0.6 rules for 合道、渡劫试炼 and terminal state transitions."""
+"""Pure rules for 合道、渡劫试炼 and terminal state transitions."""
 
 from __future__ import annotations
 

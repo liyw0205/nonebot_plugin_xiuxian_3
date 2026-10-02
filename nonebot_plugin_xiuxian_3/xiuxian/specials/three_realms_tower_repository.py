@@ -1,4 +1,4 @@
-"""Transactional persistence for the v0.3 three-realms tower."""
+"""Transactional persistence for the three-realms tower."""
 
 from __future__ import annotations
 

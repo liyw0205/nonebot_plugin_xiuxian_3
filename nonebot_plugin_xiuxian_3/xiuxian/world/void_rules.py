@@ -1,4 +1,4 @@
-"""Versioned definitions and deterministic rules for void navigation."""
+"""Definitions and deterministic rules for void navigation."""
 
 from __future__ import annotations
 

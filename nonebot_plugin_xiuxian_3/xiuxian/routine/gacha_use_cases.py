@@ -1,4 +1,4 @@
-"""Application commands for the v0.1 fate treasure pool."""
+"""Application commands for the fate treasure pool."""
 
 from __future__ import annotations
 

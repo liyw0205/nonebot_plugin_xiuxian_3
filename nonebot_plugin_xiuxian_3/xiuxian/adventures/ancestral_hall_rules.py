@@ -1,4 +1,4 @@
-"""Versioned rules for the ancestral-hall solo secret realm."""
+"""Rules for the ancestral-hall solo secret realm."""
 
 from __future__ import annotations
 

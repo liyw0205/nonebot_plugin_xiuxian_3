@@ -1,4 +1,4 @@
-"""SQLite transactions for v0.2 cave facility ownership and maintenance."""
+"""SQLite transactions for cave facility ownership and maintenance."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Transport-neutral records for the v0.5 void archive slice."""
+"""Transport-neutral records for the void archive slice."""
 
 from __future__ import annotations
 

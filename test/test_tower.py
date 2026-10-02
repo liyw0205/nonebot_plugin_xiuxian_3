@@ -138,7 +138,7 @@ def test_mist_trial_tower_first_clear_reward_and_day_five_goal_on_both_adapters(
     asyncio.run(run())
 
 
-def test_mist_trial_tower_floor_rules_match_v01_bands_and_bosses() -> None:
+def test_mist_trial_tower_early_floor_rules_and_bosses() -> None:
     assert (floor_definition(1).required_realm, floor_definition(1).stamina_cost, floor_definition(1).daily_limit) == ("qi_sensing", 4, 5)
     assert floor_definition(5).enemy_key.endswith("sensing_boss")
     assert floor_definition(10).enemy_key.endswith("sensing_boss")
@@ -154,7 +154,7 @@ def test_mist_trial_tower_floor_rules_match_v01_bands_and_bosses() -> None:
     assert reward_for(30, "seed", first_clear=True)["item.clue.mist_cave_route"] == 1
 
 
-def test_mist_trial_tower_v02_rules_are_a_separate_band() -> None:
+def test_mist_trial_tower_upper_floor_rules_and_bosses() -> None:
     assert (floor_definition(31).required_realm, floor_definition(31).required_layer) == ("golden_core", 3)
     assert (floor_definition(31).stamina_cost, floor_definition(31).daily_limit) == (10, 3)
     assert floor_definition(34).enemy_key == "enemy.mist_trial.golden_core"
@@ -190,57 +190,6 @@ def test_tower_schema_has_current_floor_range_and_no_release_metadata() -> None:
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
-def test_tower_v01_start_operation_hash_remains_replayable_after_expansion() -> None:
-    async def run() -> None:
-        with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
-            adapter = "qq.official"
-            user = "tower-v01-hash-compat"
-            await _enter_tower_eligible_path(runtime, adapter, user, "tower-v01-hash")
-            with sqlite3.connect(runtime.settings.database_path) as connection:
-                player_id = connection.execute(
-                    "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
-                ).fetchone()[0]
-                now = "2026-01-01T00:00:00+00:00"
-                connection.execute(
-                    "INSERT INTO tower_runs(run_id,player_id,tower_key,floor_no,status,first_clear,"
-                    "starts_at,result_json,reward_json,created_at,updated_at) "
-                    "VALUES('v01-existing-run',?,'tower.mist_trial',1,'claimed',1,?,'{}','{}',?,?)",
-                    (player_id, now, now, now),
-                )
-                old_payload = {
-                    "platform": adapter,
-                    "platform_user_id": user,
-                    "tower_key": "tower.mist_trial",
-                    "floor_no": 1,
-                }
-                old_hash = runtime.repository._request_hash("specials.start_tower", old_payload)
-                connection.execute(
-                    "INSERT INTO operations(operation_id,operation_name,player_id,request_hash,result_json,created_at) "
-                    "VALUES('old-v01-start','specials.start_tower',?,?,?,?)",
-                    (
-                        player_id,
-                        old_hash,
-                        json.dumps(
-                            {"run_id": "v01-existing-run", "tower_key": "tower.mist_trial", "floor_no": 1},
-                            sort_keys=True,
-                        ),
-                        now,
-                    ),
-                )
-
-            replay = await _send(runtime, adapter, user, "old-v01-start", "挑战试炼塔 1")
-            assert replay.code == "TOWER_CHALLENGE_SETTLED"
-            assert replay.data["idempotent_replay"] is True
-            with sqlite3.connect(runtime.settings.database_path) as connection:
-                assert connection.execute(
-                    "SELECT COUNT(*) FROM tower_runs WHERE player_id=?", (player_id,)
-                ).fetchone()[0] == 1
-            await runtime.close()
-
-    asyncio.run(run())
-
-
 def test_mist_trial_tower_upper_floors_and_quotas_on_both_adapters() -> None:
     async def run() -> None:
         clock = MutableClock(datetime(2026, 9, 28, tzinfo=timezone.utc))
@@ -248,7 +197,7 @@ def test_mist_trial_tower_upper_floors_and_quotas_on_both_adapters() -> None:
             runtime = create_runtime(data_dir=data_dir, clock=clock)
             for adapter in ("qq.official", "onebot.v11"):
                 prefix = adapter.replace(".", "-")
-                users = {floor_no: f"tower-v02-{prefix}-{floor_no}" for floor_no in (31, 35, 40, 45)}
+                users = {floor_no: f"tower-{prefix}-{floor_no}" for floor_no in (31, 35, 40, 45)}
                 for floor_no, user in users.items():
                     await _enter_tower_eligible_path(runtime, adapter, user, f"{prefix}-{floor_no}")
                     with sqlite3.connect(runtime.settings.database_path) as connection:

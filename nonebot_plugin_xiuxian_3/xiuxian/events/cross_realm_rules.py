@@ -1,4 +1,4 @@
-"""Versioned rules and rolling windows for cross-realm public events."""
+"""Rules and rolling windows for cross-realm public events."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Versioned contract for the v0.6 dao-origin solo secret realm."""
+"""Contract for the dao-origin solo secret realm."""
 
 from __future__ import annotations
 

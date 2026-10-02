@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.5 void archive and weekly fragments."""
+"""Rules for the void archive and weekly fragments."""
 
 from __future__ import annotations
 

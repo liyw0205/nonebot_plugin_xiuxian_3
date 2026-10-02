@@ -1,4 +1,4 @@
-"""Immutable records for the v0.6 realm and endgame progression slice."""
+"""Immutable records for the realm and endgame progression slice."""
 
 from __future__ import annotations
 

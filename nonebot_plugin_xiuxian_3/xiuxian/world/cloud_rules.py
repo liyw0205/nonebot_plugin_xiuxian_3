@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.2 cloud-boat and cross-realm introduction slice."""
+"""Rules for the cloud-boat and cross-realm introduction slice."""
 
 from __future__ import annotations
 

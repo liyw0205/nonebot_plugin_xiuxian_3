@@ -1,4 +1,4 @@
-"""Pure rules for the v0.1 personal production slice."""
+"""Pure rules for the personal production slice."""
 
 from __future__ import annotations
 

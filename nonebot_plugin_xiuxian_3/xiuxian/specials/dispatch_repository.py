@@ -1,4 +1,4 @@
-"""Atomic SQLite operations for v0.1 dispatch tasks."""
+"""Atomic SQLite operations for dispatch tasks."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""SQLite transactions for the v0.5 archive guard and weekly projections."""
+"""SQLite transactions for the archive guard and weekly projections."""
 
 from __future__ import annotations
 

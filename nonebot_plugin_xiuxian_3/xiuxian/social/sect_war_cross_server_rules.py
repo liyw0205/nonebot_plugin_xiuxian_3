@@ -1,4 +1,4 @@
-"""Rules for the v0.5 cross-server sect-war slice."""
+"""Rules for the cross-server sect-war slice."""
 
 from __future__ import annotations
 

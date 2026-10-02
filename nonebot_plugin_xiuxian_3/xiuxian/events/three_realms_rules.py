@@ -1,4 +1,4 @@
-"""Rules for the v0.3 three-realms temporary season."""
+"""Rules for the three-realms temporary season."""
 
 from __future__ import annotations
 

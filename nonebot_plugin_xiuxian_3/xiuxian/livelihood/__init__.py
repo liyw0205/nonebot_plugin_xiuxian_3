@@ -1,4 +1,4 @@
-"""Minimal v0.1 residence services used by rest and retreat."""
+"""Minimal residence services used by rest and retreat."""
 
 from .models import FieldPlotRecord, ResidenceRecord, TownCommissionRecord, TownCommissionView
 from .service_models import ServiceOrderRecord, ServiceSettlementRecord

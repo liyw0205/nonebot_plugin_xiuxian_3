@@ -48,7 +48,7 @@ def _prepare_player(runtime, user: str, *, debt: int = 0) -> None:
         )
 
 
-def test_tribulation_phase_boundaries_and_derived_stats_are_versioned_inputs() -> None:
+def test_tribulation_phase_boundaries_and_derived_stats_are_frozen_inputs() -> None:
     assert tuple(phase.key for phase in PHASES) == ("thunder", "heart", "dao")
     assert phase_for_hp(ENEMY_MAX_HP).key == "thunder"
     assert phase_for_hp(100_000).key == "heart"

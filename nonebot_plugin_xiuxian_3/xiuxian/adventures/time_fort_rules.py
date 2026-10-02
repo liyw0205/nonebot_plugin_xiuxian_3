@@ -1,4 +1,4 @@
-"""Versioned contract for the time-fort party secret realm."""
+"""Contract for the time-fort party secret realm."""
 
 from __future__ import annotations
 

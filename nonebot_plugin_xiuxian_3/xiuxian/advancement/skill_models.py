@@ -1,4 +1,4 @@
-"""Application records for v0.1 skill mastery."""
+"""Application records for skill mastery."""
 
 from __future__ import annotations
 

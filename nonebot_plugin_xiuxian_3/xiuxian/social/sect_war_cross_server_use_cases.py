@@ -1,4 +1,4 @@
-"""Application DTOs and commands for the v0.5 cross-server war."""
+"""Application DTOs and commands for the cross-server war."""
 
 from __future__ import annotations
 

@@ -280,11 +280,18 @@ def test_weighted_reward_pool_rejects_invalid_content(tmp_path: Path) -> None:
             ),
         ),
         (
+            "reward_pool.exploration.cloud_boat_trial",
+            (
+                _reward_axis("cultivation", {600: 30, 750: 40, 900: 30}),
+                _reward_axis("item.ticket.cloud_boat_fragment", {1: 60, 2: 40}),
+            ),
+        ),
+        (
             "reward_pool.exploration.cloud_mine",
             (_reward_axis("item.material.cloud_iron", {1: 25, 2: 40, 3: 25, 4: 10}),),
         ),
     ],
-    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine"],
 )
 def test_exploration_reward_pool_preserves_every_joint_probability(
     pool_key: str, axes: tuple[tuple[tuple[dict[str, int], int], ...], ...]
@@ -311,9 +318,10 @@ def test_exploration_reward_pool_preserves_every_joint_probability(
         "reward_pool.exploration.spring_gather",
         "reward_pool.exploration.mist_grotto",
         "reward_pool.exploration.mist_grotto_2",
+        "reward_pool.exploration.cloud_boat_trial",
         "reward_pool.exploration.cloud_mine",
     ],
-    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine"],
 )
 def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key: str) -> None:
     content_path = Path(__file__).parents[1] / "data"
@@ -351,11 +359,15 @@ def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key:
             {"cultivation": 1700, "item.material.cloud_iron": 7},
         ),
         (
+            "reward_pool.exploration.cloud_boat_trial",
+            {"cultivation": 1700, "item.ticket.cloud_boat_fragment": 7},
+        ),
+        (
             "reward_pool.exploration.cloud_mine",
             {"item.material.cloud_iron": 7},
         ),
     ],
-    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine"],
 )
 def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_bundle(
     tmp_path: Path, pool_key: str, rewards: dict[str, int]
@@ -384,9 +396,10 @@ def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_b
         "reward_pool.exploration.spring_gather",
         "reward_pool.exploration.mist_grotto",
         "reward_pool.exploration.mist_grotto_2",
+        "reward_pool.exploration.cloud_boat_trial",
         "reward_pool.exploration.cloud_mine",
     ],
-    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine"],
 )
 @pytest.mark.parametrize(
     ("outcome", "error"),
@@ -435,6 +448,7 @@ def test_exploration_reward_pool_rejects_malformed_outcomes(
         ("explore.spring_gather", "reward_pool.exploration.spring_gather"),
         ("explore.mist_grotto", "reward_pool.exploration.mist_grotto"),
         ("explore.mist_grotto_2", "reward_pool.exploration.mist_grotto_2"),
+        ("explore.cloud_boat_trial", "reward_pool.exploration.cloud_boat_trial"),
         ("explore.cloud_mine", "reward_pool.exploration.cloud_mine"),
     ],
 )
@@ -512,6 +526,9 @@ def test_reward_pool_battle_failure_rewards_are_content_backed() -> None:
     ) == {}
     assert reward_pool_battle_failure_rewards(
         "reward_pool.exploration.mist_grotto_2", bundle
+    ) == {}
+    assert reward_pool_battle_failure_rewards(
+        "reward_pool.exploration.cloud_boat_trial", bundle
     ) == {}
 
 

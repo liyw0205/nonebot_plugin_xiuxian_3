@@ -1,4 +1,4 @@
-"""Application commands for the v0.1 routine slice."""
+"""Application commands for the routine slice."""
 
 from __future__ import annotations
 

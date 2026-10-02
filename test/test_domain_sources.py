@@ -142,12 +142,12 @@ async def _run_exploration(runtime, adapter: str, user: str, operation: str, com
     return settled.data["result"]
 
 
-def test_v04_ancestral_lake_and_soul_seed_recipe_work_on_qq_and_onebot() -> None:
+def test_ancestral_lake_and_soul_seed_recipe_work_on_qq_and_onebot() -> None:
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
                 runtime = create_runtime(data_dir=Path(data_dir) / adapter)
-                user = f"v04-source-{adapter}"
+                user = f"domain-source-{adapter}"
                 await _prepare_soul_player(runtime, adapter, user, "beast.ancestral_lake")
 
                 blocked = await runtime.adapters.dispatch(

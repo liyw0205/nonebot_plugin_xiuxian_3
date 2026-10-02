@@ -1,4 +1,4 @@
-"""Adapter-neutral commands for the v0.3 three-realms tower."""
+"""Adapter-neutral commands for the three-realms tower."""
 
 from __future__ import annotations
 

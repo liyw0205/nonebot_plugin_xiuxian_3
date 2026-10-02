@@ -1,4 +1,4 @@
-"""Immutable records for the v0.2 world vertical slice."""
+"""Immutable records for the world vertical slice."""
 
 from __future__ import annotations
 

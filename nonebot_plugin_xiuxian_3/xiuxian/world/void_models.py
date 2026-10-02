@@ -1,4 +1,4 @@
-"""Immutable records for v0.5 void-route sessions."""
+"""Immutable records for void-route sessions."""
 
 from __future__ import annotations
 

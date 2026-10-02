@@ -1,4 +1,4 @@
-"""SQLite transactions for the v0.2 sect warehouse exchange."""
+"""SQLite transactions for the sect warehouse exchange."""
 
 from __future__ import annotations
 

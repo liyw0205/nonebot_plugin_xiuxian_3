@@ -1,4 +1,4 @@
-"""SQLite transactions for the v0.4 domain-front activity and season.
+"""SQLite transactions for the domain-front activity and season.
 
 The activity has its own tables because participation snapshots, source
 operations, and season freezes are materially different from the older spring

@@ -1,4 +1,4 @@
-"""Atomic application of v0.3 trade permits."""
+"""Atomic application of trade permits."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Application services for the non-combat v0.6 endgame slice."""
+"""Application services for the non-combat endgame slice."""
 
 from __future__ import annotations
 

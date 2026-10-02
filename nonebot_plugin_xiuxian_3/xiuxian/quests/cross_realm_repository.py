@@ -1,4 +1,4 @@
-"""Transactional source validation for the v0.3 demon mainline quest."""
+"""Transactional source validation for the demon mainline quest."""
 
 from __future__ import annotations
 

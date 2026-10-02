@@ -421,7 +421,7 @@ class VoidFrontierWeeklyNotAvailableError(RuntimeError):
 
 
 class CloudRouteLockedError(RuntimeError):
-    """The v0.2 cloud route is unavailable for the current player."""
+    """The cloud route is unavailable for the current player."""
 
 
 class CloudFareInsufficientError(RuntimeError):
@@ -1441,7 +1441,7 @@ class BoundaryRealmRequirementError(PartyBattleRequirementError):
 
 
 class CrossRealmPartyRequirementError(PartyBattleRequirementError):
-    """A v0.3 cross-realm dungeon party requirement is not satisfied."""
+    """A cross-realm dungeon party requirement is not satisfied."""
 
 
 class BoundaryRealmResourceError(PartyBattleRequirementError):
@@ -1861,7 +1861,7 @@ class MarketOrderAlreadySettledError(RuntimeError):
 
 
 class MarketPriceInvalidError(RuntimeError):
-    """The market quantity or unit price violates the v0.1 limits."""
+    """The market quantity or unit price violates the limits."""
 
 
 class MarketItemLockedError(RuntimeError):

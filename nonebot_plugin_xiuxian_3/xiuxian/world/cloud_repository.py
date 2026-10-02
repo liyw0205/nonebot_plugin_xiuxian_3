@@ -1,4 +1,4 @@
-"""Persistence for v0.2 cloud routes and gated world introductions.
+"""Persistence for cloud routes and gated world introductions.
 
 This module owns only the cloud-boat session and two short world actions. The
 ordinary travel repository remains responsible for the base map movement.
@@ -36,7 +36,7 @@ from ..utils.json import json_object
 
 
 class CloudRepositoryMixin:
-    """Transactional v0.2 world operations.
+    """Transactional world operations.
 
     The mixin relies on the storage protocol supplied by ``SQLitePlayerRepository``.
     Keeping these methods separate prevents route-specific state from growing

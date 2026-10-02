@@ -50,6 +50,7 @@ EXPLORATION_REWARD_POOLS = {
     "explore.mist_grotto": "reward_pool.exploration.mist_grotto",
     "explore.cloud_mine": "reward_pool.exploration.cloud_mine",
     "explore.mist_grotto_2": "reward_pool.exploration.mist_grotto_2",
+    "explore.cloud_boat_trial": "reward_pool.exploration.cloud_boat_trial",
 }
 
 DEFINITIONS = {
@@ -325,11 +326,6 @@ def settlement_result(
                 f"exploration reward pool {reward_pool_key} contains unsupported state"
             )
         return result
-    if mode_key == "explore.cloud_boat_trial":
-        return {
-            "cultivation": weighted_value(seed + ":cultivation", (600, 750, 900), (30, 40, 30)),
-            "item.ticket.cloud_boat_fragment": weighted_value(seed + ":ticket", (1, 2), (60, 40)),
-        }
     if mode_key == "explore.demon_threshold":
         return {"item.soul_crystal": 1, "item.demon_core": 1}
     if mode_key == "explore.demon_abyss":

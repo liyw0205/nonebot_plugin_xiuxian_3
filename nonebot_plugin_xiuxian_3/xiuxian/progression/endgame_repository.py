@@ -1,4 +1,4 @@
-"""SQLite transactions for the non-combat v0.6 endgame progression slice."""
+"""SQLite transactions for the non-combat endgame progression slice."""
 
 from __future__ import annotations
 

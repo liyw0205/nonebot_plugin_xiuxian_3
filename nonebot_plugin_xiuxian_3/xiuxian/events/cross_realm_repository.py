@@ -1,4 +1,4 @@
-"""Audited contribution projections for the v0.3 public cross-realm events."""
+"""Audited contribution projections for the public cross-realm events."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.3 limited weekly auction."""
+"""Rules for the limited weekly auction."""
 
 from __future__ import annotations
 

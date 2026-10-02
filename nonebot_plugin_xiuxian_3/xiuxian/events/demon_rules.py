@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.3 demon invasion event."""
+"""Rules for the demon invasion event."""
 
 from __future__ import annotations
 

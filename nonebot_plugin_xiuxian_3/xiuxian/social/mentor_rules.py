@@ -1,4 +1,4 @@
-"""Pure rules for the v0.1 mentor relationship slice."""
+"""Pure rules for the mentor relationship slice."""
 
 from __future__ import annotations
 

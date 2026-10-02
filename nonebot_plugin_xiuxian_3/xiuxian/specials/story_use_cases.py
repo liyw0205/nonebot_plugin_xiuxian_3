@@ -1,4 +1,4 @@
-"""Application services for the v0.1 branching story."""
+"""Application services for the branching story."""
 
 from __future__ import annotations
 

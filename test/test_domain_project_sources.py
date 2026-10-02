@@ -68,10 +68,10 @@ def _qq_event(content: str, message_id: str):
     )
 
 
-def test_v04_reconstruction_project_gate_and_dual_adapter_reward() -> None:
+def test_reconstruction_project_gate_and_dual_adapter_reward() -> None:
     async def run() -> None:
         contexts = [
-            ("qq", normalize_qq_event(_qq_event("开始修仙", "qq-v04-project")).context),
+            ("qq", normalize_qq_event(_qq_event("开始修仙", "qq-project")).context),
             ("onebot", normalize_event(_onebot_event("开始修仙", 3204)).context),
         ]
         for prefix, base in contexts:
@@ -81,7 +81,7 @@ def test_v04_reconstruction_project_gate_and_dual_adapter_reward() -> None:
                 async def dispatch(step: str, text: str):
                     return await runtime.adapters.dispatch(
                         base.adapter,
-                        replace(base, operation_id=f"{prefix}-v04-{step}"),
+                        replace(base, operation_id=f"{prefix}-{step}"),
                         text,
                     )
 
@@ -178,11 +178,11 @@ def test_v04_reconstruction_project_gate_and_dual_adapter_reward() -> None:
     asyncio.run(run())
 
 
-def test_v04_projects_are_not_available_without_authority() -> None:
+def test_projects_are_not_available_without_authority() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
-            context = normalize_qq_event(_qq_event("开始修仙", "qq-v04-closed")).context
+            context = normalize_qq_event(_qq_event("开始修仙", "qq-closed")).context
             assert (await runtime.dispatch(context, "开始修仙")).ok
             assert (await runtime.dispatch(replace(context, operation_id="seek"), "寻仙问道")).ok
             result = await runtime.dispatch(
@@ -195,7 +195,7 @@ def test_v04_projects_are_not_available_without_authority() -> None:
     asyncio.run(run())
 
 
-def test_v04_faction_projects_require_the_matching_trade_station_reputation() -> None:
+def test_faction_projects_require_the_matching_trade_station_reputation() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)

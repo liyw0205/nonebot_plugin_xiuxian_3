@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.4 domain-front event and season."""
+"""Rules for the domain-front event and season."""
 
 from __future__ import annotations
 

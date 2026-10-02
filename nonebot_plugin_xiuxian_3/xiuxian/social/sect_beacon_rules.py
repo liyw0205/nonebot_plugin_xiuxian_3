@@ -1,4 +1,4 @@
-"""Versioned rules for the v0.5 void beacon extension."""
+"""Rules for the void beacon extension."""
 
 from __future__ import annotations
 

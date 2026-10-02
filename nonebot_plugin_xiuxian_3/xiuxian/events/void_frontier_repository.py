@@ -1,4 +1,4 @@
-"""SQLite transactions for the independent v0.5 void-frontier season.
+"""SQLite transactions for the independent void-frontier season.
 
 The season is a projection of server-owned records.  It does not accept a
 client supplied score and it does not reuse the cross-server war reward box,

@@ -129,7 +129,7 @@ def test_three_realms_tower_duo_qq_onebot_progression_and_isolation(monkeypatch)
     asyncio.run(run())
 
 
-def test_three_realms_tower_duo_v04_gate_failure_and_start_refund(monkeypatch) -> None:
+def test_three_realms_tower_duo__gate_failure_and_start_refund(monkeypatch) -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)

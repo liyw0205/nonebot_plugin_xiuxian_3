@@ -99,7 +99,7 @@ def _prepare_cloud_city_player(runtime, adapter: str, user: str) -> None:
         )
 
 
-def test_v02_cloud_city_codex_unlocks_and_settles_guild_order_on_both_adapters() -> None:
+def test_cloud_city_codex_unlocks_and_settles_guild_order_on_both_adapters() -> None:
     async def run() -> None:
         clock = MutableClock(datetime(2026, 9, 27, tzinfo=timezone.utc))
         with TemporaryDirectory() as data_dir:
@@ -364,7 +364,7 @@ def test_arena_match_records_both_publicly_observed_paths_in_codex() -> None:
     asyncio.run(run())
 
 
-def test_v03_place_codex_keys_come_from_location_content_on_both_adapters() -> None:
+def test_place_codex_keys_come_from_location_content_on_both_adapters() -> None:
     async def run() -> None:
         clock = MutableClock(datetime(2026, 9, 27, tzinfo=timezone.utc))
         with TemporaryDirectory() as data_dir:
@@ -374,7 +374,7 @@ def test_v03_place_codex_keys_come_from_location_content_on_both_adapters() -> N
                 ("beast.ten_thousand_hills", "xuantian.floating_boat", "万兽山", "codex.place.beast_hills"),
             )
             for adapter in ("qq.official", "onebot.v11"):
-                user = f"codex-v03-{adapter}"
+                user = f"codex-{adapter}"
                 await _send(runtime, adapter, user, f"{adapter}-create", "开始修仙")
                 for index, (destination, source, label, entry_key) in enumerate(destinations):
                     with sqlite3.connect(runtime.settings.database_path) as connection:

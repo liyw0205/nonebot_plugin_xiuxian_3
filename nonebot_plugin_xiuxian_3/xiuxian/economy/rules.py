@@ -1,4 +1,4 @@
-"""Pure rules for the fixed-price market v0.1 slice."""
+"""Pure rules for the fixed-price market slice."""
 
 from __future__ import annotations
 

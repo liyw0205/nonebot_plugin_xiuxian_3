@@ -1,4 +1,4 @@
-"""SQLite transactions for v0.5 production alliance contracts."""
+"""SQLite transactions for production alliance contracts."""
 
 from __future__ import annotations
 

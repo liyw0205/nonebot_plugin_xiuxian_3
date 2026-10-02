@@ -32,7 +32,7 @@ from .demon_rules import (
 
 
 class DemonInvasionRepositoryMixin:
-    """Keep v0.3 event evidence separate from the v0.1 spring event."""
+    """Keep event evidence separate from the spring event."""
 
     async def get_demon_invasion_event(
         self, *, platform: str, platform_user_id: str, round_id: str | None = None

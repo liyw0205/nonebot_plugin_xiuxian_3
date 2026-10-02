@@ -1,4 +1,4 @@
-"""Pure v0.4 domain selection definitions."""
+"""Pure domain selection definitions."""
 
 from __future__ import annotations
 

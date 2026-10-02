@@ -1,4 +1,4 @@
-"""Pure rules for the v0.1 sect membership slice."""
+"""Pure rules for the sect membership slice."""
 
 from __future__ import annotations
 

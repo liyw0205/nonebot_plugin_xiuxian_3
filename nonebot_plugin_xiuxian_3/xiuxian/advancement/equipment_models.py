@@ -1,4 +1,4 @@
-"""Immutable records exchanged by the v0.1 equipment growth use cases."""
+"""Immutable records exchanged by the equipment growth use cases."""
 
 from __future__ import annotations
 

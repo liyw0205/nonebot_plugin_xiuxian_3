@@ -1,4 +1,4 @@
-"""Persistence for the v0.6 heaven-echo solo secret realm."""
+"""Persistence for the heaven-echo solo secret realm."""
 
 from __future__ import annotations
 

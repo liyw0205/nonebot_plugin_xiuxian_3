@@ -1,4 +1,4 @@
-"""Versioned movement definitions for the first world slice."""
+"""Movement definitions for the first world slice."""
 
 from __future__ import annotations
 

@@ -5,7 +5,7 @@
 | `mode_key` | 前置 | 时长/成本 | 池/产出 | 风险与上限 |
 |:--|:--|:--|:--|:--|
 | `explore.cloud_mine` | 云铁矿区、筑基、采矿 2 或有效期内已接取的矿区悬赏 | 2 分钟 / 8 体力、2 精力 | `reward_pool.exploration.cloud_mine`：云铁 1–4 | 30% 矿兽战；每日 6 |
-| `explore.cloud_boat_trial` | 云舟渡口、金丹 L1 | 5 分钟 / 12 体力；风暴支付 100 灵石 | `trial.cloud_boat.v0.2`：修为 600–900、票碎片 1–2 | 25% 风暴选择；每日 3 |
+| `explore.cloud_boat_trial` | 云舟渡口、金丹 L1 | 5 分钟 / 12 体力；风暴支付 100 灵石 | `reward_pool.exploration.cloud_boat_trial`：修为 600/750/900、云舟票碎片 1–2 | 25% 风暴选择；每日 3 |
 | `explore.mist_grotto_2` | 洞天二层、金丹 L1、已抵达 | 10 分钟 / 15 体力 | `reward_pool.exploration.mist_grotto_2`：云铁 1–2、修为 900/1100/1300 | 40% 基础精英遭遇；每日 2 |
 
 矿区云铁权重为 1/2/3/4 = 25/40/25/10，开始时冻结收获；矿兽战胜利发放冻结收获，失败按奖励池内的战败收获发放 1 云铁。云舟风暴选择固定为 `wait`（延长 2 分钟，无损失）、`pay`（付 100 灵石，奖励 +200 修为）或 `turn_back`（返还 50% 体力、无奖励）；选择/超时均写同一探索 operation，超时默认 `wait`。

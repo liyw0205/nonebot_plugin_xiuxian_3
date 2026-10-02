@@ -1,4 +1,4 @@
-"""Transport-neutral records for the v0.5 void-frontier season."""
+"""Transport-neutral records for the void-frontier season."""
 
 from __future__ import annotations
 

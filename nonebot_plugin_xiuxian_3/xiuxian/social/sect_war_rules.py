@@ -1,4 +1,4 @@
-"""Rules for the v0.3 sect-war weekly rounds."""
+"""Rules for the sect-war weekly rounds."""
 
 from __future__ import annotations
 

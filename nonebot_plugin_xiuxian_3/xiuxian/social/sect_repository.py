@@ -1,4 +1,4 @@
-"""SQLite transactions for the v0.1 sect membership slice."""
+"""SQLite transactions for the sect membership slice."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Application services for the v0.1 mentor relationship slice."""
+"""Application services for the mentor relationship slice."""
 
 from __future__ import annotations
 

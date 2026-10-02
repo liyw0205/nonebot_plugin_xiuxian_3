@@ -1,4 +1,4 @@
-"""Versioned rules for the sect warehouse exchange slice."""
+"""Rules for the sect warehouse exchange slice."""
 
 from __future__ import annotations
 

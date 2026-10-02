@@ -1,4 +1,4 @@
-"""Versioned contracts for clue-driven legacy manors."""
+"""Contracts for clue-driven legacy manors."""
 
 from __future__ import annotations
 

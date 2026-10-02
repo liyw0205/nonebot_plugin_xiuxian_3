@@ -216,7 +216,7 @@ def test_cloud_sword_production_materializes_equipment_instance() -> None:
     asyncio.run(run())
 
 
-def test_v02_bound_production_items_are_not_market_tradeable() -> None:
+def test_bound_production_items_are_not_market_tradeable() -> None:
     for item in ("item.pill.core_condense", "item.pill.golden_core_guard", "item.array.mist_barrier"):
         try:
             resolve_market_item(item)

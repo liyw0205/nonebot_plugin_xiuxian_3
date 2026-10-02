@@ -1,4 +1,4 @@
-"""SQLite transactions for the v0.1 mentor relationship slice."""
+"""SQLite transactions for the mentor relationship slice."""
 
 from __future__ import annotations
 

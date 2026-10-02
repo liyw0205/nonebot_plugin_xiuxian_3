@@ -1,4 +1,4 @@
-"""Commands for the v0.6 dao echoes mainline."""
+"""Commands for the dao echoes mainline."""
 
 from __future__ import annotations
 

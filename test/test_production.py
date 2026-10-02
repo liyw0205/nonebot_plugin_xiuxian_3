@@ -192,7 +192,7 @@ def test_modified_constitution_json_changes_frozen_production_quality(tmp_path: 
     asyncio.run(run())
 
 
-def test_v02_mist_barrier_production_uses_array_hall_permission_for_qq_and_onebot() -> None:
+def test_mist_barrier_production_uses_array_hall_permission_for_qq_and_onebot() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
@@ -328,7 +328,7 @@ def test_v02_mist_barrier_production_uses_array_hall_permission_for_qq_and_onebo
     asyncio.run(run())
 
 
-def test_v02_remaining_production_recipes_run_through_qq_and_onebot() -> None:
+def test_remaining_production_recipes_run_through_qq_and_onebot() -> None:
     cases = (
         {
             "alias": "金丹护脉丹",
@@ -391,7 +391,7 @@ def test_v02_remaining_production_recipes_run_through_qq_and_onebot() -> None:
             for adapter in ("qq.official", "onebot.v11"):
                 runtime = create_runtime(data_dir=Path(data_dir) / adapter)
                 for index, case in enumerate(cases):
-                    user = f"{adapter}-v02-recipe"
+                    user = f"{adapter}-recipe"
                     await runtime.adapters.dispatch(
                         adapter,
                         _adapter_context(adapter, user, f"create-{adapter}-{index}"),
@@ -445,9 +445,9 @@ def test_v02_remaining_production_recipes_run_through_qq_and_onebot() -> None:
                     assert preview.code == "RECIPE_PREVIEW"
                     assert preview.data["recipe_key"] == case["recipe_key"]
                     operation = next(
-                        f"{adapter}-v02-recipe-{index}-{roll}"
+                        f"{adapter}-recipe-{index}-{roll}"
                         for roll in range(256)
-                        if random_quality_bp(f"{adapter}-v02-recipe-{index}-{roll}") >= 1000
+                        if random_quality_bp(f"{adapter}-recipe-{index}-{roll}") >= 1000
                     )
                     started = await runtime.adapters.dispatch(
                         adapter,
@@ -491,7 +491,7 @@ def test_v02_remaining_production_recipes_run_through_qq_and_onebot() -> None:
     asyncio.run(run())
 
 
-def test_v02_facility_claim_maintenance_and_order_slot_lifecycle_for_qq_and_onebot() -> None:
+def test_facility_claim_maintenance_and_order_slot_lifecycle_for_qq_and_onebot() -> None:
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:

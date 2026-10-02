@@ -1,4 +1,4 @@
-"""Adapter-neutral commands for v0.1 secret realms."""
+"""Adapter-neutral commands for secret realms."""
 
 from __future__ import annotations
 

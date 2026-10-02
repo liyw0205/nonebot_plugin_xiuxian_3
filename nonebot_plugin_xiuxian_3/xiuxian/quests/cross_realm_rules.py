@@ -1,4 +1,4 @@
-"""Versioned rules for the first cross-realm player quest."""
+"""Rules for the first cross-realm player quest."""
 
 from __future__ import annotations
 

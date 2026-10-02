@@ -1,4 +1,4 @@
-"""Rules and stable keys for the v0.2 cave facility slots."""
+"""Rules and stable keys for the cave facility slots."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Stable rules for v0.3 demon and beast trade permits."""
+"""Stable rules for demon and beast trade permits."""
 
 from __future__ import annotations
 

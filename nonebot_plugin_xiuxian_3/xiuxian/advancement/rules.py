@@ -1,4 +1,4 @@
-"""Pure, deterministic rules for the v0.1 retreat slice."""
+"""Pure, deterministic rules for the retreat slice."""
 
 from __future__ import annotations
 

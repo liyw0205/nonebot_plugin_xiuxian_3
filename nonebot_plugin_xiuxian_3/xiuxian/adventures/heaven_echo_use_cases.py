@@ -1,4 +1,4 @@
-"""Adapter-neutral commands for the v0.6 heaven-echo secret realm."""
+"""Adapter-neutral commands for the heaven-echo secret realm."""
 
 from __future__ import annotations
 

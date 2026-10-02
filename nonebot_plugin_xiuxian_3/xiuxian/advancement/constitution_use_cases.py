@@ -1,4 +1,4 @@
-"""Application services for the v0.1 constitution profile."""
+"""Application services for the constitution profile."""
 
 from __future__ import annotations
 

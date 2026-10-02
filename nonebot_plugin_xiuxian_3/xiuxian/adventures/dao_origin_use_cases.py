@@ -1,4 +1,4 @@
-"""Adapter-neutral commands for the v0.6 dao-origin secret realm."""
+"""Adapter-neutral commands for the dao-origin secret realm."""
 
 from __future__ import annotations
 

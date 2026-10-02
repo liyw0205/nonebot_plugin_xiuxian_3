@@ -1,4 +1,4 @@
-"""Versioned rules for cross-realm purchase orders."""
+"""Rules for cross-realm purchase orders."""
 
 from __future__ import annotations
 

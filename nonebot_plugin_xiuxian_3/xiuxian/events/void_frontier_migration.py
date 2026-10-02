@@ -1,4 +1,4 @@
-"""SQLite schema for the independent v0.5 void-frontier season."""
+"""SQLite schema for the independent void-frontier season."""
 
 from __future__ import annotations
 

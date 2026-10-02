@@ -1,4 +1,4 @@
-"""Persistence and frozen rankings for the v0.3 three-realms season."""
+"""Persistence and frozen rankings for the three-realms season."""
 
 from __future__ import annotations
 

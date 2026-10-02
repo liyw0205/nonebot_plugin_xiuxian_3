@@ -1,4 +1,4 @@
-"""Application commands for the v0.1 bounty board."""
+"""Application commands for the bounty board."""
 
 from __future__ import annotations
 

@@ -338,6 +338,21 @@
       "status": "active"
     },
     {
+      "name": "云舟试炼收获",
+      "desc": "登临云舟试炼，参悟航路灵机并收集残票。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 18, "rewards": {"cultivation": 600, "item.ticket.cloud_boat_fragment": 1}},
+        {"weight": 12, "rewards": {"cultivation": 600, "item.ticket.cloud_boat_fragment": 2}},
+        {"weight": 24, "rewards": {"cultivation": 750, "item.ticket.cloud_boat_fragment": 1}},
+        {"weight": 16, "rewards": {"cultivation": 750, "item.ticket.cloud_boat_fragment": 2}},
+        {"weight": 18, "rewards": {"cultivation": 900, "item.ticket.cloud_boat_fragment": 1}},
+        {"weight": 12, "rewards": {"cultivation": 900, "item.ticket.cloud_boat_fragment": 2}}
+      ],
+      "key": "reward_pool.exploration.cloud_boat_trial",
+      "status": "active"
+    },
+    {
       "name": "云铁矿区采集收获",
       "desc": "按矿脉丰度采得云铁；遭遇矿兽败退时仍可带回一份。",
       "pool_type": "weighted",

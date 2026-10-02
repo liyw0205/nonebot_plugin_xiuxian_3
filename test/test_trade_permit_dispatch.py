@@ -48,7 +48,7 @@ def _seed_for(dispatch_key: str, outcome: str) -> str:
     return next(
         seed
         for index in range(10000)
-        if (seed := f"trade-v03-{dispatch_key}-{index}")
+        if (seed := f"trade-{dispatch_key}-{index}")
         and choose_outcome(definition, seed) == outcome
     )
 

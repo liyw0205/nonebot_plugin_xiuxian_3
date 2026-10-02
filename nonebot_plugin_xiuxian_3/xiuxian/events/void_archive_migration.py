@@ -1,4 +1,4 @@
-"""SQLite migration for v0.5 void archive runs and weekly claims."""
+"""SQLite migration for void archive runs and weekly claims."""
 
 from __future__ import annotations
 

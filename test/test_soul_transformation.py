@@ -42,20 +42,20 @@ def test_soul_transformation_gate_does_not_charge_and_success_initializes_domain
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
-            user = "v04-success"
+            user = "soul-success"
             await _player(runtime, user)
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute("UPDATE players SET soul_power = 199 WHERE platform_user_id = ?", (user,))
-            blocked = await runtime.dispatch(_context("web", user, "blocked", "v04-blocked"), "开始突破 化神")
+            blocked = await runtime.dispatch(_context("web", user, "blocked", "soul-blocked"), "开始突破 化神")
             assert blocked.code == "SOUL_POWER_INSUFFICIENT"
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 assert connection.execute("SELECT spirit_stones, world_merit FROM players WHERE platform_user_id = ?", (user,)).fetchone() == (20000, 500)
                 connection.execute("UPDATE players SET soul_power = 250 WHERE platform_user_id = ?", (user,))
-            operation = next(f"v04-success-{i}" for i in range(1000) if breakthrough_roll_bp(f"v04-success-{i}") < 9000)
+            operation = next(f"soul-success-{i}" for i in range(1000) if breakthrough_roll_bp(f"soul-success-{i}") < 9000)
             started = await runtime.dispatch(_context("web", user, "start", operation), "开始突破 化神")
             assert started.code == "BREAKTHROUGH_STARTED"
             _finish(runtime, started.data["session_id"])
-            settled = await runtime.dispatch(_context("web", user, "settle", "v04-settle"), "结算突破")
+            settled = await runtime.dispatch(_context("web", user, "settle", "soul-settle"), "结算突破")
             assert settled.code == "BREAKTHROUGH_SUCCEEDED"
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 row = connection.execute("SELECT realm_key, realm_layer, domain_power, domain_charge, realm_resistance_bp, max_hp, max_mp, initiative, world_merit FROM players WHERE platform_user_id = ?", (user,)).fetchone()
@@ -69,26 +69,26 @@ def test_soul_transformation_failure_creates_crack_and_domain_confirmation_is_id
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
-            user = "v04-failure"
+            user = "soul-failure"
             await _player(runtime, user)
-            operation = next(f"v04-failure-{i}" for i in range(1000) if breakthrough_roll_bp(f"v04-failure-{i}") >= 7550)
+            operation = next(f"soul-failure-{i}" for i in range(1000) if breakthrough_roll_bp(f"soul-failure-{i}") >= 7550)
             started = await runtime.dispatch(_context("web", user, "start", operation), "开始突破 化神")
             _finish(runtime, started.data["session_id"])
-            settled = await runtime.dispatch(_context("web", user, "settle", "v04-settle"), "结算突破")
+            settled = await runtime.dispatch(_context("web", user, "settle", "soul-settle"), "结算突破")
             assert settled.code == "BREAKTHROUGH_FAILED"
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 row = connection.execute("SELECT cultivation, domain_crack_until FROM players WHERE platform_user_id = ?", (user,)).fetchone()
             assert row[0] == 70000 and row[1]
-            blocked = await runtime.dispatch(_context("web", user, "choose-blocked", "v04-choose-blocked"), "选择领域 体修")
+            blocked = await runtime.dispatch(_context("web", user, "choose-blocked", "soul-choose-blocked"), "选择领域 体修")
             assert blocked.code == "DOMAIN_CRACK_ACTIVE"
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 inventory = json.loads(connection.execute("SELECT inventory_json FROM players WHERE platform_user_id = ?", (user,)).fetchone()[0])
                 inventory["item.domain_core"] = 1
                 connection.execute("UPDATE players SET domain_crack_until = ?, realm_key = 'soul_transformation', realm_layer = 3, spirit_stones = 12000, inventory_json = ? WHERE platform_user_id = ?", ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), json.dumps(inventory), user))
-            selected = await runtime.dispatch(_context("web", user, "choose", "v04-choose"), "选择领域 体修")
+            selected = await runtime.dispatch(_context("web", user, "choose", "soul-choose"), "选择领域 体修")
             assert selected.code == "DOMAIN_SELECTION_PENDING"
-            confirmed = await runtime.dispatch(_context("web", user, "confirm", "v04-confirm"), "确认领域")
-            replay = await runtime.dispatch(_context("web", user, "confirm-replay", "v04-confirm"), "确认领域")
+            confirmed = await runtime.dispatch(_context("web", user, "confirm", "soul-confirm"), "确认领域")
+            replay = await runtime.dispatch(_context("web", user, "confirm-replay", "soul-confirm"), "确认领域")
             assert confirmed.code == "DOMAIN_SELECTED"
             assert replay.data["idempotent_replay"] is True
             with sqlite3.connect(runtime.settings.database_path) as connection:

@@ -1,4 +1,4 @@
-"""SQLite schema owned by v0.3 trade permits."""
+"""SQLite schema owned by trade permits."""
 
 from __future__ import annotations
 

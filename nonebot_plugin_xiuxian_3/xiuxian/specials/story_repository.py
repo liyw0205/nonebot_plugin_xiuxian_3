@@ -1,4 +1,4 @@
-"""Transactional persistence for v0.1 branching story runs."""
+"""Transactional persistence for branching story runs."""
 
 from __future__ import annotations
 

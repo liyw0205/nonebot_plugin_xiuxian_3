@@ -1,4 +1,4 @@
-"""Application services for the v0.1 retreat slice."""
+"""Application services for the retreat slice."""
 
 from __future__ import annotations
 

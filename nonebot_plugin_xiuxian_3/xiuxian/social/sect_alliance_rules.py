@@ -1,4 +1,4 @@
-"""Versioned rules for production alliances between sects."""
+"""Rules for production alliances between sects."""
 
 from __future__ import annotations
 

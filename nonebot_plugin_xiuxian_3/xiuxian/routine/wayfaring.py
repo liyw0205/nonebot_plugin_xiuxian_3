@@ -1,4 +1,4 @@
-"""Deterministic rules for the v0.1 wayfaring pass.
+"""Deterministic rules for the wayfaring pass.
 
 The pass is deliberately a pure content module.  Persistence, entitlement
 checks and point-event idempotency belong to the repository layer; this file

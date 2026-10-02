@@ -1,4 +1,4 @@
-"""SQLite transactions for the v0.1 town commission loop."""
+"""SQLite transactions for the town commission loop."""
 
 from __future__ import annotations
 

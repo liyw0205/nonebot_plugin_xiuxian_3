@@ -1,4 +1,4 @@
-"""Immutable records exchanged by the v0.1 bounty application."""
+"""Immutable records exchanged by the bounty application."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Persistence for the complete v0.5 cross-server sect-war slice.
+"""Persistence for the complete cross-server sect-war slice.
 
 The repository intentionally keeps federation sessions local and auditable. A
 remote shard may be represented by the frozen ``shard_key`` in the existing

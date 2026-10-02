@@ -1,4 +1,4 @@
-"""Persistence and deterministic settlement for v0.3 sect-war rounds."""
+"""Persistence and deterministic settlement for sect-war rounds."""
 
 from __future__ import annotations
 

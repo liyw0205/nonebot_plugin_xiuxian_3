@@ -1,4 +1,4 @@
-"""Schema migration owned by the v0.1 branching story."""
+"""Schema migration owned by the branching story."""
 
 from __future__ import annotations
 

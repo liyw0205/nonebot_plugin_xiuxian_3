@@ -1,4 +1,4 @@
-"""Persistence for the v0.6 dao-origin solo secret realm."""
+"""Persistence for the dao-origin solo secret realm."""
 
 from __future__ import annotations
 

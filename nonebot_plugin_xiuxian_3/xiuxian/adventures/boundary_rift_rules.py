@@ -1,4 +1,4 @@
-"""Frozen rules for the v0.3 six-node party secret realm."""
+"""Frozen rules for the six-node party secret realm."""
 
 from __future__ import annotations
 

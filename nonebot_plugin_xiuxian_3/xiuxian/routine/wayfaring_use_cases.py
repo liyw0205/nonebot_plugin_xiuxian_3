@@ -1,4 +1,4 @@
-"""Application commands for the auditable v0.1 wayfaring pass."""
+"""Application commands for the auditable wayfaring pass."""
 
 from __future__ import annotations
 

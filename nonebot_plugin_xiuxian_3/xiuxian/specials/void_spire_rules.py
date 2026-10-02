@@ -1,4 +1,4 @@
-"""Versioned rules for the open floors of the void spire tower."""
+"""Rules for the open floors of the void spire tower."""
 
 from __future__ import annotations
 

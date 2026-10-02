@@ -6,7 +6,7 @@ import sqlite3
 
 
 def ensure_social_recovery_schema(connection: sqlite3.Connection) -> None:
-    """Create the recovery event ledger for databases from before v0.5."""
+    """Create the recovery event ledger for databases without this table."""
 
     connection.execute(
         """

@@ -1,4 +1,4 @@
-"""Deterministic rules for the v0.1 fate treasure pool."""
+"""Deterministic rules for the fate treasure pool."""
 
 from __future__ import annotations
 
