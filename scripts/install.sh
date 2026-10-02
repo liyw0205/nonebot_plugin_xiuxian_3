@@ -198,7 +198,7 @@ copy_if_missing "$ROOT/examples/nonebot/bot.py" "$TARGET/bot.py"
 copy_if_missing "$ROOT/examples/nonebot/pyproject.toml" "$TARGET/pyproject.toml"
 copy_if_missing "$ROOT/examples/nonebot/.env.example" "$TARGET/.env"
 
-log "从 requirements.txt 安装 nb-cli==1.5.0"
+log "从 requirements.txt 安装 nb-cli"
 retry "$VENV_PY" -m pip install --upgrade --index-url "$INDEX_URL" -r "$ROOT/requirements.txt" \
     || fail "nb-cli 安装失败。保留的宿主目录和虚拟环境可以直接重试。"
 export PIP_INDEX_URL="$INDEX_URL"
@@ -266,7 +266,7 @@ else
 fi
 
 log "校验已安装包、NoneBot 入口和 JSON 内容"
-"$VENV_PY" -c 'import importlib.metadata; import nonebot; import nonebot.adapters.qq; import nonebot.adapters.onebot.v11; import nonebot_plugin_xiuxian_3; assert importlib.metadata.version("nb-cli") == "1.5.0"'
+"$VENV_PY" -c 'import importlib.metadata; import nonebot; import nonebot.adapters.qq; import nonebot.adapters.onebot.v11; import nonebot_plugin_xiuxian_3; importlib.metadata.version("nb-cli")'
 "$VENV_NB" --help >/dev/null 2>&1 \
     || fail "nb 命令未安装：$VENV_NB"
 "$VENV_PY" - "$TARGET/data" <<'PY'

@@ -12,7 +12,7 @@
 
 ## 一键安装
 
-安装器会检查并安装系统 Python、Git 等依赖，创建 `$HOME/myenv`，使用清华 pip 源安装 `nb-cli==1.5.0`，再通过 `nb adapter install` 和 `nb driver install` 安装适配器、驱动，最后创建独立宿主 `$HOME/xiu3` 并安装插件。仓库下载方式可交互选择直连、代理测速选优或自定义 Git 地址；已有宿主配置和 JSON 内容不会被覆盖。
+安装器会检查并安装系统 Python、Git 等依赖，创建 `$HOME/myenv`，使用清华 pip 源安装 `nb-cli`，再通过 `nb adapter install` 和 `nb driver install` 安装适配器、驱动，最后创建独立宿主 `$HOME/xiu3` 并安装插件。仓库下载方式可交互选择直连、代理测速选优或自定义 Git 地址；已有宿主配置和 JSON 内容不会被覆盖。
 
 ### Linux
 

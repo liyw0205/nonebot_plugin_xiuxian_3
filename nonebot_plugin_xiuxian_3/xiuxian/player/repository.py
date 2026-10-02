@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
 from ..config import XiuxianSettings
+from ..content import ContentError
 from ..player.models import (
     CultivationRecord,
     IntroRecord,
@@ -170,6 +171,7 @@ from ..utils.assets import inventory_json
 from ..utils.player import change_player_state, grant_player_state, player_integer
 from ..utils.json import json_object
 from ..utils.player import player_field, player_reputation, player_values
+from ..rewards.rules import reward_definition
 
 
 class PlayerRepositoryMixin:
@@ -416,6 +418,7 @@ class PlayerRepositoryMixin:
                     player=player,
                     created=False,
                     already_completed=True,
+                    reward=dict(payload.get("reward", {})),
                 )
 
             row = self._require_player(connection, platform, platform_user_id)
@@ -423,15 +426,21 @@ class PlayerRepositoryMixin:
             created = row["stage"] == STAGE_NEW_USER
             if created:
                 qualification = qualification_for(platform, platform_user_id)
+                reward = reward_definition(
+                    "reward.onboarding.seeking",
+                    self.content,
+                    operation="player.start_seeking",
+                )
+                if reward.reputation:
+                    raise ContentError(
+                        "player.start_seeking reward cannot grant reputation directly"
+                    )
                 grant_player_state(
                     connection,
                     row,
                     updated_at=serialize_datetime(now),
-                    rewards={
-                        "spirit_stones": 100,
-                        "item.food.coarse_spirit_rice": 3,
-                        "item.herb.blood_grass": 3,
-                    },
+                    rewards=reward.assets,
+                    value_delta=reward.value_delta,
                     player_values={
                         "stage": STAGE_MORTAL,
                         "realm_key": "mortal",
@@ -441,17 +450,26 @@ class PlayerRepositoryMixin:
                         "qualification_json": json.dumps(
                             qualification, ensure_ascii=False, sort_keys=True
                         ),
-                        "stamina": 30,
-                        "stamina_max": 30,
-                        "energy": 30,
-                        "energy_max": 30,
+                        **reward.set_values,
                     },
                 )
                 row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             else:
                 return SeekingRecord(player=self._row_to_player(row), created=False, already_completed=False)
             player = self._row_to_player(row)
-            payload = {"created": created, "player": self._player_payload(player)}
+            reward_snapshot = reward.snapshot()
+            reward_totals = dict(reward.assets)
+            for key, amount in reward.value_delta.items():
+                reward_totals[key] = reward_totals.get(key, 0) + amount
+            for key, amount in reward.set_values.items():
+                if not key.endswith("_max"):
+                    reward_totals[key] = amount
+            payload = {
+                "created": created,
+                "player": self._player_payload(player),
+                "reward": reward_totals,
+                "reward_snapshot": reward_snapshot,
+            }
             connection.execute(
                 """
                 INSERT INTO operations(
@@ -481,10 +499,20 @@ class PlayerRepositoryMixin:
                 player_id=int(row["id"]),
                 operation_id=operation_id,
                 occurred_at=now,
-                reward={"item.herb.blood_grass": 3},
+                reward={
+                    key: value
+                    for key, value in reward.assets.items()
+                    if key.startswith("item.")
+                },
                 snapshot={"source": "player.start_seeking"},
+                content=self.content,
             )
-            return SeekingRecord(player=player, created=created, already_completed=False)
+            return SeekingRecord(
+                player=player,
+                created=created,
+                already_completed=False,
+                reward=reward_totals,
+            )
 
     async def complete_intro(
         self,

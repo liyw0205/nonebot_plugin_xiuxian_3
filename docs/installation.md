@@ -159,7 +159,7 @@ Set-Location "$HOME\xiu3"
 & "$HOME\myenv\Scripts\nb.exe" run
 ```
 
-`requirements.txt` 只安装 `nb-cli==1.5.0`。适配器及驱动通过 `nb adapter install` / `nb driver install` 安装，插件以 `--no-deps` 安装，避免 pip 重复解析宿主依赖。宿主模板注册适配器并显式加载 `nonebot_plugin_xiuxian_3`。
+`requirements.txt` 只安装 `nb-cli`。适配器及驱动通过 `nb adapter install` / `nb driver install` 安装，插件以 `--no-deps` 安装，避免 pip 重复解析宿主依赖。宿主模板注册适配器并显式加载 `nonebot_plugin_xiuxian_3`。
 
 ### 已有 NoneBot 宿主
 

@@ -11,6 +11,7 @@ class SeekingRecord:
     player: PlayerView
     created: bool
     already_completed: bool
+    reward: dict[str, int] | None = None
 
 
 @dataclass(frozen=True, slots=True)

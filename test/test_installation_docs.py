@@ -27,9 +27,10 @@ def test_shell_installers_parse_and_expose_help() -> None:
     assert "--index-url URL" in result.stdout
 
 
-def test_requirements_pin_cli_without_upper_dependency_bounds() -> None:
+def test_requirements_leave_cli_version_to_the_environment() -> None:
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
-    assert requirements == ["nb-cli==1.5.0"]
+    assert requirements == ["nb-cli"]
+    assert all("==" not in line for line in requirements)
     assert all("<" not in line for line in requirements)
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     optional_dependencies = project["project"]["optional-dependencies"]

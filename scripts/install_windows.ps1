@@ -175,7 +175,7 @@ try {
     Copy-IfMissing (Join-Path $Root "examples\nonebot\pyproject.toml") (Join-Path $Target "pyproject.toml")
     Copy-IfMissing (Join-Path $Root "examples\nonebot\.env.example") (Join-Path $Target ".env")
 
-    Write-Host "[xiuxian3] 从 requirements.txt 安装 nb-cli==1.5.0"
+    Write-Host "[xiuxian3] 从 requirements.txt 安装 nb-cli"
     Invoke-Retry { & $VenvPython -m pip install --upgrade --index-url $IndexUrl -r (Join-Path $Root "requirements.txt") } "nb-cli 安装"
     $env:PIP_INDEX_URL = $IndexUrl
 
@@ -228,7 +228,7 @@ exit `$LASTEXITCODE
     }
 
     Write-Host "[xiuxian3] 校验已安装包、NoneBot 入口和 JSON 内容"
-    & $VenvPython -c "import importlib.metadata, nonebot, nonebot.adapters.qq, nonebot.adapters.onebot.v11, nonebot_plugin_xiuxian_3; assert importlib.metadata.version('nb-cli') == '1.5.0'"
+    & $VenvPython -c "import importlib.metadata, nonebot, nonebot.adapters.qq, nonebot.adapters.onebot.v11, nonebot_plugin_xiuxian_3; importlib.metadata.version('nb-cli')"
     if ($LASTEXITCODE -ne 0) { Stop-Install "插件导入校验失败" }
     & $VenvNb --help *> $null
     if ($LASTEXITCODE -ne 0) { Stop-Install "nb 命令未安装：$VenvNb" }

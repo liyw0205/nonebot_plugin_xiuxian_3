@@ -206,6 +206,8 @@ class PlayerApplication:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求的操作编号已用于其他输入，请重新发起操作。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except ContentError:
+            return CommandResult(False, "CONTENT_INVALID", "启程礼暂未备妥，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
@@ -219,7 +221,7 @@ class PlayerApplication:
                 f"- **灵石**：{player.spirit_stones}\n\n"
                 f"- **体力**：{player.stamina}/{player.stamina_max}\n"
                 f"- **精力**：{player.energy}/{player.energy_max}\n"
-                "- **初始物资**：粗糙灵米 ×3、止血草 ×3\n\n"
+                "- **初始物资**：启程所需物资已收入囊中\n\n"
                 "### 六项资质\n\n"
                 + self._qualification_text(player.qualification)
                 + "\n\n> 下一步：发送 `完成引导 阅读`，开始凡人引导。"
@@ -262,6 +264,7 @@ class PlayerApplication:
                         "qualification",
                     ),
                 ),
+                "reward": dict(record.reward or {}),
                 "idempotent_replay": record.already_completed,
             },
         )
