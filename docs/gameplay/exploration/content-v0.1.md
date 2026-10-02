@@ -8,7 +8,7 @@
 |:--|:--|:--|:--|:--|--:|
 | `explore.gather_outskirts` | `xuantian.outskirts`、凡人以上 | 30 秒 / 3 体力 | `gather.outskirts.v0.1.1` | 止血草 1；额外止血草 0–2、铁石 0–2；木材 0–1（权重 90/10）；10% 训练战 | 12 |
 | `explore.trial_outskirts` | 近郊、感气 L2 | 60 秒 / 5 体力 | `trial.outskirts.v0.1` | 修为 40–80、灵石 10–30；20% 遭遇战 | 8 |
-| `explore.spring_gather` | 灵泉谷、感气 L2、完成采集引导 | 90 秒 / 6 体力 | `gather.spirit_field.v0.1` | 灵叶 1；额外灵叶 0–1、阵砂 0–1；15% 资源事件 | 6 |
+| `explore.spring_gather` | 灵泉谷、感气 L2、完成采集引导 | 90 秒 / 6 体力 | `reward_pool.exploration.spring_gather` | 灵叶 1、灵泉水 1；额外灵叶 0–1、阵砂 0–1；15% 资源事件、无战斗遭遇 | 6 |
 | `explore.mist_grotto` | 雾隐洞天、聚气 L4、会话已进入 | 5 分钟 / 10 体力 | `cave.mist_grotto.v0.1` | 修为 300–500、洞天材料 1–3；25% 精英战 | 2 |
 
 探索开始时扣体力、固定角色/地点/装备/道途/随机池/次数；状态 `created -> running -> settled | expired`，

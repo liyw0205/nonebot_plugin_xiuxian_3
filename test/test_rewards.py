@@ -4,6 +4,8 @@ import asyncio
 import json
 import shutil
 from fractions import Fraction
+from itertools import product
+from math import prod
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -208,46 +210,61 @@ def test_weighted_reward_pool_rejects_invalid_content(tmp_path: Path) -> None:
         raise AssertionError("invalid weighted pool must fail content validation")
 
 
-def test_gather_reward_pool_preserves_every_joint_probability() -> None:
+@pytest.mark.parametrize(
+    ("pool_key", "distributions"),
+    [
+        (
+            "reward_pool.exploration.gather_outskirts",
+            {
+                "item.herb.blood_grass": {1: 35, 2: 45, 3: 20},
+                "item.ore.ironstone": {0: 50, 1: 35, 2: 15},
+                "item.mat.wood": {0: 90, 1: 10},
+            },
+        ),
+        (
+            "reward_pool.exploration.spring_gather",
+            {
+                "item.herb.spirit_leaf": {1: 60, 2: 40},
+                "item.mat.array_sand": {0: 60, 1: 40},
+                "item.spirit_water": {1: 100},
+            },
+        ),
+    ],
+    ids=["outskirts", "spring"],
+)
+def test_gather_reward_pool_preserves_every_joint_probability(
+    pool_key: str, distributions: dict[str, dict[int, int]]
+) -> None:
     bundle = ContentBundle.load(Path(__file__).parents[1] / "data")
-    outcomes = reward_pool_outcomes("reward_pool.exploration.gather_outskirts", bundle)
+    outcomes = reward_pool_outcomes(pool_key, bundle)
     total_weight = sum(weight for weight, _ in outcomes)
-    blood_weights = {1: 35, 2: 45, 3: 20}
-    iron_weights = {0: 50, 1: 35, 2: 15}
-    wood_weights = {0: 90, 1: 10}
     expected = {
-        (blood, iron, wood): Fraction(blood_weight, 100)
-        * Fraction(iron_weight, 100)
-        * Fraction(wood_weight, 100)
-        for blood, blood_weight in blood_weights.items()
-        for iron, iron_weight in iron_weights.items()
-        for wood, wood_weight in wood_weights.items()
+        tuple(quantity for quantity, _ in combination): prod(
+            Fraction(weight, 100) for _, weight in combination
+        )
+        for combination in product(*(weights.items() for weights in distributions.values()))
     }
     actual = {}
     for weight, rewards in outcomes:
-        assert set(rewards) <= {
-            "item.herb.blood_grass",
-            "item.ore.ironstone",
-            "item.mat.wood",
-        }
+        assert set(rewards) <= distributions.keys()
         assert all(quantity > 0 for quantity in rewards.values())
-        quantities = (
-            rewards["item.herb.blood_grass"],
-            rewards.get("item.ore.ironstone", 0),
-            rewards.get("item.mat.wood", 0),
-        )
+        quantities = tuple(rewards.get(item_key, 0) for item_key in distributions)
         assert quantities not in actual
         actual[quantities] = Fraction(weight, total_weight)
-    assert len(outcomes) == len(expected) == 18
+    assert len(outcomes) == len(expected)
     assert actual == expected
     assert sum(actual.values()) == 1
 
 
-def test_reward_pool_map_is_deterministic_and_returns_detached_results() -> None:
+@pytest.mark.parametrize(
+    "pool_key",
+    ["reward_pool.exploration.gather_outskirts", "reward_pool.exploration.spring_gather"],
+    ids=["outskirts", "spring"],
+)
+def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key: str) -> None:
     content_path = Path(__file__).parents[1] / "data"
     bundle = ContentBundle.load(content_path)
     reloaded = ContentBundle.load(content_path)
-    pool_key = "reward_pool.exploration.gather_outskirts"
     configured = {
         tuple(sorted(rewards.items())) for _, rewards in reward_pool_outcomes(pool_key, bundle)
     }
@@ -258,11 +275,47 @@ def test_reward_pool_map_is_deterministic_and_returns_detached_results() -> None
         original = dict(result)
         assert result == reward_pool_map(pool_key, seed, reloaded)
         selected.add(tuple(sorted(result.items())))
-        result["item.herb.blood_grass"] = 999
+        result[next(iter(result))] = 999
         assert reward_pool_map(pool_key, seed, bundle) == original
     assert selected == configured
 
 
+@pytest.mark.parametrize(
+    ("pool_key", "rewards"),
+    [
+        ("reward_pool.exploration.gather_outskirts", {"item.herb.blood_grass": 7}),
+        (
+            "reward_pool.exploration.spring_gather",
+            {"item.herb.spirit_leaf": 7, "item.mat.array_sand": 3, "item.spirit_water": 4},
+        ),
+    ],
+    ids=["outskirts", "spring"],
+)
+def test_gather_reward_pool_reads_changed_content_without_mutating_loaded_bundle(
+    tmp_path: Path, pool_key: str, rewards: dict[str, int]
+) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    original_bundle = ContentBundle.load(data_dir)
+    seed = "gather-content-change"
+    original = reward_pool_map(pool_key, seed, original_bundle)
+    reward_file = data_dir / "奖励" / "奖励.json"
+    document = json.loads(reward_file.read_text(encoding="utf-8"))
+    pool = next(item for item in document["records"] if item["key"] == pool_key)
+    pool["outcomes"] = [{"weight": 7, "rewards": rewards}]
+    reward_file.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+
+    reloaded = ContentBundle.load(data_dir)
+    assert reward_pool_outcomes(pool_key, reloaded) == ((7, rewards),)
+    assert reward_pool_map(pool_key, seed, reloaded) == rewards != original
+    assert reward_pool_map(pool_key, seed, original_bundle) == original
+
+
+@pytest.mark.parametrize(
+    "pool_key",
+    ["reward_pool.exploration.gather_outskirts", "reward_pool.exploration.spring_gather"],
+    ids=["outskirts", "spring"],
+)
 @pytest.mark.parametrize(
     ("outcome", "error"),
     [
@@ -286,13 +339,12 @@ def test_reward_pool_map_is_deterministic_and_returns_detached_results() -> None
     ],
 )
 def test_gather_reward_pool_rejects_malformed_outcomes(
-    tmp_path: Path, outcome: dict[str, object], error: str
+    tmp_path: Path, pool_key: str, outcome: dict[str, object], error: str
 ) -> None:
     data_dir = tmp_path / "data"
     shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
     reward_file = data_dir / "奖励" / "奖励.json"
     document = json.loads(reward_file.read_text(encoding="utf-8"))
-    pool_key = "reward_pool.exploration.gather_outskirts"
     pool = next(item for item in document["records"] if item["key"] == pool_key)
     pool["outcomes"] = [outcome]
     reward_file.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
@@ -303,21 +355,30 @@ def test_gather_reward_pool_rejects_malformed_outcomes(
     assert "outcome 0" in str(caught.value)
 
 
-def test_gather_reward_pool_rejects_inactive_item_even_when_not_selected(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("pool_key", "item_key"),
+    [
+        ("reward_pool.exploration.gather_outskirts", "item.mat.wood"),
+        ("reward_pool.exploration.spring_gather", "item.mat.array_sand"),
+    ],
+    ids=["outskirts", "spring"],
+)
+def test_gather_reward_pool_rejects_inactive_item_even_when_not_selected(
+    tmp_path: Path, pool_key: str, item_key: str
+) -> None:
     data_dir = tmp_path / "data"
     shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
-    pool_key = "reward_pool.exploration.gather_outskirts"
     active_bundle = ContentBundle.load(data_dir)
     seed = next(
-        f"inactive-wood-{index}"
+        f"inactive-item-{index}"
         for index in range(100)
-        if "item.mat.wood" not in reward_pool_map(pool_key, f"inactive-wood-{index}", active_bundle)
+        if item_key not in reward_pool_map(pool_key, f"inactive-item-{index}", active_bundle)
     )
     item_file = data_dir / "道具" / "材料.json"
     document = json.loads(item_file.read_text(encoding="utf-8"))
-    wood = next(item for item in document["records"] if item["key"] == "item.mat.wood")
-    wood["status"] = "locked"
+    item = next(item for item in document["records"] if item["key"] == item_key)
+    item["status"] = "locked"
     item_file.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
     bundle = ContentBundle.load(data_dir)
-    with pytest.raises(RewardContentError, match="inactive item item.mat.wood"):
+    with pytest.raises(RewardContentError, match=f"inactive item {item_key}"):
         reward_pool_map(pool_key, seed, bundle)

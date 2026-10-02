@@ -42,6 +42,7 @@ BATTLE_ENEMY_BY_MODE = {
 EXPLORATION_REWARD_POOLS = {
     "explore.gather_outskirts": "reward_pool.exploration.gather_outskirts",
     "explore.trial_outskirts": "reward_pool.exploration.trial_outskirts",
+    "explore.spring_gather": "reward_pool.exploration.spring_gather",
 }
 
 DEFINITIONS = {
@@ -317,12 +318,6 @@ def settlement_result(
                 f"exploration reward pool {reward_pool_key} contains unsupported state"
             )
         return result
-    if mode_key == "explore.spring_gather":
-        return {
-            "item.herb.spirit_leaf": 1 + weighted_value(seed + ":leaf", (0, 1), (60, 40)),
-            "item.mat.array_sand": weighted_value(seed + ":sand", (0, 1), (60, 40)),
-            "item.spirit_water": 1,
-        }
     if mode_key == "explore.mist_grotto":
         material = weighted_value(
             seed + ":material",

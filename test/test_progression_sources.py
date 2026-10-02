@@ -208,7 +208,7 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                             and settlement_result(
                                 "explore.spring_gather",
                                 f"{adapter}-spring-before-{index}-{candidate}",
-                            )["item.mat.array_sand"]
+                            ).get("item.mat.array_sand", 0)
                             >= 1
                         )
                     )
@@ -384,7 +384,7 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         for candidate in range(1000)
                         if settlement_result(
                             "explore.spring_gather", f"{adapter}-foundation-sand-{index}-{candidate}"
-                        )["item.mat.array_sand"] == 1
+                        ).get("item.mat.array_sand", 0) == 1
                     )
                     await _dispatch(runtime, adapter, user, 300 + index, "开始探索 灵泉采集", operation_id=operation)
                     clock.advance(seconds=90)
@@ -515,7 +515,7 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         )["item.herb.spirit_leaf"] == 2
                         and settlement_result(
                             "explore.spring_gather", f"{adapter}-core-spring-{index}-{candidate}"
-                        )["item.mat.array_sand"] == 1
+                        ).get("item.mat.array_sand", 0) == 1
                     )
                     await _dispatch(runtime, adapter, user, 1410 + index, "开始探索 灵泉采集", operation_id=operation)
                     clock.advance(seconds=90)
