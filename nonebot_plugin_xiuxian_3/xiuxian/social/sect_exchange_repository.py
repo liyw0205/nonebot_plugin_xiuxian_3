@@ -9,6 +9,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_items, inventory_amount
+from ..utils.json import json_object
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     PlayerNotFoundError,
@@ -94,7 +95,7 @@ class SectExchangeRepositoryMixin:
                 raise SectExchangeDailyCapError("sect exchange daily cap reached")
             if int(membership["contribution"]) < offer.contribution_cost:
                 raise SectContributionInsufficientError("sect contribution is insufficient")
-            warehouse = self._json_map(sect["warehouse_json"])
+            warehouse = json_object(sect["warehouse_json"])
             warehouse_quantity = int(warehouse.get(offer.item_key, 0))
             if warehouse_quantity < offer.quantity:
                 raise SectStockInsufficientError("sect warehouse stock is insufficient")
@@ -135,14 +136,6 @@ class SectExchangeRepositoryMixin:
                 now_text,
             )
             return self._exchange_record_from_payload(payload)
-
-    @staticmethod
-    def _json_map(value: Any) -> dict[str, Any]:
-        try:
-            decoded = json.loads(value or "{}") if isinstance(value, str) else value
-        except (TypeError, ValueError):
-            return {}
-        return decoded if isinstance(decoded, dict) else {}
 
     @staticmethod
     def _exchange_record_from_payload(payload: dict[str, Any], *, replay: bool = False) -> SectExchangeRecord:

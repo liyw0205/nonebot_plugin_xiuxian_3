@@ -21,6 +21,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 
 
 _ARTIFACT_KEY = re.compile(r"^[a-z0-9-]{1,48}$")
@@ -164,7 +165,7 @@ class ArenaRecoveryRepositoryMixin:
                 (operation_id,),
             ).fetchone()
         if existing is not None:
-            payload = self._json_map(existing[0])
+            payload = json_object(existing[0])
             return self._artifact_from_dict(payload["artifact"])
         if manifest_path.exists() or database_path.exists():
             raise ValueError("arena recovery artifact key already exists")
@@ -245,7 +246,7 @@ class ArenaRecoveryRepositoryMixin:
                     result={},
                 )
             if completed is not None:
-                payload = self._json_map(completed[0])
+                payload = json_object(completed[0])
                 return ArenaRecoveryReport(
                     request_id=request_id,
                     operation_id=operation_id,
@@ -482,15 +483,6 @@ class ArenaRecoveryRepositoryMixin:
             row_counts={str(key): int(value) for key, value in dict(payload["row_counts"]).items()},
             created_at=str(payload["created_at"]),
         )
-
-    @staticmethod
-    def _json_map(raw: Any) -> dict[str, Any]:
-        if isinstance(raw, str):
-            try:
-                raw = json.loads(raw)
-            except json.JSONDecodeError:
-                return {}
-        return dict(raw) if isinstance(raw, dict) else {}
 
     def _record_recovery_event(
         self,

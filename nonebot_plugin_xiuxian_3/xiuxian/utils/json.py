@@ -1,4 +1,4 @@
-"""Small helpers for decoding JSON objects stored by repositories."""
+"""Small helpers for decoding JSON values stored by repositories."""
 
 from __future__ import annotations
 
@@ -20,4 +20,17 @@ def json_object(value: Any, default: Mapping[str, Any] | None = None) -> dict[st
     return dict(default or {})
 
 
-__all__ = ["json_object"]
+def json_list(value: Any, default: list[Any] | None = None) -> list[Any]:
+    """Return a detached list from a JSON value, or a detached default."""
+
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError):
+            value = None
+    if isinstance(value, list):
+        return list(value)
+    return list(default or [])
+
+
+__all__ = ["json_list", "json_object"]

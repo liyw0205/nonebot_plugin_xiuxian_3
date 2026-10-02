@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..persistence.errors import (
     CrossServerFortressRequiredError,
     OperationConflictError,
@@ -97,7 +98,7 @@ class SectBeaconRepositoryMixin:
                 ).fetchone()
                 if str(existing["status"]) in {"building", "active"}:
                     raise VoidBeaconBuildError("void beacon already exists")
-            warehouse = self._beacon_json_map(sect["warehouse_json"])
+            warehouse = json_object(sect["warehouse_json"])
             if int(warehouse.get("item.void_anchor", 0)) < VOID_BEACON_ANCHOR_COST:
                 raise VoidBeaconBuildError("void anchor is insufficient")
             if int(warehouse.get("item.mat.array_sand", 0)) < VOID_BEACON_SAND_COST:
@@ -168,7 +169,7 @@ class SectBeaconRepositoryMixin:
                 payload = self._beacon_payload(beacon)
                 self._beacon_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
                 return self._beacon_from_payload(payload, already_completed=True)
-            warehouse = self._beacon_json_map(sect["warehouse_json"])
+            warehouse = json_object(sect["warehouse_json"])
             if int(warehouse.get("item.void_anchor", 0)) < VOID_BEACON_MAINTENANCE_ANCHOR_COST:
                 connection.execute("UPDATE sect_void_beacons SET status='inactive', updated_at=? WHERE sect_id=?", (now_text, sect["sect_id"]))
                 raise VoidBeaconBuildError("void beacon maintenance anchor is insufficient")
@@ -243,14 +244,6 @@ class SectBeaconRepositoryMixin:
     @staticmethod
     def _beacon_from_row(row: Any) -> VoidBeaconRecord:
         return SectBeaconRepositoryMixin._beacon_from_payload(SectBeaconRepositoryMixin._beacon_payload(row))
-
-    @staticmethod
-    def _beacon_json_map(value: object) -> dict[str, Any]:
-        try:
-            parsed = json.loads(value) if isinstance(value, str) else value
-        except (TypeError, ValueError):
-            parsed = {}
-        return dict(parsed) if isinstance(parsed, dict) else {}
 
     @staticmethod
     def _beacon_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:

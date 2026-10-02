@@ -14,6 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..utils.player import change_player_state, player_combat_values, player_integer
 from ..persistence.errors import (
     ArenaChallengeCapError,
@@ -431,13 +432,13 @@ class ArenaRepositoryMixin:
             if defender is None or str(defender["stage"]) != "cultivator":
                 raise ArenaOpponentUnavailableError("opponent is no longer eligible")
             if mode_key == THREE_REALMS_ARENA_MODE_KEY:
-                defender_snapshot_data = self._json_map(defender_snapshot["snapshot_json"])
+                defender_snapshot_data = json_object(defender_snapshot["snapshot_json"])
                 if not bool(defender_snapshot_data.get("three_realms_permit", False)):
                     raise ArenaOpponentUnavailableError("opponent lacks the three-realms arena permit")
             match_id = f"arena.match:{uuid4().hex}"
             challenger_snapshot_id = f"arena.match_snapshot:{uuid4().hex}"
             challenger_snapshot = self._arena_player_snapshot(connection, challenger, challenger_snapshot_id)
-            defender_snapshot_data = self._json_map(defender_snapshot["snapshot_json"])
+            defender_snapshot_data = json_object(defender_snapshot["snapshot_json"])
             environment = (
                 tactical_environment(challenger_snapshot, defender_snapshot_data)
                 if mode_key == THREE_REALMS_ARENA_MODE_KEY
@@ -503,7 +504,7 @@ class ArenaRepositoryMixin:
                 "challenger_rating_delta": challenger_delta,
                 "defender_rating_delta": defender_delta,
                 "mode_key": mode_key,
-                "opponent_summary": self._json_map(defender_snapshot["public_json"]),
+                "opponent_summary": json_object(defender_snapshot["public_json"]),
                 "request_id": request_id,
                 "operation_id": operation_id,
                 "tactical_environment": environment,
@@ -634,8 +635,8 @@ class ArenaRepositoryMixin:
                 outcome=str(match["outcome"]),
                 rounds=int(match["rounds"]),
                 score_counted=bool(match["score_counted"]),
-                snapshot=self._json_map(match["snapshot_json"]),
-                result=self._json_map(match["result_json"]),
+                snapshot=json_object(match["snapshot_json"]),
+                result=json_object(match["result_json"]),
                 actions=tuple(
                     {
                         "sequence_no": int(item["sequence_no"]),
@@ -646,7 +647,7 @@ class ArenaRepositoryMixin:
                         "target_key": str(item["target_key"]),
                         "hit_roll_bp": int(item["hit_roll_bp"]),
                         "damage": int(item["damage"]),
-                        "state": self._json_map(item["state_json"]),
+                        "state": json_object(item["state_json"]),
                     }
                     for item in actions
                 ),
@@ -746,7 +747,7 @@ class ArenaRepositoryMixin:
                 if consent is None:
                     raise ArenaMatchRequirementError("practice requires the snapshot owner's consent")
             if mode_key == THREE_REALMS_ARENA_MODE_KEY:
-                frozen = self._json_map(row["snapshot_json"])
+                frozen = json_object(row["snapshot_json"])
                 if not bool(frozen.get("three_realms_permit", False)):
                     raise ArenaOpponentUnavailableError("opponent lacks the three-realms arena permit")
             return row
@@ -768,7 +769,7 @@ class ArenaRepositoryMixin:
                 ).fetchone()
                 if consent is None:
                     continue
-            if mode_key == THREE_REALMS_ARENA_MODE_KEY and not bool(self._json_map(row["snapshot_json"]).get("three_realms_permit", False)):
+            if mode_key == THREE_REALMS_ARENA_MODE_KEY and not bool(json_object(row["snapshot_json"]).get("three_realms_permit", False)):
                 continue
             if (
                 (mode_key == ARENA_RANK_MODE_KEY and rating_band(challenger_rating) == rating_band(int(row["rating"])))
@@ -844,7 +845,7 @@ class ArenaRepositoryMixin:
             (player["id"],),
         ).fetchall()
         for item in equipment_rows:
-            affixes = self._json_map(item["affixes_json"])
+            affixes = json_object(item["affixes_json"])
             attack_bonus += max(0, int(affixes.get("damage", 0)))
             attack_bonus += max(0, int(item["temper_level"])) * 4 if str(item["slot"]) == "weapon" else 0
             equipment.append(
@@ -889,15 +890,6 @@ class ArenaRepositoryMixin:
         }
 
     @staticmethod
-    def _json_map(raw: Any) -> dict[str, Any]:
-        if isinstance(raw, str):
-            try:
-                raw = json.loads(raw)
-            except json.JSONDecodeError:
-                return {}
-        return dict(raw) if isinstance(raw, dict) else {}
-
-    @staticmethod
     def _arena_operation(
         connection: sqlite3.Connection, operation_id: str, operation_name: str, request_hash: str
     ) -> dict[str, Any] | None:
@@ -909,7 +901,7 @@ class ArenaRepositoryMixin:
             return None
         if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return ArenaRepositoryMixin._json_map(existing["result_json"])
+        return json_object(existing["result_json"])
 
     @staticmethod
     def _arena_insert_operation(
@@ -932,7 +924,7 @@ class ArenaRepositoryMixin:
             "snapshot_id": str(row["snapshot_id"]),
             "status": str(row["status"]),
             "mode_key": str(row["arena_mode_key"]),
-            "public_summary": ArenaRepositoryMixin._json_map(row["public_json"]),
+            "public_summary": json_object(row["public_json"]),
             "rating": int(row["rating"]),
             "matchable_at": str(row["matchable_at"]),
             "expires_at": str(row["expires_at"]),
@@ -944,7 +936,7 @@ class ArenaRepositoryMixin:
             snapshot_id=str(payload["snapshot_id"]),
             status=str(payload["status"]),
             mode_key=str(payload.get("mode_key", ARENA_MODE_KEY)),
-            public_summary=ArenaRepositoryMixin._json_map(payload.get("public_summary", {})),
+            public_summary=json_object(payload.get("public_summary", {})),
             rating=int(payload.get("rating", 0)),
             matchable_at=str(payload.get("matchable_at", "")),
             expires_at=str(payload.get("expires_at", "")),
@@ -957,7 +949,7 @@ class ArenaRepositoryMixin:
             snapshot_id=str(row["snapshot_id"]),
             status=str(row["status"]),
             mode_key=str(row["arena_mode_key"]),
-            public_summary=ArenaRepositoryMixin._json_map(row["public_json"]),
+            public_summary=json_object(row["public_json"]),
             rating=int(row["rating"]),
             matchable_at=str(row["matchable_at"]),
             expires_at=str(row["expires_at"]),
@@ -975,7 +967,7 @@ class ArenaRepositoryMixin:
             defender_rating=int(payload.get("defender_rating", 0)),
             challenger_rating_delta=int(payload.get("challenger_rating_delta", 0)),
             defender_rating_delta=int(payload.get("defender_rating_delta", 0)),
-            opponent_summary=ArenaRepositoryMixin._json_map(payload.get("opponent_summary", {})),
+            opponent_summary=json_object(payload.get("opponent_summary", {})),
             already_completed=already_completed,
         )
 
@@ -983,7 +975,7 @@ class ArenaRepositoryMixin:
     def _arena_claim_from_payload(payload: dict[str, Any], *, already_completed: bool = False) -> ArenaClaimRecord:
         return ArenaClaimRecord(
             match_id=str(payload["match_id"]),
-            reward={str(key): int(value) for key, value in ArenaRepositoryMixin._json_map(payload.get("reward", {})).items()},
+            reward={str(key): int(value) for key, value in json_object(payload.get("reward", {})).items()},
             already_completed=already_completed,
         )
 

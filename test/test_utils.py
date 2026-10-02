@@ -45,7 +45,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
 )
 from nonebot_plugin_xiuxian_3.contracts import PlayerView
 from nonebot_plugin_xiuxian_3.xiuxian.combat.repository import CombatRepositoryMixin
-from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_object
+from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_list, json_object
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
     DuplicateJSONKeyError,
     clear_json_cache,
@@ -138,6 +138,18 @@ def test_json_object_normalizes_stored_values_without_sharing_defaults() -> None
     decoded = json_object(None, default)
     decoded["spirit_stones"] = 0
     assert default == {"spirit_stones": 3}
+
+
+def test_json_list_normalizes_stored_values_without_sharing_defaults() -> None:
+    default = [{"key": "value"}]
+
+    assert json_list('[{"key": "stored"}]') == [{"key": "stored"}]
+    decoded = json_list('[{"key": "stored"}]')
+    decoded.append({"key": "extra"})
+    assert json_list('[{"key": "stored"}]') == [{"key": "stored"}]
+    assert json_list("invalid json", default) == default
+    assert json_list(None, default) == default
+    assert default == [{"key": "value"}]
 
 
 def test_asset_helpers_share_inventory_and_currency_accounting() -> None:

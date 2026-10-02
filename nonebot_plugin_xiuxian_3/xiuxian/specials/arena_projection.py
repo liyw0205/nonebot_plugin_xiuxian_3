@@ -14,6 +14,7 @@ from typing import Any
 
 from .arena_federation import ensure_identity_route, record_settlement_audit
 from .codex_projection import record_codex_discovery
+from ..utils.json import json_object
 
 
 ARENA_LOCATION_KEY = "xuantian.new_town"
@@ -74,7 +75,7 @@ def project_arena_result(
             "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
             (player_id,),
         ).fetchone()
-        local = _json_map(reputation["local_json"]) if reputation is not None else {}
+        local = json_object(reputation["local_json"]) if reputation is not None else {}
         before = int(local.get(ARENA_LOCAL_REPUTATION_KEY, 0))
         after = min(1000, max(0, before + reputation_delta))
         payload = {
@@ -101,7 +102,7 @@ def project_arena_result(
             (match_id, player_id),
         ).fetchone()
         if existing is not None:
-            projected.append(_json_map(existing["payload_json"]))
+            projected.append(json_object(existing["payload_json"]))
             continue
 
         for entry_key in entry_keys:
@@ -196,15 +197,6 @@ def project_arena_result(
         "mode_key": mode_key,
         "participants": projected,
     }
-
-
-def _json_map(raw: Any) -> dict[str, Any]:
-    if isinstance(raw, str):
-        try:
-            raw = json.loads(raw)
-        except json.JSONDecodeError:
-            return {}
-    return dict(raw) if isinstance(raw, Mapping) else {}
 
 
 __all__ = [

@@ -2,7 +2,7 @@
 
 from .database import connect_sqlite
 from .json_cache import DuplicateJSONKeyError, clear_json_cache, read_json_cached
-from .json import json_object
+from .json import json_list, json_object
 from .operations import operation_replay, player_operation, record_operation
 from .player import (
     PLAYER_COMBAT_FIELDS,
@@ -139,6 +139,7 @@ __all__ = [
     "player_item_amount",
     "is_currency_asset_key",
     "json_object",
+    "json_list",
     "player_field",
     "player_integer",
     "player_numeric_delta",

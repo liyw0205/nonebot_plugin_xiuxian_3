@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
     TeamArenaBusyError,
@@ -150,10 +151,10 @@ class TeamArenaRepositoryMixin:
             ).fetchone()
             if challenger_row is None:
                 raise TeamArenaSnapshotRequirementError("publish a team snapshot before challenging")
-            challenger_snapshot = self._json_map(challenger_row["snapshot_json"])
+            challenger_snapshot = json_object(challenger_row["snapshot_json"])
             if not MIN_TEAM_SIZE <= len(challenger_snapshot.get("members", [])) <= MAX_TEAM_SIZE:
                 raise TeamArenaSnapshotRequirementError("challenger team snapshot is invalid")
-            defender_snapshot = self._json_map(defender["snapshot_json"])
+            defender_snapshot = json_object(defender["snapshot_json"])
             challenger_rating = team_rating(challenger_snapshot["members"])
             defender_rating = int(defender["rating"])
             if not compatible_team_rating(challenger_rating, defender_rating):
@@ -209,7 +210,7 @@ class TeamArenaRepositoryMixin:
                     ),
                 ),
             )
-            payload = {"match_id": match_id, "outcome": outcome, "rounds": rounds, "challenger_rating": challenger_rating + challenger_delta, "defender_rating": defender_rating + defender_delta, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta, "opponent_summary": self._json_map(defender["public_json"]), "projection": projection}
+            payload = {"match_id": match_id, "outcome": outcome, "rounds": rounds, "challenger_rating": challenger_rating + challenger_delta, "defender_rating": defender_rating + defender_delta, "challenger_rating_delta": challenger_delta, "defender_rating_delta": defender_delta, "opponent_summary": json_object(defender["public_json"]), "projection": projection}
             connection.execute(
                 "UPDATE arena_team_matches SET result_json = ? WHERE match_id = ?",
                 (json.dumps(payload, ensure_ascii=False, sort_keys=True), match_id),
@@ -224,7 +225,7 @@ class TeamArenaRepositoryMixin:
                 row = connection.execute("SELECT * FROM arena_team_matches WHERE match_id = ?", (match_id.strip(),)).fetchone()
                 if row is None:
                     raise TeamArenaSnapshotNotFoundError("team arena match does not exist")
-                snapshot = self._json_map(row["snapshot_json"])
+                snapshot = json_object(row["snapshot_json"])
                 member_ids = {int(member.get("database_id", -1)) for side in ("challenger", "defender") for member in snapshot.get(side, {}).get("members", [])}
                 if int(player["id"]) not in member_ids:
                     raise TeamArenaPermissionError("only a team member can view this replay")
@@ -233,9 +234,9 @@ class TeamArenaRepositoryMixin:
                 row = next((candidate for candidate in rows if self._team_arena_player_in_snapshot(candidate["snapshot_json"], int(player["id"]))), None)
                 if row is None:
                     raise TeamArenaSnapshotNotFoundError("no team arena match exists")
-                snapshot = self._json_map(row["snapshot_json"])
+                snapshot = json_object(row["snapshot_json"])
             actions = connection.execute("SELECT * FROM arena_team_actions WHERE match_id = ? ORDER BY sequence_no", (row["match_id"],)).fetchall()
-            return TeamArenaReplayRecord(match_id=str(row["match_id"]), status=str(row["status"]), outcome=str(row["outcome"]), rounds=int(row["rounds"]), snapshot=snapshot, result=self._json_map(row["result_json"]), actions=tuple({"sequence_no": int(action["sequence_no"]), "round_no": int(action["round_no"]), "actor_key": str(action["actor_key"]), "skill_key": str(action["skill_key"]), "target_key": str(action["target_key"]), "damage": int(action["damage"]), "state": self._json_map(action["state_json"])} for action in actions))
+            return TeamArenaReplayRecord(match_id=str(row["match_id"]), status=str(row["status"]), outcome=str(row["outcome"]), rounds=int(row["rounds"]), snapshot=snapshot, result=json_object(row["result_json"]), actions=tuple({"sequence_no": int(action["sequence_no"]), "round_no": int(action["round_no"]), "actor_key": str(action["actor_key"]), "skill_key": str(action["skill_key"]), "target_key": str(action["target_key"]), "damage": int(action["damage"]), "state": json_object(action["state_json"])} for action in actions))
 
     def _team_arena_party(self, connection, player_id: int, *, require_leader: bool):
         membership = connection.execute("SELECT * FROM party_members WHERE player_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1", (player_id,)).fetchone()
@@ -294,7 +295,7 @@ class TeamArenaRepositoryMixin:
 
     @staticmethod
     def _team_arena_player_in_snapshot(raw: str, player_id: int) -> bool:
-        snapshot = TeamArenaRepositoryMixin._json_map(raw)
+        snapshot = json_object(raw)
         return any(int(member.get("database_id", -1)) == player_id for side in ("challenger", "defender") for member in snapshot.get(side, {}).get("members", []))
 
     @staticmethod
@@ -307,7 +308,7 @@ class TeamArenaRepositoryMixin:
 
     @staticmethod
     def _team_snapshot_from_row(row) -> TeamArenaSnapshotRecord:
-        return TeamArenaSnapshotRecord(snapshot_id=str(row["snapshot_id"]), party_id=str(row["party_id"]), status=str(row["status"]), public_summary=TeamArenaRepositoryMixin._json_map(row["public_json"]), rating=int(row["rating"]), matchable_at=str(row["matchable_at"]), expires_at=str(row["expires_at"]))
+        return TeamArenaSnapshotRecord(snapshot_id=str(row["snapshot_id"]), party_id=str(row["party_id"]), status=str(row["status"]), public_summary=json_object(row["public_json"]), rating=int(row["rating"]), matchable_at=str(row["matchable_at"]), expires_at=str(row["expires_at"]))
 
     @staticmethod
     def _team_match_from_payload(payload: dict[str, Any], *, already_completed: bool = False) -> TeamArenaMatchRecord:
@@ -320,20 +321,10 @@ class TeamArenaRepositoryMixin:
             return None
         if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return TeamArenaRepositoryMixin._json_map(existing["result_json"])
+        return json_object(existing["result_json"])
 
     @staticmethod
     def _team_arena_insert_operation(connection, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
         connection.execute("INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))
-
-    @staticmethod
-    def _json_map(raw: Any) -> dict[str, Any]:
-        if isinstance(raw, str):
-            try:
-                raw = json.loads(raw)
-            except json.JSONDecodeError:
-                return {}
-        return dict(raw) if isinstance(raw, dict) else {}
-
 
 __all__ = ["TeamArenaRepositoryMixin"]

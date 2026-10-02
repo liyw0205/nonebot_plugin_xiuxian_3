@@ -9,6 +9,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount, spend_player_assets, player_currency
+from ..utils.json import json_object
 from ..utils.player import player_inventory
 from ..persistence.errors import (
     OperationConflictError,
@@ -160,7 +161,7 @@ class SectSupplyRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             member, sect = self._supply_member(connection, int(player["id"]))
             contribution_gain = quantity // 100 if item_key == "spirit_stones" else quantity
-            warehouse = self._json_map(sect["warehouse_json"])
+            warehouse = json_object(sect["warehouse_json"])
             if item_key == "spirit_stones":
                 if player_currency(player) < quantity:
                     raise ResourceInsufficientError("not enough spirit stones")
@@ -210,7 +211,7 @@ class SectSupplyRepositoryMixin:
             member, sect = self._supply_member(connection, int(player["id"]))
             if str(member["role"]) not in {"leader", "vice_leader"}:
                 raise SectPermissionDeniedError("only leaders can procure stock")
-            warehouse = self._json_map(sect["warehouse_json"])
+            warehouse = json_object(sect["warehouse_json"])
             if any(int(warehouse.get(key, 0)) < amount for key, amount in inputs.items()):
                 raise SectStockInsufficientError("missing warehouse supply inputs")
             if int(sect["spirit_stones"]) < price:

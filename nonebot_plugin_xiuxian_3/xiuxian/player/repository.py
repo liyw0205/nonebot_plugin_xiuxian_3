@@ -165,7 +165,6 @@ from ..routine.rules import (
     tree_harvest_reward,
     tree_status,
 )
-
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_json
 from ..utils.player import change_player_state, grant_player_state, player_integer
@@ -174,6 +173,10 @@ from ..utils.player import player_field, player_reputation, player_values
 
 
 class PlayerRepositoryMixin:
+    # Keep the composition root's domain mixins on the shared decoder while
+    # parsing remains owned by xiuxian.utils.json.
+    _json_object = staticmethod(json_object)
+
     async def create_player(
         self,
         *,
@@ -573,7 +576,7 @@ class PlayerRepositoryMixin:
             if row["stage"] not in {STAGE_MORTAL, "seeker"}:
                 raise PlayerStageConflictError("player is not ready for mortal introduction")
 
-            intro_state = self._json_object(row["intro_json"], {})
+            intro_state = json_object(row["intro_json"], {})
             flags = [str(item) for item in intro_state.get("flags", [])]
             selected = str(intro_state.get("selected_service") or row["selected_service"] or "") or None
             changed = guide_key not in flags
@@ -754,7 +757,7 @@ class PlayerRepositoryMixin:
             if destination == SPIRIT_FIELD_LOCATION:
                 if row["realm_key"] != REALM_QI_SENSING or player_integer(row, "realm_layer") < 2:
                     raise LocationRequirementError("spirit field requires qi sensing layer 2")
-                intro_state = self._json_object(row["intro_json"], {})
+                intro_state = json_object(row["intro_json"], {})
                 if GUIDE_GATHER_BLOOD_GRASS not in set(intro_state.get("flags", [])):
                     raise LocationRequirementError("spirit field requires the gathering lesson")
 
@@ -1011,15 +1014,11 @@ class PlayerRepositoryMixin:
         player = self._row_to_player(row)
         if reputation is not None:
             faction = dict(player.faction_reputation)
-            for key, value in self._json_object(reputation["local_json"], {}).items():
+            for key, value in json_object(reputation["local_json"], {}).items():
                 if str(key).startswith("faction."):
                     faction[str(key).split(".", 1)[1]] = int(value)
             player = replace(player, faction_reputation=faction)
         return player
-
-    @staticmethod
-    def _json_object(raw: Any, default: dict[str, Any]) -> dict[str, Any]:
-        return json_object(raw, default)
 
     @staticmethod
     def _row_to_player(row: sqlite3.Row | dict[str, Any]) -> PlayerView:

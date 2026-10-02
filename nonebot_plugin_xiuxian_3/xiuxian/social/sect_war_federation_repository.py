@@ -12,6 +12,7 @@ from typing import Any, Mapping
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from ..persistence.errors import OperationConflictError, SectNotFoundError, SectWarRequirementError
 from .sect_war_federation_models import SectWarFederationResultRecord, SectWarFederationSnapshotRecord
 from .sect_war_federation_rules import (
@@ -137,7 +138,7 @@ class SectWarFederationRepositoryMixin:
                         "player_id": int(member["player_id"]),
                         "roster_slot": int(member["roster_slot"]),
                         "contribution": int(member["contribution"]),
-                        "snapshot": self._json_map(member["snapshot_json"]),
+                        "snapshot": json_object(member["snapshot_json"]),
                     }
                     for member in members
                 ],

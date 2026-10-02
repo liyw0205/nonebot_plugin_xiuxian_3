@@ -57,6 +57,7 @@ from .sect_war_cross_server_rules import (
     top_reward_for_rank,
 )
 from ..utils.assets import grant_player_assets
+from ..utils.json import json_list, json_object
 from ..utils.player import change_player_state
 
 
@@ -174,7 +175,7 @@ class SectWarCrossServerRepositoryMixin:
                 existing = connection.execute("SELECT * FROM sect_void_fortresses WHERE sect_id=?", (sect["sect_id"],)).fetchone()
                 if str(existing["status"]) in {"building", "active"}:
                     raise CrossServerFortressBuildError("void fortress already exists")
-            warehouse = self._json_map(sect["warehouse_json"])
+            warehouse = json_object(sect["warehouse_json"])
             if int(warehouse.get("item.void_anchor", 0)) < CROSS_SERVER_FORTRESS_ANCHOR_COST:
                 raise CrossServerFortressBuildError("void anchor is insufficient")
             if int(sect["spirit_stones"]) < CROSS_SERVER_FORTRESS_BUILD_COST:
@@ -221,7 +222,7 @@ class SectWarCrossServerRepositoryMixin:
                 payload = self._fortress_payload(fortress)
                 self._cross_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
                 return self._fortress_from_payload(payload, already_completed=True)
-            warehouse = self._json_map(sect["warehouse_json"])
+            warehouse = json_object(sect["warehouse_json"])
             if int(warehouse.get("item.void_anchor", 0)) < CROSS_SERVER_FORTRESS_MAINTENANCE_ANCHOR_COST:
                 connection.execute("UPDATE sect_void_fortresses SET status='inactive', updated_at=? WHERE sect_id=?", (now_text, sect["sect_id"]))
                 raise CrossServerFortressBuildError("void fortress maintenance anchor is insufficient")
@@ -363,7 +364,7 @@ class SectWarCrossServerRepositoryMixin:
             pending = connection.execute("SELECT reward_json FROM sect_cross_server_weekly_rewards WHERE reward_key=?", (f"season.void_frontier.{window.week_id}:{player['id']}",)).fetchone()
             if pending is None:
                 raise CrossServerRewardNotAvailableError("cross-server reward is not available")
-            reward = self._json_map(pending["reward_json"])
+            reward = json_object(pending["reward_json"])
             if reward.get("status") == "claimed":
                 payload = {"round_id": window.round_id, "sect_id": str(member["sect_id"]), "reward": {"void_merit": CROSS_SERVER_MEMBER_MERIT}, "status": "claimed"}
                 self._cross_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -400,7 +401,7 @@ class SectWarCrossServerRepositoryMixin:
             member = connection.execute("SELECT 1 FROM sect_cross_server_war_members WHERE round_id=? AND sect_id=? AND player_id=?", (window.round_id, sect_id, target["id"])).fetchone()
             if box is None or member is None:
                 raise CrossServerRewardAllocationError("reward box or target member is unavailable")
-            reward = self._json_map(box["reward_json"]); distributed = self._json_map(box["distributed_json"])
+            reward = json_object(box["reward_json"]); distributed = json_object(box["distributed_json"])
             available = int(reward.get("item.void_crystal", 0)) - int(distributed.get("item.void_crystal", 0))
             if quantity > available:
                 raise CrossServerRewardAllocationError("reward box quantity is insufficient")
@@ -475,7 +476,7 @@ class SectWarCrossServerRepositoryMixin:
         for session in sessions:
             hp = int(session["engine_hp"]); turn = int(session["turn_no"]); branch = session["branch_key"]
             roster_size = int(connection.execute("SELECT COUNT(*) FROM sect_cross_server_war_members WHERE round_id=? AND sect_id=?", (window.round_id, session["sect_id"])).fetchone()[0])
-            replay = self._json_list(session["replay_json"])
+            replay = [dict(item) for item in json_list(session["replay_json"]) if isinstance(item, dict)]
             steps = 0
             while turn < 30 and hp > 0 and steps < 5:
                 phase = "phase_30" if hp <= 15_000 else "phase_60" if hp <= 30_000 else "normal"
@@ -496,7 +497,7 @@ class SectWarCrossServerRepositoryMixin:
     def _cross_auto_grant(self, connection: Any, window: CrossServerRoundWindow, now: datetime) -> None:
         rows = connection.execute("SELECT reward_key,player_id,reward_json FROM sect_cross_server_weekly_rewards WHERE round_id=?", (window.round_id,)).fetchall()
         for row in rows:
-            reward = self._json_map(row["reward_json"])
+            reward = json_object(row["reward_json"])
             if reward.get("status") == "claimed":
                 continue
             player = connection.execute(
@@ -548,27 +549,11 @@ class SectWarCrossServerRepositoryMixin:
             return None
         if str(existing["operation_name"]) != operation_name or str(existing["request_hash"]) != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return json.loads(existing["result_json"])
+        return json_object(existing["result_json"])
 
     @staticmethod
     def _cross_insert_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: Mapping[str, object], now_text: str) -> None:
         connection.execute("INSERT INTO operations(operation_id,operation_name,player_id,request_hash,result_json,created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, player_id, request_hash, json.dumps(dict(payload), ensure_ascii=False, sort_keys=True), now_text))
-
-    @staticmethod
-    def _json_map(value: object) -> dict[str, Any]:
-        try:
-            result = json.loads(value) if isinstance(value, str) else value
-        except (TypeError, ValueError):
-            result = {}
-        return dict(result) if isinstance(result, dict) else {}
-
-    @classmethod
-    def _json_list(cls, value: object) -> list[dict[str, Any]]:
-        try:
-            result = json.loads(value) if isinstance(value, str) else value
-        except (TypeError, ValueError):
-            result = []
-        return [dict(item) for item in result if isinstance(item, dict)] if isinstance(result, list) else []
 
     @staticmethod
     def _fortress_payload(row: Any) -> dict[str, object]:

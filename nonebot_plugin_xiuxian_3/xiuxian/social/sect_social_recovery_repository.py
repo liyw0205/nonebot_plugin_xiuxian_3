@@ -19,6 +19,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.json import json_object
 from .sect_social_recovery_models import SocialRecoveryArtifact, SocialRecoveryReport
 from .sect_social_recovery_rules import (
     SOCIAL_RECOVERY_ARTIFACT_ROOT,
@@ -97,7 +98,7 @@ class SectSocialRecoveryRepositoryMixin:
                 (operation_id,),
             ).fetchone()
         if existing is not None:
-            return self._artifact_from_dict(self._json_map(existing[0])["artifact"])
+            return self._artifact_from_dict(json_object(existing[0])["artifact"])
         if database_path.exists() or manifest_path.exists():
             raise ValueError("social recovery artifact key already exists")
 
@@ -178,7 +179,7 @@ class SectSocialRecoveryRepositoryMixin:
                     result={},
                 )
             if completed is not None:
-                payload = self._json_map(completed[0])
+                payload = json_object(completed[0])
                 return SocialRecoveryReport(
                     request_id=request_id,
                     operation_id=operation_id,
@@ -367,15 +368,6 @@ class SectSocialRecoveryRepositoryMixin:
             row_counts={str(key): int(value) for key, value in dict(payload["row_counts"]).items()},
             created_at=str(payload["created_at"]),
         )
-
-    @staticmethod
-    def _json_map(raw: Any) -> dict[str, Any]:
-        if isinstance(raw, str):
-            try:
-                raw = json.loads(raw)
-            except json.JSONDecodeError:
-                return {}
-        return dict(raw) if isinstance(raw, dict) else {}
 
     def _record_social_recovery_event(
         self,
