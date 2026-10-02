@@ -9,7 +9,7 @@
 | `explore.gather_outskirts` | `xuantian.outskirts`、凡人以上 | 30 秒 / 3 体力 | `gather.outskirts.v0.1.1` | 止血草 1；额外止血草 0–2、铁石 0–2；木材 0–1（权重 90/10）；10% 训练战 | 12 |
 | `explore.trial_outskirts` | 近郊、感气 L2 | 60 秒 / 5 体力 | `trial.outskirts.v0.1` | 修为 40–80、灵石 10–30；20% 遭遇战 | 8 |
 | `explore.spring_gather` | 灵泉谷、感气 L2、完成采集引导 | 90 秒 / 6 体力 | `reward_pool.exploration.spring_gather` | 灵叶 1、灵泉水 1；额外灵叶 0–1、阵砂 0–1；15% 资源事件、无战斗遭遇 | 6 |
-| `explore.mist_grotto` | 雾隐洞天、聚气 L4、会话已进入 | 5 分钟 / 10 体力 | `cave.mist_grotto.v0.1` | 修为 300–500、洞天材料 1–3；25% 精英战 | 2 |
+| `explore.mist_grotto` | 雾隐洞天、聚气 L4、会话已进入 | 5 分钟 / 10 体力 | `reward_pool.exploration.mist_grotto` | 修为 300/400/500（权重 30/45/25）；灵叶/阵砂/铁石（权重 45/30/25）各 1–3（权重 45/35/20）；25% 精英战 | 2 |
 
 探索开始时扣体力、固定角色/地点/装备/道途/随机池/次数；状态 `created -> running -> settled | expired`，
 遭遇时进入 `combat_pending` 并关联 `BattleSession`。只有 `created` 可取消，返还全部体力，不抽池。
@@ -21,7 +21,7 @@
 `enemy.mist_guardian`；`explore.spring_gather` 当前无战斗遭遇。敌人地点、境界前置、规则版本、
 属性与装备均以探索开始快照为准。
 
-各池为离散权重：近郊额外草 0/1/2 权重 35/45/20，铁石 0/1/2 权重 50/35/15，木材 0/1 权重 90/10；短历练修为 40/60/80 权重 30/45/25，灵石 10/20/30 权重 40/40/20；灵泉额外资源按 0/1 权重 60/40；洞天材料使用 `item.herb.spirit_leaf`/`item.mat.array_sand`/`item.ore.ironstone` 权重 45/30/25。气运只允许按属性文档调整非保底项权重，不能改保底产出或遭遇概率。
+各池为离散权重：近郊额外草 0/1/2 权重 35/45/20，铁石 0/1/2 权重 50/35/15，木材 0/1 权重 90/10；短历练修为 40/60/80 权重 30/45/25，灵石 10/20/30 权重 40/40/20；灵泉额外灵叶与阵砂分别按 0/1 权重 60/40；洞天修为 300/400/500 权重 30/45/25，材料使用 `item.herb.spirit_leaf`/`item.mat.array_sand`/`item.ore.ironstone` 权重 45/30/25，数量 1/2/3 权重 45/35/20，联合结果权重为三项相乘。气运只允许按属性文档调整非保底项权重，不能改保底产出或遭遇概率。
 
 ## 2. 悬赏轮次
 

@@ -14,6 +14,7 @@ import pytest
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import settlement_result
 from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import (
     RewardContentError,
     RewardGrant,
@@ -26,6 +27,29 @@ from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import (
 
 def _context(adapter: str, user: str, operation_id: str) -> CommandContext:
     return CommandContext(adapter=adapter, user_id=user, operation_id=operation_id)
+
+
+def _reward_axis(key: str, distribution: dict[int, int]) -> tuple[tuple[dict[str, int], int], ...]:
+    return tuple(
+        (({key: quantity} if quantity else {}), weight)
+        for quantity, weight in distribution.items()
+    )
+
+
+def _joint_reward_probabilities(
+    *axes: tuple[tuple[dict[str, int], int], ...],
+) -> dict[tuple[tuple[str, int], ...], Fraction]:
+    total_weight = prod(sum(weight for _, weight in axis) for axis in axes)
+    expected: dict[tuple[tuple[str, int], ...], Fraction] = {}
+    for choices in product(*axes):
+        weight = prod(choice_weight for _, choice_weight in choices)
+        rewards: dict[str, int] = {}
+        for choice_rewards, _ in choices:
+            assert not rewards.keys() & choice_rewards.keys()
+            rewards.update(choice_rewards)
+        outcome = tuple(sorted(rewards.items()))
+        expected[outcome] = expected.get(outcome, Fraction()) + Fraction(weight, total_weight)
+    return expected
 
 
 def test_onboarding_reward_is_loaded_from_content_for_both_adapters() -> None:
@@ -211,46 +235,55 @@ def test_weighted_reward_pool_rejects_invalid_content(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("pool_key", "distributions"),
+    ("pool_key", "axes"),
     [
         (
             "reward_pool.exploration.gather_outskirts",
-            {
-                "item.herb.blood_grass": {1: 35, 2: 45, 3: 20},
-                "item.ore.ironstone": {0: 50, 1: 35, 2: 15},
-                "item.mat.wood": {0: 90, 1: 10},
-            },
+            (
+                _reward_axis("item.herb.blood_grass", {1: 35, 2: 45, 3: 20}),
+                _reward_axis("item.ore.ironstone", {0: 50, 1: 35, 2: 15}),
+                _reward_axis("item.mat.wood", {0: 90, 1: 10}),
+            ),
         ),
         (
             "reward_pool.exploration.spring_gather",
-            {
-                "item.herb.spirit_leaf": {1: 60, 2: 40},
-                "item.mat.array_sand": {0: 60, 1: 40},
-                "item.spirit_water": {1: 100},
-            },
+            (
+                _reward_axis("item.herb.spirit_leaf", {1: 60, 2: 40}),
+                _reward_axis("item.mat.array_sand", {0: 60, 1: 40}),
+                _reward_axis("item.spirit_water", {1: 100}),
+            ),
+        ),
+        (
+            "reward_pool.exploration.mist_grotto",
+            (
+                (({"cultivation": 300}, 30), ({"cultivation": 400}, 45), ({"cultivation": 500}, 25)),
+                tuple(
+                    ({item_key: quantity}, material_weight * quantity_weight)
+                    for item_key, material_weight in (
+                        ("item.herb.spirit_leaf", 45),
+                        ("item.mat.array_sand", 30),
+                        ("item.ore.ironstone", 25),
+                    )
+                    for quantity, quantity_weight in ((1, 45), (2, 35), (3, 20))
+                ),
+            ),
         ),
     ],
-    ids=["outskirts", "spring"],
+    ids=["outskirts", "spring", "mist-grotto"],
 )
-def test_gather_reward_pool_preserves_every_joint_probability(
-    pool_key: str, distributions: dict[str, dict[int, int]]
+def test_exploration_reward_pool_preserves_every_joint_probability(
+    pool_key: str, axes: tuple[tuple[tuple[dict[str, int], int], ...], ...]
 ) -> None:
     bundle = ContentBundle.load(Path(__file__).parents[1] / "data")
     outcomes = reward_pool_outcomes(pool_key, bundle)
     total_weight = sum(weight for weight, _ in outcomes)
-    expected = {
-        tuple(quantity for quantity, _ in combination): prod(
-            Fraction(weight, 100) for _, weight in combination
-        )
-        for combination in product(*(weights.items() for weights in distributions.values()))
-    }
-    actual = {}
+    expected = _joint_reward_probabilities(*axes)
+    actual: dict[tuple[tuple[str, int], ...], Fraction] = {}
     for weight, rewards in outcomes:
-        assert set(rewards) <= distributions.keys()
         assert all(quantity > 0 for quantity in rewards.values())
-        quantities = tuple(rewards.get(item_key, 0) for item_key in distributions)
-        assert quantities not in actual
-        actual[quantities] = Fraction(weight, total_weight)
+        key = tuple(sorted(rewards.items()))
+        assert key not in actual
+        actual[key] = Fraction(weight, total_weight)
     assert len(outcomes) == len(expected)
     assert actual == expected
     assert sum(actual.values()) == 1
@@ -258,8 +291,12 @@ def test_gather_reward_pool_preserves_every_joint_probability(
 
 @pytest.mark.parametrize(
     "pool_key",
-    ["reward_pool.exploration.gather_outskirts", "reward_pool.exploration.spring_gather"],
-    ids=["outskirts", "spring"],
+    [
+        "reward_pool.exploration.gather_outskirts",
+        "reward_pool.exploration.spring_gather",
+        "reward_pool.exploration.mist_grotto",
+    ],
+    ids=["outskirts", "spring", "mist-grotto"],
 )
 def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key: str) -> None:
     content_path = Path(__file__).parents[1] / "data"
@@ -288,10 +325,14 @@ def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key:
             "reward_pool.exploration.spring_gather",
             {"item.herb.spirit_leaf": 7, "item.mat.array_sand": 3, "item.spirit_water": 4},
         ),
+        (
+            "reward_pool.exploration.mist_grotto",
+            {"cultivation": 700, "item.ore.ironstone": 5},
+        ),
     ],
-    ids=["outskirts", "spring"],
+    ids=["outskirts", "spring", "mist-grotto"],
 )
-def test_gather_reward_pool_reads_changed_content_without_mutating_loaded_bundle(
+def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_bundle(
     tmp_path: Path, pool_key: str, rewards: dict[str, int]
 ) -> None:
     data_dir = tmp_path / "data"
@@ -313,8 +354,12 @@ def test_gather_reward_pool_reads_changed_content_without_mutating_loaded_bundle
 
 @pytest.mark.parametrize(
     "pool_key",
-    ["reward_pool.exploration.gather_outskirts", "reward_pool.exploration.spring_gather"],
-    ids=["outskirts", "spring"],
+    [
+        "reward_pool.exploration.gather_outskirts",
+        "reward_pool.exploration.spring_gather",
+        "reward_pool.exploration.mist_grotto",
+    ],
+    ids=["outskirts", "spring", "mist-grotto"],
 )
 @pytest.mark.parametrize(
     ("outcome", "error"),
@@ -338,7 +383,7 @@ def test_gather_reward_pool_reads_changed_content_without_mutating_loaded_bundle
         ({"weight": 1, "rewards": {"item.mat.wood": 1.5}}, "positive integer quantities"),
     ],
 )
-def test_gather_reward_pool_rejects_malformed_outcomes(
+def test_exploration_reward_pool_rejects_malformed_outcomes(
     tmp_path: Path, pool_key: str, outcome: dict[str, object], error: str
 ) -> None:
     data_dir = tmp_path / "data"
@@ -356,14 +401,63 @@ def test_gather_reward_pool_rejects_malformed_outcomes(
 
 
 @pytest.mark.parametrize(
+    ("mode_key", "pool_key"),
+    [
+        ("explore.trial_outskirts", "reward_pool.exploration.trial_outskirts"),
+        ("explore.gather_outskirts", "reward_pool.exploration.gather_outskirts"),
+        ("explore.spring_gather", "reward_pool.exploration.spring_gather"),
+        ("explore.mist_grotto", "reward_pool.exploration.mist_grotto"),
+    ],
+)
+@pytest.mark.parametrize("resource_key", ["stamina", "soul_power"])
+def test_exploration_reward_pool_rejects_non_cultivation_player_values(
+    tmp_path: Path, mode_key: str, pool_key: str, resource_key: str
+) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    reward_file = data_dir / "奖励" / "奖励.json"
+    document = json.loads(reward_file.read_text(encoding="utf-8"))
+    pool = next(item for item in document["records"] if item["key"] == pool_key)
+    pool["outcomes"] = [{"weight": 1, "rewards": {resource_key: 1}}]
+    reward_file.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+
+    with pytest.raises(RewardContentError, match="contains unsupported state"):
+        settlement_result(mode_key, "unsupported-exploration-resource", content=bundle)
+
+
+def test_exploration_reward_pool_accepts_cultivation_and_assets() -> None:
+    with TemporaryDirectory() as temp:
+        data_dir = Path(temp) / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        reward_file = data_dir / "奖励" / "奖励.json"
+        document = json.loads(reward_file.read_text(encoding="utf-8"))
+        pool = next(
+            item for item in document["records"] if item["key"] == "reward_pool.exploration.mist_grotto"
+        )
+        rewards = {
+            "cultivation": 17,
+            "total_cultivation": 170,
+            "spirit_stones": 5,
+            "item.herb.spirit_leaf": 2,
+        }
+        pool["outcomes"] = [{"weight": 1, "rewards": rewards}]
+        reward_file.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        bundle = ContentBundle.load(data_dir)
+
+        assert settlement_result("explore.mist_grotto", "allowed-exploration-reward", content=bundle) == rewards
+
+
+@pytest.mark.parametrize(
     ("pool_key", "item_key"),
     [
         ("reward_pool.exploration.gather_outskirts", "item.mat.wood"),
         ("reward_pool.exploration.spring_gather", "item.mat.array_sand"),
+        ("reward_pool.exploration.mist_grotto", "item.ore.ironstone"),
     ],
-    ids=["outskirts", "spring"],
+    ids=["outskirts", "spring", "mist-grotto"],
 )
-def test_gather_reward_pool_rejects_inactive_item_even_when_not_selected(
+def test_exploration_reward_pool_rejects_inactive_item_even_when_not_selected(
     tmp_path: Path, pool_key: str, item_key: str
 ) -> None:
     data_dir = tmp_path / "data"

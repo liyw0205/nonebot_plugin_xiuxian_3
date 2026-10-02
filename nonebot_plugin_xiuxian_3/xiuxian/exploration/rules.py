@@ -43,6 +43,7 @@ EXPLORATION_REWARD_POOLS = {
     "explore.gather_outskirts": "reward_pool.exploration.gather_outskirts",
     "explore.trial_outskirts": "reward_pool.exploration.trial_outskirts",
     "explore.spring_gather": "reward_pool.exploration.spring_gather",
+    "explore.mist_grotto": "reward_pool.exploration.mist_grotto",
 }
 
 DEFINITIONS = {
@@ -318,17 +319,6 @@ def settlement_result(
                 f"exploration reward pool {reward_pool_key} contains unsupported state"
             )
         return result
-    if mode_key == "explore.mist_grotto":
-        material = weighted_value(
-            seed + ":material",
-            (0, 1, 2),
-            (45, 30, 25),
-        )
-        keys = ("item.herb.spirit_leaf", "item.mat.array_sand", "item.ore.ironstone")
-        return {
-            "cultivation": weighted_value(seed + ":cultivation", (300, 400, 500), (30, 45, 25)),
-            keys[material]: weighted_value(seed + ":quantity", (1, 2, 3), (45, 35, 20)),
-        }
     if mode_key == "explore.cloud_mine":
         return {
             "item.material.cloud_iron": weighted_value(
