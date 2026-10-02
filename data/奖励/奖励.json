@@ -247,6 +247,33 @@
       "status": "active"
     },
     {
+      "name": "近郊采集奖励池",
+      "desc": "走过近郊山野，采得止血草，也有机会寻到铁石与木材。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 157500, "rewards": {"item.herb.blood_grass": 1}},
+        {"weight": 17500, "rewards": {"item.herb.blood_grass": 1, "item.mat.wood": 1}},
+        {"weight": 110250, "rewards": {"item.herb.blood_grass": 1, "item.ore.ironstone": 1}},
+        {"weight": 12250, "rewards": {"item.herb.blood_grass": 1, "item.ore.ironstone": 1, "item.mat.wood": 1}},
+        {"weight": 47250, "rewards": {"item.herb.blood_grass": 1, "item.ore.ironstone": 2}},
+        {"weight": 5250, "rewards": {"item.herb.blood_grass": 1, "item.ore.ironstone": 2, "item.mat.wood": 1}},
+        {"weight": 202500, "rewards": {"item.herb.blood_grass": 2}},
+        {"weight": 22500, "rewards": {"item.herb.blood_grass": 2, "item.mat.wood": 1}},
+        {"weight": 141750, "rewards": {"item.herb.blood_grass": 2, "item.ore.ironstone": 1}},
+        {"weight": 15750, "rewards": {"item.herb.blood_grass": 2, "item.ore.ironstone": 1, "item.mat.wood": 1}},
+        {"weight": 60750, "rewards": {"item.herb.blood_grass": 2, "item.ore.ironstone": 2}},
+        {"weight": 6750, "rewards": {"item.herb.blood_grass": 2, "item.ore.ironstone": 2, "item.mat.wood": 1}},
+        {"weight": 90000, "rewards": {"item.herb.blood_grass": 3}},
+        {"weight": 10000, "rewards": {"item.herb.blood_grass": 3, "item.mat.wood": 1}},
+        {"weight": 63000, "rewards": {"item.herb.blood_grass": 3, "item.ore.ironstone": 1}},
+        {"weight": 7000, "rewards": {"item.herb.blood_grass": 3, "item.ore.ironstone": 1, "item.mat.wood": 1}},
+        {"weight": 27000, "rewards": {"item.herb.blood_grass": 3, "item.ore.ironstone": 2}},
+        {"weight": 3000, "rewards": {"item.herb.blood_grass": 3, "item.ore.ironstone": 2, "item.mat.wood": 1}}
+      ],
+      "key": "reward_pool.exploration.gather_outskirts",
+      "status": "active"
+    },
+    {
       "name": "灵泉事件基础奖励",
       "desc": "参与灵泉谷共同行动的谢礼，包含修为与灵石。",
       "operation": "event.claim_reward",

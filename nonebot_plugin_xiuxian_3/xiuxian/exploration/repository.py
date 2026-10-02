@@ -182,7 +182,13 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_spend, assets_with_delta, player_currency
-from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory
+from ..utils.player import (
+    change_player_state,
+    grant_player_state,
+    player_integer,
+    player_inventory,
+    split_player_rewards,
+)
 from ..rewards.rules import RewardContentError
 
 
@@ -646,42 +652,29 @@ class ExplorationRepositoryMixin:
             frozen_payload = frozen.get("frozen_result")
             if not isinstance(frozen_payload, dict):
                 raise RewardContentError("exploration combat reward snapshot is missing")
-            frozen_result = {
-                str(key): int(value) for key, value in dict(frozen_payload).items()
-            }
+            frozen_result = dict(frozen_payload)
             result = frozen_result if battle_outcome == "won" else {}
             soul_power_loss = 0
             soul_fatigue_until = row["soul_fatigue_until"]
             snapshot = self._json_object(session["snapshot_json"], {})
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
-            cultivation_gain = int(result.get("cultivation", 0))
-            reputation_delta = {
-                key: int(quantity)
-                for key, quantity in result.items()
-                if key.startswith("faction_reputation.")
-            }
+            reward_parts = split_player_rewards(result)
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, int(row["soul_power"]))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
+            value_delta = dict(reward_parts.value_delta)
+            value_delta["soul_power"] = value_delta.get("soul_power", 0) - soul_power_loss
             grant_player_state(
                 connection,
                 row,
-                rewards={
-                    key: quantity
-                    for key, quantity in result.items()
-                    if key != "cultivation" and not key.startswith("faction_reputation.")
-                },
+                rewards=reward_parts.assets,
                 updated_at=now_text,
-                value_delta={
-                    "cultivation": cultivation_gain,
-                    "total_cultivation": cultivation_gain,
-                    "soul_power": -soul_power_loss,
-                },
+                value_delta=value_delta,
                 player_values={
                     "soul_fatigue_until": soul_fatigue_until,
                     "bloodline_stability": bloodline_stability_after,
                 },
-                reputation_delta=reputation_delta or None,
+                reputation_delta=reward_parts.reputation or None,
                 maximums={"soul_power": row["soul_power_max"]},
             )
             result_json = {
@@ -916,7 +909,7 @@ class ExplorationRepositoryMixin:
                     frozen_result = snapshot.get("frozen_result")
                     if not isinstance(frozen_result, dict):
                         raise RewardContentError("exploration reward snapshot is missing")
-                    result = {str(key): int(value) for key, value in frozen_result.items()}
+                    result = dict(frozen_result)
                 else:
                     result = settlement_result(
                         str(session["mode_key"]),
@@ -971,27 +964,15 @@ class ExplorationRepositoryMixin:
 
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             if status == "settled":
-                cultivation_gain = int(result.get("cultivation", 0))
-                reputation_delta = {
-                    key: int(quantity)
-                    for key, quantity in result.items()
-                    if key.startswith("faction_reputation.")
-                }
+                reward_parts = split_player_rewards(result)
                 grant_player_state(
                     connection,
                     row,
-                    rewards={
-                        key: quantity
-                        for key, quantity in result.items()
-                        if key != "cultivation" and not key.startswith("faction_reputation.")
-                    },
+                    rewards=reward_parts.assets,
                     updated_at=now_text,
-                    value_delta={
-                        "cultivation": cultivation_gain,
-                        "total_cultivation": cultivation_gain,
-                    },
+                    value_delta=reward_parts.value_delta,
                     player_values={"bloodline_stability": bloodline_stability_after},
-                    reputation_delta=reputation_delta or None,
+                    reputation_delta=reward_parts.reputation or None,
                 )
             result_json = {
                 "status": status,

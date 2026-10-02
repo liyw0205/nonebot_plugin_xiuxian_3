@@ -81,6 +81,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_status_values,
     player_projection,
     player_view_values,
+    split_player_rewards,
 )
 
 
@@ -587,6 +588,60 @@ def test_player_reputation_delta_uses_stable_faction_keys_and_validation() -> No
         player_reputation_with_delta(row, {"faction_reputation.xuantian": True})
     with pytest.raises(ValueError, match="cannot be negative"):
         player_reputation_with_delta(row, {"faction_reputation.xuantian": -5})
+
+
+def test_split_player_rewards_reuses_one_state_partition_for_settlement() -> None:
+    parts = split_player_rewards(
+        {
+            "item.herb.blood_grass": 2,
+            "currency.spirit_stone": 5,
+            "cultivation": 40,
+            "faction_reputation.beast": 3,
+        }
+    )
+    assert parts.assets == {
+        "item.herb.blood_grass": 2,
+        "spirit_stones": 5,
+    }
+    assert parts.value_delta == {"cultivation": 40, "total_cultivation": 40}
+    assert parts.reputation == {"faction_reputation.beast": 3}
+
+    with pytest.raises(ValueError, match="unsupported player reward key"):
+        split_player_rewards({"reward.unknown": 1})
+    with pytest.raises(ValueError, match="cannot be negative"):
+        split_player_rewards({"item.herb.blood_grass": -1})
+
+
+@pytest.mark.parametrize("amount", [True, False, 1.5, 1.0, "1", None])
+def test_split_player_rewards_requires_integer_quantities(amount) -> None:
+    with pytest.raises(ValueError, match="must be an integer"):
+        split_player_rewards({"item.herb.blood_grass": amount})
+
+
+@pytest.mark.parametrize("key", [None, 1, True, ""])
+def test_split_player_rewards_requires_nonempty_string_keys(key) -> None:
+    with pytest.raises(ValueError, match="must be a non-empty string"):
+        split_player_rewards({key: 1})
+
+
+@pytest.mark.parametrize("key", ["stamina_max", "energy_max", "soul_power_max"])
+def test_split_player_rewards_rejects_resource_maximums(key: str) -> None:
+    with pytest.raises(ValueError, match="unsupported player reward key"):
+        split_player_rewards({key: 1})
+
+
+@pytest.mark.parametrize("key", ["item.", "faction_reputation."])
+def test_split_player_rewards_requires_named_assets_and_factions(key: str) -> None:
+    with pytest.raises(ValueError, match="must name"):
+        split_player_rewards({key: 1})
+
+
+def test_split_player_rewards_preserves_zero_and_explicit_cumulative_values() -> None:
+    parts = split_player_rewards(
+        {"item.herb.blood_grass": 0, "cultivation": 4, "total_cultivation": 7}
+    )
+    assert parts.assets == {"item.herb.blood_grass": 0}
+    assert parts.value_delta == {"cultivation": 4, "total_cultivation": 7}
 
 
 def test_player_integer_projection_is_shared_by_profile_and_combat_reads() -> None:

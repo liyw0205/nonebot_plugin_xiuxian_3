@@ -133,6 +133,16 @@ def reward_pool_outcomes(
                     raise RewardContentError(
                         f"reward pool {key} outcome {index} references inactive item {reward_key}"
                     ) from exc
+            elif reward_key not in {"spirit_stones", "currency.spirit_stone"}:
+                if reward_key.startswith("faction_reputation."):
+                    if not reward_key.removeprefix("faction_reputation."):
+                        raise RewardContentError(
+                            f"reward pool {key} outcome {index} requires a faction key"
+                        )
+                elif reward_key not in _REWARD_RESOURCE_FIELDS:
+                    raise RewardContentError(
+                        f"reward pool {key} outcome {index} has unsupported reward key {reward_key!r}"
+                    )
             normalized_rewards[reward_key] = quantity
         normalized.append((weight, normalized_rewards))
     return tuple(normalized)

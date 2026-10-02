@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from fractions import Fraction
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -15,6 +18,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import (
     combine_reward_grants,
     reward_definition,
     reward_pool_map,
+    reward_pool_outcomes,
 )
 
 
@@ -202,3 +206,118 @@ def test_weighted_reward_pool_rejects_invalid_content(tmp_path: Path) -> None:
         assert "invalid weight" in str(exc)
     else:
         raise AssertionError("invalid weighted pool must fail content validation")
+
+
+def test_gather_reward_pool_preserves_every_joint_probability() -> None:
+    bundle = ContentBundle.load(Path(__file__).parents[1] / "data")
+    outcomes = reward_pool_outcomes("reward_pool.exploration.gather_outskirts", bundle)
+    total_weight = sum(weight for weight, _ in outcomes)
+    blood_weights = {1: 35, 2: 45, 3: 20}
+    iron_weights = {0: 50, 1: 35, 2: 15}
+    wood_weights = {0: 90, 1: 10}
+    expected = {
+        (blood, iron, wood): Fraction(blood_weight, 100)
+        * Fraction(iron_weight, 100)
+        * Fraction(wood_weight, 100)
+        for blood, blood_weight in blood_weights.items()
+        for iron, iron_weight in iron_weights.items()
+        for wood, wood_weight in wood_weights.items()
+    }
+    actual = {}
+    for weight, rewards in outcomes:
+        assert set(rewards) <= {
+            "item.herb.blood_grass",
+            "item.ore.ironstone",
+            "item.mat.wood",
+        }
+        assert all(quantity > 0 for quantity in rewards.values())
+        quantities = (
+            rewards["item.herb.blood_grass"],
+            rewards.get("item.ore.ironstone", 0),
+            rewards.get("item.mat.wood", 0),
+        )
+        assert quantities not in actual
+        actual[quantities] = Fraction(weight, total_weight)
+    assert len(outcomes) == len(expected) == 18
+    assert actual == expected
+    assert sum(actual.values()) == 1
+
+
+def test_reward_pool_map_is_deterministic_and_returns_detached_results() -> None:
+    content_path = Path(__file__).parents[1] / "data"
+    bundle = ContentBundle.load(content_path)
+    reloaded = ContentBundle.load(content_path)
+    pool_key = "reward_pool.exploration.gather_outskirts"
+    configured = {
+        tuple(sorted(rewards.items())) for _, rewards in reward_pool_outcomes(pool_key, bundle)
+    }
+    selected = set()
+    for index in range(2_000):
+        seed = f"gather-replay-{index}"
+        result = reward_pool_map(pool_key, seed, bundle)
+        original = dict(result)
+        assert result == reward_pool_map(pool_key, seed, reloaded)
+        selected.add(tuple(sorted(result.items())))
+        result["item.herb.blood_grass"] = 999
+        assert reward_pool_map(pool_key, seed, bundle) == original
+    assert selected == configured
+
+
+@pytest.mark.parametrize(
+    ("outcome", "error"),
+    [
+        ({"weight": 0, "rewards": {"cultivation": 1}}, "invalid weight"),
+        ({"weight": -1, "rewards": {"cultivation": 1}}, "invalid weight"),
+        ({"weight": True, "rewards": {"cultivation": 1}}, "invalid weight"),
+        ({"weight": "1", "rewards": {"cultivation": 1}}, "invalid weight"),
+        ({"weight": 1.5, "rewards": {"cultivation": 1}}, "invalid weight"),
+        ({"weight": 1, "rewards": {}}, "requires rewards"),
+        ({"weight": 1, "rewards": {"unknown.resource": 1}}, "unsupported reward key"),
+        ({"weight": 1, "rewards": {"stamina_max": 1}}, "unsupported reward key"),
+        ({"weight": 1, "rewards": {"energy_max": 1}}, "unsupported reward key"),
+        ({"weight": 1, "rewards": {"soul_power_max": 1}}, "unsupported reward key"),
+        ({"weight": 1, "rewards": {"faction_reputation.": 1}}, "requires a faction key"),
+        ({"weight": 1, "rewards": {"item.missing_reward": 1}}, "inactive item"),
+        ({"weight": 1, "rewards": {"item.mat.wood": 0}}, "positive integer quantities"),
+        ({"weight": 1, "rewards": {"item.mat.wood": -1}}, "positive integer quantities"),
+        ({"weight": 1, "rewards": {"item.mat.wood": True}}, "positive integer quantities"),
+        ({"weight": 1, "rewards": {"item.mat.wood": "1"}}, "positive integer quantities"),
+        ({"weight": 1, "rewards": {"item.mat.wood": 1.5}}, "positive integer quantities"),
+    ],
+)
+def test_gather_reward_pool_rejects_malformed_outcomes(
+    tmp_path: Path, outcome: dict[str, object], error: str
+) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    reward_file = data_dir / "奖励" / "奖励.json"
+    document = json.loads(reward_file.read_text(encoding="utf-8"))
+    pool_key = "reward_pool.exploration.gather_outskirts"
+    pool = next(item for item in document["records"] if item["key"] == pool_key)
+    pool["outcomes"] = [outcome]
+    reward_file.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+    with pytest.raises(RewardContentError, match=error) as caught:
+        reward_pool_map(pool_key, "invalid-gather", bundle)
+    assert pool_key in str(caught.value)
+    assert "outcome 0" in str(caught.value)
+
+
+def test_gather_reward_pool_rejects_inactive_item_even_when_not_selected(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    pool_key = "reward_pool.exploration.gather_outskirts"
+    active_bundle = ContentBundle.load(data_dir)
+    seed = next(
+        f"inactive-wood-{index}"
+        for index in range(100)
+        if "item.mat.wood" not in reward_pool_map(pool_key, f"inactive-wood-{index}", active_bundle)
+    )
+    item_file = data_dir / "道具" / "材料.json"
+    document = json.loads(item_file.read_text(encoding="utf-8"))
+    wood = next(item for item in document["records"] if item["key"] == "item.mat.wood")
+    wood["status"] = "locked"
+    item_file.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+    with pytest.raises(RewardContentError, match="inactive item item.mat.wood"):
+        reward_pool_map(pool_key, seed, bundle)

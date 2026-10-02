@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..repository import (
     CurrencyInsufficientError,
     ExplorationBusyError,
@@ -25,23 +26,8 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from ..player.rules import LOCATION_LABELS
+from ..utils.assets import is_currency_asset_key
 from .rules import exploration_definition, resolve_exploration_mode
-
-
-ITEM_LABELS = {
-    "item.herb.blood_grass": "止血草",
-    "item.ore.ironstone": "铁石",
-    "item.herb.spirit_leaf": "灵叶",
-    "item.mat.array_sand": "阵砂",
-    "item.material.cloud_iron": "云铁",
-    "item.ticket.cloud_boat_fragment": "云舟票碎片",
-    "item.demon_core": "魔核",
-    "item.soul_crystal": "神魂晶",
-    "item.clue.demon_contract": "魔界契约线索",
-    "item.clue.beast_bloodline": "妖界血脉线索",
-    "item.ancestral_blood": "祖灵血",
-    "item.spirit_water": "灵泉水",
-}
 
 
 class ExplorationApplication:
@@ -78,6 +64,10 @@ class ExplorationApplication:
     def _location_text(location_key: str) -> str:
         return LOCATION_LABELS.get(location_key, "未知地点")
 
+    def _item_text(self, item_key: str) -> str:
+        content = self.repository.content or bundled_content()
+        return content.label("item", item_key)
+
     async def start_exploration(self, context: CommandContext) -> CommandResult:
         mode_key = self._mode(context.command_args)
         if mode_key is None:
@@ -104,7 +94,7 @@ class ExplorationApplication:
         except LocationRequirementError:
             return CommandResult(False, "EXPLORATION_LOCATION_FORBIDDEN", "当前地点或境界不满足这项探索。", context.request_id, operation_id)
         except ExplorationBusyError:
-            return CommandResult(False, "EXPLORATION_BUSY", "当前已有移动、修炼、生产、突破或探索会话。", context.request_id, operation_id)
+            return CommandResult(False, "EXPLORATION_BUSY", "当前已有移动、修炼、生产、突破或探索正在进行。", context.request_id, operation_id)
         except ExplorationQuotaExhaustedError:
             return CommandResult(False, "EXPLORATION_QUOTA_EXHAUSTED", "这项探索今日次数已用尽。", context.request_id, operation_id)
         except ResourceInsufficientError:
@@ -116,7 +106,7 @@ class ExplorationApplication:
         except SoulExhaustionActiveError:
             return CommandResult(False, "SOUL_EXHAUSTION_ACTIVE", "神魂疲劳尚未结束，暂时不能进行跨界探索。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他探索输入，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求已对应另一段探索，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -127,13 +117,13 @@ class ExplorationApplication:
             "EXPLORATION_STARTED",
             (
                 f"## {definition.label}已开始\n\n"
-                f"**{self._display_name(record.player)}**已锁定探索会话。\n\n"
+                f"**{self._display_name(record.player)}**已踏入这段探索。\n\n"
                 f"- **地点**：{self._location_text(definition.location_key)}\n"
                 f"- **预计耗时**：{definition.duration_seconds // 60 if definition.duration_seconds >= 60 else definition.duration_seconds} {'分钟' if definition.duration_seconds >= 60 else '秒'}\n"
                 f"- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
                 f"- **精力**：{record.player.energy}/{record.player.energy_max}（消耗 {record.energy_cost}）\n"
                 f"- **今日上限**：{definition.daily_limit} 次\n\n"
-                + (f"- **迷雾屏障**：风险 -{record.risk_reduction_bp} bp\n\n" if record.risk_reduction_bp else "")
+                + (f"- **迷雾屏障**：遇险几率降低 {record.risk_reduction_bp / 100:g}%\n\n" if record.risk_reduction_bp else "")
                 + "> 完成后发送 `结算探索`；准备期间不能移动、修炼、生产、突破或再次探索。"
             ),
             context.request_id,
@@ -174,12 +164,12 @@ class ExplorationApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能结算探索。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他探索结算，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求已对应另一段探索结算，请重新发起。", context.request_id, operation_id)
         except ExplorationCombatPendingError:
             return CommandResult(
                 False,
                 "EXPLORATION_COMBAT_PENDING",
-                "探索遭遇战仍在自动回合中，奖励已冻结，请稍后重试结算。",
+                "探索遭遇战尚未分出胜负，请稍后再来结算。",
                 context.request_id,
                 operation_id,
                 retryable=True,
@@ -196,7 +186,7 @@ class ExplorationApplication:
                 (
                     f"## {definition.label}遭遇战斗\n\n"
                     f"**{self._display_name(record.player)}**在探索中触发了战斗遭遇。\n\n"
-                    "> 自动回合战斗正在恢复，探索奖励已冻结；请稍后重试结算。"
+                    "> 战斗仍在交锋，请稍后再来结算探索。"
                 ),
                 context.request_id,
                 operation_id,
@@ -251,14 +241,16 @@ class ExplorationApplication:
             )
         reward_lines = []
         for key, quantity in record.result.items():
-            if key == "cultivation":
+            if quantity == 0:
+                continue
+            if key in {"cultivation", "total_cultivation"}:
                 reward_lines.append(f"境内修为 +{quantity}")
-            elif key == "spirit_stones":
+            elif is_currency_asset_key(key):
                 reward_lines.append(f"灵石 ×{quantity}")
             elif key.startswith("faction_reputation."):
                 reward_lines.append(f"{key.removeprefix('faction_reputation.')}界声望 +{quantity}")
             else:
-                reward_lines.append(f"{ITEM_LABELS.get(key, '探索材料')} ×{quantity}")
+                reward_lines.append(f"{self._item_text(key)} ×{quantity}")
         battle_text = f"- **遭遇战**：{'胜利' if record.battle_outcome == 'won' else '失败'}\n" if record.battle_outcome else ""
         return CommandResult(
             True,
@@ -274,7 +266,6 @@ class ExplorationApplication:
                 + f"- **污染**：{record.pollution_after}\n"
                 + (f"- **血脉稳定**：{record.bloodline_stability_after}\n" if record.mode_key in {"explore.beast_hunt", "explore.ancestral_lake"} else "")
                 + (f"- **神魂损失**：{record.soul_power_loss}\n" if record.soul_power_loss else "")
-                + "\n> 结果按开始时的规则快照结算，重复结算不会重复发放。"
             ),
             context.request_id,
             operation_id,
@@ -316,7 +307,7 @@ class ExplorationApplication:
         except CurrencyInsufficientError:
             return CommandResult(False, "SPIRIT_STONES_INSUFFICIENT", "灵石不足，无法支付风暴通行费。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他风暴选择，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求已对应另一道风暴抉择，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -360,7 +351,7 @@ class ExplorationApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能取消探索。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他探索取消，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这次请求已对应另一段探索取消，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:

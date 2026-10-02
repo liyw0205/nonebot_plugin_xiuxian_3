@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import json
 from typing import Any, Literal
 
-from .assets import inventory_value, player_database_id
+from .assets import inventory_value, is_currency_asset_key, player_database_id
 from .json import json_object
 
 
@@ -221,6 +221,57 @@ class PlayerStateChange:
 
     values: dict[str, Any]
     assets: Any | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerRewardParts:
+    """Normalized reward groups for one player state transaction."""
+
+    assets: dict[str, int]
+    value_delta: dict[str, int]
+    reputation: dict[str, int]
+
+
+def split_player_rewards(rewards: Mapping[str, Any]) -> PlayerRewardParts:
+    """Partition a flat reward map into assets, values and reputation.
+
+    Preserve zero item quantities so stored rewards can retain the same shape
+    as their frozen result. Resource maximums are state, not additive rewards.
+    """
+
+    assets: dict[str, int] = {}
+    value_delta: dict[str, int] = {}
+    reputation: dict[str, int] = {}
+    for raw_key, raw_amount in rewards.items():
+        if not isinstance(raw_key, str) or not raw_key:
+            raise ValueError("player reward key must be a non-empty string")
+        key = raw_key
+        if isinstance(raw_amount, bool) or not isinstance(raw_amount, int):
+            raise ValueError(f"player reward for {key!r} must be an integer")
+        amount = raw_amount
+        if amount < 0:
+            raise ValueError(f"player reward for {key!r} cannot be negative")
+        if key.startswith("faction_reputation."):
+            if not key.removeprefix("faction_reputation."):
+                raise ValueError("player reward reputation key must name a faction")
+            reputation[key] = reputation.get(key, 0) + amount
+        elif key.startswith("item.") or is_currency_asset_key(key):
+            if key == "item.":
+                raise ValueError("player reward item key must name an item")
+            normalized_key = "spirit_stones" if is_currency_asset_key(key) else key
+            assets[normalized_key] = assets.get(normalized_key, 0) + amount
+        elif key in PLAYER_RESOURCE_FIELDS and key != "spirit_stones" and not key.endswith("_max"):
+            value_delta[key] = value_delta.get(key, 0) + amount
+        else:
+            raise ValueError(f"unsupported player reward key: {key!r}")
+
+    if "cultivation" in value_delta and "total_cultivation" not in value_delta:
+        value_delta["total_cultivation"] = value_delta["cultivation"]
+    return PlayerRewardParts(
+        assets=assets,
+        value_delta=value_delta,
+        reputation=reputation,
+    )
 
 
 def player_field(row: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
@@ -777,6 +828,7 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
 
 
 __all__ = [
+    "PlayerRewardParts",
     "PlayerStateChange",
     "PLAYER_COMBAT_FIELDS",
     "PLAYER_COMBAT_PROJECTION_FIELDS",
@@ -789,6 +841,7 @@ __all__ = [
     "PLAYER_VIEW_FIELDS",
     "PlayerViewKind",
     "player_field",
+    "split_player_rewards",
     "player_database_id",
     "player_integer",
     "player_numeric_delta",

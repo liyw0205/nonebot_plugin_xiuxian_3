@@ -8,6 +8,7 @@ import hashlib
 from ..content import ContentBundle
 from ..rewards.rules import RewardContentError, reward_pool_map
 from ..utils.assets import inventory_amount
+from ..utils.player import split_player_rewards
 from .models import ExplorationDefinition
 
 
@@ -39,6 +40,7 @@ BATTLE_ENEMY_BY_MODE = {
 }
 
 EXPLORATION_REWARD_POOLS = {
+    "explore.gather_outskirts": "reward_pool.exploration.gather_outskirts",
     "explore.trial_outskirts": "reward_pool.exploration.trial_outskirts",
 }
 
@@ -309,23 +311,12 @@ def settlement_result(
     reward_pool_key = exploration_reward_pool(mode_key)
     if reward_pool_key is not None:
         result = reward_pool_map(reward_pool_key, seed, content)
-        if set(result) - {"cultivation", "spirit_stones"}:
+        parts = split_player_rewards(result)
+        if set(parts.value_delta) - {"cultivation", "total_cultivation"}:
             raise RewardContentError(
                 f"exploration reward pool {reward_pool_key} contains unsupported state"
             )
         return result
-    if mode_key == "explore.gather_outskirts":
-        result = {
-            "item.herb.blood_grass": 1 + weighted_value(seed + ":blood", (0, 1, 2), (35, 45, 20)),
-            "item.ore.ironstone": weighted_value(seed + ":iron", (0, 1, 2), (50, 35, 15)),
-            "item.mat.wood": weighted_value(seed + ":wood", (0, 1), (90, 10)),
-        }
-        return result
-    if mode_key == "explore.trial_outskirts":
-        return {
-            "cultivation": weighted_value(seed + ":cultivation", (40, 60, 80), (30, 45, 25)),
-            "spirit_stones": weighted_value(seed + ":stones", (10, 20, 30), (40, 40, 20)),
-        }
     if mode_key == "explore.spring_gather":
         return {
             "item.herb.spirit_leaf": 1 + weighted_value(seed + ":leaf", (0, 1), (60, 40)),

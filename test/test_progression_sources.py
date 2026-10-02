@@ -308,7 +308,7 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         settlement_result(
                             "explore.gather_outskirts",
                             f"{adapter}-outskirts-iron-{index}",
-                        )["item.ore.ironstone"]
+                        ).get("item.ore.ironstone", 0)
                         >= 2
                         and battle_roll_bp(f"{adapter}-outskirts-iron-{index}:battle") >= 1000
                     )
@@ -402,7 +402,7 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         for candidate in range(1000)
                         if settlement_result(
                             "explore.gather_outskirts", f"{adapter}-foundation-iron-{index}-{candidate}"
-                        )["item.ore.ironstone"] == 2
+                        ).get("item.ore.ironstone", 0) == 2
                         and battle_roll_bp(f"{adapter}-foundation-iron-{index}-{candidate}:battle") >= 1000
                     )
                     await _dispatch(runtime, adapter, user, 330 + index, "开始探索 近郊采集", operation_id=operation)
