@@ -5,7 +5,6 @@ from .json_cache import DuplicateJSONKeyError, clear_json_cache, read_json_cache
 from .json import json_list, json_object
 from .operations import operation_replay, player_operation, record_operation
 from .player import (
-    PLAYER_COMBAT_FIELDS,
     PLAYER_COMBAT_PROJECTION_FIELDS,
     PLAYER_NUMERIC_DEFAULTS,
     PLAYER_NUMERIC_FIELDS,
@@ -95,7 +94,6 @@ __all__ = [
     "AssetState",
     "AssetTransition",
     "CURRENCY_ASSET_KEYS",
-    "PLAYER_COMBAT_FIELDS",
     "PLAYER_COMBAT_PROJECTION_FIELDS",
     "PLAYER_NUMERIC_DEFAULTS",
     "PLAYER_NUMERIC_FIELDS",

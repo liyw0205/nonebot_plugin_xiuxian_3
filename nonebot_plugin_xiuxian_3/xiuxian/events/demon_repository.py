@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.player import change_player_state
+from ..utils.player import grant_player_state, split_player_rewards
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -213,18 +213,14 @@ class DemonInvasionRepositoryMixin:
             ).fetchone() is not None:
                 raise EventRewardAlreadyClaimedError("demon invasion reward already claimed")
             reward = {"world_merit": 50, "faction_reputation.demon": 20}
-            faction = self._json_object(player["faction_reputation_json"], {})
-            faction["demon"] = int(faction.get("demon", 0)) + reward["faction_reputation.demon"]
-            change_player_state(
+            reward_parts = split_player_rewards(reward)
+            grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                value_delta={"world_merit": reward["world_merit"]},
-                player_values={
-                    "faction_reputation_json": json.dumps(
-                        faction, ensure_ascii=False, sort_keys=True
-                    )
-                },
+                rewards=reward_parts.assets,
+                value_delta=reward_parts.value_delta,
+                reputation_delta=reward_parts.reputation,
             )
             connection.execute(
                 "INSERT INTO world_event_claims(round_id, player_id, operation_id, reward_json, claimed_at) VALUES (?, ?, ?, ?, ?)",

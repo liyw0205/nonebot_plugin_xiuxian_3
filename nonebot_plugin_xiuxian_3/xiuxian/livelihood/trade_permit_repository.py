@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import spend_player_assets, player_currency
+from ..utils.player import player_reputation
 from ..persistence.errors import (
     CurrencyInsufficientError,
     OperationConflictError,
@@ -72,8 +73,8 @@ class TradePermitRepositoryMixin:
             else:
                 intro = self._json_object(player["intro_json"], {})
                 flags = {str(flag) for flag in intro.get("flags", [])}
-                reputation = self._json_object(player["faction_reputation_json"], {})
-                if definition.required_quest not in flags or int(reputation.get(definition.faction_key, 0)) < definition.reputation_required:
+                reputation = player_reputation(player)
+                if definition.required_quest not in flags or reputation.get(definition.faction_key, 0) < definition.reputation_required:
                     raise TradePermitRequirementError("trade permit requirements are not met")
                 if player_currency(player) < definition.cost:
                     raise CurrencyInsufficientError("trade permit cost is insufficient")
@@ -82,7 +83,7 @@ class TradePermitRepositoryMixin:
                 snapshot = {
                     "required_quest": definition.required_quest,
                     "faction_key": definition.faction_key,
-                    "faction_reputation": int(reputation.get(definition.faction_key, 0)),
+                    "faction_reputation": reputation.get(definition.faction_key, 0),
                     "cost": definition.cost,
                 }
                 connection.execute(

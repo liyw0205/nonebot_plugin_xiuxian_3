@@ -33,7 +33,7 @@ from ..persistence.errors import (
 from .purchase_order_models import PurchaseOrderRecord
 from .bindings import active_binding_totals
 from ..utils.assets import apply_player_asset_transition, inventory_amount, player_currency
-from ..utils.player import player_inventory, player_qualification
+from ..utils.player import player_inventory, player_qualification, player_reputation
 from .purchase_order_rules import (
     PURCHASE_ORDER_TTL_SECONDS,
     PURCHASE_MAX_LISTINGS,
@@ -489,9 +489,9 @@ class PurchaseOrderRepositoryMixin:
         required = required_faction_reputation(str(player["location_key"]))
         if required is None:
             return
-        reputation = self._json_object(player["faction_reputation_json"], {})
+        reputation = player_reputation(player)
         faction, minimum = required
-        if int(reputation.get(faction, 0)) < minimum:
+        if reputation.get(faction, 0) < minimum:
             raise PurchasePermissionDeniedError("cross-realm purchase permission is missing")
 
     @staticmethod

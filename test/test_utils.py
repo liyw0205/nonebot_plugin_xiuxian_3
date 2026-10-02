@@ -576,6 +576,13 @@ def test_player_state_helpers_share_json_and_inventory_normalization() -> None:
     assert player_reputation(row) == {"demon": 20, "beast": 5}
 
 
+@pytest.mark.parametrize("value", [True, False, 1.5, -1])
+def test_player_reputation_rejects_non_integer_or_negative_values(value) -> None:
+    row = {"faction_reputation": {"demon": value}}
+    with pytest.raises(ValueError, match="reputation"):
+        player_reputation(row)
+
+
 def test_player_reputation_delta_uses_stable_faction_keys_and_validation() -> None:
     row = {"faction_reputation_json": '{"xuantian": "4"}'}
     assert player_reputation_with_delta(
@@ -830,6 +837,38 @@ def test_change_player_state_commits_assets_and_numeric_values_together() -> Non
         "SELECT spirit_stones, inventory_json, stamina, world_merit, updated_at FROM players WHERE id=1"
     ).fetchone()
     assert tuple(stored) == (125, '{"item.herb": 3, "item.sand": 2}', 10, 17, "after")
+    connection.close()
+
+
+def test_player_state_change_commits_assets_values_and_reputation_together() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, inventory_json TEXT NOT NULL, stamina INTEGER NOT NULL, faction_reputation_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players VALUES (1, 10, '{\"item.herb\":1}', 4, '{\"demon\":2}', 'before')"
+    )
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    updates: list[str] = []
+    connection.set_trace_callback(updates.append)
+
+    result = grant_player_state(
+        connection,
+        row,
+        {"spirit_stones": 5, "item.herb": 2},
+        "after",
+        value_delta={"stamina": 3},
+        reputation_delta={"faction_reputation.demon": 4, "faction_reputation.beast": 1},
+    )
+
+    stored = connection.execute(
+        "SELECT spirit_stones, inventory_json, stamina, faction_reputation_json, updated_at FROM players WHERE id=1"
+    ).fetchone()
+    assert tuple(stored) == (15, '{"item.herb": 3}', 7, '{"beast": 1, "demon": 6}', "after")
+    assert result.assets == AssetState(15, {"item.herb": 3})
+    assert result.values == {"stamina": 7, "faction_reputation_json": '{"beast": 1, "demon": 6}'}
+    assert sum(statement.startswith("UPDATE players SET") for statement in updates) == 1
     connection.close()
 
 

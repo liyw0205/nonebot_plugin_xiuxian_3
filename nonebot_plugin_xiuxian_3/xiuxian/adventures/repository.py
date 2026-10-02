@@ -643,7 +643,7 @@ class AdventuresRepositoryMixin:
             energy_gain = 0
             local_reputation = 0
             service_reputation = 0
-            faction_reputation = self._json_object(row["faction_reputation_json"], {})
+            faction_reputation_delta: dict[str, int] = {}
             for key, quantity in rewards.items():
                 quantity = int(quantity)
                 if key == "spirit_stones":
@@ -671,8 +671,7 @@ class AdventuresRepositoryMixin:
                     service_reputation += quantity
                     actual_rewards[key] = quantity
                 elif key.startswith("faction_reputation."):
-                    faction_key = key.removeprefix("faction_reputation.")
-                    faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + quantity
+                    faction_reputation_delta[key] = faction_reputation_delta.get(key, 0) + quantity
                     actual_rewards[key] = quantity
                 elif key.startswith("codex."):
                     record_codex_discovery(
@@ -731,11 +730,7 @@ class AdventuresRepositoryMixin:
                     "energy": energy_gain,
                 },
                 maximums={"energy": row["energy_max"]},
-                player_values={
-                    "faction_reputation_json": json.dumps(
-                        faction_reputation, ensure_ascii=False, sort_keys=True
-                    )
-                },
+                reputation_delta=faction_reputation_delta or None,
             )
             result_json = {
                 "status": "claimed",

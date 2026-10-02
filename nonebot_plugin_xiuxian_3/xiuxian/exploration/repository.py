@@ -186,8 +186,11 @@ from ..utils.assets import assets_spend, assets_with_delta, player_currency
 from ..utils.player import (
     change_player_state,
     grant_player_state,
+    player_combat_values,
     player_integer,
     player_inventory,
+    player_object,
+    player_reputation,
     split_player_rewards,
 )
 from ..rewards.rules import RewardContentError
@@ -272,14 +275,14 @@ class ExplorationRepositoryMixin:
                             raise SoulExhaustionActiveError("soul exhaustion is active")
                     except ValueError:
                         pass
-                faction = self._json_object(row["faction_reputation_json"], {})
+                faction = player_reputation(row)
                 cross_realm_penalty_bp = 0 if str(row["path_key"] or "") == "demonic" or int(faction.get("demon_alliance", 0)) > 0 else 1000
                 pollution_after = min(100, pollution_before + 10)
             if definition.key == "explore.beast_hunt":
-                faction = self._json_object(row["faction_reputation_json"], {})
+                faction = player_reputation(row)
                 cross_realm_penalty_bp = 0 if str(row["path_key"] or "") == "beast" or int(faction.get("beast_alliance", 0)) > 0 else 1000
             if definition.key == "explore.ancestral_lake":
-                faction = self._json_object(row["faction_reputation_json"], {})
+                faction = player_reputation(row)
                 if int(faction.get("beast", 0)) < 3000:
                     raise LocationRequirementError("ancestral lake requires beast reputation")
                 if bloodline_stability_before < 50:
@@ -367,13 +370,14 @@ class ExplorationRepositoryMixin:
                     self._json_object(active_barrier["snapshot_json"], {})["risk_reduction_bp"]
                 )
             battle_chance_bp = max(0, definition.battle_chance_bp - barrier_risk_reduction_bp)
+            player_state = player_combat_values(row)
             snapshot = {
                 "mode_key": definition.key,
                 "location_key": definition.location_key,
-                "realm_key": row["realm_key"],
-                "realm_layer": player_integer(row, "realm_layer"),
-                "qualification": self._json_object(row["qualification_json"], {}),
-                "path_key": row["path_key"],
+                "realm_key": player_state["realm_key"],
+                "realm_layer": player_state["realm_layer"],
+                "qualification": player_object(row, "qualification_json"),
+                "path_key": player_state["path_key"],
                 "pollution_before": pollution_before,
                 "pollution_after": pollution_after,
                 "bloodline_stability_before": bloodline_stability_before,
@@ -395,8 +399,8 @@ class ExplorationRepositoryMixin:
                 "storm_roll_bp": (
                     cloud_boat_storm_roll_bp(operation_id) if definition.key == "explore.cloud_boat_trial" else None
                 ),
-                "max_hp": player_integer(row, "max_hp"),
-                "initiative": player_integer(row, "initiative"),
+                "max_hp": player_state["max_hp"],
+                "initiative": player_state["initiative"],
                 "constitution_effect": constitution_effect_snapshot(connection, player_id),
                 "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
                 "companions": [

@@ -86,7 +86,15 @@ from ...exploration.rules import (
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from ...utils.assets import inventory_amount, player_currency
-from ...utils.player import change_player_state, grant_player_state, spend_player_state, player_integer, player_inventory
+from ...utils.player import (
+    change_player_state,
+    grant_player_state,
+    player_integer,
+    player_inventory,
+    player_object,
+    player_reputation,
+    spend_player_state,
+)
 from ...adventures.mainline_models import (
     MainlineClaimRecord,
     MainlineStageView,
@@ -379,7 +387,7 @@ class BreakthroughRepositoryMixin:
                 reputation_row = connection.execute(
                     "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
                 ).fetchone()
-                faction = self._json_object(row["faction_reputation_json"], {})
+                faction = player_reputation(row)
                 if reputation_row is not None:
                     local = self._json_object(reputation_row["local_json"], {})
                     for key, value in local.items():
@@ -527,7 +535,7 @@ class BreakthroughRepositoryMixin:
                 reputation_row = connection.execute(
                     "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
                 ).fetchone()
-                faction = self._json_object(row["faction_reputation_json"], {})
+                faction = player_reputation(row)
                 if reputation_row is not None:
                     for key, value in self._json_object(reputation_row["local_json"], {}).items():
                         if str(key).startswith("faction."):
@@ -563,7 +571,7 @@ class BreakthroughRepositoryMixin:
                 "location_key": row["location_key"],
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
-                "qualification": self._json_object(row["qualification_json"], {}),
+                "qualification": player_object(row, "qualification_json"),
                 "random_pool": definition.random_pool,
                 "base_success_bp": definition.base_success_bp,
                 "required_foundation_quality": definition.required_foundation_quality,

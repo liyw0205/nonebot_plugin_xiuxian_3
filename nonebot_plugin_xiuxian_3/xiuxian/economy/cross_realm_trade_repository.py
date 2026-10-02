@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import apply_player_asset_transition, inventory_amount, player_currency
-from ..utils.player import player_inventory
+from ..utils.player import player_inventory, player_reputation
 from ..persistence.errors import (
     CrossRealmTradeCurrencyInsufficientError,
     CrossRealmTradeInputInsufficientError,
@@ -74,12 +74,12 @@ class CrossRealmTradeRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["location_key"]) != definition.location_key:
                 raise CrossRealmTradePermissionDeniedError("trade must start at the configured trade location")
-            reputation = self._json_object(player["faction_reputation_json"], {})
+            reputation = player_reputation(player)
             required_reputations = definition.required_reputations or {
                 definition.required_faction: definition.required_reputation
             }
             if any(
-                int(reputation.get(faction, 0)) < minimum
+                reputation.get(faction, 0) < minimum
                 for faction, minimum in required_reputations.items()
             ):
                 raise CrossRealmTradePermissionDeniedError("trade reputation permission is missing")

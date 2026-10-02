@@ -24,7 +24,7 @@ from ..persistence.errors import (
     TowerStartFailedError,
 )
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_combat_values, player_integer
+from ..utils.player import change_player_state, player_combat_values, player_integer, player_object
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .three_realms_arena_rules import player_faction
 from .three_realms_tower_models import (
@@ -258,8 +258,8 @@ class ThreeRealmsTowerRepositoryMixin:
         captured_at: str,
     ) -> dict[str, Any]:
         combat = player_combat_values(player)
-        intro = self._json_object(player["intro_json"], {})
-        qualification = self._json_object(player["qualification_json"], {})
+        intro = player_object(player, "intro_json")
+        qualification = player_object(player, "qualification_json")
         reputation = connection.execute(
             "SELECT local_json FROM player_reputations WHERE player_id=?", (player["id"],)
         ).fetchone()

@@ -16,7 +16,7 @@ from ..utils.assets import (
 )
 from ..utils.assets import player_currency
 from ..utils.operations import player_operation
-from ..utils.player import player_inventory
+from ..utils.player import player_inventory, player_reputation
 from ..persistence.errors import (
     OperationConflictError,
     ProjectAlreadyCompleteError,
@@ -561,8 +561,8 @@ class ProjectRepositoryMixin:
                 (player["id"], definition.required_access_key),
             ).fetchone() is not None
         if definition.required_faction:
-            faction = json_object(player["faction_reputation_json"], {})
-            if int(faction.get(definition.required_faction, 0)) < definition.required_faction_reputation:
+            faction = player_reputation(player)
+            if faction.get(definition.required_faction, 0) < definition.required_faction_reputation:
                 return False
         if definition.required_sect_level:
             reputation = connection.execute(

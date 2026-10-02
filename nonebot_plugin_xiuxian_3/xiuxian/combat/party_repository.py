@@ -88,6 +88,7 @@ from ..utils.player import (
     player_integer,
     player_object,
     player_reputation,
+    split_player_rewards,
 )
 from ..utils.assets import inventory_amount, inventory_spend, spend_player_assets
 
@@ -496,7 +497,7 @@ class PartyCombatRepositoryMixin:
                     "pollution": int(entry_snapshot.get("pollution", player_state["pollution"]) if entry_snapshot else player_state["pollution"]),
                     "bloodline_stability": int(entry_snapshot.get("bloodline_stability", player_state["bloodline_stability"]) if entry_snapshot else player_state["bloodline_stability"]),
                     "cross_realm_penalty_bp": int(entry_snapshot.get("cross_realm_penalty_bp", player_state["cross_realm_penalty_bp"]) if entry_snapshot else player_state["cross_realm_penalty_bp"]),
-                    "faction_reputation": dict(entry_snapshot.get("faction_reputation", {}) if entry_snapshot else self._json_object(row["faction_reputation_json"], {})),
+                    "faction_reputation": dict(entry_snapshot.get("faction_reputation", {}) if entry_snapshot else player_reputation(row)),
                     "alliance_key": entry_snapshot.get("alliance_key") if entry_snapshot else self._alliance_key_from_row(row),
                 }
                 snapshots.append(
@@ -1363,39 +1364,22 @@ class PartyCombatRepositoryMixin:
                     raise PartyBattleNotFoundError("party battle member no longer exists")
                 if reward:
                     player_state = player_combat_values(player)
-                    asset_reward = {
-                        key: value
-                        for key, value in reward.items()
-                        if key not in {"cultivation", "world_merit", "soul_power"}
-                        and not key.startswith("faction_reputation.")
-                    }
+                    reward_parts = split_player_rewards(reward)
                     soul_power_max = max(
                         int(player_state["soul_power_max"]),
                         int(player_state["soul_power"]),
                         BOUNDARY_REALM_SOUL_POWER_MAX if boundary_party and reward.get("soul_power") else 0,
                     )
-                    faction = dict(player_state["faction_reputation"])
-                    for item_key, quantity in reward.items():
-                        if item_key.startswith("faction_reputation."):
-                            faction_key = item_key.removeprefix("faction_reputation.")
-                            faction[faction_key] = int(faction.get(faction_key, 0)) + int(quantity)
                     grant_player_state(
                         connection,
                         player,
                         updated_at=now_text,
-                        rewards=asset_reward or None,
-                        value_delta={
-                            "cultivation": int(reward.get("cultivation", 0)),
-                            "total_cultivation": int(reward.get("cultivation", 0)),
-                            "world_merit": int(reward.get("world_merit", 0)),
-                            "soul_power": int(reward.get("soul_power", 0)),
-                        },
+                        rewards=reward_parts.assets or None,
+                        value_delta=reward_parts.value_delta,
                         maximums={"soul_power": soul_power_max},
+                        reputation_delta=reward_parts.reputation or None,
                         player_values={
                             "soul_power_max": soul_power_max,
-                            "faction_reputation_json": json.dumps(
-                                faction, ensure_ascii=False, sort_keys=True
-                            ),
                         },
                     )
                 if fatigue_party and outcome in {"lost", "expired"}:

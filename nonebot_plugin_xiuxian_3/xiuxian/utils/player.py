@@ -69,18 +69,6 @@ PLAYER_NUMERIC_FIELDS = tuple(
 
 PLAYER_NUMERIC_DEFAULTS = {"arena_rating": 1000}
 
-PLAYER_COMBAT_FIELDS = (
-    "max_hp",
-    "initiative",
-    "pollution",
-    "bloodline_stability",
-    "cross_realm_penalty_bp",
-    "soul_power",
-    "domain_charge",
-    "domain_charge_max",
-    "domain_power",
-)
-
 PLAYER_STATUS_FIELDS = (
     "player_id",
     "dao_name",
@@ -737,7 +725,16 @@ def player_reputation(row: Mapping[str, Any] | Any) -> dict[str, int]:
 
     direct = player_field(row, "faction_reputation", None)
     values = direct if isinstance(direct, Mapping) else player_object(row, "faction_reputation_json")
-    return {str(key): player_integer({"value": value}, "value") for key, value in values.items()}
+    result: dict[str, int] = {}
+    for key, value in values.items():
+        name = str(key)
+        if isinstance(value, bool) or not isinstance(value, (int, str)):
+            raise ValueError(f"player reputation for {name!r} must be an integer")
+        amount = player_integer({"value": value}, "value")
+        if amount < 0:
+            raise ValueError(f"player reputation for {name!r} cannot be negative")
+        result[name] = amount
+    return result
 
 
 def player_reputation_with_delta(
@@ -754,12 +751,9 @@ def player_reputation_with_delta(
         faction = key.removeprefix("faction_reputation.")
         if not faction:
             raise ValueError("reputation key must name a faction")
-        if isinstance(raw_amount, bool):
+        if isinstance(raw_amount, bool) or not isinstance(raw_amount, int):
             raise ValueError(f"reputation delta for {key!r} must be an integer")
-        try:
-            amount = int(raw_amount)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"reputation delta for {key!r} must be an integer") from exc
+        amount = raw_amount
         next_value = result.get(faction, 0) + amount
         if next_value < 0:
             raise ValueError(f"reputation for {faction!r} cannot be negative")
@@ -830,7 +824,6 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
 __all__ = [
     "PlayerRewardParts",
     "PlayerStateChange",
-    "PLAYER_COMBAT_FIELDS",
     "PLAYER_COMBAT_PROJECTION_FIELDS",
     "PLAYER_NUMERIC_DEFAULTS",
     "PLAYER_NUMERIC_FIELDS",

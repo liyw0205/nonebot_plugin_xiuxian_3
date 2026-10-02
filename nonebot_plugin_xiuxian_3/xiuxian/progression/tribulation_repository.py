@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount, spend_player_items
-from ..utils.player import grant_player_state, player_integer, player_inventory
+from ..utils.player import grant_player_state, player_integer, player_inventory, player_object
 from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..combat.rules import apply_constitution_combat_effect, MAX_TURNS, TURN_TIMEOUT_SECONDS
 from ..combat.tribulation_rules import (
@@ -173,7 +173,7 @@ class TribulationTrialRepositoryMixin:
                 raise TribulationTokenInsufficientError("tribulation token is insufficient") from exc
 
             equipment = self._battle_equipment_snapshot(connection, int(row["id"]))
-            qualification = self._json_object(row["qualification_json"], {})
+            qualification = player_object(row, "qualification_json")
             constitution_effect = constitution_effect_snapshot(connection, int(row["id"]))
             stats = apply_constitution_combat_effect(
                 tribulation_stat_snapshot(

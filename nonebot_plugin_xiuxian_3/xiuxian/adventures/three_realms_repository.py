@@ -28,7 +28,7 @@ from .three_realms import (
     three_realms_definition,
 )
 from .three_realms_models import ThreeRealmsLaneProgress, ThreeRealmsStatusRecord
-from ..utils.player import grant_player_state
+from ..utils.player import grant_player_state, split_player_rewards
 
 
 class ThreeRealmsRepositoryMixin:
@@ -230,12 +230,12 @@ class ThreeRealmsRepositoryMixin:
             faction = THREE_REALMS_LANE_FACTIONS[definition.lane]
             if first_clear and definition.stage == 5:
                 reward.update({"item.token.rebuild_path": 1, f"faction_reputation.{faction}": 1000})
-            reputation = self._json_object(player["faction_reputation_json"], {})
-            for key, raw_value in reward.items():
-                value = int(raw_value) if isinstance(raw_value, int) else raw_value
-                if key.startswith("faction_reputation."):
-                    faction_key = key.removeprefix("faction_reputation.")
-                    reputation[faction_key] = int(reputation.get(faction_key, 0)) + int(value)
+            state_reward = {
+                str(key): int(value)
+                for key, value in reward.items()
+                if str(key).startswith(("item.", "faction_reputation."))
+            }
+            reward_parts = split_player_rewards(state_reward)
             flags_state = self._json_object(player["intro_json"], {})
             flags = [str(item) for item in flags_state.get("flags", [])]
             if first_clear and definition.stage == 5 and THREE_REALMS_STORY_KEY not in flags:
@@ -245,13 +245,9 @@ class ThreeRealmsRepositoryMixin:
                 connection,
                 player,
                 updated_at=now_text,
-                rewards={
-                    str(key): int(value)
-                    for key, value in reward.items()
-                    if str(key).startswith("item.")
-                },
+                rewards=reward_parts.assets,
+                reputation_delta=reward_parts.reputation,
                 player_values={
-                    "faction_reputation_json": json.dumps(reputation, ensure_ascii=False, sort_keys=True),
                     "intro_json": json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
                 },
             )

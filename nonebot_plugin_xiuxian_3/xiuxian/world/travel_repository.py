@@ -167,7 +167,13 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
-from ..utils.player import change_player_state, player_inventory, player_integer, spend_player_state
+from ..utils.player import (
+    change_player_state,
+    player_integer,
+    player_inventory,
+    player_reputation,
+    spend_player_state,
+)
 
 
 class TravelRepositoryMixin:
@@ -369,8 +375,8 @@ class TravelRepositoryMixin:
                 raise LocationRequirementError("realm requirement is not met")
             if definition.requires_selected_domain and not row["domain_key"]:
                 raise LocationRequirementError("a selected domain is required")
-            reputation = self._json_object(row["faction_reputation_json"], {})
-            current_reputation = int(reputation.get(definition.required_faction or "", 0))
+            reputation = player_reputation(row)
+            current_reputation = reputation.get(definition.required_faction or "", 0)
             if definition.required_faction and current_reputation < definition.required_faction_reputation:
                 intro = self._json_object(row["intro_json"], {})
                 has_beast_hills_access = destination == "beast.ten_thousand_hills" and beast_hills_entry_allowed(

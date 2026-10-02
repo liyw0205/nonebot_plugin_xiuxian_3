@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_currency
-from ..utils.player import change_player_state, player_integer, spend_player_state
+from ..utils.player import change_player_state, player_integer, player_reputation, spend_player_state
 from .cloud_models import (
     ArrayHallRecord,
     BeastHistoryRecord,
@@ -350,8 +350,6 @@ class CloudRepositoryMixin:
                 raise DemonIntroAlreadyCompletedError("demon introduction already completed")
             if player_currency(player) < 100:
                 raise ResourceInsufficientError("demon introduction requires 100 spirit stones")
-            faction = self._json_object(player["faction_reputation_json"], {})
-            faction["demon"] = int(faction.get("demon", 0)) + 20
             intro = self._json_object(player["intro_json"], {})
             flags = [str(item) for item in intro.get("flags", [])]
             for flag in (DEMON_INTRO_QUEST, DEMON_INTRO_FLAG):
@@ -363,8 +361,8 @@ class CloudRepositoryMixin:
                 player,
                 updated_at=now_text,
                 costs={"spirit_stones": 100},
+                reputation_delta={"faction_reputation.demon": 20},
                 player_values={
-                    "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
                     "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
                 },
             )
@@ -525,8 +523,6 @@ class CloudRepositoryMixin:
             if player_currency(player) < 100:
                 raise ResourceInsufficientError("beast introduction requires 100 spirit stones")
 
-            faction = self._json_object(player["faction_reputation_json"], {})
-            faction["beast"] = int(faction.get("beast", 0)) + 20
             intro = self._json_object(player["intro_json"], {})
             flags = {str(item) for item in intro.get("flags", [])}
             flags.update({BEAST_INTRO_QUEST, BEAST_INTRO_FLAG})
@@ -536,8 +532,8 @@ class CloudRepositoryMixin:
                 player,
                 updated_at=now_text,
                 costs={"spirit_stones": 100},
+                reputation_delta={"faction_reputation.beast": 20},
                 player_values={
-                    "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
                     "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
                 },
             )

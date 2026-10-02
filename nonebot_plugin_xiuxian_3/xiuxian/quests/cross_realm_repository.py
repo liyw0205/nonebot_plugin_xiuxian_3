@@ -8,7 +8,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_reputation
 from ..persistence.errors import (
     QuestAlreadyCompletedError,
     QuestNotCompletedError,
@@ -70,8 +70,7 @@ class DemonQuestRepositoryMixin:
             if not demon_mainline_realm_ready(str(player["realm_key"]), int(player["realm_layer"])):
                 raise QuestRequirementError("demon mainline requires nascent soul L1")
 
-            reputation = json_object(player["faction_reputation_json"], {})
-            demon_reputation = int(reputation.get("demon", 0))
+            demon_reputation = player_reputation(player).get("demon", 0)
             if demon_reputation < DEMON_MAINLINE_REQUIRED_REPUTATION:
                 raise QuestRequirementError("demon reputation is insufficient")
 

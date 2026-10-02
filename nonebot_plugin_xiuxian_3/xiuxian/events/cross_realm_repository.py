@@ -9,7 +9,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import spend_player_items
-from ..utils.player import grant_player_state
+from ..utils.player import grant_player_state, split_player_rewards
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -239,25 +239,14 @@ class CrossRealmEventRepositoryMixin:
             ).fetchone() is not None:
                 raise EventRewardAlreadyClaimedError("cross-realm event reward already claimed")
             reward = {str(key): int(value) for key, value in dict(definition["reward"]).items()}
-            asset_reward = {
-                key: value
-                for key, value in reward.items()
-                if key == "spirit_stones" or key.startswith("item.")
-            }
-            faction = self._json_object(player["faction_reputation_json"], {})
-            for key, value in reward.items():
-                if key.startswith("faction_reputation."):
-                    faction_key = key.removeprefix("faction_reputation.")
-                    faction[faction_key] = int(faction.get(faction_key, 0)) + value
+            reward_parts = split_player_rewards(reward)
             grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                rewards=asset_reward,
-                value_delta={"world_merit": int(reward.get("world_merit", 0))},
-                player_values={
-                    "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
-                },
+                rewards=reward_parts.assets,
+                value_delta=reward_parts.value_delta,
+                reputation_delta=reward_parts.reputation,
             )
             connection.execute(
                 "INSERT INTO world_event_claims(round_id, player_id, operation_id, reward_json, claimed_at) VALUES (?, ?, ?, ?, ?)",

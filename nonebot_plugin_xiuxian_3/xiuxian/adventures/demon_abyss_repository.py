@@ -20,8 +20,16 @@ from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
 )
-from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_combat_values, player_integer, player_intro_flags, player_object, player_reputation
+from ..utils.player import (
+    change_player_state,
+    grant_player_state,
+    player_combat_values,
+    player_integer,
+    player_intro_flags,
+    player_object,
+    player_reputation,
+    split_player_rewards,
+)
 from .demon_abyss_models import DemonAbyssRunRecord
 from .demon_abyss_rules import (
     DEMON_ABYSS_ENEMIES,
@@ -553,25 +561,25 @@ class DemonAbyssRepositoryMixin:
     @staticmethod
     def _demon_apply_reward(connection, player, reward: dict[str, int], now_text: str) -> None:
         intro = player_object(player, "intro_json")
-        faction = player_reputation(player)
         flags = list(player_intro_flags(player))
-        assets: dict[str, int] = {}
+        state_rewards: dict[str, int] = {}
         for key, quantity in reward.items():
-            if key == "faction_reputation.demon":
-                faction["demon"] = int(faction.get("demon", 0)) + int(quantity)
-            elif key.startswith("item."):
-                assets[key] = int(quantity)
-            elif key.startswith("story.") and key not in flags:
-                flags.append(key)
+            if key.startswith("story."):
+                if key not in flags:
+                    flags.append(key)
+            else:
+                state_rewards[key] = quantity
+        reward_parts = split_player_rewards(state_rewards)
         intro["flags"] = flags
-        grant_player_assets(
+        grant_player_state(
             connection,
             player,
-            assets,
-            now_text,
+            rewards=reward_parts.assets or None,
+            updated_at=now_text,
+            value_delta=reward_parts.value_delta,
+            reputation_delta=reward_parts.reputation or None,
             player_values={
                 "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
-                "faction_reputation_json": json.dumps(faction, ensure_ascii=False, sort_keys=True),
             },
         )
 
