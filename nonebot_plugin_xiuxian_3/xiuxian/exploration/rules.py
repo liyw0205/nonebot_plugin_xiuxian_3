@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import hashlib
 
+from ..content import ContentBundle
+from ..rewards.rules import RewardContentError, reward_pool_map
 from ..utils.assets import inventory_amount
 from .models import ExplorationDefinition
 
@@ -34,6 +36,10 @@ BATTLE_ENEMY_BY_MODE = {
     "explore.demon_abyss": "enemy.demon_ruins_scout",
     "explore.beast_hunt": "enemy.beast_guardian",
     "explore.ancestral_lake": "enemy.ancestral_spirit",
+}
+
+EXPLORATION_REWARD_POOLS = {
+    "explore.trial_outskirts": "reward_pool.exploration.trial_outskirts",
 }
 
 DEFINITIONS = {
@@ -215,8 +221,12 @@ def exploration_enemy_key(mode_key: str) -> str | None:
     return BATTLE_ENEMY_BY_MODE.get(mode_key)
 
 
+def exploration_reward_pool(mode_key: str) -> str | None:
+    return EXPLORATION_REWARD_POOLS.get(mode_key)
+
+
 def has_cloud_mine_access(*, subprofession_key: str | None, inventory: dict[str, int], intro_flags: set[str]) -> bool:
-    """Return whether the player has the v0.2 mining/commission gate.
+    """Return whether the player has the mining/commission gate.
 
     ``mining`` is accepted as a forward-compatible sub-class key even though
     the first path picker only exposes the three production sub-professions.
@@ -294,7 +304,16 @@ def settlement_result(
     seed: str,
     *,
     drop_weight_bp: int = 0,
+    content: ContentBundle | None = None,
 ) -> dict[str, int]:
+    reward_pool_key = exploration_reward_pool(mode_key)
+    if reward_pool_key is not None:
+        result = reward_pool_map(reward_pool_key, seed, content)
+        if set(result) - {"cultivation", "spirit_stones"}:
+            raise RewardContentError(
+                f"exploration reward pool {reward_pool_key} contains unsupported state"
+            )
+        return result
     if mode_key == "explore.gather_outskirts":
         result = {
             "item.herb.blood_grass": 1 + weighted_value(seed + ":blood", (0, 1, 2), (35, 45, 20)),
@@ -387,6 +406,8 @@ __all__ = [
     "CLOUD_MINE_ACCESS_ITEMS",
     "exploration_definition",
     "exploration_enemy_key",
+    "exploration_reward_pool",
+    "EXPLORATION_REWARD_POOLS",
     "has_cloud_mine_access",
     "meets_realm",
     "resolve_exploration_mode",

@@ -1,4 +1,4 @@
-"""Application commands for v0.1 exploration sessions."""
+"""Application commands for exploration sessions."""
 
 from __future__ import annotations
 

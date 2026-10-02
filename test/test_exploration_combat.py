@@ -6,12 +6,11 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.config import XiuxianSettings
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp, settlement_result
 
 
 def _context(adapter: str, user: str, operation_id: str) -> CommandContext:
@@ -65,18 +64,16 @@ def test_qq_and_onebot_exploration_encounters_use_frozen_battle_and_replay() -> 
                         "UPDATE exploration_sessions SET ends_at=? WHERE exploration_id=?",
                         ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), exploration_id),
                     )
-                with patch(
-                    "nonebot_plugin_xiuxian_3.xiuxian.exploration.repository.settlement_result",
-                    return_value={"item.demon_core": 1},
-                ):
-                    settled = await runtime.adapters.dispatch(
-                        adapter,
-                        _context(adapter, user, f"{adapter}-settle"),
-                        "结算探索",
-                    )
+                settled = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, f"{adapter}-settle"),
+                    "结算探索",
+                )
                 assert settled.code == "EXPLORATION_SETTLED"
                 assert settled.data["battle_outcome"] == "won"
-                assert settled.data["result"] == {"item.demon_core": 1}
+                assert settled.data["result"] == settlement_result(
+                    "explore.trial_outskirts", start_operation
+                )
                 battle_id = str(settled.data["battle_id"])
                 replay = await runtime.adapters.dispatch(
                     adapter,
@@ -91,8 +88,8 @@ def test_qq_and_onebot_exploration_encounters_use_frozen_battle_and_replay() -> 
                         "SELECT status, snapshot_json FROM exploration_sessions WHERE exploration_id=?",
                         (exploration_id,),
                     ).fetchone()
-                    battle_status, linked = connection.execute(
-                        "SELECT status, json_extract(snapshot_json, '$.exploration_id') "
+                    battle_status, reward_status, linked = connection.execute(
+                        "SELECT status, reward_status, json_extract(snapshot_json, '$.exploration_id') "
                         "FROM battle_sessions WHERE battle_id=?",
                         (battle_id,),
                     ).fetchone()
@@ -108,9 +105,10 @@ def test_qq_and_onebot_exploration_encounters_use_frozen_battle_and_replay() -> 
                 assert status == "settled"
                 assert json.loads(snapshot_text)["qualification"]["body"] == 2_000
                 assert battle_status == "settled"
+                assert reward_status == "none"
                 assert linked == exploration_id
                 assert operation_count == 1
-                assert bindings == [("item.demon_core", 1)]
+                assert bindings == []
                 operations[adapter] = (exploration_id, f"{adapter}-settle")
 
             await runtime.close()
@@ -128,7 +126,7 @@ def test_qq_and_onebot_exploration_encounters_use_frozen_battle_and_replay() -> 
                         "SELECT COUNT(*) FROM exploration_item_bindings WHERE player_id="
                         "(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
                         (adapter, user),
-                    ).fetchone()[0] == 1
+                    ).fetchone()[0] == 0
             await recovered.close()
 
     asyncio.run(run())
@@ -175,15 +173,11 @@ def test_exploration_battle_loss_does_not_award_frozen_result() -> None:
                     "WHERE platform=? AND platform_user_id=?",
                     (adapter, user),
                 ).fetchone()
-            with patch(
-                "nonebot_plugin_xiuxian_3.xiuxian.exploration.repository.settlement_result",
-                return_value={"item.demon_core": 1},
-            ):
-                settled = await runtime.adapters.dispatch(
-                    adapter,
-                    _context(adapter, user, "loss-settle"),
-                    "结算探索",
-                )
+            settled = await runtime.adapters.dispatch(
+                adapter,
+                _context(adapter, user, "loss-settle"),
+                "结算探索",
+            )
             assert settled.code == "EXPLORATION_SETTLED"
             assert settled.data["battle_outcome"] == "lost"
             assert settled.data["result"] == {}

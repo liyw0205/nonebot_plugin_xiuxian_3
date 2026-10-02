@@ -229,6 +229,24 @@
       "status": "active"
     },
     {
+      "name": "近郊短历练奖励池",
+      "desc": "近郊短历练所得的修为与灵石，按固定权重抽取。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 12, "rewards": {"cultivation": 40, "spirit_stones": 10}},
+        {"weight": 12, "rewards": {"cultivation": 40, "spirit_stones": 20}},
+        {"weight": 6, "rewards": {"cultivation": 40, "spirit_stones": 30}},
+        {"weight": 18, "rewards": {"cultivation": 60, "spirit_stones": 10}},
+        {"weight": 18, "rewards": {"cultivation": 60, "spirit_stones": 20}},
+        {"weight": 9, "rewards": {"cultivation": 60, "spirit_stones": 30}},
+        {"weight": 10, "rewards": {"cultivation": 80, "spirit_stones": 10}},
+        {"weight": 10, "rewards": {"cultivation": 80, "spirit_stones": 20}},
+        {"weight": 5, "rewards": {"cultivation": 80, "spirit_stones": 30}}
+      ],
+      "key": "reward_pool.exploration.trial_outskirts",
+      "status": "active"
+    },
+    {
       "name": "灵泉事件基础奖励",
       "desc": "参与灵泉谷共同行动的谢礼，包含修为与灵石。",
       "operation": "event.claim_reward",

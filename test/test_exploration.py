@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import shutil
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
@@ -131,6 +133,161 @@ def test_exploration_modes_settle_rewards_and_replay_once() -> None:
             assert 300 <= mist_result.data["result"]["cultivation"] <= 500
             assert any(key.startswith("item.") for key in mist_result.data["result"])
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_trial_exploration_uses_content_pool_and_freezes_result_across_restart() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            reward_path = data_dir / "奖励" / "奖励.json"
+            document = json.loads(reward_path.read_text(encoding="utf-8"))
+            pool = next(
+                row
+                for row in document["records"]
+                if row["key"] == "reward_pool.exploration.trial_outskirts"
+            )
+            pool["outcomes"] = [{"weight": 1, "rewards": {"cultivation": 777, "spirit_stones": 66}}]
+            reward_path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            runtime = create_runtime(data_dir=data_dir, adapters=("qq.official", "onebot.v11"))
+            settle_operations: dict[str, str] = {}
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"trial-content-{adapter}"
+                created = await runtime.adapters.dispatch(
+                    adapter,
+                    CommandContext(adapter=adapter, user_id=user, operation_id=f"{adapter}-create"),
+                    "开始修仙",
+                )
+                assert created.code == "PLAYER_CREATED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, "
+                        "location_key='xuantian.outskirts', stamina=30 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                operation = next(
+                    f"{adapter}-trial-{index}"
+                    for index in range(1000)
+                    if battle_roll_bp(f"{adapter}-trial-{index}:battle") >= 2000
+                )
+                started = await runtime.adapters.dispatch(
+                    adapter,
+                    CommandContext(adapter=adapter, user_id=user, operation_id=operation),
+                    "开始探索 短历练",
+                )
+                assert started.code == "EXPLORATION_STARTED"
+                _expire_exploration(runtime, user, started.data["exploration_id"])
+                settled = await runtime.adapters.dispatch(
+                    adapter,
+                    CommandContext(adapter=adapter, user_id=user, operation_id=f"{adapter}-trial-settle"),
+                    "结算探索",
+                )
+                assert settled.code == "EXPLORATION_SETTLED"
+                assert settled.data["result"] == {"cultivation": 777, "spirit_stones": 66}
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player = connection.execute(
+                        "SELECT cultivation, total_cultivation, spirit_stones FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    snapshot_text = connection.execute(
+                        "SELECT snapshot_json FROM exploration_sessions WHERE exploration_id=?",
+                        (started.data["exploration_id"],),
+                    ).fetchone()[0]
+                assert player == (777, 777, 66)
+                snapshot = json.loads(snapshot_text)
+                assert snapshot["reward_pool_key"] == "reward_pool.exploration.trial_outskirts"
+                assert snapshot["frozen_result"] == {"cultivation": 777, "spirit_stones": 66}
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    CommandContext(adapter=adapter, user_id=user, operation_id=f"{adapter}-trial-settle"),
+                    "结算探索",
+                )
+                assert replay.data["idempotent_replay"] is True
+                conflict = await runtime.adapters.dispatch(
+                    adapter,
+                    CommandContext(adapter=adapter, user_id=user, operation_id=f"{adapter}-trial-settle"),
+                    "开始探索 短历练",
+                )
+                assert conflict.code == "OPERATION_CONFLICT"
+                settle_operations[adapter] = f"{adapter}-trial-settle"
+            await runtime.close()
+
+            recovered = create_runtime(data_dir=data_dir, adapters=("qq.official", "onebot.v11"))
+            try:
+                for adapter in ("qq.official", "onebot.v11"):
+                    replay = await recovered.adapters.dispatch(
+                        adapter,
+                        CommandContext(
+                            adapter=adapter,
+                            user_id=f"trial-content-{adapter}",
+                            operation_id=settle_operations[adapter],
+                        ),
+                        "结算探索",
+                    )
+                    assert replay.data["idempotent_replay"] is True
+            finally:
+                await recovered.close()
+
+    asyncio.run(run())
+
+
+def test_trial_exploration_snapshot_wins_over_content_change_after_restart() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            reward_path = data_dir / "奖励" / "奖励.json"
+            document = json.loads(reward_path.read_text(encoding="utf-8"))
+            pool = next(
+                row
+                for row in document["records"]
+                if row["key"] == "reward_pool.exploration.trial_outskirts"
+            )
+            pool["outcomes"] = [{"weight": 1, "rewards": {"cultivation": 111, "spirit_stones": 11}}]
+            reward_path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            runtime = create_runtime(data_dir=data_dir, adapters=("qq.official",))
+            user = "trial-freeze"
+            await runtime.adapters.dispatch(
+                "qq.official", CommandContext(adapter="qq.official", user_id=user, operation_id="create"), "开始修仙"
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, "
+                    "location_key='xuantian.outskirts', stamina=30 WHERE platform='qq.official' AND platform_user_id=?",
+                    (user,),
+                )
+            operation = next(
+                f"trial-freeze-{index}"
+                for index in range(1000)
+                if battle_roll_bp(f"trial-freeze-{index}:battle") >= 2000
+            )
+            started = await runtime.adapters.dispatch(
+                "qq.official", CommandContext(adapter="qq.official", user_id=user, operation_id=operation), "开始探索 短历练"
+            )
+            assert started.code == "EXPLORATION_STARTED"
+            exploration_id = started.data["exploration_id"]
+            await runtime.close()
+
+            document["records"][
+                next(i for i, row in enumerate(document["records"]) if row["key"] == pool["key"])
+            ]["outcomes"] = [
+                {"weight": 1, "rewards": {"cultivation": 999, "spirit_stones": 99}}
+            ]
+            reward_path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            recovered = create_runtime(data_dir=data_dir, adapters=("qq.official",))
+            try:
+                _expire_exploration(recovered, user, exploration_id)
+                settled = await recovered.adapters.dispatch(
+                    "qq.official", CommandContext(adapter="qq.official", user_id=user, operation_id="settle"), "结算探索"
+                )
+                assert settled.data["result"] == {"cultivation": 111, "spirit_stones": 11}
+            finally:
+                await recovered.close()
 
     asyncio.run(run())
 

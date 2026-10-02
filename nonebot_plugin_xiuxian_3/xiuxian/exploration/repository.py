@@ -92,6 +92,7 @@ from ..exploration.rules import (
     has_cloud_mine_access,
     battle_roll_bp,
     exploration_definition,
+    exploration_reward_pool,
     meets_realm as exploration_meets_realm,
     settlement_result,
 )
@@ -182,6 +183,7 @@ from ..routine.rules import (
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_spend, assets_with_delta, player_currency
 from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory
+from ..rewards.rules import RewardContentError
 
 
 class ExplorationRepositoryMixin:
@@ -371,6 +373,7 @@ class ExplorationRepositoryMixin:
                 "bloodline_stability_after": bloodline_stability_after,
                 "cross_realm_penalty_bp": cross_realm_penalty_bp,
                 "random_pool": definition.random_pool,
+                "reward_pool_key": exploration_reward_pool(definition.key),
                 "random_seed": operation_id,
                 "battle_chance_bp": battle_chance_bp,
                 "base_battle_chance_bp": definition.battle_chance_bp,
@@ -394,6 +397,20 @@ class ExplorationRepositoryMixin:
                     for item in self.companion_battle_snapshot(connection, player_id).companions
                 ],
             }
+            reward_pool_key = exploration_reward_pool(definition.key)
+            if reward_pool_key is not None:
+                drop_weight_bp = (
+                    int(snapshot["constitution_effect"].get("value", 0))
+                    if isinstance(snapshot["constitution_effect"], dict)
+                    and snapshot["constitution_effect"].get("type") == "drop_weight_bp"
+                    else 0
+                )
+                snapshot["frozen_result"] = settlement_result(
+                    definition.key,
+                    operation_id,
+                    drop_weight_bp=drop_weight_bp,
+                    content=self.content,
+                )
             change_player_state(
                 connection,
                 row,
@@ -448,6 +465,12 @@ class ExplorationRepositoryMixin:
                 "bloodline_stability_before": bloodline_stability_before,
                 "bloodline_stability_after": bloodline_stability_after,
                 "cross_realm_penalty_bp": cross_realm_penalty_bp,
+                # Keep the frozen reward contract alongside the idempotency
+                # record.  It is internal operation data; presentation reads
+                # only the fields exposed by ExplorationStartRecord.
+                "reward_pool_key": snapshot.get("reward_pool_key"),
+                "random_seed": snapshot.get("random_seed"),
+                "frozen_result": dict(snapshot.get("frozen_result", {})),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -620,20 +643,23 @@ class ExplorationRepositoryMixin:
             battle_result = self._json_object(battle["result_json"], {})
             battle_outcome = str(battle_result.get("outcome", ""))
             frozen = self._json_object(session["result_json"], {})
+            frozen_payload = frozen.get("frozen_result")
+            if not isinstance(frozen_payload, dict):
+                raise RewardContentError("exploration combat reward snapshot is missing")
             frozen_result = {
-                str(key): int(value) for key, value in dict(frozen.get("result", {})).items()
+                str(key): int(value) for key, value in dict(frozen_payload).items()
             }
             result = frozen_result if battle_outcome == "won" else {}
-            faction_reputation = self._json_object(row["faction_reputation_json"], {})
             soul_power_loss = 0
             soul_fatigue_until = row["soul_fatigue_until"]
             snapshot = self._json_object(session["snapshot_json"], {})
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             cultivation_gain = int(result.get("cultivation", 0))
-            for key, quantity in result.items():
-                if key.startswith("faction_reputation."):
-                    faction_key = key.removeprefix("faction_reputation.")
-                    faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + quantity
+            reputation_delta = {
+                key: int(quantity)
+                for key, quantity in result.items()
+                if key.startswith("faction_reputation.")
+            }
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, int(row["soul_power"]))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
@@ -652,10 +678,10 @@ class ExplorationRepositoryMixin:
                     "soul_power": -soul_power_loss,
                 },
                 player_values={
-                    "faction_reputation_json": json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
                     "soul_fatigue_until": soul_fatigue_until,
                     "bloodline_stability": bloodline_stability_after,
                 },
+                reputation_delta=reputation_delta or None,
                 maximums={"soul_power": row["soul_power_max"]},
             )
             result_json = {
@@ -706,6 +732,9 @@ class ExplorationRepositoryMixin:
                 "bloodline_stability_after": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_after", 0)),
                 "soul_power_loss": soul_power_loss,
                 "soul_fatigue_until": soul_fatigue_until,
+                "reward_pool_key": snapshot.get("reward_pool_key"),
+                "random_seed": snapshot.get("random_seed"),
+                "frozen_result": dict(frozen_result),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -882,11 +911,19 @@ class ExplorationRepositoryMixin:
                     and constitution_effect.get("type") == "drop_weight_bp"
                     else 0
                 )
-                result = settlement_result(
-                    str(session["mode_key"]),
-                    seed,
-                    drop_weight_bp=drop_weight_bp,
-                )
+                reward_pool_key = exploration_reward_pool(str(session["mode_key"]))
+                if reward_pool_key is not None:
+                    frozen_result = snapshot.get("frozen_result")
+                    if not isinstance(frozen_result, dict):
+                        raise RewardContentError("exploration reward snapshot is missing")
+                    result = {str(key): int(value) for key, value in frozen_result.items()}
+                else:
+                    result = settlement_result(
+                        str(session["mode_key"]),
+                        seed,
+                        drop_weight_bp=drop_weight_bp,
+                        content=self.content,
+                    )
                 storm_hit = (
                     str(session["mode_key"]) == "explore.cloud_boat_trial"
                     and not bool(stored_result.get("storm_resolved"))
@@ -932,14 +969,14 @@ class ExplorationRepositoryMixin:
                 if battle_pending:
                     status = "combat_pending"
 
-            faction_reputation = self._json_object(row["faction_reputation_json"], {})
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             if status == "settled":
                 cultivation_gain = int(result.get("cultivation", 0))
-                for key, quantity in result.items():
-                    if key.startswith("faction_reputation."):
-                        faction_key = key.removeprefix("faction_reputation.")
-                        faction_reputation[faction_key] = int(faction_reputation.get(faction_key, 0)) + int(quantity)
+                reputation_delta = {
+                    key: int(quantity)
+                    for key, quantity in result.items()
+                    if key.startswith("faction_reputation.")
+                }
                 grant_player_state(
                     connection,
                     row,
@@ -953,10 +990,8 @@ class ExplorationRepositoryMixin:
                         "cultivation": cultivation_gain,
                         "total_cultivation": cultivation_gain,
                     },
-                    player_values={
-                        "faction_reputation_json": json.dumps(faction_reputation, ensure_ascii=False, sort_keys=True),
-                        "bloodline_stability": bloodline_stability_after,
-                    },
+                    player_values={"bloodline_stability": bloodline_stability_after},
+                    reputation_delta=reputation_delta or None,
                 )
             result_json = {
                 "status": status,
@@ -1010,6 +1045,9 @@ class ExplorationRepositoryMixin:
                 "bloodline_stability_after": int(snapshot.get("bloodline_stability_after", 0)),
                 "soul_power_loss": 0,
                 "soul_fatigue_until": None,
+                "reward_pool_key": snapshot.get("reward_pool_key"),
+                "random_seed": snapshot.get("random_seed"),
+                "frozen_result": dict(result),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",

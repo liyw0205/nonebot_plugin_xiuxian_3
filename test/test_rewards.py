@@ -14,6 +14,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import (
     RewardGrant,
     combine_reward_grants,
     reward_definition,
+    reward_pool_map,
 )
 
 
@@ -182,3 +183,22 @@ def test_reward_grant_composition_rejects_cross_grant_state_conflicts() -> None:
         assert "both delta and fixed values" in str(exc)
     else:
         raise AssertionError("cross-grant resource conflicts must fail")
+
+
+def test_weighted_reward_pool_rejects_invalid_content(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    reward_file = data_dir / "奖励" / "奖励.json"
+    document = json.loads(reward_file.read_text(encoding="utf-8"))
+    pool = next(
+        item for item in document["records"] if item["key"] == "reward_pool.exploration.trial_outskirts"
+    )
+    pool["outcomes"] = [{"weight": 0, "rewards": {"cultivation": 1}}]
+    reward_file.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+    try:
+        reward_pool_map("reward_pool.exploration.trial_outskirts", "invalid", bundle)
+    except RewardContentError as exc:
+        assert "invalid weight" in str(exc)
+    else:
+        raise AssertionError("invalid weighted pool must fail content validation")

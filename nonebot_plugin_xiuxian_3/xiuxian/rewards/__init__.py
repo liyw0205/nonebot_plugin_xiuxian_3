@@ -5,6 +5,8 @@ from .rules import (
     RewardGrant,
     combine_reward_grants,
     reward_definition,
+    reward_pool_map,
+    reward_pool_outcomes,
     reward_totals,
     reward_value_delta,
 )
@@ -14,6 +16,8 @@ __all__ = [
     "RewardGrant",
     "combine_reward_grants",
     "reward_definition",
+    "reward_pool_map",
+    "reward_pool_outcomes",
     "reward_totals",
     "reward_value_delta",
 ]

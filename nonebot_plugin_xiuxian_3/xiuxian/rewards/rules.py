@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -86,6 +87,72 @@ def reward_value_delta(grant: RewardGrant) -> dict[str, int]:
     if "cultivation" in values and "total_cultivation" not in values:
         values["total_cultivation"] = values["cultivation"]
     return values
+
+
+def reward_pool_outcomes(
+    key: str,
+    content: ContentBundle | None = None,
+) -> tuple[tuple[int, dict[str, int]], ...]:
+    """Load a weighted reward pool without applying it to player state."""
+
+    bundle = content or _DEFAULT_CONTENT
+    try:
+        row = bundle.require("reward", key, include_locked=False)
+    except KeyError as exc:
+        raise RewardContentError(f"reward pool is not active: {key}") from exc
+    if row.get("pool_type") != "weighted":
+        raise RewardContentError(f"reward pool {key} must be weighted")
+    outcomes = row.get("outcomes")
+    if not isinstance(outcomes, list) or not outcomes:
+        raise RewardContentError(f"reward pool {key} requires outcomes")
+    normalized: list[tuple[int, dict[str, int]]] = []
+    for index, outcome in enumerate(outcomes):
+        if not isinstance(outcome, dict):
+            raise RewardContentError(f"reward pool {key} outcome {index} must be an object")
+        weight = outcome.get("weight")
+        rewards = outcome.get("rewards")
+        if isinstance(weight, bool) or not isinstance(weight, int) or weight <= 0:
+            raise RewardContentError(f"reward pool {key} outcome {index} has invalid weight")
+        if not isinstance(rewards, dict) or not rewards:
+            raise RewardContentError(f"reward pool {key} outcome {index} requires rewards")
+        normalized_rewards: dict[str, int] = {}
+        for reward_key, quantity in rewards.items():
+            if (
+                not isinstance(reward_key, str)
+                or isinstance(quantity, bool)
+                or not isinstance(quantity, int)
+                or quantity <= 0
+            ):
+                raise RewardContentError(
+                    f"reward pool {key} outcome {index} rewards must be positive integer quantities"
+                )
+            if reward_key.startswith("item."):
+                try:
+                    bundle.require("item", reward_key, include_locked=False)
+                except KeyError as exc:
+                    raise RewardContentError(
+                        f"reward pool {key} outcome {index} references inactive item {reward_key}"
+                    ) from exc
+            normalized_rewards[reward_key] = quantity
+        normalized.append((weight, normalized_rewards))
+    return tuple(normalized)
+
+
+def reward_pool_map(
+    key: str,
+    seed: str,
+    content: ContentBundle | None = None,
+) -> dict[str, int]:
+    """Select one deterministic outcome from a content-backed reward pool."""
+
+    outcomes = reward_pool_outcomes(key, content)
+    cursor = int.from_bytes(hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest(), "big")
+    cursor %= sum(weight for weight, _ in outcomes)
+    for weight, rewards in outcomes:
+        if cursor < weight:
+            return dict(rewards)
+        cursor -= weight
+    raise AssertionError("weighted reward selection fell through")
 
 
 def _combine_maps(*maps: dict[str, int]) -> dict[str, int]:
@@ -235,6 +302,8 @@ __all__ = [
     "RewardGrant",
     "combine_reward_grants",
     "reward_definition",
+    "reward_pool_map",
+    "reward_pool_outcomes",
     "reward_totals",
     "reward_value_delta",
 ]
