@@ -367,6 +367,19 @@
       "status": "active"
     },
     {
+      "name": "万兽山狩猎所得",
+      "desc": "狩猎山间灵兽，可得兽血、妖界声望，或寻得血脉线索。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 45, "rewards": {"item.beast_blood": 1}},
+        {"weight": 30, "rewards": {"faction_reputation.beast": 15}},
+        {"weight": 15, "rewards": {"item.clue.beast_bloodline": 1}},
+        {"weight": 10, "no_reward": true}
+      ],
+      "key": "reward_pool.exploration.beast_hunt",
+      "status": "active"
+    },
+    {
       "name": "灵泉事件基础奖励",
       "desc": "参与灵泉谷共同行动的谢礼，包含修为与灵石。",
       "operation": "event.claim_reward",

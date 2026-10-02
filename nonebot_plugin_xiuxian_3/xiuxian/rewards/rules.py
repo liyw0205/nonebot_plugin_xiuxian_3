@@ -112,15 +112,25 @@ def reward_pool_outcomes(
         if not isinstance(outcome, dict):
             raise RewardContentError(f"reward pool {key} outcome {index} must be an object")
         weight = outcome.get("weight")
-        rewards = outcome.get("rewards")
         if isinstance(weight, bool) or not isinstance(weight, int) or weight <= 0:
             raise RewardContentError(f"reward pool {key} outcome {index} has invalid weight")
-        normalized_rewards = _normalize_reward_pool_map(
-            key,
-            f"outcome {index}",
-            rewards,
-            bundle,
-        )
+        if "no_reward" in outcome:
+            if outcome["no_reward"] is not True:
+                raise RewardContentError(
+                    f"reward pool {key} outcome {index} no_reward must be true"
+                )
+            if "rewards" in outcome:
+                raise RewardContentError(
+                    f"reward pool {key} outcome {index} cannot combine no_reward and rewards"
+                )
+            normalized_rewards = {}
+        else:
+            normalized_rewards = _normalize_reward_pool_map(
+                key,
+                f"outcome {index}",
+                outcome.get("rewards"),
+                bundle,
+            )
         normalized.append((weight, normalized_rewards))
     return tuple(normalized)
 
@@ -147,13 +157,32 @@ def reward_pool_map(
     key: str,
     seed: str,
     content: ContentBundle | None = None,
+    *,
+    item_weight_bonus_bp: int = 0,
 ) -> dict[str, int]:
     """Select one deterministic outcome from a content-backed reward pool."""
 
     outcomes = reward_pool_outcomes(key, content)
+    if (
+        isinstance(item_weight_bonus_bp, bool)
+        or not isinstance(item_weight_bonus_bp, int)
+        or item_weight_bonus_bp < 0
+    ):
+        raise RewardContentError("item reward weight bonus must be a non-negative integer")
+    weighted_outcomes = outcomes
+    if item_weight_bonus_bp:
+        weighted_outcomes = tuple(
+            (
+                weight * (10_000 + item_weight_bonus_bp)
+                if any(reward_key.startswith("item.") for reward_key in rewards)
+                else weight * 10_000,
+                rewards,
+            )
+            for weight, rewards in outcomes
+        )
     cursor = int.from_bytes(hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest(), "big")
-    cursor %= sum(weight for weight, _ in outcomes)
-    for weight, rewards in outcomes:
+    cursor %= sum(weight for weight, _ in weighted_outcomes)
+    for weight, rewards in weighted_outcomes:
         if cursor < weight:
             return dict(rewards)
         cursor -= weight

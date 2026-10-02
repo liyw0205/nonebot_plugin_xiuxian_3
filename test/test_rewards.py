@@ -311,6 +311,44 @@ def test_exploration_reward_pool_preserves_every_joint_probability(
     assert sum(actual.values()) == 1
 
 
+def test_beast_hunt_pool_preserves_original_outcomes_and_explicit_no_reward() -> None:
+    bundle = ContentBundle.load(Path(__file__).parents[1] / "data")
+    outcomes = reward_pool_outcomes("reward_pool.exploration.beast_hunt", bundle)
+    total_weight = sum(weight for weight, _ in outcomes)
+    actual = {
+        tuple(sorted(rewards.items())): Fraction(weight, total_weight)
+        for weight, rewards in outcomes
+    }
+    assert actual == {
+        (("item.beast_blood", 1),): Fraction(45, 100),
+        (("faction_reputation.beast", 15),): Fraction(30, 100),
+        (("item.clue.beast_bloodline", 1),): Fraction(15, 100),
+        (): Fraction(10, 100),
+    }
+
+
+def test_reward_pool_item_weight_bonus_only_increases_item_outcomes() -> None:
+    pool_key = "reward_pool.exploration.beast_hunt"
+    normal = [reward_pool_map(pool_key, f"bonus-{index}") for index in range(2_000)]
+    boosted = [
+        reward_pool_map(pool_key, f"bonus-{index}", item_weight_bonus_bp=100_000)
+        for index in range(2_000)
+    ]
+    normal_item_count = sum(
+        any(key.startswith("item.") for key in result) for result in normal
+    )
+    boosted_item_count = sum(
+        any(key.startswith("item.") for key in result) for result in boosted
+    )
+    assert boosted_item_count > normal_item_count
+    assert any(not result for result in normal)
+    assert any(not result for result in boosted)
+    assert boosted == [
+        reward_pool_map(pool_key, f"bonus-{index}", item_weight_bonus_bp=100_000)
+        for index in range(2_000)
+    ]
+
+
 @pytest.mark.parametrize(
     "pool_key",
     [
@@ -320,8 +358,9 @@ def test_exploration_reward_pool_preserves_every_joint_probability(
         "reward_pool.exploration.mist_grotto_2",
         "reward_pool.exploration.cloud_boat_trial",
         "reward_pool.exploration.cloud_mine",
+        "reward_pool.exploration.beast_hunt",
     ],
-    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine", "beast-hunt"],
 )
 def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key: str) -> None:
     content_path = Path(__file__).parents[1] / "data"
@@ -337,7 +376,8 @@ def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key:
         original = dict(result)
         assert result == reward_pool_map(pool_key, seed, reloaded)
         selected.add(tuple(sorted(result.items())))
-        result[next(iter(result))] = 999
+        if result:
+            result[next(iter(result))] = 999
         assert reward_pool_map(pool_key, seed, bundle) == original
     assert selected == configured
 
@@ -366,8 +406,12 @@ def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key:
             "reward_pool.exploration.cloud_mine",
             {"item.material.cloud_iron": 7},
         ),
+        (
+            "reward_pool.exploration.beast_hunt",
+            {"item.beast_blood": 7},
+        ),
     ],
-    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine", "beast-hunt"],
 )
 def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_bundle(
     tmp_path: Path, pool_key: str, rewards: dict[str, int]
@@ -398,8 +442,9 @@ def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_b
         "reward_pool.exploration.mist_grotto_2",
         "reward_pool.exploration.cloud_boat_trial",
         "reward_pool.exploration.cloud_mine",
+        "reward_pool.exploration.beast_hunt",
     ],
-    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-boat", "cloud-mine", "beast-hunt"],
 )
 @pytest.mark.parametrize(
     ("outcome", "error"),
@@ -421,6 +466,8 @@ def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_b
         ({"weight": 1, "rewards": {"item.mat.wood": True}}, "positive integer quantities"),
         ({"weight": 1, "rewards": {"item.mat.wood": "1"}}, "positive integer quantities"),
         ({"weight": 1, "rewards": {"item.mat.wood": 1.5}}, "positive integer quantities"),
+        ({"weight": 1, "no_reward": False}, "no_reward must be true"),
+        ({"weight": 1, "no_reward": True, "rewards": {"item.mat.wood": 1}}, "cannot combine"),
     ],
 )
 def test_exploration_reward_pool_rejects_malformed_outcomes(
@@ -440,6 +487,16 @@ def test_exploration_reward_pool_rejects_malformed_outcomes(
     assert "outcome 0" in str(caught.value)
 
 
+@pytest.mark.parametrize("bonus", [-1, True, 1.5, "100"])
+def test_reward_pool_rejects_invalid_item_weight_bonus(bonus: object) -> None:
+    with pytest.raises(RewardContentError, match="non-negative integer"):
+        reward_pool_map(
+            "reward_pool.exploration.beast_hunt",
+            "invalid-item-bonus",
+            item_weight_bonus_bp=bonus,  # type: ignore[arg-type]
+        )
+
+
 @pytest.mark.parametrize(
     ("mode_key", "pool_key"),
     [
@@ -450,6 +507,7 @@ def test_exploration_reward_pool_rejects_malformed_outcomes(
         ("explore.mist_grotto_2", "reward_pool.exploration.mist_grotto_2"),
         ("explore.cloud_boat_trial", "reward_pool.exploration.cloud_boat_trial"),
         ("explore.cloud_mine", "reward_pool.exploration.cloud_mine"),
+        ("explore.beast_hunt", "reward_pool.exploration.beast_hunt"),
     ],
 )
 @pytest.mark.parametrize("resource_key", ["stamina", "soul_power"])
@@ -497,8 +555,9 @@ def test_exploration_reward_pool_accepts_cultivation_and_assets() -> None:
         ("reward_pool.exploration.gather_outskirts", "item.mat.wood"),
         ("reward_pool.exploration.spring_gather", "item.mat.array_sand"),
         ("reward_pool.exploration.mist_grotto", "item.ore.ironstone"),
+        ("reward_pool.exploration.beast_hunt", "item.clue.beast_bloodline"),
     ],
-    ids=["outskirts", "spring", "mist-grotto"],
+    ids=["outskirts", "spring", "mist-grotto", "beast-hunt"],
 )
 def test_exploration_reward_pool_rejects_inactive_item_even_when_not_selected(
     tmp_path: Path, pool_key: str, item_key: str
@@ -529,6 +588,9 @@ def test_reward_pool_battle_failure_rewards_are_content_backed() -> None:
     ) == {}
     assert reward_pool_battle_failure_rewards(
         "reward_pool.exploration.cloud_boat_trial", bundle
+    ) == {}
+    assert reward_pool_battle_failure_rewards(
+        "reward_pool.exploration.beast_hunt", bundle
     ) == {}
 
 

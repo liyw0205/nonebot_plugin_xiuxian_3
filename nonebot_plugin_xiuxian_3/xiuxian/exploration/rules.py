@@ -51,6 +51,7 @@ EXPLORATION_REWARD_POOLS = {
     "explore.cloud_mine": "reward_pool.exploration.cloud_mine",
     "explore.mist_grotto_2": "reward_pool.exploration.mist_grotto_2",
     "explore.cloud_boat_trial": "reward_pool.exploration.cloud_boat_trial",
+    "explore.beast_hunt": "reward_pool.exploration.beast_hunt",
 }
 
 DEFINITIONS = {
@@ -319,7 +320,13 @@ def settlement_result(
 ) -> dict[str, int]:
     reward_pool_key = exploration_reward_pool(mode_key)
     if reward_pool_key is not None:
-        result = reward_pool_map(reward_pool_key, seed, content)
+        is_beast_hunt = mode_key == "explore.beast_hunt"
+        result = reward_pool_map(
+            reward_pool_key,
+            f"{seed}:reward" if is_beast_hunt else seed,
+            content,
+            item_weight_bonus_bp=drop_weight_bp if is_beast_hunt else 0,
+        )
         parts = split_player_rewards(result)
         if set(parts.value_delta) - {"cultivation", "total_cultivation"}:
             raise RewardContentError(
@@ -342,20 +349,6 @@ def settlement_result(
             return {"faction_reputation.demon": 15}
         if reward == 2:
             return {"item.clue.demon_contract": 1}
-        return {}
-    if mode_key == "explore.beast_hunt":
-        # The final branch is the documented ancestor event, which remains a
-        # later independent slice and therefore does not mint an asset here.
-        reward = weighted_value_with_item_bonus(
-            seed + ":reward", (0, 1, 2, 3), (45, 30, 15, 10),
-            item_values=frozenset({0, 2}), bonus_bp=drop_weight_bp,
-        )
-        if reward == 0:
-            return {"item.beast_blood": 1}
-        if reward == 1:
-            return {"faction_reputation.beast": 15}
-        if reward == 2:
-            return {"item.clue.beast_bloodline": 1}
         return {}
     if mode_key == "explore.ancestral_lake":
         return {
