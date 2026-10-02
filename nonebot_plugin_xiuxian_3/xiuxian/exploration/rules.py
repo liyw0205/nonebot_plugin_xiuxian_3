@@ -53,6 +53,7 @@ EXPLORATION_REWARD_POOLS = {
     "explore.mist_grotto_2": "reward_pool.exploration.mist_grotto_2",
     "explore.cloud_boat_trial": "reward_pool.exploration.cloud_boat_trial",
     "explore.beast_hunt": "reward_pool.exploration.beast_hunt",
+    "explore.demon_threshold": "reward_pool.exploration.demon_threshold",
     "explore.demon_abyss": "reward_pool.exploration.demon_abyss",
     "explore.ancestral_lake": "reward_pool.exploration.ancestral_lake",
 }
@@ -305,8 +306,6 @@ def settlement_result(
                 f"exploration reward pool {reward_pool_key} contains unsupported state"
             )
         return result
-    if mode_key == "explore.demon_threshold":
-        return {"item.soul_crystal": 1, "item.demon_core": 1}
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 
 

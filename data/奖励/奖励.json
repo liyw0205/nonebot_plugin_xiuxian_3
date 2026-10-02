@@ -395,6 +395,22 @@
       "status": "active"
     },
     {
+      "name": "深渊门备材所得",
+      "desc": "魔息汇聚，凝成神魂晶与魔核。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 1,
+          "rewards": {
+            "item.soul_crystal": 1,
+            "item.demon_core": 1
+          }
+        }
+      ],
+      "key": "reward_pool.exploration.demon_threshold",
+      "status": "active"
+    },
+    {
       "name": "祖灵湖探索所得",
       "desc": "于湖畔寻得祖灵血，并增进妖界声望。",
       "pool_type": "weighted",
