@@ -323,6 +323,21 @@
       "status": "active"
     },
     {
+      "name": "洞天二层探索收获",
+      "desc": "参悟二层灵机，采得云铁。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1800, "rewards": {"cultivation": 900, "item.material.cloud_iron": 1}},
+        {"weight": 1200, "rewards": {"cultivation": 900, "item.material.cloud_iron": 2}},
+        {"weight": 2700, "rewards": {"cultivation": 1100, "item.material.cloud_iron": 1}},
+        {"weight": 1800, "rewards": {"cultivation": 1100, "item.material.cloud_iron": 2}},
+        {"weight": 1500, "rewards": {"cultivation": 1300, "item.material.cloud_iron": 1}},
+        {"weight": 1000, "rewards": {"cultivation": 1300, "item.material.cloud_iron": 2}}
+      ],
+      "key": "reward_pool.exploration.mist_grotto_2",
+      "status": "active"
+    },
+    {
       "name": "云铁矿区采集收获",
       "desc": "按矿脉丰度采得云铁；遭遇矿兽败退时仍可带回一份。",
       "pool_type": "weighted",

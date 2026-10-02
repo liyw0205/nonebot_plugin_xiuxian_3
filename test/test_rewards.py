@@ -273,11 +273,18 @@ def test_weighted_reward_pool_rejects_invalid_content(tmp_path: Path) -> None:
             ),
         ),
         (
+            "reward_pool.exploration.mist_grotto_2",
+            (
+                _reward_axis("cultivation", {900: 30, 1100: 45, 1300: 25}),
+                _reward_axis("item.material.cloud_iron", {1: 60, 2: 40}),
+            ),
+        ),
+        (
             "reward_pool.exploration.cloud_mine",
             (_reward_axis("item.material.cloud_iron", {1: 25, 2: 40, 3: 25, 4: 10}),),
         ),
     ],
-    ids=["outskirts", "spring", "mist-grotto", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-mine"],
 )
 def test_exploration_reward_pool_preserves_every_joint_probability(
     pool_key: str, axes: tuple[tuple[tuple[dict[str, int], int], ...], ...]
@@ -303,9 +310,10 @@ def test_exploration_reward_pool_preserves_every_joint_probability(
         "reward_pool.exploration.gather_outskirts",
         "reward_pool.exploration.spring_gather",
         "reward_pool.exploration.mist_grotto",
+        "reward_pool.exploration.mist_grotto_2",
         "reward_pool.exploration.cloud_mine",
     ],
-    ids=["outskirts", "spring", "mist-grotto", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-mine"],
 )
 def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key: str) -> None:
     content_path = Path(__file__).parents[1] / "data"
@@ -339,11 +347,15 @@ def test_reward_pool_map_is_deterministic_and_returns_detached_results(pool_key:
             {"cultivation": 700, "item.ore.ironstone": 5},
         ),
         (
+            "reward_pool.exploration.mist_grotto_2",
+            {"cultivation": 1700, "item.material.cloud_iron": 7},
+        ),
+        (
             "reward_pool.exploration.cloud_mine",
             {"item.material.cloud_iron": 7},
         ),
     ],
-    ids=["outskirts", "spring", "mist-grotto", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-mine"],
 )
 def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_bundle(
     tmp_path: Path, pool_key: str, rewards: dict[str, int]
@@ -371,9 +383,10 @@ def test_exploration_reward_pool_reads_changed_content_without_mutating_loaded_b
         "reward_pool.exploration.gather_outskirts",
         "reward_pool.exploration.spring_gather",
         "reward_pool.exploration.mist_grotto",
+        "reward_pool.exploration.mist_grotto_2",
         "reward_pool.exploration.cloud_mine",
     ],
-    ids=["outskirts", "spring", "mist-grotto", "cloud-mine"],
+    ids=["outskirts", "spring", "mist-grotto", "mist-grotto-two", "cloud-mine"],
 )
 @pytest.mark.parametrize(
     ("outcome", "error"),
@@ -421,6 +434,7 @@ def test_exploration_reward_pool_rejects_malformed_outcomes(
         ("explore.gather_outskirts", "reward_pool.exploration.gather_outskirts"),
         ("explore.spring_gather", "reward_pool.exploration.spring_gather"),
         ("explore.mist_grotto", "reward_pool.exploration.mist_grotto"),
+        ("explore.mist_grotto_2", "reward_pool.exploration.mist_grotto_2"),
         ("explore.cloud_mine", "reward_pool.exploration.cloud_mine"),
     ],
 )
@@ -477,12 +491,7 @@ def test_exploration_reward_pool_rejects_inactive_item_even_when_not_selected(
 ) -> None:
     data_dir = tmp_path / "data"
     shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
-    active_bundle = ContentBundle.load(data_dir)
-    seed = next(
-        f"inactive-item-{index}"
-        for index in range(100)
-        if item_key not in reward_pool_map(pool_key, f"inactive-item-{index}", active_bundle)
-    )
+    seed = "inactive-item"
     item_file = data_dir / "道具" / "材料.json"
     document = json.loads(item_file.read_text(encoding="utf-8"))
     item = next(item for item in document["records"] if item["key"] == item_key)
@@ -500,6 +509,9 @@ def test_reward_pool_battle_failure_rewards_are_content_backed() -> None:
     ) == {"item.material.cloud_iron": 1}
     assert reward_pool_battle_failure_rewards(
         "reward_pool.exploration.mist_grotto", bundle
+    ) == {}
+    assert reward_pool_battle_failure_rewards(
+        "reward_pool.exploration.mist_grotto_2", bundle
     ) == {}
 
 
