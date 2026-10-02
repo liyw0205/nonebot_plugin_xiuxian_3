@@ -39,6 +39,124 @@
       "key": "event.spirit_spring"
     },
     {
+      "name": "魔界入侵",
+      "desc": "魔界战线烽烟四起，修士可凭已结算的战斗、运输与设施维护共守前线。",
+      "status": "active",
+      "public_event": {
+        "location_key": "xuantian.war_front",
+        "schedule": {
+          "kind": "weekly",
+          "weekday_utc": 2,
+          "hour_utc": 20,
+          "minute_utc": 0,
+          "duration_seconds": 10800,
+          "claim_window_seconds": 86400
+        },
+        "target_quantity": 1000,
+        "requirement": {
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        },
+        "contributions": {
+          "battle": {
+            "source": "battle_damage",
+            "damage_per_point": 100
+          },
+          "transport": {
+            "source": "settled_transport",
+            "quantity": 10
+          },
+          "maintenance": {
+            "source": "paid_active_personal_maintenance",
+            "quantity": 15
+          }
+        },
+        "claim": {
+          "min_contribution": 50,
+          "reward_key": "reward.event.demon_invasion"
+        }
+      },
+      "key": "event.demon_invasion"
+    },
+    {
+      "name": "妖界贸易",
+      "desc": "三界贸易口往来不息，修士可凭跨界贸易与妖血助益万兽山。",
+      "status": "active",
+      "public_event": {
+        "location_key": "beast.three_realms_trade_port",
+        "schedule": {
+          "kind": "weekly",
+          "weekday_utc": 0,
+          "hour_utc": 0,
+          "minute_utc": 0,
+          "duration_seconds": 604800,
+          "claim_window_seconds": 86400
+        },
+        "target_quantity": 300,
+        "requirement": null,
+        "contributions": {
+          "trade": {
+            "source": "completed_cross_realm_trade",
+            "quantity": 10,
+            "trade_keys": [
+              "trade.xuantian_to_demon",
+              "trade.xuantian_to_beast",
+              "trade.three_realms"
+            ]
+          },
+          "blood": {
+            "source": "consume_item",
+            "item_key": "item.beast_blood",
+            "item_quantity": 1,
+            "quantity": 5
+          }
+        },
+        "claim": {
+          "min_contribution": 30,
+          "reward_key": "reward.event.beast_trade"
+        }
+      },
+      "key": "event.beast_trade"
+    },
+    {
+      "name": "界隙裂痕",
+      "desc": "界隙裂痕动荡不休，修士可凭已结算的队伍胜利稳定边界。",
+      "status": "active",
+      "public_event": {
+        "location_key": "cave.boundary_realm",
+        "schedule": {
+          "kind": "utc_block",
+          "block_hours": 2,
+          "duration_seconds": 7200,
+          "claim_window_seconds": 86400
+        },
+        "target_quantity": 400,
+        "requirement": null,
+        "contributions": {
+          "route": {
+            "source": "settled_boundary_party_battle",
+            "quantity": 20,
+            "party_types": ["boundary_realm", "party_boundary"]
+          },
+          "boss": {
+            "source": "settled_boundary_party_battle",
+            "quantity": 30,
+            "party_types": ["boundary_realm", "party_boundary"]
+          },
+          "complete": {
+            "source": "settled_boundary_party_battle",
+            "quantity": 50,
+            "party_types": ["boundary_realm", "party_boundary"]
+          }
+        },
+        "claim": {
+          "min_contribution": 40,
+          "reward_key": "reward.event.boundary_rift"
+        }
+      },
+      "key": "event.boundary_rift"
+    },
+    {
       "name": "心魔试炼",
       "desc": "突破受挫后心魔乘隙而起，修士须在限期内直面它、净化心神或寻求化解。",
       "status": "open",

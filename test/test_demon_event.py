@@ -66,6 +66,7 @@ def test_demon_invasion_projects_settled_sources_and_claims_on_qq_and_onebot() -
                 )
                 assert status.code == "EVENT_STATUS"
                 assert status.data["event_key"] == "event.demon_invasion"
+                assert status.data["minimum_contribution"] == 50
                 round_id = status.data["round_id"]
 
                 for index, source_id in enumerate(sources):
@@ -75,6 +76,7 @@ def test_demon_invasion_projects_settled_sources_and_claims_on_qq_and_onebot() -
                         f"贡献魔界战场 运输 {source_id}",
                     )
                     assert contributed.code == "EVENT_CONTRIBUTION_RECORDED"
+                    assert contributed.data["minimum_contribution"] == 50
                     assert contributed.data["player_contribution"] == (index + 1) * 10
                 duplicate_source = await runtime.adapters.dispatch(
                     adapter,
@@ -404,11 +406,34 @@ def test_demon_war_front_travel_and_battle_are_server_authoritative_on_qq_and_on
                 )
                 assert contributed.code == "EVENT_CONTRIBUTION_RECORDED"
                 assert contributed.data["player_contribution"] > 0
+                round_id = contributed.data["round_id"]
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     source = connection.execute(
                         "SELECT source_operation_id FROM world_event_contribution_events ORDER BY id DESC LIMIT 1",
                     ).fetchone()[0]
+                    total_before_replay = connection.execute(
+                        "SELECT total_contribution FROM world_event_rounds WHERE round_id=?", (round_id,)
+                    ).fetchone()[0]
                 assert source == "war-battle"
+                replayed_contribution = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "contribute-battle-replay", "war-contribution"),
+                    "贡献魔界战场 战斗",
+                )
+                assert replayed_contribution.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT total_contribution FROM world_event_rounds WHERE round_id=?", (round_id,)
+                    ).fetchone()[0] == total_before_replay
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM world_event_contribution_events WHERE round_id=?", (round_id,)
+                    ).fetchone()[0] == 1
+                conflicting_contribution = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "contribute-battle-conflict", "war-contribution"),
+                    "贡献魔界战场 运输",
+                )
+                assert conflicting_contribution.code == "OPERATION_CONFLICT"
                 invalid = await runtime.adapters.dispatch(
                     adapter, _context(adapter, user, "battle-invalid"), "开始魔界战 enemy.demon_overlord"
                 )

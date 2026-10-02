@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -51,6 +52,40 @@ def _insert_trade_sources(runtime, player_id: int, prefix: str, count: int = 3) 
     return source_ids
 
 
+def _update_record(path: Path, key: str, update) -> None:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    update(next(record for record in document["records"] if record["key"] == key))
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _configure_beast_event(data_dir: Path, *, target: int, quantity: int, threshold: int, reward: int) -> None:
+    _update_record(
+        data_dir / "事件" / "事件.json",
+        "event.beast_trade",
+        lambda event: event["public_event"].update(
+            {
+                "target_quantity": target,
+                "contributions": {
+                    **event["public_event"]["contributions"],
+                    "trade": {
+                        "source": "completed_cross_realm_trade",
+                        "quantity": quantity,
+                        "trade_keys": ["trade.xuantian_to_beast"],
+                    },
+                },
+                "claim": {"min_contribution": threshold, "reward_key": "reward.event.beast_trade"},
+            }
+        ),
+    )
+
+    def change_reward(record) -> None:
+        for entry in record["entries"]:
+            if entry["kind"] in {"item", "reputation"}:
+                entry["quantity"] = reward
+
+    _update_record(data_dir / "奖励" / "奖励.json", "reward.event.beast_trade", change_reward)
+
+
 def test_beast_trade_event_projects_sources_and_claims_on_both_adapters() -> None:
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
@@ -91,7 +126,7 @@ def test_beast_trade_event_projects_sources_and_claims_on_both_adapters() -> Non
                     _context(adapter, user, "claim", f"{adapter}-claim"),
                     f"领取妖界贸易奖励 {round_id}",
                 )
-                assert claim.data["reward"] == {"faction_reputation.beast": 50, "item.material.array_sand": 10}
+                assert claim.data["reward"] == {"faction_reputation.beast": 50, "item.mat.array_sand": 10}
                 claim_replay = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "claim-replay", f"{adapter}-claim"),
@@ -102,8 +137,60 @@ def test_beast_trade_event_projects_sources_and_claims_on_both_adapters() -> Non
                     inventory, faction = connection.execute(
                         "SELECT inventory_json, faction_reputation_json FROM players WHERE id=?", (player_id,)
                     ).fetchone()
-                assert json.loads(inventory) == {"item.material.array_sand": 10}
+                assert json.loads(inventory) == {"item.mat.array_sand": 10}
                 assert json.loads(faction)["beast"] == 250
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_beast_blood_contributions_use_operation_id_as_the_consumption_source() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            clock = MutableClock(datetime(2026, 9, 21, 12, tzinfo=timezone.utc))
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=Path(data_dir), clock=clock)
+                user = f"beast-blood-{adapter}"
+                player_id = await _create_player(runtime, adapter, user)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET inventory_json=? WHERE id=?",
+                        (json.dumps({"item.beast_blood": 2}), player_id),
+                    )
+
+                first = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "blood-first", f"{adapter}-blood-first"),
+                    "贡献妖界贸易 妖血",
+                )
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "blood-first-replay", f"{adapter}-blood-first"),
+                    "贡献妖界贸易 妖血",
+                )
+                second = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "blood-second", f"{adapter}-blood-second"),
+                    "贡献妖界贸易 妖血",
+                )
+
+                assert first.data["player_contribution"] == 5
+                assert replay.data["idempotent_replay"] is True
+                assert second.data["player_contribution"] == 10
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    inventory = connection.execute(
+                        "SELECT inventory_json FROM players WHERE id=?", (player_id,)
+                    ).fetchone()[0]
+                    sources = connection.execute(
+                        "SELECT source_operation_id FROM world_event_contribution_events "
+                        "WHERE round_id=? ORDER BY id",
+                        (first.data["round_id"],),
+                    ).fetchall()
+                assert json.loads(inventory) == {}
+                assert [row[0] for row in sources] == [
+                    f"{adapter}-blood-first",
+                    f"{adapter}-blood-second",
+                ]
                 await runtime.close()
 
     asyncio.run(run())
@@ -192,5 +279,140 @@ def test_boundary_rift_event_claims_on_onebot_v11() -> None:
             )
             assert claimed.code == "EVENT_REWARD_CLAIMED"
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_beast_event_freezes_config_across_restart_and_reads_new_config_for_next_round() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as temp:
+                data_dir = Path(temp) / "data"
+                shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+                _configure_beast_event(data_dir, target=10, quantity=10, threshold=10, reward=7)
+                clock = MutableClock(datetime(2026, 9, 21, 12, tzinfo=timezone.utc))
+                runtime = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+                user = f"beast-freeze-{adapter}"
+                player_id = await _create_player(runtime, adapter, user)
+                source_id = _insert_trade_sources(runtime, player_id, adapter, count=1)[0]
+                status = await runtime.adapters.dispatch(adapter, _context(adapter, user, "status"), "妖界贸易事件")
+                round_id = status.data["round_id"]
+                await runtime.close()
+
+                _configure_beast_event(data_dir, target=900, quantity=90, threshold=90, reward=70)
+                recovered = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+                try:
+                    recovered_status = await recovered.adapters.dispatch(
+                        adapter, _context(adapter, user, "recovered-status"), f"妖界贸易事件 {round_id}"
+                    )
+                    assert recovered_status.data["target_quantity"] == 10
+                    assert recovered_status.data["minimum_contribution"] == 10
+                    contributed = await recovered.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "contribute", f"{adapter}-frozen-contribution"),
+                        f"贡献妖界贸易 贸易 {source_id}",
+                    )
+                    assert contributed.data["player_contribution"] == 10
+                    clock.advance(days=7, minutes=1)
+                    settled = await recovered.adapters.dispatch(
+                        adapter, _context(adapter, user, "settled"), f"妖界贸易事件 {round_id}"
+                    )
+                    assert settled.data["status"] == "settled"
+                    claimed = await recovered.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "claim", f"{adapter}-frozen-claim"),
+                        f"领取妖界贸易奖励 {round_id}",
+                    )
+                    assert claimed.data["reward"] == {
+                        "faction_reputation.beast": 7,
+                        "item.mat.array_sand": 7,
+                    }
+                    next_round = await recovered.adapters.dispatch(
+                        adapter, _context(adapter, user, "next-round"), "妖界贸易事件"
+                    )
+                    assert next_round.data["round_id"] != round_id
+                    assert next_round.data["target_quantity"] == 900
+                    assert next_round.data["minimum_contribution"] == 90
+                    with sqlite3.connect(recovered.settings.database_path) as connection:
+                        inventory, reputation = connection.execute(
+                            "SELECT inventory_json, faction_reputation_json FROM players WHERE id=?", (player_id,)
+                        ).fetchone()
+                    assert json.loads(inventory) == {"item.beast_blood": 1, "item.mat.array_sand": 7}
+                    assert json.loads(reputation)["beast"] == 207
+                finally:
+                    await recovered.close()
+
+    asyncio.run(run())
+
+
+def test_invalid_public_event_reward_reference_rolls_back_round_creation() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as temp:
+                data_dir = Path(temp) / "data"
+                shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+
+                def break_reward(record) -> None:
+                    next(entry for entry in record["entries"] if entry["kind"] == "item")["item_key"] = "item.missing_event_reward"
+
+                _update_record(data_dir / "奖励" / "奖励.json", "reward.event.beast_trade", break_reward)
+                runtime = create_runtime(
+                    data_dir=data_dir,
+                    adapters=(adapter,),
+                    clock=lambda: datetime(2026, 9, 21, 12, tzinfo=timezone.utc),
+                )
+                user = f"beast-invalid-reward-{adapter}"
+                player_id = await _create_player(runtime, adapter, user)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    before = connection.execute(
+                        "SELECT spirit_stones, inventory_json, faction_reputation_json FROM players WHERE id=?",
+                        (player_id,),
+                    ).fetchone()
+                rejected = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "invalid-status"), "妖界贸易事件"
+                )
+                assert rejected.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    after = connection.execute(
+                        "SELECT spirit_stones, inventory_json, faction_reputation_json FROM players WHERE id=?",
+                        (player_id,),
+                    ).fetchone()
+                    assert connection.execute("SELECT COUNT(*) FROM world_event_rounds").fetchone()[0] == 0
+                    assert connection.execute("SELECT COUNT(*) FROM world_event_contributions").fetchone()[0] == 0
+                    assert connection.execute("SELECT COUNT(*) FROM world_event_claims").fetchone()[0] == 0
+                assert after == before
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_unregistered_trade_source_rolls_back_public_event_round_creation() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as temp:
+                data_dir = Path(temp) / "data"
+                shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+
+                def add_unknown_trade(record) -> None:
+                    record["public_event"]["contributions"]["trade"]["trade_keys"].append(
+                        "trade.not_open_at_any_location"
+                    )
+
+                _update_record(data_dir / "事件" / "事件.json", "event.beast_trade", add_unknown_trade)
+                runtime = create_runtime(
+                    data_dir=data_dir,
+                    adapters=(adapter,),
+                    clock=lambda: datetime(2026, 9, 21, 12, tzinfo=timezone.utc),
+                )
+                user = f"beast-invalid-trade-{adapter}"
+                await _create_player(runtime, adapter, user)
+                rejected = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "invalid-trade-status"), "妖界贸易事件"
+                )
+                assert rejected.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute("SELECT COUNT(*) FROM world_event_rounds").fetchone()[0] == 0
+                    assert connection.execute("SELECT COUNT(*) FROM world_event_contributions").fetchone()[0] == 0
+                await runtime.close()
 
     asyncio.run(run())

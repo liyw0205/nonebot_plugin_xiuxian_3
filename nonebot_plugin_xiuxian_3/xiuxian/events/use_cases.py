@@ -16,7 +16,13 @@ from ..persistence.errors import (
 )
 from .repository import EventsRepositoryMixin
 from .demon_rules import DEMON_ACTION_VALUES
-from .cross_realm_rules import BEAST_TRADE_EVENT_KEY, BOUNDARY_RIFT_EVENT_KEY
+from .cross_realm_rules import (
+    BEAST_TRADE_ACTION_VALUES,
+    BEAST_TRADE_EVENT_KEY,
+    BOUNDARY_RIFT_ACTION_VALUES,
+    BOUNDARY_RIFT_EVENT_KEY,
+)
+from .presentation import public_event_reward_lines
 
 
 class EventsApplication:
@@ -50,6 +56,7 @@ class EventsApplication:
             "ends_at": record.ends_at,
             "claim_expires_at": record.claim_expires_at,
             "target_quantity": record.target_quantity,
+            "minimum_contribution": record.minimum_contribution,
             "total_contribution": record.total_contribution,
             "player_contribution": record.player_contribution,
             "success": record.success,
@@ -233,9 +240,9 @@ class EventsApplication:
                 f"**轮次**：`{record.round_id}`\n"
                 f"**状态**：{state}\n"
                 f"**全服贡献**：{record.total_contribution}/{record.target_quantity}\n"
-                f"**你的贡献**：{record.player_contribution}/50\n"
+                f"**你的贡献**：{record.player_contribution}/{record.minimum_contribution}（领取嘉奖所需）\n"
                 f"**时间**：{record.starts_at} 至 {record.ends_at}\n\n"
-                "> 贡献来源必须是服务器已结算的战斗、运输或维修 operation。"
+                "> 贡献须有已结算的战斗、运输或设施维护记录。"
             ),
             context.request_id,
             data=self._data(record),
@@ -243,7 +250,7 @@ class EventsApplication:
 
     async def contribute_demon_invasion(self, context: CommandContext) -> CommandResult:
         if not context.command_args or len(context.command_args) > 2:
-            return CommandResult(False, "INVALID_EVENT_COMMAND", "请使用 `贡献魔界战场 战斗|运输|维修 [来源operation]`。", context.request_id)
+            return CommandResult(False, "INVALID_EVENT_COMMAND", "请使用 `贡献魔界战场 战斗|运输|维修 [来源记录编号]`。", context.request_id)
         action_key = DEMON_ACTION_VALUES.get(context.command_args[0])
         if action_key is None:
             return CommandResult(False, "INVALID_EVENT_COMMAND", "贡献类型只能是战斗、运输或维修。", context.request_id)
@@ -262,7 +269,7 @@ class EventsApplication:
         return CommandResult(
             True,
             "EVENT_CONTRIBUTION_RECORDED",
-            f"## 魔界战场贡献已记录\n\n- **本轮贡献**：{record.player_contribution}\n- **全服贡献**：{record.total_contribution}/{record.target_quantity}",
+            f"## 魔界战场贡献已记录\n\n- **本轮贡献**：{record.player_contribution}/{record.minimum_contribution}（领取嘉奖所需）\n- **全服贡献**：{record.total_contribution}/{record.target_quantity}",
             context.request_id,
             operation_id,
             data=self._data(record),
@@ -285,7 +292,7 @@ class EventsApplication:
         return CommandResult(
             True,
             "EVENT_REWARD_CLAIMED",
-            "## 魔界入侵奖励已领取\n\n- 世界功勋 +50\n- 魔界声望 +20",
+            "## 魔界入侵嘉奖已领取\n\n" + "\n".join(public_event_reward_lines(record.reward, self.repository.content)),
             context.request_id,
             operation_id,
             data=self._data(record),
@@ -319,9 +326,9 @@ class EventsApplication:
                 f"**轮次**：`{record.round_id}`\n"
                 f"**状态**：{state}\n"
                 f"**全服贡献**：{record.total_contribution}/{record.target_quantity}\n"
-                f"**你的贡献**：{record.player_contribution}\n"
+                f"**你的贡献**：{record.player_contribution}/{record.minimum_contribution}（领取嘉奖所需）\n"
                 f"**时间**：{record.starts_at} 至 {record.ends_at}\n\n"
-                "> 贡献来源必须是服务器已结算的 operation；事件结束后 24 小时内可领奖。"
+                "> 贡献须有已结算的贸易、妖血或队伍胜利记录；事件结束后在领奖期限内领取。"
             ),
             context.request_id,
             data=self._data(record),
@@ -365,7 +372,7 @@ class EventsApplication:
         return CommandResult(
             True,
             "EVENT_CONTRIBUTION_RECORDED",
-            f"## {label}贡献已记录\n\n- **本轮贡献**：{record.player_contribution}\n- **全服贡献**：{record.total_contribution}/{record.target_quantity}",
+            f"## {label}贡献已记录\n\n- **本轮贡献**：{record.player_contribution}/{record.minimum_contribution}（领取嘉奖所需）\n- **全服贡献**：{record.total_contribution}/{record.target_quantity}",
             context.request_id,
             operation_id,
             data=self._data(record),
@@ -376,8 +383,8 @@ class EventsApplication:
             context,
             BEAST_TRADE_EVENT_KEY,
             "妖界贸易",
-            {"贸易": "trade", "跨界贸易": "trade", "妖血": "blood", "提交妖血": "blood"},
-            "请使用 `贡献妖界贸易 贸易|妖血 [来源operation]`。",
+            BEAST_TRADE_ACTION_VALUES,
+            "请使用 `贡献妖界贸易 贸易|妖血 [来源记录编号]`。",
         )
 
     async def contribute_boundary_rift_event(self, context: CommandContext) -> CommandResult:
@@ -385,8 +392,8 @@ class EventsApplication:
             context,
             BOUNDARY_RIFT_EVENT_KEY,
             "界隙裂痕",
-            {"路线": "route", "首领": "boss", "完成": "complete"},
-            "请使用 `贡献界隙裂痕 [来源operation]`。",
+            BOUNDARY_RIFT_ACTION_VALUES,
+            "请使用 `贡献界隙裂痕 [来源记录编号]`。",
         )
 
     async def _claim_cross_realm_event(self, context: CommandContext, event_key: str, label: str, usage: str) -> CommandResult:
@@ -407,7 +414,7 @@ class EventsApplication:
         return CommandResult(
             True,
             "EVENT_REWARD_CLAIMED",
-            f"## {label}奖励已领取\n\n" + "\n".join(f"- {key} +{value}" for key, value in record.reward.items()),
+            f"## {label}嘉奖已领取\n\n" + "\n".join(public_event_reward_lines(record.reward, self.repository.content)),
             context.request_id,
             operation_id,
             data=self._data(record),

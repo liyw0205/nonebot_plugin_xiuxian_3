@@ -210,10 +210,10 @@ class TravelRepositoryMixin:
                     f"{faction_label}声望（需要 {definition.required_faction_reputation}，当前 {current_reputation}）"
                 )
         if destination == "xuantian.war_front":
-            from ..events.demon_rules import demon_event_times, demon_scheduled_start
+            from ..events.demon_rules import DEMON_EVENT_KEY
+            from ..events.public_event_rules import public_event_is_open
 
-            start = demon_scheduled_start(self._now())
-            if start is None or not (start <= self._now() < demon_event_times(start)[1]):
+            if not public_event_is_open(DEMON_EVENT_KEY, self._now(), self.content):
                 missing.append("活动窗口")
         if definition.source_locations and player.location_key not in definition.source_locations:
             missing.append("来源地点")
@@ -339,10 +339,10 @@ class TravelRepositoryMixin:
 
             row = self._require_player(connection, platform, platform_user_id, writable=False)
             if destination == "xuantian.war_front":
-                from ..events.demon_rules import demon_event_times, demon_scheduled_start
+                from ..events.demon_rules import DEMON_EVENT_KEY
+                from ..events.public_event_rules import public_event_is_open
 
-                start = demon_scheduled_start(now)
-                if start is None or not (start <= now < demon_event_times(start)[1]):
+                if not public_event_is_open(DEMON_EVENT_KEY, now, self.content):
                     raise EventNotActiveError("demon invasion war front is closed")
             if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
                 raise LocationRequirementError("this destination can only be reached by a cloud boat")

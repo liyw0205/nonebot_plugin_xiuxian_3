@@ -462,6 +462,66 @@
       "status": "active"
     },
     {
+      "name": "魔界入侵个人嘉奖",
+      "desc": "为魔界战线出力达到要求后，所得世界功勋与魔界声望。",
+      "operation": "event.demon_invasion.claim_reward",
+      "entries": [
+        {
+          "kind": "resource",
+          "resource_key": "world_merit",
+          "quantity": 50
+        },
+        {
+          "kind": "reputation",
+          "reputation_key": "faction_reputation.demon",
+          "quantity": 20
+        }
+      ],
+      "once_per_event_round": true,
+      "key": "reward.event.demon_invasion",
+      "status": "active"
+    },
+    {
+      "name": "妖界贸易个人嘉奖",
+      "desc": "为万兽山贸易往来出力后，所得妖界声望与阵砂。",
+      "operation": "event.beast_trade.claim_reward",
+      "entries": [
+        {
+          "kind": "reputation",
+          "reputation_key": "faction_reputation.beast",
+          "quantity": 50
+        },
+        {
+          "kind": "item",
+          "item_key": "item.mat.array_sand",
+          "quantity": 10
+        }
+      ],
+      "once_per_event_round": true,
+      "key": "reward.event.beast_trade",
+      "status": "active"
+    },
+    {
+      "name": "界隙裂痕个人嘉奖",
+      "desc": "为稳定界隙出力达到要求后，所得神魂晶与世界功勋。",
+      "operation": "event.boundary_rift.claim_reward",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.soul_crystal",
+          "quantity": 2
+        },
+        {
+          "kind": "resource",
+          "resource_key": "world_merit",
+          "quantity": 30
+        }
+      ],
+      "once_per_event_round": true,
+      "key": "reward.event.boundary_rift",
+      "status": "active"
+    },
+    {
       "name": "基础机缘池",
       "desc": "供修士寻觅日常机缘的签筒，常见灵材居多，也藏有少量珍稀线索。",
       "operation": "routine.roll_fate_pool",

@@ -9,7 +9,6 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import spend_player_items
-from ..utils.player import grant_player_state, split_player_rewards
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -19,13 +18,13 @@ from ..persistence.errors import (
     OperationConflictError,
 )
 from .cross_realm_models import CrossRealmEventRecord
-from .cross_realm_rules import (
-    BEAST_TRADE_EVENT_KEY,
-    BOUNDARY_RIFT_EVENT_KEY,
-    EVENT_DEFINITIONS,
-    beast_trade_window,
-    boundary_rift_window,
+from .public_event_rules import (
+    PublicEventDefinition,
+    public_event_definition,
+    public_event_snapshot,
+    public_event_window,
 )
+from .reward_settlement import grant_public_event_reward
 
 
 class CrossRealmEventRepositoryMixin:
@@ -138,15 +137,18 @@ class CrossRealmEventRepositoryMixin:
             event = self._cross_event_refresh_round(connection, event, now)
             if str(event["status"]) not in {"open", "running"} or now >= datetime.fromisoformat(str(event["ends_at"])):
                 raise EventNotActiveError("cross-realm event is not open")
+            definition = public_event_snapshot(str(event["event_key"]), str(event["result_json"]))
             source = self._cross_event_find_source(
                 connection,
                 event_key,
                 int(player["id"]),
                 action_key,
                 source_operation_id,
+                operation_id,
                 str(event["round_id"]),
                 str(event["starts_at"]),
                 str(event["ends_at"]),
+                definition,
             )
             source_id = str(source["source_operation_id"])
             if connection.execute(
@@ -157,7 +159,12 @@ class CrossRealmEventRepositoryMixin:
             if source.get("consume_item"):
                 item_key = str(source["consume_item"])
                 try:
-                    spend_player_items(connection, player, {item_key: 1}, now_text)
+                    spend_player_items(
+                        connection,
+                        player,
+                        {item_key: int(source["consume_quantity"])},
+                        now_text,
+                    )
                 except ValueError as exc:
                     raise EventSourceNotEligibleError("required event item is missing") from exc
             quantity = int(source["quantity"])
@@ -231,26 +238,20 @@ class CrossRealmEventRepositoryMixin:
                 (round_id, player["id"]),
             ).fetchone()
             contribution = int(contribution_row["contribution"]) if contribution_row else 0
-            definition = EVENT_DEFINITIONS[event_key]
-            if contribution < int(definition["threshold"]):
+            definition = public_event_snapshot(str(event["event_key"]), str(event["result_json"]))
+            if contribution < definition.minimum_contribution:
                 raise EventContributionInsufficientError("cross-realm event contribution is insufficient")
             if connection.execute(
                 "SELECT 1 FROM world_event_claims WHERE round_id=? AND player_id=?", (round_id, player["id"])
             ).fetchone() is not None:
                 raise EventRewardAlreadyClaimedError("cross-realm event reward already claimed")
-            reward = {str(key): int(value) for key, value in dict(definition["reward"]).items()}
-            reward_parts = split_player_rewards(reward)
-            grant_player_state(
+            reward = grant_public_event_reward(
                 connection,
                 player,
-                updated_at=now_text,
-                rewards=reward_parts.assets,
-                value_delta=reward_parts.value_delta,
-                reputation_delta=reward_parts.reputation,
-            )
-            connection.execute(
-                "INSERT INTO world_event_claims(round_id, player_id, operation_id, reward_json, claimed_at) VALUES (?, ?, ?, ?, ?)",
-                (round_id, player["id"], operation_id, json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text),
+                round_id=round_id,
+                operation_id=operation_id,
+                claimed_at=now_text,
+                grant=definition.reward,
             )
             updated_event = connection.execute("SELECT * FROM world_event_rounds WHERE round_id=?", (round_id,)).fetchone()
             payload = self._cross_event_payload(connection, int(player["id"]), updated_event, contribution)
@@ -265,30 +266,56 @@ class CrossRealmEventRepositoryMixin:
         player_id: int,
         action_key: str,
         source_operation_id: str | None,
+        operation_id: str,
         round_id: str,
         starts_at: str,
         ends_at: str,
+        definition: PublicEventDefinition,
     ) -> dict[str, object]:
-        if event_key == BEAST_TRADE_EVENT_KEY:
-            if action_key in {"trade", "贸易", "跨界贸易"}:
-                query = "SELECT operation_id FROM cross_realm_trades WHERE player_id=? AND status='completed' AND trade_key IN ('trade.xuantian_to_demon','trade.xuantian_to_beast','trade.three_realms') AND updated_at>=? AND updated_at<?"
-                params: list[object] = [player_id, starts_at, ends_at]
-                if source_operation_id:
-                    query += " AND operation_id=?"
-                    params.append(source_operation_id)
-                else:
-                    query += " AND NOT EXISTS (SELECT 1 FROM world_event_contribution_events used WHERE used.round_id=? AND used.player_id=? AND used.source_operation_id=cross_realm_trades.operation_id)"
-                    params.extend([round_id, player_id])
-                query += " ORDER BY id DESC LIMIT 1"
-                row = connection.execute(query, tuple(params)).fetchone()
-                if row is not None:
-                    return {"source_operation_id": str(row["operation_id"]), "quantity": 10}
-            if action_key in {"blood", "妖血", "提交妖血"}:
-                source_id = source_operation_id or f"{BEAST_TRADE_EVENT_KEY}:blood:{player_id}:{round_id}:{self._now().timestamp()}"
-                return {"source_operation_id": source_id, "quantity": 5, "consume_item": "item.beast_blood"}
-        if event_key == BOUNDARY_RIFT_EVENT_KEY:
-            query = "SELECT party_battle_sessions.start_operation_id FROM party_battle_sessions JOIN parties ON parties.party_id=party_battle_sessions.party_id WHERE parties.party_type IN ('boundary_realm','party_boundary') AND party_battle_sessions.location_key=? AND party_battle_sessions.status='settled' AND party_battle_sessions.updated_at>=? AND party_battle_sessions.updated_at<? AND EXISTS (SELECT 1 FROM party_battle_members member WHERE member.battle_id=party_battle_sessions.battle_id AND member.player_id=?)"
-            params = [EVENT_DEFINITIONS[event_key]["location_key"], starts_at, ends_at, player_id]
+        contribution = definition.contributions.get(action_key)
+        if contribution is None:
+            raise EventSourceNotEligibleError("unsupported cross-realm event contribution")
+        source = str(contribution["source"])
+        if source == "completed_cross_realm_trade":
+            trade_keys = tuple(str(key) for key in contribution["trade_keys"])
+            placeholders = ",".join("?" for _ in trade_keys)
+            query = (
+                "SELECT operation_id FROM cross_realm_trades WHERE player_id=? "
+                f"AND status='completed' AND trade_key IN ({placeholders}) "
+                "AND updated_at>=? AND updated_at<?"
+            )
+            params: list[object] = [player_id, *trade_keys, starts_at, ends_at]
+            if source_operation_id:
+                query += " AND operation_id=?"
+                params.append(source_operation_id)
+            else:
+                query += " AND NOT EXISTS (SELECT 1 FROM world_event_contribution_events used WHERE used.round_id=? AND used.player_id=? AND used.source_operation_id=cross_realm_trades.operation_id)"
+                params.extend([round_id, player_id])
+            query += " ORDER BY id DESC LIMIT 1"
+            row = connection.execute(query, tuple(params)).fetchone()
+            if row is not None:
+                return {"source_operation_id": str(row["operation_id"]), "quantity": int(contribution["quantity"])}
+        elif source == "consume_item":
+            source_id = source_operation_id or operation_id
+            return {
+                "source_operation_id": source_id,
+                "quantity": int(contribution["quantity"]),
+                "consume_item": str(contribution["item_key"]),
+                "consume_quantity": int(contribution["item_quantity"]),
+            }
+        elif source == "settled_boundary_party_battle":
+            party_types = tuple(str(key) for key in contribution["party_types"])
+            placeholders = ",".join("?" for _ in party_types)
+            query = (
+                "SELECT party_battle_sessions.start_operation_id FROM party_battle_sessions "
+                "JOIN parties ON parties.party_id=party_battle_sessions.party_id "
+                f"WHERE parties.party_type IN ({placeholders}) "
+                "AND party_battle_sessions.location_key=? AND party_battle_sessions.status='settled' "
+                "AND party_battle_sessions.updated_at>=? AND party_battle_sessions.updated_at<? "
+                "AND EXISTS (SELECT 1 FROM party_battle_members member "
+                "WHERE member.battle_id=party_battle_sessions.battle_id AND member.player_id=?)"
+            )
+            params: list[object] = [*party_types, definition.location_key, starts_at, ends_at, player_id]
             if source_operation_id:
                 query += " AND party_battle_sessions.start_operation_id=?"
                 params.append(source_operation_id)
@@ -298,32 +325,38 @@ class CrossRealmEventRepositoryMixin:
             query += " AND json_extract(party_battle_sessions.result_json, '$.outcome')='won' ORDER BY party_battle_sessions.id DESC LIMIT 1"
             row = connection.execute(query, tuple(params)).fetchone()
             if row is not None:
-                quantity = 30 if action_key == "boss" else 20 if action_key == "route" else 50
-                return {"source_operation_id": str(row["start_operation_id"]), "quantity": quantity}
+                return {"source_operation_id": str(row["start_operation_id"]), "quantity": int(contribution["quantity"])}
         raise EventSourceNotEligibleError("no eligible settled source operation")
 
     def _cross_event_select_round(self, connection: Any, event_key: str, round_id: str | None, now: datetime) -> Any:
-        if event_key not in EVENT_DEFINITIONS:
-            raise EventNotActiveError("unsupported cross-realm event")
         if round_id:
             return connection.execute(
                 "SELECT * FROM world_event_rounds WHERE event_key=? AND round_id=?", (event_key, round_id)
             ).fetchone()
-        window = beast_trade_window(now) if event_key == BEAST_TRADE_EVENT_KEY else boundary_rift_window(now)
+        definition = public_event_definition(event_key, self.content)
+        window = public_event_window(definition, now)
+        if window is None:
+            return connection.execute(
+                "SELECT * FROM world_event_rounds WHERE event_key=? AND claim_expires_at>? ORDER BY starts_at DESC LIMIT 1",
+                (event_key, serialize_datetime(now)),
+            ).fetchone()
         current_id, starts_at, ends_at, claim_expires_at = window
-        definition = EVENT_DEFINITIONS[event_key]
         now_text = serialize_datetime(now)
         connection.execute(
             "INSERT OR IGNORE INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, ?, ?, ?)",
             (
                 current_id,
                 event_key,
-                definition["location_key"],
+                definition.location_key,
                 serialize_datetime(starts_at),
                 serialize_datetime(ends_at),
                 serialize_datetime(claim_expires_at),
-                int(definition["target"]),
-                json.dumps({"success": False}, ensure_ascii=False, sort_keys=True),
+                definition.target_quantity,
+                json.dumps(
+                    {"success": False, "configuration": definition.snapshot()},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
                 now_text,
                 now_text,
             ),
@@ -359,6 +392,7 @@ class CrossRealmEventRepositoryMixin:
     def _cross_event_payload(self, connection: Any, player_id: int, event: Any, contribution: int) -> dict[str, object]:
         player = connection.execute("SELECT * FROM players WHERE id=?", (player_id,)).fetchone()
         result = self._json_object(event["result_json"], {})
+        definition = public_event_snapshot(str(event["event_key"]), str(event["result_json"]))
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "round_id": str(event["round_id"]),
@@ -368,6 +402,7 @@ class CrossRealmEventRepositoryMixin:
             "ends_at": str(event["ends_at"]),
             "claim_expires_at": str(event["claim_expires_at"]),
             "target_quantity": int(event["target_quantity"]),
+            "minimum_contribution": definition.minimum_contribution,
             "total_contribution": int(event["total_contribution"]),
             "player_contribution": contribution,
             "success": result.get("success"),
@@ -385,6 +420,7 @@ class CrossRealmEventRepositoryMixin:
             ends_at=str(payload["ends_at"]),
             claim_expires_at=str(payload["claim_expires_at"]),
             target_quantity=int(payload["target_quantity"]),
+            minimum_contribution=int(payload["minimum_contribution"]),
             total_contribution=int(payload["total_contribution"]),
             player_contribution=int(payload["player_contribution"]),
             success=payload.get("success"),

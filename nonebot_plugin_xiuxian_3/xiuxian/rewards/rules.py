@@ -366,6 +366,12 @@ def reward_definition(
                 raise RewardContentError(f"reward {key} entry {index} requires reputation_key")
             if not reputation_key.removeprefix("faction_reputation."):
                 raise RewardContentError(f"reward {key} entry {index} requires a faction")
+            try:
+                bundle.require("resource", f"resource.{reputation_key}", include_locked=False)
+            except KeyError as exc:
+                raise RewardContentError(
+                    f"reward {key} entry {index} references an inactive reputation resource"
+                ) from exc
             _add(reputation, reputation_key, quantity)
 
     overlap = set(value_delta) & set(set_values)

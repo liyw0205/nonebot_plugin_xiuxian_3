@@ -9,6 +9,11 @@ open/running -> failed
 season: collecting -> frozen (claim window is derived from claim_expires_at)
 ```
 
+三界公共事件首次开轮时从内容包读取日程、目标、贡献来源与数量、个人门槛和奖励；轮次快照随
+`world_event_rounds` 一同写入。来源 operation 只按该快照解释，达到结束时间后由查询、贡献或领奖事务
+恢复并结算，领奖使用同一快照中的奖励。配置变化仅作用于下一轮；坏内容在创建轮次前拒绝，事务不留下
+轮次或角色资产变化。
+
 任务只能由白名单领域事件推进；事件 ID 去重。窗口键示例：`daily:<date>`、`weekly:<year-week>`、`season:<id>`。
 四项常驻引路任务由本人 operation 账本中的已结算记录决定是否完成；采集只接受近郊采集最终结算且
 没有战斗败退，生产只接受成功完成的订单。领奖与奖励、来源事件及 `claimed` 进度同事务提交，

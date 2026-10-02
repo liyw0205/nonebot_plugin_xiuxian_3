@@ -292,11 +292,11 @@ class CombatRepositoryMixin:
                 return self._battle_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
             if battle_type == "pve.demon_war_front":
-                from ..events.demon_rules import demon_event_times, demon_scheduled_start
+                from ..events.demon_rules import DEMON_EVENT_KEY
+                from ..events.public_event_rules import public_event_is_open
                 from ..persistence.errors import EventNotActiveError
 
-                start = demon_scheduled_start(now)
-                if start is None or not (start <= now < demon_event_times(start)[1]):
+                if not public_event_is_open(DEMON_EVENT_KEY, now, content):
                     raise EventNotActiveError("demon invasion war front is closed")
 
             player = self._require_player(connection, platform, platform_user_id)

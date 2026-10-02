@@ -215,7 +215,8 @@
       },
       "actions": [
         "explore.beast_hunt",
-        "production.beast_contract"
+        "production.beast_contract",
+        "economy.trade.xuantian_to_beast"
       ],
       "codex_entry_key": "codex.place.beast_hills",
       "key": "beast.ten_thousand_hills"
@@ -408,6 +409,23 @@
       "travel": {"duration_seconds": 1800, "stamina": 30, "item_key": "item.void_crystal", "item_quantity": 1},
       "actions": ["world.enter_void_route", "explore.time_garden"],
       "key": "cave.time_garden"
+    },
+    {
+      "name": "魔界战线",
+      "desc": "玄天界守军与魔界势力交锋的前线，战事随时可能再起。",
+      "world": "玄天界",
+      "status": "active",
+      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
+      "actions": ["event.demon_invasion"],
+      "key": "xuantian.war_front"
+    },
+    {
+      "name": "界隙秘境",
+      "desc": "天地边界裂隙交错之处，队伍可在此迎战界隙守望者。",
+      "world": "界隙",
+      "status": "active",
+      "actions": ["event.boundary_rift"],
+      "key": "cave.boundary_realm"
     }
   ],
   "schema": "xiuxian.content"

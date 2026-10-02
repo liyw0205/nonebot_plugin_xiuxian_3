@@ -14,6 +14,34 @@
       "desc": "用于参悟神通的心得积累。",
       "storage": "skill_insights",
       "status": "active"
+    },
+    {
+      "key": "resource.world_merit",
+      "name": "世界功勋",
+      "desc": "记录修士为守护天地所立的功绩。",
+      "storage": "world_merit",
+      "status": "active"
+    },
+    {
+      "key": "resource.faction_reputation.xuantian",
+      "name": "玄天界声望",
+      "desc": "记录修士在玄天界各方势力中的声望。",
+      "storage": "faction_reputation_json",
+      "status": "active"
+    },
+    {
+      "key": "resource.faction_reputation.demon",
+      "name": "魔界声望",
+      "desc": "记录修士在魔界各方势力中的声望。",
+      "storage": "faction_reputation_json",
+      "status": "active"
+    },
+    {
+      "key": "resource.faction_reputation.beast",
+      "name": "妖界声望",
+      "desc": "记录修士在妖界各方势力中的声望。",
+      "storage": "faction_reputation_json",
+      "status": "active"
     }
   ],
   "category": "资源",

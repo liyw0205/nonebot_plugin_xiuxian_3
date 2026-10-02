@@ -171,7 +171,7 @@ class WorldApplication:
         except WeaknessActiveError:
             return CommandResult(False, "PLAYER_OCCUPIED", "当前处于突破虚弱，暂时不能移动，请先恢复状态。", context.request_id, operation_id)
         except EventNotActiveError:
-            return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战场只在每周三 20:00 UTC 起的活动窗口开放。", context.request_id, operation_id)
+            return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战线当前未开放行路。", context.request_id, operation_id)
         except FactionReputationInsufficientError:
             required_faction = destination_definition(resolved).required_faction
             faction_label = {"demon": "魔界", "beast": "妖界"}.get(required_faction, "对应阵营")

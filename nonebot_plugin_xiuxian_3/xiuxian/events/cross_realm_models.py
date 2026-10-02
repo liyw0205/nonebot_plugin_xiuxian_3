@@ -17,6 +17,7 @@ class CrossRealmEventRecord:
     ends_at: str
     claim_expires_at: str
     target_quantity: int
+    minimum_contribution: int
     total_contribution: int
     player_contribution: int
     success: bool | None
