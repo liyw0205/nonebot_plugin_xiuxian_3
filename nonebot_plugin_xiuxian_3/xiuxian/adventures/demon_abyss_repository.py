@@ -578,6 +578,7 @@ class DemonAbyssRepositoryMixin:
             updated_at=now_text,
             value_delta=reward_parts.value_delta,
             reputation_delta=reward_parts.reputation or None,
+            local_reputation_delta=reward_parts.local_reputation or None,
             player_values={
                 "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
             },

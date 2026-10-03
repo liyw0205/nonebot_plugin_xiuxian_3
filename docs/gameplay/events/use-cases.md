@@ -10,6 +10,12 @@
 不计；生产只认成功完成或成功恢复的订单结算。奖励 JSON 经共享奖励解析和角色状态事务结算，
 源 operation、任务事件、领取进度与 operation ledger 原子提交；重放不重复发放。
 
+日课入口为 `每日修行` 与 `领取日课嘉奖`。轮次按 UTC 日为角色独立创建并冻结任务和奖励，来源只能从
+本人在轮次内已结算的操作账本投影；任务键、来源操作、日期和领取均有唯一约束。当前配置抽取七项，
+任意三项完成可领取，次日结束后过期。内容变更只影响新轮次；领取奖励、地方名望、领奖记录与 operation
+结果同事务提交。QQ 官方和 OneBot V11 验收覆盖真实问安、修炼及采集来源，失败/伪造/跨角色/训练战来源拒绝、
+内容变更冻结、回滚、重复请求、输入冲突、日切过期和重启恢复。
+
 领域前线用例为 `get_domain_front`、`join_domain_front`、`start_domain_front_battle`、
 `create_domain_front_point`、`record_domain_front_contribution`、`claim_domain_front_reward`、
 `get_domain_war_season`、`claim_domain_war_reward` 和 `redeem_domain_core`。活动参与、来源投影、个人门槛、轮次恢复、
@@ -45,6 +51,8 @@ v0.3 魔界入侵的玩家入口为 `魔界入侵 [轮次]`、`贡献魔界战�
 魔界入侵补充错误码：`EVENT_CONTRIBUTION_SOURCE_INVALID`、`EVENT_CONTRIBUTION_INSUFFICIENT`、
 `EVENT_REWARD_ALREADY_CLAIMED`、`EVENT_REWARD_EXPIRED` 和 `OPERATION_CONFLICT`。
 公共跨界事件复用上述来源、贡献和领奖错误码。
+日课补充错误码：`DAILY_TASKS_UNAVAILABLE`、`DAILY_TASKS_INCOMPLETE`、
+`DAILY_TASK_REWARD_CLAIMED`、`DAILY_TASK_REWARD_EXPIRED` 和 `INVALID_DAILY_TASK_COMMAND`。
 心魔事件入口为 `心魔事件 [事件编号]`；超时按 `heart_demon.face` 自动结算且不进入公共排行。补充错误码：`HEART_DEMON_ALREADY_RESOLVED`、`HEART_DEMON_NOT_FOUND`。
 
 三界赛季补充错误码：`THREE_REALMS_RANKING_NOT_FINALIZED`、`THREE_REALMS_REWARD_NOT_ELIGIBLE`、

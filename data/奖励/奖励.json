@@ -953,6 +953,31 @@
         }
       ],
       "status": "active"
+    },
+    {
+      "name": "日课嘉奖",
+      "desc": "完成每日修行后所得的灵石、精力与地方名望。",
+      "operation": "event.claim_daily_tasks",
+      "entries": [
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 50
+        },
+        {
+          "kind": "resource",
+          "resource_key": "energy",
+          "quantity": 5
+        },
+        {
+          "kind": "local_reputation",
+          "reputation_key": "local.xuantian.new_town",
+          "quantity": 2
+        }
+      ],
+      "once_per_player": true,
+      "status": "active",
+      "key": "reward.daily_task_claim"
     }
   ],
   "schema": "xiuxian.content"

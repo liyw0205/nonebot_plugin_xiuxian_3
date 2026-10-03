@@ -133,6 +133,243 @@
       "claim_policy": "once_per_season",
       "expires": false,
       "key": "task.dao_origin.teach"
+    },
+    {
+      "name": "静心修行",
+      "desc": "完成一次修行，让灵台与周天更为澄明。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "cultivation_exploration",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "progression.settle_cultivation",
+            "result": {},
+            "required_fields": ["session_id", "mode_key", "cultivation_gain"]
+          }
+        ]
+      },
+      "key": "task.daily.cultivation"
+    },
+    {
+      "name": "近郊采集",
+      "desc": "在近郊完成两次成功采集，败退不计入此项。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "cultivation_exploration",
+        "weight": 1,
+        "target": 2,
+        "sources": [
+          {
+            "operation": "exploration.settle",
+            "result": {
+              "mode_key": "explore.gather_outskirts",
+              "status": "settled",
+              "battle_pending": false,
+              "expired": false,
+              "battle_outcome": {"one_of": [null, "won"]}
+            },
+            "required_fields": ["exploration_id", "mode_key", "result"]
+          },
+          {
+            "operation": "exploration.settle_combat",
+            "result": {
+              "mode_key": "explore.gather_outskirts",
+              "status": "settled",
+              "battle_pending": false,
+              "expired": false,
+              "battle_outcome": {"one_of": [null, "won"]}
+            },
+            "required_fields": ["exploration_id", "mode_key", "result"]
+          }
+        ]
+      },
+      "key": "task.daily.outskirts_gather"
+    },
+    {
+      "name": "道历问安",
+      "desc": "于今日道历中留下一笔问安记录。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "daily_life",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "routine.checkin.daily",
+            "result": {"makeup": false},
+            "required_fields": ["target_date", "consecutive_days"]
+          }
+        ]
+      },
+      "key": "task.daily.checkin"
+    },
+    {
+      "name": "完成一炉炼制",
+      "desc": "完成一份成功的炼制订单。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "daily_life",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "production.complete",
+            "result": {"status": "completed", "success": true},
+            "required_fields": ["order_id", "recipe_key"]
+          },
+          {
+            "operation": "production.recover",
+            "result": {"status": "completed", "success": true},
+            "required_fields": ["order_id", "recipe_key"]
+          }
+        ]
+      },
+      "key": "task.daily.production"
+    },
+    {
+      "name": "交付城镇委托",
+      "desc": "将一份已承接的城镇委托妥善交付。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "daily_life",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "livelihood.deliver_commission",
+            "result": {"status": "delivered"},
+            "required_fields": ["claim_id", "commission_id", "commission_key"]
+          }
+        ]
+      },
+      "key": "task.daily.commission"
+    },
+    {
+      "name": "收获灵田",
+      "desc": "收取一处灵田中成熟的灵植。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "daily_life",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "livelihood.harvest",
+            "result": {"status": "harvested"},
+            "required_fields": ["plot_id", "crop_key", "harvest"]
+          }
+        ]
+      },
+      "key": "task.daily.field_harvest"
+    },
+    {
+      "name": "完成一份悬赏",
+      "desc": "完成并领取一份悬赏报酬。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "bounty.claim",
+            "result": {"status": "claimed"},
+            "required_fields": ["bounty_key", "progress", "target"]
+          }
+        ]
+      },
+      "key": "task.daily.bounty"
+    },
+    {
+      "name": "静养调息",
+      "desc": "完成一次静养休整，调和身心气息。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "progression.settle_retreat",
+            "result": {"status": "settled", "retreat_key": "progression.retreat.restful"},
+            "required_fields": ["session_id", "cycles"]
+          },
+          {
+            "operation": "progression.recover_retreat",
+            "result": {"status": "settled", "retreat_key": "progression.retreat.restful"},
+            "required_fields": ["session_id", "cycles"]
+          }
+        ]
+      },
+      "key": "task.daily.restful_retreat"
+    },
+    {
+      "name": "抵达商路终点",
+      "desc": "完成一次短途商路行程并平安抵达。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "livelihood.settle_route",
+            "result": {"status": "settled"},
+            "required_fields": ["route_id", "route_key", "settled_at"]
+          }
+        ]
+      },
+      "key": "task.daily.route"
+    },
+    {
+      "name": "照料灵田",
+      "desc": "为一处正在生长的灵田完成一次养护。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "livelihood.maintain_plot",
+            "result": {"status": "growing"},
+            "required_fields": ["plot_id", "maintenance_count", "required_maintenance"]
+          }
+        ]
+      },
+      "key": "task.daily.field_maintenance"
+    },
+    {
+      "name": "战胜一名敌手",
+      "desc": "在正式斗法中由自己参与并结算一场胜利。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "battle.resolve",
+            "result": {"status": "settled", "outcome": "won"},
+            "required_fields": ["battle_id", "enemy_key"],
+            "battle_types": ["pve.exploration", "pve.demon_war_front"]
+          }
+        ]
+      },
+      "key": "task.daily.pve_victory"
     }
   ],
   "schema": "xiuxian.content"

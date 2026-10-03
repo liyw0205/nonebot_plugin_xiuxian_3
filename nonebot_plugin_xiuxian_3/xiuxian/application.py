@@ -636,6 +636,20 @@ class XiuxianApplication:
             write_message="当前事件不允许领取引路嘉奖。",
         )
 
+    async def get_daily_tasks(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.events.get_daily_tasks(context),
+            require_write=False,
+        )
+
+    async def claim_daily_task_reward(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.events.claim_daily_task_reward(context),
+            write_message="当前状态不允许领取日课嘉奖。",
+        )
+
     async def complete_domain_material_commission(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.complete_domain_material_commission(context), write_message="当前事件不允许完成领域委托。")
 

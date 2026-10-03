@@ -5,7 +5,7 @@ from dataclasses import replace
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.adapters.base import EventDeduplicator
-from nonebot_plugin_xiuxian_3.adapters.nonebot import _canonical_command
+from nonebot_plugin_xiuxian_3.adapters.nonebot import _COMMANDS, _canonical_command
 from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event
 from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq_event
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -74,6 +74,11 @@ def test_nonebot_command_gate_includes_shared_routine_commands() -> None:
     assert _canonical_command("七日入道") == "七日入道"
     assert _canonical_command("领取七日目标 1") == "领取七日目标 1"
     assert _canonical_command("/七日目标") == "七日目标"
+
+
+def test_nonebot_command_gate_includes_daily_task_commands() -> None:
+    assert "每日修行" in _COMMANDS
+    assert "领取日课嘉奖" in _COMMANDS
 
 
 def test_normalized_qq_event_reaches_shared_application() -> None:

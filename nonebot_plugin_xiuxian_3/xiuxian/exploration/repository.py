@@ -689,6 +689,7 @@ class ExplorationRepositoryMixin:
                     "bloodline_stability": bloodline_stability_after,
                 },
                 reputation_delta=reward_parts.reputation or None,
+                local_reputation_delta=reward_parts.local_reputation or None,
                 maximums={"soul_power": row["soul_power_max"]},
             )
             result_json = {
@@ -988,6 +989,7 @@ class ExplorationRepositoryMixin:
                     value_delta=reward_parts.value_delta,
                     player_values={"bloodline_stability": bloodline_stability_after},
                     reputation_delta=reward_parts.reputation or None,
+                    local_reputation_delta=reward_parts.local_reputation or None,
                 )
             result_json = {
                 "status": status,

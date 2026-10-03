@@ -63,6 +63,7 @@ from ..social.sect_alliance_repository import SectAllianceRepositoryMixin
 from ..social.sect_social_recovery_repository import SectSocialRecoveryRepositoryMixin
 from ..social.sect_social_recovery_migration import ensure_social_recovery_schema
 from ..events.repository import EventsRepositoryMixin
+from ..events.daily_quest_repository import DailyQuestRepositoryMixin
 from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
 from ..events.cross_realm_repository import CrossRealmEventRepositoryMixin
@@ -161,6 +162,7 @@ class SQLitePlayerRepository(
     SectAllianceRepositoryMixin,
     SectSocialRecoveryRepositoryMixin,
     EventsRepositoryMixin,
+    DailyQuestRepositoryMixin,
     HeartDemonEventRepositoryMixin,
     DemonInvasionRepositoryMixin,
     CrossRealmEventRepositoryMixin,

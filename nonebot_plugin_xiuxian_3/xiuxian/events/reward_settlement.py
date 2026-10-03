@@ -27,6 +27,7 @@ def grant_public_event_reward(
         value_delta=reward_value_delta(grant),
         player_values=grant.set_values or None,
         reputation_delta=grant.reputation or None,
+        local_reputation_delta=grant.local_reputation or None,
     )
     connection.execute(
         "INSERT INTO world_event_claims(round_id, player_id, operation_id, reward_json, claimed_at) VALUES (?, ?, ?, ?, ?)",

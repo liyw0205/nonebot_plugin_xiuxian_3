@@ -283,6 +283,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
                 value_delta=reward_value_delta(grant),
                 player_values=grant.set_values or None,
                 reputation_delta=grant.reputation or None,
+                local_reputation_delta=grant.local_reputation or None,
             )
             progress = {"completed": 1, "target": 1}
             snapshot = {

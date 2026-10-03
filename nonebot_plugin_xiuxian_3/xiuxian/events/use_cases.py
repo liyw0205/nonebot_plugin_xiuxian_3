@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..persistence.errors import (
+    DailyTaskRewardAlreadyClaimedError,
+    DailyTaskRewardExpiredError,
+    DailyTasksIncompleteError,
+    DailyTasksUnavailableError,
     EventContributionInsufficientError,
     EventNotActiveError,
     EventRewardAlreadyClaimedError,
@@ -84,6 +88,10 @@ class EventsApplication:
             EventRewardAlreadyClaimedError: ("EVENT_REWARD_ALREADY_CLAIMED", f"本轮{event_label}事件奖励已经领取。"),
             EventRewardExpiredError: ("EVENT_REWARD_EXPIRED", f"{event_label}事件领奖窗口已经结束。"),
             EventSourceNotEligibleError: ("EVENT_CONTRIBUTION_SOURCE_INVALID", "没有可核验的已结算战斗、运输或维修记录。"),
+            DailyTasksUnavailableError: ("DAILY_TASKS_UNAVAILABLE", "今日修行簿暂不可用，角色状态未改变。"),
+            DailyTasksIncompleteError: ("DAILY_TASKS_INCOMPLETE", "日课尚未满足嘉奖条件，暂不能领取。"),
+            DailyTaskRewardAlreadyClaimedError: ("DAILY_TASK_REWARD_CLAIMED", "今日修行嘉奖已经领取。"),
+            DailyTaskRewardExpiredError: ("DAILY_TASK_REWARD_EXPIRED", "这份日课嘉奖已过领取时限。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能操作活动。"),
             OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已经用于其他活动操作。"),
@@ -98,6 +106,112 @@ class EventsApplication:
             operation_id,
             retryable=isinstance(exc, RepositoryBusyError),
         )
+
+    async def get_daily_tasks(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_DAILY_TASK_COMMAND", "今日修行无需附加内容。", context.request_id)
+        try:
+            record = await self.repository.get_daily_tasks(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except Exception as exc:
+            return self._error(context, "", exc, event_label="日课")
+        labels = {"active": "未完成", "completed": "已完成"}
+        lines = ["## 今日修行", "", f"今日已成：{record.completed_count}/{record.completion_threshold}", ""]
+        task_data: list[dict[str, object]] = []
+        for task in record.tasks:
+            status = labels.get(task.status, "修行中")
+            lines.append(f"- **{task.name}**：{task.progress}/{task.target}，{status}")
+            task_data.append(
+                {
+                    "task_key": task.task_key,
+                    "name": task.name,
+                    "description": task.description,
+                    "progress": task.progress,
+                    "target": task.target,
+                    "status": task.status,
+                }
+            )
+        if record.completed_count >= record.completion_threshold:
+            lines.extend(["", "三项日课已成，可领取今日嘉奖。"])
+        else:
+            lines.extend(["", "完成任意三项，即可领取今日嘉奖。"])
+        return CommandResult(
+            True,
+            "DAILY_TASK_STATUS",
+            "\n".join(lines),
+            context.request_id,
+            data={
+                "round_id": record.round_id,
+                "business_date": record.business_date,
+                "status": record.status,
+                "completed_count": record.completed_count,
+                "completion_threshold": record.completion_threshold,
+                "starts_at": record.starts_at,
+                "ends_at": record.ends_at,
+                "claim_expires_at": record.claim_expires_at,
+                "tasks": task_data,
+                "snapshot": record.snapshot,
+            },
+        )
+
+    async def claim_daily_task_reward(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_DAILY_TASK_COMMAND", "领取日课嘉奖无需附加内容。", context.request_id)
+        operation_id = self._operation_id(context, "event.claim_daily_tasks")
+        try:
+            record = await self.repository.claim_daily_task_reward(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc, event_label="日课")
+        reward_lines = self._daily_reward_lines(record.reward)
+        replay_note = "（嘉奖如前）" if record.already_completed else ""
+        return CommandResult(
+            True,
+            "DAILY_TASK_REWARD_CLAIMED",
+            "## 日课嘉奖已领取" + replay_note + "\n\n- " + "\n- ".join(reward_lines),
+            context.request_id,
+            operation_id,
+            data={
+                "round_id": record.round_id,
+                "business_date": record.business_date,
+                "status": record.status,
+                "completed_count": record.completed_count,
+                "completion_threshold": record.completion_threshold,
+                "reward": record.reward,
+                "snapshot": record.snapshot,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    def _daily_reward_lines(self, reward: dict[str, int]) -> list[str]:
+        lines: list[str] = []
+        for key, quantity in reward.items():
+            if quantity <= 0:
+                continue
+            if key == "spirit_stones":
+                label = "灵石"
+            elif key == "energy":
+                label = "精力"
+            elif key.startswith("item."):
+                label = self.repository.content.label("item", key)
+            elif key.startswith("faction_reputation."):
+                label = "阵营声望"
+            elif key.startswith("local."):
+                location_key = key.removeprefix("local.")
+                label = self.repository.content.label(
+                    "location", location_key, fallback="地方名望"
+                )
+                if label != "地方名望":
+                    label = f"{label}名望"
+            else:
+                label = "修行馈赠"
+            lines.append(f"{label} ×{quantity}")
+        return lines or ["一份修行嘉奖"]
 
     async def get_spirit_spring_event(self, context: CommandContext) -> CommandResult:
         round_id = self._round_id(context.command_args)

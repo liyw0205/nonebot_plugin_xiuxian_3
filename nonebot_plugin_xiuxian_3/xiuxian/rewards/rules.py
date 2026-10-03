@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -31,6 +31,7 @@ class RewardGrant:
     value_delta: dict[str, int]
     set_values: dict[str, int]
     reputation: dict[str, int]
+    local_reputation: dict[str, int] = field(default_factory=dict)
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -40,6 +41,7 @@ class RewardGrant:
             "value_delta": dict(self.value_delta),
             "set_values": dict(self.set_values),
             "reputation": dict(self.reputation),
+            "local_reputation": dict(self.local_reputation),
         }
 
 
@@ -65,6 +67,7 @@ def combine_reward_grants(*grants: RewardGrant) -> RewardGrant:
         value_delta=value_delta,
         set_values=set_values,
         reputation=_combine_maps(*(grant.reputation for grant in grants)),
+        local_reputation=_combine_maps(*(grant.local_reputation for grant in grants)),
     )
 
 
@@ -72,7 +75,7 @@ def reward_totals(grant: RewardGrant) -> dict[str, int]:
     """Flatten a grant into the values shown and frozen in an operation."""
 
     totals = dict(grant.assets)
-    for values in (grant.value_delta, grant.set_values, grant.reputation):
+    for values in (grant.value_delta, grant.set_values, grant.reputation, grant.local_reputation):
         for key, amount in values.items():
             if key.endswith("_max"):
                 continue
@@ -299,12 +302,15 @@ def reward_definition(
     value_delta: dict[str, int] = {}
     set_values: dict[str, int] = {}
     reputation: dict[str, int] = {}
+    local_reputation: dict[str, int] = {}
     for index, entry in enumerate(entries):
         if not isinstance(entry, dict):
             raise RewardContentError(f"reward {key} entry {index} must be an object")
         kind = entry.get("kind")
         quantity = entry.get("quantity")
-        if not isinstance(kind, str) or kind not in {"currency", "item", "resource", "reputation"}:
+        if not isinstance(kind, str) or kind not in {
+            "currency", "item", "resource", "reputation", "local_reputation"
+        }:
             raise RewardContentError(f"reward {key} entry {index} has unsupported kind")
         if "quantity_range" in entry and entry.get("quantity_range") is not None:
             raise RewardContentError(f"reward {key} entry {index} is not a fixed grant")
@@ -360,7 +366,7 @@ def reward_definition(
                 _set_value(set_values, max_field, set_max)
             else:
                 _add(value_delta, str(resource_key), quantity)
-        else:
+        elif kind == "reputation":
             reputation_key = entry.get("reputation_key")
             if not isinstance(reputation_key, str) or not reputation_key.startswith("faction_reputation."):
                 raise RewardContentError(f"reward {key} entry {index} requires reputation_key")
@@ -373,6 +379,17 @@ def reward_definition(
                     f"reward {key} entry {index} references an inactive reputation resource"
                 ) from exc
             _add(reputation, reputation_key, quantity)
+        else:
+            reputation_key = entry.get("reputation_key")
+            if (
+                not isinstance(reputation_key, str)
+                or not reputation_key.startswith("local.")
+                or not reputation_key.removeprefix("local.")
+            ):
+                raise RewardContentError(
+                    f"reward {key} entry {index} requires a local reputation key"
+                )
+            _add(local_reputation, reputation_key, quantity)
 
     overlap = set(value_delta) & set(set_values)
     if overlap:
@@ -387,6 +404,46 @@ def reward_definition(
         value_delta=value_delta,
         set_values=set_values,
         reputation=reputation,
+        local_reputation=local_reputation,
+    )
+
+
+def reward_grant_from_snapshot(
+    value: Any,
+    *,
+    operation: str,
+) -> RewardGrant:
+    """Restore a previously frozen grant without consulting current content."""
+
+    fields = {"key", "operation", "assets", "value_delta", "set_values", "reputation", "local_reputation"}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise RewardContentError("reward snapshot has invalid fields")
+    key = value.get("key")
+    if not isinstance(key, str) or not key:
+        raise RewardContentError("reward snapshot key is invalid")
+    if value.get("operation") != operation:
+        raise RewardContentError("reward snapshot operation is invalid")
+    maps: dict[str, dict[str, int]] = {}
+    for field_name in fields - {"key", "operation"}:
+        raw_map = value.get(field_name)
+        if not isinstance(raw_map, dict):
+            raise RewardContentError(f"reward snapshot {field_name} must be an object")
+        normalized: dict[str, int] = {}
+        for map_key, amount in raw_map.items():
+            if not isinstance(map_key, str) or not map_key or isinstance(amount, bool) or not isinstance(amount, int):
+                raise RewardContentError(f"reward snapshot {field_name} contains an invalid value")
+            if field_name in {"assets", "set_values", "reputation", "local_reputation"} and amount <= 0:
+                raise RewardContentError(f"reward snapshot {field_name} quantities must be positive")
+            normalized[map_key] = amount
+        maps[field_name] = normalized
+    return RewardGrant(
+        key=key,
+        operation=operation,
+        assets=maps["assets"],
+        value_delta=maps["value_delta"],
+        set_values=maps["set_values"],
+        reputation=maps["reputation"],
+        local_reputation=maps["local_reputation"],
     )
 
 
@@ -406,6 +463,7 @@ __all__ = [
     "RewardGrant",
     "combine_reward_grants",
     "reward_definition",
+    "reward_grant_from_snapshot",
     "reward_pool_battle_failure_rewards",
     "reward_pool_map",
     "reward_pool_outcomes",

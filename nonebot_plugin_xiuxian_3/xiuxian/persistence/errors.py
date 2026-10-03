@@ -1596,6 +1596,22 @@ class EventSourceNotEligibleError(RuntimeError):
     """No server-settled operation can be projected into the event."""
 
 
+class DailyTasksUnavailableError(RuntimeError):
+    """The current daily-task content is unavailable or has no valid candidates."""
+
+
+class DailyTasksIncompleteError(RuntimeError):
+    """The player has not completed enough tasks to claim the daily reward."""
+
+
+class DailyTaskRewardAlreadyClaimedError(RuntimeError):
+    """A daily-task round reward was already claimed."""
+
+
+class DailyTaskRewardExpiredError(RuntimeError):
+    """The daily-task claim window has ended."""
+
+
 class ArenaSnapshotRequirementError(RuntimeError):
     """The player cannot publish an arena snapshot in the current state."""
 

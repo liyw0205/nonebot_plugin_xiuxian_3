@@ -218,6 +218,7 @@ class PlayerRewardParts:
     assets: dict[str, int]
     value_delta: dict[str, int]
     reputation: dict[str, int]
+    local_reputation: dict[str, int]
 
 
 def split_player_rewards(rewards: Mapping[str, Any]) -> PlayerRewardParts:
@@ -230,6 +231,7 @@ def split_player_rewards(rewards: Mapping[str, Any]) -> PlayerRewardParts:
     assets: dict[str, int] = {}
     value_delta: dict[str, int] = {}
     reputation: dict[str, int] = {}
+    local_reputation: dict[str, int] = {}
     for raw_key, raw_amount in rewards.items():
         if not isinstance(raw_key, str) or not raw_key:
             raise ValueError("player reward key must be a non-empty string")
@@ -243,6 +245,10 @@ def split_player_rewards(rewards: Mapping[str, Any]) -> PlayerRewardParts:
             if not key.removeprefix("faction_reputation."):
                 raise ValueError("player reward reputation key must name a faction")
             reputation[key] = reputation.get(key, 0) + amount
+        elif key.startswith("local."):
+            if not key.removeprefix("local."):
+                raise ValueError("player local reputation key must name a place")
+            local_reputation[key] = local_reputation.get(key, 0) + amount
         elif key.startswith("item.") or is_currency_asset_key(key):
             if key == "item.":
                 raise ValueError("player reward item key must name an item")
@@ -259,6 +265,7 @@ def split_player_rewards(rewards: Mapping[str, Any]) -> PlayerRewardParts:
         assets=assets,
         value_delta=value_delta,
         reputation=reputation,
+        local_reputation=local_reputation,
     )
 
 
@@ -434,6 +441,7 @@ def change_player_state(
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
     reputation_delta: Mapping[str, Any] | None = None,
+    local_reputation_delta: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
     """Commit assets and numeric player values through one transaction kernel.
 
@@ -460,30 +468,53 @@ def change_player_state(
             ensure_ascii=False,
             sort_keys=True,
         )
+    local_json = None
+    if local_reputation_delta:
+        local_json = json.dumps(
+            local_reputation_with_delta(connection, player_database_id(row), local_reputation_delta),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
     if all_player_values:
         if set(all_player_values) & set(numeric_values):
             raise ValueError("player value is supplied more than once")
         numeric_values.update(all_player_values)
 
     if asset_values is None:
-        if not numeric_values:
+        if not numeric_values and local_json is None:
             raise ValueError("player state change cannot be empty")
-        from .assets import write_player_values
+        if numeric_values:
+            from .assets import write_player_values
 
-        write_player_values(connection, player_database_id(row), numeric_values, updated_at)
-        return PlayerStateChange(values=numeric_values)
+            write_player_values(connection, player_database_id(row), numeric_values, updated_at)
+        assets = None
+    else:
+        from .assets import apply_player_assets
 
-    from .assets import apply_player_assets
-
-    assets = apply_player_assets(
-        connection,
-        row,
-        asset_values,
-        updated_at,
-        mode=asset_mode,
-        preserve_zero=preserve_zero,
-        player_values=numeric_values or None,
-    )
+        assets = apply_player_assets(
+            connection,
+            row,
+            asset_values,
+            updated_at,
+            mode=asset_mode,
+            preserve_zero=preserve_zero,
+            player_values=numeric_values or None,
+        )
+    if local_json is not None:
+        existing = connection.execute(
+            "SELECT service_reputation FROM player_reputations WHERE player_id = ?",
+            (player_database_id(row),),
+        ).fetchone()
+        service_reputation = int(existing["service_reputation"]) if existing is not None else 0
+        connection.execute(
+            """
+            INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                local_json = excluded.local_json, updated_at = excluded.updated_at
+            """,
+            (player_database_id(row), local_json, service_reputation, updated_at),
+        )
     return PlayerStateChange(values=numeric_values, assets=assets)
 
 
@@ -499,6 +530,7 @@ def grant_player_state(
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
     reputation_delta: Mapping[str, Any] | None = None,
+    local_reputation_delta: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
     """Grant assets and numeric rewards through the shared state boundary."""
 
@@ -514,6 +546,7 @@ def grant_player_state(
         preserve_zero=preserve_zero,
         player_values=player_values,
         reputation_delta=reputation_delta,
+        local_reputation_delta=local_reputation_delta,
     )
 
 
@@ -529,6 +562,7 @@ def spend_player_state(
     preserve_zero: bool = False,
     player_values: Mapping[str, Any] | None = None,
     reputation_delta: Mapping[str, Any] | None = None,
+    local_reputation_delta: Mapping[str, Any] | None = None,
 ) -> PlayerStateChange:
     """Spend assets and numeric resources through the shared state boundary."""
 
@@ -544,6 +578,7 @@ def spend_player_state(
         preserve_zero=preserve_zero,
         player_values=player_values,
         reputation_delta=reputation_delta,
+        local_reputation_delta=local_reputation_delta,
     )
 
 
@@ -758,6 +793,41 @@ def player_reputation_with_delta(
         if next_value < 0:
             raise ValueError(f"reputation for {faction!r} cannot be negative")
         result[faction] = next_value
+    return result
+
+
+def local_reputation_with_delta(
+    connection: Any,
+    player_id: int,
+    delta: Mapping[str, Any],
+) -> dict[str, int]:
+    """Return validated local reputation values after signed changes."""
+
+    row = connection.execute(
+        "SELECT local_json FROM player_reputations WHERE player_id = ?", (player_id,)
+    ).fetchone()
+    try:
+        values = json.loads(str(row["local_json"] or "{}")) if row is not None else {}
+    except (TypeError, ValueError) as exc:
+        raise ValueError("player local reputation is invalid JSON") from exc
+    if not isinstance(values, dict):
+        raise ValueError("player local reputation must be an object")
+    result: dict[str, int] = {}
+    for raw_key, raw_value in values.items():
+        if not isinstance(raw_key, str) or not raw_key.startswith("local.") or not raw_key.removeprefix("local."):
+            raise ValueError("player local reputation contains an invalid key")
+        if isinstance(raw_value, bool) or not isinstance(raw_value, int) or raw_value < 0:
+            raise ValueError(f"player local reputation for {raw_key!r} must be non-negative")
+        result[raw_key] = raw_value
+    for raw_key, raw_amount in delta.items():
+        if not isinstance(raw_key, str) or not raw_key.startswith("local.") or not raw_key.removeprefix("local."):
+            raise ValueError(f"unsupported local reputation key: {raw_key!r}")
+        if isinstance(raw_amount, bool) or not isinstance(raw_amount, int):
+            raise ValueError(f"local reputation delta for {raw_key!r} must be an integer")
+        next_value = result.get(raw_key, 0) + raw_amount
+        if next_value < 0:
+            raise ValueError(f"local reputation for {raw_key!r} cannot be negative")
+        result[raw_key] = next_value
     return result
 
 

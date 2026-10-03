@@ -247,6 +247,7 @@ class ThreeRealmsRepositoryMixin:
                 updated_at=now_text,
                 rewards=reward_parts.assets,
                 reputation_delta=reward_parts.reputation,
+                local_reputation_delta=reward_parts.local_reputation,
                 player_values={
                     "intro_json": json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
                 },

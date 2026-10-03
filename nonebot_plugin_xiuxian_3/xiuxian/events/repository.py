@@ -151,6 +151,7 @@ class EventsRepositoryMixin:
                 value_delta=reward_value_delta(reward_grant),
                 player_values=reward_grant.set_values or None,
                 reputation_delta=reward_grant.reputation or None,
+                local_reputation_delta=reward_grant.local_reputation or None,
             )
             connection.execute(
                 """

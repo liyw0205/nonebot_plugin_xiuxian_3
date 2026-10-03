@@ -186,6 +186,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("高阶任务", application.get_advanced_quests, aliases=("查看高阶任务", "任务进度"))
     router.register("引路簿", application.get_guidance_quests, aliases=("查看引路簿",))
     router.register("领取引路嘉奖", application.claim_guidance_reward)
+    router.register("每日修行", application.get_daily_tasks)
+    router.register("领取日课嘉奖", application.claim_daily_task_reward)
     router.register("完成领域委托", application.complete_domain_material_commission, aliases=("领域材料委托", "领域委托"))
     router.register("完成远古洞天任务", application.complete_ancient_domain_line, aliases=("远古洞天任务", "跨界探索", "探索边界秘境", "完成边界探索", "开始远古洞天探索"))
     router.register("开始跨界战", application.start_cross_realm_battle, aliases=("跨界战", "挑战跨界守门人"))

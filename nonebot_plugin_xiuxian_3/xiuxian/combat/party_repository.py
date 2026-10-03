@@ -1378,6 +1378,7 @@ class PartyCombatRepositoryMixin:
                         value_delta=reward_parts.value_delta,
                         maximums={"soul_power": soul_power_max},
                         reputation_delta=reward_parts.reputation or None,
+                        local_reputation_delta=reward_parts.local_reputation or None,
                         player_values={
                             "soul_power_max": soul_power_max,
                         },

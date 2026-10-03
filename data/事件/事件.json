@@ -201,6 +201,23 @@
       "trial_order": ["trial.body_and_mind", "trial.three_realms", "trial.dao_choice"],
       "duration_seconds": 1800,
       "key": "event.heaven_tribulation"
+    },
+    {
+      "name": "每日修行",
+      "desc": "每日七项修行与历练，完成其中三项可领取一份嘉奖。",
+      "status": "active",
+      "daily_tasks": {
+        "timezone": "UTC",
+        "claim_window_seconds": 86400,
+        "completion_threshold": 3,
+        "selection": [
+          {"group": "cultivation_exploration", "count": 2},
+          {"group": "daily_life", "count": 2},
+          {"group": "other", "count": 3}
+        ],
+        "reward_key": "reward.daily_task_claim"
+      },
+      "key": "event.daily_tasks"
     }
   ],
   "schema": "xiuxian.content"

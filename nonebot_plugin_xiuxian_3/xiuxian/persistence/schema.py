@@ -2646,6 +2646,69 @@ CREATE TABLE IF NOT EXISTS quest_events (
 CREATE INDEX IF NOT EXISTS idx_quest_events_player
     ON quest_events(player_id, quest_key, component_key, created_at);
 
+CREATE TABLE IF NOT EXISTS daily_task_rounds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    round_key TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('open', 'claimed', 'expired')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    claim_expires_at TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, business_date),
+    UNIQUE (player_id, round_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_task_rounds_player_window
+    ON daily_task_rounds(player_id, status, ends_at);
+
+CREATE TABLE IF NOT EXISTS daily_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id INTEGER NOT NULL REFERENCES daily_task_rounds(id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    position INTEGER NOT NULL CHECK (position >= 0),
+    task_key TEXT NOT NULL,
+    target INTEGER NOT NULL CHECK (target > 0),
+    progress INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0),
+    status TEXT NOT NULL CHECK (status IN ('active', 'completed')),
+    snapshot_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (round_id, task_key),
+    UNIQUE (round_id, position)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_tasks_round_status
+    ON daily_tasks(round_id, status, task_key);
+
+CREATE TABLE IF NOT EXISTS daily_task_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id INTEGER NOT NULL REFERENCES daily_task_rounds(id),
+    task_id INTEGER NOT NULL REFERENCES daily_tasks(id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    source_operation_id TEXT NOT NULL REFERENCES operations(operation_id),
+    source_operation_name TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (round_id, source_operation_id),
+    UNIQUE (task_id, source_operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_task_events_player_date
+    ON daily_task_events(player_id, occurred_at);
+
+CREATE TABLE IF NOT EXISTS daily_task_claims (
+    round_id INTEGER PRIMARY KEY REFERENCES daily_task_rounds(id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    reward_json TEXT NOT NULL,
+    claimed_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS companion_instances (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     instance_id TEXT NOT NULL UNIQUE,

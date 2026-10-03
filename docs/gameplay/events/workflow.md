@@ -7,6 +7,7 @@ world_event: scheduled -> open -> running -> settlement -> settled
 scheduled -> cancelled
 open/running -> failed
 season: collecting -> frozen (claim window is derived from claim_expires_at)
+daily_task_round: open -> claimed | expired
 ```
 
 三界公共事件首次开轮时从内容包读取日程、目标、贡献来源与数量、个人门槛和奖励；轮次快照随
@@ -18,6 +19,10 @@ season: collecting -> frozen (claim window is derived from claim_expires_at)
 四项常驻引路任务由本人 operation 账本中的已结算记录决定是否完成；采集只接受近郊采集最终结算且
 没有战斗败退，生产只接受成功完成的订单。领奖与奖励、来源事件及 `claimed` 进度同事务提交，
 另一 operation 不能再次领取；查询观战不写入这些任务表。
+日课在 UTC 00:00 首次查阅或领取时创建角色轮次，并冻结任务、目标、奖励及次日结束时刻；本人来源按
+轮次时间窗投影且仅可归属一项任务。领取门槛为三项，窗口延至次日 24:00；逾期后不补发，新一日独立
+创建轮次。配置变化只影响新轮次，已有轮次和领奖重放继续读取原快照。战斗任务只认白名单正式 PvE
+胜场，并再次核对已结算战斗的角色、类型和结果；训练傀儡与切磋不计日课。
 终局赛季按需维护：窗口结束后的首次读取或领奖事务冻结三榜；领奖期结束后的首次访问补发展示奖励。
 冻结后榜单不再读取变化中的结局/战斗数据。
 三界赛季冻结前分别读取公共事件贡献流水、已结算多人战斗贡献快照和宗门贡献流水；冻结后不再重算，
