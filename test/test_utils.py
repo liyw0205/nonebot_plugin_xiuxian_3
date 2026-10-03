@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from datetime import datetime, timezone
@@ -363,6 +364,87 @@ def test_flat_player_reward_uses_one_asset_value_and_reputation_boundary() -> No
     assert player_integer(updated, "total_cultivation") == 130
     assert player_integer(updated, "soul_power") == 70
     assert player_reputation(updated) == {"demon": 7}
+
+
+def test_player_reward_caps_local_and_service_reputation_and_rolls_back_assets() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, "
+        "inventory_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "CREATE TABLE player_reputations (player_id INTEGER PRIMARY KEY, local_json TEXT NOT NULL, "
+        "service_reputation INTEGER NOT NULL CHECK(service_reputation BETWEEN 0 AND 100), "
+        "updated_at TEXT NOT NULL)"
+    )
+    connection.execute("INSERT INTO players VALUES (1, 20, '{\"item.herb\":1}', 'before')")
+    connection.execute(
+        "INSERT INTO player_reputations VALUES (1, '{\"local.dao_service\":995}', 98, 'before')"
+    )
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    assert row is not None
+
+    with connection:
+        grant_player_reward(
+            connection,
+            row,
+            {
+                "spirit_stones": 5,
+                "item.herb": 2,
+                "local.dao_service": 25,
+                "service_reputation": 5,
+            },
+            "after",
+            local_reputation_maximums={"local.dao_service": 1000},
+        )
+
+    updated = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    reputation = connection.execute(
+        "SELECT local_json, service_reputation FROM player_reputations WHERE player_id=1"
+    ).fetchone()
+    assert updated is not None and reputation is not None
+    assert (player_currency(updated), player_inventory(updated)) == (25, {"item.herb": 3})
+    assert json.loads(reputation["local_json"]) == {"local.dao_service": 1000}
+    assert reputation["service_reputation"] == 100
+
+    with pytest.raises(ValueError, match="cannot be empty"):
+        change_player_state(connection, row, updated_at="empty", asset_values={})
+    unchanged = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    assert unchanged is not None and unchanged["updated_at"] == "after"
+
+    with pytest.raises(ValueError, match="matching local reputation deltas"):
+        with connection:
+            change_player_state(
+                connection,
+                row,
+                updated_at="invalid-cap",
+                asset_values={"spirit_stones": 1},
+                local_reputation_delta={"local.other": 1},
+                local_reputation_maximums={"local.dao_service": 1000},
+            )
+    unchanged = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    assert unchanged is not None
+    assert player_currency(unchanged) == 25 and unchanged["updated_at"] == "after"
+
+    connection.execute("UPDATE player_reputations SET local_json='[]' WHERE player_id=1")
+    connection.commit()
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    assert row is not None
+    with pytest.raises(ValueError, match="must be an object"):
+        with connection:
+            grant_player_reward(
+                connection,
+                row,
+                {"spirit_stones": 10, "item.herb": 1},
+                "rollback",
+                local_reputation_delta={"local.dao_service": 1},
+            )
+
+    unchanged = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    assert unchanged is not None
+    assert (player_currency(unchanged), player_inventory(unchanged)) == (25, {"item.herb": 3})
+    connection.close()
 
 
 def test_asset_state_applies_currency_and_items_together() -> None:

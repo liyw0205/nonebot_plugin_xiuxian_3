@@ -165,3 +165,38 @@ def test_arena_projection_failure_rolls_back_all_participants() -> None:
         assert connection.execute("SELECT COUNT(*) FROM arena_identity_routes").fetchone()[0] == 0
     finally:
         connection.close()
+
+
+def test_arena_wins_use_the_shared_local_reputation_cap() -> None:
+    connection = _connection()
+    try:
+        connection.execute(
+            "INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+            "VALUES (1, ?, 0, 'before')",
+            (json.dumps({ARENA_LOCAL_REPUTATION_KEY: 1000}),),
+        )
+        result = project_arena_result(
+            connection,
+            match_id="arena.match:cap",
+            operation_id="arena-op-cap",
+            mode_key="arena.spar",
+            outcome="challenger_won",
+            score_counted=True,
+            settled_at="2026-09-25T00:00:00+00:00",
+            participants=(
+                {"player_id": 1, "side": "challenger"},
+                {"player_id": 2, "side": "defender"},
+            ),
+        )
+
+        winner = result["participants"][0]
+        local = json.loads(
+            connection.execute(
+                "SELECT local_json FROM player_reputations WHERE player_id=1"
+            ).fetchone()[0]
+        )
+        assert winner["reputation_delta"] == 1
+        assert (winner["reputation_before"], winner["reputation_after"]) == (1000, 1000)
+        assert local[ARENA_LOCAL_REPUTATION_KEY] == 1000
+    finally:
+        connection.close()

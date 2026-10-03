@@ -40,7 +40,15 @@ from .dispatch_rules import (
     reward_for,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
-from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, player_intro_flags, spend_player_state
+from ..utils.player import (
+    change_player_state,
+    grant_player_reward,
+    grant_player_state,
+    player_integer,
+    player_inventory,
+    player_intro_flags,
+    spend_player_state,
+)
 
 
 class DispatchRepositoryMixin:
@@ -372,24 +380,18 @@ class DispatchRepositoryMixin:
                     refunded["stamina"] = 2
                 elif str(assignment["dispatch_key"]) == WORKSHOP_HELP:
                     refunded["item.mat.wood"] = 1
-            asset_rewards = {
+            settlement_reward = {
                 str(key): int(amount)
                 for key, amount in reward.items()
                 if key == "spirit_stones" or key.startswith("item.")
             }
-            local_map = self._dispatch_local_map(connection, int(player["id"]))
-            local_updates: dict[str, int] = {}
-            service_reputation_delta = int(reward.get("service_reputation", 0))
             for key, amount in reward.items():
                 if amount <= 0:
                     continue
                 if key == "spirit_stones" or key.startswith("item."):
                     continue
-                if key == "service_reputation":
-                    continue
-                if key.startswith("local."):
-                    local_map[key] = min(1000, max(0, int(local_map.get(key, 0)) + amount))
-                    local_updates[key] = amount
+                if key == "service_reputation" or key.startswith("local."):
+                    settlement_reward[key] = amount
                 elif key.startswith("codex."):
                     record_codex_discovery(
                         connection,
@@ -411,38 +413,19 @@ class DispatchRepositoryMixin:
             )
             for key, amount in refunded.items():
                 if key.startswith("item."):
-                    asset_rewards[key] = asset_rewards.get(key, 0) + amount
+                    settlement_reward[key] = settlement_reward.get(key, 0) + amount
             stamina_refund = min(int(costs.get("stamina", 0)), int(refunded.get("stamina", 0)))
             energy_refund = min(int(costs.get("energy", 0)), int(refunded.get("energy", 0)))
-            rep = connection.execute(
-                "SELECT service_reputation FROM player_reputations WHERE player_id = ?", (player["id"],)
-            ).fetchone()
-            service_reputation = int(rep["service_reputation"]) if rep is not None else 0
-            service_reputation = min(100, service_reputation + service_reputation_delta)
-            if local_updates or service_reputation_delta:
-                connection.execute(
-                    """
-                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(player_id) DO UPDATE SET
-                        local_json = excluded.local_json,
-                        service_reputation = excluded.service_reputation,
-                        updated_at = excluded.updated_at
-                    """,
-                    (
-                        player["id"],
-                        json.dumps(local_map, ensure_ascii=False, sort_keys=True),
-                        service_reputation,
-                        now_text,
-                    ),
-                )
-            grant_player_state(
+            grant_player_reward(
                 connection,
                 player,
-                updated_at=now_text,
-                rewards=asset_rewards or None,
+                settlement_reward,
+                now_text,
                 value_delta={"stamina": stamina_refund, "energy": energy_refund},
                 maximums={"stamina": player["stamina_max"], "energy": player["energy_max"]},
+                local_reputation_maximums={
+                    key: 1000 for key in settlement_reward if key.startswith("local.")
+                } or None,
             )
             result = {
                 "outcome": outcome,
@@ -627,12 +610,6 @@ class DispatchRepositoryMixin:
             "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
         )
-
-    def _dispatch_local_map(self, connection: sqlite3.Connection, player_id: int) -> dict[str, Any]:
-        row = connection.execute(
-            "SELECT local_json FROM player_reputations WHERE player_id = ?", (player_id,)
-        ).fetchone()
-        return self._json_object(row["local_json"], {}) if row is not None else {}
 
     @staticmethod
     def _dispatch_assignment_from_payload(

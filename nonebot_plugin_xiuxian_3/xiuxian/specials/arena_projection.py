@@ -15,6 +15,7 @@ from typing import Any
 from .arena_federation import ensure_identity_route, record_settlement_audit
 from .codex_projection import record_codex_discovery
 from ..utils.json import json_object
+from ..utils.player import change_player_state, local_reputation_with_delta
 
 
 ARENA_LOCATION_KEY = "xuantian.new_town"
@@ -71,13 +72,15 @@ def project_arena_result(
             f"codex.challenge.arena.{mode_key}.participation",
             f"codex.challenge.arena.{mode_key}.{result_key}",
         )
-        reputation = connection.execute(
-            "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-            (player_id,),
-        ).fetchone()
-        local = json_object(reputation["local_json"]) if reputation is not None else {}
-        before = int(local.get(ARENA_LOCAL_REPUTATION_KEY, 0))
-        after = min(1000, max(0, before + reputation_delta))
+        before = local_reputation_with_delta(
+            connection, player_id, {ARENA_LOCAL_REPUTATION_KEY: 0}
+        ).get(ARENA_LOCAL_REPUTATION_KEY, 0)
+        after = local_reputation_with_delta(
+            connection,
+            player_id,
+            {ARENA_LOCAL_REPUTATION_KEY: reputation_delta},
+            maximums={ARENA_LOCAL_REPUTATION_KEY: 1000},
+        )[ARENA_LOCAL_REPUTATION_KEY]
         payload = {
             "match_id": match_id,
             "mode_key": mode_key,
@@ -147,19 +150,12 @@ def project_arena_result(
                 ),
             )
 
-        connection.execute(
-            """
-            INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-            """,
-            (
-                player_id,
-                json.dumps({**local, ARENA_LOCAL_REPUTATION_KEY: after}, ensure_ascii=False, sort_keys=True),
-                int(reputation["service_reputation"]) if reputation is not None else 0,
-                settled_at,
-            ),
+        change_player_state(
+            connection,
+            {"id": player_id},
+            updated_at=settled_at,
+            local_reputation_delta={ARENA_LOCAL_REPUTATION_KEY: reputation_delta},
+            local_reputation_maximums={ARENA_LOCAL_REPUTATION_KEY: 1000},
         )
         connection.execute(
             """

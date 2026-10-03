@@ -23,8 +23,7 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
-from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_integer
+from ..utils.player import change_player_state, grant_player_reward, player_integer
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .void_spire_models import VoidSpirePreviewRecord, VoidSpireRewardRecord, VoidSpireRunRecord
 from .void_spire_rules import (
@@ -336,30 +335,16 @@ class VoidSpireRepositoryMixin:
                     raise TowerAlreadyClaimedError("void spire reward was already claimed")
                 raise TowerRewardNotAvailableError("no void spire reward is pending")
             reward = {str(key): int(value) for key, value in json.loads(run["reward_json"]).items()}
-            local_updates: dict[str, int] = {}
-            asset_reward: dict[str, int] = {}
-            for key, value in reward.items():
-                if key == "spirit_stones":
-                    asset_reward[key] = value
-                elif key.startswith("local."):
-                    local_updates[key] = local_updates.get(key, 0) + value
-                else:
-                    asset_reward[key] = value
-            if local_updates:
-                reputation = connection.execute(
-                    "SELECT local_json,service_reputation FROM player_reputations WHERE player_id=?",
-                    (player["id"],),
-                ).fetchone()
-                local = self._json_object(reputation["local_json"], {}) if reputation else {}
-                service = int(reputation["service_reputation"]) if reputation else 0
-                for key, value in local_updates.items():
-                    local[key] = min(1000, int(local.get(key, 0)) + value)
-                connection.execute(
-                    "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) VALUES (?,?,?,?) "
-                    "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,updated_at=excluded.updated_at",
-                    (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
+            if reward:
+                grant_player_reward(
+                    connection,
+                    player,
+                    reward,
+                    now_text,
+                    local_reputation_maximums={
+                        key: 1000 for key in reward if key.startswith("local.")
+                    } or None,
                 )
-            grant_player_assets(connection, player, asset_reward, now_text)
             snapshot = {
                 "source": TOWER_KEY,
                 "floor_no": int(run["floor_no"]),

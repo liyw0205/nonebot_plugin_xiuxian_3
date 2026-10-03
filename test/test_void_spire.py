@@ -303,10 +303,21 @@ def test_void_spire_route_bosses_keep_battle_and_claim_snapshots() -> None:
                     ).fetchone()
                     assert json.loads(snapshot)["enemy"]["key"] == floor_definition(floor_no).enemy_key
                     assert reward_status == "none"
+                    connection.execute(
+                        "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) "
+                        "VALUES(?,?,0,'before-claim') ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json",
+                        (player_id, json.dumps({"local.void_supply": 990})),
+                    )
                 reward = await _send(runtime, adapter, user, f"{user}-reward", "领取虚空塔奖励")
                 assert reward.code == "VOID_SPIRE_REWARD_CLAIMED"
                 assert reward.data["reward"]["local.void_supply"] == 30
+                replay = await _send(runtime, adapter, user, f"{user}-reward", "领取虚空塔奖励")
+                assert replay.ok and replay.data["idempotent_replay"] is True
                 with sqlite3.connect(runtime.settings.database_path) as connection:
+                    local_json, = connection.execute(
+                        "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+                    ).fetchone()
+                    assert json.loads(local_json)["local.void_supply"] == 1000
                     keys = {
                         row[0] for row in connection.execute(
                             "SELECT entry_key FROM codex_entries WHERE player_id=?", (player_id,)
@@ -526,6 +537,11 @@ def test_dao_service_dispatch_produces_upper_floor_admission_on_both_adapters(mo
                     )
                 before = await _send(runtime, adapter, user, f"{user}-before", "挑战虚空塔 31")
                 assert before.code == "VOID_SPIRE_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE player_reputations SET local_json=?,service_reputation=98 WHERE player_id=?",
+                        (json.dumps({"local.dao_service": 996}), player_id),
+                    )
                 preview = await _send(runtime, adapter, user, f"{user}-dispatch-preview", "派遣预览 道统服务")
                 assert preview.data["dispatches"][0]["ready"] is True
                 accepted = await _send(runtime, adapter, user, f"{user}-accept", "接受派遣 道统服务")
@@ -542,8 +558,8 @@ def test_dao_service_dispatch_produces_upper_floor_admission_on_both_adapters(mo
                         "SELECT local_json,service_reputation FROM player_reputations WHERE player_id=?",
                         (player_id,),
                     ).fetchone()
-                    assert json.loads(local_json)["local.dao_service"] == 704
-                    assert service == 84
+                    assert json.loads(local_json)["local.dao_service"] == 1000
+                    assert service == 100
                 upper = await _send(runtime, adapter, user, f"{user}-upper", "挑战虚空塔 31")
                 assert upper.code == "VOID_SPIRE_CHALLENGE_SETTLED" and upper.data["outcome"] == "won"
                 assert (await _send(runtime, adapter, user, f"{user}-claim", "领取虚空塔奖励")).ok

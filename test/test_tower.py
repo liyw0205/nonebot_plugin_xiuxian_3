@@ -424,11 +424,32 @@ def test_tower_boss_honor_quotas_and_realm_band_transition_on_both_adapters() ->
                                 "SELECT snapshot_json FROM battle_sessions WHERE battle_id=?",
                                 (challenge.data["battle_id"],),
                             ).fetchone()[0]
+                            player_id = connection.execute(
+                                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                                (adapter, user),
+                            ).fetchone()[0]
                         assert json.loads(snapshot_json)["enemy"]["key"] == "enemy.mist_trial.sensing_boss"
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            connection.execute(
+                                "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) "
+                                "VALUES(?,?,0,'before-claim') ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json",
+                                (player_id, json.dumps({"local.xuantian.new_town": 999})),
+                            )
                     claim = await _send(
                         runtime, adapter, user, f"{prefix}-floor-{floor_no}-claim", "领取试炼塔奖励"
                     )
                     assert claim.code == "TOWER_REWARD_CLAIMED"
+                    if floor_no == 5:
+                        replay = await _send(
+                            runtime, adapter, user, f"{prefix}-floor-{floor_no}-claim", "领取试炼塔奖励"
+                        )
+                        assert replay.ok and replay.data["idempotent_replay"] is True
+                        with sqlite3.connect(runtime.settings.database_path) as connection:
+                            local_json, = connection.execute(
+                                "SELECT local_json FROM player_reputations WHERE player_id=?",
+                                (player_id,),
+                            ).fetchone()
+                        assert json.loads(local_json)["local.xuantian.new_town"] == 1000
 
                 daily_cap = await _send(
                     runtime, adapter, user, f"{prefix}-daily-cap", "挑战试炼塔 6"

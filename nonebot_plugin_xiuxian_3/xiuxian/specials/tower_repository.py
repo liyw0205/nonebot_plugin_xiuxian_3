@@ -34,8 +34,7 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
-from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_integer
+from ..utils.player import change_player_state, grant_player_reward, player_integer
 
 
 class TowerRepositoryMixin:
@@ -311,28 +310,26 @@ class TowerRepositoryMixin:
                     raise TowerAlreadyClaimedError("tower reward was already claimed")
                 raise TowerRewardNotAvailableError("no tower reward is pending")
             reward = {str(key): int(value) for key, value in json.loads(run["reward_json"]).items()}
-            local_reputation = 0
-            asset_reward: dict[str, int] = {}
+            settlement_reward: dict[str, int] = {}
             for key, value in reward.items():
-                if key == "spirit_stones":
-                    asset_reward[key] = value
-                elif key == "local_reputation":
-                    local_reputation += value
+                if key == "local_reputation":
+                    settlement_reward["local.xuantian.new_town"] = (
+                        settlement_reward.get("local.xuantian.new_town", 0) + value
+                    )
                 else:
-                    asset_reward[key] = value
-            if local_reputation:
-                row = connection.execute(
-                    "SELECT local_json, service_reputation FROM player_reputations WHERE player_id=?",
-                    (player["id"],),
-                ).fetchone()
-                local = self._json_object(row["local_json"], {}) if row else {}
-                service_reputation = int(row["service_reputation"]) if row else 0
-                local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
-                connection.execute(
-                    "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) VALUES (?,?,?,?) ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,service_reputation=excluded.service_reputation,updated_at=excluded.updated_at",
-                    (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
+                    settlement_reward[key] = value
+            if settlement_reward:
+                grant_player_reward(
+                    connection,
+                    player,
+                    settlement_reward,
+                    now_text,
+                    local_reputation_maximums=(
+                        {"local.xuantian.new_town": 1000}
+                        if "local.xuantian.new_town" in settlement_reward
+                        else None
+                    ),
                 )
-            grant_player_assets(connection, player, asset_reward, now_text)
             record_material_discoveries(
                 connection, player_id=int(player["id"]), operation_id=operation_id,
                 occurred_at=now, reward=reward, snapshot={"source": TOWER_KEY, "floor_no": int(run["floor_no"])},
