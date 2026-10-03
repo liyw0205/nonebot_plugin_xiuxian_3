@@ -14,8 +14,8 @@ CHECKIN_ACTIVITY = "ritual.checkin.daily"
 MAKEUP_ACTIVITY = "ritual.makeup.daily"
 TREE_WATER_ACTIVITY = "ritual.spirit_tree.water"
 TREE_HARVEST_ACTIVITY = "ritual.spirit_tree.harvest"
+TREE_HARVEST_REWARD_POOL = "reward_pool.routine.spirit_tree_harvest"
 FATE_TICKET = "item.ticket.fate_basic"
-TREE_SEED = "item.seed.spirit_tree"
 
 
 @dataclass(frozen=True, slots=True)
@@ -436,19 +436,6 @@ def makeup_reward() -> dict[str, int]:
     return {"spirit_stones": 16, "energy": 2}
 
 
-def tree_harvest_reward(operation_id: str) -> dict[str, int]:
-    digest = hashlib.blake2b(
-        f"tree.harvest:{operation_id}".encode("utf-8"), digest_size=16
-    ).digest()
-    bucket = int.from_bytes(digest[:8], "big") % 100
-    stone_bucket = int.from_bytes(digest[8:], "big") % 100
-    spirit_stones = 80 if stone_bucket < 25 else 120 if stone_bucket >= 75 else 100
-    reward = {"spirit_stones": spirit_stones, "local_reputation": 2}
-    if bucket < 30:
-        reward[TREE_SEED] = 1
-    return reward
-
-
 def tree_status(water_count: int, cooldown_until: str | None, now_iso: str) -> str:
     if cooldown_until and now_iso < cooldown_until:
         return "cooldown"
@@ -468,7 +455,7 @@ __all__ = [
     "FATE_TICKET",
     "MAKEUP_ACTIVITY",
     "TREE_HARVEST_ACTIVITY",
-    "TREE_SEED",
+    "TREE_HARVEST_REWARD_POOL",
     "TREE_WATER_ACTIVITY",
     "SEVEN_DAY_GOALS",
     "HONOR_TITLES",
@@ -483,7 +470,6 @@ __all__ = [
     "next_date",
     "parse_iso_date",
     "parse_past_date",
-    "tree_harvest_reward",
     "tree_status",
     "seven_day_goal",
     "seven_day_reward",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..repository import (
     AchievementAlreadyClaimedError,
     AchievementInvalidError,
@@ -47,7 +48,6 @@ from .rules import (
     FATE_TICKET,
     HONOR_TITLES,
     TREE_HARVEST_ACTIVITY,
-    TREE_SEED,
     TREE_WATER_ACTIVITY,
     honor_title,
     DAO_CONTRACTS,
@@ -81,20 +81,28 @@ class RoutineApplication:
             .replace("~", "\\~")
         )
 
-    @staticmethod
-    def _reward_text(reward: dict[str, int]) -> str:
+    def _reward_text(self, reward: dict[str, int]) -> str:
         labels = {
             "spirit_stones": "灵石",
             "energy": "精力",
             "local_reputation": "地方名望",
-            FATE_TICKET: "机缘签",
-            TREE_SEED: "灵木种子",
-            "item.food.coarse_spirit_rice": "粗糙灵米",
-            "item.herb.blood_grass": "止血草",
-            "item.mat.array_sand": "阵砂",
         }
+
+        content = self.repository.content or bundled_content()
+
+        def label(key: str) -> str:
+            if key in labels:
+                return labels[key]
+            if key.startswith("item."):
+                return content.label("item", key)
+            if key.startswith("local."):
+                return f"{content.label('location', key.removeprefix('local.'))}名望"
+            if key.startswith("faction_reputation."):
+                return content.label("resource", f"resource.{key}")
+            return "奖励"
+
         return "、".join(
-            f"{labels.get(key, '奖励')} ×{value}"
+            f"{label(key)} ×{value}"
             for key, value in reward.items()
             if value
         ) or "无"

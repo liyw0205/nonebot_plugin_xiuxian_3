@@ -69,6 +69,20 @@
       "key": "item.herb.spirit_leaf"
     },
     {
+      "name": "灵木种子",
+      "desc": "灵木成熟后结下的种子，蕴含温润草木灵气。",
+      "item_type": "seed",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.seed.spirit_tree"
+    },
+    {
       "name": "铁石",
       "desc": "质地坚实的常见矿石，是锻造低阶法器的基础材料。",
       "item_type": "ore",

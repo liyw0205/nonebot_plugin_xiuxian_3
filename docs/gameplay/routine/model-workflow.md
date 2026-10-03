@@ -37,9 +37,9 @@ code: available -> claimed | expired | revoked
 2. `routine.makeup.daily` 的 operation 回放优先于日期窗口检查；新请求再校验本月最近 3 日、
    月度 2 次上限、30 灵石余额，失败不会扣除资产。
 3. 灵木先懒初始化 `spirit_trees`，浇灌以 `(player_id, cycle_no, business_date)` 唯一；第 7
-   次只进入 `ready`，收获才会写入 `spirit_tree_harvests`、发放地方名望并开启 24 小时冷却。
-4. 收获随机结果由 operation ID 派生确定性种子，持久化池键、种子摘要、奖励和版本；重放
-   直接反序列化历史 payload，不重新调用随机池。
+   次只进入 `ready`。收获从当前奖池按 operation 派生的确定性种子选择结果，在同一事务写入
+   `spirit_tree_harvests`、发放资产与地点名望，并开启 24 小时冷却。
+4. 收获保存奖池键、种子摘要和实际奖励；重放直接反序列化历史 payload，不重新读取内容或抽取。
 5. 称号由已落库来源 operation 投影到 `honor_titles`，装备状态单独保存在 `honor_states`；
    功业领取在同一事务内检查来源、写入 `achievement_claims`，并更新名望/信誉流水。
    关闭功业只展示“内容未开放”，不生成来源记录或奖励。

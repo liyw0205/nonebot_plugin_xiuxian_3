@@ -20,6 +20,7 @@
       "environment": {
         "training_bp": 10000
       },
+      "local_reputation_maximum": 1000,
       "actions": [
         "player.create",
         "player.start_seeking",

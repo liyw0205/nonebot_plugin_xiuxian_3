@@ -427,6 +427,21 @@
       "status": "active"
     },
     {
+      "name": "灵木收获",
+      "desc": "灵木凝成的灵石、种子与青石镇名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1750, "rewards": {"spirit_stones": 80, "local.xuantian.new_town": 2}},
+        {"weight": 750, "rewards": {"spirit_stones": 80, "item.seed.spirit_tree": 1, "local.xuantian.new_town": 2}},
+        {"weight": 3500, "rewards": {"spirit_stones": 100, "local.xuantian.new_town": 2}},
+        {"weight": 1500, "rewards": {"spirit_stones": 100, "item.seed.spirit_tree": 1, "local.xuantian.new_town": 2}},
+        {"weight": 1750, "rewards": {"spirit_stones": 120, "local.xuantian.new_town": 2}},
+        {"weight": 750, "rewards": {"spirit_stones": 120, "item.seed.spirit_tree": 1, "local.xuantian.new_town": 2}}
+      ],
+      "key": "reward_pool.routine.spirit_tree_harvest",
+      "status": "active"
+    },
+    {
       "name": "灵泉事件基础奖励",
       "desc": "参与灵泉谷共同行动的谢礼，包含修为与灵石。",
       "operation": "event.claim_reward",

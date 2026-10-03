@@ -242,6 +242,8 @@ def _normalize_reward_pool_map(
                 raise RewardContentError(
                     f"reward pool {pool_key} {label} references inactive item {reward_key}"
                 ) from exc
+        elif reward_key.startswith("local."):
+            local_reputation_maximum(reward_key, bundle)
         elif reward_key not in {"spirit_stones", "currency.spirit_stone"}:
             if reward_key.startswith("faction_reputation."):
                 if not reward_key.removeprefix("faction_reputation."):
@@ -254,6 +256,32 @@ def _normalize_reward_pool_map(
                 )
         normalized[reward_key] = quantity
     return normalized
+
+
+def local_reputation_maximum(
+    reputation_key: str,
+    content: ContentBundle | None = None,
+) -> int:
+    """Read a location reputation cap from its active location record."""
+
+    bundle = content or _DEFAULT_CONTENT
+    if not isinstance(reputation_key, str) or not reputation_key.startswith("local."):
+        raise RewardContentError("local reputation key must name a location")
+    location_key = reputation_key.removeprefix("local.")
+    if not location_key:
+        raise RewardContentError("local reputation key must name a location")
+    try:
+        location = bundle.require("location", location_key, include_locked=False)
+    except KeyError as exc:
+        raise RewardContentError(
+            f"local reputation {reputation_key} references an inactive location"
+        ) from exc
+    maximum = location.get("local_reputation_maximum")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum <= 0:
+        raise RewardContentError(
+            f"location {location_key} requires a positive local_reputation_maximum"
+        )
+    return maximum
 
 
 def _combine_maps(*maps: dict[str, int]) -> dict[str, int]:
@@ -389,6 +417,7 @@ def reward_definition(
                 raise RewardContentError(
                     f"reward {key} entry {index} requires a local reputation key"
                 )
+            local_reputation_maximum(reputation_key, bundle)
             _add(local_reputation, reputation_key, quantity)
 
     overlap = set(value_delta) & set(set_values)
@@ -462,6 +491,7 @@ __all__ = [
     "RewardContentError",
     "RewardGrant",
     "combine_reward_grants",
+    "local_reputation_maximum",
     "reward_definition",
     "reward_grant_from_snapshot",
     "reward_pool_battle_failure_rewards",

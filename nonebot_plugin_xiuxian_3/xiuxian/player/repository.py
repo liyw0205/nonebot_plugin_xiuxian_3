@@ -163,7 +163,6 @@ from ..routine.rules import (
     redemption_code_hash,
     seven_day_goal,
     seven_day_reward,
-    tree_harvest_reward,
     tree_status,
 )
 from ..persistence.errors import *  # noqa: F401,F403

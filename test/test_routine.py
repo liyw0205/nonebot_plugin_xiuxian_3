@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import pytest
 
@@ -18,6 +19,7 @@ except ImportError:  # pragma: no cover - optional billing extra
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.config import XiuxianSettings
+from nonebot_plugin_xiuxian_3.xiuxian.routine.repository import RoutineRepositoryMixin
 from nonebot_plugin_xiuxian_3.xiuxian.routine.rules import redemption_code_definition
 
 
@@ -212,10 +214,53 @@ def test_spirit_tree_requires_seven_days_persists_harvest_roll_and_cools_down() 
                 if index < 6:
                     clock.advance(days=1)
             assert watered.data["status"] == "ready"
+
+            def harvest_state() -> tuple[object, ...]:
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player = connection.execute(
+                        "SELECT id, spirit_stones, inventory_json FROM players WHERE platform_user_id = ?",
+                        (user,),
+                    ).fetchone()
+                    assert player is not None
+                    tree = connection.execute(
+                        "SELECT cycle_no, water_count, cooldown_until, result_json FROM spirit_trees WHERE player_id = ?",
+                        (player[0],),
+                    ).fetchone()
+                    reputation = connection.execute(
+                        "SELECT local_json FROM player_reputations WHERE player_id = ?",
+                        (player[0],),
+                    ).fetchone()
+                    return (
+                        player[1],
+                        player[2],
+                        tuple(tree) if tree else None,
+                        reputation[0] if reputation else None,
+                        connection.execute(
+                            "SELECT COUNT(*) FROM spirit_tree_harvests WHERE player_id = ?",
+                            (player[0],),
+                        ).fetchone()[0],
+                        connection.execute(
+                            "SELECT COUNT(*) FROM operations WHERE operation_id = 'harvest-1'"
+                        ).fetchone()[0],
+                    )
+
+            before_failure = harvest_state()
+            with patch.object(
+                RoutineRepositoryMixin,
+                "_spirit_tree_from_payload",
+                side_effect=RuntimeError("injected failure after reward and harvest records"),
+            ):
+                failed = await runtime.dispatch(
+                    _context(user, "harvest-failure", operation_id="harvest-1"), "收获灵木"
+                )
+            assert failed.code == "PERSISTENCE_ERROR"
+            assert harvest_state() == before_failure
+
             harvested = await runtime.dispatch(
                 _context(user, "harvest", operation_id="harvest-1"), "收获灵木"
             )
             assert harvested.ok
+            assert "local.xuantian.new_town" in harvested.data["reward"]
             replay = await runtime.dispatch(
                 _context(user, "harvest-replay", operation_id="harvest-1"), "收获灵木"
             )

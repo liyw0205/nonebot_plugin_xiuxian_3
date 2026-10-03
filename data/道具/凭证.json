@@ -166,6 +166,20 @@
       "key": "item.seed.herb_bundle"
     },
     {
+      "name": "机缘签",
+      "desc": "记有机缘印记的签券，可用于机缘寻宝。",
+      "item_type": "ticket",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.ticket.fate_basic"
+    },
+    {
       "name": "建设券",
       "desc": "参与地方建设后获得的凭券，可用于后续公共工程。",
       "item_type": "token",

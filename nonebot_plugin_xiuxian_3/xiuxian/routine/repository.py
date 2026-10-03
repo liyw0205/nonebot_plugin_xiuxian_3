@@ -167,12 +167,19 @@ from ..routine.rules import (
     redemption_code_hash,
     seven_day_goal,
     seven_day_reward,
-    tree_harvest_reward,
+    TREE_HARVEST_REWARD_POOL,
     tree_status,
 )
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
-from ..utils.player import change_player_state, grant_player_state, player_inventory, player_integer
+from ..rewards.rules import local_reputation_maximum, reward_pool_map
+from ..utils.player import (
+    change_player_state,
+    grant_player_reward,
+    grant_player_state,
+    player_inventory,
+    player_integer,
+)
 
 
 class RoutineRepositoryMixin:
@@ -697,55 +704,32 @@ class RoutineRepositoryMixin:
             if int(tree["water_count"]) < 7:
                 raise SpiritTreeNotReadyError("spirit tree is not ready")
             cycle_no = int(tree["cycle_no"])
-            reward = tree_harvest_reward(operation_id)
             digest = hashlib.blake2b(
-                f"tree.harvest:{operation_id}".encode("utf-8"), digest_size=16
+                f"{TREE_HARVEST_REWARD_POOL}:{operation_id}".encode("utf-8"), digest_size=16
             ).hexdigest()
-            actual_reward: dict[str, int] = {}
-            for key, quantity in reward.items():
-                quantity = int(quantity)
-                if key == "spirit_stones":
-                    actual_reward[key] = quantity
-                elif key == "local_reputation":
-                    actual_reward[key] = quantity
-                else:
-                    actual_reward[key] = quantity
-            reputation = connection.execute(
-                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                (row["id"],),
-            ).fetchone()
-            local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + int(reward.get("local_reputation", 0))
-            service_reputation = int(reputation["service_reputation"]) if reputation is not None else 0
-            connection.execute(
-                """
-                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                """,
-                (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
-            )
+            reward = reward_pool_map(TREE_HARVEST_REWARD_POOL, digest, self.content)
+            local_reputation_maximums = {
+                key: local_reputation_maximum(key, self.content)
+                for key in reward
+                if key.startswith("local.")
+            }
             cooldown = now + timedelta(hours=24)
             cooldown_text = serialize_datetime(cooldown)
-            grant_player_state(
+            grant_player_reward(
                 connection,
                 row,
-                updated_at=now_text,
-                rewards={
-                    key: quantity
-                    for key, quantity in reward.items()
-                    if key != "local_reputation"
-                },
+                reward,
+                now_text,
+                local_reputation_maximums=local_reputation_maximums,
             )
             result = {
-                "pool_key": "tree.harvest",
+                "pool_key": TREE_HARVEST_REWARD_POOL,
                 "seed": digest,
-                "reward": actual_reward,
+                "reward": reward,
             }
             connection.execute(
                 "INSERT INTO spirit_tree_harvests(player_id, cycle_no, operation_id, pool_key, seed, reward_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (row["id"], cycle_no, operation_id, result["pool_key"], digest, json.dumps(actual_reward, ensure_ascii=False, sort_keys=True), now_text),
+                (row["id"], cycle_no, operation_id, result["pool_key"], digest, json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text),
             )
             connection.execute(
                 "UPDATE spirit_trees SET cycle_no = ?, water_count = 0, last_water_date = NULL, cycle_started_at = NULL, cooldown_until = ?, result_json = ?, updated_at = ? WHERE player_id = ?",
@@ -760,7 +744,7 @@ class RoutineRepositoryMixin:
                 "status": "cooldown",
                 "water_count": 0,
                 "energy_spent": 0,
-                "reward": actual_reward,
+                "reward": reward,
                 "cooldown_until": cooldown_text,
                 "cycle_no": cycle_no,
                 **result,
