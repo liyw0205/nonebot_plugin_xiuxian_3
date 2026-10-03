@@ -8,8 +8,7 @@ commission: published -> accepted -> delivered -> settled
                          \-> cancelled/expired
 service_order: draft -> published -> accepted -> locked -> processing -> delivered -> settled
                                                           \-> failed/expired/cancelled
-trade_route: preview -> created -> in_transit -> arrived -> settled
-                                      \-> failed/expired
+trade_route: in_transit -> settled
 project: proposed -> active -> maintenance_due -> inactive
 ```
 
@@ -23,5 +22,16 @@ project: proposed -> active -> maintenance_due -> inactive
 名称解析不触发奖励校验，已接取委托可在内容关闭后交付；operation 优先读取历史结果，新接取才
 校验当前开放规则。服务端日期不属于接取请求输入，跨日重放不占新名额。异常不得留下已扣材料、
 已发报酬或半交付记录。
+
+短途运输预览只读，不锁货物、不扣体力、不占次数。开始运输先校验当前生活内容、角色阶段、
+起点、货值、体力、次数和会话锁，在同一事务扣除货物与体力、更新灵骑随行状态，冻结路线
+报酬、地方名望键/地点上限、货物及名称、延误结果与灵骑快照。抵达是时间条件，不新增持久化
+状态；仅从出发快照结算，通过共享角色状态事务发放灵石、增加名望并更新目的地；灵骑经验/
+受伤状态、路线状态、实际名望前后值与 operation 同事务提交。封顶不扣回超过旧上限的已有
+名望，不虚报增量。内容关闭或调整只
+影响新运输，历史开始/结算请求先重放 operation；不同输入仍冲突。名望、路线或账本写入失败
+不得留下已发报酬、已移动角色、已结算路线或单独成长的灵骑，恢复后可用同一请求重试。
+未指定货物的请求在账本校验后才解析配置中的默认货物，默认货物变更不改变历史开始结果。
+当前没有主动取消、运输失败或过期退货入口；结算异常保留已锁的出发成本。
 
 公共项目由服务端业务周物化。材料贡献先校验项目轮次、资源和单次 30 点上限，再同步扣除资源、记录贡献和更新进度；服务贡献必须在同一事务内核验已成功结算的来源事务、角色归属、来源状态与唯一使用，再记录固定服务点数，不再次扣费。达到所有资源目标立即进入 `active` 并冻结 7 天效果窗口。奖励结算只读取已完成项目，累计贡献至少 10 点才发放，并以 `(project_id, player_id)` 保证奖励唯一。

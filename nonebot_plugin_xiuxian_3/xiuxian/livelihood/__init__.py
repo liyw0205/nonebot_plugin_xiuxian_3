@@ -19,7 +19,7 @@ from .service_rules import (
     service_definition,
     service_reward,
 )
-from .route_rules import ROUTE_NEW_TOWN_OUTSKIRTS, route_definition, resolve_cargo, resolve_route
+from .route_rules import ROUTE_NEW_TOWN_OUTSKIRTS, route_definition, route_definitions, resolve_cargo, resolve_route
 from .rules import (
     PROJECT_HERB_GARDEN,
     PROJECT_MARKET_ROAD,
@@ -56,6 +56,7 @@ __all__ = [
     "service_reward",
     "ROUTE_NEW_TOWN_OUTSKIRTS",
     "route_definition",
+    "route_definitions",
     "resolve_cargo",
     "resolve_route",
     "PROJECT_HERB_GARDEN",

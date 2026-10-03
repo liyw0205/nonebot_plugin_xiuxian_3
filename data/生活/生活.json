@@ -313,12 +313,11 @@
     {
       "name": "青石镇至近郊短途运输",
       "desc": "将镇中货物运往近郊，途中可能遇上天气或山路耽搁。",
-      "requirements": [
-        {
-          "type": "stage_min",
-          "stage": "mortal"
-        }
-      ],
+      "aliases": ["短途运输", "青石镇近郊运输"],
+      "source_location": "xuantian.new_town",
+      "destination_location": "xuantian.outskirts",
+      "allowed_stages": ["mortal", "seeker", "cultivator"],
+      "random_pool": "route.town",
       "cost": {
         "stamina": 2
       },
@@ -330,6 +329,7 @@
         "reputation": 2
       },
       "cargo": {
+        "default_item_key": "item.herb.blood_grass",
         "max_value": 100,
         "unit_values": {
           "item.food.coarse_spirit_rice": 5,
@@ -339,6 +339,17 @@
           "item.mat.wood": 8,
           "item.ore.ironstone": 15,
           "item.mat.array_sand": 20
+        },
+        "aliases": {
+          "粗糙灵米": "item.food.coarse_spirit_rice",
+          "灵米饭": "item.food.spirit_rice",
+          "止血草": "item.herb.blood_grass",
+          "血草": "item.herb.blood_grass",
+          "灵叶": "item.herb.spirit_leaf",
+          "木材": "item.mat.wood",
+          "木头": "item.mat.wood",
+          "铁石": "item.ore.ironstone",
+          "阵砂": "item.mat.array_sand"
         }
       },
       "daily_limit": 3,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentError
 from ..repository import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -24,7 +25,6 @@ from ..repository import (
 )
 from .route_rules import (
     ROUTE_NEW_TOWN_OUTSKIRTS,
-    cargo_label,
     resolve_cargo,
     resolve_route,
 )
@@ -43,35 +43,37 @@ class RouteApplication:
         request_key = context.message_id or context.request_id
         return f"{operation_name}:{context.adapter}:{context.user_id}:{request_key}"
 
-    @staticmethod
-    def _parse_route_args(args: tuple[str, ...]) -> tuple[str, str, int, str | None] | None:
+    def _parse_route_args(self, args: tuple[str, ...]) -> tuple[str, str | None, int, str | None] | None:
         values = list(args)
+        content = self.repository.content
         route_key = ROUTE_NEW_TOWN_OUTSKIRTS
-        if values and resolve_route(values[0]) is not None and resolve_cargo(values[0]) is None:
-            route_key = resolve_route(values.pop(0)) or route_key
+        if values:
+            selected_route = resolve_route(values[0], content)
+            if selected_route is not None:
+                route_key = selected_route
+                values.pop(0)
         if len(values) > 3:
             return None
         cargo_key = None
         quantity = 1
+        quantity_given = False
         mount_ref: str | None = None
         for value in values:
-            if cargo_key is None and resolve_cargo(value) is not None:
-                cargo_key = resolve_cargo(value)
+            selected_cargo = resolve_cargo(value, route_key, content) if cargo_key is None else None
+            if cargo_key is None and selected_cargo is not None:
+                cargo_key = selected_cargo
                 continue
             try:
                 parsed_quantity = int(value)
             except ValueError:
                 parsed_quantity = None
-            if parsed_quantity is not None and quantity == 1:
+            if parsed_quantity is not None and not quantity_given:
                 quantity = parsed_quantity
+                quantity_given = True
                 continue
             if mount_ref is None and value.strip():
                 mount_ref = value.strip()
                 continue
-            return None
-        if cargo_key is None:
-            cargo_key = resolve_cargo("止血草")
-        if cargo_key is None:
             return None
         return route_key, cargo_key, quantity, mount_ref
 
@@ -95,7 +97,10 @@ class RouteApplication:
         )
 
     async def preview_route(self, context: CommandContext) -> CommandResult:
-        parsed = self._parse_route_args(context.command_args)
+        try:
+            parsed = self._parse_route_args(context.command_args)
+        except ContentError:
+            return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该运输路线或货物暂未开放。", context.request_id)
         if parsed is None:
             return CommandResult(False, "INVALID_ROUTE", "请使用 `运输预览 止血草 [数量] [灵骑名称或编号]`。", context.request_id)
         route_key, cargo_key, quantity, mount_ref = parsed
@@ -130,14 +135,14 @@ class RouteApplication:
             "ROUTE_PREVIEW",
             (
                 f"## {record.route_name} · 运输预览\n\n"
-                f"- **货物**：{cargo_label(record.cargo_key)} ×{record.cargo_quantity}\n"
+                f"- **货物**：{record.cargo_name} ×{record.cargo_quantity}\n"
                 f"- **货值**：{record.cargo_value} 灵石\n"
                 f"- **体力消耗**：{record.stamina_cost}\n"
                 f"- **基础耗时**：{record.duration_seconds // 60} 分钟\n"
                 + (f"- **随行灵骑**：{record.mount_name}（等级 {record.mount_level}，耐力 {record.mount_stamina}）\n" if record.mount_name else "")
                 + f"- **今日次数**：{record.daily_used}/{record.daily_limit}\n"
                 f"- **当前缺少**：{missing}\n\n"
-                f"> {'发送 `开始运输 ' + cargo_label(record.cargo_key) + '` 开始。' if record.ready else '满足条件后才可锁定货物。'}"
+                f"> {'发送 `开始运输 ' + record.cargo_name + '` 开始。' if record.ready else '满足条件后才可运送货物。'}"
             ),
             context.request_id,
             data={
@@ -159,11 +164,14 @@ class RouteApplication:
         )
 
     async def start_route(self, context: CommandContext) -> CommandResult:
-        parsed = self._parse_route_args(context.command_args)
+        operation_id = self._operation_id(context, "livelihood.start_route")
+        try:
+            parsed = self._parse_route_args(context.command_args)
+        except ContentError:
+            return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该运输路线或货物暂未开放。", context.request_id, operation_id)
         if parsed is None:
             return CommandResult(False, "INVALID_ROUTE", "请使用 `开始运输 止血草 [数量] [灵骑名称或编号]`。", context.request_id)
         route_key, cargo_key, quantity, mount_ref = parsed
-        operation_id = self._operation_id(context, "livelihood.start_route")
         try:
             record = await self.repository.start_route(
                 platform=context.adapter,
@@ -181,9 +189,9 @@ class RouteApplication:
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerStageConflictError:
-            return CommandResult(False, "ROUTE_REQUIREMENT_MISSING", "完成入道后才能开始运输。", context.request_id, operation_id)
+            return CommandResult(False, "ROUTE_REQUIREMENT_MISSING", "当前修行阶段尚不能踏上这条商路。", context.request_id, operation_id)
         except RouteLocationRequirementError:
-            return CommandResult(False, "ROUTE_LOCATION_REQUIRED", "请先回到青石镇再开始这条运输。", context.request_id, operation_id)
+            return CommandResult(False, "ROUTE_LOCATION_REQUIRED", "请先抵达这条商路的起点再运送货物。", context.request_id, operation_id)
         except RouteMountNotFoundError:
             return CommandResult(False, "ROUTE_MOUNT_NOT_FOUND", "没有找到这只灵骑。", context.request_id, operation_id)
         except RouteMountRequirementError:
@@ -191,13 +199,13 @@ class RouteApplication:
         except RouteQuotaError:
             return CommandResult(False, "ROUTE_QUOTA_EXHAUSTED", "今日运输次数已用尽。", context.request_id, operation_id)
         except RouteBusyError:
-            return CommandResult(False, "ROUTE_BUSY", "已有移动、修炼、生产或其他会话正在进行。", context.request_id, operation_id)
+            return CommandResult(False, "ROUTE_BUSY", "正忙于赶路、修炼或其他事务，暂不能运送货物。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "ROUTE_RESOURCE_INSUFFICIENT", "体力不足，未扣除货物或其他资源。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能开始运输。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他运输输入。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这次传讯与先前托运的货物不符，请重新传讯。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -207,12 +215,12 @@ class RouteApplication:
             True,
             "ROUTE_STARTED",
             (
-                f"## 运输已开始\n\n**{self._display_name(record.player)}**锁定了"
-                f"**{cargo_label(record.cargo_key)} ×{record.cargo_quantity}**。\n\n"
+                f"## 运输已开始\n\n**{self._display_name(record.player)}**带上"
+                f"**{record.cargo_name} ×{record.cargo_quantity}**，踏上商路。\n\n"
                 f"- **路线**：{record.route_name}\n- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
                 f"- **预计抵达**：{record.arrives_at}{delay_text}\n"
                 + (f"- **随行灵骑**：{record.mount_name}（等级 {record.mount_level}）\n" if record.mount_name else "")
-                + f"\n> 抵达后发送 `结算运输 {record.route_id}`。"
+                + "\n> 抵达后发送 `结算运输`。"
             ),
             context.request_id,
             operation_id,
@@ -261,7 +269,7 @@ class RouteApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能结算运输。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他运输结算。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这次传讯与先前运抵的货物不符，请重新传讯。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -273,7 +281,7 @@ class RouteApplication:
                 f"## 运输已完成\n\n**{record.route_name}**已抵达。\n\n"
                 f"- **获得灵石**：+{record.reward_stones}\n"
                 f"- **地方名望**：+{record.local_reputation_delta}\n"
-                f"- **已交付货物**：{cargo_label(record.cargo_key)} ×{record.cargo_quantity}"
+                f"- **已交付货物**：{record.cargo_name} ×{record.cargo_quantity}"
                 + (f"\n- **灵骑**：{record.mount_name}获得运输经验 {record.mount_experience}。" if record.mount_name else "")
             ),
             context.request_id,
@@ -284,6 +292,8 @@ class RouteApplication:
                 "status": record.status,
                 "reward_stones": record.reward_stones,
                 "local_reputation_delta": record.local_reputation_delta,
+                "local_reputation_before": record.local_reputation_before,
+                "local_reputation_after": record.local_reputation_after,
                 "delay_seconds": record.delay_seconds,
                 "cargo": record.cargo,
                 "mount_instance_id": record.mount_instance_id,

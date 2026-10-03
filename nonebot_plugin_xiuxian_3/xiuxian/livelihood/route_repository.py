@@ -9,8 +9,13 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import grant_player_currency
-from ..utils.player import player_requirements_missing, spend_player_state
+from ..content import ContentError
+from ..utils.player import (
+    change_player_state,
+    local_reputation_with_delta,
+    player_requirements_missing,
+    spend_player_state,
+)
 from ..utils.json import json_object
 from ..persistence.errors import (
     OperationConflictError,
@@ -27,10 +32,10 @@ from ..persistence.errors import (
     RouteNotReadyError,
     RouteQuotaError,
 )
-from ..player.rules import STAGE_MORTAL
 from .route_models import RoutePreviewRecord, RouteSettlementRecord, RouteStartRecord
 from .route_rules import (
     RouteDefinition,
+    cargo_label,
     cargo_unit_value,
     route_delay_roll_bp,
     route_definition,
@@ -52,7 +57,7 @@ class RouteRepositoryMixin:
         platform: str,
         platform_user_id: str,
         route_key: str,
-        cargo_key: str,
+        cargo_key: str | None,
         cargo_quantity: int,
         mount_ref: str | None = None,
     ) -> RoutePreviewRecord:
@@ -73,11 +78,11 @@ class RouteRepositoryMixin:
         platform: str,
         platform_user_id: str,
         route_key: str,
-        cargo_key: str,
+        cargo_key: str | None,
         cargo_quantity: int,
         mount_ref: str | None = None,
     ) -> RoutePreviewRecord:
-        definition, cargo_value = self._validated_route(route_key, cargo_key, cargo_quantity)
+        definition, cargo_key, cargo_value = self._validated_route(route_key, cargo_key, cargo_quantity)
         now = self._now()
         business_date = now.date().isoformat()
         with self._connect() as connection:
@@ -86,10 +91,10 @@ class RouteRepositoryMixin:
             duration_seconds = int(mount["duration_seconds"]) if mount else definition.duration_seconds
             mount_stamina_cost = int(mount["stamina_cost"]) if mount else 0
             missing: list[str] = []
-            if str(player["stage"]) not in {STAGE_MORTAL, "seeker", "cultivator"}:
-                missing.append("入道")
+            if str(player["stage"]) not in definition.allowed_stages:
+                missing.append("修行阶段")
             if str(player["location_key"]) != definition.source_location:
-                missing.append("青石镇")
+                missing.append(definition.source_name)
             stamina_cost = mount_stamina_cost or definition.stamina_cost
             requirements = player_requirements_missing(
                 player,
@@ -120,6 +125,7 @@ class RouteRepositoryMixin:
                 source_location=definition.source_location,
                 destination_location=definition.destination_location,
                 cargo_key=cargo_key,
+                cargo_name=cargo_label(cargo_key, self.content),
                 cargo_quantity=cargo_quantity,
                 cargo_value=cargo_value,
                 stamina_cost=stamina_cost,
@@ -142,7 +148,7 @@ class RouteRepositoryMixin:
         platform: str,
         platform_user_id: str,
         route_key: str,
-        cargo_key: str,
+        cargo_key: str | None,
         cargo_quantity: int,
         operation_id: str,
         mount_ref: str | None = None,
@@ -165,19 +171,18 @@ class RouteRepositoryMixin:
         platform: str,
         platform_user_id: str,
         route_key: str,
-        cargo_key: str,
+        cargo_key: str | None,
         cargo_quantity: int,
         mount_ref: str | None,
         operation_id: str,
     ) -> RouteStartRecord:
-        definition, cargo_value = self._validated_route(route_key, cargo_key, cargo_quantity)
         operation_name = "livelihood.start_route"
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "route_key": definition.key,
+                "route_key": route_key,
                 "cargo_key": cargo_key,
                 "cargo_quantity": cargo_quantity,
                 "mount_ref": mount_ref or "",
@@ -191,8 +196,9 @@ class RouteRepositoryMixin:
             existing = self._route_operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
                 return self._start_from_payload(existing, replay=True)
+            definition, cargo_key, cargo_value = self._validated_route(route_key, cargo_key, cargo_quantity)
             player = self._require_player(connection, platform, platform_user_id)
-            if str(player["stage"]) not in {STAGE_MORTAL, "seeker", "cultivator"}:
+            if str(player["stage"]) not in definition.allowed_stages:
                 raise PlayerStageConflictError("player is not ready for transport")
             if str(player["location_key"]) != definition.source_location:
                 raise RouteLocationRequirementError("route source location is not valid")
@@ -227,11 +233,14 @@ class RouteRepositoryMixin:
                 "source_location": definition.source_location,
                 "destination_location": definition.destination_location,
                 "cargo": {cargo_key: cargo_quantity},
+                "cargo_name": cargo_label(cargo_key, self.content),
                 "cargo_value": cargo_value,
                 "stamina_cost": route_stamina_cost,
                 "duration_seconds": duration_seconds,
                 "reward_stones": definition.reward_stones,
                 "local_reputation": definition.local_reputation,
+                "local_reputation_key": definition.local_reputation_key,
+                "local_reputation_maximum": definition.local_reputation_maximum,
                 "random_pool": definition.random_pool,
                 "random_seed": operation_id,
                 "delay_roll_bp": delay_roll,
@@ -290,6 +299,7 @@ class RouteRepositoryMixin:
                 "route_key": definition.key,
                 "route_name": definition.label,
                 "cargo_key": cargo_key,
+                "cargo_name": snapshot["cargo_name"],
                 "cargo_quantity": cargo_quantity,
                 "cargo_value": cargo_value,
                 "source_location": definition.source_location,
@@ -417,37 +427,32 @@ class RouteRepositoryMixin:
                     "injury_chance_bp": injury_chance_bp,
                     "injury_until": injury_until,
                 }
-            local_key = "local.xuantian.new_town"
-            reputation = connection.execute(
-                "SELECT local_json FROM player_reputations WHERE player_id = ?", (player["id"],)
-            ).fetchone()
-            local = json_object(reputation["local_json"]) if reputation is not None else {}
-            local_before = int(local.get(local_key, 0))
-            local_after = min(1000, local_before + int(snapshot.get("local_reputation", 0)))
-            local[local_key] = local_after
-            grant_player_currency(
+            local_key = str(snapshot["local_reputation_key"])
+            local_delta = int(snapshot["local_reputation"])
+            reward_stones = int(snapshot["reward_stones"])
+            local_before = local_reputation_with_delta(connection, int(player["id"]), {}).get(local_key, 0)
+            change_player_state(
                 connection,
                 player,
-                int(snapshot.get("reward_stones", route["reward_stones"])),
-                now_text,
+                updated_at=now_text,
+                asset_values={"spirit_stones": reward_stones},
+                asset_mode="grant",
                 player_values={"location_key": str(route["destination_location"])},
+                local_reputation_delta={local_key: local_delta} if local_delta else None,
+                local_reputation_maximums=(
+                    {local_key: int(snapshot["local_reputation_maximum"])} if local_delta else None
+                ),
             )
-            connection.execute(
-                """
-                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                VALUES (?, ?, 0, ?)
-                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json, updated_at = excluded.updated_at
-                """,
-                (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), now_text),
-            )
+            local_after = local_reputation_with_delta(connection, int(player["id"]), {}).get(local_key, 0)
             result = {
                 "status": "settled",
                 "cargo": cargo,
-                "reward_stones": int(snapshot.get("reward_stones", route["reward_stones"])),
+                "reward_stones": reward_stones,
+                "local_reputation_key": local_key,
                 "local_reputation_before": local_before,
                 "local_reputation_after": local_after,
                 "local_reputation_delta": local_after - local_before,
-                "delay_seconds": int(snapshot.get("delay_seconds", 0)),
+                "delay_seconds": int(snapshot["delay_seconds"]),
                 "settled_at": now_text,
             }
             if mount_result is not None:
@@ -463,8 +468,9 @@ class RouteRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "route_id": str(route["route_id"]),
                 "route_key": str(route["route_key"]),
-                "route_name": str(snapshot.get("route_name", route["route_key"])),
+                "route_name": str(snapshot["route_name"]),
                 "cargo_key": next(iter(cargo), ""),
+                "cargo_name": str(snapshot["cargo_name"]),
                 "cargo_quantity": int(next(iter(cargo.values()), 0)),
                 **result,
             }
@@ -545,20 +551,20 @@ class RouteRepositoryMixin:
             "gear": mount["gear"],
         }
 
-    @staticmethod
-    def _validated_route(route_key: str, cargo_key: str, cargo_quantity: int) -> tuple[RouteDefinition, int]:
+    def _validated_route(self, route_key: str, cargo_key: str | None, cargo_quantity: int) -> tuple[RouteDefinition, str, int]:
         try:
-            definition = route_definition(route_key)
-            unit_value = cargo_unit_value(cargo_key)
-        except ValueError as exc:
+            definition = route_definition(route_key, self.content)
+            if cargo_key is None:
+                cargo_key = definition.default_cargo_key
+            unit_value = cargo_unit_value(cargo_key, definition)
+        except (ContentError, ValueError) as exc:
             raise RouteContentClosedError("unsupported route or cargo") from exc
-        try:
-            quantity = int(cargo_quantity)
-        except (TypeError, ValueError) as exc:
-            raise RouteCargoRequirementError("cargo quantity is invalid") from exc
+        if isinstance(cargo_quantity, bool) or not isinstance(cargo_quantity, int):
+            raise RouteCargoRequirementError("cargo quantity is invalid")
+        quantity = cargo_quantity
         if quantity <= 0 or unit_value * quantity > definition.max_cargo_value:
             raise RouteCargoRequirementError("cargo value is outside the route limit")
-        return definition, unit_value * quantity
+        return definition, cargo_key, unit_value * quantity
 
     @staticmethod
     def _check_route_busy(connection: Any, player_id: int) -> None:
@@ -603,6 +609,7 @@ class RouteRepositoryMixin:
             route_key=str(payload["route_key"]),
             route_name=str(payload["route_name"]),
             cargo_key=str(payload["cargo_key"]),
+            cargo_name=str(payload["cargo_name"]),
             cargo_quantity=int(payload["cargo_quantity"]),
             cargo_value=int(payload["cargo_value"]),
             source_location=str(payload["source_location"]),
@@ -627,10 +634,13 @@ class RouteRepositoryMixin:
             route_key=str(payload["route_key"]),
             route_name=str(payload["route_name"]),
             cargo_key=str(payload.get("cargo_key", "")),
+            cargo_name=str(payload["cargo_name"]),
             cargo_quantity=int(payload.get("cargo_quantity", 0)),
             status=str(payload["status"]),
             reward_stones=int(payload.get("reward_stones", 0)),
             local_reputation_delta=int(payload.get("local_reputation_delta", 0)),
+            local_reputation_before=int(payload["local_reputation_before"]),
+            local_reputation_after=int(payload["local_reputation_after"]),
             delay_seconds=int(payload.get("delay_seconds", 0)),
             already_completed=replay,
             cargo={str(key): int(value) for key, value in dict(payload.get("cargo", {})).items()},
