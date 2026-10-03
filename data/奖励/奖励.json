@@ -2,6 +2,111 @@
   "kind": "reward",
   "records": [
     {
+      "name": "镇中行旅所得",
+      "desc": "完成镇中行旅后所得的灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 16, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 17, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 18, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 19, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 20, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 21, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 22, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 23, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 24, "local.xuantian.new_town": 2}}
+      ],
+      "key": "reward_pool.idle.town_errand",
+      "status": "active"
+    },
+    {
+      "name": "镇中行旅保底所得",
+      "desc": "逾时后仍可领取的少量灵石。",
+      "pool_type": "weighted",
+      "outcomes": [{"weight": 1, "rewards": {"spirit_stones": 8, "local.xuantian.new_town": 1}}],
+      "key": "reward_pool.idle.town_errand.fallback",
+      "status": "active"
+    },
+    {
+      "name": "灵圃看护所得",
+      "desc": "完成灵圃看护后收获的药材。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 2}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 2, "item.herb.spirit_leaf": 1}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 3}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 3, "item.herb.spirit_leaf": 1}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 4}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 4, "item.herb.spirit_leaf": 1}}
+      ],
+      "key": "reward_pool.idle.herb_watch",
+      "status": "active"
+    },
+    {
+      "name": "灵圃看护保底所得",
+      "desc": "逾时后可收取的一份止血草。",
+      "pool_type": "weighted",
+      "outcomes": [{"weight": 1, "rewards": {"item.herb.blood_grass": 1}}],
+      "key": "reward_pool.idle.herb_watch.fallback",
+      "status": "active"
+    },
+    {
+      "name": "作坊值守所得",
+      "desc": "完成作坊值守后收获的阵砂与木材。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.mat.array_sand": 1, "item.mat.wood": 1}},
+        {"weight": 1, "rewards": {"item.mat.array_sand": 1, "item.mat.wood": 2}},
+        {"weight": 1, "rewards": {"item.mat.array_sand": 2, "item.mat.wood": 1}},
+        {"weight": 1, "rewards": {"item.mat.array_sand": 2, "item.mat.wood": 2}},
+        {"weight": 1, "rewards": {"item.mat.array_sand": 3, "item.mat.wood": 1}},
+        {"weight": 1, "rewards": {"item.mat.array_sand": 3, "item.mat.wood": 2}}
+      ],
+      "key": "reward_pool.idle.workshop_care",
+      "status": "active"
+    },
+    {
+      "name": "作坊值守保底所得",
+      "desc": "逾时后可收取的一份木材。",
+      "pool_type": "weighted",
+      "outcomes": [{"weight": 1, "rewards": {"item.mat.wood": 1}}],
+      "key": "reward_pool.idle.workshop_care.fallback",
+      "status": "active"
+    },
+    {
+      "name": "商道探路所得",
+      "desc": "完成商道探路后所得的灵石与沿途见闻。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 25, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 26, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 27, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 28, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 29, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 30, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 31, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 32, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 33, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 34, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 35, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 36, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 37, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 38, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 39, "codex.route.town_road": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 40, "codex.route.town_road": 1}}
+      ],
+      "key": "reward_pool.idle.route_scout",
+      "status": "active"
+    },
+    {
+      "name": "商道探路保底所得",
+      "desc": "逾时后仍可领取的少量灵石。",
+      "pool_type": "weighted",
+      "outcomes": [{"weight": 1, "rewards": {"spirit_stones": 12}}],
+      "key": "reward_pool.idle.route_scout.fallback",
+      "status": "active"
+    },
+    {
       "name": "寻仙问道基础奖励",
       "desc": "踏上仙途的启程之礼，备有灵石、饭食、草药与修行补给。",
       "operation": "player.start_seeking",

@@ -1,6 +1,6 @@
 # 特色玩法域：共享模型
 
-`IdleAssignment`：分配 ID、玩家、路线键、开始/可领取/最大结算时间、已锁槽位、收益快照、状态、operation ID、内容/规则版本。
+`IdleAssignment`：分配 ID、玩家、路线键、开始/可领取/最大结算时间、已锁槽位、完整与逾时所得、名望上限、耐久变化、随机种子、状态和 operation ID。
 
 `DispatchMission`：任务 ID、玩家、任务键、队伍快照（可为单人）、物品/体力锁定、开始/结束时间、风险池、结果、状态与 operation ID。
 

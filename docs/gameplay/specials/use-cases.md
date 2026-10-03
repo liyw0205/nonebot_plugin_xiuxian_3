@@ -2,7 +2,7 @@
 
 ## 用例
 
-- `specials.preview_idle`、`specials.assign_idle`、`specials.claim_idle`、`specials.cancel_idle`（v0.1 四条挂机路线已开放）
+- `specials.preview_idle`、`specials.assign_idle`、`specials.claim_idle`、`specials.cancel_idle`（四条闲居路线已开放）
 - `specials.preview_dispatch`、`specials.accept_dispatch`、`specials.cancel_dispatch`、`specials.settle_dispatch`（v0.1 三条派遣已开放）
 - `specials.record_codex_discovery`、`specials.get_codex`、`specials.claim_codex_milestone`
 - `specials.preview_tower`、`specials.start_tower`、`specials.claim_tower_reward`
@@ -22,5 +22,5 @@
 4. 同一塔层首通奖励、竞技场赛季奖励和故事结局奖励都按唯一键回放。
 5. 竞技场对局固定双方快照；对局中角色修改装备/道途不会改变已开始结果。
 6. 固定 2v2 组队竞技场只接受已确认双人队伍，服务端保存双方队伍成员快照和行动回放，不创建单人战斗会话或转移玩家资产。
-7. 故事选择、派遣失败、挂机过期、塔战斗失败都保留可审计原因与版本，恢复不重抽。
+7. 故事选择、派遣失败、闲居逾时、塔战斗失败都保留可审计原因和业务快照，恢复不重抽。
 8. 文本、按钮与 Web 入口重试同一 operation，渲染/投递失败不改变会话或奖励。

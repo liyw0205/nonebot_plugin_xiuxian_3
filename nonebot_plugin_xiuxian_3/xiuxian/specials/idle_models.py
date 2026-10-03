@@ -11,6 +11,7 @@ from ...contracts import PlayerView
 class IdleRoutePreviewRecord:
     route_key: str
     label: str
+    description: str
     duration_seconds: int
     stamina_cost: int
     energy_cost: int
@@ -26,6 +27,7 @@ class IdleAssignmentRecord:
     player: PlayerView
     assignment_id: str
     route_key: str
+    label: str
     status: str
     starts_at: str
     claim_at: str
@@ -44,6 +46,7 @@ class IdleSettlementRecord:
     player: PlayerView
     assignment_id: str
     route_key: str
+    label: str
     status: str
     reward: dict[str, int]
     fallback: bool
@@ -57,6 +60,7 @@ class IdleCancelRecord:
     player: PlayerView
     assignment_id: str
     route_key: str
+    label: str
     status: str
     refunded: dict[str, int]
     returned_tool_key: str | None = None

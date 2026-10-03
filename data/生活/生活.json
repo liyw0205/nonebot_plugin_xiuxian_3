@@ -2,6 +2,73 @@
   "kind": "livelihood",
   "records": [
     {
+      "name": "镇中行旅",
+      "desc": "替镇中商铺照看往来，积攒些许灵石与青石镇名望。",
+      "aliases": ["城镇跑腿", "看店"],
+      "duration_seconds": 7200,
+      "cost": {"stamina": 0, "energy": 0},
+      "daily_limit": 2,
+      "requirements": {"stage": "mortal", "location_key": "xuantian.new_town"},
+      "reward_pool_key": "reward_pool.idle.town_errand",
+      "fallback_reward_pool_key": "reward_pool.idle.town_errand.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.town_errand",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "灵圃看护",
+      "desc": "照料院中灵草，收获可供日常炼制的药材。",
+      "aliases": ["药圃看护", "看护药圃"],
+      "duration_seconds": 14400,
+      "cost": {"stamina": 0, "energy": 1},
+      "daily_limit": 1,
+      "requirements": {"stage": "mortal", "active_residence": true},
+      "reward_pool_key": "reward_pool.idle.herb_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.herb_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.herb_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "作坊值守",
+      "desc": "替作坊看守炉锤与阵材，所得皆为日常所用。",
+      "aliases": ["作坊看守", "工具看守"],
+      "duration_seconds": 10800,
+      "cost": {"stamina": 0, "energy": 0},
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "mortal",
+        "tool_item_keys": ["item.tool.basic_furnace", "item.tool.basic_hammer"],
+        "facility_kind": "artifice"
+      },
+      "reward_pool_key": "reward_pool.idle.workshop_care",
+      "fallback_reward_pool_key": "reward_pool.idle.workshop_care.fallback",
+      "durability_cost_bp": 50,
+      "key": "idle.workshop_care",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "商道探路",
+      "desc": "沿青石镇外商道察看路况，积攒灵石并记下沿途见闻。",
+      "aliases": ["商路观察"],
+      "duration_seconds": 21600,
+      "cost": {"stamina": 2, "energy": 0},
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "mortal",
+        "local_reputation": {"local.xuantian.new_town": 20}
+      },
+      "reward_pool_key": "reward_pool.idle.route_scout",
+      "fallback_reward_pool_key": "reward_pool.idle.route_scout.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.route_scout",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
       "name": "青石镇客房",
       "desc": "镇中简洁安稳的落脚处，可供歇息、存放少量行李并打理一方小田。",
       "requirements": [

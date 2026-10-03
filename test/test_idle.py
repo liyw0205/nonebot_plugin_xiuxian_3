@@ -92,6 +92,8 @@ def test_idle_cancel_refunds_cost_and_late_claim_is_floor() -> None:
                 _context("qq.official", "idle-cost", "herb-cancel"), "取消挂机"
             )
             assert cancelled.code == "IDLE_CANCELLED"
+            assert "精力 +1" in cancelled.message
+            assert "energy" not in cancelled.message
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 energy = connection.execute(
                     "SELECT energy FROM players WHERE platform_user_id = 'idle-cost'"
@@ -108,7 +110,10 @@ def test_idle_cancel_refunds_cost_and_late_claim_is_floor() -> None:
             )
             assert floor.code == "IDLE_CLAIMED"
             assert floor.data["fallback"] is True
-            assert floor.data["reward"] == {"spirit_stones": 8}
+            assert floor.data["reward"] == {
+                "spirit_stones": 8,
+                "local.xuantian.new_town": 1,
+            }
             await runtime.close()
 
     asyncio.run(run())

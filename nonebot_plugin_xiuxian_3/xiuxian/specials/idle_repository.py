@@ -29,14 +29,23 @@ from .idle_rules import (
     ABSOLUTE_MAX_SECONDS,
     CANCEL_WINDOW_SECONDS,
     MAX_CLAIM_EXTENSION_SECONDS,
-    ROUTES,
     IdleRouteDefinition,
+    idle_route_order,
     reward_for,
+    reward_local_reputation_maximums,
     resolve_route,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from ..utils.assets import inventory_amount
-from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, spend_player_state
+from ..utils.player import (
+    grant_player_reward,
+    grant_player_state,
+    local_reputation_with_delta,
+    player_integer,
+    player_inventory,
+    player_reputation_state,
+    spend_player_state,
+)
 
 
 class IdleRepositoryMixin:
@@ -52,7 +61,7 @@ class IdleRepositoryMixin:
     def _preview_idle_once(
         self, platform: str, platform_user_id: str, route_key: str | None
     ) -> tuple[IdleRoutePreviewRecord, ...]:
-        requested = (resolve_route(route_key),) if route_key else tuple(ROUTES.values())
+        requested = (resolve_route(route_key, self.content),) if route_key else idle_route_order(self.content)
         now = self._now()
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
@@ -71,9 +80,10 @@ class IdleRepositoryMixin:
             missing.append("角色尚未完成入道")
         if definition.required_location and str(player["location_key"]) != definition.required_location:
             missing.append("所在地点不符")
-        local_reputation = self._idle_local_reputation(connection, int(player["id"]))
-        if definition.required_reputation and local_reputation < definition.required_reputation:
-            missing.append(f"地方名望不足（需要 {definition.required_reputation}）")
+        local_reputation = player_reputation_state(connection, int(player["id"])).local
+        for reputation_key, minimum in definition.required_local_reputation:
+            if int(local_reputation.get(reputation_key, 0)) < minimum:
+                missing.append(f"地方名望不足（需要 {minimum}）")
         if definition.required_residence:
             residence = connection.execute(
                 "SELECT 1 FROM residences WHERE player_id = ? AND status = 'active' AND ends_at > ? LIMIT 1",
@@ -94,8 +104,8 @@ class IdleRepositoryMixin:
         if self._has_active_long_action(connection, int(player["id"])):
             missing.append("已有进行中的长时行动")
         used = connection.execute(
-            "SELECT COUNT(*) AS count FROM idle_assignments WHERE player_id = ? AND business_date = ? AND status IN ('claimed', 'expired')",
-            (player["id"], now.date().isoformat()),
+            "SELECT COUNT(*) AS count FROM idle_assignments WHERE player_id = ? AND route_key = ? AND business_date = ? AND status IN ('claimed', 'expired')",
+            (player["id"], definition.key, now.date().isoformat()),
         ).fetchone()
         daily_used = int(used["count"]) if used is not None else 0
         if daily_used >= definition.daily_limit:
@@ -103,6 +113,7 @@ class IdleRepositoryMixin:
         return IdleRoutePreviewRecord(
             route_key=definition.key,
             label=definition.label,
+            description=definition.description,
             duration_seconds=definition.duration_seconds,
             stamina_cost=definition.stamina_cost,
             energy_cost=definition.energy_cost,
@@ -112,7 +123,7 @@ class IdleRepositoryMixin:
             missing=tuple(missing),
             requirements={
                 "required_location": definition.required_location,
-                "required_reputation": definition.required_reputation,
+                "required_local_reputation": dict(definition.required_local_reputation),
                 "required_residence": definition.required_residence,
                 "required_tool_keys": list(definition.required_tool_keys),
                 "facility_kind": definition.facility_kind,
@@ -148,15 +159,11 @@ class IdleRepositoryMixin:
         tool_or_facility: str | None,
         operation_id: str,
     ) -> IdleAssignmentRecord:
-        try:
-            definition = resolve_route(route_key)
-        except ValueError as exc:
-            raise IdleRequirementError(str(exc)) from exc
         operation_name = "specials.assign_idle"
         request_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
-            "route_key": definition.key,
+            "route_selector": route_key,
             "tool_or_facility": tool_or_facility or "",
         }
         request_hash = self._request_hash(operation_name, request_payload)
@@ -167,6 +174,10 @@ class IdleRepositoryMixin:
             replay = self._idle_operation(connection, operation_id, operation_name, request_hash)
             if replay is not None:
                 return self._assignment_from_payload(replay, replay=True)
+            try:
+                definition = resolve_route(route_key, self.content)
+            except ValueError as exc:
+                raise IdleRequirementError(str(exc)) from exc
             player = self._require_player(connection, platform, platform_user_id)
             self._idle_validate(connection, player, definition, tool_or_facility, now)
             tool = self._idle_select_tool(connection, player, definition, tool_or_facility)
@@ -183,17 +194,25 @@ class IdleRepositoryMixin:
                 seconds=min(definition.duration_seconds + MAX_CLAIM_EXTENSION_SECONDS, ABSOLUTE_MAX_SECONDS)
             )
             assignment_id = f"idle:{uuid4().hex}"
+            random_seed = uuid4().hex
+            full_reward = reward_for(definition, random_seed, fallback=False, content=self.content)
+            fallback_reward = reward_for(definition, random_seed, fallback=True, content=self.content)
+            reputation_maximums = reward_local_reputation_maximums(definition, self.content)
             snapshot = {
                 "route_key": definition.key,
                 "label": definition.label,
                 "pool_key": definition.pool_key,
+                "full_reward": full_reward,
+                "fallback_reward": fallback_reward,
+                "local_reputation_maximums": reputation_maximums,
                 "duration_seconds": definition.duration_seconds,
                 "cost": cost,
                 "tool_key": str(tool["tool_key"]) if tool else None,
                 "tool_durability_before": int(tool["durability"]) if tool else None,
+                "durability_cost_bp": definition.durability_cost_bp,
                 "facility_slot_key": str(facility["slot_key"]) if facility else None,
                 "location_key": str(player["location_key"]),
-                "random_seed": uuid4().hex,
+                "random_seed": random_seed,
             }
             spend_player_state(
                 connection,
@@ -237,6 +256,7 @@ class IdleRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "assignment_id": assignment_id,
                 "route_key": definition.key,
+                "label": definition.label,
                 "status": "running",
                 "starts_at": serialize_datetime(starts_at),
                 "claim_at": serialize_datetime(claim_at),
@@ -285,62 +305,62 @@ class IdleRepositoryMixin:
             status = str(assignment["status"])
             if status != "running":
                 raise IdleAlreadySettledError("idle assignment is not running")
-            snapshot = self._json_object(assignment["snapshot_json"], {})
-            starts_at = datetime.fromisoformat(str(assignment["starts_at"]))
-            expected_claim_at = starts_at + timedelta(seconds=int(snapshot.get("duration_seconds", 0)))
-            expected_max_claim_at = starts_at + timedelta(
-                seconds=min(int(snapshot.get("duration_seconds", 0)) + MAX_CLAIM_EXTENSION_SECONDS, ABSOLUTE_MAX_SECONDS)
-            )
+            snapshot = self._required_json_object(assignment["snapshot_json"], "idle snapshot")
+            expected_claim_at = datetime.fromisoformat(str(assignment["claim_at"]))
+            expected_max_claim_at = datetime.fromisoformat(str(assignment["max_claim_at"]))
             if now < expected_claim_at:
                 raise IdleClaimTooEarlyError("idle assignment is not ready")
             fallback = now > expected_max_claim_at
-            definition = resolve_route(str(assignment["route_key"]))
-            reward = reward_for(definition, str(snapshot.get("random_seed", assignment["operation_id"])), fallback=fallback)
+            reward_value = snapshot["fallback_reward"] if fallback else snapshot["full_reward"]
+            if not isinstance(reward_value, dict):
+                raise ValueError("idle snapshot reward must be an object")
+            reward = {str(key): int(quantity) for key, quantity in reward_value.items()}
+            local_deltas = {key: value for key, value in reward.items() if key.startswith("local.")}
+            codex_keys = tuple(key for key in reward if key.startswith("codex."))
+            grant_reward = {key: value for key, value in reward.items() if not key.startswith("codex.")}
+            maximums = snapshot["local_reputation_maximums"]
+            if not isinstance(maximums, dict):
+                raise ValueError("idle snapshot local reputation maximums must be an object")
+            active_maximums = {key: int(maximums[key]) for key in local_deltas}
+            reputation_before = player_reputation_state(connection, int(player["id"])).local
+            reputation_after = (
+                local_reputation_with_delta(
+                    connection,
+                    int(player["id"]),
+                    local_deltas,
+                    maximums=active_maximums,
+                )
+                if local_deltas
+                else reputation_before
+            )
             tool_key = snapshot.get("tool_key")
-            asset_rewards = {
-                str(key): int(quantity)
-                for key, quantity in reward.items()
-                if key == "spirit_stones" or key.startswith("item.")
-            }
-            if tool_key:
-                asset_rewards[str(tool_key)] = asset_rewards.get(str(tool_key), 0) + 1
-            local_map = self._idle_local_map(connection, int(player["id"]))
-            local = int(local_map.get("local.xuantian.new_town", 0))
-            if definition.reputation_key:
-                delta = definition.reputation_fallback if fallback else definition.reputation_full
-                local = min(1000, max(0, local + delta))
             durability_before = snapshot.get("tool_durability_before")
             durability_after = durability_before
-            durability = self._json_object(player["durability_json"], {})
-            tool_key = snapshot.get("tool_key")
-            if tool_key and definition.durability_cost_bp and not fallback:
-                durability_after = max(0, int(durability_before or 10000) - definition.durability_cost_bp)
+            durability = self._required_json_object(player["durability_json"], "player durability")
+            durability_cost_bp = int(snapshot["durability_cost_bp"])
+            if tool_key and durability_cost_bp and not fallback:
+                durability_after = max(0, int(durability_before or 10000) - durability_cost_bp)
                 durability[str(tool_key)] = durability_after
-            if definition.reputation_key:
-                rep_row = connection.execute(
-                    "SELECT service_reputation FROM player_reputations WHERE player_id = ?", (player["id"],)
-                ).fetchone()
-                service = int(rep_row["service_reputation"]) if rep_row is not None else 0
-                connection.execute(
-                    """
-                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json, updated_at = excluded.updated_at
-                    """,
-                    (player["id"], json.dumps({**local_map, definition.reputation_key: local}, ensure_ascii=False, sort_keys=True), service, now_text),
-                )
-            grant_player_state(
+            if tool_key:
+                grant_reward[str(tool_key)] = grant_reward.get(str(tool_key), 0) + 1
+            grant_player_reward(
                 connection,
                 player,
-                updated_at=now_text,
-                rewards=asset_rewards,
+                grant_reward,
+                now_text,
                 player_values={"durability_json": json.dumps(durability, ensure_ascii=False, sort_keys=True)},
+                local_reputation_maximums=active_maximums or None,
             )
-            if "codex.route.town_road" in reward:
+            actual_reward = {key: value for key, value in reward.items() if not key.startswith("local.")}
+            for key in local_deltas:
+                actual = reputation_after.get(key, 0) - reputation_before.get(key, 0)
+                if actual:
+                    actual_reward[key] = actual
+            for codex_key in codex_keys:
                 record_codex_discovery(
                     connection,
                     player_id=int(player["id"]),
-                    entry_key="codex.route.town_road",
+                    entry_key=codex_key,
                     operation_id=operation_id,
                     occurred_at=now,
                     snapshot=snapshot,
@@ -350,11 +370,11 @@ class IdleRepositoryMixin:
                 player_id=int(player["id"]),
                 operation_id=operation_id,
                 occurred_at=now,
-                reward=reward,
+                reward=actual_reward,
                 snapshot=snapshot,
             )
             result = {
-                **reward,
+                **actual_reward,
                 "fallback": fallback,
                 "claimed_at": now_text,
                 "tool_durability_before": durability_before,
@@ -372,8 +392,9 @@ class IdleRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "assignment_id": str(assignment["assignment_id"]),
                 "route_key": str(assignment["route_key"]),
+                "label": str(snapshot["label"]),
                 "status": settled_status,
-                "reward": reward,
+                "reward": actual_reward,
                 "fallback": fallback,
                 "tool_durability_before": durability_before,
                 "tool_durability_after": durability_after,
@@ -418,8 +439,8 @@ class IdleRepositoryMixin:
                 raise IdleAlreadySettledError("idle assignment is not running")
             if now > datetime.fromisoformat(str(assignment["cancel_until"])):
                 raise IdleCancellationExpiredError("idle cancellation window expired")
-            cost = self._json_object(assignment["cost_json"], {})
-            snapshot = self._json_object(assignment["snapshot_json"], {})
+            cost = self._required_json_object(assignment["cost_json"], "idle cost")
+            snapshot = self._required_json_object(assignment["snapshot_json"], "idle snapshot")
             tool_key = snapshot.get("tool_key")
             grant_player_state(
                 connection,
@@ -446,6 +467,7 @@ class IdleRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "assignment_id": str(assignment["assignment_id"]),
                 "route_key": str(assignment["route_key"]),
+                "label": str(snapshot["label"]),
                 "status": "cancelled",
                 "refunded": cost,
                 "returned_tool_key": str(tool_key) if tool_key else None,
@@ -466,10 +488,10 @@ class IdleRepositoryMixin:
             raise IdleDailyLimitError("idle daily limit reached")
         if self._has_active_long_action(connection, int(player["id"])):
             raise IdleBusyError("another long action is active")
-            if not preview.ready:
-                if "已有进行中的挂机" in preview.missing or "已有进行中的长时行动" in preview.missing:
-                    raise IdleBusyError("another long action is active")
-                raise IdleRequirementError("; ".join(preview.missing))
+        if not preview.ready:
+            if "已有进行中的挂机" in preview.missing or "已有进行中的长时行动" in preview.missing:
+                raise IdleBusyError("another long action is active")
+            raise IdleRequirementError("; ".join(preview.missing))
         if definition.energy_cost and player_integer(player, "energy") < definition.energy_cost:
             raise IdleRequirementError("energy is insufficient")
         if definition.stamina_cost and player_integer(player, "stamina") < definition.stamina_cost:
@@ -482,16 +504,14 @@ class IdleRepositoryMixin:
             raise IdleRequirementError("tool or facility is unavailable")
 
     @staticmethod
-    def _idle_local_reputation(connection: sqlite3.Connection, player_id: int) -> int:
-        return int(IdleRepositoryMixin._idle_local_map(connection, player_id).get("local.xuantian.new_town", 0))
-
-    @staticmethod
-    def _idle_local_map(connection: sqlite3.Connection, player_id: int) -> dict[str, Any]:
-        row = connection.execute("SELECT local_json FROM player_reputations WHERE player_id = ?", (player_id,)).fetchone()
-        if row is None:
-            return {}
-        value = json.loads(row["local_json"]) if isinstance(row["local_json"], str) else row["local_json"]
-        return dict(value) if isinstance(value, dict) else {}
+    def _required_json_object(value: Any, label: str) -> dict[str, Any]:
+        try:
+            decoded = json.loads(value) if isinstance(value, str) else value
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{label} is invalid JSON") from exc
+        if not isinstance(decoded, dict):
+            raise ValueError(f"{label} must be an object")
+        return dict(decoded)
 
     @staticmethod
     def _idle_select_tool(connection: sqlite3.Connection, player: sqlite3.Row, definition: IdleRouteDefinition, requested: str | None) -> dict[str, object] | None:
@@ -574,6 +594,7 @@ class IdleRepositoryMixin:
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             assignment_id=str(payload["assignment_id"]),
             route_key=str(payload["route_key"]),
+            label=str(payload["label"]),
             status=str(payload["status"]),
             starts_at=str(payload["starts_at"]),
             claim_at=str(payload["claim_at"]),
@@ -591,6 +612,7 @@ class IdleRepositoryMixin:
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             assignment_id=str(payload["assignment_id"]),
             route_key=str(payload["route_key"]),
+            label=str(payload["label"]),
             status=str(payload["status"]),
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             fallback=bool(payload.get("fallback", False)),
@@ -605,6 +627,7 @@ class IdleRepositoryMixin:
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             assignment_id=str(payload["assignment_id"]),
             route_key=str(payload["route_key"]),
+            label=str(payload["label"]),
             status=str(payload["status"]),
             refunded={str(key): int(value) for key, value in dict(payload.get("refunded", {})).items()},
             returned_tool_key=(str(payload["returned_tool_key"]) if payload.get("returned_tool_key") else None),
