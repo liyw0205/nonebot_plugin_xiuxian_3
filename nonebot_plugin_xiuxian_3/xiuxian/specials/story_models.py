@@ -11,6 +11,7 @@ from ...contracts import PlayerView
 class StoryBranchView:
     key: str
     label: str
+    description: str
     required_source_count: int
     source_label: str
     evidence_operation_ids: tuple[str, ...] = ()
@@ -24,6 +25,8 @@ class StoryBranchView:
 class StoryRecord:
     player: PlayerView
     story_key: str
+    name: str
+    description: str
     story_run_id: str | None
     status: str
     current_node: str

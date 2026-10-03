@@ -16,7 +16,7 @@ from ..persistence.errors import (
     StoryRequirementError,
 )
 from .story_repository import StoryRepositoryMixin
-from .story_rules import BRANCHES, resolve_branch
+from .story_rules import resolve_branch, story_definition
 
 
 class StoryApplication:
@@ -79,17 +79,28 @@ class StoryApplication:
             "ending_pending": "结局待领取",
             "ended": "已完成",
         }
-        lines = ["## 玄天之路", "", f"- **状态**：{state_labels.get(record.status, record.status)}"]
+        lines = [
+            f"## {record.name}",
+            "",
+            record.description,
+            "",
+            f"- **状态**：{state_labels.get(record.status, record.status)}",
+        ]
         if record.selected_route:
-            branch = BRANCHES[record.selected_route]
+            branch = next(item for item in record.branches if item.key == record.selected_route)
             lines.append(f"- **已选路线**：{branch.label}")
-            lines.append(f"- **当前节点**：`{record.current_node}`")
         else:
             lines.extend(["", "### 可选路线"])
             for branch in record.branches:
                 count = len(branch.evidence_operation_ids)
-                readiness = "可选择" if branch.eligible else f"来源 {count}/{branch.required_source_count}"
-                lines.append(f"- **{branch.label}**：{branch.source_label}（{readiness}）")
+                readiness = (
+                    "已具备选择资格"
+                    if branch.eligible
+                    else f"尚需 {branch.required_source_count - count} 项经历"
+                )
+                lines.append(
+                    f"- **{branch.label}**：{branch.description}；{branch.source_label}，{readiness}。"
+                )
         if record.status == "available":
             lines.extend(["", "> 发送 `开始剧情` 开启玄天之路。"])
         elif record.status == "active":
@@ -138,7 +149,7 @@ class StoryApplication:
         return CommandResult(
             True,
             "STORY_STARTED",
-            "玄天之路已开启。完成商路、守望或药圃的对应经历后，可以选择一条路线；选择后不可更改。",
+            f"{record.name}已开启。完成相应经历后，可从{'、'.join(branch.label for branch in record.branches)}中选择一段过往；选择后不可更改。",
             context.request_id,
             operation_id,
             data={
@@ -151,17 +162,23 @@ class StoryApplication:
 
     async def choose(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
+            try:
+                labels = "|".join(
+                    branch.label for branch in story_definition(self.repository.content).branches
+                )
+            except Exception as exc:
+                return self._error(context, "", exc)
             return CommandResult(
                 False,
                 "INVALID_STORY_COMMAND",
-                "请使用 `选择剧情 <商路|守望|药圃>`。",
+                f"请使用 `选择剧情 <{labels}>`。",
                 context.request_id,
             )
-        route_key = resolve_branch(context.command_args[0])
-        if route_key is None:
-            return self._error(context, "", StoryChoiceRequirementError("unsupported story route"))
         operation_id = self._operation_id(context, "specials.choose_story_node")
         try:
+            route_key = resolve_branch(context.command_args[0], self.repository.content)
+            if route_key is None:
+                raise StoryChoiceRequirementError("unsupported story route")
             record = await self.repository.choose_story_route(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
@@ -170,11 +187,11 @@ class StoryApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        branch = BRANCHES[route_key]
+        branch = next(item for item in record.branches if item.key == route_key)
         return CommandResult(
             True,
             "STORY_ROUTE_LOCKED",
-            f"已锁定 **{branch.label}** 路线，完成节点：{len(record.completed_nodes)} 个。发送 `领取剧情结局` 领取结局包。",
+            f"已选定 **{branch.label}** 这段经历，记下了 {len(record.completed_nodes)} 段过往。发送 `领取剧情结局` 领取结局嘉奖。",
             context.request_id,
             operation_id,
             data={
@@ -201,12 +218,20 @@ class StoryApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        branch = BRANCHES[record.selected_route or ""]
+        choice = record.snapshot.get("choice", {})
+        branch = choice["branch"]
+        reputation_name = str(choice["reputation_name"])
+        reputation_gain = int(record.reward.get("local_reputation", 0))
+        reputation_text = (
+            f"{reputation_name}名望 +{reputation_gain}"
+            if reputation_gain
+            else f"{reputation_name}名望已达上限"
+        )
         replay = "（请求已回放）" if record.already_completed else ""
         return CommandResult(
             True,
             "STORY_ENDING_CLAIMED",
-            f"已完成 **{branch.label}** 结局：青石镇名望 +10，收录故事图鉴并解锁居所外观。{replay}",
+            f"已完成 **{branch['label']}** 结局：{reputation_text}，收录故事并解锁居所外观。{replay}",
             context.request_id,
             operation_id,
             data={
@@ -217,8 +242,8 @@ class StoryApplication:
                 "ending_key": record.ending_key,
                 "completed_nodes": list(record.completed_nodes),
                 "reward": record.reward,
-                "codex_entry_key": branch.codex_entry_key,
-                "appearance_key": branch.appearance_key,
+                "codex_entry_key": choice["codex_entry_key"],
+                "appearance_key": choice["appearance_key"],
                 "idempotent_replay": record.already_completed,
             },
         )

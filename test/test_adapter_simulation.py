@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
@@ -1019,5 +1021,174 @@ def test_story_endings_run_through_qq_and_onebot_v11_adapters() -> None:
                             (adapter, user, f"codex.story.xuantian.road.{branch}"),
                         ).fetchone()[0] == 1
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def _edit_story_content(data_dir: Path, relative_path: str, key: str, update) -> None:
+    path = data_dir / relative_path
+    document = json.loads(path.read_text(encoding="utf-8"))
+    record = next(row for row in document["records"] if row["key"] == key)
+    update(record)
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def test_story_reward_snapshot_transaction_survives_content_changes_and_failures() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temporary_root:
+            normalized_events = (
+                ("qq.official", normalize_qq_event(_qq_group_event("剧情线", message_id="qq-story-freeze"))),
+                ("onebot.v11", normalize_event(_onebot_group_event("剧情线", message_id=3199))),
+            )
+            source_data = Path(__file__).resolve().parents[1] / "data"
+            for adapter, normalized in normalized_events:
+                data_dir = Path(temporary_root) / adapter.replace(".", "_")
+                shutil.copytree(source_data, data_dir)
+                _edit_story_content(
+                    data_dir,
+                    "奖励/奖励.json",
+                    "reward.story.xuantian_road.ending",
+                    lambda row: row["entries"][0].update(quantity=12),
+                )
+                _edit_story_content(
+                    data_dir,
+                    "地图/地点.json",
+                    "xuantian.new_town",
+                    lambda row: row.update(local_reputation_maximum=50),
+                )
+                runtime = create_runtime(data_dir=data_dir)
+                user = f"{normalized.context.user_id}-story-frozen-{adapter}"
+                prefix = f"story-freeze-{adapter}"
+                base = replace(normalized.context, user_id=user)
+
+                async def dispatch(suffix: str, command: str):
+                    context = replace(base, operation_id=f"{prefix}-{suffix}")
+                    return await runtime.adapters.dispatch(adapter, context, command)
+
+                await dispatch("create", "开始修仙")
+                await dispatch("seek", "寻仙问道")
+                await dispatch("start", "开始剧情")
+                _seed_story_evidence(runtime.settings.database_path, adapter, user, "merchant")
+                chosen = await dispatch("choose", "选择剧情 商路")
+                assert chosen.code == "STORY_ROUTE_LOCKED"
+                assert "node." not in chosen.message and "节点" not in chosen.message
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id, snapshot_json = connection.execute(
+                        "SELECT p.id,r.snapshot_json FROM players p JOIN story_runs r ON r.player_id=p.id "
+                        "WHERE p.platform=? AND p.platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    snapshot = json.loads(snapshot_json)
+                    assert snapshot["choice"]["reward"]["local_reputation"] == {
+                        "local.xuantian.new_town": 12
+                    }
+                    assert snapshot["choice"]["local_reputation_maximums"] == {
+                        "local.xuantian.new_town": 50
+                    }
+                    connection.execute(
+                        "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) "
+                        "VALUES(?,?,0,'2026-01-01T00:00:00+00:00') "
+                        "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json",
+                        (player_id, json.dumps({"local.xuantian.new_town": 45})),
+                    )
+                    connection.commit()
+                await runtime.close()
+
+                _edit_story_content(
+                    data_dir,
+                    "奖励/奖励.json",
+                    "reward.story.xuantian_road.ending",
+                    lambda row: row["entries"][0].update(quantity=20),
+                )
+                _edit_story_content(
+                    data_dir,
+                    "地图/地点.json",
+                    "xuantian.new_town",
+                    lambda row: row.update(local_reputation_maximum=1000),
+                )
+                _edit_story_content(
+                    data_dir,
+                    "剧情/故事.json",
+                    "story.xuantian.road",
+                    lambda row: row.update(status="locked"),
+                )
+                _edit_story_content(
+                    data_dir,
+                    "奖励/奖励.json",
+                    "reward.story.xuantian_road.ending",
+                    lambda row: row.update(status="locked"),
+                )
+                _edit_story_content(
+                    data_dir,
+                    "图鉴/条目.json",
+                    "codex.story.xuantian.road.merchant",
+                    lambda row: row.update(status="locked"),
+                )
+                runtime = create_runtime(data_dir=data_dir)
+
+                def reputation_row():
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        return connection.execute(
+                            "SELECT r.local_json,p.intro_json,s.status,"
+                            "(SELECT COUNT(*) FROM story_ending_claims c WHERE c.player_id=p.id),"
+                            "(SELECT COUNT(*) FROM codex_entries c WHERE c.player_id=p.id "
+                            "AND c.entry_key='codex.story.xuantian.road.merchant'),"
+                            "(SELECT COUNT(*) FROM operations o WHERE o.operation_id=?) "
+                            "FROM players p JOIN story_runs s ON s.player_id=p.id "
+                            "LEFT JOIN player_reputations r ON r.player_id=p.id "
+                            "WHERE p.platform=? AND p.platform_user_id=?",
+                            (f"{prefix}-claim", adapter, user),
+                        ).fetchone()
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE player_reputations SET local_json='not-json' WHERE player_id=?",
+                        (player_id,),
+                    )
+                    connection.commit()
+                bad_json = await dispatch("claim", "领取剧情结局")
+                assert bad_json.code == "PERSISTENCE_ERROR"
+                failed_state = reputation_row()
+                assert failed_state[0] == "not-json"
+                assert failed_state[2:] == ("ending_pending", 0, 0, 0)
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE player_reputations SET local_json=? WHERE player_id=?",
+                        (json.dumps({"local.xuantian.new_town": 45}), player_id),
+                    )
+                    connection.execute(
+                        f"CREATE TRIGGER fail_story_claim_operation BEFORE INSERT ON operations "
+                        f"WHEN NEW.operation_id='{prefix}-claim' "
+                        "AND NEW.operation_name='specials.claim_story_ending' "
+                        "BEGIN SELECT RAISE(ABORT,'injected story operation failure'); END"
+                    )
+                    connection.commit()
+                transaction_failure = await dispatch("claim", "领取剧情结局")
+                assert transaction_failure.code == "PERSISTENCE_ERROR"
+                rolled_back = reputation_row()
+                assert json.loads(rolled_back[0]) == {"local.xuantian.new_town": 45}
+                assert json.loads(rolled_back[1]).get("flags", []) == []
+                assert rolled_back[2:] == ("ending_pending", 0, 0, 0)
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute("DROP TRIGGER fail_story_claim_operation")
+                    connection.commit()
+                claimed = await dispatch("claim", "领取剧情结局")
+                assert claimed.code == "STORY_ENDING_CLAIMED"
+                assert claimed.data["reward"] == {"local_reputation": 5}
+                assert "+5" in claimed.message
+                final_state = reputation_row()
+                assert json.loads(final_state[0]) == {"local.xuantian.new_town": 50}
+                assert final_state[2:] == ("ended", 1, 1, 1)
+                await runtime.close()
+                runtime = create_runtime(data_dir=data_dir)
+                replay = await dispatch("claim", "领取剧情结局")
+                assert replay.code == "STORY_ENDING_CLAIMED"
+                assert replay.data["idempotent_replay"] is True
+                assert replay.data["reward"] == {"local_reputation": 5}
+                assert (await dispatch("status", "剧情线")).data["status"] == "ended"
+                assert reputation_row()[2:] == ("ended", 1, 1, 1)
+                await runtime.close()
 
     asyncio.run(run())

@@ -206,6 +206,27 @@
       "status": "active"
     },
     {
+      "key": "codex.story.xuantian.road.merchant",
+      "name": "商路旧识",
+      "desc": "数次受托往来之后，青石镇的人情与商路都留下了你的名字。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.xuantian.road.warden",
+      "name": "守望之誓",
+      "desc": "在战斗中守住身边之人，这段誓言由此写入玄天故事。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.xuantian.road.gardener",
+      "name": "药圃春秋",
+      "desc": "照看草木、护送药材的日子，成为你在青石镇的另一段过往。",
+      "category": "story",
+      "status": "active"
+    },
+    {
       "key": "codex.challenge.mist_trial.floor_5",
       "name": "雾隐试炼塔五层",
       "desc": "挑战结算后，探索记录会收入图鉴。",

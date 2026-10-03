@@ -22,6 +22,7 @@ data/
   地图/地点.json
   生产/配方.json
   任务/任务.json
+  剧情/故事.json
   事件/事件.json
   奖励/奖励.json
   生活/生活.json
@@ -168,6 +169,8 @@ data/
 | `战斗/敌人.json` | 五个首版敌人和 `enemy.tribulation_heaven` 的阶段配置 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/model.md` |
 | `生产/配方.json` | 五条首版生产配方、输入、工具、产出和失败规则 | `gameplay/production/content-v0.1.md` |
 | `任务/任务.json` | 四条新手任务、完成条件和奖励引用 | `gameplay/events/content-v0.1.md` |
+| `剧情/故事.json` | 玄天之路分支、经历门槛、结局产物与奖励地点引用 | `gameplay/specials/story.md` |
+| `剧情/主线.json` | 玄天、领域前线与三界主线章节、前置和结局奖励 | `gameplay/specials/workflow.md` |
 | `事件/事件.json` | 灵泉事件和贡献/领奖规则 | `gameplay/events/content-v0.1.md` |
 | `奖励/奖励.json` | 首次寻仙、入道、战斗、探索、任务奖励池 | 各域 v0.1 内容文件 |
 | `生活/生活.json` | 居所、作物、城镇委托、运输和服务 | `gameplay/livelihood/content-v0.1.md` |

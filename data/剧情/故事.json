@@ -1,0 +1,61 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "story",
+  "records": [
+    {
+      "key": "story.xuantian.road",
+      "name": "玄天之路",
+      "desc": "在青石镇的历练中作出选择，留下属于自己的故事。",
+      "status": "active",
+      "entry_node": "node.arrival",
+      "reward_key": "reward.story.xuantian_road.ending",
+      "reputation_key": "local.xuantian.new_town",
+      "branches": [
+        {
+          "key": "merchant",
+          "name": "商路",
+          "desc": "从一桩桩委托中结识镇上人情。",
+          "aliases": ["商人"],
+          "required_source_count": 3,
+          "source_kind": "commission",
+          "source_label": "已交付城镇委托",
+          "ending_key": "ending.merchant",
+          "flag_key": "flag.road.merchant",
+          "codex_entry_key": "codex.story.xuantian.road.merchant",
+          "appearance_key": "appearance.home.merchant",
+          "completed_nodes": ["node.merchant.1", "node.merchant.2", "node.merchant.3"]
+        },
+        {
+          "key": "warden",
+          "name": "守望",
+          "desc": "以战斗守护身边之人。",
+          "aliases": ["守望者"],
+          "required_source_count": 2,
+          "source_kind": "battle",
+          "source_label": "已结算战斗胜利",
+          "ending_key": "ending.warden",
+          "flag_key": "flag.road.warden",
+          "codex_entry_key": "codex.story.xuantian.road.warden",
+          "appearance_key": "appearance.home.warden",
+          "completed_nodes": ["node.arrival", "node.warden.1", "node.warden.2"]
+        },
+        {
+          "key": "gardener",
+          "name": "药圃",
+          "desc": "以草木与耐心照看一方药圃。",
+          "aliases": ["园丁"],
+          "required_source_count": 2,
+          "source_kind": "harvest_or_dispatch",
+          "harvest_operation_name": "livelihood.harvest",
+          "dispatch_key": "dispatch.herb_search",
+          "source_label": "灵田收获或成功药材派遣",
+          "ending_key": "ending.gardener",
+          "flag_key": "flag.road.gardener",
+          "codex_entry_key": "codex.story.xuantian.road.gardener",
+          "appearance_key": "appearance.home.gardener",
+          "completed_nodes": ["node.arrival", "node.gardener.1", "node.gardener.2"]
+        }
+      ]
+    }
+  ]
+}

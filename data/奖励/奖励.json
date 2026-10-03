@@ -79,6 +79,21 @@
       "status": "active"
     },
     {
+      "name": "玄天之路结局嘉奖",
+      "desc": "完成一段人生历练后，获得青石镇的敬意。",
+      "operation": "specials.claim_story_ending",
+      "entries": [
+        {
+          "kind": "local_reputation",
+          "reputation_key": "local.xuantian.new_town",
+          "quantity": 10
+        }
+      ],
+      "once_per_player": true,
+      "key": "reward.story.xuantian_road.ending",
+      "status": "active"
+    },
+    {
       "name": "采集里程碑奖励",
       "desc": "首次采集成功后的嘉奖，包含草药与修为积累。",
       "operation": "quest.claim_guidance_reward",
