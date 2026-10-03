@@ -163,12 +163,24 @@ def _replace_daily_reward(path: Path, quantity: int) -> None:
     path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _replace_local_reputation_maximum(data_dir: Path, maximum: int | None) -> None:
+    path = data_dir / "地图" / "地点.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    location = next(row for row in document["records"] if row["key"] == "xuantian.new_town")
+    if maximum is None:
+        location.pop("local_reputation_maximum")
+    else:
+        location["local_reputation_maximum"] = maximum
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 @pytest.mark.parametrize("adapter", ADAPTERS)
 def test_daily_tasks_project_owned_settlements_and_claim_atomically(adapter: str) -> None:
     async def run() -> None:
         with TemporaryDirectory() as temp:
             data_dir = Path(temp) / "data"
             shutil.copytree(ROOT / "data", data_dir)
+            _replace_local_reputation_maximum(data_dir, 3)
             clock = MutableClock()
             runtime = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
             user = f"daily-{adapter}"
@@ -180,6 +192,24 @@ def test_daily_tasks_project_owned_settlements_and_claim_atomically(adapter: str
                 assert (await runtime.adapters.dispatch(
                     adapter, _context(adapter, other_user, "create-other"), "开始修仙"
                 )).code == "PLAYER_CREATED"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_ids = dict(
+                        connection.execute(
+                            "SELECT platform_user_id, id FROM players WHERE platform=?",
+                            (adapter,),
+                        ).fetchall()
+                    )
+                    for seeded_user, balance in ((user, 2), (other_user, 4)):
+                        connection.execute(
+                            "INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+                            "VALUES (?, ?, 0, ?)",
+                            (
+                                player_ids[seeded_user],
+                                json.dumps({"local.xuantian.new_town": balance}),
+                                clock.current.isoformat(),
+                            ),
+                        )
 
                 seed = _seed_for_tasks(
                     runtime.content,
@@ -194,15 +224,20 @@ def test_daily_tasks_project_owned_settlements_and_claim_atomically(adapter: str
                     )
                 assert initial.code == "DAILY_TASK_STATUS"
                 assert len(initial.data["tasks"]) == 7
+                assert initial.data["snapshot"]["local_reputation_maximums"] == {
+                    "local.xuantian.new_town": 3
+                }
                 assert "task.daily." not in initial.message
                 assert "version" not in initial.message.lower()
 
+                other_initial = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, other_user, "daily-other-status"), "每日修行"
+                )
+                assert other_initial.code == "DAILY_TASK_STATUS"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    player_ids = dict(
-                        connection.execute(
-                            "SELECT platform_user_id, id FROM players WHERE platform=?",
-                            (adapter,),
-                        ).fetchall()
+                    connection.execute(
+                        "UPDATE daily_tasks SET progress=target, status='completed' WHERE player_id=?",
+                        (player_ids[other_user],),
                     )
                 _insert_operation(
                     runtime,
@@ -366,6 +401,7 @@ def test_daily_tasks_project_owned_settlements_and_claim_atomically(adapter: str
 
             reward_path = data_dir / "奖励" / "奖励.json"
             _replace_daily_reward(reward_path, 777)
+            _replace_local_reputation_maximum(data_dir, 1)
             recovered = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
             operation_id = f"daily-claim-{adapter}"
             try:
@@ -395,15 +431,41 @@ def test_daily_tasks_project_owned_settlements_and_claim_atomically(adapter: str
                 )
                 assert claimed.code == "DAILY_TASK_REWARD_CLAIMED"
                 assert claimed.data["reward"]["spirit_stones"] == 50
-                assert "青石镇名望 ×2" in claimed.message
+                assert claimed.data["reward"]["local.xuantian.new_town"] == 1
+                assert "青石镇名望 ×1" in claimed.message
                 assert "local.xuantian.new_town" not in claimed.message
                 assert claimed.data["snapshot"]["reward"]["assets"]["spirit_stones"] == 50
+                assert claimed.data["snapshot"]["local_reputation_maximums"] == {
+                    "local.xuantian.new_town": 3
+                }
                 with sqlite3.connect(recovered.settings.database_path) as connection:
                     reputation = connection.execute(
                         "SELECT local_json FROM player_reputations WHERE player_id=?",
                         (player_ids[user],),
                     ).fetchone()[0]
-                    assert json.loads(reputation)["local.xuantian.new_town"] == 2
+                    assert json.loads(reputation)["local.xuantian.new_town"] == 3
+                claimed_state = _daily_state(recovered, adapter, user)
+                claim_reward = json.loads(claimed_state[5][0][2])
+                operation_result = json.loads(claimed_state[6][0][2])
+                assert claim_reward["local.xuantian.new_town"] == 1
+                assert operation_result["reward"]["local.xuantian.new_town"] == 1
+
+                no_reputation_gain = await recovered.adapters.dispatch(
+                    adapter,
+                    _context(adapter, other_user, "daily-other-claim", f"daily-other-claim-{adapter}"),
+                    "领取日课嘉奖",
+                )
+                assert no_reputation_gain.code == "DAILY_TASK_REWARD_CLAIMED"
+                assert "local.xuantian.new_town" not in no_reputation_gain.data["reward"]
+                assert "青石镇名望" not in no_reputation_gain.message
+                with sqlite3.connect(recovered.settings.database_path) as connection:
+                    other_reputation = connection.execute(
+                        "SELECT local_json FROM player_reputations WHERE player_id=?",
+                        (player_ids[other_user],),
+                    ).fetchone()[0]
+                    assert json.loads(other_reputation)["local.xuantian.new_town"] == 4
+                other_claim_state = _daily_state(recovered, adapter, other_user)
+                assert "local.xuantian.new_town" not in json.loads(other_claim_state[5][0][2])
                 before_replay = _daily_state(recovered, adapter, user)
                 await recovered.close()
 
@@ -426,6 +488,31 @@ def test_daily_tasks_project_owned_settlements_and_claim_atomically(adapter: str
             finally:
                 if not recovered._closed:
                     await recovered.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ADAPTERS)
+def test_daily_task_rejects_missing_reputation_cap_without_materializing(adapter: str) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(ROOT / "data", data_dir)
+            _replace_local_reputation_maximum(data_dir, None)
+            runtime = create_runtime(data_dir=data_dir, adapters=(adapter,))
+            user = f"daily-invalid-cap-{adapter}"
+            try:
+                assert (await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "create"), "开始修仙"
+                )).code == "PLAYER_CREATED"
+                before = _daily_state(runtime, adapter, user)
+                result = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "daily-invalid"), "每日修行"
+                )
+                assert result.code == "DAILY_TASKS_UNAVAILABLE"
+                assert _daily_state(runtime, adapter, user) == before
+            finally:
+                await runtime.close()
 
     asyncio.run(run())
 

@@ -24,7 +24,7 @@ from ..rewards.rules import (
     reward_totals,
     reward_value_delta,
 )
-from ..utils.player import grant_player_state, player_integer
+from ..utils.player import grant_player_state, player_integer, player_reputation_state
 from .daily_quest_models import DailyQuestRecord, DailyTaskView
 from .daily_quest_rules import (
     DailyTaskDefinition,
@@ -181,6 +181,11 @@ class DailyQuestRepositoryMixin:
                 requested_energy,
                 max(0, player_integer(player, "energy_max") - current_energy),
             )
+            reputation_before = (
+                player_reputation_state(connection, int(player["id"]))
+                if grant.local_reputation
+                else None
+            )
             applied_values = dict(reward_value_delta(grant))
             if "energy" in applied_values:
                 applied_values["energy"] = energy_gain
@@ -193,10 +198,22 @@ class DailyQuestRepositoryMixin:
                 player_values=grant.set_values or None,
                 reputation_delta=grant.reputation or None,
                 local_reputation_delta=grant.local_reputation or None,
+                local_reputation_maximums=round_snapshot["local_reputation_maximums"] or None,
             )
             reward = reward_totals(grant)
             if "energy" in reward:
                 reward["energy"] = energy_gain
+            if reputation_before is not None:
+                reputation_after = player_reputation_state(connection, int(player["id"]))
+                for reputation_key in grant.local_reputation:
+                    actual_gain = (
+                        reputation_after.local.get(reputation_key, 0)
+                        - reputation_before.local.get(reputation_key, 0)
+                    )
+                    if actual_gain:
+                        reward[reputation_key] = actual_gain
+                    else:
+                        reward.pop(reputation_key, None)
             connection.execute(
                 "INSERT INTO daily_task_claims(round_id, player_id, operation_id, reward_json, claimed_at) VALUES (?, ?, ?, ?, ?)",
                 (
@@ -268,6 +285,7 @@ class DailyQuestRepositoryMixin:
             "selection_seed": seed,
             "completion_threshold": rules.completion_threshold,
             "reward": rules.reward.snapshot(),
+            "local_reputation_maximums": dict(rules.local_reputation_maximums),
         }
         connection.execute(
             """
@@ -486,6 +504,7 @@ class DailyQuestRepositoryMixin:
             snapshot={
                 "timezone": snapshot["timezone"],
                 "reward": snapshot["reward"],
+                "local_reputation_maximums": snapshot["local_reputation_maximums"],
             },
             already_completed=already_completed,
         )
@@ -522,7 +541,11 @@ class DailyQuestRepositoryMixin:
                 for task in self._daily_task_views(connection, int(round_row["id"]))
             ],
             "reward": reward,
-            "snapshot": {"timezone": snapshot["timezone"], "reward": reward_snapshot},
+            "snapshot": {
+                "timezone": snapshot["timezone"],
+                "reward": reward_snapshot,
+                "local_reputation_maximums": snapshot["local_reputation_maximums"],
+            },
         }
 
     def _daily_task_record_from_payload(
@@ -603,8 +626,25 @@ class DailyQuestRepositoryMixin:
             or isinstance(snapshot.get("completion_threshold"), bool)
             or not isinstance(snapshot.get("completion_threshold"), int)
             or not isinstance(snapshot.get("reward"), dict)
+            or not isinstance(snapshot.get("local_reputation_maximums"), dict)
         ):
             raise DailyTasksUnavailableError("daily round snapshot is invalid")
+        reward_local = snapshot["reward"].get("local_reputation")
+        maximums = snapshot["local_reputation_maximums"]
+        if (
+            not isinstance(reward_local, dict)
+            or set(maximums) != set(reward_local)
+            or any(
+                not isinstance(key, str)
+                or not key.startswith("local.")
+                or not key.removeprefix("local.")
+                or isinstance(maximum, bool)
+                or not isinstance(maximum, int)
+                or maximum <= 0
+                for key, maximum in maximums.items()
+            )
+        ):
+            raise DailyTasksUnavailableError("daily round reputation snapshot is invalid")
         return snapshot
 
     @staticmethod

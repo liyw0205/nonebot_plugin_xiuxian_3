@@ -7,7 +7,7 @@ import random
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
-from ..rewards.rules import RewardGrant, reward_definition
+from ..rewards.rules import RewardGrant, local_reputation_maximum, reward_definition
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +56,7 @@ class DailyQuestRules:
     completion_threshold: int
     selection: tuple[tuple[str, int], ...]
     reward: RewardGrant
+    local_reputation_maximums: dict[str, int]
 
     @property
     def task_count(self) -> int:
@@ -92,6 +93,10 @@ def daily_quest_rules(content: ContentBundle | None = None) -> DailyQuestRules:
             selection.append((group, count))
         reward_key = _string(raw.get("reward_key"), "event.daily_tasks.reward_key")
         reward = reward_definition(reward_key, bundle, operation="event.claim_daily_tasks")
+        local_maximums = {
+            reputation_key: local_reputation_maximum(reputation_key, bundle)
+            for reputation_key in reward.local_reputation
+        }
         definitions = daily_task_definitions(bundle)
         if threshold > sum(count for _, count in selection):
             raise ContentError("daily task completion threshold exceeds the selected task count")
@@ -104,6 +109,7 @@ def daily_quest_rules(content: ContentBundle | None = None) -> DailyQuestRules:
             completion_threshold=threshold,
             selection=tuple(selection),
             reward=reward,
+            local_reputation_maximums=local_maximums,
         )
     except KeyError as exc:
         raise ContentError(f"daily task content is incomplete: {exc}") from exc
