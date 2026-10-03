@@ -99,6 +99,22 @@ def _prepare_cloud_city_player(runtime, adapter: str, user: str) -> None:
         )
 
 
+def _set_local_reputation(runtime, adapter: str, user: str, local_json: str) -> None:
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        player = connection.execute(
+            "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+        ).fetchone()
+        assert player is not None
+        connection.execute(
+            """
+            INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
+            VALUES (?, ?, 0, '2026-09-27T00:00:00+00:00')
+            ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json
+            """,
+            (int(player[0]), local_json),
+        )
+
+
 def test_cloud_city_codex_unlocks_and_settles_guild_order_on_both_adapters() -> None:
     async def run() -> None:
         clock = MutableClock(datetime(2026, 9, 27, tzinfo=timezone.utc))
@@ -645,6 +661,220 @@ def test_codex_collection_requirements_and_names_follow_custom_content_json() ->
             )
             assert claimed.code == "CODEX_MILESTONE_CLAIMED"
             assert "山河战策" in claimed.message
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_codex_reputation_reward_uses_location_cap_and_replays_after_content_closes() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp_dir:
+            content_dir = Path(temp_dir) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", content_dir)
+            milestones_path = content_dir / "图鉴" / "里程碑.json"
+            milestones = json.loads(milestones_path.read_text(encoding="utf-8"))
+            target = next(row for row in milestones["records"] if row["key"] == "codex.xuantian.place_3")
+            target["name"] = "新镇三则"
+            target["reward"]["amount"] = 20
+            milestones_path.write_text(
+                json.dumps(milestones, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            locations_path = content_dir / "地图" / "地点.json"
+            locations = json.loads(locations_path.read_text(encoding="utf-8"))
+            next(row for row in locations["records"] if row["key"] == "xuantian.new_town")[
+                "local_reputation_maximum"
+            ] = 50
+            locations_path.write_text(
+                json.dumps(locations, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+
+            runtime = create_runtime(data_dir=content_dir)
+            entries = (
+                "codex.place.new_town",
+                "codex.place.outskirts",
+                "codex.place.spirit_field",
+            )
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"codex-cap-{adapter}"
+                prefix = adapter.replace(".", "-")
+                await _send(runtime, adapter, user, f"{prefix}-create", "开始修仙")
+                _seed_codex_entries(runtime, adapter, user, prefix, entries)
+                _set_local_reputation(runtime, adapter, user, '{"local.xuantian.new_town":48}')
+                claim = await _send(
+                    runtime,
+                    adapter,
+                    user,
+                    f"{prefix}-claim",
+                    "领取图鉴里程碑 codex.xuantian.place_3",
+                )
+                assert claim.code == "CODEX_MILESTONE_CLAIMED", claim
+                assert claim.data["reward"] == {"local.xuantian.new_town": 2}
+                assert "新镇三则" in claim.message
+                assert "青石镇名望 +2" in claim.message
+                assert "城镇委托额外展示条目" in claim.message
+                overview = await _send(runtime, adapter, user, f"{prefix}-claimed-overview", "我的图鉴")
+                claimed_milestone = next(
+                    item
+                    for item in overview.data["milestones"]
+                    if item["milestone_key"] == "codex.xuantian.place_3"
+                )
+                assert claimed_milestone["reward"] == {"local.xuantian.new_town": 2}
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    local_json = connection.execute(
+                        "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+                    ).fetchone()[0]
+                    assert json.loads(local_json)["local.xuantian.new_town"] == 50
+                    claim_reward = connection.execute(
+                        "SELECT reward_json FROM codex_milestone_claims WHERE player_id=?",
+                        (player_id,),
+                    ).fetchone()[0]
+                    operation_payload = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?",
+                        (f"{prefix}-claim",),
+                    ).fetchone()[0]
+                assert json.loads(claim_reward) == claim.data["reward"]
+                assert json.loads(operation_payload)["reward"] == claim.data["reward"]
+            await runtime.close()
+
+            milestones = json.loads(milestones_path.read_text(encoding="utf-8"))
+            target = next(row for row in milestones["records"] if row["key"] == "codex.xuantian.place_3")
+            target["status"] = "inactive"
+            target["name"] = "后来改写的见闻"
+            milestones_path.write_text(
+                json.dumps(milestones, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            unlocks_path = content_dir / "图鉴" / "解锁.json"
+            unlocks = json.loads(unlocks_path.read_text(encoding="utf-8"))
+            next(row for row in unlocks["records"] if row["key"] == "commission.town.extra_offer")[
+                "name"
+            ] = "后来改写的委托"
+            unlocks_path.write_text(
+                json.dumps(unlocks, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+
+            runtime = create_runtime(data_dir=content_dir)
+            for adapter in ("qq.official", "onebot.v11"):
+                prefix = adapter.replace(".", "-")
+                replay = await _send(
+                    runtime,
+                    adapter,
+                    f"codex-cap-{adapter}",
+                    f"{prefix}-claim",
+                    "领取图鉴里程碑 codex.xuantian.place_3",
+                )
+                assert replay.code == "CODEX_MILESTONE_CLAIMED", replay
+                assert replay.data["idempotent_replay"] is True
+                assert replay.data["reward"] == {"local.xuantian.new_town": 2}
+                assert "新镇三则" in replay.message
+                assert "后来改写" not in replay.message
+                assert "城镇委托额外展示条目" in replay.message
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_codex_reputation_bad_json_and_operation_failure_roll_back_for_retry() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            entries = (
+                "codex.material.blood_grass",
+                "codex.material.spirit_leaf",
+                "codex.material.ironstone",
+                "codex.material.wood",
+                "codex.material.array_sand",
+            )
+            for adapter in ("qq.official", "onebot.v11"):
+                prefix = adapter.replace(".", "-")
+                bad_json_user = f"codex-bad-json-{adapter}"
+                await _send(runtime, adapter, bad_json_user, f"{prefix}-json-create", "开始修仙")
+                _seed_codex_entries(runtime, adapter, bad_json_user, f"{prefix}-json", entries)
+                _set_local_reputation(runtime, adapter, bad_json_user, "{broken")
+                bad_json = await _send(
+                    runtime,
+                    adapter,
+                    bad_json_user,
+                    f"{prefix}-json-claim",
+                    "领取图鉴里程碑 codex.xuantian.materials_5",
+                )
+                assert bad_json.code == "PERSISTENCE_ERROR", bad_json
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, bad_json_user),
+                    ).fetchone()[0]
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM codex_milestone_claims WHERE player_id=?", (player_id,)
+                    ).fetchone()[0] == 0
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM operations WHERE operation_id=?",
+                        (f"{prefix}-json-claim",),
+                    ).fetchone()[0] == 0
+                _set_local_reputation(
+                    runtime, adapter, bad_json_user, '{"local.xuantian.new_town":10}'
+                )
+                retried_json = await _send(
+                    runtime,
+                    adapter,
+                    bad_json_user,
+                    f"{prefix}-json-claim",
+                    "领取图鉴里程碑 codex.xuantian.materials_5",
+                )
+                assert retried_json.code == "CODEX_MILESTONE_CLAIMED", retried_json
+                assert retried_json.data["reward"] == {"local.xuantian.new_town": 5}
+
+                operation_user = f"codex-op-failure-{adapter}"
+                await _send(runtime, adapter, operation_user, f"{prefix}-op-create", "开始修仙")
+                _seed_codex_entries(runtime, adapter, operation_user, f"{prefix}-op", entries)
+                _set_local_reputation(
+                    runtime, adapter, operation_user, '{"local.xuantian.new_town":9}'
+                )
+                with runtime.repository._connect() as connection:
+                    connection.executescript(
+                        """
+                        CREATE TRIGGER fail_codex_claim_operation BEFORE INSERT ON operations
+                        WHEN NEW.operation_name = 'specials.claim_codex_milestone'
+                        BEGIN SELECT RAISE(ABORT, 'injected codex operation failure'); END;
+                        """
+                    )
+                operation_id = f"{prefix}-operation-claim"
+                failed = await _send(
+                    runtime,
+                    adapter,
+                    operation_user,
+                    operation_id,
+                    "领取图鉴里程碑 codex.xuantian.materials_5",
+                )
+                assert failed.code == "PERSISTENCE_ERROR", failed
+                with runtime.repository._connect() as connection:
+                    connection.execute("DROP TRIGGER fail_codex_claim_operation")
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, operation_user),
+                    ).fetchone()[0]
+                    local_json = connection.execute(
+                        "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+                    ).fetchone()[0]
+                    assert json.loads(local_json)["local.xuantian.new_town"] == 9
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM codex_milestone_claims WHERE player_id=?", (player_id,)
+                    ).fetchone()[0] == 0
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM operations WHERE operation_id=?", (operation_id,)
+                    ).fetchone()[0] == 0
+                retried_operation = await _send(
+                    runtime,
+                    adapter,
+                    operation_user,
+                    operation_id,
+                    "领取图鉴里程碑 codex.xuantian.materials_5",
+                )
+                assert retried_operation.code == "CODEX_MILESTONE_CLAIMED", retried_operation
+                assert retried_operation.data["reward"] == {"local.xuantian.new_town": 5}
             await runtime.close()
 
     asyncio.run(run())

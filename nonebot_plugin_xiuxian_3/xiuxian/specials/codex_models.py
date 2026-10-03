@@ -35,8 +35,11 @@ class CodexOverviewRecord:
 @dataclass(frozen=True, slots=True)
 class CodexMilestoneClaimRecord:
     milestone_key: str
+    milestone_label: str
     reward: dict[str, int]
+    reputation_name: str | None
     unlocks: tuple[str, ...]
+    unlock_labels: tuple[str, ...]
     already_completed: bool = False
 
 

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sqlite3
-from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
@@ -15,6 +13,8 @@ from ..persistence.errors import (
     CodexMilestoneNotReadyError,
     OperationConflictError,
 )
+from ..rewards.rules import local_reputation_maximum
+from ..utils.player import grant_player_state, local_reputation_with_delta
 from .codex_models import (
     CodexEntryRecord,
     CodexMilestoneClaimRecord,
@@ -24,6 +24,7 @@ from .codex_models import (
 from .codex_rules import (
     codex_milestones,
     label_for_entry,
+    unlock_label,
 )
 
 
@@ -45,9 +46,9 @@ class CodexRepositoryMixin:
                 (player["id"],),
             ).fetchall()
             claims = {
-                str(row["milestone_key"])
+                str(row["milestone_key"]): json.loads(row["reward_json"])
                 for row in connection.execute(
-                "SELECT milestone_key FROM codex_milestone_claims "
+                    "SELECT milestone_key, reward_json FROM codex_milestone_claims "
                     "WHERE player_id = ?",
                     (player["id"],),
                 ).fetchall()
@@ -71,8 +72,16 @@ class CodexRepositoryMixin:
                         required_count=len(definition.entry_keys),
                         ready=all(key in discovered for key in definition.entry_keys),
                         claimed=definition.key in claims,
-                        reputation_key=definition.reputation_key,
-                        reputation_reward=definition.reputation_reward,
+                        reputation_key=(
+                            next(iter(claims[definition.key]), definition.reputation_key)
+                            if definition.key in claims
+                            else definition.reputation_key
+                        ),
+                        reputation_reward=(
+                            next(iter(claims[definition.key].values()), 0)
+                            if definition.key in claims
+                            else definition.reputation_reward
+                        ),
                         unlocks=definition.unlocks,
                     )
                     for definition in milestones.values()
@@ -104,9 +113,6 @@ class CodexRepositoryMixin:
         milestone_key: str,
         operation_id: str,
     ) -> CodexMilestoneClaimRecord:
-        definition = codex_milestones(self.content).get(milestone_key)
-        if definition is None:
-            raise CodexMilestoneNotFoundError("unsupported codex milestone")
         operation_name = "specials.claim_codex_milestone"
         request_payload = {
             "platform": platform,
@@ -129,6 +135,10 @@ class CodexRepositoryMixin:
                     json.loads(operation["result_json"]), replay=True
                 )
 
+            definition = codex_milestones(self.content).get(milestone_key)
+            if definition is None:
+                raise CodexMilestoneNotFoundError("unsupported codex milestone")
+
             player = self._require_player(connection, platform, platform_user_id)
             prior = connection.execute(
                 "SELECT 1 FROM codex_milestone_claims "
@@ -147,30 +157,28 @@ class CodexRepositoryMixin:
             if len(entry_keys) != len(definition.entry_keys):
                 raise CodexMilestoneNotReadyError("codex milestone requirements are incomplete")
 
-            reward = (
-                {definition.reputation_key: definition.reputation_reward}
-                if definition.reputation_key is not None and definition.reputation_reward
-                else {}
-            )
-            if reward:
-                reputation = connection.execute(
-                    "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                    (player["id"],),
-                ).fetchone()
-                local = self._json_object(reputation["local_json"], {}) if reputation else {}
-                service = int(reputation["service_reputation"]) if reputation else 0
-                for key, amount in reward.items():
-                    local[key] = min(1000, int(local.get(key, 0)) + amount)
-                connection.execute(
-                    """
-                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(player_id) DO UPDATE SET
-                        local_json = excluded.local_json,
-                        updated_at = excluded.updated_at
-                    """,
-                    (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
+            reward: dict[str, int] = {}
+            if definition.reputation_key is not None and definition.reputation_reward:
+                reputation_key = definition.reputation_key
+                local_before = local_reputation_with_delta(
+                    connection, int(player["id"]), {}
+                ).get(reputation_key, 0)
+                grant_player_state(
+                    connection,
+                    player,
+                    rewards=None,
+                    updated_at=now_text,
+                    local_reputation_delta={reputation_key: definition.reputation_reward},
+                    local_reputation_maximums={
+                        reputation_key: local_reputation_maximum(reputation_key, self.content)
+                    },
                 )
+                local_after = local_reputation_with_delta(
+                    connection, int(player["id"]), {}
+                ).get(reputation_key, 0)
+                actual_reward = local_after - local_before
+                if actual_reward:
+                    reward[reputation_key] = actual_reward
 
             snapshot = {
                 "entry_keys": list(entry_keys),
@@ -195,8 +203,11 @@ class CodexRepositoryMixin:
             )
             payload = {
                 "milestone_key": milestone_key,
+                "milestone_label": definition.label,
                 "reward": reward,
+                "reputation_name": definition.reputation_name,
                 "unlocks": list(definition.unlocks),
+                "unlock_labels": [unlock_label(key, self.content) for key in definition.unlocks],
                 "snapshot": snapshot,
             }
             connection.execute(
@@ -220,8 +231,15 @@ class CodexRepositoryMixin:
     ) -> CodexMilestoneClaimRecord:
         return CodexMilestoneClaimRecord(
             milestone_key=str(payload["milestone_key"]),
+            milestone_label=str(payload["milestone_label"]),
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            reputation_name=(
+                str(payload["reputation_name"])
+                if payload.get("reputation_name") is not None
+                else None
+            ),
             unlocks=tuple(str(key) for key in payload.get("unlocks", [])),
+            unlock_labels=tuple(str(key) for key in payload["unlock_labels"]),
             already_completed=replay,
         )
 

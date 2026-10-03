@@ -155,18 +155,18 @@ class CodexApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        definition = codex_milestones(self.repository.content)[record.milestone_key]
         reward = "、".join(
-            f"{definition.reputation_name} +{amount}"
+            f"{record.reputation_name} +{amount}"
             for amount in record.reward.values()
+            if record.reputation_name is not None
         )
-        unlocks = "、".join(unlock_label(key, self.repository.content) for key in record.unlocks)
+        unlocks = "、".join(record.unlock_labels)
         replay_text = "（此赏此前已领取）" if record.already_completed else ""
         benefits = "、".join(value for value in (reward, unlocks) if value)
         return CommandResult(
             True,
             "CODEX_MILESTONE_CLAIMED",
-            f"已领取 **{definition.label}**。所得：{benefits}。{replay_text}",
+            f"已领取 **{record.milestone_label}**。所得：{benefits}。{replay_text}",
             context.request_id,
             operation_id,
             data={
