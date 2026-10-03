@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -151,6 +153,248 @@ def test_mainline_claim_uses_start_snapshot_after_content_closes(tmp_path: Path)
             ).fetchone()[0]
             assert events == 1
         await reloaded.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_mainline_reputation_uses_frozen_location_cap_after_restart(
+    tmp_path: Path, adapter: str
+) -> None:
+    source = Path(__file__).parents[1] / "data"
+    data_dir = tmp_path / adapter.replace(".", "-")
+    shutil.copytree(source, data_dir)
+    location_path = data_dir / "地图" / "地点.json"
+    locations = json.loads(location_path.read_text(encoding="utf-8"))
+    town = next(row for row in locations["records"] if row["key"] == "xuantian.new_town")
+    town["local_reputation_maximum"] = 4
+    location_path.write_text(json.dumps(locations, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    mainline_path = data_dir / "剧情" / "主线.json"
+    user = f"mainline-cap-{adapter}"
+
+    async def run() -> None:
+        now = datetime(2026, 9, 22, tzinfo=timezone.utc)
+        runtime = create_runtime(data_dir=data_dir, clock=lambda: now)
+
+        async def send(runtime_instance, operation_id: str, command: str):
+            return await runtime_instance.adapters.dispatch(
+                adapter, _context(adapter, user, operation_id), command
+            )
+
+        assert (await send(runtime, "create", "开始修仙")).ok
+        assert (await send(runtime, "seek", "寻仙问道")).ok
+        with runtime.repository._connect() as connection:
+            player_id = connection.execute(
+                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user),
+            ).fetchone()[0]
+            connection.execute(
+                "INSERT INTO player_reputations(player_id, local_json, updated_at) VALUES (?, ?, ?)",
+                (player_id, json.dumps({"local.xuantian.new_town": 3}), now.isoformat()),
+            )
+        assert (await send(runtime, "start", "开始主线 1")).ok
+        await runtime.close()
+
+        story = json.loads(mainline_path.read_text(encoding="utf-8"))
+        first = next(row for row in story["records"] if row["key"] == "chapter.1.stage.1")
+        first["status"] = "locked"
+        first["first_clear_reward"]["local_reputation"] = 99
+        mainline_path.write_text(json.dumps(story, ensure_ascii=False, indent=2), encoding="utf-8")
+        locations = json.loads(location_path.read_text(encoding="utf-8"))
+        town = next(row for row in locations["records"] if row["key"] == "xuantian.new_town")
+        town["local_reputation_maximum"] = 1
+        location_path.write_text(json.dumps(locations, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        restored = create_runtime(data_dir=data_dir, clock=lambda: now)
+        claimed = await send(restored, "claim", "领取主线奖励 1")
+        assert claimed.code == "MAINLINE_REWARD_CLAIMED"
+        assert claimed.data["reward"]["local_reputation"] == 1
+        replay = await send(restored, "claim", "领取主线奖励 1")
+        assert replay.data["idempotent_replay"] is True
+        with restored.repository._connect() as connection:
+            reputation_json = connection.execute(
+                "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+            ).fetchone()[0]
+            run = connection.execute(
+                "SELECT snapshot_json, result_json FROM mainline_runs WHERE player_id=? AND stage_key=?",
+                (player_id, "chapter.1.stage.1"),
+            ).fetchone()
+            operation = connection.execute(
+                "SELECT result_json FROM operations WHERE operation_id=?",
+                (f"{adapter}:claim",),
+            ).fetchone()[0]
+        assert json.loads(reputation_json)["local.xuantian.new_town"] == 4
+        assert json.loads(run["snapshot_json"])["definition"]["local_reputation_maximum"] == 4
+        assert json.loads(run["result_json"])["reward"]["local_reputation"] == 1
+        assert json.loads(operation)["reward"]["local_reputation"] == 1
+        await restored.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_mainline_reward_failure_rolls_back_and_same_operation_recovers(
+    tmp_path: Path, adapter: str
+) -> None:
+    async def run() -> None:
+        now = datetime(2026, 9, 22, tzinfo=timezone.utc)
+        runtime = create_runtime(data_dir=tmp_path / adapter.replace(".", "-"), clock=lambda: now)
+        user = f"mainline-recovery-{adapter}"
+
+        async def send(operation_id: str, command: str):
+            return await runtime.adapters.dispatch(
+                adapter, _context(adapter, user, operation_id), command
+            )
+
+        assert (await send("create", "开始修仙")).ok
+        assert (await send("seek", "寻仙问道")).ok
+        assert (await send("start", "开始主线 1")).ok
+        with runtime.repository._connect() as connection:
+            player_id = connection.execute(
+                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user),
+            ).fetchone()[0]
+            connection.execute(
+                """
+                CREATE TRIGGER fail_mainline_claim
+                BEFORE INSERT ON operations
+                WHEN NEW.operation_name = 'mainline.claim_first_clear'
+                BEGIN SELECT RAISE(ABORT, 'injected mainline operation failure'); END
+                """
+            )
+
+        failed = await send("claim", "领取主线奖励 1")
+        assert failed.code == "PERSISTENCE_ERROR"
+        with runtime.repository._connect() as connection:
+            status = connection.execute(
+                "SELECT status, first_clear_claimed FROM mainline_runs WHERE player_id=? AND stage_key=?",
+                (player_id, "chapter.1.stage.1"),
+            ).fetchone()
+            reputation = connection.execute(
+                "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+            ).fetchone()
+            claim_operation_count = connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE operation_id=?", (f"{adapter}:claim",)
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER fail_mainline_claim")
+        assert tuple(status) == ("running", 0)
+        assert reputation is None
+        assert claim_operation_count == 0
+
+        claimed = await send("claim", "领取主线奖励 1")
+        assert claimed.code == "MAINLINE_REWARD_CLAIMED"
+        assert claimed.data["reward"]["local_reputation"] == 3
+        replay = await send("claim", "领取主线奖励 1")
+        assert replay.data["idempotent_replay"] is True
+        with runtime.repository._connect() as connection:
+            reputation_json = connection.execute(
+                "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+            ).fetchone()[0]
+            claim_operation_count = connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE operation_id=?", (f"{adapter}:claim",)
+            ).fetchone()[0]
+        assert json.loads(reputation_json)["local.xuantian.new_town"] == 3
+        assert claim_operation_count == 1
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("broken_json", ["{", "[]", '{"local.xuantian.new_town": true}'])
+def test_mainline_invalid_reputation_json_rejects_claim_atomically(
+    tmp_path: Path, broken_json: str
+) -> None:
+    async def run() -> None:
+        now = datetime(2026, 9, 22, tzinfo=timezone.utc)
+        runtime = create_runtime(data_dir=tmp_path, clock=lambda: now)
+        adapter = "onebot.v11"
+        user = "mainline-invalid-reputation"
+
+        async def send(operation_id: str, command: str):
+            return await runtime.adapters.dispatch(
+                adapter, _context(adapter, user, operation_id), command
+            )
+
+        assert (await send("create", "开始修仙")).ok
+        assert (await send("seek", "寻仙问道")).ok
+        assert (await send("start", "开始主线 1")).ok
+        with runtime.repository._connect() as connection:
+            player_id = connection.execute(
+                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user),
+            ).fetchone()[0]
+            connection.execute(
+                "INSERT INTO player_reputations(player_id, local_json, updated_at) VALUES (?, ?, ?)",
+                (player_id, broken_json, now.isoformat()),
+            )
+
+        rejected = await send("claim", "领取主线奖励 1")
+        assert rejected.code == "PERSISTENCE_ERROR"
+        with runtime.repository._connect() as connection:
+            status = connection.execute(
+                "SELECT status, first_clear_claimed FROM mainline_runs WHERE player_id=? AND stage_key=?",
+                (player_id, "chapter.1.stage.1"),
+            ).fetchone()
+            stored_json = connection.execute(
+                "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+            ).fetchone()[0]
+            claim_operation_count = connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE operation_id=?", (f"{adapter}:claim",)
+            ).fetchone()[0]
+        assert tuple(status) == ("running", 0)
+        assert stored_json == broken_json
+        assert claim_operation_count == 0
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_mainline_invalid_run_snapshot_does_not_fall_back_to_current_content(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        now = datetime(2026, 9, 22, tzinfo=timezone.utc)
+        runtime = create_runtime(data_dir=tmp_path, clock=lambda: now)
+        adapter = "onebot.v11"
+        user = "mainline-invalid-snapshot"
+
+        async def send(operation_id: str, command: str):
+            return await runtime.adapters.dispatch(
+                adapter, _context(adapter, user, operation_id), command
+            )
+
+        assert (await send("create", "开始修仙")).ok
+        assert (await send("seek", "寻仙问道")).ok
+        assert (await send("start", "开始主线 1")).ok
+        with runtime.repository._connect() as connection:
+            player_id = connection.execute(
+                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user),
+            ).fetchone()[0]
+            connection.execute(
+                "UPDATE mainline_runs SET snapshot_json='{' WHERE player_id=? AND stage_key=?",
+                (player_id, "chapter.1.stage.1"),
+            )
+
+        rejected = await send("claim", "领取主线奖励 1")
+        assert rejected.code == "PERSISTENCE_ERROR"
+        with runtime.repository._connect() as connection:
+            run = connection.execute(
+                "SELECT status, first_clear_claimed FROM mainline_runs WHERE player_id=? AND stage_key=?",
+                (player_id, "chapter.1.stage.1"),
+            ).fetchone()
+            reputation = connection.execute(
+                "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+            ).fetchone()
+            claim_operation_count = connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE operation_id=?",
+                (f"{adapter}:claim",),
+            ).fetchone()[0]
+        assert tuple(run) == ("running", 0)
+        assert reputation is None
+        assert claim_operation_count == 0
+        await runtime.close()
 
     asyncio.run(run())
 

@@ -179,7 +179,14 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import grant_player_assets, inventory_amount
-from ..utils.player import change_player_state, player_integer, player_inventory
+from ..utils.player import (
+    change_player_state,
+    grant_player_state,
+    player_integer,
+    player_inventory,
+    player_reputation_state,
+)
+from ..rewards.rules import local_reputation_maximum
 
 
 class AdventuresRepositoryMixin:
@@ -1087,6 +1094,20 @@ class AdventuresRepositoryMixin:
                 if run is not None
                 else mainline_first_clear_key(definition.chapter, definition.stage, str(row["player_id"]), story_key=story_key)
             )
+            has_local_reputation_reward = any(
+                "local_reputation" in reward
+                for reward in (
+                    definition.first_clear_reward_map(),
+                    definition.repeat_reward_map(),
+                )
+            )
+            if has_local_reputation_reward and not definition.reputation_key:
+                raise ValueError("mainline local reputation requires a configured reputation key")
+            reputation_maximum = (
+                local_reputation_maximum(definition.reputation_key, self.content)
+                if has_local_reputation_reward
+                else None
+            )
             snapshot = {
                 "stage": str(row["stage"]),
                 "realm_key": str(row["realm_key"]),
@@ -1103,6 +1124,7 @@ class AdventuresRepositoryMixin:
                     "first_clear_reward": definition.first_clear_reward_map(),
                     "repeat_reward": definition.repeat_reward_map(),
                     "reputation_key": definition.reputation_key,
+                    "local_reputation_maximum": reputation_maximum,
                 },
             }
             if run is None:
@@ -1253,13 +1275,10 @@ class AdventuresRepositoryMixin:
             ).fetchone()
             if run is None or str(run["status"]) != "running":
                 raise MainlineNotStartedError("mainline stage has not been started")
-            if definition.runtime_status != "open":
-                frozen = self._mainline_definition_from_snapshot(run, definition)
-                if frozen is None:
-                    raise MainlineContentClosedError("mainline stage is not open")
-                definition = frozen
-            else:
-                definition = self._mainline_definition_from_snapshot(run, definition) or definition
+            frozen = self._mainline_definition_from_snapshot(run, definition)
+            if frozen is None:
+                raise ValueError("mainline run snapshot is invalid")
+            definition = frozen
             first_clear = not bool(run["first_clear_claimed"])
             reward = mainline_reward(definition, first_clear=first_clear, content=self.content)
             connection.execute(
@@ -1335,6 +1354,7 @@ class AdventuresRepositoryMixin:
                 return None
             first_clear = payload["first_clear_reward"]
             repeat = payload["repeat_reward"]
+            reputation_maximum = payload["local_reputation_maximum"]
             def valid_reward(reward: object) -> bool:
                 if not isinstance(reward, dict) or not reward:
                     return False
@@ -1363,6 +1383,19 @@ class AdventuresRepositoryMixin:
                 or not valid_reward(first_clear)
                 or not valid_reward(repeat)
                 or (
+                    ("local_reputation" in first_clear or "local_reputation" in repeat)
+                    and (
+                        isinstance(reputation_maximum, bool)
+                        or not isinstance(reputation_maximum, int)
+                        or reputation_maximum <= 0
+                    )
+                )
+                or (
+                    "local_reputation" not in first_clear
+                    and "local_reputation" not in repeat
+                    and reputation_maximum is not None
+                )
+                or (
                     payload.get("reputation_key") is not None
                     and not isinstance(payload.get("reputation_key"), str)
                 )
@@ -1384,6 +1417,7 @@ class AdventuresRepositoryMixin:
                 runtime_status="open",
                 aliases=current.aliases,
                 reputation_key=payload.get("reputation_key"),
+                local_reputation_maximum=reputation_maximum,
             )
         except (KeyError, TypeError, ValueError, json.JSONDecodeError):
             return None
@@ -1412,10 +1446,8 @@ class AdventuresRepositoryMixin:
                 actual[key] = quantity
             elif key == "local_reputation":
                 local_delta += int(raw_value)
-                actual[key] = int(raw_value)
             elif key == "service_reputation":
                 service_delta += int(raw_value)
-                actual[key] = int(raw_value)
             elif key == "title_key":
                 title_key = str(raw_value)
                 title = honor_title(title_key)
@@ -1442,29 +1474,45 @@ class AdventuresRepositoryMixin:
                 event_keys.append(key)
             else:
                 raise ValueError(f"unsupported mainline reward: {key}")
-        if local_delta or service_delta:
-            reputation = connection.execute(
-                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                (player["id"],),
-            ).fetchone()
-            local = SQLitePlayerRepository._json_object(reputation["local_json"], {}) if reputation else {}
-            if local_delta:
-                if not definition.reputation_key:
-                    raise ValueError("mainline local reputation requires a configured reputation key")
-                reputation_key = definition.reputation_key
-                local[reputation_key] = int(local.get(reputation_key, 0)) + local_delta
-            service = int(reputation["service_reputation"]) if reputation else 0
-            service = min(100, service + service_delta)
-            connection.execute(
-                """
-                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                """,
-                (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
+        reputation_before = (
+            player_reputation_state(connection, int(player["id"]))
+            if local_delta or service_delta
+            else None
+        )
+        local_delta_map = None
+        local_maximums = None
+        if local_delta:
+            if not definition.reputation_key or definition.local_reputation_maximum is None:
+                raise ValueError("mainline local reputation requires a frozen location maximum")
+            local_delta_map = {definition.reputation_key: local_delta}
+            local_maximums = {
+                definition.reputation_key: definition.local_reputation_maximum
+            }
+        if asset_rewards or local_delta or service_delta:
+            grant_player_state(
+                connection,
+                player,
+                asset_rewards or None,
+                now_text,
+                local_reputation_delta=local_delta_map,
+                local_reputation_maximums=local_maximums,
+                service_reputation_delta=service_delta if service_delta else None,
             )
-        grant_player_assets(connection, player, asset_rewards, now_text)
+        if reputation_before is not None:
+            reputation_after = player_reputation_state(connection, int(player["id"]))
+            if local_delta_map:
+                reputation_key = definition.reputation_key
+                assert reputation_key is not None
+                local_actual = (
+                    reputation_after.local.get(reputation_key, 0)
+                    - reputation_before.local.get(reputation_key, 0)
+                )
+                if local_actual:
+                    actual["local_reputation"] = local_actual
+            if service_delta:
+                service_actual = reputation_after.service - reputation_before.service
+                if service_actual:
+                    actual["service_reputation"] = service_actual
         for event_key in event_keys:
             connection.execute(
                 """

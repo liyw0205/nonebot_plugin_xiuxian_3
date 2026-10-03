@@ -49,6 +49,7 @@ class MainlineStageDefinition:
     runtime_status: str = "open"
     aliases: tuple[str, ...] = ()
     reputation_key: str | None = None
+    local_reputation_maximum: int | None = None
 
     def first_clear_reward_map(self) -> dict[str, int | str]:
         return dict(self.first_clear_reward)
