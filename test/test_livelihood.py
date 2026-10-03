@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -79,6 +81,102 @@ def test_blood_grass_plot_is_idempotent_and_does_not_change_cultivation() -> Non
                     (user,),
                 ).fetchone()
                 assert json.loads(reputation[0])["local.xuantian.new_town"] == 2
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_blood_grass_harvest_uses_location_cap_and_recovers_after_reward_failure() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            location_file = data_dir / "地图" / "地点.json"
+            locations = json.loads(location_file.read_text(encoding="utf-8"))
+            new_town = next(
+                item for item in locations["records"] if item["key"] == "xuantian.new_town"
+            )
+            new_town["local_reputation_maximum"] = 41
+            location_file.write_text(
+                json.dumps(locations, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            user = "livelihood-reputation-cap"
+            assert (await runtime.dispatch(_context(user), "开始修仙")).ok
+            assert (await runtime.dispatch(_context(user), "寻仙问道")).ok
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform='web' AND platform_user_id=?",
+                    (user,),
+                ).fetchone()[0]
+                connection.execute(
+                    "INSERT INTO player_reputations(player_id, local_json, updated_at) "
+                    "VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json",
+                    (player_id, json.dumps({"local.xuantian.new_town": 40}), clock.value.isoformat()),
+                )
+            assert (await runtime.dispatch(_context(user, "lease"), "租住居所")).ok
+            planted = await runtime.dispatch(_context(user, "plant"), "灵田播种 止血草")
+            assert planted.code == "FIELD_PLOT_PLANTED"
+            assert (await runtime.dispatch(_context(user, "maintain"), "灵田维护")).ok
+            clock.advance(hours=4)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                inventory_before_harvest = json.loads(
+                    connection.execute(
+                        "SELECT inventory_json FROM players WHERE id=?", (player_id,)
+                    ).fetchone()[0]
+                )
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    f"CREATE TRIGGER fail_reputation_insert BEFORE INSERT ON player_reputations "
+                    f"WHEN NEW.player_id={player_id} BEGIN "
+                    "SELECT RAISE(ABORT, 'injected reputation failure'); END"
+                )
+            with pytest.raises(sqlite3.IntegrityError, match="injected reputation failure"):
+                await runtime.repository.harvest_plot(
+                    platform="web",
+                    platform_user_id=user,
+                    operation_id="harvest-retry",
+                )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT status FROM field_plots WHERE plot_id=?", (planted.data["plot_id"],)
+                ).fetchone()[0] == "growing"
+                inventory_raw, reputation_raw, operation_count = connection.execute(
+                    "SELECT p.inventory_json, r.local_json, "
+                    "(SELECT COUNT(*) FROM operations WHERE operation_id='harvest-retry') "
+                    "FROM players p JOIN player_reputations r ON r.player_id=p.id WHERE p.id=?",
+                    (player_id,),
+                ).fetchone()
+                assert json.loads(inventory_raw) == inventory_before_harvest
+                assert json.loads(reputation_raw)["local.xuantian.new_town"] == 40
+                assert operation_count == 0
+                connection.execute("DROP TRIGGER fail_reputation_insert")
+
+            harvested = await runtime.dispatch(
+                _context(user, "harvest-retry"), "灵田收获"
+            )
+            assert harvested.code == "FIELD_PLOT_HARVESTED"
+            assert harvested.data["local_reputation_delta"] == 1
+            replay = await runtime.dispatch(
+                _context(user, "harvest-retry"), "灵田收获"
+            )
+            assert replay.data["idempotent_replay"] is True
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                inventory_raw, reputation_raw, operation_count = connection.execute(
+                    "SELECT p.inventory_json, r.local_json, "
+                    "(SELECT COUNT(*) FROM operations WHERE operation_id='harvest-retry') "
+                    "FROM players p JOIN player_reputations r ON r.player_id=p.id WHERE p.id=?",
+                    (player_id,),
+                ).fetchone()
+            assert json.loads(inventory_raw)["item.herb.blood_grass"] == (
+                inventory_before_harvest.get("item.herb.blood_grass", 0) + 3
+            )
+            assert json.loads(reputation_raw)["local.xuantian.new_town"] == 41
+            assert operation_count == 1
             await runtime.close()
 
     asyncio.run(run())

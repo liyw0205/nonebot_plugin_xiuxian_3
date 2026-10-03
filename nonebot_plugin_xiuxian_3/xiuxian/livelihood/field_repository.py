@@ -9,8 +9,15 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import grant_player_assets, inventory_amount
-from ..utils.player import change_player_state, spend_player_state, player_inventory, player_integer
+from ..utils.assets import inventory_amount
+from ..utils.player import (
+    change_player_state,
+    grant_player_reward,
+    player_integer,
+    player_inventory,
+    spend_player_state,
+)
+from ..rewards.rules import local_reputation_maximum
 from ..persistence.errors import (
     CropContentClosedError,
     CropDailyLimitError,
@@ -310,28 +317,22 @@ class FieldPlotRepositoryMixin:
                 harvest = dict(snapshot.get("maintained_harvest" if maintained else "unmaintained_harvest", {}))
                 if maintained and int(snapshot.get("array_sand_roll", 0)):
                     harvest["item.mat.array_sand"] = int(harvest.get("item.mat.array_sand", 0)) + 1
-                grant_player_assets(
+                reputation_delta = 1 if str(plot["crop_key"]) == "crop.blood_grass" else 0
+                reward = dict(harvest)
+                local_reputation_key = "local.xuantian.new_town"
+                if reputation_delta:
+                    reward[local_reputation_key] = reputation_delta
+                grant_player_reward(
                     connection,
                     row,
-                    harvest,
+                    reward,
                     now_text,
+                    local_reputation_maximums=(
+                        {local_reputation_key: local_reputation_maximum(local_reputation_key, self.content)}
+                        if reputation_delta
+                        else None
+                    ),
                 )
-                reputation_delta = 1 if str(plot["crop_key"]) == "crop.blood_grass" else 0
-                if reputation_delta:
-                    reputation = connection.execute(
-                        "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
-                    ).fetchone()
-                    local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-                    local_key = "local.xuantian.new_town"
-                    local[local_key] = min(1000, int(local.get(local_key, 0)) + reputation_delta)
-                    connection.execute(
-                        """
-                        INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                        VALUES (?, ?, 0, ?)
-                        ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json, updated_at = excluded.updated_at
-                        """,
-                        (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), now_text),
-                    )
                 connection.execute(
                     "UPDATE field_plots SET status = 'harvested', result_json = ?, updated_at = ? WHERE id = ? AND status IN ('growing', 'harvestable')",
                     (json.dumps({"harvest": harvest, "maintained": maintained, "local_reputation_delta": reputation_delta}, ensure_ascii=False, sort_keys=True), now_text, plot["id"]),

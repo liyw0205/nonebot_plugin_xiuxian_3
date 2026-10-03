@@ -305,7 +305,15 @@ def test_qq_and_onebot_spirit_leaf_field_flow_reaches_shared_application() -> No
                     ).fetchone()[0]
                     connection.execute(
                         "UPDATE players SET inventory_json = ?, spirit_stones = 100 WHERE id = ?",
-                        (json.dumps({"item.herb.spirit_leaf": 1}), player_id),
+                        (
+                            json.dumps(
+                                {
+                                    "item.herb.spirit_leaf": 1,
+                                    "item.herb.blood_grass": 1,
+                                }
+                            ),
+                            player_id,
+                        ),
                     )
                     connection.execute(
                         """
@@ -328,6 +336,41 @@ def test_qq_and_onebot_spirit_leaf_field_flow_reaches_shared_application() -> No
                 harvested = await dispatch(f"{prefix}-harvest", "灵田收获")
                 assert harvested.code == "FIELD_PLOT_HARVESTED"
                 assert harvested.data["harvest"]["item.herb.spirit_leaf"] == 3
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (normalized.context.adapter, normalized.context.user_id),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE player_reputations SET local_json=? WHERE player_id=?",
+                        (json.dumps({"local.xuantian.new_town": 999}), player_id),
+                    )
+                assert (
+                    await dispatch(f"{prefix}-blood-plant", "灵田播种 止血草")
+                ).code == "FIELD_PLOT_PLANTED"
+                assert (await dispatch(f"{prefix}-blood-maintain", "灵田维护")).ok
+                clock.advance(hours=4)
+                blood_grass = await dispatch(f"{prefix}-blood-harvest", "灵田收获")
+                assert blood_grass.code == "FIELD_PLOT_HARVESTED"
+                assert blood_grass.data["harvest"] == {"item.herb.blood_grass": 3}
+                assert blood_grass.data["local_reputation_delta"] == 1
+                replay = await dispatch(f"{prefix}-blood-harvest", "灵田收获")
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    inventory_raw = connection.execute(
+                        "SELECT inventory_json FROM players WHERE id=?", (player_id,)
+                    ).fetchone()[0]
+                    reputation_raw = connection.execute(
+                        "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
+                    ).fetchone()[0]
+                    operation_count = connection.execute(
+                        "SELECT COUNT(*) FROM operations WHERE operation_id=?",
+                        (f"{prefix}-blood-harvest",),
+                    ).fetchone()[0]
+                assert json.loads(inventory_raw)["item.herb.blood_grass"] == 3
+                assert json.loads(reputation_raw)["local.xuantian.new_town"] == 1000
+                assert operation_count == 1
             await runtime.close()
 
     asyncio.run(run())
