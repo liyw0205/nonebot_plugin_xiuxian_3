@@ -108,6 +108,7 @@ def test_spirit_spring_event_uses_qq_onebot_and_original_exploration_operation()
             assert status.code == "EVENT_STATUS"
             assert status.data["round_id"] == "20260923"
             assert status.data["status"] == "open"
+            assert status.data["minimum_contribution"] == 10
 
             started = await runtime.adapters.dispatch(
                 "onebot.v11", replace(onebot, operation_id="ob-spring-start"), "开始探索 灵泉采集"
@@ -165,6 +166,7 @@ def test_spirit_spring_event_uses_qq_onebot_and_original_exploration_operation()
                 "领取灵泉事件奖励 20260923",
             )
             assert claimed.code == "EVENT_REWARD_CLAIMED"
+            assert claimed.data["minimum_contribution"] == 10
             assert claimed.data["reward"] == {
                 "cultivation": 150,
                 "faction_reputation.xuantian": 10,
@@ -177,6 +179,7 @@ def test_spirit_spring_event_uses_qq_onebot_and_original_exploration_operation()
             )
             assert replay_claim.code == claimed.code
             assert replay_claim.data["idempotent_replay"] is True
+            assert replay_claim.data["minimum_contribution"] == claimed.data["minimum_contribution"]
             duplicate_claim = await runtime.adapters.dispatch(
                 "onebot.v11",
                 replace(onebot, operation_id="ob-event-claim-duplicate"),

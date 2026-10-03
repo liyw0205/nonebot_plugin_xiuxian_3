@@ -9,6 +9,7 @@ from functools import lru_cache
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
+from ..rewards.rules import local_reputation_maximum
 
 
 TOWN_ROOM = "residence.town_room"
@@ -158,6 +159,35 @@ def _default_commission_content() -> ContentBundle:
     return bundled_content()
 
 
+def _commission_identity(row: dict[str, Any]) -> tuple[str, str, tuple[str, ...]]:
+    key, label = row.get("key"), row.get("name")
+    if not isinstance(key, str) or not key or not isinstance(label, str) or not label.strip():
+        raise ContentError(f"commission requires key and name: {key!r}")
+    aliases = row.get("aliases", [])
+    if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
+        raise ContentError(f"commission {key} aliases must be non-empty strings")
+    return key, label.strip(), tuple(alias.strip() for alias in aliases)
+
+
+def resolve_commission_key(value: str | None, content: ContentBundle | None = None) -> str:
+    """Resolve identity without revalidating rewards of a frozen claim or replay."""
+
+    bundle = content if content is not None else _default_commission_content()
+    selectors: dict[str, str] = {}
+    for row in bundle.list("livelihood", include_locked=True):
+        if row.get("record_type") != "commission":
+            continue
+        key, label, aliases = _commission_identity(row)
+        for selector in {key, label, *aliases}:
+            if selector in selectors:
+                raise ContentError(f"commission {key} has a duplicate name or alias")
+            selectors[selector] = key
+    try:
+        return selectors[(value or "").strip()]
+    except KeyError as exc:
+        raise ValueError(f"unsupported commission key: {value}") from exc
+
+
 def town_commission_definitions(
     content: ContentBundle | None = None,
 ) -> dict[str, TownCommissionDefinition]:
@@ -168,9 +198,7 @@ def town_commission_definitions(
     for row in bundle.list("livelihood", include_locked=False):
         if row.get("record_type") != "commission":
             continue
-        key, label = row.get("key"), row.get("name")
-        if not isinstance(key, str) or not key or not isinstance(label, str) or not label.strip():
-            raise ContentError(f"commission requires key and name: {key!r}")
+        key, label, aliases = _commission_identity(row)
         inputs = row.get("inputs")
         if (
             not isinstance(inputs, list)
@@ -199,12 +227,15 @@ def town_commission_definitions(
             raise ContentError(f"commission {key} has invalid numeric values")
         if amount < 0 or stock <= 0 or duration <= 0 or local_reputation < 0 or service_reputation < 0:
             raise ContentError(f"commission {key} has out-of-range numeric values")
-        reputation_key = reward.get("reputation_key", "local.xuantian.new_town")
+        reputation_key = reward.get("reputation_key")
         if not isinstance(reputation_key, str) or not reputation_key:
             raise ContentError(f"commission {key} has an invalid reputation key")
-        aliases = row.get("aliases", [])
-        if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
-            raise ContentError(f"commission {key} aliases must be non-empty strings")
+        try:
+            local_reputation_maximum(reputation_key, bundle)
+        except ContentError as exc:
+            raise ContentError(
+                f"commission {key} references an invalid reputation location"
+            ) from exc
         unlock_key = row.get("unlock_key")
         if unlock_key is not None and (
             not isinstance(unlock_key, str)
@@ -245,13 +276,13 @@ def town_commission_definitions(
             for value in (stock_bonus_key, reward_bonus_key)
         ):
             raise ContentError(f"commission {key} has an invalid public-project bonus key")
-        selectors_for_row = {key, label.strip(), *(alias.strip() for alias in aliases)}
+        selectors_for_row = {key, label, *aliases}
         if selectors & selectors_for_row:
             raise ContentError(f"commission {key} has a duplicate name or alias")
         selectors.update(selectors_for_row)
         result[key] = TownCommissionDefinition(
             key=key,
-            label=label.strip(),
+            label=label,
             inputs={str(item["item_key"]): int(item["quantity"]) for item in inputs},
             reward_stones=amount,
             local_reputation=local_reputation,
@@ -259,7 +290,7 @@ def town_commission_definitions(
             stock=stock,
             local_reputation_key=reputation_key,
             duration_seconds=duration,
-            aliases=tuple(alias.strip() for alias in aliases),
+            aliases=aliases,
             unlock_key=unlock_key,
             requirements_any=tuple(dict(requirement) for requirement in requirements_any),
             stock_bonus_key=stock_bonus_key,
@@ -480,6 +511,7 @@ __all__ = [
     "crop_definition",
     "spirit_leaf_array_sand_roll",
     "commission_definition",
+    "resolve_commission_key",
     "town_commission_definitions",
     "residence_definition",
     "HERB_SEED_BUNDLE",

@@ -9,9 +9,11 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.assets import change_player_assets, player_assets_missing
+from ..utils.assets import player_assets_missing
 from ..utils.json import json_object
+from ..utils.player import change_player_state
 from ..content import bundled_content
+from ..rewards.rules import local_reputation_maximum
 from ..persistence.errors import (
     CommissionAlreadyAcceptedError,
     CommissionAlreadyDeliveredError,
@@ -28,6 +30,7 @@ from .models import TownCommissionRecord, TownCommissionView
 from .rules import (
     TownCommissionDefinition,
     commission_definition,
+    resolve_commission_key,
     town_commission_definitions,
 )
 
@@ -97,7 +100,7 @@ class CommissionRepositoryMixin:
         operation_id: str,
     ) -> TownCommissionRecord:
         try:
-            definition = commission_definition(commission_key, self.content)
+            normalized_key = resolve_commission_key(commission_key, self.content)
         except ValueError as exc:
             raise CommissionNotFoundError("unsupported commission") from exc
         operation_name = "livelihood.accept_commission"
@@ -109,8 +112,7 @@ class CommissionRepositoryMixin:
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "commission_key": definition.key,
-                "business_date": business_date,
+                "commission_key": normalized_key,
             },
         )
         with self._connect() as connection:
@@ -118,6 +120,10 @@ class CommissionRepositoryMixin:
             existing = self._operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
                 return self._record_from_payload(existing, replay=True)
+            try:
+                definition = commission_definition(normalized_key, self.content)
+            except ValueError as exc:
+                raise CommissionNotFoundError("unsupported commission") from exc
             player = self._require_player(connection, platform, platform_user_id)
             if definition.unlock_key and not self._has_codex_unlock(
                 connection, int(player["id"]), definition.unlock_key
@@ -223,7 +229,7 @@ class CommissionRepositoryMixin:
         normalized_key = ""
         if commission_key:
             try:
-                normalized_key = commission_definition(commission_key, self.content).key
+                normalized_key = resolve_commission_key(commission_key, self.content)
             except ValueError as exc:
                 raise CommissionNotFoundError("unsupported commission") from exc
         operation_name = "livelihood.deliver_commission"
@@ -286,27 +292,28 @@ class CommissionRepositoryMixin:
             service_before = int(reputation["service_reputation"]) if reputation is not None else 0
             local_key = str(snapshot["local_reputation_key"])
             local_before = int(local.get(local_key, 0))
-            local_after = min(1000, local_before + local_delta)
-            service_after = min(100, service_before + service_delta)
-            local[local_key] = local_after
-            change_player_assets(
+            change_player_state(
                 connection,
                 player,
-                {
+                updated_at=now_text,
+                asset_values={
                     "spirit_stones": reward_stones,
                     **{str(key): -int(value) for key, value in inputs.items()},
                 },
-                now_text,
+                local_reputation_delta={local_key: local_delta} if local_delta else None,
+                service_reputation_delta=service_delta,
+                local_reputation_maximums=(
+                    {local_key: int(snapshot["local_reputation_maximum"])}
+                    if local_delta
+                    else None
+                ),
             )
-            connection.execute(
-                """
-                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                """,
-                (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_after, now_text),
-            )
+            reputation = connection.execute(
+                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+                (player["id"],),
+            ).fetchone()
+            local_after = int(json_object(reputation["local_json"], {}).get(local_key, 0))
+            service_after = int(reputation["service_reputation"])
             result = {
                 "inputs": inputs,
                 "reward_stones": reward_stones,
@@ -357,6 +364,9 @@ class CommissionRepositoryMixin:
                 "reward_stones": reward_stones,
                 "local_reputation": definition.local_reputation,
                 "local_reputation_key": definition.local_reputation_key,
+                "local_reputation_maximum": local_reputation_maximum(
+                    definition.local_reputation_key, self.content
+                ),
                 "service_reputation": definition.service_reputation,
             }
             connection.execute(
@@ -470,7 +480,6 @@ class CommissionRepositoryMixin:
     def _snapshot(definition: TownCommissionDefinition, offer: Any, now_text: str) -> dict[str, Any]:
         snapshot = json_object(offer["snapshot_json"], {})
         snapshot["commission_key"] = definition.key
-        snapshot["local_reputation_key"] = definition.local_reputation_key
         snapshot["accepted_at"] = now_text
         snapshot["expires_at"] = str(offer["expires_at"])
         return snapshot
@@ -497,6 +506,12 @@ class CommissionRepositoryMixin:
         )
 
     def _payload(self, player: Any, offer: Any, *, snapshot: dict[str, Any], status: str, claim_id: str, stock_remaining: int, result: dict[str, Any] | None = None) -> dict[str, Any]:
+        result = result or {}
+        local_reputation = int(snapshot["local_reputation"])
+        service_reputation = int(snapshot["service_reputation"])
+        if status == "delivered":
+            local_reputation = result["local_reputation_after"] - result["local_reputation_before"]
+            service_reputation = result["service_reputation_after"] - result["service_reputation_before"]
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "claim_id": claim_id,
@@ -508,10 +523,10 @@ class CommissionRepositoryMixin:
             "stock_remaining": stock_remaining,
             "inputs": {str(key): int(value) for key, value in dict(snapshot.get("inputs", {})).items()},
             "reward_stones": int(snapshot.get("reward_stones", 0)),
-            "local_reputation": int(snapshot.get("local_reputation", 0)),
-            "service_reputation": int(snapshot.get("service_reputation", 0)),
+            "local_reputation": local_reputation,
+            "service_reputation": service_reputation,
             "expires_at": str(offer["expires_at"]),
-            "result": result or {},
+            "result": result,
         }
 
     def _record_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> TownCommissionRecord:

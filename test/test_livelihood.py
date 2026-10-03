@@ -369,6 +369,114 @@ def test_town_commission_quota_material_failure_and_global_stock_are_atomic() ->
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("failure_stage", ["reputation", "claim", "operation"])
+def test_town_commission_shared_reward_transaction_caps_and_recovers(failure_stage: str) -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            location_file = data_dir / "地图" / "地点.json"
+            locations = json.loads(location_file.read_text(encoding="utf-8"))
+            new_town = next(
+                item for item in locations["records"] if item["key"] == "xuantian.new_town"
+            )
+            new_town["local_reputation_maximum"] = 4
+            location_file.write_text(
+                json.dumps(locations, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            user = "commission-reward-transaction"
+            assert (await runtime.dispatch(_context(user), "开始修仙")).ok
+            assert (await runtime.dispatch(_context(user), "寻仙问道")).ok
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform='web' AND platform_user_id=?",
+                    (user,),
+                ).fetchone()[0]
+                connection.execute(
+                    "UPDATE players SET inventory_json=? WHERE id=?",
+                    (json.dumps({"item.herb.blood_grass": 3}), player_id),
+                )
+                connection.execute(
+                    "INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+                    "VALUES (?, ?, 99, ?) ON CONFLICT(player_id) DO UPDATE SET "
+                    "local_json=excluded.local_json, service_reputation=excluded.service_reputation",
+                    (player_id, json.dumps({"local.xuantian.new_town": 3}), clock.value.isoformat()),
+                )
+            assert (await runtime.dispatch(_context(user, "commission-list"), "城镇委托")).ok
+            assert (
+                await runtime.dispatch(
+                    _context(user, "commission-accept"), "接取委托 止血草供应"
+                )
+            ).code == "COMMISSION_ACCEPTED"
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                table, timing, action = {
+                    "reputation": ("player_reputations", "BEFORE", "INSERT"),
+                    "claim": ("town_commission_claims", "AFTER", "UPDATE"),
+                    "operation": ("operations", "AFTER", "INSERT"),
+                }[failure_stage]
+                connection.execute(
+                    f"CREATE TRIGGER fail_commission_write {timing} {action} ON {table} "
+                    f"WHEN NEW.player_id={player_id} BEGIN "
+                    "SELECT RAISE(ABORT, 'injected commission failure'); END"
+                )
+            with pytest.raises(sqlite3.IntegrityError, match="injected commission failure"):
+                await runtime.repository.deliver_commission(
+                    platform="web",
+                    platform_user_id=user,
+                    commission_key="town_commission.herb_supply",
+                    operation_id="commission-retry",
+                )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                state = connection.execute(
+                    "SELECT p.spirit_stones, p.inventory_json, r.local_json, r.service_reputation, "
+                    "c.status, (SELECT COUNT(*) FROM operations WHERE operation_id='commission-retry') "
+                    "FROM players p JOIN player_reputations r ON r.player_id=p.id "
+                    "JOIN town_commission_claims c ON c.player_id=p.id "
+                    "WHERE p.id=? ORDER BY c.id DESC LIMIT 1",
+                    (player_id,),
+                ).fetchone()
+                connection.execute("DROP TRIGGER fail_commission_write")
+            assert state[0] == 100
+            assert json.loads(state[1]) == {"item.herb.blood_grass": 3}
+            assert json.loads(state[2])["local.xuantian.new_town"] == 3
+            assert state[3] == 99
+            assert state[4] == "accepted"
+            assert state[5] == 0
+
+            settled = await runtime.dispatch(
+                _context(user, "commission-retry"), "交付委托 止血草供应"
+            )
+            assert settled.code == "COMMISSION_DELIVERED"
+            assert settled.data["local_reputation"] == 1
+            assert settled.data["service_reputation"] == 1
+            replay = await runtime.dispatch(
+                _context(user, "commission-retry"), "交付委托 止血草供应"
+            )
+            assert replay.data["idempotent_replay"] is True
+            conflict = await runtime.dispatch(
+                _context(user, "commission-retry"), "交付委托 工具修缮"
+            )
+            assert conflict.code == "OPERATION_CONFLICT"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                wallet, inventory, local_json, service = connection.execute(
+                    "SELECT p.spirit_stones, p.inventory_json, r.local_json, r.service_reputation "
+                    "FROM players p JOIN player_reputations r ON r.player_id=p.id WHERE p.id=?",
+                    (player_id,),
+                ).fetchone()
+            assert wallet == 118
+            assert json.loads(inventory) == {}
+            assert json.loads(local_json)["local.xuantian.new_town"] == 4
+            assert service == 100
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_service_order_success_locks_both_players_and_preserves_cultivation() -> None:
     async def run() -> None:
         clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
@@ -873,6 +981,33 @@ def test_real_adapters_reach_livelihood_application(kind: str) -> None:
                 normalized = normalize_event(event) if kind == "onebot" else normalize_qq_event(event)
                 result = await runtime.dispatch(normalized.context, normalized.text)
                 assert result.ok, result
+            delivery_event = (
+                _onebot_event("交付委托 止血草供应", 4004)
+                if kind == "onebot"
+                else _qq_event("交付委托 止血草供应", "qq-4")
+            )
+            delivery_replay = normalize_event(delivery_event) if kind == "onebot" else normalize_qq_event(delivery_event)
+            replay = await runtime.dispatch(delivery_replay.context, delivery_replay.text)
+            assert replay.code == "COMMISSION_DELIVERED"
+            assert replay.data["idempotent_replay"] is True
+            platform = "onebot.v11" if kind == "onebot" else "qq.official"
+            user_id = "1001" if kind == "onebot" else "qq-user-1"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id, spirit_stones, inventory, local_json, service = connection.execute(
+                    "SELECT p.id, p.spirit_stones, p.inventory_json, r.local_json, r.service_reputation "
+                    "FROM players p JOIN player_reputations r ON r.player_id=p.id "
+                    "WHERE p.platform=? AND p.platform_user_id=?",
+                    (platform, user_id),
+                ).fetchone()
+                operation_count = connection.execute(
+                    "SELECT COUNT(*) FROM operations WHERE operation_id=?",
+                    (delivery_replay.context.operation_id,),
+                ).fetchone()[0]
+            assert spirit_stones == 118
+            assert json.loads(inventory) == {"item.food.coarse_spirit_rice": 3}
+            assert json.loads(local_json)["local.xuantian.new_town"] == 3
+            assert service == 1
+            assert operation_count == 1
             await runtime.close()
 
     asyncio.run(run())

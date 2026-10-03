@@ -290,7 +290,7 @@
       "name": "玄天界·云城",
       "desc": "浮云环绕的玄天城池，高阶修士与远道而来的访客在此汇聚。",
       "world": "玄天界",
-      "status": "locked",
+      "status": "open",
       "requirements": [
         {
           "type": "realm",
@@ -305,6 +305,7 @@
       "environment": {
         "training_bp": 11000
       },
+      "local_reputation_maximum": 1000,
       "actions": [
         "read_entry_requirements"
       ],

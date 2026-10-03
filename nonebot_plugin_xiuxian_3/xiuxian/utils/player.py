@@ -908,11 +908,13 @@ def _local_reputation_after_delta(
             raise ValueError(f"unsupported local reputation key: {raw_key!r}")
         if isinstance(raw_amount, bool) or not isinstance(raw_amount, int):
             raise ValueError(f"local reputation delta for {raw_key!r} must be an integer")
-        next_value = result.get(raw_key, 0) + raw_amount
+        before = result.get(raw_key, 0)
+        next_value = before + raw_amount
         if next_value < 0:
             raise ValueError(f"local reputation for {raw_key!r} cannot be negative")
-        if raw_key in caps:
-            next_value = min(next_value, caps[raw_key])
+        if raw_key in caps and raw_amount > 0:
+            # A frozen award cap limits new gains, not an existing balance.
+            next_value = max(before, min(next_value, caps[raw_key]))
         result[raw_key] = next_value
     return result
 

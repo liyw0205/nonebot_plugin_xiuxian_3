@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..repository import (
     CropContentClosedError,
     CropDailyLimitError,
@@ -37,7 +38,7 @@ from ..repository import (
     TradePermitContentClosedError,
     TradePermitRequirementError,
 )
-from .rules import commission_definition, crop_definition, residence_definition
+from .rules import crop_definition, residence_definition, resolve_commission_key
 from .trade_permit_rules import resolve_trade_permit
 
 
@@ -83,7 +84,7 @@ class LivelihoodApplication:
         if not args and not required:
             return None
         try:
-            return commission_definition(args[0] if args else None, self.repository.content).key
+            return resolve_commission_key(args[0] if args else None, self.repository.content)
         except ValueError:
             return None
 
@@ -352,13 +353,16 @@ class LivelihoodApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         lines = ["## 今日委托", ""]
         data = []
+        content = self.repository.content or bundled_content()
         for record in records:
-            inputs = "、".join(f"{key} ×{value}" for key, value in record.inputs.items())
-            state = "已交付" if record.delivered else "已接取" if record.accepted else record.status
+            inputs = "、".join(f"{content.label('item', key)} ×{value}" for key, value in record.inputs.items())
+            state = (
+                "已交付" if record.delivered else "已接取" if record.accepted
+                else "待接取" if record.status == "published" else "已过期"
+            )
             lines.extend(
                 [
                     f"### {record.label}",
-                    f"- **指令键**：`{record.commission_key}`",
                     f"- **需求**：{inputs}",
                     f"- **报酬**：灵石 {record.reward_stones}；名望 +{record.local_reputation}；信誉 +{record.service_reputation}",
                     f"- **库存**：{record.stock_remaining}/{record.stock_total}",
@@ -410,15 +414,19 @@ class LivelihoodApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能接取城镇委托。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他城镇委托操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "仙缘簿中已记有另一项委托，请重新传讯。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        content = self.repository.content or bundled_content()
+        inputs = "、".join(
+            f"{content.label('item', key)} ×{value}" for key, value in record.inputs.items()
+        )
         return CommandResult(
             True,
             "COMMISSION_ACCEPTED",
-            f"## 委托已接取\n\n**{record.label}**已登记。交付时才会检查并扣除物品。\n\n- **需求**：{'、'.join(f'{key} ×{value}' for key, value in record.inputs.items())}\n- **截止**：{record.expires_at}\n- **剩余库存**：{record.stock_remaining}",
+            f"## 委托已接取\n\n**{record.label}**已记入委托簿，备齐所需物品即可交付。\n\n- **需求**：{inputs}\n- **截止**：{record.expires_at}\n- **剩余库存**：{record.stock_remaining}",
             context.request_id,
             operation_id,
             data={"claim_id": record.claim_id, "commission_id": record.commission_id, "commission_key": record.commission_key, "status": record.status, "stock_remaining": record.stock_remaining, "idempotent_replay": record.already_completed},
@@ -451,7 +459,7 @@ class LivelihoodApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能交付城镇委托。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他城镇委托操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "仙缘簿中已记有另一项委托，请重新传讯。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -459,7 +467,7 @@ class LivelihoodApplication:
         return CommandResult(
             True,
             "COMMISSION_DELIVERED",
-            f"## 委托已交付\n\n**{record.label}**结算完成。\n\n- **灵石**：+{record.reward_stones}\n- **地方名望**：+{record.local_reputation}\n- **服务信誉**：+{record.service_reputation}",
+            f"## 委托已交付\n\n**{record.label}**已交清，酬劳收入囊中。\n\n- **灵石**：+{record.reward_stones}\n- **地方名望**：{record.local_reputation:+d}\n- **服务信誉**：{record.service_reputation:+d}",
             context.request_id,
             operation_id,
             data={"commission_id": record.commission_id, "commission_key": record.commission_key, "status": record.status, "reward_stones": record.reward_stones, "local_reputation": record.local_reputation, "service_reputation": record.service_reputation, "idempotent_replay": record.already_completed},

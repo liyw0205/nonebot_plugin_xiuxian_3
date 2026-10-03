@@ -447,6 +447,62 @@ def test_player_reward_caps_local_and_service_reputation_and_rolls_back_assets()
     connection.close()
 
 
+@pytest.mark.parametrize(
+    ("before", "delta", "expected"),
+    [(3, 3, 4), (6, 3, 6), (6, 0, 6), (6, -1, 5), (6, -3, 3)],
+)
+def test_local_reputation_award_cap_preserves_existing_balance(
+    before: int, delta: int, expected: int,
+) -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, "
+        "inventory_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "CREATE TABLE player_reputations (player_id INTEGER PRIMARY KEY, local_json TEXT NOT NULL, "
+        "service_reputation INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute("INSERT INTO players VALUES (1, 20, '{}', 'before')")
+    connection.execute(
+        "INSERT INTO player_reputations VALUES (1, ?, 0, 'before')",
+        (json.dumps({"local.dao_service": before}),),
+    )
+    connection.commit()
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    with connection:
+        change_player_state(
+            connection, row, updated_at="after",
+            asset_values={"spirit_stones": 5, "item.herb": 1},
+            local_reputation_delta={"local.dao_service": delta},
+            local_reputation_maximums={"local.dao_service": 4},
+        )
+    reputation = connection.execute(
+        "SELECT local_json FROM player_reputations WHERE player_id=1"
+    ).fetchone()
+    assert json.loads(reputation["local_json"]) == {"local.dao_service": expected}
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    assert (player_currency(row), player_inventory(row)) == (25, {"item.herb": 1})
+
+    with pytest.raises(ValueError, match="cannot be negative"):
+        with connection:
+            change_player_state(
+                connection, row, updated_at="underflow",
+                asset_values={"spirit_stones": -5, "item.herb": -1},
+                local_reputation_delta={"local.dao_service": -expected - 1},
+                local_reputation_maximums={"local.dao_service": 4},
+            )
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    reputation = connection.execute(
+        "SELECT local_json FROM player_reputations WHERE player_id=1"
+    ).fetchone()
+    assert (player_currency(row), player_inventory(row)) == (25, {"item.herb": 1})
+    assert row["updated_at"] == "after"
+    assert json.loads(reputation["local_json"]) == {"local.dao_service": expected}
+    connection.close()
+
+
 def test_asset_state_applies_currency_and_items_together() -> None:
     inventory = {"item.herb": 2}
 
