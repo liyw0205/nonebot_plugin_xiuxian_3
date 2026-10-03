@@ -60,6 +60,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     change_player_state,
     change_player_values,
     grant_player_state,
+    grant_player_reward,
     spend_player_state,
     player_object,
     player_inventory,
@@ -316,6 +317,52 @@ def test_player_state_kernel_persists_assets_and_shared_views_atomically() -> No
     assert player_currency(unchanged) == 120
     assert player_inventory(unchanged) == {"item.herb": 5}
     assert player_integer(unchanged, "energy") == 10
+
+
+def test_flat_player_reward_uses_one_asset_value_and_reputation_boundary() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players("
+        "id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, "
+        "inventory_json TEXT NOT NULL, cultivation INTEGER NOT NULL, "
+        "total_cultivation INTEGER NOT NULL, soul_power INTEGER NOT NULL, "
+        "soul_power_max INTEGER NOT NULL, faction_reputation_json TEXT NOT NULL, "
+        "updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT INTO players(id, spirit_stones, inventory_json, cultivation, total_cultivation, soul_power, soul_power_max, faction_reputation_json, updated_at) "
+        "VALUES (1, 20, ?, 10, 100, 80, 100, ?, '')",
+        ('{"item.herb": 1}', '{"demon": 3}'),
+    )
+    row = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    assert row is not None
+
+    parts = grant_player_reward(
+        connection,
+        row,
+        {
+            "spirit_stones": 5,
+            "item.herb": 2,
+            "cultivation": 30,
+            "faction_reputation.demon": 4,
+        },
+        "now",
+        value_delta={"soul_power": -10},
+        maximums={"soul_power": row["soul_power_max"]},
+    )
+    connection.commit()
+
+    assert parts.assets == {"spirit_stones": 5, "item.herb": 2}
+    assert parts.value_delta == {"cultivation": 30, "total_cultivation": 30}
+    updated = connection.execute("SELECT * FROM players WHERE id = 1").fetchone()
+    assert updated is not None
+    assert player_currency(updated) == 25
+    assert player_inventory(updated) == {"item.herb": 3}
+    assert player_integer(updated, "cultivation") == 40
+    assert player_integer(updated, "total_cultivation") == 130
+    assert player_integer(updated, "soul_power") == 70
+    assert player_reputation(updated) == {"demon": 7}
 
 
 def test_asset_state_applies_currency_and_items_together() -> None:

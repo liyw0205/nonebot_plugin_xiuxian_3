@@ -185,13 +185,12 @@ from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_spend, assets_with_delta, player_currency
 from ..utils.player import (
     change_player_state,
-    grant_player_state,
+    grant_player_reward,
     player_combat_values,
     player_integer,
     player_inventory,
     player_object,
     player_reputation,
-    split_player_rewards,
 )
 from ..rewards.rules import RewardContentError
 
@@ -672,24 +671,19 @@ class ExplorationRepositoryMixin:
             soul_fatigue_until = row["soul_fatigue_until"]
             snapshot = self._json_object(session["snapshot_json"], {})
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
-            reward_parts = split_player_rewards(result)
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, int(row["soul_power"]))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
-            value_delta = dict(reward_parts.value_delta)
-            value_delta["soul_power"] = value_delta.get("soul_power", 0) - soul_power_loss
-            grant_player_state(
+            grant_player_reward(
                 connection,
                 row,
-                rewards=reward_parts.assets,
+                result,
                 updated_at=now_text,
-                value_delta=value_delta,
+                value_delta={"soul_power": -soul_power_loss},
                 player_values={
                     "soul_fatigue_until": soul_fatigue_until,
                     "bloodline_stability": bloodline_stability_after,
                 },
-                reputation_delta=reward_parts.reputation or None,
-                local_reputation_delta=reward_parts.local_reputation or None,
                 maximums={"soul_power": row["soul_power_max"]},
             )
             result_json = {
@@ -980,16 +974,12 @@ class ExplorationRepositoryMixin:
 
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
             if status == "settled":
-                reward_parts = split_player_rewards(result)
-                grant_player_state(
+                grant_player_reward(
                     connection,
                     row,
-                    rewards=reward_parts.assets,
+                    result,
                     updated_at=now_text,
-                    value_delta=reward_parts.value_delta,
                     player_values={"bloodline_stability": bloodline_stability_after},
-                    reputation_delta=reward_parts.reputation or None,
-                    local_reputation_delta=reward_parts.local_reputation or None,
                 )
             result_json = {
                 "status": status,

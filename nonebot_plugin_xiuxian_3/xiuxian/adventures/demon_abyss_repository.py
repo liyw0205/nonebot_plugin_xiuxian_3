@@ -22,13 +22,12 @@ from ..persistence.errors import (
 )
 from ..utils.player import (
     change_player_state,
-    grant_player_state,
+    grant_player_reward,
     player_combat_values,
     player_integer,
     player_intro_flags,
     player_object,
     player_reputation,
-    split_player_rewards,
 )
 from .demon_abyss_models import DemonAbyssRunRecord
 from .demon_abyss_rules import (
@@ -569,16 +568,12 @@ class DemonAbyssRepositoryMixin:
                     flags.append(key)
             else:
                 state_rewards[key] = quantity
-        reward_parts = split_player_rewards(state_rewards)
         intro["flags"] = flags
-        grant_player_state(
+        grant_player_reward(
             connection,
             player,
-            rewards=reward_parts.assets or None,
+            state_rewards,
             updated_at=now_text,
-            value_delta=reward_parts.value_delta,
-            reputation_delta=reward_parts.reputation or None,
-            local_reputation_delta=reward_parts.local_reputation or None,
             player_values={
                 "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
             },

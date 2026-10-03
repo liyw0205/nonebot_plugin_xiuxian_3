@@ -28,7 +28,7 @@ from .three_realms import (
     three_realms_definition,
 )
 from .three_realms_models import ThreeRealmsLaneProgress, ThreeRealmsStatusRecord
-from ..utils.player import grant_player_state, split_player_rewards
+from ..utils.player import grant_player_reward
 
 
 class ThreeRealmsRepositoryMixin:
@@ -235,19 +235,16 @@ class ThreeRealmsRepositoryMixin:
                 for key, value in reward.items()
                 if str(key).startswith(("item.", "faction_reputation."))
             }
-            reward_parts = split_player_rewards(state_reward)
             flags_state = self._json_object(player["intro_json"], {})
             flags = [str(item) for item in flags_state.get("flags", [])]
             if first_clear and definition.stage == 5 and THREE_REALMS_STORY_KEY not in flags:
                 flags.append(THREE_REALMS_STORY_KEY)
             flags_state["flags"] = flags
-            grant_player_state(
+            grant_player_reward(
                 connection,
                 player,
+                state_reward,
                 updated_at=now_text,
-                rewards=reward_parts.assets,
-                reputation_delta=reward_parts.reputation,
-                local_reputation_delta=reward_parts.local_reputation,
                 player_values={
                     "intro_json": json.dumps(flags_state, ensure_ascii=False, sort_keys=True),
                 },

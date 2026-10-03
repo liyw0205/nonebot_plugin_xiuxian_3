@@ -269,6 +269,60 @@ def split_player_rewards(rewards: Mapping[str, Any]) -> PlayerRewardParts:
     )
 
 
+def grant_player_reward(
+    connection: Any,
+    row: Mapping[str, Any] | Any,
+    reward: Mapping[str, Any],
+    updated_at: str,
+    *,
+    value_delta: Mapping[str, Any] | None = None,
+    maximums: Mapping[str, Any] | None = None,
+    clamp_minimum: bool = False,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+    reputation_delta: Mapping[str, Any] | None = None,
+    local_reputation_delta: Mapping[str, Any] | None = None,
+) -> PlayerRewardParts:
+    """Apply one flat reward map through the shared player-state transaction.
+
+    Domain code may still add contextual changes such as fatigue or a frozen
+    status column, but it no longer repeats the asset/value/reputation split.
+    The returned parts keep the frozen reward shape available to callers that
+    need to record an operation payload.
+    """
+
+    parts = split_player_rewards(reward)
+
+    def merge_values(base: Mapping[str, int], extra: Mapping[str, Any] | None) -> dict[str, int]:
+        merged = dict(base)
+        for raw_key, raw_value in (extra or {}).items():
+            key = str(raw_key)
+            if isinstance(raw_value, bool) or not isinstance(raw_value, int):
+                raise ValueError(f"player reward delta for {key!r} must be an integer")
+            merged[key] = merged.get(key, 0) + raw_value
+        return merged
+
+    merged_values = merge_values(parts.value_delta, value_delta)
+    if "cultivation" in merged_values and "total_cultivation" not in merged_values:
+        merged_values["total_cultivation"] = merged_values["cultivation"]
+    merged_reputation = merge_values(parts.reputation, reputation_delta)
+    merged_local_reputation = merge_values(parts.local_reputation, local_reputation_delta)
+    grant_player_state(
+        connection,
+        row,
+        rewards=parts.assets or None,
+        updated_at=updated_at,
+        value_delta=merged_values,
+        maximums=maximums,
+        clamp_minimum=clamp_minimum,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+        reputation_delta=merged_reputation or None,
+        local_reputation_delta=merged_local_reputation or None,
+    )
+    return parts
+
+
 def player_field(row: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
     """Read a player column from either a mapping or a SQLite row."""
 
@@ -905,6 +959,7 @@ __all__ = [
     "PlayerViewKind",
     "player_field",
     "split_player_rewards",
+    "grant_player_reward",
     "player_database_id",
     "player_integer",
     "player_numeric_delta",

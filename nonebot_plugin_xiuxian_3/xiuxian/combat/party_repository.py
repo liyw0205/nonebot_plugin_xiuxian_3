@@ -83,12 +83,11 @@ from ..adventures.time_fort_rules import (
 )
 from ..utils.player import (
     change_player_state,
-    grant_player_state,
+    grant_player_reward,
     player_combat_values,
     player_integer,
     player_object,
     player_reputation,
-    split_player_rewards,
 )
 from ..utils.assets import inventory_amount, inventory_spend, spend_player_assets
 
@@ -1364,21 +1363,17 @@ class PartyCombatRepositoryMixin:
                     raise PartyBattleNotFoundError("party battle member no longer exists")
                 if reward:
                     player_state = player_combat_values(player)
-                    reward_parts = split_player_rewards(reward)
                     soul_power_max = max(
                         int(player_state["soul_power_max"]),
                         int(player_state["soul_power"]),
                         BOUNDARY_REALM_SOUL_POWER_MAX if boundary_party and reward.get("soul_power") else 0,
                     )
-                    grant_player_state(
+                    grant_player_reward(
                         connection,
                         player,
+                        reward,
                         updated_at=now_text,
-                        rewards=reward_parts.assets or None,
-                        value_delta=reward_parts.value_delta,
                         maximums={"soul_power": soul_power_max},
-                        reputation_delta=reward_parts.reputation or None,
-                        local_reputation_delta=reward_parts.local_reputation or None,
                         player_values={
                             "soul_power_max": soul_power_max,
                         },
