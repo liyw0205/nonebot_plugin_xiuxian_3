@@ -14,6 +14,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
 from nonebot_plugin_xiuxian_3.xiuxian.adventures.rules import (
     _reward_outcomes,
     bounty_definition,
+    bounty_definitions,
     meets_realm,
     reward_map,
 )
@@ -91,14 +92,17 @@ def test_accessory_reward_pools_cover_all_paths_and_open_realms() -> None:
         ("dao_union", "reward_pool.bounty.void_anchoring"),
         ("tribulation", "reward_pool.bounty.void_anchoring"),
     )
+    definitions = bounty_definitions(content)
     for path_key in ("body", "spell", "device", "demonic", "beast", "support"):
         for realm_key, pool_key in sources:
+            definition = next(item for item in definitions if item.reward_pool_key == pool_key)
             outcomes = _reward_outcomes(
                 content,
                 pool_key,
                 path_key=path_key,
                 realm_key=realm_key,
                 realm_layer=1,
+                reputation_key=definition.reputation_key,
             )
             accessory_keys = {
                 key
@@ -122,6 +126,7 @@ def test_accessory_reward_pools_cover_all_paths_and_open_realms() -> None:
 
 def test_equipment_quality_rewards_select_path_and_realm_eligible_gear() -> None:
     content = bundled_content()
+    definitions = bounty_definitions(content)
     for path_key in ("body", "spell", "device", "demonic", "beast", "support"):
         for realm_key, pool_key in (
             ("foundation", "reward_pool.bounty.cloud_mine"),
@@ -132,12 +137,14 @@ def test_equipment_quality_rewards_select_path_and_realm_eligible_gear() -> None
             ("dao_union", "reward_pool.bounty.void_anchoring"),
             ("tribulation", "reward_pool.bounty.void_anchoring"),
         ):
+            definition = next(item for item in definitions if item.reward_pool_key == pool_key)
             outcomes = _reward_outcomes(
                 content,
                 pool_key,
                 path_key=path_key,
                 realm_key=realm_key,
                 realm_layer=1,
+                reputation_key=definition.reputation_key,
             )
             gear = {
                 key
@@ -308,8 +315,16 @@ def test_bounty_progress_guards_expiry_and_operation_conflict() -> None:
                     "UPDATE bounty_offers SET expires_at = ? WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
                     (old, user),
                 )
-            expired = await runtime.dispatch(_context(user, "claim-expired"), "领取悬赏")
+            expired = await runtime.dispatch(
+                _context(user, "claim-expired", operation_id="bounty-expired-claim"),
+                "领取悬赏",
+            )
             assert expired.code == "BOUNTY_EXPIRED"
+            expired_replay = await runtime.dispatch(
+                _context(user, "claim-expired-replay", operation_id="bounty-expired-claim"),
+                "领取悬赏",
+            )
+            assert expired_replay.code == "BOUNTY_EXPIRED"
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 status = connection.execute(
                     "SELECT status FROM bounty_offers WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",

@@ -95,6 +95,8 @@ def reward_value_delta(grant: RewardGrant) -> dict[str, int]:
 def reward_pool_outcomes(
     key: str,
     content: ContentBundle | None = None,
+    *,
+    reward_key_aliases: dict[str, str] | None = None,
 ) -> tuple[tuple[int, dict[str, int]], ...]:
     """Load a weighted reward pool without applying it to player state."""
 
@@ -106,6 +108,7 @@ def reward_pool_outcomes(
             "battle_failure_rewards",
             row["battle_failure_rewards"],
             bundle,
+            reward_key_aliases=reward_key_aliases,
         )
     outcomes = row.get("outcomes")
     if not isinstance(outcomes, list) or not outcomes:
@@ -133,6 +136,7 @@ def reward_pool_outcomes(
                 f"outcome {index}",
                 outcome.get("rewards"),
                 bundle,
+                reward_key_aliases=reward_key_aliases,
             )
         normalized.append((weight, normalized_rewards))
     return tuple(normalized)
@@ -221,6 +225,8 @@ def _normalize_reward_pool_map(
     label: str,
     rewards: Any,
     bundle: ContentBundle,
+    *,
+    reward_key_aliases: dict[str, str] | None = None,
 ) -> dict[str, int]:
     if not isinstance(rewards, dict) or not rewards:
         raise RewardContentError(f"reward pool {pool_key} {label} requires rewards")
@@ -235,24 +241,36 @@ def _normalize_reward_pool_map(
             raise RewardContentError(
                 f"reward pool {pool_key} {label} rewards must be positive integer quantities"
             )
-        if reward_key.startswith("item."):
+        validation_key = (reward_key_aliases or {}).get(reward_key, reward_key)
+        if validation_key.startswith("item."):
             try:
-                bundle.require("item", reward_key, include_locked=False)
+                bundle.require("item", validation_key, include_locked=False)
             except KeyError as exc:
                 raise RewardContentError(
-                    f"reward pool {pool_key} {label} references inactive item {reward_key}"
+                    f"reward pool {pool_key} {label} references inactive item {validation_key}"
                 ) from exc
-        elif reward_key.startswith("local."):
-            local_reputation_maximum(reward_key, bundle)
-        elif reward_key not in {"spirit_stones", "currency.spirit_stone"}:
-            if reward_key.startswith("faction_reputation."):
-                if not reward_key.removeprefix("faction_reputation."):
+        elif validation_key.startswith("local."):
+            local_reputation_maximum(validation_key, bundle)
+        elif validation_key.startswith("codex."):
+            try:
+                bundle.require("codex_entry", validation_key, include_locked=False)
+            except KeyError as exc:
+                raise RewardContentError(
+                    f"reward pool {pool_key} {label} references inactive codex entry {validation_key}"
+                ) from exc
+        elif validation_key not in {
+            "spirit_stones",
+            "currency.spirit_stone",
+            "service_reputation",
+        }:
+            if validation_key.startswith("faction_reputation."):
+                if not validation_key.removeprefix("faction_reputation."):
                     raise RewardContentError(
                         f"reward pool {pool_key} {label} requires a faction key"
                     )
-            elif reward_key not in _REWARD_RESOURCE_FIELDS:
+            elif validation_key not in _REWARD_RESOURCE_FIELDS:
                 raise RewardContentError(
-                    f"reward pool {pool_key} {label} has unsupported reward key {reward_key!r}"
+                    f"reward pool {pool_key} {label} has unsupported reward key {validation_key!r}"
                 )
         normalized[reward_key] = quantity
     return normalized

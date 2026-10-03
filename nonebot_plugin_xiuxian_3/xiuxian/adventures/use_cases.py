@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Mapping
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
@@ -19,7 +20,7 @@ from ..repository import (
     RepositoryBusyError,
     SQLitePlayerRepository,
 )
-from .rules import bounty_definition, default_content_bundle, resolve_bounty
+from .rules import resolve_bounty
 
 STATUS_LABELS = {
     "available": "可接取",
@@ -27,9 +28,9 @@ STATUS_LABELS = {
     "completed": "待领取",
     "claimed": "已领取",
     "expired": "已过期",
-    "daily_limit": "今日已接取其他悬赏",
+    "daily_limit": "今日次数已尽",
     "requirement": "前置不足",
-    "locked": "战斗功能未开放",
+    "locked": "暂不可接取",
 }
 
 
@@ -57,7 +58,9 @@ class AdventuresApplication:
             .replace("~", "\\~")
         )
 
-    def _reward_text(self, rewards: dict[str, int], bounty_key: str | None = None) -> str:
+    def _reward_text(
+        self, rewards: dict[str, int], configured_labels: Mapping[str, str]
+    ) -> str:
         labels = {
             "spirit_stones": "灵石",
             "cultivation": "修为",
@@ -65,17 +68,11 @@ class AdventuresApplication:
             "local_reputation": "城镇名望",
             "service_reputation": "服务信誉",
         }
-        content = self.repository.content or default_content_bundle()
-        configured_labels = {}
-        if bounty_key is not None:
-            configured_labels = bounty_definition(bounty_key, content).reward_labels
         parts: list[str] = []
         for key, quantity in rewards.items():
             if not quantity:
                 continue
             label = configured_labels.get(key) or labels.get(key)
-            if label is None and key.startswith("item."):
-                label = content.label("item", key, fallback=key)
             if label is None and key.startswith("faction_reputation."):
                 label = f"{key.removeprefix('faction_reputation.')}声望"
             label = label or "悬赏奖励"
@@ -128,7 +125,7 @@ class AdventuresApplication:
                 [
                     f"### {offer.label} · {status}",
                     f"- **目标**：{offer.description}（{progress}）",
-                    f"- **奖励**：{self._reward_text(offer.reward, offer.key)}{expires}",
+                    f"- **奖励**：{self._reward_text(offer.reward, offer.reward_labels)}{expires}",
                     "",
                 ]
             )
@@ -140,10 +137,11 @@ class AdventuresApplication:
                     "progress": offer.progress,
                     "target": offer.target,
                     "reward": offer.reward,
+                    "reward_labels": offer.reward_labels,
                     "expires_at": offer.expires_at,
                 }
             )
-        lines.append("> 每日最多接取一条悬赏；使用对应的 `接取悬赏 <名称>` 开始。")
+        lines.append("> 各悬赏按榜上次数开放，同一时间只能承接一桩；榜示为可能之赏，实得于接取时抽定。")
         return CommandResult(
             True,
             "BOUNTY_BOARD",
@@ -173,7 +171,7 @@ class AdventuresApplication:
         except BountyRequirementError:
             return CommandResult(False, "BOUNTY_REQUIREMENT_MISSING", "当前阶段、境界或地区许可不满足这条悬赏。", context.request_id, operation_id)
         except BountyDailyLimitError:
-            return CommandResult(False, "BOUNTY_DAILY_LIMIT", "今日已经接取过悬赏，请明日再来。", context.request_id, operation_id)
+            return CommandResult(False, "BOUNTY_DAILY_LIMIT", "今日可接次数已尽，或仍有悬赏尚未结清。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他悬赏操作，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
@@ -235,7 +233,7 @@ class AdventuresApplication:
             (
                 f"## 悬赏奖励已领取\n\n**{self._display_name(record.player)}**完成了 **{record.label}**。\n\n"
                 f"- **进度**：{record.progress}/{record.target}\n"
-                f"- **奖励**：{self._reward_text(record.rewards, record.bounty_key)}\n\n"
+                f"- **奖励**：{self._reward_text(record.rewards, record.reward_labels)}\n\n"
                 "> 奖励已写入角色资产，重复领取不会再次发放。"
             ),
             context.request_id,

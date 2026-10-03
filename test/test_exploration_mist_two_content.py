@@ -4,16 +4,13 @@ import asyncio
 import json
 import shutil
 import sqlite3
-from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import ENEMIES
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
 
 
@@ -221,59 +218,60 @@ def test_mist_grotto_two_real_encounters_settle_frozen_rewards_by_outcome(
     async def run() -> None:
         data_dir = _copy_data(tmp_path)
         _set_pool(data_dir, FROZEN_REWARDS)
-        runtime = create_runtime(data_dir=data_dir, adapters=ADAPTERS)
-        base_enemy = ENEMIES["enemy.mist_elite"]
-        test_enemy = replace(
-            base_enemy,
-            max_hp=1 if outcome == "won" else 100_000,
-            attack=1 if outcome == "won" else 100_000,
-            initiative=1 if outcome == "won" else 1_000,
-            agility=1 if outcome == "won" else 1_000,
+        _update_record(
+            data_dir / "战斗" / "敌人.json",
+            "enemy.mist_elite",
+            stats={
+                "hp": 1 if outcome == "won" else 100_000,
+                "attack": 1 if outcome == "won" else 100_000,
+                "initiative": 1 if outcome == "won" else 1_000,
+                "agility": 1 if outcome == "won" else 1_000,
+            },
         )
+        runtime = create_runtime(data_dir=data_dir, adapters=ADAPTERS)
         try:
-            with patch.dict(ENEMIES, {"enemy.mist_elite": test_enemy}):
-                for adapter in ADAPTERS:
-                    user = f"mist-two-battle-{outcome}-{adapter}"
-                    await _prepare_player(runtime, adapter, user, outcome=outcome)
-                    start_operation = _operation_for_encounter(adapter, encounter=True)
-                    started = await _send(
-                        runtime, adapter, user, start_operation, "开始探索 洞天二层探索"
-                    )
-                    assert started.code == "EXPLORATION_STARTED"
-                    exploration_id = str(started.data["exploration_id"])
-                    _expire(runtime, exploration_id)
-                    settled = await _send(
-                        runtime, adapter, user, f"{user}-settle", "结算探索"
-                    )
-                    assert settled.code == "EXPLORATION_SETTLED"
-                    assert settled.data["battle_outcome"] == outcome
-                    expected = FROZEN_REWARDS if outcome == "won" else {}
-                    assert settled.data["result"] == expected
-                    with sqlite3.connect(runtime.settings.database_path) as connection:
-                        inventory_text, cultivation, total_cultivation, stamina = connection.execute(
-                            "SELECT inventory_json, cultivation, total_cultivation, stamina FROM players "
-                            "WHERE platform=? AND platform_user_id=?",
-                            (adapter, user),
-                        ).fetchone()
-                        battle_status, reward_status, battle_type, enemy_key = connection.execute(
-                            "SELECT status, reward_status, battle_type, enemy_key FROM battle_sessions "
-                            "WHERE battle_id=?",
-                            (settled.data["battle_id"],),
-                        ).fetchone()
-                    assert json.loads(inventory_text) == (
-                        {MATERIAL: 3} if outcome == "won" else {}
-                    )
-                    assert (cultivation, total_cultivation, stamina) == (
-                        (777, 777, 85) if outcome == "won" else (0, 0, 85)
-                    )
-                    assert (battle_status, reward_status, battle_type, enemy_key) == (
-                        "settled", "none", "pve.exploration", "enemy.mist_elite"
-                    )
-                    before_replay = _state(runtime)
-                    replay = await _send(runtime, adapter, user, f"{user}-settle", "结算探索")
-                    assert replay.data["idempotent_replay"] is True
-                    assert replay.data["result"] == expected
-                    assert _state(runtime) == before_replay
+            for adapter in ADAPTERS:
+                user = f"mist-two-battle-{outcome}-{adapter}"
+                await _prepare_player(runtime, adapter, user, outcome=outcome)
+                start_operation = _operation_for_encounter(adapter, encounter=True)
+                started = await _send(
+                    runtime, adapter, user, start_operation, "开始探索 洞天二层探索"
+                )
+                assert started.code == "EXPLORATION_STARTED"
+                exploration_id = str(started.data["exploration_id"])
+                _expire(runtime, exploration_id)
+                settled = await _send(
+                    runtime, adapter, user, f"{user}-settle", "结算探索"
+                )
+                assert settled.code == "EXPLORATION_SETTLED"
+                assert settled.data["battle_outcome"] == outcome
+                expected = FROZEN_REWARDS if outcome == "won" else {}
+                assert settled.data["result"] == expected
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    inventory_text, cultivation, total_cultivation, stamina = connection.execute(
+                        "SELECT inventory_json, cultivation, total_cultivation, stamina FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    battle_status, reward_status, battle_type, enemy_key = connection.execute(
+                        "SELECT status, reward_status, battle_type, enemy_key FROM battle_sessions "
+                        "WHERE battle_id=?",
+                        (settled.data["battle_id"],),
+                    ).fetchone()
+                assert json.loads(inventory_text) == (
+                    {MATERIAL: 3} if outcome == "won" else {}
+                )
+                assert (cultivation, total_cultivation, stamina) == (
+                    (777, 777, 85) if outcome == "won" else (0, 0, 85)
+                )
+                assert (battle_status, reward_status, battle_type, enemy_key) == (
+                    "settled", "none", "pve.exploration", "enemy.mist_elite"
+                )
+                before_replay = _state(runtime)
+                replay = await _send(runtime, adapter, user, f"{user}-settle", "结算探索")
+                assert replay.data["idempotent_replay"] is True
+                assert replay.data["result"] == expected
+                assert _state(runtime) == before_replay
         finally:
             await runtime.close()
 

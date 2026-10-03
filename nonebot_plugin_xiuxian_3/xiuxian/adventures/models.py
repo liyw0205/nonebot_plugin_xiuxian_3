@@ -22,6 +22,7 @@ class BountyOfferView:
     progress: int
     target: int
     reward: dict[str, int]
+    reward_labels: dict[str, str]
     expires_at: str | None = None
 
 
@@ -54,6 +55,7 @@ class BountyClaimRecord:
     progress: int
     target: int
     rewards: dict[str, int]
+    reward_labels: dict[str, str]
     already_completed: bool = False
 
 

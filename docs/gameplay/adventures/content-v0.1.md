@@ -9,7 +9,7 @@
 | `bounty.herb_supply` | 凡人；交付止血草 5 | 30m；每日 1 | 灵石 30、地方名望 +2 | 过期无奖励，不回收草 |
 | `bounty.craft_order` | 完成任意生产订单 1 | 2h；每日 1 | 精力 10、服务信誉 +2 | 过期无奖励 |
 
-每日 00:00 创建 `bounty.daily.<date>`；角色最多接 1 条。接取时冻结目标/奖励/截止时间；同一已结算事件只推进一次；领取键为 `bounty_key:date:player`。
+每日 00:00 创建 `bounty.daily.<date>`；每条悬赏依其 `daily_limit` 限次接取，同一时间最多承接 1 条。接取时冻结目标/奖励/截止时间；同一已结算事件只推进一次；领取键为 `bounty_key:date:player`。
 
 运行时状态：`bounty.herb_supply` 与 `bounty.craft_order` 已开放。
 草药进度以接取时背包数量为基线，生产进度以接取时已完成订单数为基线；领取成功

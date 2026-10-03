@@ -22,10 +22,11 @@ replay: recorded -> indexed -> private/shared -> archived
 
 ## 统一要求
 
-- `bounty.advance` 只能由白名单 operation 事件推进；同一事件 ID只计一次。
+- `bounty.advance` 只能由白名单 operation 事件推进；同一事件 ID只计一次。接取时冻结目标、交付扣除规则、奖励结果、展示信息、名望地点/上限与进度基线；进度和领取不重新读取现行悬赏定义。
 - v0.1 的草药补给从背包基线计算新增止血草，生产订单从接取时的已完成订单基线计算；
   进度读取不创建资产 operation，领取时才写入奖励和声誉流水。
-- 每业务日每角色最多接取一条，且同时最多有一条未结/待领悬赏；过期领取会持久化 `expired`，不返还已获得物品。
+- 每条悬赏按内容中的每日次数限额计算，同一时间最多有一条未结/待领悬赏；过期领取不返还已获得物品，状态变化与对应 operation 结果同事务记账。
+- 领奖的资产、数值、阵营/地方名望与服务信誉复用共享角色状态事务；名望只增加至接取时冻结的地点上限之内，结果只记实际增量。悬赏状态、图鉴投影和 operation 与角色状态一起提交，坏 JSON 或故障不能留下部分奖励。
 - 秘境路线节点由服务端保存，玩家只能从当前允许节点选择；进入门票/体力先锁定，结算一次释放或消耗。
 - `instance.secret_realm.boundary_rift` 使用独立队伍类型、运行记录、每周成员额度与结算事务；不得复用 `cave.boundary_realm` 战斗奖励。其固定路线、两场自动战、退款边界和恢复合同见[v0.3 冒险内容](content-v0.3.md#instancesecret_realmboundary_rift-合同)。
 - `instance.secret_realm.demon_abyss` 将专属事务放在冒险域仓储 mixin；与其他秘境共享活动锁表，但不可并行运行。冻结路线、风险和版本快照，过期遭遇不得继续自动战，系统中止补偿只能回滚本 run 已记录的资源变化；详细合同见[v0.3 冒险内容](content-v0.3.md#instancesecret_realmdemon_abyss-合同)。

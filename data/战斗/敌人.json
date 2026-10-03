@@ -137,6 +137,35 @@
       "status": "active"
     },
     {
+      "name": "雾隐精英",
+      "desc": "盘踞在雾隐洞天深处的强敌，借浓雾掩护身形，以凌厉攻势逼退来者。",
+      "location_key": "cave.mist_grotto_2",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "golden_core",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1800,
+        "attack": 190,
+        "initiative": 15,
+        "agility": 18
+      },
+      "skills": [
+        "enemy_skill.mist_exposed"
+      ],
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.mist_elite",
+        "preview_max_rounds": 20,
+        "reward": {}
+      },
+      "key": "enemy.mist_elite",
+      "status": "active"
+    },
+    {
       "name": "云铁矿兽",
       "desc": "栖居矿脉深处，以铁砂护体；战斗结算确认踪迹后，矿区异兽记录方可点亮。",
       "location_key": "xuantian.cloud_mine",

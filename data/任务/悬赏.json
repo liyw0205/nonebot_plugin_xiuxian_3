@@ -19,6 +19,7 @@
       "target_amount": 5,
       "reward_pool_key": "reward_pool.bounty.herb_supply",
       "reputation_key": "local.xuantian.new_town",
+      "consume_target": false,
       "reward_labels": {}
     },
     {
@@ -39,6 +40,7 @@
       "target_amount": 1,
       "reward_pool_key": "reward_pool.bounty.craft_order",
       "reputation_key": "local.xuantian.new_town",
+      "consume_target": false,
       "reward_labels": {}
     },
     {
@@ -68,6 +70,7 @@
       "target_amount": 3,
       "reward_pool_key": "reward_pool.bounty.cloud_mine",
       "reputation_key": "local.xuantian.cloud_city",
+      "consume_target": false,
       "reward_labels": {}
     },
     {
@@ -88,6 +91,7 @@
       "target_amount": 1,
       "reward_pool_key": "reward_pool.bounty.elite_hunt",
       "reputation_key": "local.xuantian.cloud_city",
+      "consume_target": false,
       "reward_labels": {}
     },
     {
@@ -130,6 +134,7 @@
       "target_amount": 2,
       "reward_pool_key": "reward_pool.bounty.beast_habitat",
       "reputation_key": "local.xuantian.new_town",
+      "consume_target": false,
       "required_permit": "permit.beast_trade",
       "reward_labels": {"faction_reputation.beast": "妖界声望"}
     },
@@ -151,6 +156,7 @@
       "target_amount": 2,
       "reward_pool_key": "reward_pool.bounty.spell_trial",
       "reputation_key": "local.xuantian.new_town",
+      "consume_target": false,
       "reward_labels": {}
     },
     {

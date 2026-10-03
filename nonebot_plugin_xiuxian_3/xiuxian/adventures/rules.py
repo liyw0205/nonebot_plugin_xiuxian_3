@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
+from ..rewards.rules import local_reputation_maximum, reward_pool_outcomes
+from ..specials.dispatch_rules import resolve_dispatch
 
 
 _DEFAULT_CONTENT = bundled_content()
@@ -65,12 +67,24 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
         if not isinstance(description, str) or not description.strip():
             raise ContentError(f"bounty {key} requires desc")
         required_realm = row.get("required_realm")
+        if "required_realm" not in row:
+            raise ContentError(f"bounty {key} requires required_realm")
         if required_realm is not None:
-            bundle.require("realm", str(required_realm))
+            if not isinstance(required_realm, str) or not required_realm:
+                raise ContentError(f"bounty {key} required_realm must be a string or null")
+            bundle.require("realm", required_realm)
+        reputation_key = row.get("reputation_key")
+        if not isinstance(reputation_key, str) or not reputation_key.startswith("local."):
+            raise ContentError(f"bounty {key} requires a local reputation key")
+        local_reputation_maximum(reputation_key, bundle)
         reward_pool_key = row.get("reward_pool_key")
         if not isinstance(reward_pool_key, str) or not reward_pool_key:
             raise ContentError(f"bounty {key} requires reward_pool_key")
-        _reward_outcomes(bundle, reward_pool_key)
+        outcomes = _reward_outcomes(
+            bundle, reward_pool_key, reputation_key=reputation_key
+        )
+        if any(not outcome["rewards"] for outcome in outcomes):
+            raise ContentError(f"bounty {key} reward pool cannot contain empty rewards")
         path_keys = _string_tuple(row, "path_keys", key)
         for path_key in path_keys:
             bundle.require("path", path_key)
@@ -85,18 +99,56 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
         ):
             raise ContentError(f"bounty {key} reward_labels must map strings to strings")
         target_kind = row.get("target_kind")
-        if target_kind not in _TARGET_KINDS:
+        if not isinstance(target_kind, str) or target_kind not in _TARGET_KINDS:
             raise ContentError(f"bounty {key} has unsupported target_kind: {target_kind}")
         target_amount = _positive_int(row, "target_amount", key)
         duration = _positive_int(row, "duration_seconds", key)
         daily_limit = _positive_int(row, "daily_limit", key)
         weight = _positive_int(row, "weight", key)
-        required_layer = row.get("required_layer", 0)
-        if not isinstance(required_layer, int) or required_layer < 0:
+        if "required_layer" not in row:
+            raise ContentError(f"bounty {key} requires required_layer")
+        required_layer = row["required_layer"]
+        if isinstance(required_layer, bool) or not isinstance(required_layer, int) or required_layer < 0:
             raise ContentError(f"bounty {key} required_layer must be a non-negative integer")
+        if "target_key" not in row:
+            raise ContentError(f"bounty {key} requires target_key")
         target_key = row.get("target_key")
-        if target_key is not None and not isinstance(target_key, str):
-            raise ContentError(f"bounty {key} target_key must be a string or null")
+        if target_kind == "production_completed":
+            if target_key is not None:
+                raise ContentError(f"bounty {key} production target_key must be null")
+        else:
+            if not isinstance(target_key, str) or not target_key:
+                raise ContentError(f"bounty {key} requires a target_key")
+            if target_kind == "inventory_gain":
+                try:
+                    bundle.require("item", target_key, include_locked=False)
+                except KeyError as exc:
+                    raise ContentError(
+                        f"bounty {key} references inactive item {target_key}"
+                    ) from exc
+            elif target_kind == "exploration_battle_wins":
+                try:
+                    bundle.require("enemy", target_key, include_locked=False)
+                except KeyError as exc:
+                    raise ContentError(
+                        f"bounty {key} references inactive enemy {target_key}"
+                    ) from exc
+            elif target_kind == "dispatch_successes":
+                try:
+                    resolved_dispatch = resolve_dispatch(target_key)
+                except ValueError as exc:
+                    raise ContentError(
+                        f"bounty {key} references unknown dispatch {target_key}"
+                    ) from exc
+                if resolved_dispatch.key != target_key:
+                    raise ContentError(f"bounty {key} target must use a dispatch key")
+        if "consume_target" not in row or not isinstance(row["consume_target"], bool):
+            raise ContentError(f"bounty {key} consume_target must be a boolean")
+        if row["consume_target"] and target_kind != "inventory_gain":
+            raise ContentError(f"bounty {key} can only consume an inventory target")
+        status = row.get("status")
+        if not isinstance(status, str) or status not in {"open", "locked"}:
+            raise ContentError(f"bounty {key} status must be open or locked")
         definitions.append(
             BountyDefinition(
                 key=key,
@@ -111,10 +163,10 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
                 target_amount=target_amount,
                 reward_pool_key=reward_pool_key,
                 weight=weight,
-                reputation_key=str(row.get("reputation_key", "local.xuantian.new_town")),
-                runtime_status=str(row.get("status", "locked")),
+                reputation_key=reputation_key,
+                runtime_status=status,
                 required_intro_flag=_optional_string(row, "required_intro_flag", key),
-                consume_target=bool(row.get("consume_target", False)),
+                consume_target=row["consume_target"],
                 required_permit=_optional_string(row, "required_permit", key),
                 path_keys=path_keys,
                 aliases=aliases,
@@ -153,11 +205,14 @@ def _reward_outcomes(
     path_key: str | None = None,
     realm_key: str | None = None,
     realm_layer: int | None = None,
+    reputation_key: str,
 ) -> tuple[dict[str, Any], ...]:
     pool = content.require("reward", pool_key, include_locked=False)
-    outcomes = pool.get("outcomes")
-    if pool.get("pool_type") != "weighted" or not isinstance(outcomes, list) or not outcomes:
-        raise ContentError(f"reward pool {pool_key} must define weighted outcomes")
+    outcomes = reward_pool_outcomes(
+        pool_key,
+        content,
+        reward_key_aliases={"local_reputation": reputation_key},
+    )
     equipment_quality_weights = pool.get("equipment_reward_qualities", {})
     if not isinstance(equipment_quality_weights, dict) or any(
         quality not in {"common", "uncommon", "rare", "heaven", "mythic"}
@@ -168,17 +223,7 @@ def _reward_outcomes(
     ):
         raise ContentError(f"reward pool {pool_key} has invalid equipment_reward_qualities")
     normalized: list[dict[str, Any]] = []
-    for index, outcome in enumerate(outcomes):
-        if not isinstance(outcome, dict):
-            raise ContentError(f"reward pool {pool_key} outcome {index} must be an object")
-        weight = outcome.get("weight")
-        rewards = outcome.get("rewards")
-        if not isinstance(weight, int) or isinstance(weight, bool) or weight <= 0:
-            raise ContentError(f"reward pool {pool_key} outcome {index} has invalid weight")
-        if not isinstance(rewards, dict) or not rewards:
-            raise ContentError(f"reward pool {pool_key} outcome {index} requires rewards")
-        if any(not isinstance(key, str) or not isinstance(amount, int) or amount <= 0 for key, amount in rewards.items()):
-            raise ContentError(f"reward pool {pool_key} outcome {index} rewards must be positive integer quantities")
+    for weight, rewards in outcomes:
         equipment_available = True
         for reward_key in rewards:
             if reward_key.startswith("item."):
@@ -186,7 +231,7 @@ def _reward_outcomes(
                     item = content.require("item", reward_key, include_locked=False)
                 except KeyError as exc:
                     raise ContentError(
-                        f"reward pool {pool_key} outcome {index} references unknown item {reward_key}"
+                        f"reward pool {pool_key} references unknown item {reward_key}"
                     ) from exc
                 if item.get("item_type") in {"weapon", "armor", "accessory"} and (
                     path_key is not None or realm_key is not None
@@ -199,7 +244,7 @@ def _reward_outcomes(
                     ):
                         equipment_available = False
         if equipment_available:
-            normalized.append({"weight": weight, "rewards": dict(rewards)})
+            normalized.append({"weight": weight, "rewards": rewards})
     if equipment_quality_weights:
         for item in content.list("item", include_locked=False):
             if item.get("item_type") not in {"weapon", "armor", "accessory"}:
@@ -223,6 +268,28 @@ def _reward_outcomes(
                 }
             )
     return tuple(normalized)
+
+
+def bounty_reward_labels(
+    definition: BountyDefinition,
+    rewards: Mapping[str, int],
+    content: ContentBundle | None = None,
+) -> dict[str, str]:
+    """Freeze the names needed to present one selected bounty reward."""
+
+    bundle = _content(content)
+    labels = dict(definition.reward_labels)
+    if "local_reputation" in rewards:
+        location_key = definition.reputation_key.removeprefix("local.")
+        labels.setdefault(
+            "local_reputation", f"{bundle.label('location', location_key)}名望"
+        )
+    for key in rewards:
+        if key.startswith("item."):
+            labels.setdefault(key, bundle.label("item", key))
+        elif key.startswith("codex."):
+            labels.setdefault(key, bundle.label("codex_entry", key))
+    return labels
 
 
 def _equipment_meets_realm(
@@ -298,6 +365,7 @@ def reward_map(
         path_key=path_key,
         realm_key=realm_key,
         realm_layer=realm_layer,
+        reputation_key=definition.reputation_key,
     )
     if not outcomes:
         raise ContentError(f"reward pool {definition.reward_pool_key} has no eligible outcomes")
@@ -331,6 +399,7 @@ __all__ = [
     "BountyDefinition",
     "bounty_definition",
     "bounty_definitions",
+    "bounty_reward_labels",
     "choose_bounty",
     "default_content_bundle",
     "meets_realm",

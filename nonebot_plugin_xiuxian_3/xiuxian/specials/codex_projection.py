@@ -25,8 +25,9 @@ def record_codex_discovery(
     occurred_at: datetime | str,
     snapshot: dict[str, Any] | None = None,
     content: ContentBundle | None = None,
+    category_snapshot: str | None = None,
 ) -> bool:
-    category = category_for_entry(entry_key, content)
+    category = category_snapshot or category_for_entry(entry_key, content)
     if category is None:
         return False
     now_text = serialize_datetime(occurred_at) if isinstance(occurred_at, datetime) else occurred_at

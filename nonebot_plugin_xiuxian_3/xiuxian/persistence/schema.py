@@ -1396,11 +1396,10 @@ CREATE TABLE IF NOT EXISTS bounty_offers (
     snapshot_json TEXT NOT NULL DEFAULT '{}',
     result_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE (player_id, business_date)
+    updated_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_bounty_offers_player ON bounty_offers(player_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_bounty_offers_player_day ON bounty_offers(player_id, business_date, bounty_key);
 CREATE INDEX IF NOT EXISTS idx_bounty_offers_status ON bounty_offers(player_id, status);
 
 CREATE TABLE IF NOT EXISTS routine_checkins (

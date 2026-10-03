@@ -111,21 +111,6 @@ SPRING_WISP = EnemyDefinition(
     reward={},
 )
 
-MIST_ELITE = EnemyDefinition(
-    key="enemy.mist_elite",
-    label="雾隐精英",
-    location_key="cave.mist_grotto_2",
-    required_realm="golden_core",
-    required_layer=1,
-    max_hp=1800,
-    attack=190,
-    initiative=15,
-    agility=18,
-    skill_key="enemy_skill.mist_exposed",
-    random_pool=combat_random_pool("enemy.mist_elite"),
-    reward={},
-)
-
 CLOUD_BOAT_GUARDIAN = EnemyDefinition(
     key="enemy.cloud_boat_guardian",
     label="云舟守灵",
@@ -626,7 +611,6 @@ ENEMIES = {
     IRON_BOAR.key: IRON_BOAR,
     MIST_GUARDIAN.key: MIST_GUARDIAN,
     SPRING_WISP.key: SPRING_WISP,
-    MIST_ELITE.key: MIST_ELITE,
     CLOUD_BOAT_GUARDIAN.key: CLOUD_BOAT_GUARDIAN,
     DEMON_OVERLORD.key: DEMON_OVERLORD,
     DEMON_RUINS_SCOUT.key: DEMON_RUINS_SCOUT,
@@ -907,7 +891,6 @@ __all__ = [
     "ANCESTRAL_SPIRIT",
     "DEMON_WAR_FRONT",
     "IRON_BOAR",
-    "MIST_ELITE",
     "MIST_GUARDIAN",
     "SPRING_WISP",
     "WOOD_RAT",
