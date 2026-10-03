@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import shutil
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.social.mentor_repository import MentorRepositoryMixin
+
+
+ROOT = Path(__file__).parents[1]
 
 
 class MutableClock:
@@ -25,6 +33,24 @@ class MutableClock:
 
 def _context(user: str, operation_id: str = "") -> CommandContext:
     return CommandContext(adapter="web", user_id=user, operation_id=operation_id)
+
+
+def _adapter_context(adapter: str, user: str, request_id: str, operation_id: str = "") -> CommandContext:
+    return CommandContext(
+        adapter=adapter,
+        user_id=user,
+        request_id=request_id,
+        operation_id=operation_id,
+        can_write_assets=True,
+    )
+
+
+def _set_new_town_reputation_cap(data_dir: Path, maximum: int) -> None:
+    path = data_dir / "地图" / "地点.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    location = next(row for row in document["records"] if row["key"] == "xuantian.new_town")
+    location["local_reputation_maximum"] = maximum
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 async def _create_player(runtime, user: str) -> None:
@@ -171,7 +197,8 @@ def test_mentor_graduation_requires_progress_and_rewards_once() -> None:
             assert graduated.code == "MENTOR_GRADUATED"
             assert graduated.data["apprentice_local_reputation"] == 10
             assert graduated.data["master_contribution"] == 20
-            assert graduated.data["service_reputation_delta"] == 2
+            assert graduated.data["apprentice_service_reputation_gain"] == 2
+            assert graduated.data["master_service_reputation_gain"] == 2
 
             replay = await runtime.dispatch(_context("master", "mentor-graduate"), f"师徒毕业 {relation_id}")
             assert replay.code == "MENTOR_GRADUATED"
@@ -199,6 +226,184 @@ def test_mentor_graduation_requires_progress_and_rewards_once() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ("qq.official", "onebot.v11"))
+def test_mentor_graduation_uses_shared_reputation_transaction_and_recovers(adapter: str) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(ROOT / "data", data_dir)
+            _set_new_town_reputation_cap(data_dir, 997)
+            runtime = create_runtime(data_dir=data_dir, adapters=(adapter,))
+            master = f"mentor-master-{adapter}"
+            apprentice = f"mentor-apprentice-{adapter}"
+            try:
+                for user in (master, apprentice):
+                    assert (await runtime.adapters.dispatch(
+                        adapter, _adapter_context(adapter, user, f"{user}-create"), "开始修仙"
+                    )).code == "PLAYER_CREATED"
+                    assert (await runtime.adapters.dispatch(
+                        adapter, _adapter_context(adapter, user, f"{user}-seek"), "寻仙问道"
+                    )).code == "SEEKING_STARTED"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET realm_key='foundation', realm_layer=4 WHERE platform=? AND platform_user_id=?",
+                        (adapter, master),
+                    )
+                invited = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, master, f"{master}-invite", f"{master}-invite-op"),
+                    f"邀请拜师 {adapter}:{apprentice}",
+                )
+                relation_id = invited.data["relation_id"]
+                accepted = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, apprentice, f"{apprentice}-accept", f"{apprentice}-accept-op"),
+                    f"接受拜师 {relation_id}",
+                )
+                assert accepted.code == "MENTOR_ACCEPTED"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    apprentice_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, apprentice),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='qi_gathering', realm_layer=3 WHERE id=?",
+                        (apprentice_id,),
+                    )
+                    connection.execute(
+                        "INSERT INTO production_orders(order_id, player_id, operation_id, recipe_key, status, "
+                        "starts_at, ends_at, energy_cost, currency_cost, snapshot_json, result_json, created_at, updated_at) "
+                        "VALUES (?, ?, ?, 'recipe.pill.healing_low', 'completed', ?, ?, 0, 0, '{}', '{}', ?, ?)",
+                        (
+                            f"{adapter}-mentor-production",
+                            apprentice_id,
+                            f"{adapter}-mentor-production-op",
+                            "2026-09-23T00:00:00+00:00",
+                            "2026-09-23T00:01:00+00:00",
+                            "2026-09-23T00:00:00+00:00",
+                            "2026-09-23T00:01:00+00:00",
+                        ),
+                    )
+                    master_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, master),
+                    ).fetchone()[0]
+                    for player_id, local_json, service in (
+                        (apprentice_id, "{", 99),
+                        (master_id, "{}", 100),
+                    ):
+                        connection.execute(
+                            "INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+                            "VALUES (?, ?, ?, '2026-09-23T00:00:00+00:00')",
+                            (player_id, local_json, service),
+                        )
+
+                operation_id = f"{adapter}-mentor-graduate-op"
+                before_invalid = _mentor_graduation_state(runtime, adapter, master, apprentice, relation_id, operation_id)
+                invalid = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, master, f"{master}-invalid-graduate", operation_id),
+                    f"师徒毕业 {relation_id}",
+                )
+                assert invalid.code == "PERSISTENCE_ERROR"
+                assert _mentor_graduation_state(
+                    runtime, adapter, master, apprentice, relation_id, operation_id
+                ) == before_invalid
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE player_reputations SET local_json=? WHERE player_id=?",
+                        ('{"local.xuantian.new_town": 995}', apprentice_id),
+                    )
+                before_failure = _mentor_graduation_state(runtime, adapter, master, apprentice, relation_id, operation_id)
+                with patch.object(
+                    MentorRepositoryMixin,
+                    "_mentor_record_operation",
+                    side_effect=RuntimeError("injected failure after reputation writes"),
+                ):
+                    failed = await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, master, f"{master}-failed-graduate", operation_id),
+                        f"师徒毕业 {relation_id}",
+                    )
+                assert failed.code == "PERSISTENCE_ERROR"
+                assert _mentor_graduation_state(
+                    runtime, adapter, master, apprentice, relation_id, operation_id
+                ) == before_failure
+
+                graduated = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, master, f"{master}-graduate", operation_id),
+                    f"师徒毕业 {relation_id}",
+                )
+                assert graduated.code == "MENTOR_GRADUATED"
+                assert graduated.data["apprentice_local_reputation"] == 2
+                assert graduated.data["apprentice_service_reputation_gain"] == 1
+                assert graduated.data["master_service_reputation_gain"] == 0
+                assert "徒弟地方名望**：+2" in graduated.message
+                assert "徒弟服务信誉**：+1" in graduated.message
+                assert "师傅服务信誉**" not in graduated.message
+                settled_state = _mentor_graduation_state(
+                    runtime, adapter, master, apprentice, relation_id, operation_id
+                )
+                assert settled_state[1] == (apprentice, '{"local.xuantian.new_town": 997}', 100)
+                assert settled_state[2] == (master, "{}", 100)
+                assert settled_state[3]["apprentice_local_reputation"] == 2
+                assert settled_state[3]["apprentice_service_reputation_gain"] == 1
+                assert settled_state[3]["master_service_reputation_gain"] == 0
+                await runtime.close()
+            finally:
+                if not runtime._closed:
+                    await runtime.close()
+
+            _set_new_town_reputation_cap(data_dir, 996)
+            recovered = create_runtime(data_dir=data_dir, adapters=(adapter,))
+            try:
+                replay = await recovered.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, master, f"{master}-graduate-replay", operation_id),
+                    f"师徒毕业 {relation_id}",
+                )
+                assert replay.code == "MENTOR_GRADUATED"
+                assert replay.data["idempotent_replay"] is True
+                assert replay.data["apprentice_local_reputation"] == 2
+                assert replay.data["apprentice_service_reputation_gain"] == 1
+                assert replay.data["master_service_reputation_gain"] == 0
+                assert _mentor_graduation_state(
+                    recovered, adapter, master, apprentice, relation_id, operation_id
+                ) == settled_state
+            finally:
+                await recovered.close()
+
+    asyncio.run(run())
+
+
+def _mentor_graduation_state(runtime, adapter: str, master: str, apprentice: str, relation_id: str, operation_id: str):
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        relation = connection.execute(
+            "SELECT status, master_contribution, graduate_operation_id FROM mentor_relations WHERE relation_id=?",
+            (relation_id,),
+        ).fetchone()
+        reputations = connection.execute(
+            "SELECT platform_user_id, local_json, service_reputation FROM players "
+            "LEFT JOIN player_reputations ON players.id=player_reputations.player_id "
+            "WHERE platform=? AND platform_user_id IN (?, ?) "
+            "ORDER BY CASE platform_user_id WHEN ? THEN 0 ELSE 1 END",
+            (adapter, master, apprentice, apprentice),
+        ).fetchall()
+        operation = connection.execute(
+            "SELECT result_json FROM operations WHERE operation_id=?", (operation_id,)
+        ).fetchone()
+    return (
+        relation,
+        (reputations[0][0], reputations[0][1] or "{}", reputations[0][2] or 0),
+        (reputations[1][0], reputations[1][1] or "{}", reputations[1][2] or 0),
+        json.loads(operation[0]) if operation is not None else None,
+    )
 
 
 @pytest.mark.parametrize("kind", ["onebot", "qq"])

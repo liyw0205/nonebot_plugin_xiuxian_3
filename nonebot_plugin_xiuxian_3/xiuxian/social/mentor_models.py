@@ -20,7 +20,8 @@ class MentorRelationRecord:
     graduated_at: str | None = None
     master_contribution: int = 0
     apprentice_local_reputation: int = 0
-    service_reputation_delta: int = 0
+    apprentice_service_reputation_gain: int = 0
+    master_service_reputation_gain: int = 0
     already_completed: bool = False
 
 

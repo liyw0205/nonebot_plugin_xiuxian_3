@@ -9,6 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..rewards.rules import local_reputation_maximum
+from ..utils.player import change_player_state, player_reputation_state
 from ..persistence.errors import (
     MentorGraduationNotReadyError,
     MentorInvitationExpiredError,
@@ -334,6 +336,12 @@ class MentorRepositoryMixin:
                 raise MentorGraduationNotReadyError("apprentice has not reached qi gathering L3 after entry")
             if not self._mentor_has_completed_service(connection, int(apprentice["id"])):
                 raise MentorGraduationNotReadyError("apprentice has not completed production or livelihood service")
+            local_key = "local.xuantian.new_town"
+            apprentice_id = int(apprentice["id"])
+            master_id = int(master["id"])
+            local_maximum = local_reputation_maximum(local_key, self.content)
+            apprentice_reputation_before = player_reputation_state(connection, apprentice_id)
+            master_reputation_before = player_reputation_state(connection, master_id)
             connection.execute(
                 """
                 UPDATE mentor_relations
@@ -343,8 +351,22 @@ class MentorRepositoryMixin:
                 """,
                 (now_text, operation_id, MENTOR_CONTRIBUTION, now_text, relation["id"]),
             )
-            self._mentor_add_reputation(connection, int(apprentice["id"]), MENTOR_APPRENTICE_LOCAL_REPUTATION, MENTOR_SERVICE_REPUTATION, now_text)
-            self._mentor_add_reputation(connection, int(master["id"]), 0, MENTOR_SERVICE_REPUTATION, now_text)
+            change_player_state(
+                connection,
+                apprentice,
+                updated_at=now_text,
+                local_reputation_delta={local_key: MENTOR_APPRENTICE_LOCAL_REPUTATION},
+                local_reputation_maximums={local_key: local_maximum},
+                service_reputation_delta=MENTOR_SERVICE_REPUTATION,
+            )
+            change_player_state(
+                connection,
+                master,
+                updated_at=now_text,
+                service_reputation_delta=MENTOR_SERVICE_REPUTATION,
+            )
+            apprentice_reputation_after = player_reputation_state(connection, apprentice_id)
+            master_reputation_after = player_reputation_state(connection, master_id)
             # Sect contribution is the existing shared contribution ledger. The
             # relation row remains the source of truth when the mentor is not in a sect.
             sect_member = connection.execute(
@@ -367,8 +389,16 @@ class MentorRepositoryMixin:
             payload = self._mentor_payload(
                 connection,
                 relation_id,
-                apprentice_local_reputation=MENTOR_APPRENTICE_LOCAL_REPUTATION,
-                service_reputation_delta=MENTOR_SERVICE_REPUTATION,
+                apprentice_local_reputation=(
+                    apprentice_reputation_after.local.get(local_key, 0)
+                    - apprentice_reputation_before.local.get(local_key, 0)
+                ),
+                apprentice_service_reputation_gain=(
+                    apprentice_reputation_after.service - apprentice_reputation_before.service
+                ),
+                master_service_reputation_gain=(
+                    master_reputation_after.service - master_reputation_before.service
+                ),
             )
             self._mentor_record_operation(connection, operation_id, operation_name, int(master["id"]), request_hash, payload, now_text)
             return self._mentor_record_from_payload(payload)
@@ -394,34 +424,6 @@ class MentorRepositoryMixin:
         return commission is not None
 
     @staticmethod
-    def _mentor_add_reputation(connection: Any, player_id: int, local_delta: int, service_delta: int, now_text: str) -> None:
-        reputation = connection.execute(
-            "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-            (player_id,),
-        ).fetchone()
-        if reputation is None:
-            local: dict[str, Any] = {}
-        else:
-            try:
-                decoded = json.loads(str(reputation["local_json"]))
-            except (TypeError, ValueError):
-                decoded = {}
-            local = decoded if isinstance(decoded, dict) else {}
-        local_key = "local.xuantian.new_town"
-        local[local_key] = int(local.get(local_key, 0)) + int(local_delta)
-        service = int(reputation["service_reputation"]) if reputation is not None else 0
-        service = min(100, service + int(service_delta))
-        connection.execute(
-            """
-            INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-            """,
-            (player_id, json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
-        )
-
-    @staticmethod
     def _mentor_target_ref(platform: str, target_ref: str) -> tuple[str, str]:
         value = target_ref.strip()
         if ":" in value:
@@ -443,7 +445,8 @@ class MentorRepositoryMixin:
         relation_id: str,
         *,
         apprentice_local_reputation: int = 0,
-        service_reputation_delta: int = 0,
+        apprentice_service_reputation_gain: int = 0,
+        master_service_reputation_gain: int = 0,
     ) -> dict[str, Any]:
         row = connection.execute(
             """
@@ -473,7 +476,8 @@ class MentorRepositoryMixin:
             "graduated_at": str(row["graduated_at"]) if row["graduated_at"] else None,
             "master_contribution": int(row["master_contribution"]),
             "apprentice_local_reputation": int(apprentice_local_reputation),
-            "service_reputation_delta": int(service_reputation_delta),
+            "apprentice_service_reputation_gain": int(apprentice_service_reputation_gain),
+            "master_service_reputation_gain": int(master_service_reputation_gain),
         }
 
     @staticmethod
@@ -510,8 +514,9 @@ class MentorRepositoryMixin:
             accepted_at=payload.get("accepted_at"),
             graduated_at=payload.get("graduated_at"),
             master_contribution=int(payload.get("master_contribution", 0)),
-            apprentice_local_reputation=int(payload.get("apprentice_local_reputation", 0)),
-            service_reputation_delta=int(payload.get("service_reputation_delta", 0)),
+            apprentice_local_reputation=int(payload["apprentice_local_reputation"]),
+            apprentice_service_reputation_gain=int(payload["apprentice_service_reputation_gain"]),
+            master_service_reputation_gain=int(payload["master_service_reputation_gain"]),
             already_completed=replay,
         )
 

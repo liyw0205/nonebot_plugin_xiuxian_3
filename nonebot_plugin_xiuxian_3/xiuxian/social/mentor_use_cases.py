@@ -48,7 +48,8 @@ class MentorApplication:
             "graduated_at": record.graduated_at,
             "master_contribution": record.master_contribution,
             "apprentice_local_reputation": record.apprentice_local_reputation,
-            "service_reputation_delta": record.service_reputation_delta,
+            "apprentice_service_reputation_gain": record.apprentice_service_reputation_gain,
+            "master_service_reputation_gain": record.master_service_reputation_gain,
             "idempotent_replay": record.already_completed,
         }
 
@@ -192,16 +193,17 @@ class MentorApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return self._persistence_error(context, operation_id)
+        reward_lines = [f"- **师傅贡献**：+{record.master_contribution}"]
+        if record.apprentice_local_reputation:
+            reward_lines.append(f"- **徒弟地方名望**：+{record.apprentice_local_reputation}")
+        if record.apprentice_service_reputation_gain:
+            reward_lines.append(f"- **徒弟服务信誉**：+{record.apprentice_service_reputation_gain}")
+        if record.master_service_reputation_gain:
+            reward_lines.append(f"- **师傅服务信誉**：+{record.master_service_reputation_gain}")
         return CommandResult(
             True,
             "MENTOR_GRADUATED",
-            (
-                "## 徒弟已毕业\n\n"
-                + self._summary(record)
-                + f"\n\n- **徒弟地方名望**：+{record.apprentice_local_reputation}"
-                + f"\n- **师傅贡献**：+{record.master_contribution}"
-                + f"\n- **双方服务信誉**：+{record.service_reputation_delta}"
-            ),
+            "## 徒弟已毕业\n\n" + self._summary(record) + "\n\n" + "\n".join(reward_lines),
             context.request_id,
             operation_id,
             data=self._data(record),
