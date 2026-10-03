@@ -61,7 +61,11 @@ def test_three_realms_tower_rules_are_faction_specific() -> None:
     assert floor_definition(21).required_realm == "soul_transformation"
     assert floor_definition(40).required_realm == "soul_transformation"
     assert rebuild_reputation_total(
-        {"local.domain_refuge": 200, "local.abyss_outpost": 200, "local.ancestral_habitat": 100}
+        {
+            "local.xuantian.domain_front": 200,
+            "local.demon.abyss_market": 200,
+            "local.beast.three_realms_trade_port": 100,
+        }
     ) == 500
     assert reward_for(1, "seed", first_clear=True) == {
         "item.mat.array_sand": 2,
@@ -124,7 +128,13 @@ def _make_tower_eligible(
             "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,updated_at=excluded.updated_at",
             (
                 player_id,
-                json.dumps({"local.domain_refuge": rebuild_reputation, "local.abyss_outpost": 0, "local.ancestral_habitat": 0}),
+                json.dumps(
+                    {
+                        "local.xuantian.domain_front": rebuild_reputation,
+                        "local.demon.abyss_market": 0,
+                        "local.beast.three_realms_trade_port": 0,
+                    }
+                ),
             ),
         )
 

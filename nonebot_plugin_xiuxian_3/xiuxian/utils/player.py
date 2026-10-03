@@ -213,6 +213,14 @@ class PlayerStateChange:
 
 
 @dataclass(frozen=True, slots=True)
+class PlayerReputationState:
+    """Validated local and service reputation balances for one player."""
+
+    local: dict[str, int]
+    service: int
+
+
+@dataclass(frozen=True, slots=True)
 class PlayerRewardParts:
     """Normalized reward groups for one player state transaction."""
 
@@ -932,8 +940,9 @@ def _change_player_reputations(
         "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
         (player_id,),
     ).fetchone()
-    local_json = str(row["local_json"] or "{}") if row is not None else "{}"
-    service_value = int(row["service_reputation"]) if row is not None else 0
+    current = _reputation_state_from_row(row)
+    local_json = json.dumps(current.local, ensure_ascii=False, sort_keys=True)
+    service_value = current.service
     if local_delta:
         local_json = json.dumps(
             _local_reputation_after_delta(local_json, local_delta, local_maximums),
@@ -945,10 +954,14 @@ def _change_player_reputations(
     if service_delta is not None:
         if isinstance(service_delta, bool) or not isinstance(service_delta, int):
             raise ValueError("service reputation delta must be an integer")
-        service_value += service_delta
-        if service_value < 0:
+        next_service_value = service_value + service_delta
+        if next_service_value < 0:
             raise ValueError("service reputation cannot be negative")
-        service_value = min(service_value, PLAYER_SERVICE_REPUTATION_MAXIMUM)
+        service_value = (
+            max(service_value, min(next_service_value, PLAYER_SERVICE_REPUTATION_MAXIMUM))
+            if service_delta > 0
+            else next_service_value
+        )
     connection.execute(
         """
         INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
@@ -962,6 +975,26 @@ def _change_player_reputations(
     )
 
 
+def _reputation_state_from_row(row: Mapping[str, Any] | Any | None) -> PlayerReputationState:
+    if row is None:
+        return PlayerReputationState(local={}, service=0)
+    local = _local_reputation_after_delta(player_field(row, "local_json", "{}"), {})
+    raw_service = player_field(row, "service_reputation", 0)
+    if isinstance(raw_service, bool) or not isinstance(raw_service, int) or raw_service < 0:
+        raise ValueError("player service reputation must be a non-negative integer")
+    return PlayerReputationState(local=local, service=raw_service)
+
+
+def player_reputation_state(connection: Any, player_id: int) -> PlayerReputationState:
+    """Read validated local and service reputation through the shared projection."""
+
+    row = connection.execute(
+        "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
+        (player_id,),
+    ).fetchone()
+    return _reputation_state_from_row(row)
+
+
 def local_reputation_with_delta(
     connection: Any,
     player_id: int,
@@ -971,11 +1004,9 @@ def local_reputation_with_delta(
 ) -> dict[str, int]:
     """Return validated local reputation values after signed changes."""
 
-    row = connection.execute(
-        "SELECT local_json FROM player_reputations WHERE player_id = ?", (player_id,)
-    ).fetchone()
+    current = player_reputation_state(connection, player_id)
     return _local_reputation_after_delta(
-        row["local_json"] if row is not None else "{}", delta, maximums
+        json.dumps(current.local, ensure_ascii=False, sort_keys=True), delta, maximums
     )
 
 
@@ -1041,6 +1072,7 @@ def player_combat_values(row: Mapping[str, Any] | Any) -> dict[str, Any]:
 
 __all__ = [
     "PlayerRewardParts",
+    "PlayerReputationState",
     "PlayerStateChange",
     "PLAYER_COMBAT_PROJECTION_FIELDS",
     "PLAYER_NUMERIC_DEFAULTS",
@@ -1078,6 +1110,7 @@ __all__ = [
     "player_qualification",
     "player_intro_flags",
     "player_reputation",
+    "player_reputation_state",
     "player_reputation_with_delta",
     "player_values",
     "player_combat_values",

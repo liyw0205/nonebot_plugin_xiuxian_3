@@ -40,7 +40,7 @@ def _eligible(runtime, identities: list[tuple[str, str]], *, realm: str = "nasce
             db.execute(
                 "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) VALUES (?,?,0,'2026-09-28T00:00:00+00:00') "
                 "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,updated_at=excluded.updated_at",
-                (player_id, json.dumps({"local.domain_refuge": 500})),
+                (player_id, json.dumps({"local.xuantian.domain_front": 500})),
             )
 
 
@@ -144,7 +144,7 @@ def test_three_realms_tower_duo__gate_failure_and_start_refund(monkeypatch) -> N
                     "UPDATE players SET realm_key='nascent_soul',realm_layer=1 WHERE platform=? AND platform_user_id=?",
                     identities[1],
                 )
-                db.execute("UPDATE player_reputations SET local_json=? WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)", (json.dumps({"local.domain_refuge": 499}), identities[1][0], identities[1][1]))
+                db.execute("UPDATE player_reputations SET local_json=? WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)", (json.dumps({"local.xuantian.domain_front": 499}), identities[1][0], identities[1][1]))
                 db.execute(
                     "INSERT INTO three_realms_tower_duo_runs(duo_run_id,party_id,tower_key,floor_no,status,member_run_ids_json,result_json,start_operation_id,created_at,updated_at) VALUES ('seed-duo',?,'tower.three_realms',20,'won','[]','{}','seed-op','2026-09-27T00:00:00+00:00','2026-09-27T00:00:00+00:00')",
                     (party_id,),

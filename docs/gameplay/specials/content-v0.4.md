@@ -19,7 +19,7 @@
 ## `tower.three_realms` v0.4 扩层合同
 
 - 仅新增 21–40 层规则；单人命令为 `三界塔`、`挑战三界塔 <1-40>`、`领取三界塔奖励`，双人命令为 `创建三界塔双人队伍`、`挑战三界塔双人 <1-40>`、`领取三界塔双人奖励`；虚空塔仍关闭。
-- 门槛为化神 L1，或 `local.domain_refuge`、`local.abyss_outpost`、`local.ancestral_habitat` 的重建名望总值达到 500。v0.3 的三界主线许可只开放 1–20 层，不替代 v0.4 门槛。
+- 门槛为化神 L1，或 `local.xuantian.domain_front`、`local.demon.abyss_market`、`local.beast.three_realms_trade_port` 的重建名望总值达到 500。旧三界主线许可只开放 1–20 层，不替代此门槛。
 - 每次扣体力 12；每角色/层/UTC 周最多 2 次，首通、练习、失败和逃跑均计次。战斗无法启动时退还全部体力且不计次。首通仍须按 1→40 层逐层胜利并领取；练习奖励由 run ID 摘要决定为阵砂 0 或 1。
 - 首通每层固定领取灵石 60、阵砂 2，并发现 `codex.challenge.three_realms.floor_N`。第 30 层发现 `codex.story.three_realms.reconstruction_<faction>`；第 40 层发现 `codex.story.three_realms.domain_<faction>` 并授予展示称号 `title.three_realms_tower.domain_guardian`。故事阵营取战斗开始快照。
 - v0.4 首领为第 30/40 层，敌人键分别为 `enemy.three_realms_tower.<faction>.floor_30_boss` 与 `enemy.three_realms_tower.<faction>.floor_40_boss`；21–29 层使用 `.domain_vanguard`，31–39 层使用 `.domain_veteran`。

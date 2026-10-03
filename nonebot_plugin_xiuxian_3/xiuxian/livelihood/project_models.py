@@ -12,12 +12,16 @@ class PublicProjectView:
     project_id: str
     project_key: str
     label: str
+    description: str
+    effect_description: str
     business_week: str
     status: str
     contribution_points: int
     target_points: int
     progress: dict[str, int] = field(default_factory=dict)
     requirements: dict[str, int] = field(default_factory=dict)
+    resource_labels: dict[str, str] = field(default_factory=dict)
+    reward_labels: dict[str, str] = field(default_factory=dict)
     effect_key: str = ""
     effect_ends_at: str = ""
 
@@ -42,6 +46,9 @@ class ProjectSettlementRecord:
     eligible: bool
     rewarded: bool
     reward: dict[str, int] = field(default_factory=dict)
+    local_reputation_before: int = 0
+    local_reputation_after: int = 0
+    local_reputation_delta: int = 0
     already_completed: bool = False
 
 

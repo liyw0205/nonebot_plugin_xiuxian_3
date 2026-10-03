@@ -325,11 +325,17 @@ CONSTRUCTION_COUPON = "item.token.construction_coupon"
 class PublicProjectDefinition:
     key: str
     label: str
+    description: str
+    effect_description: str
     requirements: dict[str, int]
     contribution_resources: tuple[str, ...]
+    resource_labels: dict[str, str]
+    reward_labels: dict[str, str]
     effect_key: str
     reward: dict[str, int | str]
-    local_reputation_key: str = "local.xuantian.new_town"
+    local_reputation_key: str | None = None
+    reputation_location_key: str | None = None
+    local_reputation_maximum: int = 0
     required_faction: str | None = None
     required_faction_reputation: int = 0
     required_sect_level: int = 0
@@ -380,6 +386,9 @@ def public_project_definitions(content: ContentBundle | None = None) -> dict[str
         key, label, desc = row.get("key"), row.get("name"), row.get("desc")
         if not isinstance(key, str) or not key or not isinstance(label, str) or not label.strip() or not isinstance(desc, str) or not desc.strip():
             raise ContentError(f"public project {key!r} requires key, name and desc")
+        effect_desc = row.get("effect_desc")
+        if not isinstance(effect_desc, str) or not effect_desc.strip():
+            raise ContentError(f"public project {key} requires effect_desc")
         requirements = _positive_mapping(row, "requirements", bundle, key)
         resources = row.get("contribution_resources")
         if not isinstance(resources, list) or not resources or any(item not in requirements for item in resources):
@@ -391,27 +400,59 @@ def public_project_definitions(content: ContentBundle | None = None) -> dict[str
         if not isinstance(reward, dict):
             raise ContentError(f"public project {key} has invalid reward")
         normalized_reward: dict[str, int | str] = {}
+        reward_labels: dict[str, str] = {}
         for reward_key, reward_value in reward.items():
             if reward_key == "item":
                 if not isinstance(reward_value, str) or not bundle.has("item", reward_value, include_locked=False):
                     raise ContentError(f"public project {key} has invalid reward item")
                 normalized_reward[reward_key] = reward_value
+                reward_labels[reward_value] = bundle.label("item", reward_value)
             elif reward_key in {"spirit_stones", "local_reputation", "service_reputation"}:
                 if isinstance(reward_value, bool) or not isinstance(reward_value, int) or reward_value < 0:
                     raise ContentError(f"public project {key} has invalid reward amount")
                 normalized_reward[reward_key] = reward_value
+                reward_labels[reward_key] = {
+                    "spirit_stones": "灵石",
+                    "local_reputation": "地方名望",
+                    "service_reputation": "行旅声望",
+                }[reward_key]
             else:
                 raise ContentError(f"public project {key} has unsupported reward {reward_key}")
+        if not normalized_reward or not any(
+            isinstance(value, int) and value > 0 for value in normalized_reward.values()
+        ) and "item" not in normalized_reward:
+            raise ContentError(f"public project {key} requires a non-empty reward")
         aliases = row.get("aliases", [])
         if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
             raise ContentError(f"public project {key} aliases must be non-empty strings")
+        local_reputation_key = row.get("local_reputation_key")
+        reputation_location_key = row.get("reputation_location_key")
+        local_reputation = normalized_reward.get("local_reputation", 0)
+        local_maximum = 0
+        if local_reputation:
+            if (
+                not isinstance(local_reputation_key, str)
+                or not isinstance(reputation_location_key, str)
+                or not reputation_location_key
+                or local_reputation_key != f"local.{reputation_location_key}"
+            ):
+                raise ContentError(
+                    f"public project {key} requires matching local_reputation_key and reputation_location_key"
+                )
+            try:
+                local_maximum = local_reputation_maximum(
+                    local_reputation_key, bundle
+                )
+            except ContentError as exc:
+                raise ContentError(f"public project {key} has invalid reputation location: {exc}") from exc
+            reward_labels[local_reputation_key] = f"{bundle.label('location', reputation_location_key)}名望"
+            reward_labels.pop("local_reputation", None)
+        elif local_reputation_key is not None or reputation_location_key is not None:
+            raise ContentError(f"public project {key} has reputation location without a local reputation reward")
         permission_fields = {
-            "local_reputation_key": row.get("local_reputation_key", "local.xuantian.new_town"),
             "required_faction": row.get("required_faction"),
             "required_access_key": row.get("required_access_key"),
         }
-        if not isinstance(permission_fields["local_reputation_key"], str) or not permission_fields["local_reputation_key"]:
-            raise ContentError(f"public project {key} has invalid local_reputation_key")
         for field in ("required_faction", "required_access_key"):
             if permission_fields[field] is not None and (not isinstance(permission_fields[field], str) or not permission_fields[field]):
                 raise ContentError(f"public project {key} has invalid {field}")
@@ -439,6 +480,14 @@ def public_project_definitions(content: ContentBundle | None = None) -> dict[str
             ):
                 raise ContentError(f"public project {key} has invalid service source")
             service_sources.append(ProjectServiceSource(key, service_key, tuple(operation_names), points, quantity))
+        resource_labels = {
+            resource: (
+                "灵石"
+                if resource == "currency.spirit_stone"
+                else bundle.label("item", resource)
+            )
+            for resource in requirements
+        }
         selector_values = {key, label.strip(), *(alias.strip() for alias in aliases)}
         if selectors & selector_values or key in result:
             raise ContentError(f"public project {key} has duplicate key or alias")
@@ -446,11 +495,17 @@ def public_project_definitions(content: ContentBundle | None = None) -> dict[str
         result[key] = PublicProjectDefinition(
             key=key,
             label=label.strip(),
+            description=desc.strip(),
+            effect_description=effect_desc.strip(),
             requirements=requirements,
             contribution_resources=tuple(str(item) for item in resources),
+            resource_labels=resource_labels,
+            reward_labels=reward_labels,
             effect_key=effect_key,
             reward=normalized_reward,
-            local_reputation_key=permission_fields["local_reputation_key"],
+            local_reputation_key=local_reputation_key,
+            reputation_location_key=reputation_location_key,
+            local_reputation_maximum=local_maximum,
             required_faction=permission_fields["required_faction"],
             required_faction_reputation=numeric["required_faction_reputation"],
             required_sect_level=numeric["required_sect_level"],
@@ -483,6 +538,23 @@ def project_definition(value: str | None = None, content: ContentBundle | None =
         if normalized in {definition.key, definition.label, *definition.aliases}:
             return definition
     raise ValueError(f"unsupported project key: {value}")
+
+
+def project_resource_key(value: str | None) -> str | None:
+    normalized = (value or "").strip()
+    if not normalized:
+        return None
+    return {
+        "木材": "item.mat.wood",
+        "云铁": "item.material.cloud_iron",
+        "灵石": "currency.spirit_stone",
+        "灵叶": "item.herb.spirit_leaf",
+        "灵米": "item.food.coarse_spirit_rice",
+        "灵米饭": "item.food.coarse_spirit_rice",
+        "血草": "item.herb.blood_grass",
+        "阵砂": "item.mat.array_sand",
+        "疗伤丹": "item.pill.healing_low",
+    }.get(normalized, normalized)
 
 
 def weekly_project_key(week_key: str) -> str:
@@ -527,6 +599,7 @@ __all__ = [
     "PublicProjectDefinition",
     "TRANSPORT_TICKET",
     "project_definition",
+    "project_resource_key",
     "project_service_source",
     "weekly_project_key",
 ]

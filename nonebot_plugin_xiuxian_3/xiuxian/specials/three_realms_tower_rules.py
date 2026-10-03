@@ -14,9 +14,9 @@ MAX_FLOOR = 40
 WEEKLY_ATTEMPT_LIMIT = 2
 FACTIONS = ("xuantian", "demon", "beast")
 REBUILD_REPUTATION_KEYS = (
-    "local.domain_refuge",
-    "local.abyss_outpost",
-    "local.ancestral_habitat",
+    "local.xuantian.domain_front",
+    "local.demon.abyss_market",
+    "local.beast.three_realms_trade_port",
 )
 
 

@@ -10,13 +10,12 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import (
-    grant_player_assets,
     inventory_amount,
     spend_player_assets,
 )
 from ..utils.assets import player_currency
 from ..utils.operations import player_operation
-from ..utils.player import player_inventory, player_reputation
+from ..utils.player import grant_player_reward, player_inventory, player_reputation, player_reputation_state
 from ..persistence.errors import (
     OperationConflictError,
     ProjectAlreadyCompleteError,
@@ -34,7 +33,7 @@ from .rules import (
     PublicProjectDefinition,
     public_project_definitions,
     project_definition,
-    project_service_source,
+    project_resource_key,
     weekly_project_key,
 )
 
@@ -162,20 +161,23 @@ class ProjectRepositoryMixin:
                 raise ProjectNotFoundError("project does not exist")
             if str(project["status"]) in {"active", "maintenance_due", "inactive"}:
                 raise ProjectAlreadyCompleteError("project is already complete")
-            resource = self._resolve_resource(definition, resource_key)
+            snapshot = self._project_snapshot(project)
+            resources = tuple(str(value) for value in snapshot["contribution_resources"])
+            requirements = snapshot["requirements"]
+            resource = self._resolve_resource(resources, resource_key)
             if source_operation_id:
                 return self._contribute_service_once(
                     connection,
                     player,
                     project,
-                    definition,
+                    snapshot,
                     source_operation_id,
                     operation_id,
                     request_hash,
                     now,
                     now_text,
                 )
-            if resource not in definition.contribution_resources:
+            if resource not in resources:
                 raise ProjectContributionRequirementError("resource cannot contribute to this project")
             cost_key, resource_amount = self._resource_cost(resource, points)
             inventory = player_inventory(player)
@@ -186,7 +188,7 @@ class ProjectRepositoryMixin:
             if available < resource_amount:
                 raise ResourceInsufficientError("project resource is insufficient")
             progress = json_object(project["progress_json"], {})
-            required = int(definition.requirements.get(cost_key, 0))
+            required = int(requirements.get(cost_key, 0))
             before = int(progress.get(cost_key, 0))
             if before >= required:
                 raise ProjectContributionRequirementError("this project requirement is already complete")
@@ -209,7 +211,7 @@ class ProjectRepositoryMixin:
             progress[cost_key] = before + resource_amount
             contribution_points = int(project["contribution_points"]) + points
             target_points = int(project["target_points"])
-            complete = all(int(progress.get(key, 0)) >= int(value) for key, value in definition.requirements.items())
+            complete = all(int(progress.get(key, 0)) >= int(value) for key, value in requirements.items())
             status = "active" if complete else "proposed"
             effect_starts = now_text if complete else project["effect_starts_at"]
             effect_ends = serialize_datetime(now + timedelta(days=7)) if complete else project["effect_ends_at"]
@@ -272,7 +274,7 @@ class ProjectRepositoryMixin:
         connection: Any,
         player: Any,
         project: Any,
-        definition: PublicProjectDefinition,
+        snapshot: dict[str, Any],
         source_operation_id: str,
         operation_id: str,
         request_hash: str,
@@ -283,7 +285,14 @@ class ProjectRepositoryMixin:
         if evidence is None:
             raise ProjectContributionRequirementError("service source is unavailable")
         operation_name, source_payload = evidence
-        source = project_service_source(definition.key, operation_name, self.content)
+        source = next(
+            (
+                row
+                for row in snapshot["service_sources"]
+                if operation_name in row["operation_names"]
+            ),
+            None,
+        )
         if source is None:
             raise ProjectContributionRequirementError("service source cannot contribute to this project")
         self._validate_project_service_source(
@@ -299,8 +308,11 @@ class ProjectRepositoryMixin:
         ).fetchone()
         if used is not None:
             raise ProjectSourceAlreadyUsedError("service source has already contributed")
-        self._require_project_day_quota(connection, project, player, now, source.contribution_points)
-        contribution_points = int(project["contribution_points"]) + source.contribution_points
+        points = int(source["contribution_points"])
+        quantity = int(source["quantity"])
+        service_key = str(source["service_key"])
+        self._require_project_day_quota(connection, project, player, now, points)
+        contribution_points = int(project["contribution_points"]) + points
         connection.execute(
             "UPDATE livelihood_projects SET contribution_points = ?, updated_at = ? WHERE id = ?",
             (contribution_points, now_text, project["id"]),
@@ -320,11 +332,11 @@ class ProjectRepositoryMixin:
                 player["id"],
                 operation_id,
                 source_operation_id,
-                source.service_key,
-                source.quantity,
-                source.service_key,
-                source.quantity,
-                source.contribution_points,
+                service_key,
+                quantity,
+                service_key,
+                quantity,
+                points,
                 now_text,
             ),
         )
@@ -335,12 +347,12 @@ class ProjectRepositoryMixin:
         payload = {
             "player": self._player_payload(self._row_to_player(updated_player)),
             "project": self._project_payload(updated_project),
-            "resource_key": source.service_key,
-            "resource_amount": source.quantity,
-            "contribution_points": source.contribution_points,
+            "resource_key": service_key,
+            "resource_amount": quantity,
+            "contribution_points": points,
             "source_operation_id": source_operation_id,
-            "service_key": source.service_key,
-            "quantity": source.quantity,
+            "service_key": service_key,
+            "quantity": quantity,
         }
         self._record_project_operation(connection, operation_id, "livelihood.contribute_project", int(player["id"]), request_hash, payload, now_text)
         return self._contribution_from_payload(payload)
@@ -466,8 +478,16 @@ class ProjectRepositoryMixin:
                 (project["project_id"], player["id"]),
             ).fetchone()
             if prior is not None:
-                reward = json_object(prior["reward_json"], {})
-                payload = self._settlement_payload(player, project, bool(prior["eligible"]), bool(prior["eligible"]), reward)
+                award = self._decode_object(prior["reward_json"], "project reward")
+                payload = self._settlement_payload(
+                    player,
+                    project,
+                    bool(prior["eligible"]),
+                    bool(prior["eligible"]),
+                    award.get("reward", {}),
+                    int(award.get("local_reputation_before", 0)),
+                    int(award.get("local_reputation_after", 0)),
+                )
                 self._record_project_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
                 return self._project_settlement_from_payload(payload, replay=True)
             contribution = connection.execute(
@@ -476,16 +496,33 @@ class ProjectRepositoryMixin:
             ).fetchone()
             eligible = int(contribution["points"] if contribution is not None else 0) >= 10
             reward: dict[str, int] = {}
+            local_reputation_before = 0
+            local_reputation_after = 0
             updated_player = player
             if eligible:
-                definition = project_definition(str(project["project_key"]), self.content)
-                reward = self._grant_reward(connection, player, definition, now_text, project["project_id"], operation_id)
+                snapshot = self._project_snapshot(project)
+                reward, local_reputation_before, local_reputation_after = self._grant_reward(
+                    connection, player, snapshot, now_text
+                )
                 updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+                award = {
+                    "reward": reward,
+                    "local_reputation_before": local_reputation_before,
+                    "local_reputation_after": local_reputation_after,
+                }
                 connection.execute(
                     "INSERT INTO livelihood_project_rewards(project_id, player_id, operation_id, eligible, reward_json, created_at) VALUES (?, ?, ?, 1, ?, ?)",
-                    (project["project_id"], player["id"], operation_id, json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text),
+                    (project["project_id"], player["id"], operation_id, json.dumps(award, ensure_ascii=False, sort_keys=True), now_text),
                 )
-            payload = self._settlement_payload(updated_player, project, eligible, eligible, reward)
+            payload = self._settlement_payload(
+                updated_player,
+                project,
+                eligible,
+                eligible,
+                reward,
+                local_reputation_before,
+                local_reputation_after,
+            )
             self._record_project_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._project_settlement_from_payload(payload)
 
@@ -508,16 +545,16 @@ class ProjectRepositoryMixin:
         player: Any | None = None,
     ) -> Any:
         key = weekly_project_key(week) if project_key is None else project_key
+        row = connection.execute(
+            "SELECT * FROM livelihood_projects WHERE project_key = ? AND business_week = ?",
+            (key, week),
+        ).fetchone()
+        if row is not None:
+            return row
         definition = project_definition(key, self.content)
         if definition.required_faction or definition.required_sect_level:
             if player is None or not self._project_available(connection, player, definition):
                 raise ProjectContentClosedError("project authority is not available")
-        row = connection.execute(
-            "SELECT * FROM livelihood_projects WHERE project_key = ? AND business_week = ?",
-            (definition.key, week),
-        ).fetchone()
-        if row is not None:
-            return row
         now_text = serialize_datetime(now)
         project_prefix = (
             "project.reconstruction"
@@ -543,7 +580,32 @@ class ProjectRepositoryMixin:
                 json.dumps(requirements, ensure_ascii=False, sort_keys=True),
                 json.dumps(progress, ensure_ascii=False, sort_keys=True),
                 definition.effect_key,
-                json.dumps({"label": definition.label}, ensure_ascii=False, sort_keys=True),
+                json.dumps(
+                    {
+                        "label": definition.label,
+                        "desc": definition.description,
+                        "effect_desc": definition.effect_description,
+                        "requirements": requirements,
+                        "contribution_resources": list(definition.contribution_resources),
+                        "resource_labels": definition.resource_labels,
+                        "reward_labels": definition.reward_labels,
+                        "reward": definition.reward,
+                        "local_reputation_key": definition.local_reputation_key,
+                        "reputation_location_key": definition.reputation_location_key,
+                        "local_reputation_maximum": definition.local_reputation_maximum,
+                        "service_sources": [
+                            {
+                                "service_key": source.service_key,
+                                "operation_names": list(source.operation_names),
+                                "contribution_points": source.contribution_points,
+                                "quantity": source.quantity,
+                            }
+                            for source in definition.service_sources
+                        ],
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
                 now_text,
                 now_text,
             ),
@@ -630,20 +692,9 @@ class ProjectRepositoryMixin:
         return frozenset(str(row["effect_key"]) for row in rows)
 
     @staticmethod
-    def _resolve_resource(definition: PublicProjectDefinition, resource_key: str | None) -> str:
-        aliases = {
-            "木材": "item.mat.wood",
-            "云铁": "item.material.cloud_iron",
-            "灵石": "currency.spirit_stone",
-            "灵叶": "item.herb.spirit_leaf",
-            "灵米": "item.food.coarse_spirit_rice",
-            "灵米饭": "item.food.coarse_spirit_rice",
-            "血草": "item.herb.blood_grass",
-            "阵砂": "item.mat.array_sand",
-            "疗伤丹": "item.pill.healing_low",
-        }
-        value = aliases.get((resource_key or "").strip(), (resource_key or "").strip())
-        return value or definition.contribution_resources[0]
+    def _resolve_resource(resources: tuple[str, ...], resource_key: str | None) -> str:
+        value = project_resource_key(resource_key)
+        return value or resources[0]
 
     @staticmethod
     def _resource_cost(resource: str, points: int) -> tuple[str, int]:
@@ -655,57 +706,105 @@ class ProjectRepositoryMixin:
         self,
         connection: Any,
         player: Any,
-        definition: PublicProjectDefinition,
-        now_text: str,
-        project_id: str,
-        operation_id: str,
-    ) -> dict[str, int]:
-        reward = {str(key): int(value) for key, value in definition.reward.items() if isinstance(value, int)}
-        item_key = definition.reward.get("item")
+        snapshot: dict[str, Any],
+        updated_at: str,
+    ) -> tuple[dict[str, int], int, int]:
+        configured = snapshot["reward"]
+        reward: dict[str, int] = {
+            "spirit_stones": int(configured["spirit_stones"])
+        } if configured.get("spirit_stones") else {}
+        item_key = configured.get("item")
         if item_key:
             reward[str(item_key)] = 1
-        grant_player_assets(
+        local_delta = int(configured.get("local_reputation", 0))
+        service_delta = int(configured.get("service_reputation", 0))
+        local_key = snapshot.get("local_reputation_key")
+        maximums = {str(local_key): int(snapshot["local_reputation_maximum"])} if local_delta else None
+        if local_delta:
+            reward[str(local_key)] = local_delta
+        if service_delta:
+            reward["service_reputation"] = service_delta
+        before = player_reputation_state(connection, int(player["id"])) if local_delta or service_delta else None
+        grant_player_reward(
             connection,
             player,
-            {
-                key: value
-                for key, value in reward.items()
-                if key == "spirit_stones" or key.startswith("item.")
-            },
-            now_text,
+            reward,
+            updated_at,
+            local_reputation_maximums=maximums,
         )
-        local_delta = int(reward.get("local_reputation", 0))
-        service_delta = int(reward.get("service_reputation", 0))
-        if local_delta or service_delta:
-            row = connection.execute("SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?", (player["id"],)).fetchone()
-            local = json_object(row["local_json"], {}) if row is not None else {}
-            local_key = definition.local_reputation_key
-            local[local_key] = min(1000, int(local.get(local_key, 0)) + local_delta)
-            service = min(100, int(row["service_reputation"]) + service_delta) if row is not None else service_delta
-            connection.execute(
-                """
-                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                """,
-                (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service, now_text),
-            )
-        return reward
+        if before is None:
+            return reward, 0, 0
+        after = player_reputation_state(connection, int(player["id"]))
+        actual_reward = {
+            key: value
+            for key, value in reward.items()
+            if key.startswith("item.") or key == "spirit_stones"
+        }
+        local_before = before.local.get(str(local_key), 0) if local_delta else 0
+        local_after = after.local.get(str(local_key), 0) if local_delta else 0
+        local_gain = local_after - local_before
+        service_gain = after.service - before.service
+        if local_delta and local_gain:
+            actual_reward[str(local_key)] = local_gain
+        if service_delta and service_gain:
+            actual_reward["service_reputation"] = service_gain
+        return actual_reward, local_before, local_after
+
+    @staticmethod
+    def _decode_object(value: Any, label: str) -> dict[str, Any]:
+        try:
+            parsed = json.loads(str(value))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{label} is invalid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{label} must be an object")
+        return parsed
+
+    @classmethod
+    def _project_snapshot(cls, row: Any) -> dict[str, Any]:
+        snapshot = cls._decode_object(row["snapshot_json"], "project snapshot")
+        required = {
+            "label",
+            "desc",
+            "effect_desc",
+            "requirements",
+            "contribution_resources",
+            "resource_labels",
+            "reward_labels",
+            "reward",
+            "service_sources",
+        }
+        if not required.issubset(snapshot):
+            raise ValueError("project snapshot is incomplete")
+        if not isinstance(snapshot["label"], str) or not isinstance(snapshot["desc"], str):
+            raise ValueError("project snapshot presentation is invalid")
+        if not isinstance(snapshot["effect_desc"], str) or not isinstance(snapshot["reward"], dict):
+            raise ValueError("project snapshot reward or effect is invalid")
+        if not isinstance(snapshot["requirements"], dict) or not isinstance(snapshot["contribution_resources"], list):
+            raise ValueError("project snapshot requirements are invalid")
+        if not isinstance(snapshot["resource_labels"], dict) or not isinstance(snapshot["reward_labels"], dict):
+            raise ValueError("project snapshot labels are invalid")
+        if not isinstance(snapshot["service_sources"], list):
+            raise ValueError("project snapshot service sources are invalid")
+        return snapshot
 
     @staticmethod
     def _project_payload(row: Any) -> dict[str, Any]:
-        snapshot = json_object(row["snapshot_json"], {})
+        snapshot = ProjectRepositoryMixin._project_snapshot(row)
         return {
             "project_id": str(row["project_id"]),
             "project_key": str(row["project_key"]),
-            "label": str(snapshot.get("label", row["project_key"])),
+            "label": snapshot["label"],
+            "description": snapshot["desc"],
+            "effect_description": snapshot["effect_desc"],
             "business_week": str(row["business_week"]),
             "status": str(row["status"]),
             "contribution_points": int(row["contribution_points"]),
             "target_points": int(row["target_points"]),
             "progress": json_object(row["progress_json"], {}),
-            "requirements": json_object(row["requirements_json"], {}),
+            "requirements": dict(snapshot["requirements"]),
+            "resource_labels": dict(snapshot["resource_labels"]),
+            "reward_labels": dict(snapshot["reward_labels"]),
             "effect_key": str(row["effect_key"]),
             "effect_ends_at": str(row["effect_ends_at"] or ""),
         }
@@ -728,13 +827,25 @@ class ProjectRepositoryMixin:
             already_completed=replay,
         )
 
-    def _settlement_payload(self, player: Any, project: Any, eligible: bool, rewarded: bool, reward: dict[str, int]) -> dict[str, Any]:
+    def _settlement_payload(
+        self,
+        player: Any,
+        project: Any,
+        eligible: bool,
+        rewarded: bool,
+        reward: dict[str, int],
+        local_reputation_before: int,
+        local_reputation_after: int,
+    ) -> dict[str, Any]:
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "project": self._project_payload(project),
             "eligible": eligible,
             "rewarded": rewarded,
             "reward": reward,
+            "local_reputation_before": local_reputation_before,
+            "local_reputation_after": local_reputation_after,
+            "local_reputation_delta": local_reputation_after - local_reputation_before,
         }
 
     def _project_settlement_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> ProjectSettlementRecord:
@@ -744,6 +855,9 @@ class ProjectRepositoryMixin:
             eligible=bool(payload.get("eligible", False)),
             rewarded=bool(payload.get("rewarded", False)),
             reward={str(key): int(value) for key, value in payload.get("reward", {}).items() if isinstance(value, int)},
+            local_reputation_before=int(payload.get("local_reputation_before", 0)),
+            local_reputation_after=int(payload.get("local_reputation_after", 0)),
+            local_reputation_delta=int(payload.get("local_reputation_delta", 0)),
             already_completed=replay,
         )
 

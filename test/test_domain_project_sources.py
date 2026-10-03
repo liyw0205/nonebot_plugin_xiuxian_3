@@ -151,7 +151,7 @@ def test_reconstruction_project_gate_and_dual_adapter_reward() -> None:
 
                 settled = await dispatch("settle", "结算公共项目")
                 assert settled.code == "PROJECT_SETTLED", settled
-                assert settled.data["reward"]["local_reputation"] == 8
+                assert settled.data["reward"]["local.xuantian.domain_front"] == 8
                 replay = await dispatch("settle-replay", "结算公共项目")
                 assert replay.data["idempotent_replay"] is True
 
@@ -164,7 +164,7 @@ def test_reconstruction_project_gate_and_dual_adapter_reward() -> None:
                     inventory = json.loads(
                         connection.execute("SELECT inventory_json FROM players WHERE id=?", (player_id,)).fetchone()[0]
                     )
-                    assert local["local.domain_refuge"] == 8
+                    assert local["local.xuantian.domain_front"] == 8
                     assert service == 3
                     assert inventory["item.token.construction_coupon"] == 1
                     snapshot = json.loads(

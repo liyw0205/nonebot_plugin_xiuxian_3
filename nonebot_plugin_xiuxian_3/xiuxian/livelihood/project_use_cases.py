@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -18,7 +21,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..repository import SQLitePlayerRepository
-from .rules import project_definition
+from .rules import project_definition, project_resource_key
 
 
 class ProjectApplication:
@@ -26,13 +29,7 @@ class ProjectApplication:
 
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
-
-    _SERVICE_LABELS = {
-        "service.transport": "运输协助",
-        "service.purification": "污染净化",
-        "service.taming": "灵兽驯养",
-        "service.repair": "灵兽修复",
-    }
+        self.content = repository.content or bundled_content()
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -44,27 +41,24 @@ class ProjectApplication:
         if value is None:
             return None
         try:
-            return project_definition(value, self.repository.content).key
+            return project_definition(value, self.content).key
         except ValueError:
             return None
 
     @staticmethod
-    def _resource_key(value: str | None) -> str | None:
-        return {
-            "木材": "item.mat.wood",
-            "云铁": "item.material.cloud_iron",
-            "灵石": "currency.spirit_stone",
-            "灵叶": "item.herb.spirit_leaf",
-            "灵米": "item.food.coarse_spirit_rice",
-            "灵米饭": "item.food.coarse_spirit_rice",
-            "血草": "item.herb.blood_grass",
-            "阵砂": "item.mat.array_sand",
-            "疗伤丹": "item.pill.healing_low",
-        }.get((value or "").strip(), value)
-
-    @staticmethod
     def _service_marker(value: str | None) -> bool:
         return (value or "").strip() in {"服务", "来源", "运输", "净化", "驯养", "修复"}
+
+    @staticmethod
+    def _status_label(status: str) -> str:
+        return {
+            "proposed": "筹备中",
+            "funded": "筹备中",
+            "building": "修缮中",
+            "active": "已建成",
+            "maintenance_due": "效用期满",
+            "inactive": "已停用",
+        }[status]
 
     async def list_projects(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -78,17 +72,25 @@ class ProjectApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         data = []
-        lines = ["## 本周地方公共项目", ""]
+        lines = ["## 本周共建诸事", ""]
         for project in projects:
-            requirements = "、".join(f"{key} ×{value}" for key, value in project.requirements.items())
+            requirements = "、".join(
+                f"{project.resource_labels[key]} {project.progress.get(key, 0)}/{value}"
+                for key, value in project.requirements.items()
+            )
+            effect_end = (
+                f"（持续至 {datetime.fromisoformat(project.effect_ends_at).astimezone().strftime('%Y年%m月%d日 %H:%M')}）"
+                if project.effect_ends_at
+                else ""
+            )
             lines.extend(
                 [
                     f"### {project.label}",
-                    f"- **项目键**：`{project.project_key}`",
-                    f"- **需求**：{requirements}",
-                    f"- **进度**：{project.contribution_points}/{project.target_points} 点",
-                    f"- **状态**：{project.status}",
-                    f"- **效果**：{project.effect_key}（至 {project.effect_ends_at or '达成后 7 天'}）",
+                    project.description,
+                    f"- **所需物资**：{requirements}",
+                    f"- **众修合力**：{project.contribution_points}/{project.target_points}",
+                    f"- **进境**：{self._status_label(project.status)}",
+                    f"- **成效**：{project.effect_description}{effect_end}",
                     "",
                 ]
             )
@@ -150,7 +152,7 @@ class ProjectApplication:
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 project_key=project_key,
-                resource_key=self._resource_key(resource_key),
+                resource_key=project_resource_key(resource_key),
                 amount=amount,
                 operation_id=operation_id,
                 source_operation_id=source_operation_id,
@@ -180,12 +182,15 @@ class ProjectApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         project = record.project
-        contribution_label = "服务" if record.service_key else "资源"
-        contribution_name = self._SERVICE_LABELS.get(record.service_key, record.resource_key)
+        contribution = (
+            "以一份善举"
+            if record.service_key
+            else f"将**{project.resource_labels[record.resource_key]} ×{record.quantity or record.resource_amount}**投入"
+        )
         return CommandResult(
             True,
             "PROJECT_CONTRIBUTED",
-            f"## 公共项目贡献完成\n\n已向**{project.label}**贡献 **{record.contribution_points} 点**。\n\n- **{contribution_label}**：{contribution_name} ×{record.quantity or record.resource_amount}\n- **项目进度**：{project.contribution_points}/{project.target_points}\n- **状态**：{project.status}",
+            f"## 共建添力\n\n你{contribution}**{project.label}**，添力 **{record.contribution_points} 份**。\n\n- **众修合力**：{project.contribution_points}/{project.target_points}\n- **进境**：{self._status_label(project.status)}",
             context.request_id,
             operation_id,
             data={
@@ -207,7 +212,7 @@ class ProjectApplication:
 
     async def settle(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1:
-            return CommandResult(False, "INVALID_PROJECT_COMMAND", "结算公共项目最多附加项目 ID。", context.request_id)
+            return CommandResult(False, "INVALID_PROJECT_COMMAND", "一次只能结算一项公共项目。", context.request_id)
         project_id = context.command_args[0] if context.command_args else None
         operation_id = self._operation_id(context, "livelihood.settle_project")
         try:
@@ -233,19 +238,31 @@ class ProjectApplication:
             return CommandResult(
                 True,
                 "PROJECT_SETTLEMENT_INELIGIBLE",
-                f"公共项目已完成，但你的贡献不足 10 点，暂不满足个人奖励条件。\n\n- **项目**：{record.project.label}",
+                f"**{record.project.label}**已告功成，你出力尚不足十份，未能领取个人嘉赏。",
                 context.request_id,
                 operation_id,
                 data={"project_id": record.project.project_id, "eligible": False, "rewarded": False, "idempotent_replay": record.already_completed},
             )
-        reward = ", ".join(f"{key} ×{value}" for key, value in record.reward.items()) or "已登记"
+        reward = "、".join(
+            f"{record.project.reward_labels[key]} {'×' if key.startswith('item.') else '+'}{value}"
+            for key, value in record.reward.items()
+        ) or "未获得额外赏赐"
         return CommandResult(
             True,
             "PROJECT_SETTLED" if not record.already_completed else "PROJECT_SETTLED",
-            f"## 公共项目奖励已结算\n\n- **项目**：{record.project.label}\n- **奖励**：{reward}",
+            f"## 嘉赏已入囊\n\n你为**{record.project.label}**出力有成，所得嘉赏：{reward}。",
             context.request_id,
             operation_id,
-            data={"project_id": record.project.project_id, "eligible": True, "rewarded": record.rewarded, "reward": record.reward, "idempotent_replay": record.already_completed},
+            data={
+                "project_id": record.project.project_id,
+                "eligible": True,
+                "rewarded": record.rewarded,
+                "reward": record.reward,
+                "local_reputation_before": record.local_reputation_before,
+                "local_reputation_after": record.local_reputation_after,
+                "local_reputation_delta": record.local_reputation_delta,
+                "idempotent_replay": record.already_completed,
+            },
         )
 
 

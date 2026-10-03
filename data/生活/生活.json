@@ -362,6 +362,7 @@
     {
       "name": "新镇灵井",
       "desc": "汇聚木材修复灵井，使新镇委托得到更多库存。",
+      "effect_desc": "灵井修复期间，青石镇委托可提供更多库存。",
       "aliases": ["灵井"],
       "requirements": {
         "item.mat.wood": 100
@@ -372,6 +373,8 @@
         "spirit_stones": 30,
         "local_reputation": 5
       },
+      "local_reputation_key": "local.xuantian.new_town",
+      "reputation_location_key": "xuantian.new_town",
       "key": "project.town_well",
       "record_type": "public_project",
       "status": "active"
@@ -379,6 +382,7 @@
     {
       "name": "商路修缮",
       "desc": "补齐云铁与灵石，令往来商路少受风沙阻滞。",
+      "effect_desc": "商路修缮完成后，云城商路的风沙险象有所减少。",
       "aliases": ["商路"],
       "requirements": {
         "item.material.cloud_iron": 60,
@@ -397,6 +401,7 @@
     {
       "name": "百草园",
       "desc": "整饬灵田与药圃，让灵草委托收成更丰。",
+      "effect_desc": "百草园建成后，青石镇草药委托的收获有所增加。",
       "aliases": ["灵草园"],
       "requirements": {
         "item.herb.spirit_leaf": 120
@@ -413,6 +418,7 @@
     {
       "name": "领域避难所",
       "desc": "修筑避难所，守护领域内的百姓与行旅。",
+      "effect_desc": "避难所建成后，领域前线周边的低风险委托有所增加。",
       "requirements": {
         "item.mat.wood": 60,
         "item.food.coarse_spirit_rice": 60,
@@ -429,7 +435,8 @@
         "service_reputation": 3,
         "item": "item.token.construction_coupon"
       },
-      "local_reputation_key": "local.domain_refuge",
+      "local_reputation_key": "local.xuantian.domain_front",
+      "reputation_location_key": "xuantian.domain_front",
       "required_sect_level": 4,
       "required_access_key": "access.project.domain_refuge",
       "service_sources": [
@@ -446,6 +453,7 @@
     {
       "name": "魔渊净化工程",
       "desc": "以血草和阵砂净化魔渊边缘的侵蚀。",
+      "effect_desc": "净化工程建成后，魔渊集市商路遭遇延误的机会降低。",
       "requirements": {
         "item.herb.blood_grass": 60,
         "item.mat.array_sand": 60
@@ -457,7 +465,8 @@
         "service_reputation": 3,
         "item": "item.token.construction_coupon"
       },
-      "local_reputation_key": "local.abyss_outpost",
+      "local_reputation_key": "local.demon.abyss_market",
+      "reputation_location_key": "demon.abyss_market",
       "required_faction": "demon",
       "required_faction_reputation": 300,
       "required_access_key": "access.project.abyss_purification",
@@ -475,6 +484,7 @@
     {
       "name": "祖灵栖地修复",
       "desc": "补足灵米与灵叶，修复祖灵栖地的生息之地。",
+      "effect_desc": "栖地修复完成后，万兽山商路委托可提供更多名额。",
       "requirements": {
         "item.food.coarse_spirit_rice": 60,
         "item.herb.spirit_leaf": 60
@@ -486,7 +496,8 @@
         "service_reputation": 3,
         "item": "item.token.construction_coupon"
       },
-      "local_reputation_key": "local.ancestral_habitat",
+      "local_reputation_key": "local.beast.three_realms_trade_port",
+      "reputation_location_key": "beast.three_realms_trade_port",
       "required_faction": "beast",
       "required_faction_reputation": 300,
       "required_access_key": "access.project.ancestral_habitat",

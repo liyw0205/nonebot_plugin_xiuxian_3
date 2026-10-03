@@ -252,6 +252,7 @@
         "economy.trade.xuantian_to_demon",
         "production.demon_contract"
       ],
+      "local_reputation_maximum": 1000,
       "codex_entry_key": "codex.place.demon_market",
       "key": "demon.abyss_market"
     },
@@ -284,6 +285,7 @@
       "actions": [
         "economy.trade.three_realms"
       ],
+      "local_reputation_maximum": 1000,
       "key": "beast.three_realms_trade_port"
     },
     {
@@ -368,6 +370,7 @@
       "desc": "天地裂痕附近的交锋之地，各方修士在此守望疆界、抵御异动。",
       "world": "玄天界",
       "status": "active",
+      "local_reputation_maximum": 1000,
       "codex_entry_key": "codex.place.domain_front",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, "domain_selected"],
       "actions": ["event.domain_front", "progression.recover_domain_crack"],

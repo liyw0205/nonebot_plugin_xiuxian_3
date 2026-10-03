@@ -387,7 +387,7 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 31–60 层首通不发灵石、阵砂、道果、功勋或终局装备：领奖时发现本层 `codex.challenge.void_spire.floor_<N>` 和路线 `codex.void.route_spire_<route>`；45/60 层分别追加 `codex.story.void_spire.inscription` 和 `codex.story.void_spire.witness`。60 层首胜产生 `specials.void_spire.floor.60` 来源，授予只用于展示的 `title.void_spire.witness`；练习无奖励。入场冻结敌人、路线、空资产奖励和内容/规则版本；31–60 层快照版本单独登记在 `data/内容版本.json`，低层继续使用原模块版本。扩表迁移须保留既有领奖记录、活动中会话及外键；按重启、重放、并发、QQ 官方和 OneBot V11 逐项验收。`dispatch.dao_service` 道统服务派遣为正式名望来源：合道 L1 或通用服务信誉 80 可接取，8 小时、每天 2 次、6 体力/4 精力，成功独立名望 +8、信誉 +4、服务图鉴和故事线索；部分成功独立名望 +4，失败不发奖。名望上限 1000，达到 700 可替代高层境界准入；派遣自身不得产出终局资产。
 
-21–40 层的准入为化神 L1，或重建名望总值至少 500。重建名望定义为玩家 `local_json` 中 `local.domain_refuge`、`local.abyss_outpost`、`local.ancestral_habitat` 三项之和；不能以旧三界主线许可绕过该门槛。每次挑战消耗 12 体力；每角色、每层、每 UTC 周最多 2 次，胜利、失败和逃跑都计次。战斗启动失败标记 `aborted`、全额退还体力且不计次。首通必须按层胜利并领取上一层奖励后才解锁下一层；已首通层可练习。
+21–40 层的准入为化神 L1，或重建名望总值至少 500。重建名望由 `local.xuantian.domain_front`、`local.demon.abyss_market`、`local.beast.three_realms_trade_port` 三处名望合计；不能以旧三界主线许可绕过该门槛。每次挑战消耗 12 体力；每角色、每层、每 UTC 周最多 2 次，胜利、失败和逃跑都计次。战斗启动失败标记 `aborted`、全额退还体力且不计次。首通必须按层胜利并领取上一层奖励后才解锁下一层；已首通层可练习。
 
 每层首通奖励固定为灵石 60、阵砂 2，并在领取事务发现 `codex.challenge.three_realms.floor_N`。练习奖励由 run ID 的 BLAKE2b 摘要稳定决定为阵砂 0 或 1；不发灵石、修为、神魂晶、突破物、声望或普通战斗掉落。第 30 层额外发现 `codex.story.three_realms.reconstruction_<faction>`，第 40 层额外发现 `codex.story.three_realms.domain_<faction>`；故事图鉴使用战斗开始时冻结的三界阵营，不接受命令参数覆盖。第 40 层首通胜利事件授予展示称号 `title.three_realms_tower.domain_guardian`，来源为 `specials.three_realms_tower.floor.40`，称号只用于展示。
 

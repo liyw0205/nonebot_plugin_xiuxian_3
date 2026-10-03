@@ -88,6 +88,44 @@ def test_public_project_content_rejects_unknown_asset_reference(tmp_path: Path) 
         public_project_definitions(bundle)
 
 
+@pytest.mark.parametrize(
+    "invalid_reference",
+    ["missing_reputation_key", "closed_location", "missing_location_cap"],
+)
+def test_public_project_content_rejects_invalid_reputation_location(
+    invalid_reference: str, tmp_path: Path
+) -> None:
+    content_dir = _copy_content(tmp_path)
+    livelihood_path = content_dir / "生活" / "生活.json"
+    livelihood = json.loads(livelihood_path.read_text(encoding="utf-8"))
+    project = next(
+        row for row in livelihood["records"] if row.get("key") == "project.town_well"
+    )
+    locations_path = content_dir / "地图" / "地点.json"
+    locations = json.loads(locations_path.read_text(encoding="utf-8"))
+    location = next(
+        row for row in locations["records"] if row.get("key") == "xuantian.new_town"
+    )
+
+    if invalid_reference == "missing_reputation_key":
+        project.pop("local_reputation_key")
+    elif invalid_reference == "closed_location":
+        location["status"] = "locked"
+    else:
+        location.pop("local_reputation_maximum")
+
+    livelihood_path.write_text(
+        json.dumps(livelihood, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    locations_path.write_text(
+        json.dumps(locations, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    bundle = ContentBundle.load(content_dir)
+    with pytest.raises(ContentError, match="public project project.town_well"):
+        public_project_definitions(bundle)
+
+
 def test_public_project_service_source_values_are_content_driven(tmp_path: Path) -> None:
     content_dir = _copy_content(tmp_path)
     source = content_dir / "生活" / "生活.json"
