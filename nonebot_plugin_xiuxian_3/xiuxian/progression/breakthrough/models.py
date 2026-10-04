@@ -34,8 +34,8 @@ class BreakthroughDefinition:
     reward_currency: int = 0
     reward_stamina: int = 0
     reward_world_merit: int = 0
-    reward_local_reputation: int = 0
     reward_items: dict[str, int] | None = None
+    reward_key: str | None = None
     source_cultivation_cap: int = 0
     required_foundation_quality: int = 0
     location_bonus_bp: int = 0

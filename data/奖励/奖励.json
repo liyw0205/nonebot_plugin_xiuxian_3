@@ -1090,6 +1090,20 @@
       "status": "active"
     },
     {
+      "name": "金丹入境嘉奖",
+      "desc": "凝成金丹后，获得青石镇的敬意。",
+      "operation": "progression.settle_breakthrough",
+      "entries": [
+        {
+          "kind": "local_reputation",
+          "reputation_key": "local.xuantian.new_town",
+          "quantity": 50
+        }
+      ],
+      "status": "active",
+      "key": "reward.breakthrough.golden_core"
+    },
+    {
       "name": "日课嘉奖",
       "desc": "完成每日修行后所得的灵石、精力与地方名望。",
       "operation": "event.claim_daily_tasks",

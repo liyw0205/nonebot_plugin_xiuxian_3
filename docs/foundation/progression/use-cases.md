@@ -58,10 +58,17 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 `护脉` 或 `提前`）。金丹突破使用 `突破预览 金丹`、`开始突破 金丹`、`结算突破` 和
 `恢复道基震荡`（可追加保护或提前恢复）。开始突破独立使用对应的
 `progression.breakthrough_*` operation，结算独立使用 `progression.settle_breakthrough`；
-两者均保存规则版本、随机池、地点、道途、资质、境界和成本快照。当前实现开放聚气、筑基
+两者均保存随机池、地点、道途、资质、境界和成本快照，不保存运行时版本标识。当前实现开放聚气、筑基
 与金丹目标；元婴及以上目标明确保持关闭。
 筑基突破固定使用 5 分钟会话、7,500 bp 基础成功率、聚气修为 70% 失败保留和 6 小时虚弱；
 道基质量、功法、阵法辅修、筑基护脉丹和 +400 bp 失败保底均写入开始快照。
+
+金丹突破成功后的嘉奖由 `data/奖励/奖励.json` 的
+`reward.breakthrough.golden_core` 提供，目前只包含青石镇地方名望。开始突破时冻结嘉奖、
+名望键和地点上限；结算从冻结快照恢复，并通过共享角色状态事务提交，结果记录封顶后的实际
+到账数量。坏名望 JSON、内容改动或关闭、停机重启、账本故障和重复 operation 均不得产生部分
+结算；故障解除后可用原 operation 重试。QQ 官方与 OneBot V11 均须覆盖部分封顶、已满、重放、
+冲突和回滚。
 
 灵泉相关错误码包括 `LOCATION_REQUIRED`、`LOCATION_REQUIREMENT_MISSING` 和
 `CULTIVATION_DAILY_LIMIT`；准入或次数不足时不扣体力、不创建修炼会话。

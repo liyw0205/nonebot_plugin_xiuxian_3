@@ -54,6 +54,7 @@ from ...advancement.equipment_models import EquipmentRecord, RefinementRecord, T
 from ...items.manual_rules import manual_breakthrough_bonus
 from ...specials.codex_projection import record_codex_discovery
 from ...content import bundled_content
+from ...rewards.rules import local_reputation_maximum, reward_definition, reward_grant_from_snapshot
 from ...advancement.rules import (
     MAX_OFFLINE_SECONDS,
     MAX_SETTLEMENT_SECONDS,
@@ -93,6 +94,7 @@ from ...utils.player import (
     player_inventory,
     player_object,
     player_reputation,
+    player_reputation_state,
     spend_player_state,
 )
 from ...adventures.mainline_models import (
@@ -560,6 +562,23 @@ class BreakthroughRepositoryMixin:
             session_id = uuid4().hex
             starts_at = now_text
             ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
+            success_reward = None
+            success_reward_local_reputation_maximums: dict[str, int] = {}
+            if definition.reward_key is not None:
+                reward = reward_definition(
+                    definition.reward_key,
+                    self.content,
+                    operation="progression.settle_breakthrough",
+                )
+                if reward.assets or reward.value_delta or reward.set_values or reward.reputation:
+                    raise ValueError("breakthrough reward must contain only local reputation")
+                if len(reward.local_reputation) > 1:
+                    raise ValueError("breakthrough reward must name at most one location")
+                success_reward = reward.snapshot()
+                success_reward_local_reputation_maximums = {
+                    key: local_reputation_maximum(key, self.content)
+                    for key in reward.local_reputation
+                }
             snapshot = {
                 "target_realm": definition.target_realm,
                 "source_realm": definition.source_realm,
@@ -606,6 +625,8 @@ class BreakthroughRepositoryMixin:
                 "void_power_before": player_integer(row, "void_power"),
                 "space_resistance_bp": player_integer(row, "space_resistance_bp"),
                 "void_instability_until": row["void_instability_until"],
+                "success_reward": success_reward,
+                "success_reward_local_reputation_maximums": success_reward_local_reputation_maximums,
             }
             value_delta = {
                 "world_merit": -(
@@ -974,6 +995,26 @@ class BreakthroughRepositoryMixin:
                 definition = breakthrough_definition(str(snapshot.get("target_realm", session["target_realm"])))
             except ValueError as exc:
                 raise BreakthroughRequirementError("historical breakthrough rule is unavailable") from exc
+            success_reward = None
+            success_reward_local_reputation_maximums: dict[str, int] = {}
+            if definition.reward_key is not None:
+                success_reward = reward_grant_from_snapshot(
+                    snapshot.get("success_reward"),
+                    operation="progression.settle_breakthrough",
+                )
+                if success_reward.key != definition.reward_key:
+                    raise ValueError("breakthrough reward snapshot does not match its definition")
+                if success_reward.assets or success_reward.value_delta or success_reward.set_values or success_reward.reputation:
+                    raise ValueError("breakthrough reward snapshot must contain only local reputation")
+                raw_maximums = snapshot.get("success_reward_local_reputation_maximums")
+                if not isinstance(raw_maximums, dict) or set(raw_maximums) != set(success_reward.local_reputation):
+                    raise ValueError("breakthrough reward snapshot has invalid local reputation maximums")
+                for key, maximum in raw_maximums.items():
+                    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum <= 0:
+                        raise ValueError("breakthrough reward snapshot has an invalid local reputation maximum")
+                    success_reward_local_reputation_maximums[key] = maximum
+            elif snapshot.get("success_reward") is not None or snapshot.get("success_reward_local_reputation_maximums") != {}:
+                raise ValueError("breakthrough has an unexpected reward snapshot")
             roll_bp = breakthrough_roll_bp(str(snapshot.get("random_seed", session["operation_id"])))
             final_success_bp = int(snapshot.get("success_bp", definition.base_success_bp))
             success = roll_bp < final_success_bp
@@ -994,6 +1035,7 @@ class BreakthroughRepositoryMixin:
             pity_after = next_pity_bp(definition, pity_before, success)
             weakness_until: str | None = None
             heart_demon_pending = False
+            reward_local_reputation = 0
             if success:
                 cultivation_after = 0
                 stamina_after = min(
@@ -1059,6 +1101,11 @@ class BreakthroughRepositoryMixin:
                             "carry_capacity": player_integer(row, "carry_capacity") + 100,
                         }
                     )
+                local_reputation_before = (
+                    player_reputation_state(connection, int(row["id"])).local
+                    if success_reward is not None and success_reward.local_reputation
+                    else {}
+                )
                 grant_player_state(
                     connection,
                     row,
@@ -1068,7 +1115,23 @@ class BreakthroughRepositoryMixin:
                     maximums={"stamina": player_integer(row, "stamina_max")},
                     player_values=player_values,
                     preserve_zero=is_void_refining,
+                    local_reputation_delta=(
+                        success_reward.local_reputation
+                        if success_reward is not None
+                        else None
+                    ),
+                    local_reputation_maximums=(
+                        success_reward_local_reputation_maximums
+                        if success_reward is not None and success_reward.local_reputation
+                        else None
+                    ),
                 )
+                if success_reward is not None and success_reward.local_reputation:
+                    local_reputation_after = player_reputation_state(connection, int(row["id"])).local
+                    reward_local_reputation = sum(
+                        local_reputation_after.get(key, 0) - local_reputation_before.get(key, 0)
+                        for key in success_reward.local_reputation
+                    )
                 if definition.target_realm == "foundation":
                     change_player_state(
                         connection,
@@ -1080,23 +1143,6 @@ class BreakthroughRepositoryMixin:
                                 int(snapshot.get("foundation_quality_on_success") or 5500),
                             )
                         },
-                    )
-                if definition.reward_local_reputation:
-                    reputation = connection.execute(
-                        "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                        (row["id"],),
-                    ).fetchone()
-                    local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-                    local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + definition.reward_local_reputation
-                    service_reputation = int(reputation["service_reputation"]) if reputation is not None else 0
-                    connection.execute(
-                        """
-                        INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                        VALUES (?, ?, ?, ?)
-                        ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                            service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                        """,
-                        (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
                     )
                 status = "succeeded"
             else:
@@ -1161,7 +1207,7 @@ class BreakthroughRepositoryMixin:
                 "reward_currency": definition.reward_currency if success else 0,
                 "reward_stamina": definition.reward_stamina if success else 0,
                 "reward_world_merit": definition.reward_world_merit if success else 0,
-                "reward_local_reputation": definition.reward_local_reputation if success else 0,
+                "reward_local_reputation": reward_local_reputation,
                 "reward_items": dict(definition.reward_items or {}) if success else {},
                 "status": status,
                 "heart_demon_pending": heart_demon_pending,

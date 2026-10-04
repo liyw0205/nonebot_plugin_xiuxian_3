@@ -174,7 +174,7 @@ data/
 | `剧情/故事.json` | 玄天之路分支、经历门槛、结局产物与奖励地点引用 | `gameplay/specials/story.md` |
 | `剧情/主线.json` | 玄天、领域前线与三界主线章节、前置和结局奖励 | `gameplay/specials/workflow.md` |
 | `事件/事件.json` | 灵泉事件和贡献/领奖规则 | `gameplay/events/content-v0.1.md` |
-| `奖励/奖励.json` | 首次寻仙、入道、战斗、探索、任务奖励池 | 各域 v0.1 内容文件 |
+| `奖励/奖励.json` | 首次寻仙、入道、战斗、探索、任务奖励池；金丹突破成功后的青石镇地方名望嘉奖 | 各域 v0.1 内容文件；突破嘉奖由 `reward.breakthrough.golden_core` 引用 |
 | `生活/生活.json` | 居所、作物、城镇委托、运输和服务 | `gameplay/livelihood/content-v0.1.md` |
 | `灵兽/灵兽.json` | 灵兽、灵骑及其装备定义 | `gameplay/companions/content-v0.1.md` |
 
