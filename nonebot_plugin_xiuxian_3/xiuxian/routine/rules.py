@@ -16,6 +16,7 @@ TREE_WATER_ACTIVITY = "ritual.spirit_tree.water"
 TREE_HARVEST_ACTIVITY = "ritual.spirit_tree.harvest"
 TREE_HARVEST_REWARD_POOL = "reward_pool.routine.spirit_tree_harvest"
 FATE_TICKET = "item.ticket.fate_basic"
+ROUTINE_LOCAL_REPUTATION_KEY = "local.xuantian.new_town"
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +58,7 @@ SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
         "接取一次悬赏",
         (("local_reputation", 2),),
         "bounty.accept",
-        local_reputation_key="local.xuantian.new_town",
+        local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY,
     ),
     SevenDayGoalDefinition(
         5,
@@ -79,7 +80,7 @@ SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
         "选择道途",
         (("local_reputation", 5), (FATE_TICKET, 2)),
         "player.enter_cultivation",
-        local_reputation_key="local.xuantian.new_town",
+        local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY,
     ),
 )
 
@@ -98,6 +99,7 @@ class AchievementDefinition:
     label: str
     source_event: str
     reward: tuple[tuple[str, int | str], ...]
+    local_reputation_key: str | None = None
     closed: bool = False
 
 
@@ -227,6 +229,7 @@ ACHIEVEMENTS: tuple[AchievementDefinition, ...] = (
         "首次道历问安",
         "routine.checkin.daily",
         (("local_reputation", 3),),
+        local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY,
     ),
     AchievementDefinition(
         "achievement.first_craft",
@@ -245,6 +248,7 @@ ACHIEVEMENTS: tuple[AchievementDefinition, ...] = (
         "收录五条图鉴",
         "specials.codex.count.5",
         (("local_reputation", 5),),
+        local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY,
     ),
     AchievementDefinition(
         "achievement.tower_10",
@@ -456,6 +460,7 @@ def next_date(value: date) -> date:
 __all__ = [
     "CHECKIN_ACTIVITY",
     "FATE_TICKET",
+    "ROUTINE_LOCAL_REPUTATION_KEY",
     "MAKEUP_ACTIVITY",
     "TREE_HARVEST_ACTIVITY",
     "TREE_HARVEST_REWARD_POOL",

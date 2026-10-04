@@ -345,6 +345,85 @@ def grant_player_reward(
     return parts
 
 
+def grant_player_reward_actual(
+    connection: Any,
+    row: Mapping[str, Any] | Any,
+    reward: Mapping[str, Any],
+    updated_at: str,
+    *,
+    local_reputation_key: str | None = None,
+    value_delta: Mapping[str, Any] | None = None,
+    maximums: Mapping[str, Any] | None = None,
+    clamp_minimum: bool = False,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+    reputation_delta: Mapping[str, Any] | None = None,
+    local_reputation_delta: Mapping[str, Any] | None = None,
+    service_reputation_delta: int | None = None,
+    local_reputation_maximums: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    """Apply a reward and return the quantities that actually landed.
+
+    Routine rewards use the generic ``local_reputation`` key because their
+    location is supplied by the surrounding rule.  The shared state kernel
+    stores only qualified ``local.*`` keys, so this helper resolves that key,
+    applies all assets/values/reputations in one transaction, and measures
+    capped numeric and reputation changes from the same connection.
+    """
+
+    normalized = dict(reward)
+    generic_local = normalized.pop("local_reputation", 0)
+    if isinstance(generic_local, bool) or not isinstance(generic_local, int) or generic_local < 0:
+        raise ValueError("local reputation reward must be a non-negative integer")
+    merged_local = {str(key): int(value) for key, value in (local_reputation_delta or {}).items()}
+    if generic_local:
+        if not local_reputation_key:
+            raise ValueError("generic local reputation reward requires a location key")
+        merged_local[local_reputation_key] = merged_local.get(local_reputation_key, 0) + generic_local
+
+    parts = split_player_rewards(normalized)
+    reputation_before = player_reputation_state(connection, player_database_id(row))
+    grant_player_reward(
+        connection,
+        row,
+        normalized,
+        updated_at,
+        value_delta=value_delta,
+        maximums=maximums,
+        clamp_minimum=clamp_minimum,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+        reputation_delta=reputation_delta,
+        local_reputation_delta=merged_local or None,
+        service_reputation_delta=service_reputation_delta,
+        local_reputation_maximums=local_reputation_maximums,
+    )
+
+    actual: dict[str, int] = dict(parts.assets)
+    requested_values = set(parts.value_delta) | set(value_delta or {})
+    if requested_values:
+        updated = connection.execute(
+            "SELECT * FROM players WHERE id = ?", (player_database_id(row),)
+        ).fetchone()
+        if updated is None:
+            raise ValueError("player reward returned no player")
+        for key in requested_values:
+            actual[key] = player_integer(updated, key) - player_integer(row, key)
+
+    reputation_after = player_reputation_state(connection, player_database_id(row))
+    requested_local = dict(parts.local_reputation)
+    for key, amount in merged_local.items():
+        requested_local[str(key)] = requested_local.get(str(key), 0) + int(amount)
+    for key in requested_local:
+        actual_key = "local_reputation" if generic_local and key == local_reputation_key else key
+        actual[actual_key] = reputation_after.local.get(key, 0) - reputation_before.local.get(key, 0)
+
+    requested_service = (parts.service_reputation or 0) + (service_reputation_delta or 0)
+    if requested_service:
+        actual["service_reputation"] = reputation_after.service - reputation_before.service
+    return actual
+
+
 def player_field(row: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
     """Read a player column from either a mapping or a SQLite row."""
 
@@ -1086,6 +1165,7 @@ __all__ = [
     "player_field",
     "split_player_rewards",
     "grant_player_reward",
+    "grant_player_reward_actual",
     "player_database_id",
     "player_integer",
     "player_numeric_delta",

@@ -42,6 +42,9 @@ code: available -> claimed | expired | revoked
 4. 收获保存奖池键、种子摘要和实际奖励；重放直接反序列化历史 payload，不重新读取内容或抽取。
 5. 称号由已落库来源 operation 投影到 `honor_titles`，装备状态单独保存在 `honor_states`；
    功业领取在同一事务内检查来源、写入 `achievement_claims`，并更新名望/信誉流水。
+   功业、密令、道契和行卷的奖励均交给 `utils.player.grant_player_reward_actual`，地点键与上限由规则传入；
+   资产、精力、名望、信誉、领取记录和 operation 共用同一事务，回复只展示实际到账数量。坏名望 JSON
+   在角色状态事务入口拒绝，原 operation 可在故障解除后重试。
    关闭功业只展示“内容未开放”，不生成来源记录或奖励。
 6. 机缘密令启动时从外部配置物化密令哈希和版本快照；兑换事务锁定库存，检查有效期、撤销、
    角色唯一领取和总库存，再原子更新资产、`redemption_claims`、库存计数与 operation。

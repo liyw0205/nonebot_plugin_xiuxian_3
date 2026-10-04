@@ -164,6 +164,7 @@ from ..routine.rules import (
     achievement_reward,
     honor_title,
     dao_contract,
+    ROUTINE_LOCAL_REPUTATION_KEY,
     redemption_code_hash,
     seven_day_goal,
     seven_day_reward,
@@ -176,6 +177,7 @@ from ..rewards.rules import local_reputation_maximum, reward_pool_map
 from ..utils.player import (
     change_player_state,
     grant_player_reward,
+    grant_player_reward_actual,
     grant_player_state,
     player_inventory,
     player_integer,
@@ -1426,32 +1428,31 @@ class RoutineRepositoryMixin:
             if source_operation_id is None:
                 raise AchievementNotCompletedError("achievement is not completed")
             reward = achievement_reward(definition)
-            local_reputation = int(reward.get("local_reputation", 0))
-            service_reputation_delta = int(reward.get("service_reputation", 0))
-            reputation = connection.execute(
-                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                (row["id"],),
-            ).fetchone()
-            local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
-            service_reputation = int(reputation["service_reputation"]) if reputation is not None else 0
-            service_reputation = min(100, service_reputation + service_reputation_delta)
-            if local_reputation or service_reputation_delta:
-                connection.execute(
-                    """
-                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                        service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                    """,
-                    (
-                        row["id"],
-                        json.dumps(local, ensure_ascii=False, sort_keys=True),
-                        service_reputation,
-                        now_text,
-                    ),
-                )
             title_key = reward.get("title_key")
+            numeric_reward = {
+                key: value for key, value in reward.items() if key != "title_key"
+            }
+            actual_reward: dict[str, int | str] = {}
+            if numeric_reward:
+                local_reward = int(numeric_reward.get("local_reputation", 0))
+                local_key = definition.local_reputation_key
+                if local_reward and not local_key:
+                    raise ValueError(f"achievement {definition.key} has no reputation location")
+                local_maximums = (
+                    {local_key: local_reputation_maximum(local_key, self.content)}
+                    if local_reward and local_key
+                    else None
+                )
+                actual_reward.update(
+                    grant_player_reward_actual(
+                        connection,
+                        row,
+                        numeric_reward,
+                        now_text,
+                        local_reputation_key=local_key,
+                        local_reputation_maximums=local_maximums,
+                    )
+                )
             if title_key:
                 title_definition = honor_title(str(title_key))
                 connection.execute(
@@ -1465,6 +1466,7 @@ class RoutineRepositoryMixin:
                     ),
                 )
                 del title_definition
+                actual_reward["title_key"] = str(title_key)
             connection.execute(
                 """
                 INSERT INTO achievement_claims(
@@ -1474,7 +1476,7 @@ class RoutineRepositoryMixin:
                 """,
                 (
                     row["id"], definition.key, source_operation_id, operation_id,
-                    json.dumps(reward, ensure_ascii=False, sort_keys=True),
+                    json.dumps(actual_reward, ensure_ascii=False, sort_keys=True),
                     now_text,
                 ),
             )
@@ -1487,7 +1489,7 @@ class RoutineRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "achievement_key": definition.key,
                 "label": definition.label,
-                "reward": reward,
+                "reward": actual_reward,
                 "source_operation_id": source_operation_id,
             }
             connection.execute(
@@ -1688,56 +1690,25 @@ class RoutineRepositoryMixin:
                 raise RedemptionCodeExhaustedError("redemption code has no remaining claims")
 
             reward = self._json_object(code_row["reward_json"], {})
-            energy = player_integer(row, "energy")
-            actual_reward: dict[str, int] = {}
-            local_reputation = 0
-            service_reputation = 0
-            for key, raw_quantity in reward.items():
-                quantity = int(raw_quantity)
-                if key == "spirit_stones":
-                    actual_reward[key] = quantity
-                elif key == "energy":
-                    gained = min(quantity, max(0, player_integer(row, "energy_max") - energy))
-                    energy += gained
-                    actual_reward[key] = gained
-                elif key == "local_reputation":
-                    local_reputation += quantity
-                    actual_reward[key] = quantity
-                elif key == "service_reputation":
-                    service_reputation += quantity
-                    actual_reward[key] = quantity
-                elif key != "spirit_stones":
-                    actual_reward[key] = quantity
-
-            if local_reputation or service_reputation:
-                reputation = connection.execute(
-                    "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                    (row["id"],),
-                ).fetchone()
-                local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-                local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
-                current_service = int(reputation["service_reputation"]) if reputation is not None else 0
-                current_service = min(100, current_service + service_reputation)
-                connection.execute(
-                    """
-                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                        service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                    """,
-                    (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
-                )
-            grant_player_state(
+            local_reward = int(reward.get("local_reputation", 0))
+            actual_reward = grant_player_reward_actual(
                 connection,
                 row,
-                updated_at=now_text,
-                rewards={
-                    key: quantity
-                    for key, quantity in reward.items()
-                    if key not in {"energy", "local_reputation", "service_reputation"}
-                },
-                value_delta={"energy": energy - player_integer(row, "energy")},
-                maximums={"energy": player_integer(row, "energy_max")},
+                reward,
+                now_text,
+                local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY if local_reward else None,
+                maximums={"energy": player_integer(row, "energy_max")}
+                if "energy" in reward
+                else None,
+                local_reputation_maximums=(
+                    {
+                        ROUTINE_LOCAL_REPUTATION_KEY: local_reputation_maximum(
+                            ROUTINE_LOCAL_REPUTATION_KEY, self.content
+                        )
+                    }
+                    if local_reward
+                    else None
+                ),
             )
             connection.execute(
                 """
@@ -2431,65 +2402,31 @@ class RoutineRepositoryMixin:
             ),
         )
 
-    @staticmethod
     def _apply_dao_reward(
+        self,
         connection: sqlite3.Connection,
         player: sqlite3.Row,
         reward: dict[str, int],
         now_text: str,
     ) -> dict[str, int]:
-        asset_rewards = {
-            str(key): int(value)
-            for key, value in reward.items()
-            if key not in {"energy", "local_reputation", "service_reputation"}
-        }
-        actual: dict[str, int] = {}
-        local_reputation = 0
-        service_reputation = 0
-        energy_gain = 0
-        for key, raw_quantity in reward.items():
-            quantity = int(raw_quantity)
-            if key == "spirit_stones":
-                actual[key] = quantity
-            elif key == "energy":
-                gained = min(quantity, max(0, player_integer(player, "energy_max") - player_integer(player, "energy") - energy_gain))
-                energy_gain += gained
-                actual[key] = gained
-            elif key == "local_reputation":
-                local_reputation += quantity
-                actual[key] = quantity
-            elif key == "service_reputation":
-                service_reputation += quantity
-                actual[key] = quantity
-            elif key != "spirit_stones":
-                actual[key] = quantity
-        if local_reputation or service_reputation:
-            reputation = connection.execute(
-                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                (player["id"],),
-            ).fetchone()
-            local = SQLitePlayerRepository._json_object(reputation["local_json"], {}) if reputation is not None else {}
-            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
-            current_service = int(reputation["service_reputation"]) if reputation is not None else 0
-            current_service = min(100, current_service + service_reputation)
-            connection.execute(
-                """
-                INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                    service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                """,
-                (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), current_service, now_text),
-            )
-        grant_player_state(
+        local_reward = int(reward.get("local_reputation", 0))
+        local_key = ROUTINE_LOCAL_REPUTATION_KEY if local_reward else None
+        local_maximums = (
+            {local_key: local_reputation_maximum(local_key, self.content)}
+            if local_key
+            else None
+        )
+        return grant_player_reward_actual(
             connection,
             player,
-            updated_at=now_text,
-            rewards=asset_rewards,
-            value_delta={"energy": energy_gain},
-            maximums={"energy": player_integer(player, "energy_max")},
+            reward,
+            now_text,
+            local_reputation_key=local_key,
+            maximums={"energy": player_integer(player, "energy_max")}
+            if "energy" in reward
+            else None,
+            local_reputation_maximums=local_maximums,
         )
-        return actual
 
     @staticmethod
     def _dao_status_from_connection(
