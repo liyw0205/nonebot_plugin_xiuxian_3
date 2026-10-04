@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+import tomllib
 from pathlib import Path
 
 import nonebot_plugin_xiuxian_3.xiuxian as xiuxian
@@ -17,6 +18,18 @@ def test_runtime_does_not_select_rules_by_release_label() -> None:
     assert set(bundle.manifest) == {"schema", "status", "files"}
     assert not (data_root / "内容版本.json").exists()
     assert not (Path(__file__).parents[1] / "nonebot_plugin_xiuxian_3" / "xiuxian" / "versions.py").exists()
+
+
+def test_project_metadata_does_not_hardcode_a_release_version() -> None:
+    root = Path(__file__).parents[1]
+    for relative_path in (
+        "pyproject.toml",
+        "examples/nonebot/pyproject.toml",
+        "docker/pyproject.toml",
+    ):
+        project = tomllib.loads((root / relative_path).read_text(encoding="utf-8"))["project"]
+        assert "version" not in project
+        assert project.get("dynamic") == ["version"]
 
 
 def test_new_player_schema_has_no_release_marker(tmp_path: Path) -> None:

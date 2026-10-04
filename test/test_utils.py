@@ -59,6 +59,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_integer,
     player_numeric_delta,
     change_player_state,
+    change_player_state_actual,
     change_player_values,
     grant_player_state,
     grant_player_reward,
@@ -444,6 +445,53 @@ def test_player_reward_caps_local_and_service_reputation_and_rolls_back_assets()
     unchanged = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
     assert unchanged is not None
     assert (player_currency(unchanged), player_inventory(unchanged)) == (25, {"item.herb": 3})
+    connection.close()
+
+
+def test_change_player_state_actual_unifies_grants_costs_and_caps() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, "
+        "inventory_json TEXT NOT NULL, energy INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "CREATE TABLE player_reputations (player_id INTEGER PRIMARY KEY, local_json TEXT NOT NULL, "
+        "service_reputation INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute("INSERT INTO players VALUES (1, 20, '{\"item.herb\":3}', 10, 'before')")
+    connection.execute(
+        "INSERT INTO player_reputations VALUES (1, '{\"local.dao_service\":3}', 98, 'before')"
+    )
+    row = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    assert row is not None
+
+    actual = change_player_state_actual(
+        connection,
+        row,
+        updated_at="after",
+        asset_values={"spirit_stones": 7, "item.herb": -2},
+        value_delta={"energy": -3},
+        local_reputation_delta={"local.dao_service": 5},
+        local_reputation_maximums={"local.dao_service": 4},
+        service_reputation_delta=5,
+    )
+
+    assert actual == {
+        "spirit_stones": 7,
+        "item.herb": -2,
+        "energy": -3,
+        "local.dao_service": 1,
+        "service_reputation": 2,
+    }
+    updated = connection.execute("SELECT * FROM players WHERE id=1").fetchone()
+    reputation = connection.execute(
+        "SELECT local_json, service_reputation FROM player_reputations WHERE player_id=1"
+    ).fetchone()
+    assert updated is not None and reputation is not None
+    assert (player_currency(updated), player_inventory(updated), updated["energy"]) == (27, {"item.herb": 1}, 7)
+    assert json.loads(reputation["local_json"]) == {"local.dao_service": 4}
+    assert reputation["service_reputation"] == 100
     connection.close()
 
 

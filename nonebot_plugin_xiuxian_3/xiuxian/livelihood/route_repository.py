@@ -11,8 +11,8 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..content import ContentError
 from ..utils.player import (
-    change_player_state,
-    local_reputation_with_delta,
+    change_player_state_actual,
+    player_reputation_state,
     player_requirements_missing,
     spend_player_state,
 )
@@ -430,8 +430,8 @@ class RouteRepositoryMixin:
             local_key = str(snapshot["local_reputation_key"])
             local_delta = int(snapshot["local_reputation"])
             reward_stones = int(snapshot["reward_stones"])
-            local_before = local_reputation_with_delta(connection, int(player["id"]), {}).get(local_key, 0)
-            change_player_state(
+            local_before = player_reputation_state(connection, int(player["id"])).local.get(local_key, 0)
+            actual = change_player_state_actual(
                 connection,
                 player,
                 updated_at=now_text,
@@ -443,7 +443,7 @@ class RouteRepositoryMixin:
                     {local_key: int(snapshot["local_reputation_maximum"])} if local_delta else None
                 ),
             )
-            local_after = local_reputation_with_delta(connection, int(player["id"]), {}).get(local_key, 0)
+            local_after = local_before + actual.get(local_key, 0)
             result = {
                 "status": "settled",
                 "cargo": cargo,

@@ -7,7 +7,13 @@ from dataclasses import dataclass
 import json
 from typing import Any, Literal
 
-from .assets import inventory_value, is_currency_asset_key, player_database_id
+from .assets import (
+    asset_state_amount,
+    inventory_value,
+    is_currency_asset_key,
+    player_asset_state,
+    player_database_id,
+)
 from .json import json_object
 
 
@@ -375,52 +381,55 @@ def grant_player_reward_actual(
     generic_local = normalized.pop("local_reputation", 0)
     if isinstance(generic_local, bool) or not isinstance(generic_local, int) or generic_local < 0:
         raise ValueError("local reputation reward must be a non-negative integer")
-    merged_local = {str(key): int(value) for key, value in (local_reputation_delta or {}).items()}
+    parts = split_player_rewards(normalized)
+    merged_local = dict(parts.local_reputation)
+    for raw_key, raw_value in (local_reputation_delta or {}).items():
+        key = str(raw_key)
+        if isinstance(raw_value, bool) or not isinstance(raw_value, int):
+            raise ValueError(f"player reward delta for {key!r} must be an integer")
+        merged_local[key] = merged_local.get(key, 0) + raw_value
     if generic_local:
         if not local_reputation_key:
             raise ValueError("generic local reputation reward requires a location key")
         merged_local[local_reputation_key] = merged_local.get(local_reputation_key, 0) + generic_local
 
-    parts = split_player_rewards(normalized)
-    reputation_before = player_reputation_state(connection, player_database_id(row))
-    grant_player_reward(
+    merged_values = dict(parts.value_delta)
+    for raw_key, raw_value in (value_delta or {}).items():
+        key = str(raw_key)
+        if isinstance(raw_value, bool) or not isinstance(raw_value, int):
+            raise ValueError(f"player reward delta for {key!r} must be an integer")
+        merged_values[key] = merged_values.get(key, 0) + raw_value
+    if "cultivation" in merged_values and "total_cultivation" not in merged_values:
+        merged_values["total_cultivation"] = merged_values["cultivation"]
+    merged_reputation = dict(parts.reputation)
+    for raw_key, raw_value in (reputation_delta or {}).items():
+        key = str(raw_key)
+        if isinstance(raw_value, bool) or not isinstance(raw_value, int):
+            raise ValueError(f"player reward delta for {key!r} must be an integer")
+        merged_reputation[key] = merged_reputation.get(key, 0) + raw_value
+    merged_service = (
+        None
+        if parts.service_reputation is None and service_reputation_delta is None
+        else (parts.service_reputation or 0) + (service_reputation_delta or 0)
+    )
+    actual = change_player_state_actual(
         connection,
         row,
-        normalized,
-        updated_at,
-        value_delta=value_delta,
+        updated_at=updated_at,
+        asset_values=parts.assets or None,
+        asset_mode="grant",
+        value_delta=merged_values or None,
         maximums=maximums,
         clamp_minimum=clamp_minimum,
         preserve_zero=preserve_zero,
         player_values=player_values,
-        reputation_delta=reputation_delta,
         local_reputation_delta=merged_local or None,
-        service_reputation_delta=service_reputation_delta,
+        reputation_delta=merged_reputation or None,
+        service_reputation_delta=merged_service,
         local_reputation_maximums=local_reputation_maximums,
     )
-
-    actual: dict[str, int] = dict(parts.assets)
-    requested_values = set(parts.value_delta) | set(value_delta or {})
-    if requested_values:
-        updated = connection.execute(
-            "SELECT * FROM players WHERE id = ?", (player_database_id(row),)
-        ).fetchone()
-        if updated is None:
-            raise ValueError("player reward returned no player")
-        for key in requested_values:
-            actual[key] = player_integer(updated, key) - player_integer(row, key)
-
-    reputation_after = player_reputation_state(connection, player_database_id(row))
-    requested_local = dict(parts.local_reputation)
-    for key, amount in merged_local.items():
-        requested_local[str(key)] = requested_local.get(str(key), 0) + int(amount)
-    for key in requested_local:
-        actual_key = "local_reputation" if generic_local and key == local_reputation_key else key
-        actual[actual_key] = reputation_after.local.get(key, 0) - reputation_before.local.get(key, 0)
-
-    requested_service = (parts.service_reputation or 0) + (service_reputation_delta or 0)
-    if requested_service:
-        actual["service_reputation"] = reputation_after.service - reputation_before.service
+    if generic_local and local_reputation_key:
+        actual["local_reputation"] = actual.pop(local_reputation_key, 0)
     return actual
 
 
@@ -672,6 +681,84 @@ def change_player_state(
             service_delta=service_reputation_delta,
         )
     return PlayerStateChange(values=numeric_values, assets=assets)
+
+
+def change_player_state_actual(
+    connection: Any,
+    row: Mapping[str, Any] | Any,
+    *,
+    updated_at: str,
+    asset_values: Mapping[str, Any] | None = None,
+    asset_mode: str = "delta",
+    value_delta: Mapping[str, Any] | None = None,
+    maximums: Mapping[str, Any] | None = None,
+    clamp_minimum: bool = False,
+    preserve_zero: bool = False,
+    player_values: Mapping[str, Any] | None = None,
+    reputation_delta: Mapping[str, Any] | None = None,
+    local_reputation_delta: Mapping[str, Any] | None = None,
+    service_reputation_delta: int | None = None,
+    local_reputation_maximums: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    """Commit one player state change and return signed changes that landed.
+
+    Asset, numeric and reputation changes often share one transaction but have
+    different caps or normalization rules.  Callers provide the requested
+    changes once; this helper reads the canonical before/after rows and keeps
+    result payloads consistent for grants, costs and mixed settlements.
+    """
+
+    player_id = player_database_id(row)
+    before_row = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+    if before_row is None:
+        raise ValueError("player state change returned no player")
+    before_assets = player_asset_state(before_row, preserve_zero=preserve_zero)
+    before_values = {
+        str(key): player_integer(before_row, str(key))
+        for key in (value_delta or {})
+    }
+    before_reputation = player_reputation_state(connection, player_id)
+    before_faction = player_reputation(before_row) if reputation_delta else {}
+
+    change_player_state(
+        connection,
+        before_row,
+        updated_at=updated_at,
+        asset_values=asset_values,
+        asset_mode=asset_mode,
+        value_delta=value_delta,
+        maximums=maximums,
+        clamp_minimum=clamp_minimum,
+        preserve_zero=preserve_zero,
+        player_values=player_values,
+        reputation_delta=reputation_delta,
+        local_reputation_delta=local_reputation_delta,
+        service_reputation_delta=service_reputation_delta,
+        local_reputation_maximums=local_reputation_maximums,
+    )
+
+    after_row = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+    if after_row is None:
+        raise ValueError("player state change returned no player")
+    after_assets = player_asset_state(after_row, preserve_zero=preserve_zero)
+    after_faction = player_reputation(after_row) if reputation_delta else {}
+    actual: dict[str, int] = {}
+    for raw_key in (asset_values or {}):
+        key = str(raw_key)
+        actual[key] = asset_state_amount(after_assets, key) - asset_state_amount(before_assets, key)
+    for raw_key, before in before_values.items():
+        actual[raw_key] = player_integer(after_row, raw_key) - before
+    after_reputation = player_reputation_state(connection, player_id)
+    for raw_key in (reputation_delta or {}):
+        key = str(raw_key)
+        faction = key.removeprefix("faction_reputation.")
+        actual[key] = after_faction.get(faction, 0) - before_faction.get(faction, 0)
+    for raw_key in (local_reputation_delta or {}):
+        key = str(raw_key)
+        actual[key] = after_reputation.local.get(key, 0) - before_reputation.local.get(key, 0)
+    if service_reputation_delta is not None:
+        actual["service_reputation"] = after_reputation.service - before_reputation.service
+    return actual
 
 
 def grant_player_state(
@@ -1175,6 +1262,7 @@ __all__ = [
     "player_has_requirements",
     "change_player_values",
     "change_player_state",
+    "change_player_state_actual",
     "grant_player_state",
     "spend_player_state",
     "player_numeric_values",

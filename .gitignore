@@ -19,7 +19,6 @@ dist/
 data/*
 !data/.gitkeep
 !data/内容清单.json
-!data/内容版本.json
 !data/*/
 data/*/*
 !data/*/*.json

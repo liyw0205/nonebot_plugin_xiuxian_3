@@ -307,3 +307,73 @@ def test_commission_invalid_stored_reputation_rolls_back_assets(tmp_path: Path, 
         await runtime.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_commission_invalid_snapshot_rolls_back_and_retries_same_operation(
+    tmp_path: Path, adapter: str,
+) -> None:
+    async def run() -> None:
+        clock = MutableClock()
+        runtime = create_runtime(data_dir=tmp_path, clock=clock)
+        base = CommandContext(adapter=adapter, user_id="invalid-commission-snapshot")
+
+        async def send(operation: str, text: str):
+            return await runtime.adapters.dispatch(
+                adapter, replace(base, operation_id=operation), text
+            )
+
+        assert (await send("create", "开始修仙")).ok
+        assert (await send("seek", "寻仙问道")).ok
+        accepted = await send("accept", "接取委托 止血草供应")
+        assert accepted.ok
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            player_id, stones, inventory = connection.execute(
+                "SELECT id, spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, base.user_id),
+            ).fetchone()
+            claim_id = accepted.data["claim_id"]
+            snapshot = connection.execute(
+                "SELECT snapshot_json FROM town_commission_claims WHERE claim_id=?",
+                (claim_id,),
+            ).fetchone()[0]
+            connection.execute(
+                "UPDATE town_commission_claims SET snapshot_json=? WHERE claim_id=?",
+                ("[", claim_id),
+            )
+
+        failed = await send("deliver-retry", "交付委托 止血草供应")
+        assert failed.code == "PERSISTENCE_ERROR"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            after, status, operation_count = connection.execute(
+                "SELECT p.spirit_stones, c.status, "
+                "(SELECT COUNT(*) FROM operations WHERE operation_id=?) "
+                "FROM players p JOIN town_commission_claims c ON c.player_id=p.id "
+                "WHERE p.id=? AND c.claim_id=?",
+                ("deliver-retry", player_id, claim_id),
+            ).fetchone()
+        assert after == stones
+        assert status == "accepted"
+        assert operation_count == 0
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            assert connection.execute(
+                "SELECT inventory_json FROM players WHERE id=?", (player_id,)
+            ).fetchone()[0] == inventory
+
+            connection.execute(
+                "UPDATE town_commission_claims SET snapshot_json=? WHERE claim_id=?",
+                (snapshot, claim_id),
+            )
+
+        delivered = await send("deliver-retry", "交付委托 止血草供应")
+        assert delivered.code == "COMMISSION_DELIVERED"
+        await runtime.close()
+
+        recovered = create_runtime(data_dir=tmp_path, clock=clock)
+        replay = await recovered.adapters.dispatch(
+            adapter, replace(base, operation_id="deliver-retry"), "交付委托 止血草供应"
+        )
+        assert replay.data == {**delivered.data, "idempotent_replay": True}
+        await recovered.close()
+
+    asyncio.run(run())

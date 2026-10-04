@@ -15,7 +15,12 @@ from ..utils.assets import (
 )
 from ..utils.assets import player_currency
 from ..utils.operations import player_operation
-from ..utils.player import grant_player_reward, player_inventory, player_reputation, player_reputation_state
+from ..utils.player import (
+    grant_player_reward_actual,
+    player_inventory,
+    player_reputation,
+    player_reputation_state,
+)
 from ..persistence.errors import (
     OperationConflictError,
     ProjectAlreadyCompleteError,
@@ -627,11 +632,7 @@ class ProjectRepositoryMixin:
             if faction.get(definition.required_faction, 0) < definition.required_faction_reputation:
                 return False
         if definition.required_sect_level:
-            reputation = connection.execute(
-                "SELECT local_json FROM player_reputations WHERE player_id = ?",
-                (player["id"],),
-            ).fetchone()
-            local = json_object(reputation["local_json"], {}) if reputation else {}
+            local = player_reputation_state(connection, int(player["id"])).local
             city_authorized = int(local.get("local.domain_refuge_authorized", 0)) > 0 or has_access
             sect_authorized = connection.execute(
                 """
@@ -725,29 +726,25 @@ class ProjectRepositoryMixin:
         if service_delta:
             reward["service_reputation"] = service_delta
         before = player_reputation_state(connection, int(player["id"])) if local_delta or service_delta else None
-        grant_player_reward(
+        actual = grant_player_reward_actual(
             connection,
             player,
             reward,
             updated_at,
+            local_reputation_key=None,
             local_reputation_maximums=maximums,
         )
-        if before is None:
-            return reward, 0, 0
-        after = player_reputation_state(connection, int(player["id"]))
         actual_reward = {
             key: value
-            for key, value in reward.items()
+            for key, value in actual.items()
             if key.startswith("item.") or key == "spirit_stones"
+            or (local_delta and key == str(local_key) and value)
+            or (service_delta and key == "service_reputation" and value)
         }
+        if before is None:
+            return actual_reward, 0, 0
         local_before = before.local.get(str(local_key), 0) if local_delta else 0
-        local_after = after.local.get(str(local_key), 0) if local_delta else 0
-        local_gain = local_after - local_before
-        service_gain = after.service - before.service
-        if local_delta and local_gain:
-            actual_reward[str(local_key)] = local_gain
-        if service_delta and service_gain:
-            actual_reward["service_reputation"] = service_gain
+        local_after = local_before + actual.get(str(local_key), 0) if local_delta else 0
         return actual_reward, local_before, local_after
 
     @staticmethod

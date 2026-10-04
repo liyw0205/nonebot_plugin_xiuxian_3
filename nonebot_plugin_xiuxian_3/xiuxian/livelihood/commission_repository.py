@@ -10,8 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_assets_missing
-from ..utils.json import json_object
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state_actual, player_reputation_state
 from ..content import bundled_content
 from ..rewards.rules import local_reputation_maximum
 from ..persistence.errors import (
@@ -276,7 +275,7 @@ class CommissionRepositoryMixin:
                     (now_text, claim["id"]),
                 )
                 raise CommissionExpiredError("commission has expired")
-            snapshot = json_object(claim["snapshot_json"], {})
+            snapshot = self._snapshot_object(claim["snapshot_json"])
             inputs = {str(key): int(value) for key, value in dict(snapshot.get("inputs", {})).items()}
             missing = player_assets_missing(player, inputs)
             if missing:
@@ -284,15 +283,10 @@ class CommissionRepositoryMixin:
             reward_stones = int(snapshot.get("reward_stones", 0))
             local_delta = int(snapshot.get("local_reputation", 0))
             service_delta = int(snapshot.get("service_reputation", 0))
-            reputation = connection.execute(
-                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                (player["id"],),
-            ).fetchone()
-            local = json_object(reputation["local_json"], {}) if reputation is not None else {}
-            service_before = int(reputation["service_reputation"]) if reputation is not None else 0
+            reputation_before = player_reputation_state(connection, int(player["id"]))
             local_key = str(snapshot["local_reputation_key"])
-            local_before = int(local.get(local_key, 0))
-            change_player_state(
+            local_before = reputation_before.local.get(local_key, 0)
+            actual = change_player_state_actual(
                 connection,
                 player,
                 updated_at=now_text,
@@ -308,12 +302,9 @@ class CommissionRepositoryMixin:
                     else None
                 ),
             )
-            reputation = connection.execute(
-                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                (player["id"],),
-            ).fetchone()
-            local_after = int(json_object(reputation["local_json"], {}).get(local_key, 0))
-            service_after = int(reputation["service_reputation"])
+            local_after = local_before + actual.get(local_key, 0)
+            service_before = reputation_before.service
+            service_after = service_before + actual.get("service_reputation", 0)
             result = {
                 "inputs": inputs,
                 "reward_stones": reward_stones,
@@ -398,7 +389,7 @@ class CommissionRepositoryMixin:
                 if current is None:
                     continue
                 additional_stock = max(0, stock - int(current["stock_total"]))
-                current_snapshot = json_object(current["snapshot_json"], {})
+                current_snapshot = self._snapshot_object(current["snapshot_json"])
                 if reward_multiplier > 100:
                     current_snapshot["reward_stones"] = reward_stones
                 connection.execute(
@@ -453,7 +444,7 @@ class CommissionRepositoryMixin:
                 (self.content or bundled_content()).list("realm", include_locked=False)
             )
         }
-        local_reputation: dict[str, Any] = {}
+        local_reputation: dict[str, int] | None = None
         for requirement in definition.requirements_any:
             if requirement.get("type") == "realm":
                 current_rank = realm_order.get(str(player["realm_key"]), -1)
@@ -464,13 +455,9 @@ class CommissionRepositoryMixin:
                 ):
                     return True
             elif requirement.get("type") == "local_reputation":
-                if not local_reputation:
-                    row = connection.execute(
-                        "SELECT local_json FROM player_reputations WHERE player_id = ?",
-                        (player["id"],),
-                    ).fetchone()
-                    local_reputation = json_object(row["local_json"], {}) if row else {}
-                if int(local_reputation.get(str(requirement["reputation_key"]), 0)) >= int(
+                if local_reputation is None:
+                    local_reputation = player_reputation_state(connection, int(player["id"])).local
+                if local_reputation.get(str(requirement["reputation_key"]), 0) >= int(
                     requirement["minimum"]
                 ):
                     return True
@@ -478,7 +465,7 @@ class CommissionRepositoryMixin:
 
     @staticmethod
     def _snapshot(definition: TownCommissionDefinition, offer: Any, now_text: str) -> dict[str, Any]:
-        snapshot = json_object(offer["snapshot_json"], {})
+        snapshot = CommissionRepositoryMixin._snapshot_object(offer["snapshot_json"])
         snapshot["commission_key"] = definition.key
         snapshot["accepted_at"] = now_text
         snapshot["expires_at"] = str(offer["expires_at"])
@@ -486,7 +473,7 @@ class CommissionRepositoryMixin:
 
     @staticmethod
     def _commission_view(row: Any) -> TownCommissionView:
-        snapshot = json_object(row["snapshot_json"], {})
+        snapshot = CommissionRepositoryMixin._snapshot_object(row["snapshot_json"])
         claim_status = str(row["claim_status"]) if row["claim_status"] else ""
         return TownCommissionView(
             commission_id=str(row["commission_id"]),
@@ -504,6 +491,16 @@ class CommissionRepositoryMixin:
             accepted=claim_status in {"accepted", "delivered"},
             delivered=claim_status == "delivered",
         )
+
+    @staticmethod
+    def _snapshot_object(value: Any) -> dict[str, Any]:
+        try:
+            decoded = json.loads(value) if isinstance(value, str) else value
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("commission snapshot is invalid JSON") from exc
+        if not isinstance(decoded, dict):
+            raise ValueError("commission snapshot must be an object")
+        return dict(decoded)
 
     def _payload(self, player: Any, offer: Any, *, snapshot: dict[str, Any], status: str, claim_id: str, stock_remaining: int, result: dict[str, Any] | None = None) -> dict[str, Any]:
         result = result or {}
