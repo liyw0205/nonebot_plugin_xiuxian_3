@@ -197,6 +197,117 @@ def test_item_content_aliases_and_labels_follow_the_active_content_bundle(tmp_pa
     asyncio.run(run())
 
 
+def test_item_original_name_replays_after_content_rename_and_alias_removal(tmp_path: Path) -> None:
+    source_data = Path(__file__).parents[1] / "data"
+
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            content_dir = tmp_path / adapter.replace(".", "-")
+            shutil.copytree(source_data, content_dir)
+            runtime = create_runtime(data_dir=content_dir)
+            user = f"item-history-{adapter}"
+            await _player(
+                runtime,
+                adapter,
+                user,
+                realm="qi_gathering",
+                location="xuantian.spirit_field",
+                inventory={"item.food.cloud_tea": 1},
+            )
+            used = await runtime.adapters.dispatch(
+                adapter,
+                _context(adapter, user, "history-use", "history-use-op"),
+                "使用 云灵茶",
+            )
+            assert used.code == "ITEM_USED"
+            await runtime.close()
+
+            materials = content_dir / "道具" / "材料.json"
+            document = json.loads(materials.read_text(encoding="utf-8"))
+            tea = next(row for row in document["records"] if row["key"] == "item.food.cloud_tea")
+            tea["name"] = "玄灵茶"
+            tea["aliases"] = ["玄茶"]
+            tea["status"] = "closed"
+            materials.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            runtime = create_runtime(data_dir=content_dir)
+            replay = await runtime.adapters.dispatch(
+                adapter,
+                _context(adapter, user, "history-replay", "history-use-op"),
+                "使用 云灵茶",
+            )
+            assert replay.code == "ITEM_USED"
+            assert replay.data["idempotent_replay"] is True
+            assert "云灵茶已饮尽" in replay.message
+            conflict = await runtime.adapters.dispatch(
+                adapter,
+                _context(adapter, user, "history-conflict", "history-use-op"),
+                "使用 玄茶",
+            )
+            assert conflict.code == "OPERATION_CONFLICT"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                inventory, operation_count = connection.execute(
+                    "SELECT p.inventory_json, (SELECT COUNT(*) FROM operations WHERE operation_id=?) "
+                    "FROM players p WHERE p.platform=? AND p.platform_user_id=?",
+                    ("history-use-op", adapter, user),
+                ).fetchone()
+            assert json.loads(inventory) == {}
+            assert operation_count == 1
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_item_replay_rejects_corrupt_result_without_writing_again() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=Path(data_dir))
+                user = f"item-corrupt-{adapter}"
+                await _player(
+                    runtime,
+                    adapter,
+                    user,
+                    realm="qi_gathering",
+                    location="xuantian.spirit_field",
+                    inventory={"item.food.cloud_tea": 1},
+                )
+                used = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "corrupt-use", "corrupt-op"),
+                    "使用 云灵茶",
+                )
+                assert used.code == "ITEM_USED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    payload = json.loads(
+                        connection.execute(
+                            "SELECT result_json FROM operations WHERE operation_id=?", ("corrupt-op",)
+                        ).fetchone()[0]
+                    )
+                    payload["effect"] = {}
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (json.dumps(payload, ensure_ascii=False, sort_keys=True), "corrupt-op"),
+                    )
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "corrupt-replay", "corrupt-op"),
+                    "使用 云灵茶",
+                )
+                assert replay.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    inventory, operation_count = connection.execute(
+                        "SELECT p.inventory_json, (SELECT COUNT(*) FROM operations WHERE operation_id=?) "
+                        "FROM players p WHERE p.platform=? AND p.platform_user_id=?",
+                        ("corrupt-op", adapter, user),
+                    ).fetchone()
+                assert json.loads(inventory) == {}
+                assert operation_count == 1
+                await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_item_operation_conflict_does_not_consume_a_second_item() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
@@ -415,6 +526,47 @@ def test_food_content_amount_is_read_from_json_for_both_adapters(tmp_path: Path)
     asyncio.run(run())
 
 
+def test_food_recovery_choices_follow_content_resources(tmp_path: Path) -> None:
+    content_dir = tmp_path / "content"
+    shutil.copytree(Path(__file__).parents[1] / "data", content_dir)
+    materials = content_dir / "道具" / "材料.json"
+    document = json.loads(materials.read_text(encoding="utf-8"))
+    rice = next(row for row in document["records"] if row["key"] == "item.food.coarse_spirit_rice")
+    rice["effects"][0]["resources"] = ["stamina"]
+    materials.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    async def run() -> None:
+        runtime = create_runtime(data_dir=content_dir)
+        for adapter in ("qq.official", "onebot.v11"):
+            user = f"food-choice-{adapter}"
+            await _player(
+                runtime,
+                adapter,
+                user,
+                realm="qi_gathering",
+                location="xuantian.spirit_field",
+                inventory={"item.food.coarse_spirit_rice": 1},
+            )
+            invalid = await runtime.adapters.dispatch(
+                adapter,
+                _context(adapter, user, f"{adapter}-invalid", f"{adapter}-invalid-op"),
+                "使用 粗糙灵米 精力",
+            )
+            assert invalid.code == "ITEM_CHOICE_INVALID"
+            assert "体力" in invalid.message
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                inventory, operation_count = connection.execute(
+                    "SELECT inventory_json, (SELECT COUNT(*) FROM operations WHERE operation_id=?) "
+                    "FROM players WHERE platform=? AND platform_user_id=?",
+                    (f"{adapter}-invalid-op", adapter, user),
+                ).fetchone()
+            assert json.loads(inventory) == {"item.food.coarse_spirit_rice": 1}
+            assert operation_count == 0
+        await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_food_write_failure_rolls_back_and_operation_can_retry() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
@@ -488,6 +640,27 @@ def test_usable_item_rejects_an_unknown_content_location(tmp_path: Path) -> None
     content = ContentBundle.load(content_dir)
     with pytest.raises(ContentError, match="location_key"):
         resolve_item("item.array.mist_barrier", content)
+
+
+def test_restore_choice_rejects_invalid_content_contract(tmp_path: Path) -> None:
+    for index, (field, value, message) in enumerate(
+        (
+            ("resources", [], "resources"),
+            ("resources", ["spirit"], "resources"),
+            ("cooldown_seconds", 0, "cooldown_seconds"),
+            ("amount", True, "amount"),
+        )
+    ):
+        content_dir = tmp_path / str(index)
+        shutil.copytree(Path(__file__).parents[1] / "data", content_dir)
+        materials = content_dir / "道具" / "材料.json"
+        document = json.loads(materials.read_text(encoding="utf-8"))
+        rice = next(row for row in document["records"] if row["key"] == "item.food.coarse_spirit_rice")
+        rice["effects"][0][field] = value
+        materials.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        content = ContentBundle.load(content_dir)
+        with pytest.raises(ContentError, match=message):
+            resolve_item("item.food.coarse_spirit_rice", content)
 
 
 def test_cloud_sword_production_materializes_equipment_instance() -> None:

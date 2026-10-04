@@ -19,6 +19,7 @@ from ..repository import (
     RepositoryBusyError,
     SQLitePlayerRepository,
 )
+from .models import ItemUseRecord
 from .rules import resolve_item
 
 
@@ -40,9 +41,77 @@ class ItemApplication:
             return str(whole)
         return f"{whole}.{fraction:02d}".rstrip("0")
 
+    @staticmethod
+    def _resource_key(value: str, resources: tuple[str, ...]) -> str | None:
+        labels = {"stamina": "体力", "energy": "精力"}
+        normalized = (value or "").strip()
+        for resource in resources:
+            if normalized in {resource, labels[resource]}:
+                return resource
+        return None
+
+    @staticmethod
+    def _resource_prompt(resources: tuple[str, ...]) -> str:
+        labels = {"stamina": "体力", "energy": "精力"}
+        return "、".join(labels[resource] for resource in resources)
+
+    def _result(self, context: CommandContext, operation_id: str, record: ItemUseRecord) -> CommandResult:
+        effect = record.effect
+        if effect.get("type") == "restore_choice":
+            resource = "体力" if effect.get("resource") == "stamina" else "精力"
+            message = (
+                f"## {record.item_name}已用\n\n"
+                f"灵食化作暖流，{resource}恢复 **{int(effect['restored'])}**。"
+            )
+        elif effect.get("type") == "next_cultivation_state_bonus_bp":
+            message = (
+                f"## {record.item_name}已饮尽\n\n一缕清灵仍在经脉间流转，"
+                f"下一次修炼所得修为提高 **{self._percent(int(effect['state_bp_bonus']))}%**。"
+            )
+        else:
+            expires_at = datetime.fromisoformat(str(effect["expires_at"]))
+            expires_label = expires_at.astimezone().strftime("%Y年%m月%d日 %H:%M")
+            message = (
+                f"## {record.item_name}已布下\n\n屏障笼罩{effect['location_name']}，探索途中遭遇战斗的机会"
+                f"降低 **{self._percent(int(effect['risk_reduction_bp']))}%**，"
+                f"将持续到 {expires_label}。"
+            )
+        return CommandResult(
+            True,
+            "ITEM_USED",
+            message,
+            context.request_id,
+            operation_id,
+            data={
+                "item_key": record.item_key,
+                "item_name": record.item_name,
+                "quantity": record.quantity,
+                "effect": effect,
+                "inventory": record.player.inventory,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
     async def use_item(self, context: CommandContext) -> CommandResult:
         if not 1 <= len(context.command_args) <= 2:
             return CommandResult(False, "INVALID_ITEM_COMMAND", "请写明物品；食物还需选择体力或精力。", context.request_id)
+        operation_id = self._operation_id(context)
+        try:
+            replay = await self.repository.replay_item_use(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+                request_args=context.command_args,
+            )
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这道操作已承载另一番心意，请换一枚新的传讯凭证。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if replay is not None:
+            return self._result(context, operation_id, replay)
+
         content = self.repository.content or bundled_content()
         try:
             definition = resolve_item(context.command_args[0], content)
@@ -51,15 +120,20 @@ class ItemApplication:
         location_key = None
         if definition.effect_type == "restore_choice":
             if len(context.command_args) != 2:
-                return CommandResult(False, "ITEM_CHOICE_REQUIRED", "请在体力与精力之间选择一项恢复。", context.request_id)
-            location_key = {
-                "体力": "stamina",
-                "精力": "energy",
-                "stamina": "stamina",
-                "energy": "energy",
-            }.get(context.command_args[1].strip())
+                return CommandResult(
+                    False,
+                    "ITEM_CHOICE_REQUIRED",
+                    f"请在{self._resource_prompt(definition.resources)}之间选择一项恢复。",
+                    context.request_id,
+                )
+            location_key = self._resource_key(context.command_args[1], definition.resources)
             if location_key is None:
-                return CommandResult(False, "ITEM_CHOICE_INVALID", "这份灵食只能调养体力或精力。", context.request_id)
+                return CommandResult(
+                    False,
+                    "ITEM_CHOICE_INVALID",
+                    f"这份灵食只能调养{self._resource_prompt(definition.resources)}。",
+                    context.request_id,
+                )
         elif len(context.command_args) == 2:
             if definition.effect_type != "exploration_risk_reduction_bp":
                 return CommandResult(False, "INVALID_ITEM_COMMAND", "这件物品无需指定地点。", context.request_id)
@@ -67,7 +141,6 @@ class ItemApplication:
                 location_key = resolve_content_key(content, "location", context.command_args[1])
             except ValueError:
                 location_key = context.command_args[1].strip()
-        operation_id = self._operation_id(context)
         try:
             record = await self.repository.use_item(
                 platform=context.adapter,
@@ -75,6 +148,7 @@ class ItemApplication:
                 item_key=definition.key,
                 location_key=location_key,
                 operation_id=operation_id,
+                request_args=context.command_args,
             )
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
@@ -101,26 +175,7 @@ class ItemApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        if record.effect.get("type") == "restore_choice":
-            resource = "体力" if record.effect.get("resource") == "stamina" else "精力"
-            message = (
-                f"## {record.item_name}已用\n\n"
-                f"灵食化作暖流，{resource}恢复 **{int(record.effect['restored'])}**。"
-            )
-        elif record.effect.get("type") == "next_cultivation_state_bonus_bp":
-            message = (
-                f"## {record.item_name}已饮尽\n\n一缕清灵仍在经脉间流转，"
-                f"下一次修炼所得修为提高 **{self._percent(int(record.effect['state_bp_bonus']))}%**。"
-            )
-        else:
-            expires_at = datetime.fromisoformat(str(record.effect["expires_at"]))
-            expires_label = expires_at.astimezone().strftime("%Y年%m月%d日 %H:%M")
-            message = (
-                f"## {record.item_name}已布下\n\n屏障笼罩{content.label('location', str(record.effect['location_key']))}，探索途中遭遇战斗的机会"
-                f"降低 **{self._percent(int(record.effect['risk_reduction_bp']))}%**，"
-                f"将持续到 {expires_label}。"
-            )
-        return CommandResult(True, "ITEM_USED", message, context.request_id, operation_id, data={"item_key": record.item_key, "item_name": record.item_name, "quantity": record.quantity, "effect": record.effect, "inventory": record.player.inventory, "idempotent_replay": record.already_completed})
+        return self._result(context, operation_id, record)
 
 
 __all__ = ["ItemApplication"]

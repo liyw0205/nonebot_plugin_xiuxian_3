@@ -10,6 +10,7 @@ from datetime import timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, spend_player_items
 from ..utils.player import change_player_state_actual, player_integer, player_inventory
@@ -24,6 +25,108 @@ SQLitePlayerRepository = None
 
 
 class ItemRepositoryMixin:
+    async def replay_item_use(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> ItemUseRecord | None:
+        """Replay before resolving a name that may have left the content pack."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._replay_item_use_with_retry,
+                platform,
+                platform_user_id,
+                operation_id,
+                request_args,
+            )
+
+    def _replay_item_use_with_retry(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> ItemUseRecord | None:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return self._replay_item_use_once(platform, platform_user_id, operation_id, request_args)
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    raise
+                if attempt == 4:
+                    raise RepositoryBusyError("database remained locked") from exc
+                last_error = exc
+                time.sleep(0.01 * (2**attempt))
+        raise RepositoryBusyError("database remained locked") from last_error
+
+    def _replay_item_use_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> ItemUseRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT o.operation_name, o.result_json, p.platform, p.platform_user_id
+                FROM operations AS o
+                JOIN players AS p ON p.id = o.player_id
+                WHERE o.operation_id = ?
+                """,
+                (operation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        if (
+            row["operation_name"] != "items.use"
+            or row["platform"] != platform
+            or row["platform_user_id"] != platform_user_id
+        ):
+            raise OperationConflictError("operation input differs from its original request")
+        try:
+            payload = json.loads(row["result_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("item operation snapshot is invalid") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("item operation snapshot must be an object")
+        self._item_use_from_payload(payload)
+        if not self._item_request_matches(payload, request_args):
+            raise OperationConflictError("operation input differs from its original request")
+        return self._item_use_from_payload(payload, replay=True)
+
+    @staticmethod
+    def _item_request_matches(payload: dict[str, object], request_args: tuple[str, ...]) -> bool:
+        stored = payload.get("request_args")
+        if not isinstance(stored, list) or any(not isinstance(value, str) for value in stored):
+            return False
+        if len(stored) != len(request_args) or not request_args:
+            return False
+        accepted_item_references = {stored[0], str(payload.get("item_key", ""))}
+        historical_references = payload.get("item_references")
+        if isinstance(historical_references, list):
+            accepted_item_references.update(
+                value for value in historical_references if isinstance(value, str)
+            )
+        if request_args[0] not in accepted_item_references:
+            return False
+        if len(request_args) == 1:
+            return True
+        effect = payload.get("effect")
+        accepted_second = {stored[1]}
+        if isinstance(effect, dict):
+            for key in ("resource", "location_key"):
+                value = effect.get(key)
+                if isinstance(value, str):
+                    accepted_second.add(value)
+        return request_args[1] in accepted_second
+
     async def expire_mist_barriers(self) -> int:
         """Mark elapsed barrier instances terminal; safe to run repeatedly."""
 
@@ -49,6 +152,7 @@ class ItemRepositoryMixin:
         item_key: str,
         location_key: str | None,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> ItemUseRecord:
         await self.initialize()
         async with self._inflight:
@@ -59,6 +163,7 @@ class ItemRepositoryMixin:
                 item_key,
                 location_key,
                 operation_id,
+                request_args,
             )
 
     def _use_item_with_retry(
@@ -68,12 +173,13 @@ class ItemRepositoryMixin:
         item_key: str,
         location_key: str | None,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> ItemUseRecord:
         last_error: Exception | None = None
         for attempt in range(5):
             try:
                 return self._use_item_once(
-                    platform, platform_user_id, item_key, location_key, operation_id
+                    platform, platform_user_id, item_key, location_key, operation_id, request_args
                 )
             except sqlite3.OperationalError as exc:
                 if "locked" not in str(exc).lower():
@@ -91,6 +197,7 @@ class ItemRepositoryMixin:
         item_key: str,
         location_key: str | None,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> ItemUseRecord:
         try:
             definition = resolve_item(item_key, self.content)
@@ -216,7 +323,14 @@ class ItemRepositoryMixin:
                     (barrier_id, row["id"], operation_id, target, now_text, expires_at, json.dumps({"risk_reduction_bp": definition.effect_value}, ensure_ascii=False, sort_keys=True), now_text, now_text),
                 )
                 spend_player_items(connection, row, {definition.key: 1}, now_text)
-                effect = {"type": definition.effect_type, "barrier_id": barrier_id, "location_key": target, "risk_reduction_bp": definition.effect_value, "expires_at": expires_at}
+                effect = {
+                    "type": definition.effect_type,
+                    "barrier_id": barrier_id,
+                    "location_key": target,
+                    "location_name": (self.content or bundled_content()).label("location", target),
+                    "risk_reduction_bp": definition.effect_value,
+                    "expires_at": expires_at,
+                }
             else:
                 raise ItemNotUsableError("item has no active use effect")
 
@@ -227,8 +341,10 @@ class ItemRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "item_key": definition.key,
                 "item_name": definition.name,
+                "item_references": [definition.key, definition.name, *definition.aliases],
                 "quantity": 1,
                 "effect": effect,
+                "request_args": list(request_args),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -238,12 +354,57 @@ class ItemRepositoryMixin:
 
     @staticmethod
     def _item_use_from_payload(payload: dict[str, object], *, replay: bool = False) -> ItemUseRecord:
+        if not isinstance(payload.get("player"), dict):
+            raise ValueError("item operation snapshot player is invalid")
+        if not isinstance(payload.get("item_key"), str) or not str(payload["item_key"]).strip():
+            raise ValueError("item operation snapshot key is invalid")
+        if not isinstance(payload.get("item_name"), str) or not str(payload["item_name"]).strip():
+            raise ValueError("item operation snapshot name is invalid")
+        quantity = payload.get("quantity")
+        if not isinstance(quantity, int) or isinstance(quantity, bool) or quantity <= 0:
+            raise ValueError("item operation snapshot quantity is invalid")
+        request_args = payload.get("request_args")
+        references = payload.get("item_references")
+        if (
+            not isinstance(request_args, list)
+            or not request_args
+            or any(not isinstance(value, str) for value in request_args)
+            or not isinstance(references, list)
+            or any(not isinstance(value, str) or not value for value in references)
+        ):
+            raise ValueError("item operation snapshot references are invalid")
+        effect = payload.get("effect")
+        if not isinstance(effect, dict) or effect.get("type") not in {
+            "restore_choice",
+            "next_cultivation_state_bonus_bp",
+            "exploration_risk_reduction_bp",
+        }:
+            raise ValueError("item operation snapshot effect is invalid")
+        effect_type = effect["type"]
+        if effect_type == "restore_choice":
+            if (
+                effect.get("resource") not in {"stamina", "energy"}
+                or not isinstance(effect.get("requested"), int)
+                or isinstance(effect.get("requested"), bool)
+                or not isinstance(effect.get("restored"), int)
+                or isinstance(effect.get("restored"), bool)
+                or not isinstance(effect.get("cooldown_until"), str)
+            ):
+                raise ValueError("item operation snapshot recovery effect is invalid")
+        elif effect_type == "next_cultivation_state_bonus_bp":
+            if not isinstance(effect.get("state_bp_bonus"), int) or isinstance(effect.get("state_bp_bonus"), bool):
+                raise ValueError("item operation snapshot cultivation effect is invalid")
+        elif not all(
+            isinstance(effect.get(key), str) and str(effect[key]).strip()
+            for key in ("barrier_id", "location_key", "location_name", "expires_at")
+        ) or not isinstance(effect.get("risk_reduction_bp"), int) or isinstance(effect.get("risk_reduction_bp"), bool):
+            raise ValueError("item operation snapshot barrier effect is invalid")
         return ItemUseRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             item_key=str(payload["item_key"]),
             item_name=str(payload["item_name"]),
             quantity=int(payload.get("quantity", 1)),
-            effect=dict(payload.get("effect", {})),
+            effect=effect,
             already_completed=replay,
         )
 
