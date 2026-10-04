@@ -118,6 +118,18 @@ CREATE TABLE IF NOT EXISTS mist_barrier_instances (
 CREATE INDEX IF NOT EXISTS idx_mist_barrier_active
     ON mist_barrier_instances(player_id, location_key, status, expires_at);
 
+CREATE TABLE IF NOT EXISTS item_use_cooldowns (
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    cooldown_until TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (player_id, item_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_use_cooldowns_until
+    ON item_use_cooldowns(player_id, cooldown_until);
+
 CREATE TABLE IF NOT EXISTS endgame_endings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_id INTEGER NOT NULL UNIQUE REFERENCES players(id),

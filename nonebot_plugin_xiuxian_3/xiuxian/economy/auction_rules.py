@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from .rules import NON_TRADEABLE_ITEMS, resolve_market_item
+from ..content import ContentBundle
+from .rules import resolve_market_item
 
 
 AUCTION_SLOT_LIMIT = 20
@@ -22,10 +23,8 @@ def auction_week_start(value) -> str:
     return (value.date() - timedelta(days=value.weekday())).isoformat()
 
 
-def validate_auction_listing(item_key: str, quantity: int, starting_bid: int):
-    item = resolve_market_item(item_key)
-    if item.key in NON_TRADEABLE_ITEMS:
-        raise ValueError("item is not allowed in the auction")
+def validate_auction_listing(item_key: str, quantity: int, starting_bid: int, content: ContentBundle | None = None):
+    item = resolve_market_item(item_key, content)
     if not AUCTION_MIN_QUANTITY <= int(quantity) <= AUCTION_MAX_QUANTITY:
         raise ValueError("quantity out of range")
     if int(starting_bid) < AUCTION_MIN_BID:

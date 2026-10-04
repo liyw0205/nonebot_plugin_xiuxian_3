@@ -12,7 +12,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, spend_player_items
-from ..utils.player import player_inventory
+from ..utils.player import change_player_state_actual, player_integer, player_inventory
 from .models import ItemUseRecord
 from .rules import (
     resolve_item,
@@ -93,7 +93,7 @@ class ItemRepositoryMixin:
         operation_id: str,
     ) -> ItemUseRecord:
         try:
-            definition = resolve_item(item_key)
+            definition = resolve_item(item_key, self.content)
         except ValueError as exc:
             raise ItemNotUsableError("item has no active use effect") from exc
         operation_name = "items.use"
@@ -124,14 +124,54 @@ class ItemRepositoryMixin:
                 raise ItemInsufficientError("item is missing")
 
             effect: dict[str, object]
-            if definition.effect_type == "next_cultivation_state_bonus_bp":
+            if definition.effect_type == "restore_choice":
+                choice = normalized_location
+                if choice not in definition.resources:
+                    raise ItemLocationRequiredError("food must name one of its configured recovery resources")
+                cooldown = connection.execute(
+                    "SELECT cooldown_until FROM item_use_cooldowns WHERE player_id = ? AND item_key = ?",
+                    (row["id"], definition.key),
+                ).fetchone()
+                if cooldown is not None and str(cooldown["cooldown_until"]) > now_text:
+                    raise ItemCooldownError("item recovery is still cooling down")
+                maximum = player_integer(row, f"{choice}_max")
+                actual = change_player_state_actual(
+                    connection,
+                    row,
+                    updated_at=now_text,
+                    asset_values={definition.key: 1},
+                    asset_mode="spend",
+                    value_delta={choice: definition.effect_value},
+                    maximums={choice: maximum},
+                )
+                cooldown_until = serialize_datetime(
+                    now + timedelta(seconds=int(definition.cooldown_seconds or 0))
+                )
+                connection.execute(
+                    "INSERT INTO item_use_cooldowns(player_id, item_key, cooldown_until, operation_id, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?) "
+                    "ON CONFLICT(player_id, item_key) DO UPDATE SET cooldown_until=excluded.cooldown_until, "
+                    "operation_id=excluded.operation_id, updated_at=excluded.updated_at",
+                    (row["id"], definition.key, cooldown_until, operation_id, now_text),
+                )
+                effect = {
+                    "type": definition.effect_type,
+                    "resource": choice,
+                    "requested": definition.effect_value,
+                    "restored": actual.get(choice, 0),
+                    "cooldown_until": cooldown_until,
+                }
+            elif definition.effect_type == "next_cultivation_state_bonus_bp":
                 effects = self._json_object(row["item_effects_json"], {})
-                if int(effects.get("cloud_tea_state_bp", 0)) > 0 or effects.get("cloud_tea_operation_id"):
-                    raise ItemEffectAlreadyPendingError("cloud tea effect is already pending")
+                if effects.get("pending") is not None:
+                    raise ItemEffectAlreadyPendingError("a cultivation effect is already pending")
                 effects = {
-                    "cloud_tea_state_bp": definition.effect_value,
-                    "cloud_tea_operation_id": operation_id,
-                    "consumed_at": now_text,
+                    "pending": {
+                        "type": definition.effect_type,
+                        "value": definition.effect_value,
+                        "operation_id": operation_id,
+                        "consumed_at": now_text,
+                    }
                 }
                 spend_player_items(
                     connection,
@@ -148,10 +188,13 @@ class ItemRepositoryMixin:
                     "pending": True,
                 }
             elif definition.effect_type == "exploration_risk_reduction_bp":
-                if str(row["location_key"]) != "cave.mist_grotto_2":
-                    raise ItemLocationRequiredError("mist barrier must be deployed from mist grotto two")
+                target_location = definition.location_key
+                if target_location is None:
+                    raise ItemNotUsableError("item effect has no target location")
+                if str(row["location_key"]) != target_location:
+                    raise ItemLocationRequiredError("item must be deployed from its configured location")
                 target = normalized_location or str(row["location_key"])
-                if target != "cave.mist_grotto_2":
+                if target != target_location:
                     raise ItemLocationRequiredError("mist barrier target is unsupported")
                 connection.execute(
                     "UPDATE mist_barrier_instances SET status = 'expired', updated_at = ? WHERE player_id = ? AND status = 'active' AND expires_at <= ?",

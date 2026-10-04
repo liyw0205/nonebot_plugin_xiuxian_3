@@ -136,7 +136,7 @@ class PurchaseOrderRepositoryMixin:
         cross_realm: bool,
     ) -> PurchaseOrderRecord:
         try:
-            item = resolve_purchase_item(item_key)
+            item = resolve_purchase_item(item_key, self.content)
             validate_purchase_order(int(quantity), int(unit_price))
         except ValueError as exc:
             if "item" in str(exc):

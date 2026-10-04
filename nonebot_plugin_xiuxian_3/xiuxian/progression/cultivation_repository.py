@@ -415,7 +415,7 @@ class CultivationRepositoryMixin:
                     stamina_cost=int(payload["stamina_cost"]),
                     energy_cost=int(payload.get("energy_cost", 0)),
                     state_bp=int(payload.get("state_bp", 10000)),
-                    cloud_tea_effect_bp=int(payload.get("cloud_tea_effect_bp", 0)),
+                    state_bonus_bp=int(payload.get("state_bonus_bp", 0)),
                     already_completed=True,
                 )
 
@@ -518,10 +518,16 @@ class CultivationRepositoryMixin:
                 if domain_crack_until > now:
                     state_bp = min(state_bp, 8500)
             item_effects = self._json_object(row["item_effects_json"], {})
-            cloud_tea_effect_bp = int(item_effects.get("cloud_tea_state_bp", 0))
-            if cloud_tea_effect_bp > 0:
-                state_bp += cloud_tea_effect_bp
-                item_effects = {}
+            pending_effect = item_effects.pop("pending", None)
+            state_bonus_bp = 0
+            if pending_effect is not None:
+                if not isinstance(pending_effect, dict) or pending_effect.get("type") != "next_cultivation_state_bonus_bp":
+                    raise ValueError("player has an invalid pending cultivation effect")
+                raw_value = pending_effect.get("value")
+                if isinstance(raw_value, bool) or not isinstance(raw_value, int) or raw_value <= 0:
+                    raise ValueError("pending cultivation effect value must be positive")
+                state_bonus_bp = raw_value
+                state_bp += state_bonus_bp
             manual_effects = manual_effect_totals(player_inventory(row), self.content)
             snapshot = {
                 "realm_key": row["realm_key"],
@@ -532,7 +538,8 @@ class CultivationRepositoryMixin:
                 "stamina_cost": mode.stamina_cost,
                 "energy_cost": mode.energy_cost,
                 "state_bp": state_bp,
-                "cloud_tea_effect_bp": cloud_tea_effect_bp,
+                "state_bonus_bp": state_bonus_bp,
+                "pending_state_bonus_bp": state_bonus_bp,
                 "base_cultivation": mode.base_cultivation,
                 "environment_bp": mode.environment_bp,
                 "manual_cultivation_gain_bp": int(manual_effects["cultivation_gain_bp"]),
@@ -614,7 +621,7 @@ class CultivationRepositoryMixin:
                 stamina_cost=mode.stamina_cost,
                 energy_cost=mode.energy_cost,
                 state_bp=state_bp,
-                cloud_tea_effect_bp=cloud_tea_effect_bp,
+                state_bonus_bp=state_bonus_bp,
             )
 
     async def settle_cultivation(

@@ -6,7 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
-from .rules import NON_TRADEABLE_ITEMS, resolve_market_item
+from ..content import ContentBundle
+from .rules import resolve_market_item
 
 
 PURCHASE_ORDER_TTL_SECONDS = 12 * 60 * 60
@@ -32,13 +33,11 @@ class PurchaseOrderItem:
     label: str
 
 
-def resolve_purchase_item(value: str) -> PurchaseOrderItem:
+def resolve_purchase_item(value: str, content: ContentBundle | None = None) -> PurchaseOrderItem:
     try:
-        item = resolve_market_item(value)
+        item = resolve_market_item(value, content)
     except ValueError as exc:
         raise ValueError("item is not allowed in a purchase order") from exc
-    if item.key in NON_TRADEABLE_ITEMS:
-        raise ValueError("item is not allowed in a purchase order")
     return PurchaseOrderItem(item.key, item.label)
 
 

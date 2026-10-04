@@ -2152,6 +2152,10 @@ class ItemEffectAlreadyPendingError(RuntimeError):
     """A one-shot consumable effect is already waiting to be applied."""
 
 
+class ItemCooldownError(RuntimeError):
+    """The requested consumable is still recovering its spiritual efficacy."""
+
+
 class CrossServerFortressRequiredError(RuntimeError):
     """The sect does not have an active void fortress."""
 

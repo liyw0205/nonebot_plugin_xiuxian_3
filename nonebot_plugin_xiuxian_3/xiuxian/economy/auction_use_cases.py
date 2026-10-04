@@ -35,15 +35,13 @@ class AuctionApplication:
         key = context.message_id or context.request_id
         return f"{name}:{context.adapter}:{context.user_id}:{key}"
 
-    @staticmethod
-    def _label(item_key: str) -> str:
+    def _label(self, item_key: str) -> str:
         try:
-            return resolve_market_item(item_key).label
+            return resolve_market_item(item_key, self.repository.content).label
         except ValueError:
             return item_key
 
-    @classmethod
-    def _data(cls, record: AuctionRecord) -> dict[str, object]:
+    def _data(self, record: AuctionRecord) -> dict[str, object]:
         return {
             "auction_id": record.auction_id,
             "status": record.status,
@@ -51,7 +49,7 @@ class AuctionApplication:
             "seller_platform_user_id": record.seller_platform_user_id,
             "seller_dao_name": record.seller_dao_name,
             "item_key": record.item_key,
-            "item_label": cls._label(record.item_key),
+            "item_label": self._label(record.item_key),
             "quantity": record.quantity,
             "starting_bid": record.starting_bid,
             "current_bid": record.current_bid,

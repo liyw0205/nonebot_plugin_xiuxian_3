@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..content import ContentBundle
+from ..items.rules import resolve_item_record
+
 
 MARKET_ORDER_TTL_SECONDS = 24 * 60 * 60
 MARKET_MAX_LISTINGS = 10
@@ -21,71 +24,22 @@ COMMISSION_FAILURE_REFUND_BP = 8000
 COMMISSION_TTL_SECONDS = 24 * 60 * 60
 COMMISSION_RECOVERY_GRACE_SECONDS = 24 * 60 * 60
 COMMISSION_RECIPES = frozenset({"recipe.pill.healing_low", "recipe.weapon.wood_sword"})
-NON_TRADEABLE_ITEMS = frozenset({
-    "item.pill.qi_guard",
-    "item.pill.foundation_draft",
-    "item.pill.foundation_guard",
-    "item.pill.core_condense",
-    "item.pill.soul_condense",
-    "item.pill.golden_core_guard",
-    "item.array.mist_barrier",
-    "item.contract.beast_pact",
-})
-
-
 @dataclass(frozen=True, slots=True)
 class MarketItem:
     key: str
     label: str
 
 
-_ITEMS = {
-    "item.food.coarse_spirit_rice": "粗糙灵米",
-    "item.food.spirit_rice": "灵米饭",
-    "item.herb.blood_grass": "止血草",
-    "item.herb.spirit_leaf": "灵叶",
-    "item.mat.wood": "木材",
-    "item.ore.ironstone": "铁石",
-    "item.material.cloud_iron": "云铁",
-    "item.demon_core": "魔核",
-    "item.mat.array_sand": "阵砂",
-    "item.pill.healing_low": "低阶疗伤丹",
-    "item.pill.qi_guard": "聚气护脉丹",
-    "item.pill.foundation_draft": "筑基丹",
-    "item.pill.foundation_guard": "筑基护脉丹",
-    "item.weapon.wood_sword": "木纹剑",
-    "item.contract.beast_pact": "妖兽契约",
-}
-_ALIASES = {
-    "粗糙灵米": "item.food.coarse_spirit_rice",
-    "灵米饭": "item.food.spirit_rice",
-    "止血草": "item.herb.blood_grass",
-    "血草": "item.herb.blood_grass",
-    "灵叶": "item.herb.spirit_leaf",
-    "木材": "item.mat.wood",
-    "木头": "item.mat.wood",
-    "铁石": "item.ore.ironstone",
-    "云铁": "item.material.cloud_iron",
-    "魔核": "item.demon_core",
-    "阵砂": "item.mat.array_sand",
-    "低阶疗伤丹": "item.pill.healing_low",
-    "聚气护脉丹": "item.pill.qi_guard",
-    "聚气保护丹": "item.pill.qi_guard",
-    "筑基丹": "item.pill.foundation_draft",
-    "筑基护脉丹": "item.pill.foundation_guard",
-    "筑基保护丹": "item.pill.foundation_guard",
-    "木纹剑": "item.weapon.wood_sword",
-    "木剑": "item.weapon.wood_sword",
-}
-
-
-def resolve_market_item(value: str) -> MarketItem:
-    key = _ALIASES.get(value.strip(), value.strip())
-    if not key or not key.startswith("item."):
+def resolve_market_item(value: str, content: ContentBundle | None = None) -> MarketItem:
+    try:
+        item = resolve_item_record(value, content)
+    except ValueError as exc:
+        raise ValueError("item is not tradeable") from exc
+    # The content contract supplies the static gate; a stack's binding state is
+    # checked later by the repository's binding ledger.
+    if not item.tradeable:
         raise ValueError("item is not tradeable")
-    if key in NON_TRADEABLE_ITEMS or any(marker in key for marker in ("manual", "token", "certificate", "bound", "locked", "masterwork")):
-        raise ValueError("item is not tradeable")
-    return MarketItem(key=key, label=_ITEMS.get(key, key))
+    return MarketItem(key=item.key, label=item.name)
 
 
 def validate_market_listing(quantity: int, unit_price: int) -> None:
@@ -125,7 +79,6 @@ __all__ = [
     "COMMISSION_MIN_REWARD",
     "COMMISSION_PLATFORM_FEE_BP",
     "COMMISSION_RECIPES",
-    "NON_TRADEABLE_ITEMS",
     "COMMISSION_RECOVERY_GRACE_SECONDS",
     "COMMISSION_TTL_SECONDS",
     "MarketItem",

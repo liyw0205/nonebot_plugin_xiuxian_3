@@ -78,7 +78,7 @@ class AuctionRepositoryMixin:
         quantity: int, starting_bid: int, operation_id: str
     ) -> AuctionRecord:
         try:
-            item = validate_auction_listing(item_key, quantity, starting_bid)
+            item = validate_auction_listing(item_key, quantity, starting_bid, self.content)
         except ValueError as exc:
             from ..persistence.errors import MarketItemForbiddenError, MarketPriceInvalidError
             if "item" in str(exc):

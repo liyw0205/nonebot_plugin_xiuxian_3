@@ -55,15 +55,13 @@ class EconomyApplication:
         except (TypeError, ValueError):
             return None
 
-    @staticmethod
-    def _item_label(item_key: str) -> str:
+    def _item_label(self, item_key: str) -> str:
         try:
-            return resolve_market_item(item_key).label
+            return resolve_market_item(item_key, self.repository.content).label
         except ValueError:
             return item_key
 
-    @staticmethod
-    def _data(record, *, idempotent: bool | None = None) -> dict[str, object]:
+    def _data(self, record, *, idempotent: bool | None = None) -> dict[str, object]:
         return {
             "order_id": record.order_id,
             "status": record.status,
@@ -73,7 +71,7 @@ class EconomyApplication:
             "buyer_player_id": record.buyer_player_id,
             "buyer_platform_user_id": record.buyer_platform_user_id,
             "item_key": record.item_key,
-            "item_label": EconomyApplication._item_label(record.item_key),
+            "item_label": self._item_label(record.item_key),
             "quantity": record.quantity,
             "remaining_quantity": record.remaining_quantity,
             "unit_price": record.unit_price,
@@ -84,9 +82,8 @@ class EconomyApplication:
             "idempotent_replay": record.already_completed if idempotent is None else idempotent,
         }
 
-    @staticmethod
-    def _record_result(context: CommandContext, operation_id: str, code: str, message: str, record) -> CommandResult:
-        return CommandResult(True, code, message, context.request_id, operation_id, data=EconomyApplication._data(record))
+    def _record_result(self, context: CommandContext, operation_id: str, code: str, message: str, record) -> CommandResult:
+        return CommandResult(True, code, message, context.request_id, operation_id, data=self._data(record))
 
     @staticmethod
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:

@@ -291,7 +291,7 @@ class EconomyRepositoryMixin:
         now = self._now()
         now_text = serialize_datetime(now)
         try:
-            item = resolve_market_item(item_key)
+            item = resolve_market_item(item_key, self.content)
             validate_market_listing(int(quantity), int(unit_price))
         except (ValueError, TypeError) as exc:
             if "item" in str(exc):

@@ -34,7 +34,7 @@
       "bind_type": "time_bound",
       "bind_duration_seconds": 43200,
       "tradeable": false,
-      "effects": [{"type": "exploration_risk_reduction_bp", "value": 500}],
+      "effects": [{"type": "exploration_risk_reduction_bp", "value": 500, "location_key": "cave.mist_grotto_2"}],
       "requirements": [],
       "status": "active",
       "key": "item.array.mist_barrier"

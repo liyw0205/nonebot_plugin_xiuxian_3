@@ -147,4 +147,31 @@ def bundled_content(data_dir: str | Path | None = None) -> ContentBundle:
     )
 
 
-__all__ = ["ContentBundle", "ContentError", "bundled_content"]
+def resolve_content_key(
+    bundle: ContentBundle,
+    kind: str,
+    value: str,
+    *,
+    include_locked: bool = False,
+) -> str:
+    """Resolve a player-facing content name, alias, or stable key."""
+
+    normalized = (value or "").strip()
+    if not normalized:
+        raise ValueError(f"empty {kind} reference")
+    matches: list[str] = []
+    for row in bundle.list(kind, include_locked=include_locked):
+        key = row.get("key")
+        aliases = row.get("aliases", [])
+        if not isinstance(aliases, list) or any(not isinstance(alias, str) for alias in aliases):
+            raise ContentError(f"{kind} {key!r} aliases must be a string list")
+        if normalized == key or normalized == row.get("name") or normalized in aliases:
+            if not isinstance(key, str):
+                raise ContentError(f"{kind} record has no stable key")
+            matches.append(key)
+    if len(matches) != 1:
+        raise ValueError(f"unknown or ambiguous {kind}: {value}")
+    return matches[0]
+
+
+__all__ = ["ContentBundle", "ContentError", "bundled_content", "resolve_content_key"]
