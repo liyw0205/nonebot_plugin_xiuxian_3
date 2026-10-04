@@ -1,0 +1,114 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "secret_realm",
+  "records": [
+    {
+      "key": "instance.secret_realm.mist_grotto",
+      "record_type": "common",
+      "name": "雾隐秘境",
+      "desc": "石径深入薄雾，守洞灵卫静候来者。",
+      "status": "active",
+      "aliases": ["雾隐洞天秘境"],
+      "required_realm": "qi_gathering",
+      "required_layer": 4,
+      "location_key": "cave.mist_grotto",
+      "stamina_cost": 10,
+      "ticket_key": "item.cave_pass_basic",
+      "ticket_quantity": 1,
+      "node_keys": ["resource", "encounter", "choice"],
+      "enemy_key": "enemy.mist_guardian",
+      "first_reward": {
+        "spirit_stones": 80,
+        "item.material.mist_core": 2,
+        "codex.instance.mist_grotto": 1
+      },
+      "repeat_reward_pool": [
+        {"weight": 1, "no_reward": true},
+        {"weight": 1, "rewards": {"item.material.mist_core": 1}}
+      ],
+      "quota_period": "week",
+      "quota_limit": 2,
+      "expiry_seconds": 3600
+    },
+    {
+      "key": "instance.secret_realm.spring_path",
+      "record_type": "common",
+      "name": "灵泉小径",
+      "desc": "沿泉而行，水灵与草木灵机相伴。",
+      "status": "active",
+      "aliases": ["灵泉秘境"],
+      "required_realm": "qi_sensing",
+      "required_layer": 3,
+      "location_key": "xuantian.spirit_field",
+      "stamina_cost": 6,
+      "ticket_key": null,
+      "ticket_quantity": 0,
+      "node_keys": ["resource", "encounter"],
+      "enemy_key": "enemy.spring_wisp",
+      "first_reward": {
+        "item.herb.spirit_leaf": 2,
+        "local.xuantian.new_town": 5
+      },
+      "repeat_reward_pool": [
+        {"weight": 1, "no_reward": true},
+        {"weight": 1, "rewards": {"item.herb.spirit_leaf": 1}}
+      ],
+      "quota_period": "day",
+      "quota_limit": 1,
+      "expiry_seconds": 3600,
+      "reputation_key": "local.xuantian.new_town"
+    },
+    {
+      "key": "instance.secret_realm.mist_depth_2",
+      "record_type": "common",
+      "name": "雾隐洞天二层秘境",
+      "desc": "五重石径层层深入，雾隐精英镇守其中。",
+      "status": "active",
+      "aliases": ["洞天二层秘境"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "location_key": "cave.mist_grotto_2",
+      "stamina_cost": 15,
+      "ticket_key": "item.cave_pass_advanced",
+      "ticket_quantity": 1,
+      "node_keys": ["resource", "encounter", "choice", "encounter", "choice"],
+      "enemy_key": "enemy.mist_elite",
+      "first_reward": {"item.weapon.cloud_sword": 1},
+      "repeat_reward_pool": [
+        {"weight": 1, "no_reward": true},
+        {"weight": 1, "rewards": {"item.material.cloud_iron": 1}}
+      ],
+      "quota_period": "week",
+      "quota_limit": 1,
+      "expiry_seconds": 3600
+    },
+    {
+      "key": "instance.secret_realm.cloud_boat",
+      "record_type": "common",
+      "name": "云舟秘境",
+      "desc": "循着古航图登上云舟，试炼守灵静候于航路尽头。",
+      "status": "active",
+      "aliases": [],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "location_key": "xuantian.floating_boat",
+      "stamina_cost": 12,
+      "ticket_key": "item.ticket.cloud_boat_fragment",
+      "ticket_quantity": 1,
+      "node_keys": ["resource", "encounter", "choice"],
+      "enemy_key": "enemy.cloud_boat_guardian",
+      "first_reward": {
+        "codex.instance.cloud_boat": 1,
+        "local.xuantian.new_town": 12
+      },
+      "repeat_reward_pool": [
+        {"weight": 1, "no_reward": true},
+        {"weight": 1, "rewards": {"item.ticket.cloud_boat_fragment": 1}}
+      ],
+      "quota_period": "week",
+      "quota_limit": 2,
+      "expiry_seconds": 3600,
+      "reputation_key": "local.xuantian.new_town"
+    }
+  ]
+}

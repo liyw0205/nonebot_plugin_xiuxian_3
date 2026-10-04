@@ -11,6 +11,7 @@ from ...contracts import PlayerView
 class SecretRealmDefinition:
     key: str
     label: str
+    description: str
     required_realm: str
     required_layer: int
     location_key: str
@@ -20,10 +21,10 @@ class SecretRealmDefinition:
     node_keys: tuple[str, ...]
     enemy_key: str
     first_reward: dict[str, int]
-    repeat_reward: dict[str, int]
+    repeat_reward_pool: tuple[tuple[int, dict[str, int]], ...]
     quota_period: str
     quota_limit: int
-    expiry_seconds: int = 3600
+    expiry_seconds: int
     reputation_key: str | None = None
 
 
@@ -40,6 +41,7 @@ class SecretRealmRunRecord:
     run_id: str
     instance_key: str
     label: str
+    enemy_key: str
     status: str
     node_index: int
     current_node: str | None

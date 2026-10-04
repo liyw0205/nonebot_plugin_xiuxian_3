@@ -184,7 +184,7 @@ class VoidRuinsRepositoryMixin:
                 player_id = int(row["id"])
                 if (
                     str(row["location_key"]) != VOID_RUINS_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1, self.content)
                 ):
                     raise VoidRuinsRequirementError("a member lacks void-refining realm or archive location")
                 if self._has_active_long_action(connection, player_id):

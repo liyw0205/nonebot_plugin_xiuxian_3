@@ -163,7 +163,7 @@ class HeavenEchoRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             if str(player["endgame_status"] or "none") in {"ascension_ready", "ascended", "remained_in_world"}:
                 raise HeavenEchoRequirementError("the player already has a terminal ending")
-            if not realm_at_least(str(player["realm_key"]), int(player["realm_layer"]), "tribulation", 1):
+            if not realm_at_least(str(player["realm_key"]), int(player["realm_layer"]), "tribulation", 1, self.content):
                 raise HeavenEchoRequirementError("tribulation L1 is required")
             if connection.execute(
                 "SELECT 1 FROM final_battle_members m JOIN final_battle_sessions s ON s.battle_id=m.battle_id "

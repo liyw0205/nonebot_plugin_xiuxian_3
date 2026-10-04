@@ -140,7 +140,7 @@ class BoundaryRiftRepositoryMixin:
                 flags = {str(value) for value in intro.get("flags", [])}
                 if (
                     str(row["location_key"]) != BOUNDARY_RIFT_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "nascent_soul", 1)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "nascent_soul", 1, self.content)
                     or REQUIRED_FLAG not in flags
                 ):
                     raise BoundaryRiftRequirementError("a member lacks location, realm, or three-realms evidence")

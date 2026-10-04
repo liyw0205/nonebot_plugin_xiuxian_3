@@ -197,7 +197,11 @@ def test_onebot_cloud_boat_uses_ticket_and_projects_reputation() -> None:
             repeat = await runtime.dispatch(
                 _context(adapter, user, "cloud-repeat-final"), "结算秘境"
             )
-            assert set(repeat.data["reward"]) == {"item.ticket.cloud_boat_fragment"}
+            assert repeat.data["reward"] in (
+                {},
+                {"item.ticket.cloud_boat_fragment": 1},
+            )
+            assert "失败" not in repeat.message
             limited = await runtime.dispatch(
                 _context(adapter, user, "cloud-limited"), "进入秘境 云舟秘境"
             )

@@ -179,7 +179,7 @@ class AncestralHallRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if (
                 str(player["location_key"]) != ANCESTRAL_HALL_LOCATION
-                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "soul_transformation", 1)
+                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "soul_transformation", 1, self.content)
             ):
                 raise AncestralHallRequirementError("realm or location requirement is not met")
             combat = player_combat_values(player)

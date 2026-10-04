@@ -169,7 +169,7 @@ class LegacyManorRepositoryMixin:
             if str(player["location_key"]) != definition.location_key:
                 raise LegacyManorRequirementError("player is not at the reliquary location")
             if not realm_at_least(
-                str(player["realm_key"]), player_integer(player, "realm_layer"), definition.realm_key, definition.realm_layer
+                str(player["realm_key"]), player_integer(player, "realm_layer"), definition.realm_key, definition.realm_layer, self.content
             ):
                 raise LegacyManorRequirementError("minimum legacy-manor realm is required")
             intro = self._legacy_manor_json(player["intro_json"], {})

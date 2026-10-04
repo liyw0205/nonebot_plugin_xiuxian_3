@@ -194,7 +194,7 @@ class DemonAbyssRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if (
                 str(player["location_key"]) != DEMON_ABYSS_LOCATION
-                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "foundation", 1)
+                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "foundation", 1, self.content)
             ):
                 raise DemonAbyssRequirementError("realm or location requirement is not met")
             combat = player_combat_values(player)

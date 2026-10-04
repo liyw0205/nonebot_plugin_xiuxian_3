@@ -166,6 +166,30 @@
       "status": "active"
     },
     {
+      "name": "灵泉水灵",
+      "desc": "灵泉凝聚而成的精怪，身形轻盈，招式如泉涌不息。",
+      "location_key": "xuantian.spirit_field",
+      "requirements": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 3}],
+      "stats": {"hp": 110, "attack": 18, "initiative": 11, "agility": 10},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.spring_wisp", "reward": {}},
+      "key": "enemy.spring_wisp",
+      "status": "active"
+    },
+    {
+      "name": "云舟守灵",
+      "desc": "守护云舟航路的灵卫，周身浮动云纹，出手沉稳有力。",
+      "location_key": "xuantian.floating_boat",
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}],
+      "stats": {"hp": 900, "attack": 120, "initiative": 16, "agility": 16},
+      "skills": ["enemy_skill.cloud_armor"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.cloud_boat_guardian", "reward": {}},
+      "key": "enemy.cloud_boat_guardian",
+      "status": "active"
+    },
+    {
       "name": "云铁矿兽",
       "desc": "栖居矿脉深处，以铁砂护体；战斗结算确认踪迹后，矿区异兽记录方可点亮。",
       "location_key": "xuantian.cloud_mine",

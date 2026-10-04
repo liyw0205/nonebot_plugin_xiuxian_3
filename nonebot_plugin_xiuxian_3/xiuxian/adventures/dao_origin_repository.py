@@ -147,7 +147,7 @@ class DaoOriginRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if (
                 str(player["location_key"]) != DAO_ORIGIN_LOCATION
-                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union", 1)
+                or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union", 1, self.content)
                 or DAO_ORIGIN_PERMISSION not in self._dao_origin_json(player["intro_json"], {}).get("flags", [])
             ):
                 raise DaoOriginRequirementError("location, realm, or dao-origin permission is missing")

@@ -20,6 +20,7 @@ data/
   战斗/敌人.json
   引导/引导.json
   地图/地点.json
+  冒险/秘境.json
   生产/配方.json
   任务/任务.json
   剧情/故事.json
@@ -166,6 +167,7 @@ data/
 | `战斗/实体.json` | 独立战斗实体注册；未接入消费器的召唤机关保持锁定 | `gameplay/combat/content-v0.1.md` |
 | `引导/引导.json` | 凡人世界阅读、教学采集和生产教学 | `foundation/player/content-v0.1.md` |
 | `地图/地点.json` | 玄天起步区、洞天地点、准入、移动成本 | `gameplay/world/content-v0.1.md` |
+| `冒险/秘境.json` | 普通秘境准入、地点、路线、守护敌人、消耗、次数、期限及首通/再入所得 | `gameplay/adventures/README.md` |
 | `战斗/敌人.json` | 五个首版敌人和 `enemy.tribulation_heaven` 的阶段配置 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/model.md` |
 | `生产/配方.json` | 五条首版生产配方、输入、工具、产出和失败规则 | `gameplay/production/content-v0.1.md` |
 | `任务/任务.json` | 四条新手任务、完成条件和奖励引用 | `gameplay/events/content-v0.1.md` |

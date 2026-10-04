@@ -69,6 +69,20 @@
       "key": "item.herb.spirit_leaf"
     },
     {
+      "name": "雾隐核心",
+      "desc": "凝结雾隐洞天灵机的晶核，握在手中仍有丝丝清凉灵意。",
+      "item_type": "material",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [{"type": "crafting_material", "tags": ["qi", "mist_grotto"]}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.material.mist_core"
+    },
+    {
       "name": "灵木种子",
       "desc": "灵木成熟后结下的种子，蕴含温润草木灵气。",
       "item_type": "seed",

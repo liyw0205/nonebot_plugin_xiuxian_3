@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
 from ..utils.player import PLAYER_RESOURCE_FIELDS
+from ..utils.randomness import deterministic_weighted_choice
 
 
 class RewardContentError(ContentError):
@@ -201,13 +201,7 @@ def reward_pool_map(
             )
             for weight, rewards in outcomes
         )
-    cursor = int.from_bytes(hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest(), "big")
-    cursor %= sum(weight for weight, _ in weighted_outcomes)
-    for weight, rewards in weighted_outcomes:
-        if cursor < weight:
-            return dict(rewards)
-        cursor -= weight
-    raise AssertionError("weighted reward selection fell through")
+    return dict(deterministic_weighted_choice(weighted_outcomes, seed))
 
 
 def _reward_pool_record(key: str, bundle: ContentBundle) -> dict[str, Any]:

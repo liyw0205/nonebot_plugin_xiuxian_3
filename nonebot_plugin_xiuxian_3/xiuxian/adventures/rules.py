@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from typing import Any, Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
 from ..rewards.rules import local_reputation_maximum, reward_pool_outcomes
 from ..specials.dispatch_rules import resolve_dispatch
+from ..utils.randomness import deterministic_weighted_choice
 
 
 _DEFAULT_CONTENT = bundled_content()
@@ -369,13 +369,11 @@ def reward_map(
     )
     if not outcomes:
         raise ContentError(f"reward pool {definition.reward_pool_key} has no eligible outcomes")
-    total_weight = sum(int(item["weight"]) for item in outcomes)
-    roll = int.from_bytes(hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest(), "big") % total_weight
-    for outcome in outcomes:
-        roll -= int(outcome["weight"])
-        if roll < 0:
-            return {str(key): int(value) for key, value in outcome["rewards"].items()}
-    raise AssertionError("weighted reward selection fell through")
+    selected = deterministic_weighted_choice(
+        tuple((int(outcome["weight"]), outcome["rewards"]) for outcome in outcomes),
+        seed,
+    )
+    return {str(key): int(value) for key, value in selected.items()}
 
 
 def choose_bounty(
@@ -385,13 +383,10 @@ def choose_bounty(
 ) -> BountyDefinition:
     if not candidates:
         raise ValueError("no eligible bounty candidates")
-    total_weight = sum(item.weight for item in candidates)
-    roll = int.from_bytes(hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest(), "big") % total_weight
-    for definition in candidates:
-        roll -= definition.weight
-        if roll < 0:
-            return definition
-    raise AssertionError("weighted bounty selection fell through")
+    return deterministic_weighted_choice(
+        tuple((definition.weight, definition) for definition in candidates),
+        seed,
+    )
 
 
 __all__ = [

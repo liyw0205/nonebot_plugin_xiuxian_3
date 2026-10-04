@@ -4,6 +4,7 @@ from .database import connect_sqlite
 from .json_cache import DuplicateJSONKeyError, clear_json_cache, read_json_cached
 from .json import json_list, json_object
 from .operations import operation_replay, player_operation, record_operation
+from .randomness import deterministic_weighted_choice
 from .player import (
     PLAYER_COMBAT_PROJECTION_FIELDS,
     PLAYER_NUMERIC_DEFAULTS,
@@ -118,6 +119,7 @@ __all__ = [
     "change_player_items",
     "grant_player_currency",
     "DuplicateJSONKeyError",
+    "deterministic_weighted_choice",
     "clear_json_cache",
     "connect_sqlite",
     "currency_grant",

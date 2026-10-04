@@ -129,7 +129,7 @@ class AncientDomainRepositoryMixin:
                 player_id = int(row["id"])
                 if (
                     str(row["location_key"]) != ANCIENT_DOMAIN_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "soul_transformation", 1)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "soul_transformation", 1, self.content)
                 ):
                     raise AncientDomainRequirementError("a member lacks location or soul-transformation access")
                 crack_until = row["domain_crack_until"]

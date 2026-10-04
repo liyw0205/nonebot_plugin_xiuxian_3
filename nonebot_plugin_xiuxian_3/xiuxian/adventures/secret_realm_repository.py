@@ -26,8 +26,9 @@ from ..specials.codex_rules import category_for_entry
 from ..utils.equipment import create_equipment_instances
 from .secret_realm_models import SecretRealmPreviewRecord, SecretRealmRunRecord
 from .secret_realm_rules import (
-    DEFINITIONS,
     realm_at_least,
+    repeat_reward,
+    secret_realm_definitions,
     secret_realm_definition,
 )
 from ..persistence.errors import (
@@ -60,7 +61,7 @@ class SecretRealmRepositoryMixin:
             ).fetchone()
             return SecretRealmPreviewRecord(
                 player=self._row_to_player(player),
-                definitions=tuple(DEFINITIONS.values()),
+                definitions=tuple(secret_realm_definitions(self.content).values()),
                 active_run_id=str(active["run_id"]) if active else None,
             )
 
@@ -76,7 +77,7 @@ class SecretRealmRepositoryMixin:
     def _enter_secret_realm_sync(
         self, platform: str, platform_user_id: str, instance_key: str, operation_id: str
     ) -> SecretRealmRunRecord:
-        definition = secret_realm_definition(instance_key)
+        definition = secret_realm_definition(instance_key, self.content)
         operation_name = "secret_realm.enter"
         request_hash = self._request_hash(
             operation_name,
@@ -92,7 +93,7 @@ class SecretRealmRepositoryMixin:
                 return self._run_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["location_key"]) != definition.location_key or not realm_at_least(
-                str(player["realm_key"]), player_integer(player, "realm_layer"), definition.required_realm, definition.required_layer
+                str(player["realm_key"]), player_integer(player, "realm_layer"), definition.required_realm, definition.required_layer, self.content
             ):
                 raise SecretRealmRequirementError("realm or location requirement is not met")
             active = connection.execute(
@@ -130,16 +131,17 @@ class SecretRealmRepositoryMixin:
             run_id = uuid4().hex
             snapshot = {
                 "instance_key": definition.key,
+                "label": definition.label,
+                "enemy_key": definition.enemy_key,
                 "location_key": definition.location_key,
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": player_integer(player, "realm_layer"),
                 "node_keys": list(definition.node_keys),
                 "first_clear": self._is_first_clear(connection, int(player["id"]), definition.key),
-                "resource_roll": self._resource_roll(definition.key, run_id),
             }
             reward_snapshot = {
                 "first": dict(definition.first_reward),
-                "repeat": dict(snapshot["resource_roll"]),
+                "repeat": repeat_reward(definition, run_id),
             }
             local_keys = {
                 key
@@ -169,6 +171,7 @@ class SecretRealmRepositoryMixin:
                 {
                     "reward_snapshot": reward_snapshot,
                     "local_reputation_key": local_key,
+                    "reputation_key": definition.reputation_key,
                     "local_reputation_maximum": local_maximum,
                     "codex_categories": codex_categories,
                 }
@@ -201,7 +204,6 @@ class SecretRealmRepositoryMixin:
             updated = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
             payload = self._run_payload(
                 updated,
-                definition,
                 run_id=run_id,
                 status="routing",
                 node_index=0,
@@ -233,7 +235,7 @@ class SecretRealmRepositoryMixin:
             battle = await self.start_quest_battle(
                 platform=platform,
                 platform_user_id=platform_user_id,
-                enemy_key=secret_realm_definition(record.instance_key).enemy_key,
+                enemy_key=record.enemy_key,
                 battle_type="pve.secret_realm",
                 operation_id=battle_operation,
                 ignore_secret_realm_run_id=record.run_id,
@@ -263,12 +265,11 @@ class SecretRealmRepositoryMixin:
             ).fetchone()
             if run is None:
                 raise SecretRealmNotFoundError("no active secret realm")
-            definition = secret_realm_definition(str(run["instance_key"]))
             if self._expired(run):
                 raise SecretRealmNotReadyError("secret realm has expired")
             snapshot = json_object(run["snapshot_json"], {})
             node_index = int(run["node_index"])
-            nodes = tuple(str(item) for item in snapshot.get("node_keys", definition.node_keys))
+            nodes = tuple(str(item) for item in snapshot["node_keys"])
             if str(run["status"]) != "routing" or node_index >= len(nodes) or node_key != nodes[node_index]:
                 raise SecretRealmNodeError("node is not the server-authorized next node")
             if node_key == "resource":
@@ -298,7 +299,6 @@ class SecretRealmRepositoryMixin:
             updated = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
             payload = self._run_payload(
                 updated,
-                definition,
                 run_id=str(run["run_id"]),
                 status=status,
                 node_index=next_index,
@@ -357,12 +357,10 @@ class SecretRealmRepositoryMixin:
             ).fetchone()
             if run is None:
                 raise SecretRealmNotFoundError("no active secret realm")
-            definition = secret_realm_definition(str(run["instance_key"]))
             snapshot = json_object(run["snapshot_json"], {})
             return self._run_from_payload(
                 self._run_payload(
                     player,
-                    definition,
                     run_id=str(run["run_id"]),
                     status=str(run["status"]),
                     node_index=int(run["node_index"]),
@@ -388,17 +386,22 @@ class SecretRealmRepositoryMixin:
             existing = self._secret_realm_operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
                 return self._run_from_payload(existing, replay=True)
-            player = connection.execute("SELECT * FROM players WHERE player_id=?", (record.player.player_id,)).fetchone()
+            player = connection.execute(
+                "SELECT * FROM players WHERE platform=? AND platform_user_id=?",
+                (record.player.platform, record.player.platform_user_id),
+            ).fetchone()
             if player is None:
                 raise SecretRealmNotFoundError("secret realm player does not exist")
-            definition = secret_realm_definition(record.instance_key)
+            run = connection.execute("SELECT snapshot_json FROM secret_realm_runs WHERE run_id=?", (record.run_id,)).fetchone()
+            if run is None:
+                raise SecretRealmNotFoundError("secret realm run does not exist")
+            snapshot = json_object(run["snapshot_json"], {})
             payload = self._run_payload(
                 player,
-                definition,
                 run_id=record.run_id,
                 status=record.status,
                 node_index=record.node_index,
-                snapshot={"node_keys": list(definition.node_keys), "first_clear": record.first_clear},
+                snapshot=snapshot,
                 battle_id=record.battle_id,
                 ticket_locked=record.ticket_locked,
                 stamina_locked=record.stamina_locked,
@@ -423,7 +426,6 @@ class SecretRealmRepositoryMixin:
             if run is None:
                 raise SecretRealmNotFoundError("no secret realm run")
             status = str(run["status"])
-            definition = secret_realm_definition(str(run["instance_key"]))
             snapshot = json_object(run["snapshot_json"], {})
             result = json_object(run["result_json"], {})
             if status in {"routing", "combat_pending"}:
@@ -462,12 +464,12 @@ class SecretRealmRepositoryMixin:
                     if isinstance(key, str) and key.startswith("local.")
                 }
                 if (
-                    local_keys != ({definition.reputation_key} if definition.reputation_key else set())
-                    or snapshot.get("local_reputation_key") != definition.reputation_key
+                    local_keys != ({snapshot.get("reputation_key")} if snapshot.get("reputation_key") else set())
+                    or snapshot.get("local_reputation_key") != snapshot.get("reputation_key")
                 ):
                     raise ValueError("secret realm reputation snapshot does not match its definition")
                 reputation_maximum = snapshot.get("local_reputation_maximum")
-                if definition.reputation_key is None:
+                if snapshot.get("reputation_key") is None:
                     if reputation_maximum is not None:
                         raise ValueError("secret realm reputation maximum has no matching key")
                 elif (
@@ -520,7 +522,6 @@ class SecretRealmRepositoryMixin:
             updated = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
             payload = self._run_payload(
                 updated,
-                definition,
                 run_id=str(run["run_id"]),
                 status="settled",
                 node_index=int(run["node_index"]),
@@ -567,9 +568,8 @@ class SecretRealmRepositoryMixin:
                 raise SecretRealmNotFoundError("secret realm run does not exist")
             connection.execute("UPDATE secret_realm_runs SET battle_id=?, updated_at=? WHERE id=?", (battle_id, now_text, run["id"]))
             player = connection.execute("SELECT * FROM players WHERE id=?", (run["player_id"],)).fetchone()
-            definition = secret_realm_definition(str(run["instance_key"]))
             payload = self._run_payload(
-                player, definition, run_id=run_id, status=str(run["status"]), node_index=int(run["node_index"]),
+                player, run_id=run_id, status=str(run["status"]), node_index=int(run["node_index"]),
                 snapshot=json_object(run["snapshot_json"], {}), battle_id=battle_id,
                 ticket_locked=int(run["ticket_locked"]), stamina_locked=int(run["stamina_locked"]),
             )
@@ -589,19 +589,6 @@ class SecretRealmRepositoryMixin:
         if period == "day":
             return now.date().isoformat()
         return (now.date() - timedelta(days=now.weekday())).isoformat()
-
-    @staticmethod
-    def _resource_roll(instance_key: str, run_id: str) -> dict[str, int]:
-        quantity = int(run_id[-1], 16) % 2
-        if instance_key.endswith("mist_grotto"):
-            return {"item.material.mist_core": quantity}
-        if instance_key.endswith("spring_path"):
-            return {"item.herb.spirit_leaf": quantity}
-        if instance_key.endswith("mist_depth_2"):
-            return {"item.material.cloud_iron": quantity}
-        if instance_key.endswith("cloud_boat"):
-            return {"item.ticket.cloud_boat_fragment": quantity}
-        raise ValueError(f"unsupported secret-realm resource roll: {instance_key}")
 
     @staticmethod
     def _is_first_clear(connection: sqlite3.Connection, player_id: int, instance_key: str) -> bool:
@@ -693,13 +680,14 @@ class SecretRealmRepositoryMixin:
                 raise ValueError(f"secret realm codex reward could not be recorded: {key}")
         return reward
 
-    def _run_payload(self, player: sqlite3.Row, definition, *, run_id: str, status: str, node_index: int, snapshot: dict[str, Any], battle_id: str | None = None, reward: dict[str, int] | None = None, first_clear: bool | None = None, ticket_locked: int = 0, stamina_locked: int = 0) -> dict[str, Any]:
-        nodes = tuple(str(item) for item in snapshot.get("node_keys", definition.node_keys))
+    def _run_payload(self, player: sqlite3.Row, *, run_id: str, status: str, node_index: int, snapshot: dict[str, Any], battle_id: str | None = None, reward: dict[str, int] | None = None, first_clear: bool | None = None, ticket_locked: int = 0, stamina_locked: int = 0) -> dict[str, Any]:
+        nodes = tuple(str(item) for item in snapshot["node_keys"])
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "run_id": run_id,
-            "instance_key": definition.key,
-            "label": definition.label,
+            "instance_key": str(snapshot["instance_key"]),
+            "label": str(snapshot["label"]),
+            "enemy_key": str(snapshot["enemy_key"]),
             "status": status,
             "node_index": node_index,
             "current_node": nodes[node_index] if status == "routing" and node_index < len(nodes) else None,
@@ -718,6 +706,7 @@ class SecretRealmRepositoryMixin:
         return SecretRealmRunRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             run_id=str(payload["run_id"]), instance_key=str(payload["instance_key"]), label=str(payload["label"]),
+            enemy_key=str(payload["enemy_key"]),
             status=str(payload["status"]), node_index=int(payload["node_index"]), current_node=payload.get("current_node"),
             allowed_nodes=tuple(str(item) for item in payload.get("allowed_nodes", ())), battle_id=payload.get("battle_id"),
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},

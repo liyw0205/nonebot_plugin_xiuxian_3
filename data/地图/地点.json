@@ -431,6 +431,32 @@
       "status": "active",
       "actions": ["event.boundary_rift"],
       "key": "cave.boundary_realm"
+    },
+    {
+      "name": "云舟渡口",
+      "desc": "云舟停泊于此，往来修士可循着航路前往洞天深处。",
+      "world": "玄天界",
+      "status": "open",
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}],
+      "travel": {"duration_seconds": 300, "stamina": 12},
+      "environment": {"training_bp": 11000},
+      "local_reputation_maximum": 1000,
+      "actions": ["explore.cloud_boat_trial", "instance.secret_realm.cloud_boat"],
+      "key": "xuantian.floating_boat"
+    },
+    {
+      "name": "雾隐洞天二层",
+      "desc": "穿过层层禁制方可抵达的洞天深处，云铁与古器在此沉眠。",
+      "world": "洞天",
+      "status": "open",
+      "requirements": [
+        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
+        {"type": "item", "item_key": "item.cave_pass_advanced", "quantity": 1}
+      ],
+      "travel": {"duration_seconds": 180, "stamina": 8, "item_key": "item.cave_pass_advanced", "item_quantity": 1},
+      "environment": {"risk": "high"},
+      "actions": ["explore.mist_grotto_2", "instance.secret_realm.mist_depth_2"],
+      "key": "cave.mist_grotto_2"
     }
   ],
   "schema": "xiuxian.content"

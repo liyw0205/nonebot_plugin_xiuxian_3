@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import SQLitePlayerRepository
+from ..content import bundled_content
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -102,10 +103,39 @@ class SecretRealmApplication:
         return value.replace("\\", "\\\\").replace("`", "\\`").replace("*", "\\*").replace("_", "\\_").replace("~", "\\~")
 
     @staticmethod
-    def _reward_text(reward: dict[str, int]) -> str:
+    def _reward_text(reward: dict[str, int], content=None) -> str:
+        bundle = content or bundled_content()
+        labels = {}
+        for key, amount in reward.items():
+            if key == "spirit_stones":
+                labels[key] = "灵石"
+            elif key.startswith("item."):
+                labels[key] = bundle.label("item", key)
+            elif key.startswith("codex."):
+                labels[key] = f"{bundle.label('codex_entry', key)}图鉴"
+            elif key.startswith("local."):
+                labels[key] = f"{bundle.label('location', key.removeprefix('local.'))}名望"
+            elif key in ITEM_LABELS:
+                labels[key] = ITEM_LABELS[key]
+            else:
+                labels[key] = key
         return "、".join(
-            f"{ITEM_LABELS.get(key, key)} +{value}" for key, value in reward.items() if value
-        ) or "无"
+            f"{labels[key]} +{amount}" for key, amount in reward.items() if amount
+        ) or "暂无所得"
+
+    @classmethod
+    def _reward_pool_text(cls, outcomes, content) -> str:
+        total_weight = sum(weight for weight, _ in outcomes)
+        entries = []
+        for weight, reward in outcomes:
+            percent = weight * 100 / total_weight
+            rate = f"{int(percent)}%" if percent.is_integer() else f"{percent:.1f}%"
+            entries.append(f"{cls._reward_text(reward, content)}（{rate}）")
+        return " / ".join(entries)
+
+    @staticmethod
+    def _node_label(node: str | None) -> str:
+        return {"resource": "探寻灵机", "encounter": "迎战守护者", "choice": "择路前行"}.get(node, "秘境深处")
 
     async def preview(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -118,20 +148,26 @@ class SecretRealmApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看秘境。", context.request_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
-        lines = ["## 秘境试炼", "", f"**{self._display_name(record.player)}**，当前可查看以下秘境：", ""]
+        content = self.repository.content or bundled_content()
+        lines = ["## 秘境试炼", "", f"**{self._display_name(record.player)}**，可循下列秘境探寻机缘：", ""]
         data = []
         for definition in record.definitions:
+            realm_label = content.label("realm", definition.required_realm)
+            location_label = content.label("location", definition.location_key)
+            node_labels = tuple(self._node_label(node) for node in definition.node_keys)
             lines.extend(
                 [
                     f"### {definition.label}",
-                    f"- **前置**：{definition.required_realm} L{definition.required_layer} · {definition.location_key}",
-                    f"- **路线**：{' → '.join(definition.node_keys)} · 体力 {definition.stamina_cost}",
-                    f"- **首通**：{self._reward_text(definition.first_reward)}",
+                    definition.description,
+                    f"- **前置**：{realm_label}境{definition.required_layer}层 · {location_label}",
+                    f"- **路线**：{' → '.join(node_labels)} · 体力 {definition.stamina_cost}",
+                    f"- **首通**：{self._reward_text(definition.first_reward, content)}",
+                    f"- **再入所得**：{self._reward_pool_text(definition.repeat_reward_pool, content)}",
                     f"- **次数**：每{('日' if definition.quota_period == 'day' else '周')} {definition.quota_limit} 次",
                     "",
                 ]
             )
-            data.append({"instance_key": definition.key, "label": definition.label, "nodes": definition.node_keys, "stamina_cost": definition.stamina_cost, "ticket_key": definition.ticket_key, "first_reward": definition.first_reward, "repeat_reward": definition.repeat_reward, "quota_period": definition.quota_period, "quota_limit": definition.quota_limit})
+            data.append({"instance_key": definition.key, "label": definition.label, "desc": definition.description, "nodes": definition.node_keys, "stamina_cost": definition.stamina_cost, "ticket_key": definition.ticket_key, "first_reward": definition.first_reward, "repeat_reward_pool": [{"weight": weight, "rewards": rewards} for weight, rewards in definition.repeat_reward_pool], "quota_period": definition.quota_period, "quota_limit": definition.quota_limit})
         data.append({
             "instance_key": DEMON_ABYSS_KEY,
             "label": DEMON_ABYSS_LABEL,
@@ -266,21 +302,22 @@ class SecretRealmApplication:
         return CommandResult(True, "SECRET_REALM_PREVIEW", "\n".join(lines), context.request_id, data={"realms": data, "active_run_id": record.active_run_id})
 
     async def enter(self, context: CommandContext) -> CommandResult:
-        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == TIME_FORT_KEY:
+        content = self.repository.content
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0], content) == TIME_FORT_KEY:
             return await self.time_fort.enter(context)
-        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == DAO_ORIGIN_KEY:
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0], content) == DAO_ORIGIN_KEY:
             return await self.dao_origin.enter(context)
-        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == HEAVEN_ECHO_KEY:
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0], content) == HEAVEN_ECHO_KEY:
             return await self.heaven_echo.enter(context)
-        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == VOID_RUINS_KEY:
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0], content) == VOID_RUINS_KEY:
             return await self.void_ruins.enter(context)
-        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == ANCESTRAL_HALL_KEY:
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0], content) == ANCESTRAL_HALL_KEY:
             return await self.ancestral_hall.enter(context)
-        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0]) == ANCIENT_DOMAIN_KEY:
+        if len(context.command_args) == 1 and resolve_secret_realm(context.command_args[0], content) == ANCIENT_DOMAIN_KEY:
             return await self.ancient_domain.enter(context)
         if len(context.command_args) == 1 and resolve_demon_abyss(context.command_args[0]) == DEMON_ABYSS_KEY:
             return await self.demon_abyss.enter(context)
-        if len(context.command_args) != 1 or not (instance_key := resolve_secret_realm(context.command_args[0])):
+        if len(context.command_args) != 1 or not (instance_key := resolve_secret_realm(context.command_args[0], content)):
             return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙`。", context.request_id)
         if instance_key == BOUNDARY_RIFT_KEY:
             return await self.boundary_rift.enter(context)
@@ -305,7 +342,7 @@ class SecretRealmApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "秘境入口暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        return CommandResult(True, "SECRET_REALM_ENTERED", f"## {record.label}已进入\n\n已锁定体力 {record.stamina_locked} 点和秘境凭证。\n\n- **下一节点**：{record.current_node}\n- **状态**：路线进行中\n\n> 发送 `选择秘境节点 资源` 按服务端顺序推进。", context.request_id, operation_id, data=self._data(record))
+        return CommandResult(True, "SECRET_REALM_ENTERED", f"## 踏入{record.label}\n\n体力 {record.stamina_locked} 点与秘境凭证已备妥。\n\n- **眼前所见**：{self._node_label(record.current_node)}\n\n> 发送 `选择秘境节点 资源`，循着灵机继续深入。", context.request_id, operation_id, data=self._data(record))
 
     async def choose_node(self, context: CommandContext) -> CommandResult:
         if context.command_args and resolve_heaven_echo_node(context.command_args[0]):
@@ -377,11 +414,11 @@ class SecretRealmApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "秘境路线暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         if record.status == "combat_pending":
-            return CommandResult(True, "SECRET_REALM_COMBAT_PENDING", f"## {record.label}遭遇战\n\n服务器已创建自动战斗会话 ` {record.battle_id or 'pending'} `。\n\n> 发送 `结算秘境` 推进并结算遭遇战；客户端不能提交攻击、目标或结果。", context.request_id, operation_id, data=self._data(record))
+            return CommandResult(True, "SECRET_REALM_COMBAT_PENDING", f"## {record.label}有守护者拦路\n\n秘境守护者已现身，招式随战局而变。\n\n> 发送 `结算秘境` 查看战况。", context.request_id, operation_id, data=self._data(record))
         if record.status == "cleared":
-            text = f"## {record.label}路线完成\n\n所有节点已通过，发送 `结算秘境` 领取首通或重复挑战奖励。"
+            text = f"## {record.label}前路已通\n\n机缘已定，发送 `结算秘境` 收取所得。"
         else:
-            text = f"## 节点已完成\n\n下一节点：**{record.current_node}**。"
+            text = f"## 灵机已探明\n\n前路所见：**{self._node_label(record.current_node)}**。"
         return CommandResult(True, "SECRET_REALM_NODE_SELECTED", text, context.request_id, operation_id, data=self._data(record))
 
     async def settle(self, context: CommandContext) -> CommandResult:
@@ -487,8 +524,10 @@ class SecretRealmApplication:
             return CommandResult(False, "SECRET_REALM_ALREADY_SETTLED", "这次秘境已经结算。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "秘境结算暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        outcome = "失败" if record.status == "settled" and not record.reward else "完成"
-        return CommandResult(True, "SECRET_REALM_SETTLED", f"## {record.label}已结算\n\n- **结果**：{outcome}\n- **奖励**：{self._reward_text(record.reward)}\n- **首通**：{'是' if record.first_clear and record.reward else '否'}\n\n> 同一 operation 会回放原结算，不会重复发放资产。", context.request_id, operation_id, data=self._data(record))
+        outcome = {"won": "顺利归来", "lost": "败退", "expired": "行程逾期"}.get(
+            record.outcome, "行程已毕"
+        )
+        return CommandResult(True, "SECRET_REALM_SETTLED", f"## {record.label}行程已毕\n\n- **结果**：{outcome}\n- **所得**：{self._reward_text(record.reward)}\n- **首入**：{'是' if record.first_clear else '否'}", context.request_id, operation_id, data=self._data(record))
 
     @staticmethod
     def _data(record) -> dict[str, object]:

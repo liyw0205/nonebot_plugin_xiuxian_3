@@ -163,7 +163,7 @@ class TimeFortRepositoryMixin:
                 player_state = player_combat_values(row)
                 if (
                     str(row["location_key"]) != TIME_FORT_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1, self.content)
                     or TIME_FORT_PERMISSION not in set(player_state["intro_flags"])
                 ):
                     raise TimeFortRequirementError("a member lacks time-fort permission or archive location")
