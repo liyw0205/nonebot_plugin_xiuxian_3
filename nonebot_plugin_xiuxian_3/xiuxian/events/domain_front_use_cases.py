@@ -64,7 +64,7 @@ class DomainFrontApplication:
             ResourceInsufficientError: ("STAMINA_INSUFFICIENT", "加入领域前线需要 20 点体力。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能执行领域前线操作。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已经用于其他输入。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "领域前线簿暂时繁忙，请稍后再试。"),
         }
         code, message = mapping.get(type(exc), ("PERSISTENCE_ERROR", "领域前线簿暂时不可用，请稍后再试。"))

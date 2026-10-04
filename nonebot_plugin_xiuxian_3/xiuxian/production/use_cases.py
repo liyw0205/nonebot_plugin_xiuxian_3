@@ -176,7 +176,7 @@ class ProductionApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能生产。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他生产，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -228,7 +228,7 @@ class ProductionApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能领取生产。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他领取，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -254,7 +254,7 @@ class ProductionApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能恢复生产。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他恢复，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -284,7 +284,7 @@ class ProductionApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能净化污染。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他净化操作，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:

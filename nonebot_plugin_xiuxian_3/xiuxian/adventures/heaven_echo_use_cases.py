@@ -62,7 +62,7 @@ class HeavenEchoApplication:
         except HeavenEchoBusyError:
             return CommandResult(False, "HEAVEN_ECHO_BUSY", "当前已有其他进行中的行动或秘境。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "天劫回音入口暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         return CommandResult(True, "HEAVEN_ECHO_ENTERED", f"## 已进入天劫回音\n\n- **下一节点**：{self._label(record.current_node)}\n- **有效期**：{record.expires_at}\n\n> 此旁线不消耗体力，也不改变天劫债。", context.request_id, operation_id, data=self._data(record))
@@ -80,7 +80,7 @@ class HeavenEchoApplication:
         except HeavenEchoNotReadyError:
             return CommandResult(False, "HEAVEN_ECHO_NOT_READY", "秘境已过期或当前节点不能推进。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "天劫回音路线暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         if record.status == "expired":
@@ -100,7 +100,7 @@ class HeavenEchoApplication:
         except HeavenEchoNotReadyError:
             return CommandResult(False, "HEAVEN_ECHO_NOT_READY", "请先按路线完成三个节点，再结算秘境。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的结算操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "天劫回音结算暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         outcome = {"won": "成功", "expired": "过期", "system_aborted": "系统中止"}.get(record.outcome or "", "未完成")

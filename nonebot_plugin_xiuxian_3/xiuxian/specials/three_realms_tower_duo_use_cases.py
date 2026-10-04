@@ -38,7 +38,7 @@ class ThreeRealmsTowerDuoApplication:
             TowerStartFailedError: ("THREE_REALMS_TOWER_DUO_START_FAILED", "自动战未能启动，双方体力已退回。"),
             TowerRewardNotAvailableError: ("THREE_REALMS_TOWER_DUO_REWARD_NOT_AVAILABLE", "当前没有待领取的双人塔奖励。"),
             TowerAlreadyClaimedError: ("THREE_REALMS_TOWER_DUO_REWARD_ALREADY_CLAIMED", "双人塔奖励已经领取。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他双人塔操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
         }
         for kind, value in mapping.items():
             if isinstance(exc, kind):

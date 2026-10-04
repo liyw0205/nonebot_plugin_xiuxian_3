@@ -57,7 +57,7 @@ class QuestApplication:
             BattleRequirementError: ("BATTLE_REQUIREMENT_MISSING", "当前境界或位置不满足战斗前置。"),
             BattleBusyError: ("BATTLE_BUSY", "已有行动或战斗会话，请先完成后再试。"),
             BattleNotReadyError: ("BATTLE_NOT_READY", "服务器自动战斗尚未完成。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于不同的任务输入。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in errors.items():

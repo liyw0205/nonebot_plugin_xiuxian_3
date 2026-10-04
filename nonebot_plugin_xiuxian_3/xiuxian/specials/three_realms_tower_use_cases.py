@@ -53,7 +53,7 @@ class ThreeRealmsTowerApplication:
             ResourceInsufficientError: ("RESOURCE_INSUFFICIENT", "体力不足，未扣除任何资源。"),
             BattleBusyError: ("THREE_REALMS_TOWER_BUSY", "当前角色已有进行中的战斗或其他行动。"),
             BattleRequirementError: ("THREE_REALMS_TOWER_REQUIREMENT_MISSING", "当前境界或状态不满足挑战条件。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他三界塔操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "三界塔暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in errors.items():

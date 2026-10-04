@@ -71,7 +71,7 @@ class VoidRuinsApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "队长体力不足，未扣除体力或托管虚空锚。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "虚空遗迹秘境暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         return CommandResult(
@@ -103,7 +103,7 @@ class VoidRuinsApplication:
         except VoidRuinsNotReadyError:
             return CommandResult(False, "VOID_RUINS_NOT_READY", "秘境已过期、尚未进入，或当前节点不能推进。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "虚空遗迹路线暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         if record.status == "expired":
@@ -136,7 +136,7 @@ class VoidRuinsApplication:
         except VoidRuinsNotReadyError:
             return CommandResult(False, "VOID_RUINS_NOT_READY", "请先按路线完成全部节点和两场自动战。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "虚空遗迹结算暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         if record.status == "routing":

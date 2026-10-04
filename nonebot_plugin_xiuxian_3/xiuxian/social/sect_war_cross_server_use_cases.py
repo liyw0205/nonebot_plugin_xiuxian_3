@@ -53,7 +53,7 @@ class SectWarCrossServerApplication:
             SectNotFoundError: ("SECT_NOT_FOUND", "你当前不在有效宗门中。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能操作跨服宗门战。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已经用于其他跨服宗门战操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "跨服宗门战簿暂时繁忙，请稍后再试。"),
             ValueError: ("INVALID_CROSS_SERVER_WAR", "跨服宗门战轮次编号无效。"),
         }

@@ -64,7 +64,7 @@ class TowerApplication:
             ResourceInsufficientError: ("RESOURCE_INSUFFICIENT", "体力不足，未扣除任何资源。"),
             BattleBusyError: ("TOWER_BUSY", "当前角色已有进行中的战斗或其他行动。"),
             BattleRequirementError: ("TOWER_REQUIREMENT_MISSING", "当前境界或状态不满足该层挑战条件。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他试炼塔操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "试炼塔暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in errors.items():

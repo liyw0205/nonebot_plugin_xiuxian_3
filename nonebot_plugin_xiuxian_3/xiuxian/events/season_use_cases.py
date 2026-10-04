@@ -102,7 +102,7 @@ class FinalHeavenSeasonApplication:
             ),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能查看或领取赛季奖励。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已经用于其他操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "赛季簿暂时繁忙，请稍后再试。"),
         }
         code, message = errors.get(type(exc), ("PERSISTENCE_ERROR", "赛季簿暂时不可用，请稍后再试。"))

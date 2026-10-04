@@ -34,7 +34,7 @@ class SectBeaconApplication:
             SectNotFoundError: ("SECT_NOT_FOUND", "你当前不在有效宗门中。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能操作虚空信标。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已经用于其他信标操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "信标簿暂时繁忙，请稍后再试。"),
         }
         code, message = errors.get(type(exc), ("PERSISTENCE_ERROR", "信标簿暂时不可用，请稍后再试。"))

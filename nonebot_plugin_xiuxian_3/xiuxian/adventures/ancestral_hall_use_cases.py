@@ -68,7 +68,7 @@ class AncestralHallApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，未扣除资源。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "祖灵殿秘境暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         return CommandResult(
@@ -95,7 +95,7 @@ class AncestralHallApplication:
         except AncestralHallNotReadyError:
             return CommandResult(False, "ANCESTRAL_HALL_NOT_READY", "秘境已过期、尚未进入，或当前节点不能推进。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "祖灵殿路线暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         if record.status == "expired":
@@ -124,7 +124,7 @@ class AncestralHallApplication:
         except AncestralHallNotReadyError:
             return CommandResult(False, "ANCESTRAL_HALL_NOT_READY", "请先按路线完成全部节点和守灵自动战。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "祖灵殿秘境结算暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         if record.status == "routing":

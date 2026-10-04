@@ -108,7 +108,7 @@ class LegacyManorApplication:
         except LegacyManorQuotaError:
             return CommandResult(False, "LEGACY_MANOR_ALREADY_CLEARED", "这处遗府已完成首通，不可再次进入。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他遗府操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", f"{self.display_name}入口暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         return CommandResult(
@@ -145,7 +145,7 @@ class LegacyManorApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", f"当前角色暂时不能推进{self.display_name}。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的遗府操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", f"{self.display_name}路线暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         if record.status == "expired":
@@ -174,7 +174,7 @@ class LegacyManorApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", f"当前角色暂时不能结算{self.display_name}。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的遗府结算。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", f"{self.display_name}结算暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         outcome = {"won": "成功", "expired": "过期", "system_aborted": "系统中止"}.get(record.outcome or "", "未完成")

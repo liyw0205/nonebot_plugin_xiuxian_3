@@ -46,7 +46,7 @@ class TeamArenaApplication:
             TeamArenaSnapshotNotFoundError: ("TEAM_ARENA_SNAPSHOT_NOT_FOUND", "没有找到可用的组队竞技场快照。"),
             TeamArenaOpponentUnavailableError: ("TEAM_ARENA_OPPONENT_UNAVAILABLE", "当前没有相邻积分段的可挑战队伍。"),
             TeamArenaChallengeCapError: ("TEAM_ARENA_DAILY_CAP", "今日组队竞技场挑战次数已用尽。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他组队竞技场操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "组队竞技场簿暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in errors.items():

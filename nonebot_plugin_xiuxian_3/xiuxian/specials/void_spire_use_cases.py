@@ -67,7 +67,7 @@ class VoidSpireApplication:
             ResourceInsufficientError: ("RESOURCE_INSUFFICIENT", "体力不足，未扣除任何资源。"),
             BattleBusyError: ("VOID_SPIRE_BUSY", "当前角色已有进行中的战斗或其他行动。"),
             BattleRequirementError: ("VOID_SPIRE_REQUIREMENT_MISSING", "当前状态不满足虚空塔挑战条件。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他虚空塔操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "虚空塔暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in errors.items():

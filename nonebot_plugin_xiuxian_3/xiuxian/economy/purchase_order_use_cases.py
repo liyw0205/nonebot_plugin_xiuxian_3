@@ -90,7 +90,7 @@ class PurchaseOrderApplication:
             PurchasePermissionDeniedError: ("CROSS_REALM_TRADE_PERMISSION_DENIED", "当前地点或阵营声望不满足跨界求购许可。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能操作求购。"),
-            OperationConflictError: ("LEDGER_CONFLICT", "这次请求编号已经用于其他经济操作。"),
+            OperationConflictError: ("LEDGER_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in mapping.items():

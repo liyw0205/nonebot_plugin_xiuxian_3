@@ -48,7 +48,7 @@ class DispatchApplication:
             DispatchNotReadyError: ("DISPATCH_NOT_READY", "派遣尚未到结算时间。"),
             DispatchAlreadySettledError: ("DISPATCH_ALREADY_SETTLED", "这条派遣已经结算或取消。"),
             DispatchCancellationExpiredError: ("DISPATCH_CANCEL_WINDOW_EXPIRED", "接受超过 60 秒，不能再取消。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他派遣操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "派遣簿暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in errors.items():

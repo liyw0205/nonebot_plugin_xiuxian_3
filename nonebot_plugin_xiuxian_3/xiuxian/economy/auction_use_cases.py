@@ -75,7 +75,7 @@ class AuctionApplication:
             MarketPriceInvalidError: ("AUCTION_INPUT_INVALID", "数量或起拍价不合法。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能操作拍卖。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他拍卖操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in mapping.items():

@@ -102,7 +102,7 @@ class EconomyApplication:
             MarketSelfTradeError: ("MARKET_SELF_TRADE", "不能购买自己的摆摊订单。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能操作经济功能。"),
-            OperationConflictError: ("LEDGER_CONFLICT", "这次请求编号已经用于其他经济操作。"),
+            OperationConflictError: ("LEDGER_CONFLICT", "此事已有安排，请重新起意。"),
             CommissionRecipeForbiddenError: ("COMMISSION_RECIPE_FORBIDDEN", "当前只开放疗伤丹和木纹剑生产委托。"),
             CommissionEscrowConflictError: ("COMMISSION_ESCROW_CONFLICT", "灵石不足，无法锁定委托报酬。"),
             CommissionStateConflictError: ("COMMISSION_STATE_CONFLICT", "委托当前状态不允许此操作。"),

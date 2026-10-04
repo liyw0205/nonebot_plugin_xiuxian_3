@@ -99,7 +99,7 @@ class CrossRealmTradeApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能进行跨界贸易。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "LEDGER_CONFLICT", "这次请求编号已经用于其他贸易操作。", context.request_id, operation_id)
+            return CommandResult(False, "LEDGER_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:

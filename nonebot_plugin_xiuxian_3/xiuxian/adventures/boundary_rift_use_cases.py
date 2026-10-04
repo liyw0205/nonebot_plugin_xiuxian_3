@@ -67,7 +67,7 @@ class BoundaryRiftApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "至少一名队员体力不足，未扣除任何资源。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "界隙裂隙秘境暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         return CommandResult(

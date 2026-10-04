@@ -41,7 +41,7 @@ class StoryApplication:
             StoryChoiceConflictError: ("STORY_CHOICE_LOCKED", "剧情分支已经锁定，不能改选。"),
             StoryEndingNotAvailableError: ("STORY_ENDING_NOT_READY", "当前没有待领取的剧情结局。"),
             StoryEndingAlreadyClaimedError: ("STORY_ENDING_ALREADY_CLAIMED", "剧情结局奖励已经领取。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他剧情操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "剧情暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in errors.items():

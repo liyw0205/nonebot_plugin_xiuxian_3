@@ -189,7 +189,7 @@ class BreakthroughApplication:
         except BreakthroughRequirementError:
             return CommandResult(False, "REALM_MISMATCH", "需要金丹 L10、总修为达到 58,960 才能准备元婴。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他准备操作，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         return CommandResult(True, "NASCENT_SOUL_PREPARED", "## 元婴准备完成\n\n已记录 `quest.prepare_nascent_soul`，可以查看 `突破预览 元婴`。", context.request_id, operation_id, data={"quest_key": "quest.prepare_nascent_soul", "idempotent_replay": record.already_completed})
 
     async def preview_breakthrough(self, context: CommandContext) -> CommandResult:
@@ -333,7 +333,7 @@ class BreakthroughApplication:
         except CurrencyInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "灵石不足，未扣除任何资源。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他突破输入，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -371,7 +371,7 @@ class BreakthroughApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能结算突破。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他突破结算，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -441,7 +441,7 @@ class BreakthroughApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能恢复虚弱。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他恢复，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -468,7 +468,7 @@ class BreakthroughApplication:
         except BreakthroughRequirementError:
             return CommandResult(False, "HEART_DEMON_CHOICE_INVALID", "当前状态不能选择该心魔处理方式。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他心魔选择，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能处理心魔。", context.request_id, operation_id)
         except Exception:
@@ -486,7 +486,7 @@ class BreakthroughApplication:
         except SoulFatigueActiveError:
             return CommandResult(False, "SOUL_FATIGUE_ACTIVE", "神魂疲劳尚未到期。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他恢复，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能恢复神魂疲劳。", context.request_id, operation_id)
         return CommandResult(True, "SOUL_FATIGUE_RECOVERED", "## 神魂疲劳已恢复\n\n现在可以继续准备元婴突破。", context.request_id, operation_id, data={"recovered": record.recovered, "idempotent_replay": record.already_completed})
@@ -516,7 +516,7 @@ class BreakthroughApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能恢复道基震荡。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他恢复，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -554,7 +554,7 @@ class BreakthroughApplication:
         except CurrencyInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "选择领域需要 10,000 灵石，未扣除资源。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他领域选择，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         definition = domain_definition(path_key)
         return CommandResult(True, "DOMAIN_SELECTION_PENDING", f"## 领域选择待确认\n\n将选择 **{definition.label}**。\n\n- **确认期限**：5 分钟\n- **确认消耗**：领域核心 ×1、灵石 ×10,000\n\n请发送 `确认领域` 完成选择。", context.request_id, operation_id, data={"session_id": record.session_id, "domain_key": record.domain_key, "status": record.status, "ends_at": record.ends_at, "energy_cost": record.energy_cost, "idempotent_replay": record.already_completed})
 
@@ -577,7 +577,7 @@ class BreakthroughApplication:
         except CurrencyInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "灵石不足，未扣除领域核心。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他确认，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         return CommandResult(True, "DOMAIN_SELECTED", f"## 领域已觉醒\n\n已激活 **{record.domain_key}**。\n\n- **领域能量**：{record.player.domain_charge}/{record.player.domain_charge_max}\n- **领域力量**：{record.player.domain_power}\n- **灵石**：{record.player.spirit_stones}", context.request_id, operation_id, data={"session_id": record.session_id, "domain_key": record.domain_key, "status": record.status, "idempotent_replay": record.already_completed})
 
     async def cancel_domain(self, context: CommandContext) -> CommandResult:
@@ -591,7 +591,7 @@ class BreakthroughApplication:
         except DomainNotEligibleError:
             return CommandResult(False, "DOMAIN_NOT_ELIGIBLE", "当前没有待确认的领域选择。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他领域操作，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         return CommandResult(True, "DOMAIN_SELECTION_CANCELLED", "## 领域选择已取消\n\n未扣除领域核心或灵石。", context.request_id, operation_id, data={"session_id": record.session_id, "domain_key": record.domain_key, "status": record.status, "idempotent_replay": record.already_completed})
 
     async def recover_domain_crack(self, context: CommandContext) -> CommandResult:
@@ -614,7 +614,7 @@ class BreakthroughApplication:
         except CurrencyInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "提前恢复需要 2,000 灵石，未扣除资源。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他恢复，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         return CommandResult(True, "DOMAIN_CRACK_RECOVERED", "## 领域裂痕已恢复\n\n现在可以再次准备化神或选择领域。", context.request_id, operation_id, data={"early": record.early, "spirit_stones_spent": record.spirit_stones_spent, "medicine_consumed": record.medicine_consumed, "idempotent_replay": record.already_completed})
 
 

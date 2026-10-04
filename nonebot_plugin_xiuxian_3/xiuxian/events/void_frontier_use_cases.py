@@ -41,7 +41,7 @@ class VoidFrontierApplication:
             VoidFrontierWeeklyNotAvailableError: ("VOID_FRONTIER_WEEKLY_NOT_AVAILABLE", "当前没有可领取的虚空前线周任务奖励。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能查看或领取虚空前线奖励。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已经用于其他虚空前线操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "虚空前线簿暂时繁忙，请稍后再试。"),
         }
         code, message = errors.get(type(exc), ("PERSISTENCE_ERROR", "虚空前线簿暂时不可用，请稍后再试。"))

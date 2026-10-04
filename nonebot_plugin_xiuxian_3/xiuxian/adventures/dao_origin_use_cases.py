@@ -60,7 +60,7 @@ class DaoOriginApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，未扣除资源。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "道源秘境入口暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         return CommandResult(True, "DAO_ORIGIN_ENTERED", f"## 已进入道源秘境\n\n已扣除体力 60 点。\n\n- **下一节点**：{self._label(record.current_node)}\n- **有效期**：{record.expires_at}", context.request_id, operation_id, data=self._data(record))
@@ -78,7 +78,7 @@ class DaoOriginApplication:
         except DaoOriginNotReadyError:
             return CommandResult(False, "DAO_ORIGIN_NOT_READY", "秘境已过期或当前节点不能推进。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "道源秘境路线暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         if record.status == "expired":
@@ -98,7 +98,7 @@ class DaoOriginApplication:
         except DaoOriginNotReadyError:
             return CommandResult(False, "DAO_ORIGIN_NOT_READY", "请先按路线完成八个节点，再结算秘境。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于不同的结算操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事与先前安排不合，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "道源秘境结算暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         outcome = {"won": "成功", "expired": "过期", "lost": "失败", "system_aborted": "系统中止"}.get(record.outcome or "", "未完成")

@@ -63,7 +63,7 @@ class TimeFortApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "队长体力不足，未扣除资源。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "时序堡垒入口暂时不可用，请稍后重试。", context.request_id, operation_id, retryable=True)
         return CommandResult(True, "TIME_FORT_ENTERED", f"## 已进入时序堡垒秘境\n\n已扣除队长体力 40 点。\n\n- **下一节点**：{self._label(record.current_node)}\n- **有效期**：{record.expires_at}", context.request_id, operation_id, data=self._data(record))

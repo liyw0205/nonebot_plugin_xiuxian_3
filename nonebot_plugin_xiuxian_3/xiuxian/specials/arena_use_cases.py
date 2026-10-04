@@ -66,7 +66,7 @@ class ArenaApplication:
             ArenaMatchNotFoundError: ("ARENA_MATCH_NOT_FOUND", "没有找到可查看的竞技场对局。"),
             ArenaRewardAlreadyClaimedError: ("ARENA_RESULT_ALREADY_ACKNOWLEDGED", "这场竞技场结果已经确认。"),
             ArenaRewardNotAvailableError: ("ARENA_RESULT_NOT_AVAILABLE", "当前没有待确认的竞技场结果。"),
-            OperationConflictError: ("OPERATION_CONFLICT", "这次请求编号已用于其他竞技场操作。"),
+            OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "竞技场簿暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in errors.items():

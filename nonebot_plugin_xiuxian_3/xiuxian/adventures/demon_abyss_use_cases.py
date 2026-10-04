@@ -111,7 +111,7 @@ class DemonAbyssApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力不足，未扣除资源。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -145,7 +145,7 @@ class DemonAbyssApplication:
         except DemonAbyssNotReadyError:
             return CommandResult(False, "DEMON_ABYSS_NOT_READY", "秘境已过期或当前节点尚不能推进。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "魔界深渊秘境节点暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         if record.status == "combat_pending":
@@ -184,7 +184,7 @@ class DemonAbyssApplication:
         except DemonAbyssNotReadyError:
             return CommandResult(False, "DEMON_ABYSS_NOT_READY", "请先按路线推进当前节点，自动战仍在运行时可稍后重试。", context.request_id, operation_id, retryable=True)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他秘境操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "魔界深渊秘境结算暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
