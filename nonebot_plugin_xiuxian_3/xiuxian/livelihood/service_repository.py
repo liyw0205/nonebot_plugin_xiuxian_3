@@ -17,6 +17,7 @@ from ..utils.player import (
     spend_player_state,
 )
 from ..utils.json import json_object
+from ..utils.operations import record_operation
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -37,6 +38,70 @@ from .service_rules import ServiceDefinition, service_definition, service_reward
 class ServiceRepositoryMixin:
     """Own the cross-player lock and settlement transactions for services."""
 
+    async def replay_service_publish(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> ServiceOrderRecord | None:
+        """Replay a publish operation before resolving its service selector."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._replay_service_publish_once,
+                platform,
+                platform_user_id,
+                operation_id,
+                request_args,
+            )
+
+    def _replay_service_publish_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> ServiceOrderRecord | None:
+        if (
+            not isinstance(request_args, tuple)
+            or any(not isinstance(value, str) for value in request_args)
+        ):
+            raise ValueError("service publish request arguments must be strings")
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT o.operation_name, o.result_json, p.platform, p.platform_user_id
+                FROM operations AS o
+                JOIN players AS p ON p.id = o.player_id
+                WHERE o.operation_id = ?
+                """,
+                (operation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        if (
+            row["operation_name"] != "livelihood.publish_service"
+            or row["platform"] != platform
+            or row["platform_user_id"] != platform_user_id
+        ):
+            raise OperationConflictError("operation input differs from its original request")
+        try:
+            payload = json.loads(row["result_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("service publish operation snapshot is invalid") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("service publish operation snapshot must be an object")
+        self._validate_publish_payload(payload)
+        if not self._publish_request_matches(payload, request_args):
+            raise OperationConflictError("operation input differs from its original request")
+        try:
+            return self._order_from_payload(payload, replay=True)
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            raise ValueError("service publish operation snapshot is invalid") from exc
+
     async def publish_service(
         self,
         *,
@@ -45,6 +110,7 @@ class ServiceRepositoryMixin:
         service_key: str,
         reward_stones: int | None,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> ServiceOrderRecord:
         await self.initialize()
         async with self._inflight:
@@ -55,6 +121,7 @@ class ServiceRepositoryMixin:
                 service_key,
                 reward_stones,
                 operation_id,
+                request_args,
             )
 
     def _publish_service_once(
@@ -64,7 +131,23 @@ class ServiceRepositoryMixin:
         service_key: str,
         reward_stones: int | None,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> ServiceOrderRecord:
+        if (
+            not isinstance(request_args, tuple)
+            or any(not isinstance(value, str) or not value.strip() for value in request_args)
+        ):
+            raise ValueError("service publish request arguments must be strings")
+        replay = self._replay_service_publish_once(
+            platform,
+            platform_user_id,
+            operation_id,
+            request_args,
+        )
+        if replay is not None:
+            return replay
+        if not 1 <= len(request_args) <= 2:
+            raise ValueError("service publish request arguments must contain a service and optional reward")
         try:
             definition = service_definition(service_key, self.content)
             reward = service_reward(definition, reward_stones)
@@ -87,6 +170,9 @@ class ServiceRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
+                self._validate_publish_payload(existing)
+                if not self._publish_request_matches(existing, request_args):
+                    raise OperationConflictError("operation input differs from its original request")
                 return self._order_from_payload(existing, replay=True)
             publisher = self._require_player(connection, platform, platform_user_id)
             if player_currency(publisher) < reward:
@@ -134,8 +220,10 @@ class ServiceRepositoryMixin:
                 expires_at,
                 snapshot,
                 status="published",
+                request_args=request_args,
+                service_references=(definition.key, definition.label, *definition.aliases),
             )
-            self._record_operation(connection, operation_id, operation_name, publisher["id"], request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, publisher["id"], request_hash, payload, now_text)
             return self._order_from_payload(payload)
 
     async def cancel_service(
@@ -212,7 +300,7 @@ class ServiceRepositoryMixin:
                 snapshot,
                 status="cancelled",
             )
-            self._record_operation(connection, operation_id, operation_name, publisher["id"], request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, publisher["id"], request_hash, payload, now_text)
             return self._order_from_payload(payload)
 
     async def accept_service(
@@ -298,7 +386,7 @@ class ServiceRepositoryMixin:
                     snapshot,
                     status="expired",
                 )
-                self._record_operation(
+                record_operation(
                     connection,
                     operation_id,
                     operation_name,
@@ -381,7 +469,7 @@ class ServiceRepositoryMixin:
                 snapshot,
                 status="accepted",
             )
-            self._record_operation(connection, operation_id, operation_name, provider["id"], request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, provider["id"], request_hash, payload, now_text)
             return self._order_from_payload(payload)
 
     async def settle_service(
@@ -536,7 +624,7 @@ class ServiceRepositoryMixin:
                 "reward_stones": int(order["reward_stones"]),
                 **result,
             }
-            self._record_operation(connection, operation_id, operation_name, provider["id"], request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, provider["id"], request_hash, payload, now_text)
             return self._settlement_from_payload(payload)
 
     @staticmethod
@@ -689,8 +777,10 @@ class ServiceRepositoryMixin:
         snapshot: dict[str, Any],
         *,
         status: str,
+        request_args: tuple[str, ...] | None = None,
+        service_references: tuple[str, ...] | None = None,
     ) -> dict[str, Any]:
-        return {
+        payload = {
             "player": self._player_payload(self._row_to_player(player)),
             "order_id": order_id,
             "service_key": service_key,
@@ -702,6 +792,101 @@ class ServiceRepositoryMixin:
             "expires_at": expires_at,
             "publisher_outputs": dict(snapshot.get("publisher_outputs", {})),
         }
+        if request_args is not None:
+            payload["request_args"] = list(request_args)
+        if service_references is not None:
+            payload["service_references"] = list(service_references)
+        return payload
+
+    @staticmethod
+    def _validate_publish_payload(payload: dict[str, Any]) -> None:
+        required = {
+            "player",
+            "order_id",
+            "service_key",
+            "service_name",
+            "service_description",
+            "status",
+            "reward_stones",
+            "starts_at",
+            "expires_at",
+            "publisher_outputs",
+            "request_args",
+            "service_references",
+        }
+        if set(payload) != required:
+            raise ValueError("service publish operation snapshot is incomplete")
+        if not isinstance(payload["player"], dict):
+            raise ValueError("service publish operation player is invalid")
+        for key in ("order_id", "service_key", "service_name", "service_description", "status", "starts_at", "expires_at"):
+            if not isinstance(payload[key], str) or not payload[key].strip():
+                raise ValueError("service publish operation text is invalid")
+        if payload["status"] != "published":
+            raise ValueError("service publish operation status is invalid")
+        reward = payload["reward_stones"]
+        if isinstance(reward, bool) or not isinstance(reward, int) or reward <= 0:
+            raise ValueError("service publish operation reward is invalid")
+        outputs = payload["publisher_outputs"]
+        if not isinstance(outputs, dict):
+            raise ValueError("service publish operation outputs are invalid")
+        for key, amount in outputs.items():
+            if (
+                not isinstance(key, str)
+                or not key.startswith("item.")
+                or isinstance(amount, bool)
+                or not isinstance(amount, int)
+                or amount <= 0
+            ):
+                raise ValueError("service publish operation outputs are invalid")
+        request_args = payload["request_args"]
+        if (
+            not isinstance(request_args, list)
+            or not 1 <= len(request_args) <= 2
+            or any(not isinstance(value, str) or not value.strip() for value in request_args)
+        ):
+            raise ValueError("service publish operation request arguments are invalid")
+        references = payload["service_references"]
+        if (
+            not isinstance(references, list)
+            or not references
+            or any(not isinstance(value, str) or not value.strip() for value in references)
+        ):
+            raise ValueError("service publish operation references are invalid")
+        references_set = set(references)
+        if payload["service_key"] not in references_set or payload["service_name"] not in references_set:
+            raise ValueError("service publish operation references are incomplete")
+        if request_args[0] not in references_set:
+            raise ValueError("service publish operation selector is invalid")
+        if len(request_args) == 2:
+            try:
+                if int(request_args[1]) != reward:
+                    raise ValueError("service publish operation reward input is invalid")
+            except (TypeError, ValueError) as exc:
+                raise ValueError("service publish operation reward input is invalid") from exc
+        try:
+            starts_at = datetime.fromisoformat(payload["starts_at"])
+            expires_at = datetime.fromisoformat(payload["expires_at"])
+        except ValueError as exc:
+            raise ValueError("service publish operation timestamps are invalid") from exc
+        if expires_at <= starts_at:
+            raise ValueError("service publish operation timestamps are invalid")
+
+    @staticmethod
+    def _publish_request_matches(payload: dict[str, Any], request_args: tuple[str, ...]) -> bool:
+        stored = payload["request_args"]
+        if len(stored) != len(request_args):
+            return False
+        references = set(payload["service_references"])
+        references.add(str(payload["service_key"]))
+        references.add(str(payload["service_name"]))
+        if request_args[0] not in references:
+            return False
+        if len(request_args) == 1:
+            return True
+        try:
+            return int(request_args[1]) == int(stored[1]) == int(payload["reward_stones"])
+        except (TypeError, ValueError):
+            return False
 
     def _order_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> ServiceOrderRecord:
         return ServiceOrderRecord(
@@ -745,13 +930,12 @@ class ServiceRepositoryMixin:
             return None
         if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return json.loads(existing["result_json"])
-
-    @staticmethod
-    def _record_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
-        connection.execute(
-            "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
+        try:
+            payload = json.loads(existing["result_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("service operation result is invalid") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("service operation result must be an object")
+        return payload
 
 __all__ = ["ServiceRepositoryMixin"]

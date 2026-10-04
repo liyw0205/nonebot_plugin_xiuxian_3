@@ -71,10 +71,26 @@ class ServiceApplication:
         return args[0].strip()
 
     async def publish_service(self, context: CommandContext) -> CommandResult:
+        operation_id = self._operation_id(context, "livelihood.publish_service")
+        try:
+            replay = await self.repository.replay_service_publish(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+                request_args=context.command_args,
+            )
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这道传讯已被另一笔服务事务占用，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "这笔服务暂时无法落定，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if replay is not None:
+            return self._published_result(context, operation_id, replay)
+
         service_key, reward = self._parse_publish_args(context.command_args)
         if service_key is None:
             return CommandResult(False, "INVALID_SERVICE", "请使用 `发布服务 教学采集协助` 或 `发布服务 烹饪服务 [报酬]`。", context.request_id)
-        operation_id = self._operation_id(context, "livelihood.publish_service")
         try:
             record = await self.repository.publish_service(
                 platform=context.adapter,
@@ -82,6 +98,7 @@ class ServiceApplication:
                 service_key=service_key,
                 reward_stones=reward,
                 operation_id=operation_id,
+                request_args=context.command_args,
             )
         except ServiceRequirementError:
             return CommandResult(False, "INVALID_SERVICE", "这项服务或报酬不合规，请换一项服务或调整报酬。", context.request_id, operation_id)
@@ -97,6 +114,10 @@ class ServiceApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时无法落定这笔服务，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return self._published_result(context, operation_id, record)
+
+    @staticmethod
+    def _published_result(context: CommandContext, operation_id: str, record) -> CommandResult:
         return CommandResult(
             True,
             "SERVICE_PUBLISHED",

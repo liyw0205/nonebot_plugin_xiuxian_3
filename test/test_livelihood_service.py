@@ -148,6 +148,229 @@ def test_service_snapshot_freezes_content_and_settlement_replays_after_restart(t
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("kind", ["onebot", "qq"])
+def test_service_publish_original_name_replays_after_content_rename_and_close(
+    tmp_path: Path, kind: str,
+) -> None:
+    pytest.importorskip("nonebot")
+
+    async def run() -> None:
+        data_dir = _content(tmp_path)
+        _edit_service(data_dir, lambda row: row.update(aliases=["采药帮工"]))
+        clock = MutableClock(datetime(2026, 10, 1, tzinfo=timezone.utc))
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
+        adapter = "onebot.v11" if kind == "onebot" else "qq.official"
+        publisher = "1001" if kind == "onebot" else "service-history-publisher"
+
+        def event(text: str, message_id: int):
+            if kind == "onebot":
+                return _onebot_event(text, message_id, user_id=1001, group_id=2002)
+            return _qq_event(text, f"service-history-{message_id}", member_openid=publisher, group_openid="qq-group")
+
+        async def send(text: str, message_id: int):
+            from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event
+            from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq_event
+
+            raw = event(text, message_id)
+            normalized = normalize_event(raw) if kind == "onebot" else normalize_qq_event(raw)
+            return await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+
+        assert (await send("开始修仙", 8200)).ok
+        assert (await send("寻仙问道", 8201)).ok
+        published = await send("发布服务 采药帮工 15", 8202)
+        assert published.code == "SERVICE_PUBLISHED"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            before = connection.execute(
+                "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, publisher),
+            ).fetchone()[0]
+            order_count = connection.execute(
+                "SELECT COUNT(*) FROM livelihood_service_orders WHERE publish_operation_id=?",
+                (published.operation_id,),
+            ).fetchone()[0]
+        assert before == 85
+        assert order_count == 1
+        await runtime.close()
+
+        _edit_service(
+            data_dir,
+            lambda row: row.update(name="采集新约", aliases=[], status="locked"),
+        )
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
+        replay = await send("发布服务 采药帮工 15", 8202)
+        assert replay.data == {**published.data, "idempotent_replay": True}
+        assert "教学采集协助" in replay.message
+        conflict = await send("发布服务 采集新约 15", 8202)
+        assert conflict.code == "OPERATION_CONFLICT"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            after = connection.execute(
+                "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, publisher),
+            ).fetchone()[0]
+            order_count = connection.execute(
+                "SELECT COUNT(*) FROM livelihood_service_orders WHERE publish_operation_id=?",
+                (published.operation_id,),
+            ).fetchone()[0]
+        assert after == before
+        assert order_count == 1
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("kind", ["onebot", "qq"])
+@pytest.mark.parametrize("result_json", ["{", "[]", '{"status":"published"}'])
+def test_service_publish_replay_rejects_corrupt_operation_without_writing(
+    tmp_path: Path, kind: str, result_json: str,
+) -> None:
+    pytest.importorskip("nonebot")
+
+    async def run() -> None:
+        data_dir = _content(tmp_path)
+        runtime = create_runtime(data_dir=data_dir)
+        adapter = "onebot.v11" if kind == "onebot" else "qq.official"
+        publisher = "1001" if kind == "onebot" else "service-corrupt-publisher"
+
+        def event(text: str, message_id: int):
+            if kind == "onebot":
+                return _onebot_event(text, message_id, user_id=1001, group_id=2002)
+            return _qq_event(text, f"service-corrupt-{message_id}", member_openid=publisher, group_openid="qq-group")
+
+        async def send(text: str, message_id: int):
+            from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event
+            from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq_event
+
+            raw = event(text, message_id)
+            normalized = normalize_event(raw) if kind == "onebot" else normalize_qq_event(raw)
+            return await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+
+        assert (await send("开始修仙", 8300)).ok
+        assert (await send("寻仙问道", 8301)).ok
+        published = await send("发布服务 教学采集协助", 8302)
+        assert published.code == "SERVICE_PUBLISHED"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id=?",
+                (result_json, published.operation_id),
+            )
+            before = connection.execute(
+                "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, publisher),
+            ).fetchone()[0]
+        replay = await send("发布服务 教学采集协助", 8302)
+        assert replay.code == "PERSISTENCE_ERROR"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            after = connection.execute(
+                "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, publisher),
+            ).fetchone()[0]
+            order_count = connection.execute(
+                "SELECT COUNT(*) FROM livelihood_service_orders WHERE publish_operation_id=?",
+                (published.operation_id,),
+            ).fetchone()[0]
+            operation_count = connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE operation_id=?",
+                (published.operation_id,),
+            ).fetchone()[0]
+        assert after == before == 85
+        assert order_count == 1
+        assert operation_count == 1
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("kind", ["onebot", "qq"])
+def test_service_settlement_rejects_corrupt_snapshot_and_recovers(
+    tmp_path: Path, kind: str,
+) -> None:
+    pytest.importorskip("nonebot")
+
+    async def run() -> None:
+        data_dir = _content(tmp_path)
+        runtime = create_runtime(data_dir=data_dir)
+        adapter = "onebot.v11" if kind == "onebot" else "qq.official"
+        publisher = "1001" if kind == "onebot" else "service-snapshot-publisher"
+        provider = "1002" if kind == "onebot" else "service-snapshot-provider"
+
+        def event(text: str, message_id: int, user: str):
+            if kind == "onebot":
+                return _onebot_event(text, message_id, user_id=int(user), group_id=2002)
+            return _qq_event(
+                text,
+                f"service-snapshot-{message_id}",
+                member_openid=user,
+                group_openid="qq-group",
+            )
+
+        async def send(text: str, message_id: int, user: str):
+            from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event
+            from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq_event
+
+            raw = event(text, message_id, user)
+            normalized = normalize_event(raw) if kind == "onebot" else normalize_qq_event(raw)
+            return await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+
+        for user, base in ((publisher, 8400), (provider, 8410)):
+            assert (await send("开始修仙", base, user)).ok
+            assert (await send("寻仙问道", base + 1, user)).ok
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            provider_id = connection.execute(
+                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, provider),
+            ).fetchone()[0]
+            connection.execute(
+                "INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+                "VALUES (?, '{}', 10, ?) ON CONFLICT(player_id) DO UPDATE SET service_reputation=10",
+                (provider_id, datetime.now(timezone.utc).isoformat()),
+            )
+        published = await send("发布服务 教学采集协助", 8420, publisher)
+        assert published.code == "SERVICE_PUBLISHED"
+        order_id = published.data["order_id"]
+        accepted = await send(f"接取服务 {order_id}", 8421, provider)
+        assert accepted.code == "SERVICE_ACCEPTED"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            snapshot = connection.execute(
+                "SELECT snapshot_json FROM livelihood_service_orders WHERE order_id=?",
+                (order_id,),
+            ).fetchone()[0]
+            connection.execute(
+                "UPDATE livelihood_service_orders SET snapshot_json='{' WHERE order_id=?",
+                (order_id,),
+            )
+            before = connection.execute(
+                "SELECT p.spirit_stones, p.stamina, p.inventory_json, o.status "
+                "FROM players p JOIN livelihood_service_orders o ON o.provider_id=p.id "
+                "WHERE p.platform=? AND p.platform_user_id=? AND o.order_id=?",
+                (adapter, provider, order_id),
+            ).fetchone()
+        failed = await send(f"结算服务 {order_id}", 8422, provider)
+        assert failed.code == "SERVICE_ORDER_CONFLICT"
+        settle_operation_id = "8422" if kind == "onebot" else "service-snapshot-8422"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            after = connection.execute(
+                "SELECT p.spirit_stones, p.stamina, p.inventory_json, o.status "
+                "FROM players p JOIN livelihood_service_orders o ON o.provider_id=p.id "
+                "WHERE p.platform=? AND p.platform_user_id=? AND o.order_id=?",
+                (adapter, provider, order_id),
+            ).fetchone()
+            assert connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE operation_id=?", (settle_operation_id,)
+            ).fetchone()[0] == 0
+            connection.execute(
+                "UPDATE livelihood_service_orders SET snapshot_json=? WHERE order_id=?",
+                (snapshot, order_id),
+            )
+        assert after == before
+        settled = await send(f"结算服务 {order_id}", 8422, provider)
+        assert settled.code == "SERVICE_SETTLED"
+        replay = await send(f"结算服务 {order_id}", 8422, provider)
+        assert replay.data["idempotent_replay"] is True
+        await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_service_settlement_failure_rolls_back_and_retries(tmp_path: Path) -> None:
     async def run() -> None:
         data_dir = _content(tmp_path)
