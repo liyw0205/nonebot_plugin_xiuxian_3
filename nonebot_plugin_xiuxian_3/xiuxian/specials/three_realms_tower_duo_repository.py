@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_combat_values, player_integer
+from ..utils.player import change_player_state, player_combat_values, player_integer, player_local_reputations
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -257,8 +257,7 @@ class ThreeRealmsTowerDuoRepositoryMixin:
 
     @staticmethod
     def _local_reputations(connection, player_id: int) -> dict[str, int]:
-        row = connection.execute("SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)).fetchone()
-        return json.loads(row[0]) if row and row[0] else {}
+        return player_local_reputations(connection, player_id)
 
     def _tower_run_faction_for_player(self, connection, player_id: int) -> str:
         row = connection.execute("SELECT * FROM players WHERE id=?", (player_id,)).fetchone()

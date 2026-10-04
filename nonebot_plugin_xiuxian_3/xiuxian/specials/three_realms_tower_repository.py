@@ -24,7 +24,13 @@ from ..persistence.errors import (
     TowerStartFailedError,
 )
 from ..utils.assets import grant_player_assets
-from ..utils.player import change_player_state, player_combat_values, player_integer, player_object
+from ..utils.player import (
+    change_player_state,
+    player_combat_values,
+    player_integer,
+    player_local_reputations,
+    player_object,
+)
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .three_realms_arena_rules import player_faction
 from .three_realms_tower_models import (
@@ -166,11 +172,7 @@ class ThreeRealmsTowerRepositoryMixin:
                 if not meets_realm and not has_story_permit:
                     raise TowerRequirementError("nascent-soul rank or three-realms story permit is required")
             elif not meets_realm:
-                reputation = connection.execute(
-                    "SELECT local_json FROM player_reputations WHERE player_id=?",
-                    (player["id"],),
-                ).fetchone()
-                local = self._json_object(reputation["local_json"], {}) if reputation else {}
+                local = player_local_reputations(connection, int(player["id"]))
                 if rebuild_reputation_total(local) < 500:
                     raise TowerRequirementError("soul-transformation rank or 500 rebuild reputation is required")
             if self._has_active_long_action(connection, int(player["id"])):
@@ -260,13 +262,7 @@ class ThreeRealmsTowerRepositoryMixin:
         combat = player_combat_values(player)
         intro = player_object(player, "intro_json")
         qualification = player_object(player, "qualification_json")
-        reputation = connection.execute(
-            "SELECT local_json FROM player_reputations WHERE player_id=?", (player["id"],)
-        ).fetchone()
-        local_reputation = (
-            self._json_object(reputation["local_json"], {})
-            if reputation else {}
-        )
+        local_reputation = player_local_reputations(connection, int(player["id"]))
         alliance = faction
         for source in (qualification, intro):
             for key in ("cross_realm_alliance", "alliance_key", "alliance", "盟约"):

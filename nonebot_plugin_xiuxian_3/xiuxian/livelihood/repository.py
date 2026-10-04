@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import spend_player_currency, player_currency
+from ..utils.player import player_local_reputation
 from ..persistence.errors import (
     CurrencyInsufficientError,
     LocalReputationInsufficientError,
@@ -104,11 +105,8 @@ class LivelihoodRepositoryMixin(
             if player_currency(row) < definition.rent_cost:
                 raise CurrencyInsufficientError("rent is insufficient")
             if definition.required_local_reputation:
-                reputation = connection.execute(
-                    "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
-                ).fetchone()
-                local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-                if int(local.get("local.xuantian.new_town", 0)) < definition.required_local_reputation:
+                reputation = player_local_reputation(connection, int(row["id"]), "local.xuantian.new_town")
+                if reputation < definition.required_local_reputation:
                     raise LocalReputationInsufficientError("local reputation is insufficient")
             residence_id = uuid4().hex
             ends_at = serialize_datetime(now + timedelta(days=definition.lease_days))

@@ -47,6 +47,8 @@ from .player import (
     player_combat_values,
     player_reputation,
     player_reputation_state,
+    player_local_reputations,
+    player_local_reputation,
     player_reputation_with_delta,
     player_values,
 )
@@ -177,6 +179,8 @@ __all__ = [
     "player_combat_values",
     "player_reputation",
     "player_reputation_state",
+    "player_local_reputations",
+    "player_local_reputation",
     "player_reputation_with_delta",
     "player_realm_values",
     "player_values",

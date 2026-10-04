@@ -47,6 +47,7 @@ from ..utils.player import (
     player_integer,
     player_inventory,
     player_intro_flags,
+    player_reputation_state,
     spend_player_state,
 )
 
@@ -91,10 +92,7 @@ class DispatchRepositoryMixin:
             if "guide.choose_service" not in intro_flags:
                 missing.append("需要完成任一教学服务")
         if definition.key == DAO_SERVICE:
-            reputation = connection.execute(
-                "SELECT service_reputation FROM player_reputations WHERE player_id=?", (player["id"],)
-            ).fetchone()
-            service = int(reputation["service_reputation"]) if reputation else 0
+            service = player_reputation_state(connection, int(player["id"])).service
             if service < 80 and not self._meets_realm_values(
                 str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union", 1
             ):

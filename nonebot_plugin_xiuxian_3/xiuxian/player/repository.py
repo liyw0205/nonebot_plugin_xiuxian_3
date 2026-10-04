@@ -7,7 +7,6 @@ import hashlib
 import json
 import sqlite3
 import time
-from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 from uuid import uuid4
@@ -1035,16 +1034,7 @@ class PlayerRepositoryMixin:
                         row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
                 except ValueError:
                     pass
-            reputation = connection.execute(
-                "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
-            ).fetchone()
         player = self._row_to_player(row)
-        if reputation is not None:
-            faction = dict(player.faction_reputation)
-            for key, value in json_object(reputation["local_json"], {}).items():
-                if str(key).startswith("faction."):
-                    faction[str(key).split(".", 1)[1]] = int(value)
-            player = replace(player, faction_reputation=faction)
         return player
 
     @staticmethod

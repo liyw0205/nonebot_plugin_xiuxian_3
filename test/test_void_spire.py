@@ -196,6 +196,54 @@ def test_void_spire_reputation_boundary_and_previous_floor_lock() -> None:
     asyncio.run(run())
 
 
+def test_void_spire_reputation_read_failure_is_atomic_and_recoverable() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            cases = (("qq.official", "reputation-json-qq"), ("onebot.v11", "reputation-json-onebot"))
+            for adapter, user in cases:
+                await _setup(runtime, adapter, user, user)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE players SET realm_key='qi_sensing', realm_layer=1, stamina=100, stamina_max=100 WHERE id=?",
+                        (player_id,),
+                    )
+                    connection.execute(
+                        "INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+                        "VALUES (?, '{', 0, 'before') "
+                        "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json",
+                        (player_id,),
+                    )
+                failed = await _send(runtime, adapter, user, f"{user}-start", "挑战虚空塔 1")
+                assert failed.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute("SELECT stamina FROM players WHERE id=?", (player_id,)).fetchone()[0] == 100
+                    assert connection.execute("SELECT COUNT(*) FROM void_spire_runs WHERE player_id=?", (player_id,)).fetchone()[0] == 0
+                    connection.execute(
+                        "UPDATE player_reputations SET local_json=? WHERE player_id=?",
+                        (json.dumps({"local.void_supply": 600}), player_id),
+                    )
+                settled = await _send(runtime, adapter, user, f"{user}-start", "挑战虚空塔 1")
+                assert settled.code == "VOID_SPIRE_CHALLENGE_SETTLED"
+                replay = await _send(runtime, adapter, user, f"{user}-start", "挑战虚空塔 1")
+                assert replay.code == settled.code
+                assert replay.data["idempotent_replay"] is True
+            await runtime.close()
+
+            recovered = create_runtime(data_dir=data_dir)
+            for adapter, user in cases:
+                replay = await _send(recovered, adapter, user, f"{user}-start", "挑战虚空塔 1")
+                assert replay.code == "VOID_SPIRE_CHALLENGE_SETTLED"
+                assert replay.data["idempotent_replay"] is True
+            await recovered.close()
+
+    asyncio.run(run())
+
+
 def test_void_spire_start_failure_refunds_and_replay_is_failure(monkeypatch) -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:

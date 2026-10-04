@@ -70,6 +70,9 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     player_intro_flags,
     player_combat_values,
     player_reputation,
+    player_reputation_state,
+    player_local_reputations,
+    player_local_reputation,
     player_reputation_with_delta,
     player_values,
     player_numeric_values,
@@ -828,6 +831,32 @@ def test_player_reputation_delta_uses_stable_faction_keys_and_validation() -> No
         player_reputation_with_delta(row, {"faction_reputation.xuantian": True})
     with pytest.raises(ValueError, match="cannot be negative"):
         player_reputation_with_delta(row, {"faction_reputation.xuantian": -5})
+
+
+def test_local_reputation_projection_is_shared_and_strict() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE player_reputations (player_id INTEGER PRIMARY KEY, local_json TEXT NOT NULL, service_reputation INTEGER NOT NULL DEFAULT 0)"
+    )
+    connection.execute(
+        "INSERT INTO player_reputations(player_id, local_json, service_reputation) VALUES (1, ?, 7)",
+        ('{"local.xuantian.new_town": 12}',),
+    )
+
+    assert player_reputation_state(connection, 1).service == 7
+    assert player_local_reputations(connection, 1) == {"local.xuantian.new_town": 12}
+    assert player_local_reputation(connection, 1, "local.xuantian.new_town") == 12
+    assert player_local_reputation(connection, 1, "local.xuantian.missing") == 0
+    assert player_local_reputations(connection, 2) == {}
+
+    for raw in ("{", "[]", "true", '{"local.xuantian.new_town": true}', '{"local.xuantian.new_town": -1}', '{"local.xuantian.new_town": 1.5}'):
+        connection.execute("UPDATE player_reputations SET local_json=? WHERE player_id=1", (raw,))
+        with pytest.raises(ValueError, match="local reputation"):
+            player_local_reputations(connection, 1)
+    with pytest.raises(ValueError, match="local reputation key"):
+        player_local_reputation(connection, 1, "xuantian.new_town")
+    connection.close()
 
 
 def test_split_player_rewards_reuses_one_state_partition_for_settlement() -> None:

@@ -385,15 +385,7 @@ class BreakthroughRepositoryMixin:
                 intro_state = self._json_object(row["intro_json"], {})
                 if "quest.soul_transformation" not in {str(item) for item in intro_state.get("flags", [])}:
                     raise QuestRequirementError("soul transformation quest is missing")
-                reputation_row = connection.execute(
-                    "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
-                ).fetchone()
                 faction = player_reputation(row)
-                if reputation_row is not None:
-                    local = self._json_object(reputation_row["local_json"], {})
-                    for key, value in local.items():
-                        if str(key).startswith("faction."):
-                            faction[str(key).split(".", 1)[1]] = int(value)
                 if max((int(value) for value in faction.values()), default=0) < 2000:
                     raise FactionReputationInsufficientError("faction reputation is insufficient")
             if is_void_refining:
@@ -533,14 +525,7 @@ class BreakthroughRepositoryMixin:
                     preparation_bp += 300
                 final_success_bp = max(5500, min(9000, 5500 + quality_bonus_bp + preparation_bp + pity_before + heart_demon_bonus_bp - cross_realm_risk_bp))
             elif is_soul_transformation:
-                reputation_row = connection.execute(
-                    "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
-                ).fetchone()
                 faction = player_reputation(row)
-                if reputation_row is not None:
-                    for key, value in self._json_object(reputation_row["local_json"], {}).items():
-                        if str(key).startswith("faction."):
-                            faction[str(key).split(".", 1)[1]] = int(value)
                 soul_prepare_bp = min(1000, max(0, player_integer(row, "soul_power") - 200) * 4)
                 reputation_prepare_bp = min(1000, max(0, max((int(value) for value in faction.values()), default=0) - 2000) // 2)
                 quest_prepare_bp = 600 if "quest.soul_transformation" in {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])} else 0

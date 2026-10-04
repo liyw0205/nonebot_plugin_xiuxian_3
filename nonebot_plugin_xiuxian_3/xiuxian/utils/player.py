@@ -1161,6 +1161,24 @@ def player_reputation_state(connection: Any, player_id: int) -> PlayerReputation
     return _reputation_state_from_row(row)
 
 
+def player_local_reputations(connection: Any, player_id: int) -> dict[str, int]:
+    """Return the validated local-reputation projection for a player."""
+
+    return dict(player_reputation_state(connection, player_id).local)
+
+
+def player_local_reputation(
+    connection: Any, player_id: int, key: str, *, default: int = 0
+) -> int:
+    """Read one local-reputation value without duplicating JSON parsing."""
+
+    if not isinstance(key, str) or not key.startswith("local.") or not key.removeprefix("local."):
+        raise ValueError("local reputation key must be a non-empty local.* key")
+    if isinstance(default, bool) or not isinstance(default, int) or default < 0:
+        raise ValueError("local reputation default must be a non-negative integer")
+    return player_local_reputations(connection, player_id).get(key, default)
+
+
 def local_reputation_with_delta(
     connection: Any,
     player_id: int,
@@ -1279,6 +1297,8 @@ __all__ = [
     "player_intro_flags",
     "player_reputation",
     "player_reputation_state",
+    "player_local_reputations",
+    "player_local_reputation",
     "player_reputation_with_delta",
     "player_values",
     "player_combat_values",

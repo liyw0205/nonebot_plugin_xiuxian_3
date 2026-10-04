@@ -23,7 +23,7 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
-from ..utils.player import change_player_state, grant_player_reward, player_integer
+from ..utils.player import change_player_state, grant_player_reward, player_integer, player_local_reputation
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .void_spire_models import VoidSpirePreviewRecord, VoidSpireRewardRecord, VoidSpireRunRecord
 from .void_spire_rules import (
@@ -432,19 +432,7 @@ class VoidSpireRepositoryMixin:
 
     @staticmethod
     def _void_spire_local_reputation(connection: sqlite3.Connection, player_id: int, key: str) -> int:
-        row = connection.execute(
-            "SELECT local_json FROM player_reputations WHERE player_id=?", (player_id,)
-        ).fetchone()
-        if row is None:
-            return 0
-        try:
-            values = json.loads(str(row["local_json"] or "{}"))
-        except (TypeError, ValueError):
-            return 0
-        try:
-            return max(0, int(values.get(key, 0))) if isinstance(values, dict) else 0
-        except (TypeError, ValueError):
-            return 0
+        return player_local_reputation(connection, player_id, key)
 
     @staticmethod
     def _insert_void_spire_operation(

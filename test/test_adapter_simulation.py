@@ -118,6 +118,48 @@ def test_real_qq_group_event_reaches_shared_application() -> None:
     asyncio.run(run())
 
 
+def test_profile_uses_canonical_faction_reputation_only() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter, user in (("qq.official", "profile-qq"), ("onebot.v11", "profile-onebot")):
+                base = (
+                    normalize_qq_event(_qq_group_event("开始修仙", message_id=f"{user}-create"))
+                    if adapter == "qq.official"
+                    else normalize_event(_onebot_group_event("开始修仙"))
+                ).context
+                created = await runtime.adapters.dispatch(
+                    adapter,
+                    replace(base, adapter=adapter, user_id=user, operation_id=f"{user}-create"),
+                    "开始修仙",
+                )
+                assert created.code == "PLAYER_CREATED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE players SET faction_reputation_json=? WHERE id=?",
+                        (json.dumps({"demon": 7}), player_id),
+                    )
+                    connection.execute(
+                        "INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+                        "VALUES (?, ?, 0, 'test') ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json",
+                        (player_id, json.dumps({"faction.demon": 999})),
+                    )
+                profile = await runtime.adapters.dispatch(
+                    adapter,
+                    replace(base, adapter=adapter, user_id=user, operation_id=f"{user}-profile"),
+                    "我的状态",
+                )
+                assert profile.code == "PROFILE_READ"
+                assert profile.data["faction_reputation"] == {"demon": 7}
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_qq_and_onebot_normalized_events_reach_sky_terrace_flow() -> None:
     qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-sky-terrace"))
     onebot = normalize_event(_onebot_group_event("开始修仙", message_id=3050))

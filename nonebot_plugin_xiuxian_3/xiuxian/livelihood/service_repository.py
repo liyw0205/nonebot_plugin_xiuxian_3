@@ -12,6 +12,7 @@ from ...contracts import serialize_datetime
 from ..utils.assets import player_currency
 from ..utils.player import (
     change_player_state_actual,
+    player_reputation_state,
     player_requirements_missing,
     spend_player_state,
 )
@@ -314,10 +315,7 @@ class ServiceRepositoryMixin:
                 raise ServiceRequirementError("publisher is not active")
             required_service_reputation = int(snapshot["required_service_reputation"])
             if required_service_reputation:
-                reputation = connection.execute(
-                    "SELECT service_reputation FROM player_reputations WHERE player_id = ?", (provider["id"],)
-                ).fetchone()
-                current = int(reputation["service_reputation"]) if reputation is not None else 0
+                current = player_reputation_state(connection, int(provider["id"])).service
                 if current < required_service_reputation:
                     raise ServiceReputationInsufficientError("service reputation is insufficient")
             required_teaching_flag = snapshot["required_teaching_flag"]
