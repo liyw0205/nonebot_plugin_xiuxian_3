@@ -29,19 +29,11 @@ from .domain_front_rules import EVENT_KEY as DOMAIN_FRONT_EVENT_KEY
 from .void_frontier_models import VoidFrontierClaimRecord, VoidFrontierSeasonRecord, VoidFrontierStanding, VoidFrontierWeeklyRecord
 from .void_frontier_repository import VoidFrontierRepositoryMixin
 from .void_frontier_use_cases import VoidFrontierApplication
-from .rules import (
-    EVENT_KEY,
-    EVENT_LOCATION,
-    EVENT_TARGET,
-    PERSONAL_CONTRIBUTION_CAP,
-    PERSONAL_REWARD_THRESHOLD,
-)
+from .spirit_spring_rules import SPIRIT_SPRING_EVENT_KEY
 from .use_cases import EventsApplication
 
 __all__ = [
-    "EVENT_KEY",
-    "EVENT_LOCATION",
-    "EVENT_TARGET",
+    "SPIRIT_SPRING_EVENT_KEY",
     "EventsApplication",
     "EventsRepositoryMixin",
     "HEART_DEMON_EVENT_KEY",
@@ -62,8 +54,6 @@ __all__ = [
     "ThreeRealmsSeasonRecord",
     "ThreeRealmsSeasonRepositoryMixin",
     "ThreeRealmsStanding",
-    "PERSONAL_CONTRIBUTION_CAP",
-    "PERSONAL_REWARD_THRESHOLD",
     "SpiritSpringEventRecord",
     "DOMAIN_FRONT_EVENT_KEY",
     "DomainFrontApplication",

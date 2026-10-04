@@ -82,6 +82,7 @@ from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.repository import WorldRepositoryMixin
 from ..world.rules import destination_definition, meets_realm
 from ..world.cloud_rules import DEMON_INTRO_FLAG
+from ..events.contribution_projection import record_spirit_spring_contribution
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
     CLOUD_BOAT_STORM_CHANCE_BP,
@@ -707,11 +708,12 @@ class ExplorationRepositoryMixin:
                 (json.dumps(result_json, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
             )
             if str(session["mode_key"]) == "explore.spring_gather":
-                self._record_spirit_spring_contribution(
+                record_spirit_spring_contribution(
                     connection,
+                    content=self.content,
                     player_id=int(row["id"]),
                     source_operation_id=str(session["operation_id"]),
-                    quantity=int(result.get("item.herb.spirit_leaf", 0)),
+                    result=result,
                     occurred_at=datetime.fromisoformat(str(session["starts_at"])),
                 )
             updated = connection.execute("SELECT * FROM players WHERE id=?", (row["id"],)).fetchone()
@@ -1001,11 +1003,12 @@ class ExplorationRepositoryMixin:
                 (status, json.dumps(result_json, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
             )
             if status == "settled" and str(session["mode_key"]) == "explore.spring_gather":
-                self._record_spirit_spring_contribution(
+                record_spirit_spring_contribution(
                     connection,
+                    content=self.content,
                     player_id=int(row["id"]),
                     source_operation_id=str(session["operation_id"]),
-                    quantity=int(result.get("item.herb.spirit_leaf", 0)),
+                    result=result,
                     occurred_at=datetime.fromisoformat(str(session["starts_at"])),
                 )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()

@@ -12,7 +12,7 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.events.repository import EventsRepositoryMixin
+from nonebot_plugin_xiuxian_3.xiuxian.events.contribution_projection import record_spirit_spring_contribution
 from nonebot_plugin_xiuxian_3.xiuxian.specials.codex_projection import record_material_discoveries
 
 
@@ -37,6 +37,7 @@ def adapter(request) -> str:
 def content_dir(tmp_path: Path) -> Path:
     target = tmp_path / "data"
     shutil.copytree(Path(__file__).parents[1] / "data", target)
+    (target / "xiuxian3.sqlite3").unlink(missing_ok=True)
     _set_pool(target, REWARDS)
     return target
 
@@ -174,7 +175,7 @@ def test_spring_projection_failure_rolls_back_then_concurrent_retry_is_unique(
             clock.value += timedelta(minutes=2)
             before = _state(runtime)
             original = (
-                EventsRepositoryMixin._record_spirit_spring_contribution
+                record_spirit_spring_contribution
                 if projection == "contribution" else record_material_discoveries
             )
 
@@ -183,8 +184,8 @@ def test_spring_projection_failure_rolls_back_then_concurrent_retry_is_unique(
                 raise RuntimeError("injected projection failure")
 
             target = (
-                "nonebot_plugin_xiuxian_3.xiuxian.events.repository."
-                "EventsRepositoryMixin._record_spirit_spring_contribution"
+                "nonebot_plugin_xiuxian_3.xiuxian.exploration.repository."
+                "record_spirit_spring_contribution"
                 if projection == "contribution" else
                 "nonebot_plugin_xiuxian_3.xiuxian.exploration.repository.record_material_discoveries"
             )

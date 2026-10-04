@@ -16,6 +16,13 @@
       "status": "active"
     },
     {
+      "key": "resource.cultivation",
+      "name": "境内修为",
+      "desc": "修士在当前境界积累的修行进境。",
+      "storage": "cultivation",
+      "status": "active"
+    },
+    {
       "key": "resource.world_merit",
       "name": "世界功勋",
       "desc": "记录修士为守护天地所立的功绩。",

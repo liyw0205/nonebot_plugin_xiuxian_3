@@ -52,7 +52,7 @@ class EventsApplication:
 
     @staticmethod
     def _data(record, **extra: object) -> dict[str, object]:
-        return {
+        data = {
             "round_id": record.round_id,
             "event_key": record.event_key,
             "status": record.status,
@@ -68,6 +68,16 @@ class EventsApplication:
             "idempotent_replay": record.already_completed,
             **extra,
         }
+        for field in (
+            "contribution_cap",
+            "source_item_key",
+            "source_item_name",
+            "event_name",
+            "event_description",
+        ):
+            if hasattr(record, field):
+                data[field] = getattr(record, field)
+        return data
 
     @staticmethod
     def _error(
@@ -77,11 +87,7 @@ class EventsApplication:
         *,
         event_label: str = "灵泉",
     ) -> CommandResult:
-        contribution_message = (
-            "本轮灵泉事件贡献不足 10 份灵叶。"
-            if event_label == "灵泉"
-            else f"本轮{event_label}事件贡献不足领取门槛。"
-        )
+        contribution_message = f"本轮{event_label}事件贡献不足领取门槛。"
         errors = {
             EventNotActiveError: ("EVENT_NOT_ACTIVE", f"当前没有可参与或可领奖的{event_label}事件。"),
             EventContributionInsufficientError: ("EVENT_CONTRIBUTION_INSUFFICIENT", contribution_message),
@@ -236,13 +242,13 @@ class EventsApplication:
             True,
             "EVENT_STATUS",
             (
-                "## 灵泉事件\n\n"
+                f"## {record.event_name}\n\n"
                 f"**轮次**：`{record.round_id}`\n"
                 f"**状态**：{state}\n"
                 f"**全服进度**：{record.total_contribution}/{record.target_quantity}\n"
-                f"**你的贡献**：{record.player_contribution}/30 份灵叶\n"
+                f"**你的贡献**：{record.player_contribution}/{record.contribution_cap} 份{record.source_item_name}\n"
                 f"**时间**：{record.starts_at} 至 {record.ends_at}\n\n"
-                f"> {success_text}；达到 10 份贡献后可在结束后领取奖励。"
+                f"> {record.event_description}\n> {success_text}；达到 {record.minimum_contribution} 份贡献后可在结束后领取奖励。"
             ),
             context.request_id,
             data=self._data(record, reward_snapshot=record.reward_snapshot),
@@ -310,18 +316,11 @@ class EventsApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        reward_lines = [
-            f"境内修为 +{record.reward.get('cultivation', 0)}",
-            f"灵石 +{record.reward.get('spirit_stones', 0)}",
-        ]
-        if record.reward.get("faction_reputation.xuantian", 0):
-            reward_lines.append(
-                f"玄天界阵营声望 +{record.reward['faction_reputation.xuantian']}"
-            )
+        reward_lines = public_event_reward_lines(record.reward, self.repository.content)
         return CommandResult(
             True,
             "EVENT_REWARD_CLAIMED",
-            f"## 灵泉事件奖励已领取\n\n本轮贡献 {record.player_contribution} 份灵叶。\n\n- " + "\n- ".join(reward_lines),
+            f"## {record.event_name}奖励已领取\n\n本轮贡献 {record.player_contribution} 份{record.source_item_name}。\n\n" + "\n".join(reward_lines),
             context.request_id,
             operation_id,
             data=self._data(record, reward_snapshot=record.reward_snapshot),

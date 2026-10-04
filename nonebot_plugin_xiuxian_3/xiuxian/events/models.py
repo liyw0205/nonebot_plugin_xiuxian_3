@@ -19,6 +19,11 @@ class SpiritSpringEventRecord:
     claim_expires_at: str
     target_quantity: int
     minimum_contribution: int
+    contribution_cap: int
+    source_item_key: str
+    source_item_name: str
+    event_name: str
+    event_description: str
     total_contribution: int
     player_contribution: int
     success: bool | None

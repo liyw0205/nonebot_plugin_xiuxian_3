@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..content import ContentError, bundled_content
+from ..content import bundled_content
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -17,23 +17,14 @@ from ..persistence.errors import (
     OperationConflictError,
 )
 from .models import SpiritSpringEventRecord
-from .rules import (
-    EVENT_KEY,
-    EVENT_LOCATION,
-    EVENT_TARGET,
-    PERSONAL_CONTRIBUTION_CAP,
-    PERSONAL_REWARD_THRESHOLD,
-    event_times,
-    round_id_for,
-    scheduled_start,
+from .reward_settlement import grant_public_event_reward
+from .spirit_spring_rules import (
+    SPIRIT_SPRING_EVENT_KEY,
+    SpiritSpringDefinition,
+    spirit_spring_definition,
+    spirit_spring_snapshot,
+    spirit_spring_window,
 )
-from ..rewards.rules import (
-    combine_reward_grants,
-    reward_definition,
-    reward_totals,
-    reward_value_delta,
-)
-from ..utils.player import grant_player_state
 
 
 class EventsRepositoryMixin:
@@ -131,7 +122,8 @@ class EventsRepositoryMixin:
                 (event["round_id"], player["id"]),
             ).fetchone()
             contribution = int(contribution_row["contribution"]) if contribution_row else 0
-            if contribution < PERSONAL_REWARD_THRESHOLD:
+            definition = spirit_spring_snapshot(str(event["result_json"]))
+            if contribution < definition.minimum_contribution:
                 raise EventContributionInsufficientError("event contribution is insufficient")
             claimed = connection.execute(
                 "SELECT 1 FROM world_event_claims WHERE round_id = ? AND player_id = ?",
@@ -142,30 +134,13 @@ class EventsRepositoryMixin:
 
             success = bool(self._json_object(event["result_json"], {}).get("success", False))
             reward_grant, reward_snapshot = self._event_reward_grant(event, success=success)
-            reward = reward_totals(reward_grant)
-            grant_player_state(
+            reward = grant_public_event_reward(
                 connection,
                 player,
-                rewards=reward_grant.assets,
-                updated_at=now_text,
-                value_delta=reward_value_delta(reward_grant),
-                player_values=reward_grant.set_values or None,
-                reputation_delta=reward_grant.reputation or None,
-                local_reputation_delta=reward_grant.local_reputation or None,
-            )
-            connection.execute(
-                """
-                INSERT INTO world_event_claims(
-                    round_id, player_id, operation_id, reward_json, claimed_at
-                ) VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    event["round_id"],
-                    player["id"],
-                    operation_id,
-                    json.dumps(reward, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                ),
+                round_id=str(event["round_id"]),
+                operation_id=operation_id,
+                claimed_at=now_text,
+                grant=reward_grant,
             )
             connection.execute(
                 """
@@ -215,32 +190,19 @@ class EventsRepositoryMixin:
             return self._event_record_from_payload(payload)
 
     def _event_reward_grant(self, event: Any, *, success: bool):
-        content = self.content or bundled_content()
-        try:
-            event_definition = content.require("event", str(event["event_key"]), include_locked=False)
-            claim = event_definition["claim"]
-            base_key = claim["reward_key"]
-            if not isinstance(base_key, str) or not base_key:
-                raise ContentError("event claim requires reward_key")
-            base_grant = reward_definition(base_key, content, operation="event.claim_reward")
-            completion_grant = None
-            grants = [base_grant]
-            if success:
-                completion_key = claim.get("completion_bonus_key")
-                if not isinstance(completion_key, str) or not completion_key:
-                    raise ContentError("successful event claim requires completion_bonus_key")
-                completion_grant = reward_definition(
-                    completion_key, content, operation="event.claim_reward"
-                )
-                grants.append(completion_grant)
-            final_grant = combine_reward_grants(*grants)
-            return final_grant, {
-                "base": base_grant.snapshot(),
-                "completion": completion_grant.snapshot() if completion_grant else None,
-                "final": final_grant.snapshot(),
-            }
-        except (KeyError, TypeError) as exc:
-            raise ContentError(f"event reward configuration is invalid: {event['event_key']}") from exc
+        definition = spirit_spring_snapshot(str(event["result_json"]))
+        grants = [definition.base_reward]
+        completion = definition.completion_reward if success else None
+        if completion is not None:
+            grants.append(completion)
+        from ..rewards.rules import combine_reward_grants
+
+        final_grant = combine_reward_grants(*grants)
+        return final_grant, {
+            "base": definition.base_reward.snapshot(),
+            "completion": completion.snapshot() if completion else None,
+            "final": final_grant.snapshot(),
+        }
 
     def _event_select_round(
         self,
@@ -251,15 +213,20 @@ class EventsRepositoryMixin:
         if round_id:
             return connection.execute(
                 "SELECT * FROM world_event_rounds WHERE event_key = ? AND round_id = ?",
-                (EVENT_KEY, round_id),
+                (SPIRIT_SPRING_EVENT_KEY, round_id),
             ).fetchone()
-        start = scheduled_start(now)
-        if start is not None:
-            current_id = round_id_for(start)
-            self._event_insert_round(connection, current_id, start)
+        content = self.content or bundled_content()
+        raw_event = content.get("event", SPIRIT_SPRING_EVENT_KEY, include_locked=True)
+        if raw_event is not None and raw_event.get("status") in {"open", "active"}:
+            definition = spirit_spring_definition(content)
+            window = spirit_spring_window(definition, now)
+        else:
+            window = None
+        if window is not None:
+            self._event_insert_round(connection, definition, window)
             row = connection.execute(
                 "SELECT * FROM world_event_rounds WHERE event_key = ? AND round_id = ?",
-                (EVENT_KEY, current_id),
+                (SPIRIT_SPRING_EVENT_KEY, window[0]),
             ).fetchone()
             if row is not None:
                 return row
@@ -269,29 +236,39 @@ class EventsRepositoryMixin:
             WHERE event_key = ? AND claim_expires_at > ?
             ORDER BY starts_at DESC LIMIT 1
             """,
-            (EVENT_KEY, serialize_datetime(now)),
+            (SPIRIT_SPRING_EVENT_KEY, serialize_datetime(now)),
         ).fetchone()
 
-    def _event_insert_round(self, connection: Any, round_id: str, start: datetime) -> None:
-        starts_at, ends_at, claim_expires_at = event_times(start)
+    @staticmethod
+    def _event_insert_round(
+        connection: Any,
+        definition: SpiritSpringDefinition,
+        window: tuple[str, datetime, datetime, datetime],
+    ) -> None:
+        round_id, starts_at, ends_at, claim_expires_at = window
         connection.execute(
             """
             INSERT OR IGNORE INTO world_event_rounds(
                 round_id, event_key, location_key, status, starts_at, ends_at,
                 claim_expires_at, target_quantity, total_contribution, result_json,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, '{}', ?, ?)
+            ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, ?, ?, ?)
             """,
             (
                 round_id,
-                EVENT_KEY,
-                EVENT_LOCATION,
+                SPIRIT_SPRING_EVENT_KEY,
+                definition.location_key,
                 serialize_datetime(starts_at),
                 serialize_datetime(ends_at),
                 serialize_datetime(claim_expires_at),
-                EVENT_TARGET,
-                serialize_datetime(start),
-                serialize_datetime(start),
+                definition.target_quantity,
+                json.dumps(
+                    {"success": False, "configuration": definition.snapshot()},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+                serialize_datetime(starts_at),
+                serialize_datetime(starts_at),
             ),
         )
 
@@ -303,8 +280,11 @@ class EventsRepositoryMixin:
                 "SELECT COALESCE(SUM(contribution), 0) AS total FROM world_event_contributions WHERE round_id = ?",
                 (event["round_id"],),
             ).fetchone()
+            definition = spirit_spring_snapshot(str(event["result_json"]))
             total = int(total_row["total"] if total_row else 0)
-            success = total >= int(event["target_quantity"])
+            success = total >= definition.target_quantity
+            result = self._json_object(event["result_json"], {})
+            result.update({"success": success, "settled_at": serialize_datetime(now)})
             connection.execute(
                 """
                 UPDATE world_event_rounds
@@ -313,7 +293,7 @@ class EventsRepositoryMixin:
                 """,
                 (
                     total,
-                    json.dumps({"success": success, "settled_at": serialize_datetime(now)}, ensure_ascii=False, sort_keys=True),
+                    json.dumps(result, ensure_ascii=False, sort_keys=True),
                     serialize_datetime(now),
                     event["round_id"],
                 ),
@@ -330,6 +310,7 @@ class EventsRepositoryMixin:
         ).fetchone()
         contribution = int(contribution_row["contribution"]) if contribution_row else 0
         result = self._json_object(event["result_json"], {})
+        definition = spirit_spring_snapshot(result)
         return SpiritSpringEventRecord(
             player=self._row_to_player(player),
             round_id=str(event["round_id"]),
@@ -338,8 +319,13 @@ class EventsRepositoryMixin:
             starts_at=str(event["starts_at"]),
             ends_at=str(event["ends_at"]),
             claim_expires_at=str(event["claim_expires_at"]),
-            target_quantity=int(event["target_quantity"]),
-            minimum_contribution=PERSONAL_REWARD_THRESHOLD,
+            target_quantity=definition.target_quantity,
+            minimum_contribution=definition.minimum_contribution,
+            contribution_cap=definition.contribution_cap,
+            source_item_key=definition.source_item_key,
+            source_item_name=definition.source_item_name,
+            event_name=definition.name,
+            event_description=definition.description,
             total_contribution=int(event["total_contribution"]),
             player_contribution=contribution,
             success=result.get("success") if "success" in result else None,
@@ -357,6 +343,7 @@ class EventsRepositoryMixin:
         reward_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         result = self._json_object(event["result_json"], {})
+        definition = spirit_spring_snapshot(result)
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "round_id": str(event["round_id"]),
@@ -365,8 +352,13 @@ class EventsRepositoryMixin:
             "starts_at": str(event["starts_at"]),
             "ends_at": str(event["ends_at"]),
             "claim_expires_at": str(event["claim_expires_at"]),
-            "target_quantity": int(event["target_quantity"]),
-            "minimum_contribution": PERSONAL_REWARD_THRESHOLD,
+            "target_quantity": definition.target_quantity,
+            "minimum_contribution": definition.minimum_contribution,
+            "contribution_cap": definition.contribution_cap,
+            "source_item_key": definition.source_item_key,
+            "source_item_name": definition.source_item_name,
+            "event_name": definition.name,
+            "event_description": definition.description,
             "total_contribution": int(event["total_contribution"]),
             "player_contribution": contribution,
             "success": result.get("success"),
@@ -388,6 +380,11 @@ class EventsRepositoryMixin:
             claim_expires_at=str(payload["claim_expires_at"]),
             target_quantity=int(payload["target_quantity"]),
             minimum_contribution=int(payload["minimum_contribution"]),
+            contribution_cap=int(payload["contribution_cap"]),
+            source_item_key=str(payload["source_item_key"]),
+            source_item_name=str(payload["source_item_name"]),
+            event_name=str(payload["event_name"]),
+            event_description=str(payload["event_description"]),
             total_contribution=int(payload["total_contribution"]),
             player_contribution=int(payload.get("player_contribution", 0)),
             success=payload.get("success"),
@@ -395,90 +392,5 @@ class EventsRepositoryMixin:
             reward_snapshot=dict(payload.get("reward_snapshot", {})),
             already_completed=replay,
         )
-
-    def _record_spirit_spring_contribution(
-        self,
-        connection: Any,
-        *,
-        player_id: int,
-        source_operation_id: str,
-        quantity: int,
-        occurred_at: datetime,
-    ) -> None:
-        """Project one settled spring exploration into its scheduled round."""
-
-        if quantity <= 0 or not source_operation_id:
-            return
-        source_time = occurred_at.astimezone(timezone.utc)
-        start = scheduled_start(source_time)
-        if start is None:
-            return
-        self._event_insert_round(connection, round_id_for(start), start)
-        event = connection.execute(
-            "SELECT * FROM world_event_rounds WHERE event_key = ? AND round_id = ?",
-            (EVENT_KEY, round_id_for(start)),
-        ).fetchone()
-        if event is None:
-            return
-        event_start = datetime.fromisoformat(str(event["starts_at"]))
-        event_end = datetime.fromisoformat(str(event["ends_at"]))
-        if source_time < event_start or source_time >= event_end:
-            return
-        current = connection.execute(
-            "SELECT contribution FROM world_event_contributions WHERE round_id = ? AND player_id = ?",
-            (event["round_id"], player_id),
-        ).fetchone()
-        current_value = int(current["contribution"]) if current else 0
-        applied = max(0, min(int(quantity), PERSONAL_CONTRIBUTION_CAP - current_value))
-        connection.execute(
-            """
-            INSERT OR IGNORE INTO world_event_contribution_events(
-                round_id, player_id, source_operation_id, quantity, applied_quantity, occurred_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                event["round_id"],
-                player_id,
-                source_operation_id,
-                quantity,
-                applied,
-                serialize_datetime(source_time),
-            ),
-        )
-        if connection.execute("SELECT changes()").fetchone()[0] != 1 or applied <= 0:
-            return
-        connection.execute(
-            """
-            INSERT INTO world_event_contributions(round_id, player_id, contribution, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(round_id, player_id) DO UPDATE SET
-                contribution = MIN(world_event_contributions.contribution + excluded.contribution, ?),
-                updated_at = excluded.updated_at
-            """,
-            (event["round_id"], player_id, applied, serialize_datetime(source_time), PERSONAL_CONTRIBUTION_CAP),
-        )
-        total_row = connection.execute(
-            "SELECT COALESCE(SUM(contribution), 0) AS total FROM world_event_contributions WHERE round_id = ?",
-            (event["round_id"],),
-        ).fetchone()
-        total = int(total_row["total"] if total_row else 0)
-        result = self._json_object(event["result_json"], {})
-        if str(event["status"]) in {"settled", "failed"}:
-            result["success"] = total >= int(event["target_quantity"])
-        connection.execute(
-            """
-            UPDATE world_event_rounds
-            SET status = CASE WHEN status = 'open' THEN 'running' ELSE status END,
-                total_contribution = ?, result_json = ?, updated_at = ?
-            WHERE round_id = ?
-            """,
-            (
-                total,
-                json.dumps(result, ensure_ascii=False, sort_keys=True),
-                serialize_datetime(source_time),
-                event["round_id"],
-            ),
-        )
-
 
 __all__ = ["EventsRepositoryMixin"]

@@ -321,7 +321,7 @@ def test_spirit_spring_reward_content_is_shared_by_adapters_and_replay() -> None
                         "faction_reputation.xuantian": 17,
                         "spirit_stones": 321,
                     }
-                    assert "玄天界阵营声望 +17" in claimed.message
+                    assert "玄天界声望" in claimed.message
                     with sqlite3.connect(runtime.settings.database_path) as connection:
                         row = connection.execute(
                             "SELECT cultivation, total_cultivation, faction_reputation_json FROM players WHERE platform_user_id = ?",
@@ -376,5 +376,125 @@ def test_spirit_spring_reward_content_is_shared_by_adapters_and_replay() -> None
             finally:
                 if not runtime._closed:
                     await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_spirit_spring_round_uses_content_and_freezes_old_configuration() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 23, 20, 5, tzinfo=timezone.utc))
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            (data_dir / "xiuxian3.sqlite3").unlink(missing_ok=True)
+
+            event_path = data_dir / "事件" / "事件.json"
+            event_document = json.loads(event_path.read_text(encoding="utf-8"))
+            event = next(row for row in event_document["records"] if row["key"] == "event.spirit_spring")
+            event.update(
+                {
+                    "duration_seconds": 600,
+                    "schedule": {"weekdays": [3], "local_time": "20:00"},
+                    "contribution": {
+                        "source_item_key": "item.spirit_water",
+                        "per_quantity": 2,
+                        "max_per_player": 7,
+                    },
+                    "global_goal": {"item_key": "item.spirit_water", "quantity": 40},
+                    "claim": {
+                        "min_contribution": 2,
+                        "window_seconds": 3600,
+                        "reward_key": "reward.event.spirit_spring.base",
+                        "completion_bonus_key": "reward.event.spirit_spring.completion",
+                    },
+                }
+            )
+            event_path.write_text(json.dumps(event_document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            item_path = data_dir / "道具" / "材料.json"
+            item_document = json.loads(item_path.read_text(encoding="utf-8"))
+            next(row for row in item_document["records"] if row["key"] == "item.spirit_water")["name"] = "澄心泉露"
+            item_path.write_text(json.dumps(item_document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            qq, onebot = _adapter_contexts()
+            runtime = create_runtime(data_dir=data_dir, clock=clock, adapters=("onebot.v11",))
+            await _create_player(runtime, onebot, "spring-config-user", "config")
+            _prepare_spring_player(runtime, "spring-config-user")
+            try:
+                status = await runtime.adapters.dispatch(
+                    "onebot.v11", replace(onebot, user_id="spring-config-user", operation_id="config-status"), "灵泉事件"
+                )
+                assert status.code == "EVENT_STATUS"
+                assert status.data["ends_at"] == "2026-09-23T20:10:00+00:00"
+                assert status.data["target_quantity"] == 40
+                assert status.data["minimum_contribution"] == 2
+                assert status.data["contribution_cap"] == 7
+                assert status.data["source_item_name"] == "澄心泉露"
+
+                started = await runtime.adapters.dispatch(
+                    "onebot.v11", replace(onebot, user_id="spring-config-user", operation_id="config-start"), "开始探索 灵泉采集"
+                )
+                assert started.ok
+                clock.advance(minutes=2)
+                settled = await runtime.adapters.dispatch(
+                    "onebot.v11", replace(onebot, user_id="spring-config-user", operation_id="config-settle"), "结算探索"
+                )
+                assert settled.code == "EXPLORATION_SETTLED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    contribution = connection.execute(
+                        "SELECT contribution FROM world_event_contributions"
+                    ).fetchone()[0]
+                assert contribution == settled.data["result"]["item.spirit_water"] * 2
+            finally:
+                await runtime.close()
+
+            changed_event = json.loads(event_path.read_text(encoding="utf-8"))
+            next(row for row in changed_event["records"] if row["key"] == "event.spirit_spring")["status"] = "closed"
+            event_path.write_text(json.dumps(changed_event, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            changed_reward = json.loads((data_dir / "奖励" / "奖励.json").read_text(encoding="utf-8"))
+            base = next(row for row in changed_reward["records"] if row["key"] == "reward.event.spirit_spring.base")
+            for entry in base["entries"]:
+                if entry["kind"] == "currency":
+                    entry["quantity"] = 777
+                elif entry.get("resource_key") == "cultivation":
+                    entry["quantity"] = 888
+            (data_dir / "奖励" / "奖励.json").write_text(
+                json.dumps(changed_reward, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            clock.advance(minutes=14)
+            recovered = create_runtime(data_dir=data_dir, clock=clock, adapters=("onebot.v11",))
+            try:
+                claimed = await recovered.adapters.dispatch(
+                    "onebot.v11",
+                    replace(onebot, user_id="spring-config-user", operation_id="config-claim"),
+                    "领取灵泉事件奖励 20260923",
+                )
+                assert claimed.code == "EVENT_REWARD_CLAIMED"
+                assert claimed.data["reward"] == {"cultivation": 150, "spirit_stones": 100}
+            finally:
+                await recovered.close()
+
+            invalid = json.loads(event_path.read_text(encoding="utf-8"))
+            invalid_event = next(row for row in invalid["records"] if row["key"] == "event.spirit_spring")
+            invalid_event["status"] = "open"
+            invalid_event["contribution"]["source_item_key"] = "item.missing"
+            invalid["records"] = [
+                invalid_event if row["key"] == "event.spirit_spring" else row for row in invalid["records"]
+            ]
+            event_path.write_text(json.dumps(invalid, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            invalid_clock = MutableClock(datetime(2026, 9, 24, 20, 5, tzinfo=timezone.utc))
+            invalid_runtime = create_runtime(data_dir=data_dir, clock=invalid_clock, adapters=("onebot.v11",))
+            try:
+                await _create_player(invalid_runtime, onebot, "invalid-config-user", "invalid")
+                rejected = await invalid_runtime.adapters.dispatch(
+                    "onebot.v11", replace(onebot, user_id="invalid-config-user", operation_id="invalid-status"), "灵泉事件"
+                )
+                assert rejected.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(invalid_runtime.settings.database_path) as connection:
+                    assert connection.execute("SELECT COUNT(*) FROM world_event_rounds").fetchone()[0] == 1
+                    assert connection.execute(
+                        "SELECT stamina FROM players WHERE platform_user_id = ?", ("invalid-config-user",)
+                    ).fetchone()[0] == 30
+            finally:
+                await invalid_runtime.close()
 
     asyncio.run(run())
