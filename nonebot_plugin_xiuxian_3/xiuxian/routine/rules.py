@@ -26,6 +26,7 @@ class SevenDayGoalDefinition:
     reward: tuple[tuple[str, int], ...]
     event_key: str
     closed: bool = False
+    local_reputation_key: str | None = None
 
 
 SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
@@ -56,6 +57,7 @@ SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
         "接取一次悬赏",
         (("local_reputation", 2),),
         "bounty.accept",
+        local_reputation_key="local.xuantian.new_town",
     ),
     SevenDayGoalDefinition(
         5,
@@ -77,6 +79,7 @@ SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
         "选择道途",
         (("local_reputation", 5), (FATE_TICKET, 2)),
         "player.enter_cultivation",
+        local_reputation_key="local.xuantian.new_town",
     ),
 )
 

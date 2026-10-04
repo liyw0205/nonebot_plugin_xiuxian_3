@@ -60,7 +60,7 @@ code: available -> claimed | expired | revoked
 2. 目标来源必须是已落库的业务记录：问安、采集、生产订单、悬赏接取、派遣结算和入道
    operation；同一来源 operation 只能绑定一个目标，补做只能补领未领取的历史日数。
 3. 领奖在同一事务内检查目标日期、来源、`seven_day_goal_claims(player_id, day_number)` 唯一
-   键，更新背包/灵石/地方名望并写 operation。D5 只认试炼塔第一层胜利事件；D6 只认派遣结算事务
+   键，通过共享角色奖励事务更新背包、灵石和地方名望并写 operation。D4/D7 名望上限读取青石镇地点内容，claim、operation 与回复只记录封顶后的实得数量；坏名望 JSON 或事务故障不得留下部分奖励。D5 只认试炼塔第一层胜利事件；D6 只认派遣结算事务
    投影的 `specials.dispatch.settled` 来源。目标查询/领奖不自行创建战斗或派遣状态。
 
 ## 观测

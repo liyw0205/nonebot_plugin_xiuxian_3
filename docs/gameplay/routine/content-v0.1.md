@@ -52,14 +52,14 @@
 | D1 | `quest.seven_day.day1_checkin` | 粗糙灵米 ×1 | 已开放 |
 | D2 | `quest.seven_day.day2_gather` | 止血草 ×2 | 已开放 |
 | D3 | `quest.seven_day.day3_production_preview` | 灵石 ×30 | 已开放；以生产预览或已开始订单作为可审计来源 |
-| D4 | `quest.seven_day.day4_bounty` | 地方名望 +2 | 已开放；以接取悬赏作为可审计来源 |
+| D4 | `quest.seven_day.day4_bounty` | 青石镇名望 +2 | 已开放；以接取悬赏作为可审计来源，领奖按青石镇当前名望上限计入 |
 | D5 | `quest.seven_day.day5_tower` | 阵砂 ×2 | 运行时已开放；须在目标日期或之后胜利完成试炼塔第一层 |
 | D6 | `quest.seven_day.day6_dispatch` | 灵石 ×50 | 已开放；以已结算派遣来源 operation 为凭据 |
-| D7 | `quest.seven_day.day7_path` | 地方名望 +5、机缘签 ×2 | 已开放；以选择道途作为可审计来源 |
+| D7 | `quest.seven_day.day7_path` | 青石镇名望 +5、机缘签 ×2 | 已开放；以选择道途作为可审计来源，领奖按青石镇当前名望上限计入 |
 
 用户发送 `七日入道` 查看状态，发送 `领取七日目标 <1-7>` 领取已完成目标。目标起点、
 目标日期、来源 operation、奖励和版本均持久化；同一日数或同一 operation 重试只回放原结果，
-不同 operation 不能重复占用同一来源事件。D5 来源为 `specials.tower.floor.1`，D6 来源为派遣结算事件。七日目标查询/领奖不会自行创建战斗或派遣会话。
+不同 operation 不能重复占用同一来源事件。D4/D7 的名望上限取自 `xuantian.new_town` 地点内容；领取、角色资产/名望、实得奖励记录和 operation 在同一事务提交，已有名望高于上限时不扣回。D5 来源为 `specials.tower.floor.1`，D6 来源为派遣结算事件。七日目标查询/领奖不会自行创建战斗或派遣会话。
 
 称号与功业录当前开放以下来源：
 

@@ -179,6 +179,7 @@ from ..utils.player import (
     grant_player_state,
     player_inventory,
     player_integer,
+    player_reputation_state,
 )
 
 
@@ -1078,37 +1079,36 @@ class RoutineRepositoryMixin:
             if source_operation_id is None:
                 raise SevenDayGoalNotCompletedError("seven-day goal is not completed")
             reward = seven_day_reward(definition)
-            local_reputation = 0
-            for key, quantity in reward.items():
-                if key == "local_reputation":
-                    local_reputation += int(quantity)
-            reputation = connection.execute(
-                "SELECT local_json, service_reputation FROM player_reputations WHERE player_id = ?",
-                (row["id"],),
-            ).fetchone()
-            local = self._json_object(reputation["local_json"], {}) if reputation is not None else {}
-            local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + local_reputation
-            service_reputation = int(reputation["service_reputation"]) if reputation is not None else 0
+            local_reputation = int(reward.pop("local_reputation", 0))
+            local_reputation_key = definition.local_reputation_key
+            local_reputation_maximums = None
+            local_reputation_delta = None
+            reputation_before = 0
             if local_reputation:
-                connection.execute(
-                    """
-                    INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(player_id) DO UPDATE SET local_json = excluded.local_json,
-                        service_reputation = excluded.service_reputation, updated_at = excluded.updated_at
-                    """,
-                    (row["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), service_reputation, now_text),
-                )
-            grant_player_state(
+                if local_reputation_key is None:
+                    raise ValueError(f"seven-day goal {definition.key} has no reputation location")
+                reputation_before = player_reputation_state(
+                    connection, int(row["id"])
+                ).local.get(local_reputation_key, 0)
+                local_reputation_maximums = {
+                    local_reputation_key: local_reputation_maximum(
+                        local_reputation_key, self.content
+                    )
+                }
+                local_reputation_delta = {local_reputation_key: local_reputation}
+            grant_player_reward(
                 connection,
                 row,
-                updated_at=now_text,
-                rewards={
-                    key: quantity
-                    for key, quantity in reward.items()
-                    if key != "local_reputation"
-                },
+                reward,
+                now_text,
+                local_reputation_delta=local_reputation_delta,
+                local_reputation_maximums=local_reputation_maximums,
             )
+            if local_reputation_key is not None and local_reputation:
+                reputation_after = player_reputation_state(
+                    connection, int(row["id"])
+                ).local.get(local_reputation_key, 0)
+                reward["local_reputation"] = reputation_after - reputation_before
             connection.execute(
                 """
                 INSERT INTO seven_day_goal_claims(
