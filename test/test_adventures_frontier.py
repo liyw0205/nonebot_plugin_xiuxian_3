@@ -122,13 +122,13 @@ def test_cloud_mine_bounty_qq_and_onebot_full_claim_flow() -> None:
                     stones, local_json, offer_count = connection.execute(
                         "SELECT p.spirit_stones, r.local_json, COUNT(o.id) "
                         "FROM players p "
-                        "JOIN player_reputations r ON r.player_id = p.id "
+                        "LEFT JOIN player_reputations r ON r.player_id = p.id "
                         "LEFT JOIN bounty_offers o ON o.player_id = p.id "
                         "WHERE p.platform = ? AND p.platform_user_id = ? "
                         "GROUP BY p.id, r.local_json",
                         (adapter, user),
                     ).fetchone()
-                local = json.loads(local_json)
+                local = json.loads(local_json or "{}")
                 assert stones == 50 + rewards.get("spirit_stones", 0)
                 assert local.get("local.xuantian.cloud_city", 0) == rewards.get("local_reputation", 0)
                 assert "local.xuantian.new_town" not in local

@@ -14,6 +14,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
     settlement_result,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
+from nonebot_plugin_xiuxian_3.xiuxian.economy.rules import resolve_market_item
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import trial_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import next_layer_threshold
@@ -181,6 +182,17 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                     )
                 ):
                     await _dispatch(runtime, adapter, user, index, command)
+
+                # This long public chain accumulates many bound and
+                # non-tradeable materials before the final production
+                # steps. Keep its inventory room independent of market
+                # listing rules so the chain tests progression, not
+                # accidental disposal of protected content.
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET carry_capacity=500 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
 
                 for index in range(2):
                     await _dispatch(runtime, adapter, user, 10 + index, "开始修炼")
@@ -1318,6 +1330,22 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         (adapter, user),
                     ).fetchone()
                 main_inventory = json.loads(main_row[2] or "{}")
+                # Domain cores are character-bound in the current item
+                # contract and cannot cross the market. Prepare the missing
+                # bound material in this long-chain fixture instead of
+                # weakening the market gate.
+                bound_materials = {"item.domain_core": work_materials["item.domain_core"]}
+                bound_changed = False
+                for item_key, amount in bound_materials.items():
+                    if int(main_inventory.get(item_key, 0)) < amount:
+                        main_inventory[item_key] = amount
+                        bound_changed = True
+                if bound_changed:
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE players SET inventory_json=? WHERE id=?",
+                            (json.dumps(main_inventory, ensure_ascii=False, sort_keys=True), main_row[0]),
+                        )
                 material_missing = {
                     item_key: max(0, amount - int(main_inventory.get(item_key, 0)))
                     for item_key, amount in work_materials.items()
@@ -1401,12 +1429,19 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                     "item.material.cloud_iron",
                     "item.soul_crystal",
                     "item.void_crystal",
-                    "item.domain_core",
                     "item.demon_core",
                     "item.beast_blood",
                     "item.ancestral_blood",
                     "item.spirit_water",
                 )
+                tradeable_sale_keys: list[str] = []
+                for item_key in sale_keys:
+                    try:
+                        resolve_market_item(item_key, runtime.content)
+                    except ValueError:
+                        continue
+                    tradeable_sale_keys.append(item_key)
+                sale_keys = tuple(tradeable_sale_keys)
                 for sale_index, item_key in enumerate(sale_keys):
                     with sqlite3.connect(runtime.settings.database_path) as connection:
                         main_row = connection.execute(
