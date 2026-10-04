@@ -33,10 +33,11 @@ SPRING_PATH = SecretRealmDefinition(
     ticket_quantity=0,
     node_keys=("resource", "encounter"),
     enemy_key="enemy.spring_wisp",
-    first_reward={"item.herb.spirit_leaf": 2, "local_reputation": 5},
+    first_reward={"item.herb.spirit_leaf": 2, "local.xuantian.new_town": 5},
     repeat_reward={"item.herb.spirit_leaf": 1},
     quota_period="day",
     quota_limit=1,
+    reputation_key="local.xuantian.new_town",
 )
 
 MIST_DEPTH_2 = SecretRealmDefinition(
@@ -67,10 +68,11 @@ CLOUD_BOAT = SecretRealmDefinition(
     ticket_quantity=1,
     node_keys=("resource", "encounter", "choice"),
     enemy_key="enemy.cloud_boat_guardian",
-    first_reward={"codex.instance.cloud_boat": 1, "local_reputation": 12},
+    first_reward={"codex.instance.cloud_boat": 1, "local.xuantian.new_town": 12},
     repeat_reward={"item.ticket.cloud_boat_fragment": 1},
     quota_period="week",
     quota_limit=2,
+    reputation_key="local.xuantian.new_town",
 )
 
 DEFINITIONS = {item.key: item for item in (MIST_GROTTO, SPRING_PATH, MIST_DEPTH_2, CLOUD_BOAT)}

@@ -24,6 +24,7 @@ class SecretRealmDefinition:
     quota_period: str
     quota_limit: int
     expiry_seconds: int = 3600
+    reputation_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -185,7 +185,7 @@ def test_spring_path_first_clear_grants_leaf_and_local_reputation() -> None:
                 _context("onebot.v11", user, "spring-settle"), "结算秘境"
             )
             assert settled.code == "SECRET_REALM_SETTLED"
-            assert settled.data["reward"] == {"item.herb.spirit_leaf": 2, "local_reputation": 5}
+            assert settled.data["reward"] == {"item.herb.spirit_leaf": 2, "local.xuantian.new_town": 5}
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 inventory, local_json = connection.execute(
                     "SELECT p.inventory_json, r.local_json FROM players p "

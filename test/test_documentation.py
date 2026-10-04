@@ -49,4 +49,4 @@ def test_player_copywriting_contract_excludes_mixed_development_tone() -> None:
     assert "## 文案风格" in copywriting
     assert "不要把半段" in copywriting
     assert "不把开发进度写成世界设定" in copywriting
-    assert "当前版本暂未接入" in copywriting
+    assert "请等待后续更新" not in copywriting

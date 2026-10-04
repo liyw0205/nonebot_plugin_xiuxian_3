@@ -70,7 +70,7 @@ ITEM_LABELS = {
     "item.material.cloud_iron": "云铁",
     "item.weapon.cloud_sword": "云纹剑",
     "item.ticket.cloud_boat_fragment": "云舟票碎片",
-    "local_reputation": "地方名望",
+    "local.xuantian.new_town": "青石镇名望",
     "faction_reputation.demon": "魔界声望",
     "item.clue.demon_abyss_echo": "深渊残响线索",
     "item.demon_core": "魔核",

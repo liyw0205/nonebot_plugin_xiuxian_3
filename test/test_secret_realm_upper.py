@@ -153,7 +153,7 @@ def test_onebot_cloud_boat_uses_ticket_and_projects_reputation() -> None:
             )
             assert settled.data["reward"] == {
                 "codex.instance.cloud_boat": 1,
-                "local_reputation": 12,
+                "local.xuantian.new_town": 12,
             }
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 inventory, local_json, stamina = connection.execute(

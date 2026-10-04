@@ -11,8 +11,19 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
-from ..utils.assets import grant_player_assets, grant_player_items, inventory_amount
-from ..utils.player import change_player_state, spend_player_state, player_integer, player_inventory
+from ..utils.assets import grant_player_items, inventory_amount
+from ..utils.player import (
+    grant_player_reward,
+    change_player_state,
+    spend_player_state,
+    player_integer,
+    player_inventory,
+    player_reputation_state,
+)
+from ..rewards.rules import local_reputation_maximum
+from ..specials.codex_projection import record_codex_discovery
+from ..specials.codex_rules import category_for_entry
+from ..utils.equipment import create_equipment_instances
 from .secret_realm_models import SecretRealmPreviewRecord, SecretRealmRunRecord
 from .secret_realm_rules import (
     DEFINITIONS,
@@ -126,6 +137,42 @@ class SecretRealmRepositoryMixin:
                 "first_clear": self._is_first_clear(connection, int(player["id"]), definition.key),
                 "resource_roll": self._resource_roll(definition.key, run_id),
             }
+            reward_snapshot = {
+                "first": dict(definition.first_reward),
+                "repeat": dict(snapshot["resource_roll"]),
+            }
+            local_keys = {
+                key
+                for reward in reward_snapshot.values()
+                for key in reward
+                if key.startswith("local.")
+            }
+            if len(local_keys) > 1:
+                raise ValueError("secret realm rewards must use one local reputation key")
+            local_key = next(iter(local_keys), None)
+            if local_key != definition.reputation_key:
+                raise ValueError("secret realm reward reputation key does not match its definition")
+            local_maximum = (
+                local_reputation_maximum(local_key, self.content)
+                if local_key is not None
+                else None
+            )
+            codex_categories = {
+                key: category_for_entry(key, self.content)
+                for reward in reward_snapshot.values()
+                for key in reward
+                if key.startswith("codex.")
+            }
+            if any(not category for category in codex_categories.values()):
+                raise ValueError("secret realm reward references an unknown codex entry")
+            snapshot.update(
+                {
+                    "reward_snapshot": reward_snapshot,
+                    "local_reputation_key": local_key,
+                    "local_reputation_maximum": local_maximum,
+                    "codex_categories": codex_categories,
+                }
+            )
             expires_at = serialize_datetime(now + timedelta(seconds=definition.expiry_seconds))
             connection.execute(
                 """
@@ -401,12 +448,66 @@ class SecretRealmRepositoryMixin:
                 first_clear = bool(snapshot.get("first_clear"))
                 # Roll the resource node once at entry and keep that result in
                 # the frozen snapshot for deterministic settlement/replay.
-                reward = dict(
-                    definition.first_reward
-                    if first_clear
-                    else snapshot.get("resource_roll", definition.repeat_reward)
+                reward_snapshot = snapshot.get("reward_snapshot")
+                if (
+                    not isinstance(reward_snapshot, dict)
+                    or set(reward_snapshot) != {"first", "repeat"}
+                    or any(not isinstance(value, dict) for value in reward_snapshot.values())
+                ):
+                    raise ValueError("secret realm reward snapshot is missing")
+                local_keys = {
+                    key
+                    for value in reward_snapshot.values()
+                    for key in value
+                    if isinstance(key, str) and key.startswith("local.")
+                }
+                if (
+                    local_keys != ({definition.reputation_key} if definition.reputation_key else set())
+                    or snapshot.get("local_reputation_key") != definition.reputation_key
+                ):
+                    raise ValueError("secret realm reputation snapshot does not match its definition")
+                reputation_maximum = snapshot.get("local_reputation_maximum")
+                if definition.reputation_key is None:
+                    if reputation_maximum is not None:
+                        raise ValueError("secret realm reputation maximum has no matching key")
+                elif (
+                    isinstance(reputation_maximum, bool)
+                    or not isinstance(reputation_maximum, int)
+                    or reputation_maximum <= 0
+                ):
+                    raise ValueError("secret realm reputation maximum snapshot is invalid")
+                expected_categories = {
+                    key
+                    for value in reward_snapshot.values()
+                    for key in value
+                    if isinstance(key, str) and key.startswith("codex.")
+                }
+                categories = snapshot.get("codex_categories")
+                if (
+                    not isinstance(categories, dict)
+                    or set(categories) != expected_categories
+                    or any(not isinstance(value, str) or not value for value in categories.values())
+                ):
+                    raise ValueError("secret realm codex snapshot is invalid")
+                for reward_map in reward_snapshot.values():
+                    for key, quantity in reward_map.items():
+                        if (
+                            not isinstance(key, str)
+                            or not key
+                            or isinstance(quantity, bool)
+                            or not isinstance(quantity, int)
+                            or quantity < 0
+                        ):
+                            raise ValueError("secret realm reward snapshot contains an invalid amount")
+                reward = dict(reward_snapshot["first" if first_clear else "repeat"])
+                reward = self._apply_reward(
+                    connection,
+                    player,
+                    reward,
+                    now_text,
+                    operation_id=operation_id,
+                    snapshot=snapshot,
                 )
-                self._apply_reward(connection, player, reward, now_text)
                 result = {"reward": reward, "outcome": "won", "first_clear": first_clear}
             elif status == "settled":
                 raise SecretRealmAlreadySettledError("secret realm is already settled")
@@ -525,18 +626,24 @@ class SecretRealmRepositoryMixin:
             now_text,
         )
 
-    @staticmethod
-    def _apply_reward(connection: sqlite3.Connection, player: sqlite3.Row, reward: dict[str, int], now_text: str) -> None:
-        asset_reward: dict[str, int] = {}
+    def _apply_reward(
+        self,
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        reward: dict[str, int],
+        now_text: str,
+        *,
+        operation_id: str,
+        snapshot: dict[str, Any],
+    ) -> dict[str, int]:
+        state_reward: dict[str, int] = {}
+        codex_reward: dict[str, int] = {}
+        reputation_key = snapshot.get("local_reputation_key")
+        reputation_maximum = snapshot.get("local_reputation_maximum")
         for key, value in reward.items():
-            if key == "local_reputation":
-                rep = connection.execute("SELECT local_json FROM player_reputations WHERE player_id=?", (player["id"],)).fetchone()
-                local = json_object(rep["local_json"], {}) if rep else {}
-                local["local.xuantian.new_town"] = int(local.get("local.xuantian.new_town", 0)) + int(value)
-                connection.execute("INSERT INTO player_reputations(player_id, local_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json, updated_at=excluded.updated_at", (player["id"], json.dumps(local, ensure_ascii=False, sort_keys=True), now_text))
-            elif key.startswith("item.weapon.") or key.startswith("item.armor.") or key.startswith("item.accessory."):
-                from ..utils.equipment import create_equipment_instances
-
+            if key.startswith("codex."):
+                codex_reward[key] = int(value)
+            elif key.startswith(("item.weapon.", "item.armor.", "item.accessory.")):
                 if not create_equipment_instances(
                     connection,
                     player_id=int(player["id"]),
@@ -547,8 +654,44 @@ class SecretRealmRepositoryMixin:
                 ):
                     raise RuntimeError(f"equipment definition disappeared: {key}")
             else:
-                asset_reward[key] = int(value)
-        grant_player_assets(connection, player, asset_reward, now_text)
+                state_reward[key] = int(value)
+
+        maximums = None
+        before = None
+        if reputation_key is not None:
+            if not isinstance(reputation_maximum, int) or reputation_maximum <= 0:
+                raise ValueError("secret realm local reputation snapshot is invalid")
+            local_amount = int(state_reward.get(reputation_key, 0))
+            if local_amount:
+                before = player_reputation_state(connection, int(player["id"]))
+                maximums = {reputation_key: reputation_maximum}
+        if state_reward:
+            grant_player_reward(
+                connection,
+                player,
+                state_reward,
+                now_text,
+                local_reputation_maximums=maximums,
+            )
+        if before is not None:
+            after = player_reputation_state(connection, int(player["id"]))
+            reward[reputation_key] = after.local.get(reputation_key, 0) - before.local.get(reputation_key, 0)
+
+        categories = snapshot.get("codex_categories")
+        if not isinstance(categories, dict) or any(key not in categories for key in codex_reward):
+            raise ValueError("secret realm codex snapshot is invalid")
+        for key, quantity in codex_reward.items():
+            if quantity <= 0 or not record_codex_discovery(
+                connection,
+                player_id=int(player["id"]),
+                entry_key=key,
+                operation_id=f"{operation_id}:codex:{key}",
+                occurred_at=now_text,
+                snapshot={"instance_key": snapshot.get("instance_key")},
+                category_snapshot=categories[key],
+            ):
+                raise ValueError(f"secret realm codex reward could not be recorded: {key}")
+        return reward
 
     def _run_payload(self, player: sqlite3.Row, definition, *, run_id: str, status: str, node_index: int, snapshot: dict[str, Any], battle_id: str | None = None, reward: dict[str, int] | None = None, first_clear: bool | None = None, ticket_locked: int = 0, stamina_locked: int = 0) -> dict[str, Any]:
         nodes = tuple(str(item) for item in snapshot.get("node_keys", definition.node_keys))
