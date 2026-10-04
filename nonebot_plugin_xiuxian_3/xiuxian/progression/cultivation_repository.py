@@ -1284,7 +1284,8 @@ class CultivationRepositoryMixin:
 
     def _advance_layer_once(self, platform: str, platform_user_id: str, operation_id: str) -> LayerAdvanceRecord:
         from ..progression.rules import can_advance_layer, layer_unlocks, next_layer_threshold
-        from ..progression.endgame_rules import TRIAL_ORDER
+        from ..progression.endgame_rules import trial_definition, tribulation_definition
+        tribulation_trials = tribulation_definition(self.content)
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
         request_hash = self._request_hash("progression.advance_layer", operation_payload)
@@ -1339,7 +1340,8 @@ class CultivationRepositoryMixin:
                 raise RealmLayerInvalidError("realm is already at its maximum layer")
             if not can_advance_layer(realm_key, layer, player_integer(row, "cultivation")):
                 raise RealmCultivationInsufficientError("realm cultivation is insufficient")
-            if realm_key == "tribulation" and layer in {3, 6, 9}:
+            trial_layers = {trial_definition(key, self.content).required_layer for key in tribulation_trials.trial_order}
+            if realm_key == "tribulation" and layer in trial_layers:
                 completed = {
                     str(item["trial_key"])
                     for item in connection.execute(
@@ -1347,7 +1349,11 @@ class CultivationRepositoryMixin:
                         (row["id"],),
                     ).fetchall()
                 }
-                required = {3: TRIAL_ORDER[:1], 6: TRIAL_ORDER[:2], 9: TRIAL_ORDER}[layer]
+                required = tuple(
+                    key
+                    for key in tribulation_trials.trial_order
+                    if trial_definition(key, self.content).required_layer <= layer
+                )
                 if any(item not in completed for item in required):
                     raise TrialSequenceError("the required tribulation trial has not succeeded")
                 if layer == 9:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..repository import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -11,7 +12,6 @@ from ..repository import (
     RepositoryBusyError,
     ServiceAlreadySettledError,
     ServiceDailyLimitError,
-    ServiceExpiredError,
     ServiceLocationConflictError,
     ServiceNotFoundError,
     ServiceOrderConflictError,
@@ -47,12 +47,11 @@ class ServiceApplication:
             .replace("~", "\\~")
         )
 
-    @staticmethod
-    def _parse_publish_args(args: tuple[str, ...]) -> tuple[str | None, int | None]:
+    def _parse_publish_args(self, args: tuple[str, ...]) -> tuple[str | None, int | None]:
         if not args or len(args) > 2:
             return None, None
         try:
-            service_key = service_definition(args[0]).key
+            service_key = service_definition(args[0], self.repository.content).key
         except ValueError:
             return None, None
         if len(args) == 1:
@@ -85,7 +84,7 @@ class ServiceApplication:
                 operation_id=operation_id,
             )
         except ServiceRequirementError:
-            return CommandResult(False, "INVALID_SERVICE", "服务类型或报酬不符合当前内容规则。", context.request_id, operation_id)
+            return CommandResult(False, "INVALID_SERVICE", "这项服务或报酬不合规，请换一项服务或调整报酬。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerSuspendedError:
@@ -93,16 +92,17 @@ class ServiceApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "CURRENCY_INSUFFICIENT", "灵石不足，无法锁定服务报酬。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他服务操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这道传讯已被另一笔服务事务占用，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时无法落定这笔服务，请稍后再试。", context.request_id, operation_id, retryable=True)
         return CommandResult(
             True,
             "SERVICE_PUBLISHED",
             (
                 f"## 服务已发布\n\n**{record.service_name}**已发布，报酬为灵石 {record.reward_stones}。\n\n"
+                f"> {record.service_description}\n\n"
                 f"- **订单号**：`{record.order_id}`\n- **有效至**：{record.expires_at}\n\n"
                 "> 报酬已锁定；接取后还会锁定承接者的材料与体力/精力。"
             ),
@@ -136,8 +136,6 @@ class ServiceApplication:
             return CommandResult(False, "SERVICE_ORDER_CONFLICT", "不能接取自己发布的服务。", context.request_id, operation_id)
         except ServiceOrderConflictError:
             return CommandResult(False, "SERVICE_ORDER_CONFLICT", "服务订单已经被接取或不再开放。", context.request_id, operation_id)
-        except ServiceExpiredError:
-            return CommandResult(False, "SERVICE_EXPIRED", "服务订单已经过期。", context.request_id, operation_id)
         except ServiceReputationInsufficientError:
             return CommandResult(False, "SERVICE_REPUTATION_INSUFFICIENT", "服务信誉不足，暂不能承接该服务。", context.request_id, operation_id)
         except ServiceLocationConflictError:
@@ -151,15 +149,30 @@ class ServiceApplication:
         except (PlayerNotFoundError, PlayerSuspendedError):
             return CommandResult(False, "PLAYER_NOT_FOUND", "当前角色不存在或暂时不可用。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他服务操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这道传讯已被另一笔服务事务占用，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时无法落定这笔服务，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if record.status == "expired":
+            return CommandResult(
+                False,
+                "SERVICE_EXPIRED",
+                "服务订单已经过期，锁定的报酬已退回委托人。",
+                context.request_id,
+                operation_id,
+                data={
+                    "order_id": record.order_id,
+                    "service_key": record.service_key,
+                    "status": record.status,
+                    "refund_stones": record.reward_stones,
+                    "idempotent_replay": record.already_completed,
+                },
+            )
         return CommandResult(
             True,
             "SERVICE_ACCEPTED",
-            f"## 服务已接取\n\n你已接取 **{record.service_name}**。\n\n- **订单号**：`{record.order_id}`\n- **状态**：承接中\n- **截止**：{record.expires_at}\n\n> 完成后发送 `结算服务 {record.order_id}`。",
+            f"## 服务已接取\n\n你已接取 **{record.service_name}**。\n\n> {record.service_description}\n\n- **订单号**：`{record.order_id}`\n- **状态**：承接中\n- **截止**：{record.expires_at}\n\n> 完成后发送 `结算服务 {record.order_id}`。",
             context.request_id,
             operation_id,
             data={"order_id": record.order_id, "service_key": record.service_key, "status": record.status, "idempotent_replay": record.already_completed},
@@ -184,11 +197,11 @@ class ServiceApplication:
         except (PlayerNotFoundError, PlayerSuspendedError):
             return CommandResult(False, "PLAYER_NOT_FOUND", "当前角色不存在或暂时不可用。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他服务操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这道传讯已被另一笔服务事务占用，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时无法落定这笔服务，请稍后再试。", context.request_id, operation_id, retryable=True)
         return CommandResult(
             True,
             "SERVICE_CANCELLED",
@@ -225,11 +238,11 @@ class ServiceApplication:
         except (PlayerNotFoundError, PlayerSuspendedError):
             return CommandResult(False, "PLAYER_NOT_FOUND", "当前角色不存在或暂时不可用。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他服务操作。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这道传讯已被另一笔服务事务占用，请重新发起。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时无法落定这笔服务，请稍后再试。", context.request_id, operation_id, retryable=True)
         if record.status == "delivered":
             return CommandResult(
                 True,
@@ -243,15 +256,18 @@ class ServiceApplication:
         return CommandResult(
             True,
             code,
-            f"## 服务未完成\n\n**{record.service_name}**按失败快照结算。\n\n- **委托人退回**：灵石 {record.publisher_refund}\n- **承接者退回材料**：{self._items(record.provider_refunds)}\n- **退回体力**：{record.stamina_refund}",
+            f"## 服务未完成\n\n**{record.service_name}**依照接取时的约定结算。\n\n- **委托人退回**：灵石 {record.publisher_refund}\n- **承接者退回材料**：{self._items(record.provider_refunds)}\n- **退回体力**：{record.stamina_refund}",
             context.request_id,
             operation_id,
             data=self._settlement_data(record),
         )
 
-    @staticmethod
-    def _items(items: dict[str, int]) -> str:
-        return "、".join(f"{key} ×{value}" for key, value in items.items()) or "无"
+    def _items(self, items: dict[str, int]) -> str:
+        content = self.repository.content or bundled_content()
+        return "、".join(
+            f"{content.label('item', key)} ×{value}"
+            for key, value in items.items()
+        ) or "无"
 
     @staticmethod
     def _settlement_data(record) -> dict:

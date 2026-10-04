@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentError
 from ..repository import (
     AscensionRequirementError,
     CurrencyInsufficientError,
@@ -26,7 +27,7 @@ from ..repository import (
     TrialSequenceError,
     SQLitePlayerRepository,
 )
-from .endgame_rules import ASCENSION_READY_STATUS, TRIAL_LABELS
+from .endgame_rules import ASCENSION_READY_STATUS, resolve_trial_key, trial_definition
 
 
 class EndgameApplication:
@@ -46,17 +47,8 @@ class EndgameApplication:
     def _display_name(player) -> str:
         return player.dao_name or "未命名"
 
-    @staticmethod
-    def _trial_key(value: str) -> str | None:
-        aliases = {
-            "身心劫": "trial.body_and_mind",
-            "trial.body_and_mind": "trial.body_and_mind",
-            "三界劫": "trial.three_realms",
-            "trial.three_realms": "trial.three_realms",
-            "道果劫": "trial.dao_choice",
-            "trial.dao_choice": "trial.dao_choice",
-        }
-        return aliases.get(value)
+    def _trial_key(self, value: str) -> str | None:
+        return resolve_trial_key(value, self.repository.content)
 
     @staticmethod
     def _ending_key(value: str) -> str | None:
@@ -131,7 +123,7 @@ class EndgameApplication:
         except PlayerSuspendedError:
             return self._failure(context, operation_id, "PLAYER_SUSPENDED", "当前角色暂时不能合道。")
         except OperationConflictError:
-            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这次操作编号已经用于其他合道请求。")
+            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这道传讯已被另一笔合道事务占用，请重新发起。")
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -161,7 +153,7 @@ class EndgameApplication:
         except PlayerSuspendedError:
             return self._failure(context, operation_id, "PLAYER_SUSPENDED", "当前角色暂时不能进入渡劫。")
         except OperationConflictError:
-            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这次操作编号已经用于其他渡劫请求。")
+            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这道传讯已被另一笔渡劫事务占用，请重新发起。")
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -201,7 +193,7 @@ class EndgameApplication:
         except PlayerSuspendedError:
             return self._failure(context, operation_id, "PLAYER_SUSPENDED", "当前角色暂时不能选择终局。")
         except OperationConflictError:
-            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这次请求编号已经用于其他终局选择。")
+            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这道传讯已被另一笔终局事务占用，请重新发起。")
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
@@ -218,10 +210,17 @@ class EndgameApplication:
 
     async def start_trial(self, context: CommandContext) -> CommandResult:
         if not context.command_args or len(context.command_args) > 2:
-            return CommandResult(False, "INVALID_TRIAL_COMMAND", "请使用 `开始天劫试炼 <身心劫|三界劫|道果劫> [道果键]`。", context.request_id)
+            return CommandResult(False, "INVALID_TRIAL_COMMAND", "请使用 `开始天劫试炼 <试炼名称> [道果键]`。", context.request_id)
         trial_key = self._trial_key(context.command_args[0])
-        if trial_key is None or (trial_key != "trial.dao_choice" and len(context.command_args) != 1) or (trial_key == "trial.dao_choice" and len(context.command_args) != 2):
-            return CommandResult(False, "INVALID_TRIAL_COMMAND", "身心劫、三界劫无需道果键；道果劫必须指定与主道途匹配的道果键。", context.request_id)
+        if trial_key is None:
+            return CommandResult(False, "INVALID_TRIAL_COMMAND", "未找到对应的天劫试炼。", context.request_id)
+        try:
+            definition = trial_definition(trial_key, self.repository.content)
+        except ContentError:
+            return CommandResult(False, "CONTENT_CLOSED", "天劫试炼尚未开放。", context.request_id)
+        choice_required = definition.choice_minimum_progress is not None
+        if (choice_required and len(context.command_args) != 2) or (not choice_required and len(context.command_args) != 1):
+            return CommandResult(False, "INVALID_TRIAL_COMMAND", "此试炼的入场条件尚未齐备，请按要求选择试炼。", context.request_id)
         choice_key = context.command_args[1] if len(context.command_args) == 2 else None
         operation_id = self._operation_id(context, "tribulation.start_trial")
         try:
@@ -238,7 +237,7 @@ class EndgameApplication:
         except LocationRequirementError:
             return self._failure(context, operation_id, "TRIBULATION_LOCATION_REQUIRED", "请先抵达天劫台，再开始天劫试炼。")
         except TrialSequenceError:
-            return self._failure(context, operation_id, "TRIAL_SEQUENCE_INVALID", "天劫试炼必须按身心劫、三界劫、道果劫顺序完成。")
+            return self._failure(context, operation_id, "TRIAL_SEQUENCE_INVALID", "天劫试炼必须按天劫台指引的顺序完成。")
         except TribulationCooldownError:
             return self._failure(context, operation_id, "TRIBULATION_COOLDOWN", "该试炼失败冷却尚未结束。")
         except TribulationDebtBlockedError:
@@ -250,14 +249,14 @@ class EndgameApplication:
         except DaoFruitChoiceError:
             return self._failure(context, operation_id, "DAO_FRUIT_PATH_MISMATCH", "道果必须与当前主道途匹配，且只能锁定一次。")
         except OperationConflictError:
-            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这次操作编号已经用于其他天劫试炼。")
+            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这道传讯已被另一笔天劫事务占用，请重新发起。")
         except PlayerSuspendedError:
             return self._failure(context, operation_id, "PLAYER_SUSPENDED", "当前角色暂时不能开始试炼。")
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        label = TRIAL_LABELS[record.trial_key]
+        label = record.trial_name
         battle_label = "胜利" if battle.outcome == "won" else "失败"
         return CommandResult(
             True,
@@ -289,14 +288,14 @@ class EndgameApplication:
         except TribulationTrialNotReadyError:
             return self._failure(context, operation_id, "TRIBULATION_TRIAL_NOT_READY", "天劫试炼尚未结束，请稍后再来。")
         except OperationConflictError:
-            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这次操作编号已经用于其他结算。")
+            return self._failure(context, operation_id, "OPERATION_CONFLICT", "这道传讯已被另一笔结算事务占用，请重新发起。")
         except PlayerSuspendedError:
             return self._failure(context, operation_id, "PLAYER_SUSPENDED", "当前角色暂时不能结算试炼。")
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        label = TRIAL_LABELS[record.trial_key]
+        label = record.trial_name
         status = "成功" if record.success else "失败"
         battle_line = f"自动战斗 `{'胜利' if record.battle_outcome == 'won' else '失败'}`，" if record.battle_outcome else ""
         return CommandResult(

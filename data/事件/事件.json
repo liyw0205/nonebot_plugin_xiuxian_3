@@ -200,6 +200,53 @@
       "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}],
       "trial_order": ["trial.body_and_mind", "trial.three_realms", "trial.dao_choice"],
       "duration_seconds": 1800,
+      "trials": [
+        {
+          "key": "trial.body_and_mind",
+          "name": "身心劫",
+          "desc": "以身心承受雷火磨炼，稳住道基后再向下一劫行进。",
+          "required_layer": 3,
+          "token_cost": 1,
+          "progress_reward": 100,
+          "merit_reward": 100,
+          "world_merit_reward": 0,
+          "debt_delta": 10,
+          "cooldown_seconds": 86400,
+          "random_pool": "battle.enemy.tribulation_heaven",
+          "reward_items": {"item.dao_fruit_fragment": 1},
+          "choice": null
+        },
+        {
+          "key": "trial.three_realms",
+          "name": "三界劫",
+          "desc": "守望三界风云，承受更重的天劫压力并积累世界功勋。",
+          "required_layer": 6,
+          "token_cost": 1,
+          "progress_reward": 180,
+          "merit_reward": 200,
+          "world_merit_reward": 500,
+          "debt_delta": 15,
+          "cooldown_seconds": 172800,
+          "random_pool": "battle.enemy.tribulation_heaven",
+          "reward_items": {},
+          "choice": null
+        },
+        {
+          "key": "trial.dao_choice",
+          "name": "道果劫",
+          "desc": "在道果劫中作出与主道途相合的最终选择。",
+          "required_layer": 9,
+          "token_cost": 1,
+          "progress_reward": 250,
+          "merit_reward": 250,
+          "world_merit_reward": 0,
+          "debt_delta": 20,
+          "cooldown_seconds": 259200,
+          "random_pool": "battle.enemy.tribulation_heaven",
+          "reward_items": {},
+          "choice": {"minimum_progress": 280, "match_path_fruit": true}
+        }
+      ],
       "key": "event.heaven_tribulation"
     },
     {

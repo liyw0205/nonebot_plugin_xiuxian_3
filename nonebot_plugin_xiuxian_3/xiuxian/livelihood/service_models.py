@@ -13,6 +13,7 @@ class ServiceOrderRecord:
     order_id: str
     service_key: str
     service_name: str
+    service_description: str
     status: str
     reward_stones: int
     starts_at: str
@@ -27,6 +28,7 @@ class ServiceSettlementRecord:
     order_id: str
     service_key: str
     service_name: str
+    service_description: str
     status: str
     reward_stones: int
     provider_payment: int

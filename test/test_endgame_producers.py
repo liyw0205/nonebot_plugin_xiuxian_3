@@ -19,8 +19,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
     DAO_UNION_MAINLINE_STORY_KEY,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import (
-    TRIBULATION_MERIT_REWARD,
-    TRIBULATION_PROGRESS_REWARD,
+    tribulation_definition,
     trial_roll_bp,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
@@ -451,14 +450,15 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
 
 
 def test_tribulation_and_dao_origin_rewards_match_documented_totals() -> None:
-    assert sum(TRIBULATION_PROGRESS_REWARD.values()) == 530
-    assert sum(TRIBULATION_MERIT_REWARD.values()) == 550
+    trials = tribulation_definition().trials
+    assert sum(trial.progress_reward for trial in trials) == 530
+    assert sum(trial.merit_reward for trial in trials) == 550
     assert sum(reward["dao_fruit_progress"] for reward in DAO_ORIGIN_REWARDS.values()) == 470
     assert sum(reward["ascension_merit"] for reward in DAO_ORIGIN_REWARDS.values()) == 450
-    assert sum(TRIBULATION_PROGRESS_REWARD.values()) + sum(
+    assert sum(trial.progress_reward for trial in trials) + sum(
         reward["dao_fruit_progress"] for reward in DAO_ORIGIN_REWARDS.values()
     ) == 1_000
-    assert sum(TRIBULATION_MERIT_REWARD.values()) + sum(
+    assert sum(trial.merit_reward for trial in trials) + sum(
         reward["ascension_merit"] for reward in DAO_ORIGIN_REWARDS.values()
     ) == 1_000
 

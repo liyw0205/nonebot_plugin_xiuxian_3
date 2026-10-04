@@ -23,8 +23,6 @@ from .rules import (
 from .endgame_rules import (
     DAO_UNION_TOTAL_CULTIVATION,
     TRIBULATION_TOTAL_CULTIVATION,
-    TRIAL_ORDER,
-    TRIAL_LABELS,
     THREE_REALM_KEYS,
 )
 from .milestone_rules import (
@@ -57,8 +55,6 @@ __all__ = [
     "unlocks_for_layer",
     "DAO_UNION_TOTAL_CULTIVATION",
     "TRIBULATION_TOTAL_CULTIVATION",
-    "TRIAL_ORDER",
-    "TRIAL_LABELS",
     "THREE_REALM_KEYS",
     "FOUNDATION_LATE_MILESTONE",
     "MILESTONE_DEFINITIONS",

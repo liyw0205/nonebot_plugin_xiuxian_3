@@ -27,6 +27,7 @@ class TrialSessionRecord:
     session_id: str
     battle_id: str
     trial_key: str
+    trial_name: str
     choice_key: str | None
     status: str
     starts_at: str
@@ -40,6 +41,7 @@ class TrialSettlementRecord:
     player: PlayerView
     session_id: str
     trial_key: str
+    trial_name: str
     status: str
     success: bool
     roll_bp: int | None

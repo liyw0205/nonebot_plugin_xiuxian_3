@@ -25,7 +25,7 @@ from .endgame_rules import (
     FINAL_BATTLE_MIN_PROGRESS,
     REMAINED_IN_WORLD_STATUS,
     TRIBULATION_TOTAL_CULTIVATION,
-    TRIAL_ORDER,
+    tribulation_definition,
 )
 from ..utils.assets import inventory_amount, player_currency
 from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, spend_player_state
@@ -304,7 +304,7 @@ class EndgameRepositoryMixin:
             missing: list[str] = []
             if str(row["realm_key"]) != "tribulation" or player_integer(row, "realm_layer") != 10:
                 missing.append("TRIBULATION_L10_REQUIRED")
-            if not set(TRIAL_ORDER).issubset(completed_set):
+            if not set(tribulation_definition(self.content).trial_order).issubset(completed_set):
                 missing.append("TRIBULATION_TRIALS_INCOMPLETE")
             if int(row["dao_fruit_progress"]) < FINAL_BATTLE_MIN_PROGRESS:
                 missing.append("DAO_FRUIT_PROGRESS_INSUFFICIENT")

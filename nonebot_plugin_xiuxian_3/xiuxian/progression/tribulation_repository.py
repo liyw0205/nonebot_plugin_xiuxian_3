@@ -25,14 +25,11 @@ from ..combat.tribulation_rules import (
 )
 from .endgame_models import TrialSessionRecord, TrialSettlementRecord
 from .endgame_rules import (
-    FRUIT_KEYS,
-    TRIAL_ORDER,
-    TRIBULATION_TRIAL_DURATION_SECONDS,
-    TRIBULATION_WORLD_MERIT_REWARD,
     fruit_for_path,
+    trial_definition_from_snapshot,
     trial_definition,
     trial_roll_bp,
-    trial_success,
+    tribulation_definition,
 )
 
 
@@ -73,9 +70,10 @@ class TribulationTrialRepositoryMixin:
             TrialSequenceError,
         )
 
-        if trial_key not in TRIAL_ORDER:
+        event_definition = tribulation_definition(self.content)
+        if trial_key not in event_definition.trial_order:
             raise TrialSequenceError("unknown tribulation trial")
-        definition = trial_definition(trial_key)
+        definition = trial_definition(trial_key, self.content)
         operation_name = "tribulation.start_trial"
         request_hash = self._request_hash(
             operation_name,
@@ -104,7 +102,10 @@ class TribulationTrialRepositoryMixin:
                 raise PlayerSuspendedError("player is not active")
             if self._has_active_long_action(connection, int(row["id"])):
                 raise TribulationTrialBusyError("another long action is active")
-            if str(row["realm_key"]) != "tribulation" or player_integer(row, "realm_layer") < definition.required_layer:
+            if (
+                str(row["realm_key"]) != event_definition.required_realm_key
+                or player_integer(row, "realm_layer") < max(event_definition.required_layer, definition.required_layer)
+            ):
                 raise TrialSequenceError("tribulation layer is insufficient")
             if int(row["tribulation_debt"]) >= 100:
                 raise TribulationDebtBlockedError("tribulation debt is too high")
@@ -138,8 +139,8 @@ class TribulationTrialRepositoryMixin:
                 (row["id"],),
             ).fetchall()
             successful = {str(item["trial_key"]) for item in previous if str(item["status"]) == "succeeded"}
-            index = TRIAL_ORDER.index(trial_key)
-            if trial_key in successful or any(required not in successful for required in TRIAL_ORDER[:index]):
+            index = event_definition.trial_order.index(trial_key)
+            if trial_key in successful or any(required not in successful for required in event_definition.trial_order[:index]):
                 raise TrialSequenceError("tribulation trials must be completed in order")
             last_failed = next(
                 (item for item in reversed(previous) if str(item["trial_key"]) == trial_key and str(item["status"]) == "failed"),
@@ -154,13 +155,13 @@ class TribulationTrialRepositoryMixin:
                     except ValueError:
                         pass
 
-            if trial_key == "trial.dao_choice":
-                if int(row["dao_fruit_progress"]) < 280:
+            if definition.choice_minimum_progress is not None:
+                if int(row["dao_fruit_progress"]) < definition.choice_minimum_progress:
                     raise TrialSequenceError("dao fruit progress is insufficient")
-                expected_fruit = fruit_for_path(row["path_key"])
-                if not choice_key or choice_key not in FRUIT_KEYS or choice_key != expected_fruit:
+                expected_fruit = fruit_for_path(row["path_key"], self.content)
+                if not choice_key or (definition.choice_match_path_fruit and choice_key != expected_fruit):
                     raise DaoFruitChoiceError("dao fruit does not match the primary path")
-                if row["dao_fruit_key"]:
+                if row["dao_fruit_key"] and definition.choice_match_path_fruit:
                     raise DaoFruitChoiceError("dao fruit is already locked")
             inventory = player_inventory(row)
             guard_used = inventory_amount(inventory, "item.tribulation_guard") > 0
@@ -233,6 +234,7 @@ class TribulationTrialRepositoryMixin:
                         for phase in PHASES
                     ],
                 },
+                "trial": definition.snapshot(),
                 "tribulation": {
                     "trial_key": trial_key,
                     "choice_key": choice_key,
@@ -243,7 +245,7 @@ class TribulationTrialRepositoryMixin:
                     "fate_roll_bp": fate_bp,
                     "fate_rule": "battle_pressure",
                 },
-                "random_pool": "battle.enemy.tribulation_heaven",
+                "random_pool": definition.random_pool,
                 "random_seed": operation_id,
                 "reward": {},
             }
@@ -255,7 +257,7 @@ class TribulationTrialRepositoryMixin:
                 "tribulation_phase": PHASES[0].key,
                 "debt_shield_bp": shield_bp,
             }
-            ends_at = serialize_datetime(now + timedelta(seconds=TRIBULATION_TRIAL_DURATION_SECONDS))
+            ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
             connection.execute(
                 "INSERT INTO tribulation_trial_sessions(session_id, player_id, operation_id, trial_key, choice_key, status, starts_at, ends_at, snapshot_json, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, 'preparing', ?, ?, ?, ?, ?)",
@@ -296,6 +298,7 @@ class TribulationTrialRepositoryMixin:
                 "session_id": session_id,
                 "battle_id": battle_id,
                 "trial_key": trial_key,
+                "trial_name": definition.name,
                 "choice_key": choice_key,
                 "status": "preparing",
                 "starts_at": now_text,
@@ -367,40 +370,42 @@ class TribulationTrialRepositoryMixin:
             if now < datetime.fromisoformat(str(session["ends_at"])):
                 raise TribulationTrialNotReadyError("tribulation trial is not ready")
             snapshot = self._json_object(session["snapshot_json"], {})
-            battle_id = snapshot.get("battle_id")
+            battle_id = snapshot["battle_id"]
             roll_bp: int | None = None
             battle_outcome: str | None = None
-            if battle_id:
-                battle = connection.execute(
-                    "SELECT status, result_json FROM battle_sessions WHERE battle_id=? AND player_id=?",
-                    (battle_id, row["id"]),
-                ).fetchone()
-                if battle is None:
-                    raise TribulationTrialNotFoundError("linked tribulation battle does not exist")
-                if str(battle["status"]) != "settled":
-                    raise TribulationTrialNotReadyError("linked tribulation battle is not settled")
-                battle_result = self._json_object(battle["result_json"], {})
-                battle_outcome = str(battle_result.get("outcome", ""))
-                if battle_outcome not in {"won", "lost", "expired"}:
-                    raise TribulationTrialNotReadyError("linked tribulation battle has no final outcome")
-                success = battle_outcome == "won"
-            else:
-                # Complete any active session using its frozen deterministic trial state.
-                roll_bp = trial_roll_bp(str(snapshot.get("random_seed", session["operation_id"])))
-                success = trial_success(str(session["trial_key"]), roll_bp)
+            battle = connection.execute(
+                "SELECT status, result_json FROM battle_sessions WHERE battle_id=? AND player_id=?",
+                (battle_id, row["id"]),
+            ).fetchone()
+            if battle is None:
+                raise TribulationTrialNotFoundError("linked tribulation battle does not exist")
+            if str(battle["status"]) != "settled":
+                raise TribulationTrialNotReadyError("linked tribulation battle is not settled")
+            battle_result = self._json_object(battle["result_json"], {})
+            battle_outcome = str(battle_result.get("outcome", ""))
+            if battle_outcome not in {"won", "lost", "expired"}:
+                raise TribulationTrialNotReadyError("linked tribulation battle has no final outcome")
+            success = battle_outcome == "won"
 
-            trial_key = str(session["trial_key"])
-            definition = trial_definition(trial_key)
-            debt_delta = 0 if success else max(0, definition.debt_delta - (5 if snapshot.get("tribulation", {}).get("guard_used", snapshot.get("guard_used")) else 0))
+            trial_definition_snapshot = snapshot["trial"]
+            definition = trial_definition_from_snapshot(trial_definition_snapshot, self.content)
+            trial_key = definition.key
+            tribulation_snapshot = snapshot["tribulation"]
+            guard_used = bool(tribulation_snapshot["guard_used"])
+            debt_delta = 0 if success else max(0, definition.debt_delta - (5 if guard_used else 0))
             progress = definition.progress_reward if success else 0
             merit = definition.merit_reward if success else 0
-            world_merit = TRIBULATION_WORLD_MERIT_REWARD[trial_key] if success else 0
-            reward_items = {"item.dao_fruit_fragment": 1} if success and trial_key == "trial.body_and_mind" else {}
+            world_merit = definition.world_merit_reward if success else 0
+            reward_items = dict(definition.reward_items) if success else {}
             guard_refund = bool(
                 success
-                and snapshot.get("tribulation", {}).get("guard_used", snapshot.get("guard_used"))
+                and guard_used
             )
-            fruit_key = str(snapshot.get("tribulation", {}).get("choice_key", snapshot.get("choice_key"))) if success and trial_key == "trial.dao_choice" else None
+            fruit_key = (
+                str(tribulation_snapshot["choice_key"])
+                if success and definition.choice_match_path_fruit
+                else None
+            )
             new_progress = min(1300, int(row["dao_fruit_progress"]) + progress)
             new_debt = int(row["tribulation_debt"]) + debt_delta
             cooldown_until = serialize_datetime(now + timedelta(seconds=definition.cooldown_seconds)) if not success else None
@@ -433,6 +438,7 @@ class TribulationTrialRepositoryMixin:
                 "dao_fruit_key": fruit_key,
                 "cooldown_until": cooldown_until,
                 "status": "succeeded" if success else "failed",
+                "trial_name": definition.name,
             }
             if roll_bp is not None:
                 result["roll_bp"] = roll_bp
@@ -457,6 +463,7 @@ class TribulationTrialRepositoryMixin:
             session_id=str(payload["session_id"]),
             battle_id=str(payload.get("battle_id", "")),
             trial_key=str(payload["trial_key"]),
+            trial_name=str(payload["trial_name"]),
             choice_key=payload.get("choice_key"),
             status=str(payload["status"]),
             starts_at=str(payload["starts_at"]),
@@ -473,6 +480,7 @@ class TribulationTrialRepositoryMixin:
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             session_id=str(payload["session_id"]),
             trial_key=str(payload["trial_key"]),
+            trial_name=str(payload["trial_name"]),
             status=str(payload.get("status", "failed")),
             success=bool(payload.get("success", False)),
             roll_bp=int(payload["roll_bp"]) if payload.get("roll_bp") is not None else None,

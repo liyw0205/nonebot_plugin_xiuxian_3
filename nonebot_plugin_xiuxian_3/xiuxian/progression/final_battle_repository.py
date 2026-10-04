@@ -44,7 +44,7 @@ from .endgame_rules import (
     FINAL_BATTLE_MAX_TURNS,
     FINAL_BATTLE_MIN_MERIT,
     FINAL_BATTLE_MIN_PROGRESS,
-    TRIAL_ORDER,
+    tribulation_definition,
 )
 from ..utils.assets import grant_player_items, inventory_amount, spend_player_items
 from ..utils.player import (
@@ -710,7 +710,7 @@ class FinalBattleRepositoryMixin:
         if str(player["endgame_status"] or "none") != "tribulation" or str(player["location_key"]) != FINAL_BATTLE_LOCATION:
             raise FinalBattleRequirementError("initiator must be on the sky terrace tribulation route")
         trials = {str(row["trial_key"]) for row in connection.execute("SELECT trial_key FROM tribulation_trial_sessions WHERE player_id=? AND status='succeeded'", (player["id"],)).fetchall()}
-        if not set(TRIAL_ORDER).issubset(trials):
+        if not set(tribulation_definition(self.content).trial_order).issubset(trials):
             raise FinalBattleRequirementError("all three tribulation trials must be complete")
         if int(player["dao_fruit_progress"]) < FINAL_BATTLE_MIN_PROGRESS or int(player["ascension_merit"]) < FINAL_BATTLE_MIN_MERIT or int(player["tribulation_debt"]) >= 100:
             raise FinalBattleRequirementError("final battle progression requirements are not met")
