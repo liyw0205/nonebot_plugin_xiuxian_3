@@ -470,6 +470,7 @@ def test_repository_rejects_non_integer_cargo_quantities(tmp_path: Path, quantit
             await runtime.repository.start_route(
                 platform="web", platform_user_id="route-recovery", route_key=ROUTE_NEW_TOWN_OUTSKIRTS,
                 cargo_key="item.herb.blood_grass", cargo_quantity=quantity, operation_id="invalid-start",
+                request_args=(),
             )
         assert _state(runtime, player_id) == before
         await runtime.close()
@@ -529,6 +530,110 @@ def test_implicit_cargo_request_replays_before_current_default_is_resolved(tmp_p
         else:
             assert next_route.code == "LIVELIHOOD_CONTENT_CLOSED"
             assert _state(runtime, player_id) == before
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("kind", ["onebot", "qq"])
+def test_explicit_route_and_cargo_alias_replay_after_content_rename_and_close(
+    tmp_path: Path, kind: str,
+) -> None:
+    pytest.importorskip("nonebot")
+
+    async def run() -> None:
+        data_dir = _content(tmp_path)
+        _edit_record(
+            data_dir,
+            "生活/生活.json",
+            ROUTE_NEW_TOWN_OUTSKIRTS,
+            lambda row: row.update(
+                name="青石药车",
+                aliases=["旧商路"],
+                cargo={
+                    **row["cargo"],
+                    "aliases": {**row["cargo"]["aliases"], "旧灵草": "item.herb.blood_grass"},
+                },
+            ),
+        )
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
+        adapter = "onebot.v11" if kind == "onebot" else "qq.official"
+        user_id = "1001" if kind == "onebot" else "qq-user-1"
+
+        def event(text: str, message_id: int):
+            if kind == "onebot":
+                return _onebot_event(text, message_id, user_id=1001, group_id=2002)
+            return _qq_event(text, f"route-alias-{message_id}", member_openid=user_id, group_openid="qq-group")
+
+        async def send(text: str, message_id: int):
+            from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event
+            from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq_event
+
+            raw = event(text, message_id)
+            normalized = normalize_event(raw) if kind == "onebot" else normalize_qq_event(raw)
+            return await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+
+        assert (await send("开始修仙", 9000)).ok
+        assert (await send("寻仙问道", 9001)).ok
+        started = await send("开始运输 旧商路 旧灵草 1", 9002)
+        assert started.code == "ROUTE_STARTED"
+        route_id = started.data["route_id"]
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            before = connection.execute(
+                "SELECT stamina, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user_id),
+            ).fetchone()
+        await runtime.close()
+
+        def close_and_rename(row):
+            row.update(name="新商路", aliases=[], status="locked")
+            row["cargo"]["aliases"].pop("旧灵草", None)
+
+        _edit_record(data_dir, "生活/生活.json", ROUTE_NEW_TOWN_OUTSKIRTS, close_and_rename)
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
+        replay = await send("开始运输 旧商路 旧灵草 1", 9002)
+        assert replay.data == {**started.data, "idempotent_replay": True}
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            after = connection.execute(
+                "SELECT stamina, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user_id),
+            ).fetchone()
+        assert after == before
+        conflict = await send("开始运输 旧商路 旧灵草 2", 9002)
+        assert conflict.code == "OPERATION_CONFLICT"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            assert connection.execute(
+                "SELECT COUNT(*) FROM livelihood_trade_routes WHERE route_id=?", (route_id,)
+            ).fetchone()[0] == 1
+        clock.advance(minutes=20)
+        settled = await send(f"结算运输 {route_id}", 9003)
+        assert settled.code == "ROUTE_SETTLED"
+        assert "青石药车" in settled.message
+        assert "新商路" not in settled.message
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("result_json", ["{", "[]", '{"status":"settled"}'])
+def test_route_start_replay_rejects_corrupt_operation_without_writing(
+    tmp_path: Path, result_json: str,
+) -> None:
+    async def run() -> None:
+        runtime = create_runtime(data_dir=tmp_path)
+        player_id = await _prepare(runtime)
+        started = await runtime.dispatch(_context("start"), "开始运输 止血草 1")
+        assert started.code == "ROUTE_STARTED"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id=?",
+                (result_json, "start"),
+            )
+        before = _state(runtime, player_id)
+        replay = await runtime.dispatch(_context("start"), "开始运输 止血草 1")
+        assert replay.code == "PERSISTENCE_ERROR"
+        assert _state(runtime, player_id) == before
         await runtime.close()
 
     asyncio.run(run())

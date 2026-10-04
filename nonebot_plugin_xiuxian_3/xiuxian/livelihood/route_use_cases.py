@@ -166,6 +166,22 @@ class RouteApplication:
     async def start_route(self, context: CommandContext) -> CommandResult:
         operation_id = self._operation_id(context, "livelihood.start_route")
         try:
+            replay = await self.repository.replay_route_start(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+                request_args=context.command_args,
+            )
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次传讯与先前托运的货物不符，请重新传讯。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if replay is not None:
+            return self._started_result(context, operation_id, replay)
+
+        try:
             parsed = self._parse_route_args(context.command_args)
         except ContentError:
             return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该运输路线或货物暂未开放。", context.request_id, operation_id)
@@ -180,6 +196,7 @@ class RouteApplication:
                 cargo_key=cargo_key,
                 cargo_quantity=quantity,
                 operation_id=operation_id,
+                request_args=context.command_args,
                 mount_ref=mount_ref,
             )
         except RouteContentClosedError:
@@ -210,6 +227,9 @@ class RouteApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return self._started_result(context, operation_id, record)
+
+    def _started_result(self, context: CommandContext, operation_id: str, record) -> CommandResult:
         delay_text = f"，可能延误 {record.delay_seconds // 60} 分钟" if record.delay_seconds else ""
         return CommandResult(
             True,

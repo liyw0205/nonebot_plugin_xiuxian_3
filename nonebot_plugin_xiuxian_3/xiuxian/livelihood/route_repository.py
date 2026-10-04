@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
@@ -50,6 +51,87 @@ from ..companions.rules import (
 
 class RouteRepositoryMixin:
     """Own cargo locking, route sessions and route settlement."""
+
+    async def replay_route_start(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> RouteStartRecord | None:
+        """Replay a start operation before resolving selectors from current content."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._replay_route_start_once,
+                platform,
+                platform_user_id,
+                operation_id,
+                request_args,
+            )
+
+    def _replay_route_start_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> RouteStartRecord | None:
+        if not isinstance(request_args, tuple) or any(not isinstance(value, str) for value in request_args):
+            raise ValueError("route request arguments must be strings")
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT o.operation_name, o.result_json, p.platform, p.platform_user_id
+                FROM operations AS o
+                JOIN players AS p ON p.id = o.player_id
+                WHERE o.operation_id = ?
+                """,
+                (operation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        if (
+            row["operation_name"] != "livelihood.start_route"
+            or row["platform"] != platform
+            or row["platform_user_id"] != platform_user_id
+        ):
+            raise OperationConflictError("operation input differs from its original request")
+        try:
+            payload = json.loads(row["result_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("route operation snapshot is invalid") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("route operation snapshot must be an object")
+        return self._start_replay_payload(payload, request_args)
+
+    def _start_replay_payload(
+        self,
+        payload: dict[str, Any],
+        request_args: tuple[str, ...],
+    ) -> RouteStartRecord:
+        record = self._start_from_payload(payload)
+        stored_args = payload.get("request_args")
+        request_forms = payload.get("request_forms")
+        if not isinstance(stored_args, list) or any(not isinstance(value, str) for value in stored_args):
+            raise ValueError("route operation request arguments are invalid")
+        if (
+            not isinstance(request_forms, list)
+            or not request_forms
+            or any(
+                not isinstance(form, list)
+                or len(form) != len(stored_args)
+                or any(not isinstance(value, str) for value in form)
+                for form in request_forms
+            )
+            or stored_args not in request_forms
+        ):
+            raise ValueError("route operation request forms are invalid")
+        if list(request_args) not in request_forms:
+            raise OperationConflictError("operation input differs from its original request")
+        return replace(record, already_completed=True)
 
     async def preview_route(
         self,
@@ -151,6 +233,7 @@ class RouteRepositoryMixin:
         cargo_key: str | None,
         cargo_quantity: int,
         operation_id: str,
+        request_args: tuple[str, ...],
         mount_ref: str | None = None,
     ) -> RouteStartRecord:
         await self.initialize()
@@ -162,6 +245,7 @@ class RouteRepositoryMixin:
                 route_key,
                 cargo_key,
                 cargo_quantity,
+                request_args,
                 mount_ref,
                 operation_id,
             )
@@ -173,9 +257,12 @@ class RouteRepositoryMixin:
         route_key: str,
         cargo_key: str | None,
         cargo_quantity: int,
+        request_args: tuple[str, ...],
         mount_ref: str | None,
         operation_id: str,
     ) -> RouteStartRecord:
+        if not isinstance(request_args, tuple) or any(not isinstance(value, str) for value in request_args):
+            raise ValueError("route request arguments must be strings")
         operation_name = "livelihood.start_route"
         request_hash = self._request_hash(
             operation_name,
@@ -195,7 +282,7 @@ class RouteRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._route_operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                return self._start_from_payload(existing, replay=True)
+                return self._start_replay_payload(existing, request_args)
             definition, cargo_key, cargo_value = self._validated_route(route_key, cargo_key, cargo_quantity)
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["stage"]) not in definition.allowed_stages:
@@ -310,6 +397,8 @@ class RouteRepositoryMixin:
                 "stamina_cost": route_stamina_cost,
                 "reward_stones": definition.reward_stones,
                 "delay_seconds": delay_seconds,
+                "request_args": list(request_args),
+                "request_forms": self._route_request_forms(request_args, definition, cargo_key, mount, mount_ref),
                 "mount_instance_id": str(mount["instance_id"]) if mount else None,
                 "mount_name": str(mount["name"]) if mount else None,
                 "mount_level": int(mount["level"]) if mount else None,
@@ -566,6 +655,42 @@ class RouteRepositoryMixin:
             raise RouteCargoRequirementError("cargo value is outside the route limit")
         return definition, cargo_key, unit_value * quantity
 
+    def _route_request_forms(
+        self,
+        request_args: tuple[str, ...],
+        definition: RouteDefinition,
+        cargo_key: str,
+        mount: dict[str, Any] | None,
+        mount_ref: str | None,
+    ) -> list[list[str]]:
+        """Freeze equivalent route/cargo selectors while retaining quantity and shape."""
+
+        raw = list(request_args)
+        route_refs = [definition.key, definition.label, *definition.aliases]
+        cargo_refs = [cargo_key, cargo_label(cargo_key, self.content)]
+        cargo_refs.extend(alias for alias, key in definition.cargo_aliases.items() if key == cargo_key)
+        route_explicit = bool(raw and raw[0] in route_refs)
+        cargo_index = 1 if route_explicit else 0
+        cargo_explicit = len(raw) > cargo_index and raw[cargo_index] in cargo_refs
+        choices: list[tuple[int, list[str]]] = []
+        if route_explicit:
+            choices.append((0, list(dict.fromkeys(route_refs))))
+        if cargo_explicit:
+            choices.append((cargo_index, list(dict.fromkeys(cargo_refs))))
+        if mount is not None:
+            mount_refs = [mount["instance_id"], mount["key"], mount["name"]]
+            selected_mount_ref = str(mount_ref or "")
+            if selected_mount_ref and selected_mount_ref in raw:
+                choices.append((raw.index(selected_mount_ref), list(dict.fromkeys(str(ref) for ref in mount_refs))))
+        forms = [raw]
+        for index, replacements in choices:
+            forms = [
+                [*form[:index], replacement, *form[index + 1 :]]
+                for form in forms
+                for replacement in replacements
+            ]
+        return [list(form) for form in dict.fromkeys(tuple(form) for form in forms)]
+
     @staticmethod
     def _check_route_busy(connection: Any, player_id: int) -> None:
         checks = (
@@ -603,6 +728,49 @@ class RouteRepositoryMixin:
         )
 
     def _start_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> RouteStartRecord:
+        if not isinstance(payload.get("player"), dict):
+            raise ValueError("route operation snapshot player is invalid")
+        required_strings = (
+            "route_id",
+            "route_key",
+            "route_name",
+            "cargo_key",
+            "cargo_name",
+            "source_location",
+            "destination_location",
+            "starts_at",
+            "arrives_at",
+        )
+        if any(not isinstance(payload.get(key), str) or not str(payload[key]).strip() for key in required_strings):
+            raise ValueError("route operation snapshot identity is invalid")
+        if payload.get("status") != "in_transit":
+            raise ValueError("route operation snapshot status is invalid")
+        for key, minimum in (
+            ("cargo_quantity", 1),
+            ("cargo_value", 0),
+            ("stamina_cost", 0),
+            ("reward_stones", 0),
+            ("delay_seconds", 0),
+        ):
+            value = payload.get(key)
+            if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+                raise ValueError(f"route operation snapshot {key} is invalid")
+        try:
+            datetime.fromisoformat(str(payload["starts_at"]))
+            datetime.fromisoformat(str(payload["arrives_at"]))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("route operation snapshot time is invalid") from exc
+        if payload.get("mount_instance_id") is not None and not isinstance(payload["mount_instance_id"], str):
+            raise ValueError("route operation snapshot mount is invalid")
+        if payload.get("mount_name") is not None and not isinstance(payload["mount_name"], str):
+            raise ValueError("route operation snapshot mount name is invalid")
+        if payload.get("mount_level") is not None and (
+            not isinstance(payload["mount_level"], int) or isinstance(payload["mount_level"], bool)
+        ):
+            raise ValueError("route operation snapshot mount level is invalid")
+        mount_stamina_cost = payload.get("mount_stamina_cost", 0)
+        if not isinstance(mount_stamina_cost, int) or isinstance(mount_stamina_cost, bool) or mount_stamina_cost < 0:
+            raise ValueError("route operation snapshot mount stamina is invalid")
         return RouteStartRecord(
             player=self._row_to_player(payload["player"]),
             route_id=str(payload["route_id"]),
@@ -628,6 +796,33 @@ class RouteRepositoryMixin:
         )
 
     def _route_settlement_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> RouteSettlementRecord:
+        if not isinstance(payload.get("player"), dict):
+            raise ValueError("route settlement snapshot player is invalid")
+        required_strings = ("route_id", "route_key", "route_name", "cargo_name")
+        if any(not isinstance(payload.get(key), str) or not str(payload[key]).strip() for key in required_strings):
+            raise ValueError("route settlement snapshot identity is invalid")
+        if payload.get("status") != "settled":
+            raise ValueError("route settlement snapshot status is invalid")
+        for key, minimum in (
+            ("cargo_quantity", 0),
+            ("reward_stones", 0),
+            ("local_reputation_before", 0),
+            ("local_reputation_after", 0),
+            ("delay_seconds", 0),
+            ("local_reputation_delta", 0),
+        ):
+            value = payload.get(key, 0)
+            if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+                raise ValueError(f"route settlement snapshot {key} is invalid")
+        cargo = payload.get("cargo", {})
+        if not isinstance(cargo, dict) or any(
+            not isinstance(key, str)
+            or not isinstance(value, int)
+            or isinstance(value, bool)
+            or value <= 0
+            for key, value in cargo.items()
+        ):
+            raise ValueError("route settlement snapshot cargo is invalid")
         return RouteSettlementRecord(
             player=self._row_to_player(payload["player"]),
             route_id=str(payload["route_id"]),
