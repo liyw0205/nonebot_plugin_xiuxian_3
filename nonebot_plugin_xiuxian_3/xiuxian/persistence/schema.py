@@ -1087,6 +1087,7 @@ CREATE TABLE IF NOT EXISTS equipment_instances (
     label TEXT NOT NULL,
     slot TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('active', 'broken', 'archived')),
+    equipped INTEGER NOT NULL DEFAULT 1 CHECK (equipped IN (0, 1)),
     durability_bp INTEGER NOT NULL CHECK (durability_bp >= 0),
     temper_level INTEGER NOT NULL CHECK (temper_level >= 0 AND temper_level <= max_temper_level),
     max_temper_level INTEGER NOT NULL CHECK (max_temper_level > 0),
@@ -1099,6 +1100,27 @@ CREATE TABLE IF NOT EXISTS equipment_instances (
 
 CREATE INDEX IF NOT EXISTS idx_equipment_instances_player
     ON equipment_instances(player_id, item_key, status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_equipment_instances_equipped_slot
+    ON equipment_instances(player_id, slot)
+    WHERE status = 'active' AND equipped = 1;
+
+CREATE TABLE IF NOT EXISTS equipment_loadout_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    equipment_id INTEGER NOT NULL REFERENCES equipment_instances(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    action TEXT NOT NULL CHECK (action IN ('equip', 'unequip')),
+    slot TEXT NOT NULL,
+    equipped_before INTEGER NOT NULL CHECK (equipped_before IN (0, 1)),
+    equipped_after INTEGER NOT NULL CHECK (equipped_after IN (0, 1)),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_loadout_events_player
+    ON equipment_loadout_events(player_id, created_at);
 
 CREATE TABLE IF NOT EXISTS equipment_tempering_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

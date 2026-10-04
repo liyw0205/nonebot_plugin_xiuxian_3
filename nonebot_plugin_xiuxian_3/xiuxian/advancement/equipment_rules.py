@@ -20,6 +20,7 @@ COMBAT_EQUIPMENT_STATS = frozenset(
         "healing_reduction_bp", "recovery_reduction_bp",
     }
 )
+EQUIPMENT_SLOTS = frozenset({"weapon", "armor", "accessory"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +63,9 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
                 raise ContentError(f"equipment {key} references unknown growth profile {growth_profile_key}") from exc
         if not isinstance(key, str) or not isinstance(name, str) or not isinstance(growth, dict):
             raise ContentError(f"equipment item requires key, name and growth configuration: {row!r}")
+        slot = row.get("equipment_slot", row.get("item_type"))
+        if not isinstance(slot, str) or slot not in EQUIPMENT_SLOTS:
+            raise ContentError(f"equipment {key} has an unsupported equipment slot")
         if not isinstance(row.get("desc"), str) or not row["desc"].strip():
             raise ContentError(f"equipment {key} requires desc")
         if row.get("quality") not in {"common", "uncommon", "rare", "heaven", "mythic"}:
@@ -143,7 +147,7 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
             equipment_initial_durability_bp(0, EquipmentDefinition(
                 key=key,
                 label=name.strip(),
-                slot=str(row.get("equipment_slot", row["item_type"])),
+                slot=slot,
                 base_durability_bp=base_durability,
                 growth=dict(growth),
                 path_key=path_key,
@@ -154,7 +158,7 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
         result[key] = EquipmentDefinition(
             key=key,
             label=name.strip(),
-            slot=str(row.get("equipment_slot", row["item_type"])),
+            slot=slot,
             base_durability_bp=base_durability,
             growth=dict(growth),
             aliases=tuple(aliases),
@@ -331,6 +335,7 @@ EQUIPMENT_ALIASES = {
 
 __all__ = [
     "COMBAT_EQUIPMENT_STATS",
+    "EQUIPMENT_SLOTS",
     "EQUIPMENT_ALIASES",
     "EQUIPMENT_DEFINITIONS",
     "FLAT_EQUIPMENT_STATS",

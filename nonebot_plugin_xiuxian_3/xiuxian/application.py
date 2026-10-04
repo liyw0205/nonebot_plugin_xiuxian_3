@@ -1336,6 +1336,23 @@ class XiuxianApplication:
             write_message="当前事件不允许重铸法器。",
         )
 
+    async def list_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.equipment.list_equipment(context), require_write=False)
+
+    async def equip_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.equip(context),
+            write_message="当前事件不允许穿戴装备。",
+        )
+
+    async def unequip_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.unequip(context),
+            write_message="当前事件不允许卸下装备。",
+        )
+
     async def get_companion_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.companions.status(context), require_write=False)
 

@@ -1208,6 +1208,14 @@ class EquipmentBusyError(RuntimeError):
     """A long-running action prevents equipment mutation."""
 
 
+class EquipmentSlotBusyError(RuntimeError):
+    """The requested equipment slot already contains another item."""
+
+
+class EquipmentDurabilityZeroError(RuntimeError):
+    """An equipment instance with no remaining durability cannot be worn."""
+
+
 class RealmCultivationInsufficientError(RuntimeError):
     """The player has not reached the next layer threshold."""
 

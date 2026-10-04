@@ -22,8 +22,14 @@ from nonebot_plugin_xiuxian_3.xiuxian.advancement.equipment_rules import (
 )
 
 
-def _context(user_id: str, request_id: str, *, operation_id: str = "") -> CommandContext:
-    return CommandContext(adapter="web", user_id=user_id, request_id=request_id, operation_id=operation_id)
+def _context(
+    user_id: str,
+    request_id: str,
+    *,
+    operation_id: str = "",
+    adapter: str = "web",
+) -> CommandContext:
+    return CommandContext(adapter=adapter, user_id=user_id, request_id=request_id, operation_id=operation_id)
 
 
 async def _enter_cultivator(runtime, user_id: str) -> None:
@@ -41,19 +47,31 @@ async def _enter_cultivator(runtime, user_id: str) -> None:
         assert result.ok, (command, result.code, result.message)
 
 
-def _set_equipment_resources(runtime, user_id: str, *, ironstone: int, stones: int, sword: int = 1) -> None:
+def _set_equipment_resources(
+    runtime,
+    user_id: str,
+    *,
+    ironstone: int,
+    stones: int,
+    sword: int = 1,
+    cloud_sword: int = 0,
+    cloud_iron: int = 0,
+    adapter: str = "web",
+) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
         row = connection.execute(
             "SELECT inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
-            ("web", user_id),
+            (adapter, user_id),
         ).fetchone()
         assert row is not None
         inventory = json.loads(row[0])
         inventory["item.weapon.wood_sword"] = sword
+        inventory["item.weapon.cloud_sword"] = cloud_sword
         inventory["item.ore.ironstone"] = ironstone
+        inventory["item.material.cloud_iron"] = cloud_iron
         connection.execute(
             "UPDATE players SET inventory_json = ?, spirit_stones = ? WHERE platform = ? AND platform_user_id = ?",
-            (json.dumps(inventory, ensure_ascii=False, sort_keys=True), stones, "web", user_id),
+            (json.dumps(inventory, ensure_ascii=False, sort_keys=True), stones, adapter, user_id),
         )
 
 
@@ -440,3 +458,157 @@ def test_equipment_requires_ownership_and_respects_long_action_and_concurrency()
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_equipment_loadout_is_idempotent_recoverable_and_adapter_neutral() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            adapters = ("qq.official", "onebot.v11")
+            runtime = create_runtime(data_dir=data_dir, adapters=adapters)
+            for adapter in adapters:
+                user = f"loadout-{adapter}"
+                await _enter_cultivator_with_adapter(runtime, adapter, user)
+                _set_equipment_resources(
+                    runtime,
+                    user,
+                    adapter=adapter,
+                    ironstone=100,
+                    stones=10_000,
+                    sword=1,
+                    cloud_sword=1,
+                    cloud_iron=2,
+                )
+
+                wood = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(user, f"{adapter}-temper-wood", adapter=adapter, operation_id=f"{adapter}:temper:wood"),
+                    "强化法器 木纹剑",
+                )
+                cloud = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(user, f"{adapter}-temper-cloud", adapter=adapter, operation_id=f"{adapter}:temper:cloud"),
+                    "强化法器 云纹剑",
+                )
+                assert wood.ok and cloud.ok
+
+                initial = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(user, f"{adapter}-list-before", adapter=adapter),
+                    "我的装备",
+                )
+                assert initial.code == "EQUIPMENT_LISTED"
+                assert {item["label"] for item in initial.data["equipment"]} == {"木纹剑", "云纹剑"}
+                assert next(item for item in initial.data["equipment"] if item["label"] == "木纹剑")["equipped"] is True
+                assert next(item for item in initial.data["equipment"] if item["label"] == "云纹剑")["equipped"] is False
+
+                unequip = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(
+                        user,
+                        f"{adapter}-unequip",
+                        adapter=adapter,
+                        operation_id=f"{adapter}:loadout:unequip",
+                    ),
+                    "卸下装备 木纹剑",
+                )
+                assert unequip.code == "EQUIPMENT_UNEQUIPPED"
+                equip_operation = f"{adapter}:loadout:equip"
+                equip = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(user, f"{adapter}-equip", adapter=adapter, operation_id=equip_operation),
+                    "穿戴装备 木纹剑",
+                )
+                assert equip.code == "EQUIPMENT_EQUIPPED"
+                assert equip.data["idempotent_replay"] is False
+
+                with runtime.repository._connect() as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    snapshot = runtime.repository._battle_equipment_snapshot(connection, player_id)
+                    before_counts = tuple(connection.execute(
+                        "SELECT COUNT(*), SUM(equipped_after) FROM equipment_loadout_events WHERE player_id=?",
+                        (player_id,),
+                    ).fetchone())
+                assert [item["item_key"] for item in snapshot] == ["item.weapon.wood_sword"]
+                assert before_counts == (2, 1)
+                with runtime.repository._connect() as connection:
+                    event_snapshot = connection.execute(
+                        "SELECT snapshot_json FROM equipment_loadout_events WHERE operation_id=?",
+                        (equip_operation,),
+                    ).fetchone()[0]
+                assert json.loads(event_snapshot)["equipped"] is True
+
+                conflict = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(user, f"{adapter}-conflict", adapter=adapter, operation_id=f"{adapter}:loadout:cloud"),
+                    "穿戴装备 云纹剑",
+                )
+                assert conflict.code == "EQUIP_SLOT_BUSY"
+                input_conflict = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(user, f"{adapter}-input-conflict", adapter=adapter, operation_id=equip_operation),
+                    "穿戴装备 云纹剑",
+                )
+                assert input_conflict.code == "OPERATION_CONFLICT"
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(user, f"{adapter}-equip-replay", adapter=adapter, operation_id=equip_operation),
+                    "穿戴装备 木纹剑",
+                )
+                assert replay.code == "EQUIPMENT_EQUIPPED"
+                assert replay.data["idempotent_replay"] is True
+
+                with runtime.repository._connect() as connection:
+                        after_counts = tuple(connection.execute(
+                            "SELECT COUNT(*), SUM(equipped_after) FROM equipment_loadout_events WHERE player_id=?",
+                            (player_id,),
+                        ).fetchone())
+                assert after_counts == before_counts
+
+            await runtime.close()
+
+            recovered = create_runtime(data_dir=data_dir, adapters=adapters)
+            for adapter in adapters:
+                user = f"loadout-{adapter}"
+                replay = await recovered.adapters.dispatch(
+                    adapter,
+                    _context(
+                        user,
+                        f"{adapter}-equip-after-restart",
+                        adapter=adapter,
+                        operation_id=f"{adapter}:loadout:equip",
+                    ),
+                    "穿戴装备 木纹剑",
+                )
+                assert replay.code == "EQUIPMENT_EQUIPPED"
+                assert replay.data["idempotent_replay"] is True
+                listed = await recovered.adapters.dispatch(
+                    adapter,
+                    _context(user, f"{adapter}-list-after-restart", adapter=adapter),
+                    "我的装备",
+                )
+                assert next(item for item in listed.data["equipment"] if item["label"] == "木纹剑")["equipped"] is True
+            await recovered.close()
+
+    asyncio.run(run())
+
+
+async def _enter_cultivator_with_adapter(runtime, adapter: str, user_id: str) -> None:
+    commands = (
+        "开始修仙",
+        "寻仙问道",
+        "完成引导 阅读",
+        "前往近郊",
+        "完成引导 采集",
+        "完成引导 炼丹",
+        "选择道途 体修",
+    )
+    for index, command in enumerate(commands):
+        result = await runtime.adapters.dispatch(
+            adapter,
+            _context(user_id, f"{adapter}-setup-{index}", adapter=adapter),
+            command,
+        )
+        assert result.ok, (adapter, command, result.code, result.message)

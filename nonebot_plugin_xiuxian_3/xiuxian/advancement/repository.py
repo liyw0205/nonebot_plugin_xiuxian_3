@@ -53,7 +53,13 @@ from ..advancement.models import RetreatSessionRecord, RetreatSettlementRecord
 from ..advancement.constitution_models import ConstitutionRecord
 from ..advancement.talent_models import TalentNodeRecord, TalentProfileRecord
 from ..advancement.skill_models import SkillMasteryRecord, SkillProfileRecord
-from ..advancement.equipment_models import EquipmentRecord, RefinementRecord, TemperingRecord
+from ..advancement.equipment_models import (
+    EquipmentListRecord,
+    EquipmentLoadoutRecord,
+    EquipmentRecord,
+    RefinementRecord,
+    TemperingRecord,
+)
 from ..advancement.rules import (
     MAX_OFFLINE_SECONDS,
     MAX_SETTLEMENT_SECONDS,
@@ -205,6 +211,7 @@ from ..utils.assets import (
     assets_spend,
     player_currency,
 )
+from ..utils.equipment import equipment_instance_rows
 from ..utils.player import change_player_state, player_integer, player_inventory, spend_player_state
 
 
@@ -1223,6 +1230,7 @@ class AdvancementRepositoryMixin:
             label=str(payload["label"]),
             slot=str(payload["slot"]),
             status=str(payload.get("status", "active")),
+            equipped=bool(payload["equipped"]),
             durability_bp=int(payload.get("durability_bp", 10000)),
             temper_level=int(payload.get("temper_level", 0)),
             max_temper_level=int(payload["max_temper_level"]),
@@ -1239,6 +1247,7 @@ class AdvancementRepositoryMixin:
             label=str(row["label"] or (definition.label if definition else row["item_key"])),
             slot=str(row["slot"] or (definition.slot if definition else "unknown")),
             status=str(row["status"]),
+            equipped=bool(row["equipped"]),
             durability_bp=int(row["durability_bp"]),
             temper_level=int(row["temper_level"]),
             max_temper_level=int(row["max_temper_level"]),
@@ -1284,6 +1293,28 @@ class AdvancementRepositoryMixin:
         )
 
     @staticmethod
+    def _loadout_from_payload(
+        payload: dict[str, Any], *, replay: bool = False
+    ) -> EquipmentLoadoutRecord:
+        return EquipmentLoadoutRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            equipment=SQLitePlayerRepository._equipment_from_payload(payload["equipment"]),
+            action=str(payload["action"]),
+            previous_equipped=bool(payload["previous_equipped"]),
+            equipped=bool(payload["equipped"]),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _equipment_list_from_rows(
+        player: sqlite3.Row, rows: list[sqlite3.Row]
+    ) -> EquipmentListRecord:
+        return EquipmentListRecord(
+            player=SQLitePlayerRepository._row_to_player(player),
+            equipment=tuple(SQLitePlayerRepository._equipment_from_row(row) for row in rows),
+        )
+
+    @staticmethod
     def _materialize_equipment(
         connection: sqlite3.Connection,
         player: sqlite3.Row,
@@ -1304,14 +1335,18 @@ class AdvancementRepositoryMixin:
             return player
         durability = SQLitePlayerRepository._json_object(player["durability_json"], {})
         durability_bp = int(durability.get(definition.key, 10000))
+        occupied = connection.execute(
+            "SELECT 1 FROM equipment_instances WHERE player_id = ? AND slot = ? AND status = 'active' AND equipped = 1 LIMIT 1",
+            (player["id"], definition.slot),
+        ).fetchone() is not None
         for _ in range(quantity):
             connection.execute(
                 """
                 INSERT INTO equipment_instances(
                     instance_id, player_id, item_key, label, slot, status,
-                    durability_bp, temper_level, max_temper_level, affixes_json,
+                    equipped, durability_bp, temper_level, max_temper_level, affixes_json,
                     refinement_failure_streak, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'active', ?, 0, ?, '{}', 0, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, 0, ?, '{}', 0, ?, ?)
                 """,
                 (
                     uuid4().hex,
@@ -1319,12 +1354,14 @@ class AdvancementRepositoryMixin:
                     definition.key,
                     definition.label,
                     definition.slot,
+                    int(not occupied),
                     max(0, durability_bp),
                     definition.max_temper_level,
                     now_text,
                     now_text,
                 ),
             )
+            occupied = True
         spend_player_items(connection, player, {definition.key: quantity}, now_text)
         return connection.execute(
             "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id LIMIT 1",
@@ -1364,6 +1401,194 @@ class AdvancementRepositoryMixin:
             return True
         inventory = player_inventory(player)
         return inventory_amount(inventory, definition.key) > 0
+
+    async def list_equipment(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> EquipmentListRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._list_equipment_sync, platform, platform_user_id)
+
+    def _list_equipment_sync(self, platform: str, platform_user_id: str) -> EquipmentListRecord:
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            rows = equipment_instance_rows(connection, int(player["id"]))
+            return self._equipment_list_from_rows(player, rows)
+
+    async def equip_equipment(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+    ) -> EquipmentLoadoutRecord:
+        return await self._set_equipment_loadout(
+            platform=platform,
+            platform_user_id=platform_user_id,
+            equipment_reference=equipment_reference,
+            operation_id=operation_id,
+            equipped=True,
+        )
+
+    async def unequip_equipment(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+    ) -> EquipmentLoadoutRecord:
+        return await self._set_equipment_loadout(
+            platform=platform,
+            platform_user_id=platform_user_id,
+            equipment_reference=equipment_reference,
+            operation_id=operation_id,
+            equipped=False,
+        )
+
+    async def _set_equipment_loadout(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+        equipped: bool,
+    ) -> EquipmentLoadoutRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._set_equipment_loadout_sync,
+                platform,
+                platform_user_id,
+                equipment_reference,
+                operation_id,
+                equipped,
+            )
+
+    def _set_equipment_loadout_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        equipment_reference: str,
+        operation_id: str,
+        equipped: bool,
+    ) -> EquipmentLoadoutRecord:
+        operation_name = "item.equip" if equipped else "item.unequip"
+        definition = equipment_definition(equipment_reference, self.content)
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "equipment_reference": equipment_reference.strip(),
+                "item_key": definition.key,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("operation input differs from its original request")
+                return self._loadout_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            player = self._require_player(connection, platform, platform_user_id)
+            if str(player["stage"]) != "cultivator":
+                raise PlayerStageConflictError("equipment loadout requires entry into cultivation")
+            if equipped and not equipment_meets_path(definition, player["path_key"]):
+                raise EquipmentRequirementError("equipment is restricted to another path")
+            if equipped and not equipment_meets_realm(
+                definition,
+                str(player["realm_key"]),
+                player_integer(player, "realm_layer"),
+                self.content,
+            ):
+                raise EquipmentRequirementError("player realm does not meet equipment requirement")
+            if self._has_active_long_action(connection, int(player["id"])):
+                raise EquipmentBusyError("another long action is active")
+            equipment = self._resolve_equipment(connection, player, equipment_reference, now_text)
+            previous_equipped = bool(equipment["equipped"])
+            if equipped and int(equipment["durability_bp"]) <= 0:
+                raise EquipmentDurabilityZeroError("equipment durability is empty")
+            if equipped and not previous_equipped:
+                occupied = connection.execute(
+                    "SELECT 1 FROM equipment_instances WHERE player_id = ? AND slot = ? AND status = 'active' AND equipped = 1 LIMIT 1",
+                    (player["id"], equipment["slot"]),
+                ).fetchone()
+                if occupied is not None:
+                    raise EquipmentSlotBusyError("equipment slot is occupied")
+            connection.execute(
+                "UPDATE equipment_instances SET equipped = ?, updated_at = ? WHERE id = ? AND player_id = ?",
+                (int(equipped), now_text, equipment["id"], player["id"]),
+            )
+            updated_equipment = connection.execute(
+                "SELECT * FROM equipment_instances WHERE id = ?", (equipment["id"],)
+            ).fetchone()
+            updated_player = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (player["id"],)
+            ).fetchone()
+            if updated_equipment is None or updated_player is None:
+                raise RuntimeError("equipment loadout returned no state")
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated_player)),
+                "equipment": {
+                    "instance_id": updated_equipment["instance_id"],
+                    "item_key": updated_equipment["item_key"],
+                    "label": updated_equipment["label"],
+                    "slot": updated_equipment["slot"],
+                    "status": updated_equipment["status"],
+                    "equipped": bool(updated_equipment["equipped"]),
+                    "durability_bp": updated_equipment["durability_bp"],
+                    "temper_level": updated_equipment["temper_level"],
+                    "max_temper_level": updated_equipment["max_temper_level"],
+                    "affixes": self._json_object(updated_equipment["affixes_json"], {}),
+                    "refinement_failure_streak": updated_equipment["refinement_failure_streak"],
+                },
+                "action": operation_name.removeprefix("item."),
+                "previous_equipped": previous_equipped,
+                "equipped": bool(updated_equipment["equipped"]),
+            }
+            connection.execute(
+                """
+                INSERT INTO equipment_loadout_events(
+                    event_id, player_id, equipment_id, operation_id, action, slot,
+                    equipped_before, equipped_after, snapshot_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    uuid4().hex,
+                    player["id"],
+                    equipment["id"],
+                    operation_id,
+                    payload["action"],
+                    equipment["slot"],
+                    int(previous_equipped),
+                    int(equipped),
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    operation_id,
+                    operation_name,
+                    player["id"],
+                    request_hash,
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            return self._loadout_from_payload(payload)
 
     @staticmethod
     def _consume_equipment_costs(
@@ -1558,6 +1783,7 @@ class AdvancementRepositoryMixin:
                     "label": updated_equipment["label"],
                     "slot": updated_equipment["slot"],
                     "status": updated_equipment["status"],
+                    "equipped": bool(updated_equipment["equipped"]),
                     "durability_bp": updated_equipment["durability_bp"],
                     "temper_level": updated_equipment["temper_level"],
                     "max_temper_level": updated_equipment["max_temper_level"],
@@ -1747,6 +1973,7 @@ class AdvancementRepositoryMixin:
                     "label": updated_equipment["label"],
                     "slot": updated_equipment["slot"],
                     "status": updated_equipment["status"],
+                    "equipped": bool(updated_equipment["equipped"]),
                     "durability_bp": updated_equipment["durability_bp"],
                     "temper_level": updated_equipment["temper_level"],
                     "max_temper_level": updated_equipment["max_temper_level"],

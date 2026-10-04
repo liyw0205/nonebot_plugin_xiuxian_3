@@ -14,6 +14,7 @@ class EquipmentRecord:
     label: str
     slot: str
     status: str
+    equipped: bool
     durability_bp: int
     temper_level: int
     max_temper_level: int
@@ -49,4 +50,26 @@ class RefinementRecord:
     already_completed: bool = False
 
 
-__all__ = ["EquipmentRecord", "RefinementRecord", "TemperingRecord"]
+@dataclass(frozen=True, slots=True)
+class EquipmentLoadoutRecord:
+    player: PlayerView
+    equipment: EquipmentRecord
+    action: str
+    previous_equipped: bool
+    equipped: bool
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EquipmentListRecord:
+    player: PlayerView
+    equipment: tuple[EquipmentRecord, ...]
+
+
+__all__ = [
+    "EquipmentListRecord",
+    "EquipmentLoadoutRecord",
+    "EquipmentRecord",
+    "RefinementRecord",
+    "TemperingRecord",
+]

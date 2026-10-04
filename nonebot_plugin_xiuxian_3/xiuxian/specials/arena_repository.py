@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
+from ..utils.equipment import equipment_instance_rows
 from ..utils.player import change_player_state, player_combat_values, player_integer
 from ..persistence.errors import (
     ArenaChallengeCapError,
@@ -839,11 +840,9 @@ class ArenaRepositoryMixin:
         qualification = player_state["qualification"]
         equipment = []
         attack_bonus = 0
-        equipment_rows = connection.execute(
-            "SELECT instance_id, item_key, slot, durability_bp, temper_level, affixes_json FROM equipment_instances "
-            "WHERE player_id = ? AND status = 'active' AND durability_bp > 0 ORDER BY id",
-            (player["id"],),
-        ).fetchall()
+        equipment_rows = equipment_instance_rows(
+            connection, int(player["id"]), equipped_only=True, durable_only=True, active_only=True
+        )
         for item in equipment_rows:
             affixes = json_object(item["affixes_json"])
             attack_bonus += max(0, int(affixes.get("damage", 0)))

@@ -16,6 +16,8 @@ from ..repository import (
     RepositoryBusyError,
     ResourceInsufficientError,
     EquipmentBusyError,
+    EquipmentDurabilityZeroError,
+    EquipmentSlotBusyError,
     SQLitePlayerRepository,
 )
 from .equipment_rules import (
@@ -56,6 +58,10 @@ class EquipmentApplication:
 
     def _content(self) -> ContentBundle:
         return self.repository.content or bundled_content()
+
+    @staticmethod
+    def _slot_label(slot: str) -> str:
+        return {"weapon": "法器", "armor": "防具", "accessory": "饰品"}.get(slot, "装备")
 
     def _cost_text(self, costs: dict[str, int], content: ContentBundle | None = None) -> str:
         content = content or self._content()
@@ -127,6 +133,121 @@ class EquipmentApplication:
     async def refine(self, context: CommandContext) -> CommandResult:
         return await self._mutate(context, mode="refine")
 
+    async def list_equipment(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "查看装备无需附加参数。", context.request_id)
+        try:
+            record = await self.repository.list_equipment(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时无法查看装备。", context.request_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        lines = ["## 我的装备", ""]
+        if not record.equipment:
+            lines.append("身边还没有可用的法器、防具或饰品。")
+        else:
+            for equipment in record.equipment:
+                state = "已穿戴" if equipment.equipped else "收纳中"
+                lines.append(
+                    f"- **{equipment.label}**（{self._slot_label(equipment.slot)}）：{state}，耐久 {equipment.durability_bp / 100:.0f}%"
+                )
+        return CommandResult(
+            True,
+            "EQUIPMENT_LISTED",
+            "\n".join(lines),
+            context.request_id,
+            data={
+                "equipment": [
+                    {
+                        "label": equipment.label,
+                        "slot": equipment.slot,
+                        "status": equipment.status,
+                        "equipped": equipment.equipped,
+                        "durability_bp": equipment.durability_bp,
+                        "temper_level": equipment.temper_level,
+                        "affixes": equipment.affixes,
+                    }
+                    for equipment in record.equipment
+                ]
+            },
+        )
+
+    async def equip(self, context: CommandContext) -> CommandResult:
+        return await self._set_loadout(context, equipped=True)
+
+    async def unequip(self, context: CommandContext) -> CommandResult:
+        return await self._set_loadout(context, equipped=False)
+
+    async def _set_loadout(self, context: CommandContext, *, equipped: bool) -> CommandResult:
+        command = "穿戴法器" if equipped else "卸下法器"
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", f"请指定目标，例如 `{command} 木纹剑`。", context.request_id)
+        operation_name = "item.equip" if equipped else "item.unequip"
+        operation_id = self._operation_id(context, operation_name)
+        try:
+            record = await (
+                self.repository.equip_equipment(
+                    platform=context.adapter,
+                    platform_user_id=context.user_id,
+                    equipment_reference=context.command_args[0],
+                    operation_id=operation_id,
+                )
+                if equipped
+                else self.repository.unequip_equipment(
+                    platform=context.adapter,
+                    platform_user_id=context.user_id,
+                    equipment_reference=context.command_args[0],
+                    operation_id=operation_id,
+                )
+            )
+        except ValueError:
+            return CommandResult(False, "INVALID_EQUIPMENT", "无法辨认这件装备。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerStageConflictError:
+            return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成入道后才能调整装备。", context.request_id, operation_id)
+        except EquipmentNotOwnedError:
+            return CommandResult(False, "EQUIPMENT_NOT_OWNED", "你当前没有这件装备。", context.request_id, operation_id)
+        except EquipmentAmbiguousError:
+            return CommandResult(False, "EQUIPMENT_AMBIGUOUS", "同名装备不止一件，请先处理已有装备。", context.request_id, operation_id)
+        except EquipmentRequirementError:
+            return CommandResult(False, "EQUIPMENT_REQUIREMENT_MISSING", "当前境界或道途还不能穿戴这件装备。", context.request_id, operation_id)
+        except EquipmentDurabilityZeroError:
+            return CommandResult(False, "EQUIPMENT_DURABILITY_ZERO", "这件装备灵力耗尽，修复后才能穿戴。", context.request_id, operation_id)
+        except EquipmentSlotBusyError:
+            return CommandResult(False, "EQUIP_SLOT_BUSY", "这个装备槽已有装备。", context.request_id, operation_id)
+        except EquipmentBusyError:
+            return CommandResult(False, "EQUIPMENT_BUSY", "当前正有一段修行事务进行中，暂不能调整装备。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能调整装备。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次装备调整已改作他用，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        action_text = "穿戴" if equipped else "卸下"
+        return CommandResult(
+            True,
+            "EQUIPMENT_EQUIPPED" if equipped else "EQUIPMENT_UNEQUIPPED",
+            f"## 装备调整\n\n已{action_text} **{record.equipment.label}**，归入{self._slot_label(record.equipment.slot)}。",
+            context.request_id,
+            operation_id,
+            data={
+                "label": record.equipment.label,
+                "slot": record.equipment.slot,
+                "equipped": record.equipped,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
     async def _mutate(self, context: CommandContext, *, mode: str) -> CommandResult:
         if len(context.command_args) != 1:
             command = "强化法器" if mode == "temper" else "重铸法器"
@@ -170,7 +291,7 @@ class EquipmentApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能养成法器。", context.request_id, operation_id)
         except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "这次请求编号已用于其他法器操作，请重新发起。", context.request_id, operation_id)
+            return CommandResult(False, "OPERATION_CONFLICT", "这次祭炼记录已有异议，请重新起炉。", context.request_id, operation_id)
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:

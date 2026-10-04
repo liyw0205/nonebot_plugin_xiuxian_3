@@ -82,30 +82,64 @@ def create_equipment_instances(
         if durability_bp is None
         else max(0, min(10_000, int(durability_bp)))
     )
-    connection.executemany(
-        """
-        INSERT INTO equipment_instances(
-            instance_id, player_id, item_key, label, slot, status,
-            durability_bp, temper_level, max_temper_level, affixes_json,
-            refinement_failure_streak, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'active', ?, 0, ?, '{}', 0, ?, ?)
-        """,
-        [
+    occupied_slots = {
+        str(row[0])
+        for row in connection.execute(
+            "SELECT slot FROM equipment_instances WHERE player_id = ? AND status = 'active' AND equipped = 1",
+            (player_id,),
+        ).fetchall()
+    }
+    rows: list[tuple[Any, ...]] = []
+    for _ in range(quantity):
+        is_equipped = slot not in occupied_slots
+        occupied_slots.add(slot)
+        rows.append(
             (
                 uuid4().hex,
                 player_id,
                 item_key,
                 label,
                 slot,
+                int(is_equipped),
                 durability,
                 max_temper_level,
                 now_text,
                 now_text,
             )
-            for _ in range(quantity)
-        ],
+        )
+    connection.executemany(
+        """
+        INSERT INTO equipment_instances(
+            instance_id, player_id, item_key, label, slot, status,
+            equipped, durability_bp, temper_level, max_temper_level, affixes_json,
+            refinement_failure_streak, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, 0, ?, '{}', 0, ?, ?)
+        """,
+        rows,
     )
     return True
 
 
-__all__ = ["create_equipment_instances", "equipment_instance_template"]
+def equipment_instance_rows(
+    connection: sqlite3.Connection,
+    player_id: int,
+    *,
+    equipped_only: bool = False,
+    durable_only: bool = False,
+    active_only: bool = False,
+) -> list[sqlite3.Row]:
+    """Read owned equipment with one shared loadout filter for all snapshots."""
+
+    clauses = ["player_id = ?", "status = 'active'" if active_only else "status IN ('active', 'broken')"]
+    parameters: list[Any] = [player_id]
+    if equipped_only:
+        clauses.append("equipped = 1")
+    if durable_only:
+        clauses.append("durability_bp > 0")
+    return connection.execute(
+        "SELECT * FROM equipment_instances WHERE " + " AND ".join(clauses) + " ORDER BY id",
+        parameters,
+    ).fetchall()
+
+
+__all__ = ["create_equipment_instances", "equipment_instance_rows", "equipment_instance_template"]

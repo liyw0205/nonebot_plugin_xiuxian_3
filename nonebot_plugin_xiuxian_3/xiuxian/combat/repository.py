@@ -66,6 +66,7 @@ from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..advancement.skill_rules import effective_skill_effect, skill_definition
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
 from ..utils.player import grant_player_state, player_combat_values, player_realm_values
+from ..utils.equipment import equipment_instance_rows
 
 
 class CombatRepositoryMixin:
@@ -1392,15 +1393,9 @@ class CombatRepositoryMixin:
     def _battle_equipment_snapshot(
         self, connection: sqlite3.Connection, player_id: int
     ) -> tuple[dict[str, object], ...]:
-        rows = connection.execute(
-            """
-            SELECT instance_id, item_key, slot, durability_bp, temper_level, affixes_json
-            FROM equipment_instances
-            WHERE player_id = ? AND status = 'active' AND durability_bp > 0
-            ORDER BY id
-            """,
-            (player_id,),
-        ).fetchall()
+        rows = equipment_instance_rows(
+            connection, player_id, equipped_only=True, durable_only=True, active_only=True
+        )
         content = self.content or bundled_content()
         player = connection.execute("SELECT path_key FROM players WHERE id = ?", (player_id,)).fetchone()
         path_key = str(player["path_key"] or "") if player is not None else ""
