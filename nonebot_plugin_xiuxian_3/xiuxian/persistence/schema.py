@@ -1778,7 +1778,7 @@ CREATE INDEX IF NOT EXISTS idx_redemption_claims_player
 CREATE TABLE IF NOT EXISTS fate_pools (
     player_id INTEGER NOT NULL REFERENCES players(id),
     pool_key TEXT NOT NULL,
-    pity_count INTEGER NOT NULL DEFAULT 0 CHECK (pity_count >= 0 AND pity_count < 10),
+    pity_count INTEGER NOT NULL DEFAULT 0 CHECK (pity_count >= 0),
     total_draws INTEGER NOT NULL DEFAULT 0 CHECK (total_draws >= 0),
     updated_at TEXT NOT NULL,
     PRIMARY KEY (player_id, pool_key)
@@ -1792,8 +1792,8 @@ CREATE TABLE IF NOT EXISTS fate_rolls (
     draw_count INTEGER NOT NULL CHECK (draw_count IN (1, 10)),
     cost_kind TEXT NOT NULL CHECK (cost_kind IN ('spirit_stones', 'ticket')),
     cost_quantity INTEGER NOT NULL CHECK (cost_quantity > 0),
-    pity_before INTEGER NOT NULL CHECK (pity_before >= 0 AND pity_before < 10),
-    pity_after INTEGER NOT NULL CHECK (pity_after >= 0 AND pity_after < 10),
+    pity_before INTEGER NOT NULL CHECK (pity_before >= 0),
+    pity_after INTEGER NOT NULL CHECK (pity_after >= 0),
     seed_hash TEXT NOT NULL,
     reward_json TEXT NOT NULL DEFAULT '{}',
     draws_json TEXT NOT NULL DEFAULT '[]',

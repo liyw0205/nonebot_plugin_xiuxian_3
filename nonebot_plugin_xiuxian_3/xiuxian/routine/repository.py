@@ -142,11 +142,8 @@ from ..routine.wayfaring import (
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.gacha import (
-    FATE_PITY_LIMIT,
     FATE_POOL_KEY,
-    FATE_SINGLE_COST,
-    FATE_TEN_COST,
-    FATE_TICKET,
+    fate_pool_definition,
     reward_totals,
     roll_fate_pool,
 )
@@ -173,9 +170,11 @@ from ..routine.rules import (
 )
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
+from ..utils.operations import operation_replay
 from ..rewards.rules import local_reputation_maximum, reward_pool_map
 from ..utils.player import (
     change_player_state,
+    change_player_state_actual,
     grant_player_reward,
     grant_player_reward_actual,
     grant_player_state,
@@ -186,6 +185,49 @@ from ..utils.player import (
 
 
 class RoutineRepositoryMixin:
+    async def fate_pool_key_for_operation(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> str | None:
+        """Resolve a prior fate operation without consulting current content."""
+
+        await self.initialize()
+        return await asyncio.to_thread(
+            self._fate_pool_key_for_operation_sync,
+            platform,
+            platform_user_id,
+            operation_id,
+        )
+
+    def _fate_pool_key_for_operation_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+    ) -> str | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT o.operation_name, o.result_json
+                FROM operations o
+                JOIN players p ON p.id = o.player_id
+                WHERE o.operation_id = ? AND p.platform = ? AND p.platform_user_id = ?
+                """,
+                (operation_id, platform, platform_user_id),
+            ).fetchone()
+            if row is None or row["operation_name"] != "routine.roll_fate_pool":
+                return None
+            try:
+                payload = json.loads(row["result_json"])
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise OperationResultMalformedError("fate operation result is malformed") from exc
+            if not isinstance(payload, dict) or not isinstance(payload.get("pool_key"), str):
+                raise OperationResultMalformedError("fate operation pool key is malformed")
+            return payload["pool_key"]
+
     async def claim_daily(
         self,
         *,
@@ -1764,6 +1806,7 @@ class RoutineRepositoryMixin:
         *,
         platform: str,
         platform_user_id: str,
+        pool_key: str = FATE_POOL_KEY,
         draw_count: int,
         operation_id: str,
     ) -> FateRollRecord:
@@ -1773,6 +1816,7 @@ class RoutineRepositoryMixin:
                 self._roll_fate_pool_sync,
                 platform,
                 platform_user_id,
+                pool_key,
                 draw_count,
                 operation_id,
             )
@@ -1781,6 +1825,7 @@ class RoutineRepositoryMixin:
         self,
         platform: str,
         platform_user_id: str,
+        pool_key: str,
         draw_count: int,
         operation_id: str,
     ) -> FateRollRecord:
@@ -1792,59 +1837,92 @@ class RoutineRepositoryMixin:
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "pool_key": FATE_POOL_KEY,
+                "pool_key": pool_key,
                 "draw_count": draw_count,
             },
         )
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._fate_roll_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay_payload = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+            )
+            if replay_payload is not None:
+                return self._fate_roll_from_payload(replay_payload, replay=True)
+            try:
+                definition = fate_pool_definition(pool_key, self.content)
+            except Exception as exc:
+                raise FatePoolNotOpenError("fate pool content is unavailable") from exc
             row = self._require_player(connection, platform, platform_user_id)
+            if definition.required_realm is not None and (
+                str(row["realm_key"]) != definition.required_realm
+                or int(row["realm_layer"]) < definition.required_layer
+            ):
+                raise FatePoolRequirementError("fate pool admission is not met")
+            if definition.required_service_reputation is not None:
+                reputation = player_reputation_state(connection, int(row["id"]))
+                if reputation.service < definition.required_service_reputation:
+                    raise FatePoolRequirementError("fate pool admission is not met")
             pool = connection.execute(
                 "SELECT * FROM fate_pools WHERE player_id = ? AND pool_key = ?",
-                (row["id"], FATE_POOL_KEY),
+                (row["id"], definition.key),
             ).fetchone()
             pity_before = int(pool["pity_count"]) if pool is not None else 0
-            if pity_before < 0 or pity_before >= FATE_PITY_LIMIT:
+            if pity_before < 0 or pity_before >= definition.pity_limit:
                 raise FatePoolNotOpenError("fate pity state is invalid")
 
             inventory = player_inventory(row)
             asset_delta: dict[str, int] = {}
-            if draw_count == 1 and inventory_amount(inventory, FATE_TICKET) > 0:
+            if draw_count == 1 and definition.ticket_key and inventory_amount(inventory, definition.ticket_key) >= definition.ticket_quantity:
                 cost_kind = "ticket"
-                cost_quantity = 1
-                asset_delta[FATE_TICKET] = -1
+                cost_quantity = definition.ticket_quantity
+                asset_delta[definition.ticket_key] = -definition.ticket_quantity
             else:
                 cost_kind = "spirit_stones"
-                cost_quantity = FATE_SINGLE_COST if draw_count == 1 else FATE_TEN_COST
+                cost_quantity = definition.single_cost if draw_count == 1 else definition.ten_cost
+                if player_currency(row) < cost_quantity:
+                    raise FateDrawInsufficientError("fate draw cost is insufficient")
                 asset_delta["spirit_stones"] = -cost_quantity
 
             draws, pity_after, seed_hash = roll_fate_pool(
                 operation_id,
                 draw_count=draw_count,
                 pity_before=pity_before,
+                pool=definition,
             )
-            reward = reward_totals(draws)
-            for key, quantity in reward.items():
-                asset_delta[str(key)] = asset_delta.get(str(key), 0) + int(quantity)
+            requested_reward = reward_totals(draws)
+            local_delta: dict[str, int] = {}
+            for key, quantity in requested_reward.items():
+                if str(key).startswith("local."):
+                    local_delta[str(key)] = local_delta.get(str(key), 0) + int(quantity)
+                else:
+                    asset_delta[str(key)] = asset_delta.get(str(key), 0) + int(quantity)
             try:
-                change_player_state(
+                actual_change = change_player_state_actual(
                     connection,
                     row,
                     updated_at=now_text,
                     asset_values=asset_delta,
                     asset_mode="delta",
+                    local_reputation_delta=local_delta or None,
+                    local_reputation_maximums={
+                        key: local_reputation_maximum(key, self.content)
+                        for key in local_delta
+                    } or None,
                 )
             except ValueError as exc:
                 raise FateDrawInsufficientError("fate draw cost is insufficient") from exc
+            reward = {
+                key: (
+                    actual_change.get(key, 0)
+                    if key.startswith("local.")
+                    else quantity
+                )
+                for key, quantity in requested_reward.items()
+            }
             total_draws = (int(pool["total_draws"]) if pool is not None else 0) + draw_count
             connection.execute(
                 """
@@ -1859,7 +1937,7 @@ class RoutineRepositoryMixin:
                 """,
                 (
                     row["id"],
-                    FATE_POOL_KEY,
+                    definition.key,
                     pity_after,
                     total_draws,
                     now_text,
@@ -1885,7 +1963,7 @@ class RoutineRepositoryMixin:
                 """,
                 (
                     row["id"],
-                    FATE_POOL_KEY,
+                    definition.key,
                     operation_id,
                     draw_count,
                     cost_kind,
@@ -1903,7 +1981,10 @@ class RoutineRepositoryMixin:
                 raise RuntimeError("fate roll returned no player")
             payload = {
                 "player": self._player_payload(self._row_to_player(updated)),
-                "pool_key": FATE_POOL_KEY,
+                "pool_key": definition.key,
+                "pool_name": definition.name,
+                "pity_limit": definition.pity_limit,
+                "pool_snapshot": definition.snapshot(),
                 "draw_count": draw_count,
                 "cost_kind": cost_kind,
                 "cost_quantity": cost_quantity,
@@ -1912,6 +1993,7 @@ class RoutineRepositoryMixin:
                 "seed_hash": seed_hash,
                 "draws": draws_payload,
                 "reward": reward,
+                "requested_reward": requested_reward,
             }
             connection.execute(
                 """
@@ -1935,28 +2017,118 @@ class RoutineRepositoryMixin:
     def _fate_roll_from_payload(
         payload: dict[str, Any], replay: bool = False
     ) -> FateRollRecord:
-        draws = tuple(
-            FateDrawView(
-                key=str(item["key"]),
-                label=str(item["label"]),
-                rarity=str(item["rarity"]),
-                quantity=int(item["quantity"]),
-                guaranteed=bool(item.get("guaranteed", False)),
+        if not isinstance(payload, dict):
+            raise OperationResultMalformedError("fate operation result must be an object")
+        required = {
+            "player", "pool_key", "pool_name", "pity_limit", "pool_snapshot",
+            "draw_count", "cost_kind", "cost_quantity", "pity_before", "pity_after",
+            "seed_hash", "draws", "reward",
+        }
+        if not required.issubset(payload):
+            raise OperationResultMalformedError("fate operation result is incomplete")
+        pool_key = payload["pool_key"]
+        pool_name = payload["pool_name"]
+        pity_limit = payload["pity_limit"]
+        if (
+            not isinstance(pool_key, str) or not pool_key
+            or not isinstance(pool_name, str) or not pool_name
+            or isinstance(pity_limit, bool) or not isinstance(pity_limit, int) or pity_limit < 1
+        ):
+            raise OperationResultMalformedError("fate operation pool metadata is invalid")
+        snapshot = payload["pool_snapshot"]
+        if not isinstance(snapshot, dict) or snapshot.get("key") != pool_key or snapshot.get("name") != pool_name:
+            raise OperationResultMalformedError("fate operation pool snapshot is invalid")
+        if snapshot.get("pity_limit") != pity_limit or not isinstance(snapshot.get("entries"), list):
+            raise OperationResultMalformedError("fate operation pool snapshot is incomplete")
+        for entry in snapshot["entries"]:
+            if (
+                not isinstance(entry, dict)
+                or not isinstance(entry.get("item_key"), str)
+                or not isinstance(entry.get("label"), str)
+                or entry.get("rarity") not in {"common", "rare"}
+                or isinstance(entry.get("weight"), bool)
+                or not isinstance(entry.get("weight"), int)
+                or entry["weight"] <= 0
+                or not isinstance(entry.get("quantity_range"), list)
+                or len(entry["quantity_range"]) != 2
+            ):
+                raise OperationResultMalformedError("fate operation pool snapshot entry is invalid")
+        draw_count = payload["draw_count"]
+        if draw_count not in {1, 10}:
+            raise OperationResultMalformedError("fate operation draw count is invalid")
+        cost_kind = payload["cost_kind"]
+        cost_quantity = payload["cost_quantity"]
+        if cost_kind not in {"spirit_stones", "ticket"} or (
+            isinstance(cost_quantity, bool) or not isinstance(cost_quantity, int) or cost_quantity <= 0
+        ):
+            raise OperationResultMalformedError("fate operation cost is invalid")
+        pity_before = payload["pity_before"]
+        pity_after = payload["pity_after"]
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0 or value >= pity_limit
+            for value in (pity_before, pity_after)
+        ):
+            raise OperationResultMalformedError("fate operation pity is invalid")
+        raw_draws = payload["draws"]
+        if not isinstance(raw_draws, list) or len(raw_draws) != draw_count:
+            raise OperationResultMalformedError("fate operation draws are invalid")
+        draws_list: list[FateDrawView] = []
+        for item in raw_draws:
+            if not isinstance(item, dict):
+                raise OperationResultMalformedError("fate operation draw is invalid")
+            key, label, rarity, quantity = (
+                item.get("key"), item.get("label"), item.get("rarity"), item.get("quantity")
             )
-            for item in payload.get("draws", [])
-        )
+            if (
+                not isinstance(key, str) or not key
+                or not isinstance(label, str) or not label
+                or rarity not in {"common", "rare"}
+                or isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0
+            ):
+                raise OperationResultMalformedError("fate operation draw is invalid")
+            guaranteed = item.get("guaranteed", False)
+            if not isinstance(guaranteed, bool):
+                raise OperationResultMalformedError("fate operation draw guarantee is invalid")
+            draws_list.append(FateDrawView(key, label, rarity, quantity, guaranteed))
+        reward = payload["reward"]
+        if not isinstance(reward, dict) or any(
+            not isinstance(key, str)
+            or isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 0
+            for key, value in reward.items()
+        ):
+            raise OperationResultMalformedError("fate operation reward is invalid")
+        totals: dict[str, int] = {}
+        for draw in draws_list:
+            totals[draw.key] = totals.get(draw.key, 0) + draw.quantity
+        normalized_reward = {str(key): int(value) for key, value in reward.items() if int(value) > 0}
+        if any(key not in totals or value > totals[key] for key, value in normalized_reward.items()):
+            raise OperationResultMalformedError("fate operation reward does not match draws")
+        if any(
+            totals[key] != normalized_reward.get(key, 0) and not key.startswith("local.")
+            for key in totals
+        ):
+            raise OperationResultMalformedError("fate operation reward does not match draws")
+        draws = tuple(draws_list)
+        try:
+            player = SQLitePlayerRepository._row_to_player(payload["player"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise OperationResultMalformedError("fate operation player snapshot is invalid") from exc
         return FateRollRecord(
-            player=SQLitePlayerRepository._row_to_player(payload["player"]),
-            pool_key=str(payload["pool_key"]),
-            draw_count=int(payload["draw_count"]),
-            cost_kind=str(payload["cost_kind"]),
-            cost_quantity=int(payload["cost_quantity"]),
-            pity_before=int(payload["pity_before"]),
-            pity_after=int(payload["pity_after"]),
+            player=player,
+            pool_key=pool_key,
+            draw_count=draw_count,
+            cost_kind=cost_kind,
+            cost_quantity=cost_quantity,
+            pity_before=pity_before,
+            pity_after=pity_after,
             seed_hash=str(payload["seed_hash"]),
             draws=draws,
-            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            reward=normalized_reward,
             already_completed=replay,
+            pool_name=pool_name,
+            pity_limit=pity_limit,
         )
 
     async def start_wayfaring(

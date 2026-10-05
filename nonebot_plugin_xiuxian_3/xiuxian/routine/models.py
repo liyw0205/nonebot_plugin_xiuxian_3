@@ -175,6 +175,8 @@ class FateRollRecord:
     draws: tuple[FateDrawView, ...]
     reward: dict[str, int] = field(default_factory=dict)
     already_completed: bool = False
+    pool_name: str = "基础机缘池"
+    pity_limit: int = 10
 
 
 @dataclass(frozen=True, slots=True)

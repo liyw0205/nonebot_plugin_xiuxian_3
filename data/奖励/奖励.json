@@ -680,6 +680,7 @@
     },
     {
       "name": "基础机缘池",
+      "aliases": ["基础机缘", "日常机缘"],
       "desc": "供修士寻觅日常机缘的签筒，常见灵材居多，也藏有少量珍稀线索。",
       "operation": "routine.roll_fate_pool",
       "pool_key": "gacha.fate.basic",
@@ -788,6 +789,53 @@
       ],
       "status": "active",
       "key": "reward.gacha.fate.basic"
+    },
+    {
+      "name": "道统回响",
+      "aliases": ["道统机缘", "道统回响池"],
+      "desc": "合道修士可从旧日道统回响中寻得新篇线索、展示遗痕与服务名望。",
+      "operation": "routine.roll_fate_pool",
+      "pool_key": "gacha.fate.dao_echo",
+      "admission": {
+        "realm": {"key": "dao_union", "min_layer": 1}
+      },
+      "draw_costs": {
+        "single": {"spirit_stones": 800},
+        "ten": {"spirit_stones": 7200}
+      },
+      "pity_limit": 20,
+      "entries": [
+        {
+          "item_key": "item.clue.recipe_basic",
+          "label": "新篇配方线索",
+          "rarity": "common",
+          "weight": 520,
+          "quantity_range": [1, 1]
+        },
+        {
+          "item_key": "local.dao_service",
+          "label": "道统服务名望",
+          "rarity": "common",
+          "weight": 260,
+          "quantity_range": [4, 8]
+        },
+        {
+          "item_key": "item.fragment.dao_name",
+          "label": "道号展示碎片",
+          "rarity": "rare",
+          "weight": 140,
+          "quantity_range": [1, 1]
+        },
+        {
+          "item_key": "item.clue.manual_basic",
+          "label": "道统章法线索",
+          "rarity": "rare",
+          "weight": 80,
+          "quantity_range": [1, 1]
+        }
+      ],
+      "status": "active",
+      "key": "reward.gacha.fate.dao_echo"
     },
     {
       "key": "reward_pool.bounty.herb_supply",

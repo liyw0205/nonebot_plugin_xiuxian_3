@@ -1776,6 +1776,10 @@ class FatePoolNotOpenError(RuntimeError):
     """The requested fate pool is not available in the current content."""
 
 
+class FatePoolRequirementError(RuntimeError):
+    """The player does not meet the requested fate-pool admission rule."""
+
+
 class FateDrawInsufficientError(RuntimeError):
     """The player lacks the ticket or spirit stones required for a draw."""
 

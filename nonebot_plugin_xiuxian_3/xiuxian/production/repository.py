@@ -140,15 +140,6 @@ from ..routine.wayfaring import (
     wayfaring_week_start,
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
-from ..routine.gacha import (
-    FATE_PITY_LIMIT,
-    FATE_POOL_KEY,
-    FATE_SINGLE_COST,
-    FATE_TEN_COST,
-    FATE_TICKET,
-    reward_totals,
-    roll_fate_pool,
-)
 from ..routine.rules import (
     CHECKIN_ACTIVITY,
     FATE_TICKET,
