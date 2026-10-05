@@ -2,6 +2,46 @@
   "kind": "quest",
   "records": [
     {
+      "name": "魔界引导",
+      "desc": "确认魔界的污染与契约风险，取得深渊门的引路资格。",
+      "status": "active",
+      "operation": "world.accept_demon_intro",
+      "claim_policy": "once_per_player",
+      "introduction": {
+        "costs": {"currency.spirit_stone": 100},
+        "reward_key": "reward.world.demon_intro",
+        "access_flag": "access.demon_abyss_gate",
+        "required_location_key": "demon.abyss_gate",
+        "required_realm_key": "foundation",
+        "required_realm_layer": 1,
+        "arrival_route_key": "route.cloud_to_abyss_intro"
+      },
+      "key": "quest.demon_intro"
+    },
+    {
+      "name": "妖界引导",
+      "desc": "读懂妖族源流并完成一次近郊见闻，取得万兽山的引路资格。",
+      "status": "active",
+      "operation": "world.complete_beast_intro",
+      "claim_policy": "once_per_player",
+      "introduction": {
+        "costs": {"currency.spirit_stone": 100},
+        "reward_key": "reward.world.beast_intro",
+        "access_flag": "access.beast_ten_thousand_hills",
+        "required_location_key": "xuantian.outskirts",
+        "required_realm_key": "foundation",
+        "required_realm_layer": 1,
+        "arrival_route_key": null,
+        "required_read_component": "beast_history_read",
+        "required_evidence": {
+          "location_key": "xuantian.outskirts",
+          "mode_keys": ["explore.gather_outskirts", "explore.trial_outskirts"],
+          "status": "settled"
+        }
+      },
+      "key": "quest.beast_intro"
+    },
+    {
       "name": "第一次寻仙",
       "desc": "离开熟悉的日常，亲自踏出寻仙问道的第一步。",
       "status": "open",

@@ -16,6 +16,10 @@ class OperationConflictError(RuntimeError):
     """An operation ID was reused with a different actor or input."""
 
 
+class OperationResultMalformedError(RuntimeError):
+    """An operation ledger row contains a non-object or invalid JSON result."""
+
+
 class PlayerNotFoundError(RuntimeError):
     """The requested platform identity has no player record."""
 

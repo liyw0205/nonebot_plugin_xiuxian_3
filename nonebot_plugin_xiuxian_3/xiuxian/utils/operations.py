@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ..persistence.errors import OperationConflictError
+from ..persistence.errors import OperationConflictError, OperationResultMalformedError
 
 
 def player_operation(
@@ -60,9 +60,9 @@ def operation_replay(
     try:
         payload = json.loads(str(row["result_json"]))
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise OperationConflictError("operation result is malformed") from exc
+        raise OperationResultMalformedError("operation result is malformed") from exc
     if not isinstance(payload, dict):
-        raise OperationConflictError("operation result must be an object")
+        raise OperationResultMalformedError("operation result must be an object")
     return payload
 
 

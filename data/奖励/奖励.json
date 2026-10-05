@@ -2,6 +2,28 @@
   "kind": "reward",
   "records": [
     {
+      "name": "魔界引路所得",
+      "desc": "确认魔界风险后取得的引路声望。",
+      "operation": "world.accept_demon_intro",
+      "entries": [
+        {"kind": "reputation", "reputation_key": "faction_reputation.demon", "quantity": 20}
+      ],
+      "once_per_player": true,
+      "key": "reward.world.demon_intro",
+      "status": "active"
+    },
+    {
+      "name": "妖界引路所得",
+      "desc": "完成妖界引导后取得的引路声望。",
+      "operation": "world.complete_beast_intro",
+      "entries": [
+        {"kind": "reputation", "reputation_key": "faction_reputation.beast", "quantity": 20}
+      ],
+      "once_per_player": true,
+      "key": "reward.world.beast_intro",
+      "status": "active"
+    },
+    {
       "name": "镇中行旅所得",
       "desc": "完成镇中行旅后所得的灵石。",
       "pool_type": "weighted",

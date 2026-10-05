@@ -70,6 +70,32 @@ def test_cloud_boat_route_is_idempotent_and_qq_onebot_compatible() -> None:
                 )
                 assert replay.data["idempotent_replay"] is True
                 with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_operation = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?",
+                        (f"board-{adapter}",),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE operations SET result_json='{' WHERE operation_id=?",
+                        (f"board-{adapter}",),
+                    )
+                malformed = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, f"board-malformed-{adapter}", f"board-{adapter}"),
+                    "登上云舟 洞天二层",
+                )
+                assert malformed.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (original_operation, f"board-{adapter}"),
+                    )
+                restored = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, f"board-restored-{adapter}", f"board-{adapter}"),
+                    "登上云舟 洞天二层",
+                )
+                assert restored.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
                     state = connection.execute(
                         "SELECT spirit_stones, stamina, inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
                         (adapter, user),
@@ -157,33 +183,41 @@ def test_cloud_boat_recovery_uses_frozen_route_after_24_hours() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
-            adapter, user = "qq.official", "qq-cloud-recovery"
-            await runtime.dispatch(_context(adapter, user, "create"), "开始修仙")
-            await runtime.dispatch(_context(adapter, user, "seek"), "寻仙问道")
-            _prepare_player(runtime, adapter, user, realm="foundation", location="xuantian.cloud_city")
-            started = await runtime.dispatch(_context(adapter, user, "board", "board"), "登上云舟 魔界引导")
-            assert started.code == "CLOUD_BOAT_STARTED"
-            with sqlite3.connect(runtime.settings.database_path) as connection:
-                connection.execute(
-                    "UPDATE cloud_boat_sessions SET ends_at=? WHERE session_id=?",
-                    ((datetime.now(timezone.utc) - timedelta(hours=25)).isoformat(), started.data["session_id"]),
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"{adapter}-cloud-recovery"
+                await runtime.dispatch(_context(adapter, user, "create"), "开始修仙")
+                await runtime.dispatch(_context(adapter, user, "seek"), "寻仙问道")
+                _prepare_player(runtime, adapter, user, realm="foundation", location="xuantian.cloud_city")
+                started = await runtime.dispatch(
+                    _context(adapter, user, f"board-{adapter}", f"board-{adapter}"),
+                    "登上云舟 魔界引导",
                 )
-            recovered = await runtime.dispatch(_context(adapter, user, "recover", "recover"), "恢复云舟")
-            assert recovered.code == "CLOUD_BOAT_RECOVERED"
-            replay = await runtime.dispatch(_context(adapter, user, "recover-replay", "recover"), "恢复云舟")
-            assert replay.data["idempotent_replay"] is True
-            with sqlite3.connect(runtime.settings.database_path) as connection:
-                state = connection.execute(
-                    "SELECT location_key, spirit_stones, stamina FROM players WHERE platform=? AND platform_user_id=?",
-                    (adapter, user),
-                ).fetchone()
-                session = connection.execute(
-                    "SELECT status, result_json FROM cloud_boat_sessions WHERE session_id=?",
-                    (started.data["session_id"],),
-                ).fetchone()
-            assert state == ("demon.abyss_gate", 500, 20)
-            assert session[0] == "arrived"
-            assert json.loads(session[1])["recovered"] is True
+                assert started.code == "CLOUD_BOAT_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE cloud_boat_sessions SET ends_at=? WHERE session_id=?",
+                        ((datetime.now(timezone.utc) - timedelta(hours=25)).isoformat(), started.data["session_id"]),
+                    )
+                recovered = await runtime.dispatch(
+                    _context(adapter, user, f"recover-{adapter}", f"recover-{adapter}"), "恢复云舟"
+                )
+                assert recovered.code == "CLOUD_BOAT_RECOVERED"
+                replay = await runtime.dispatch(
+                    _context(adapter, user, f"recover-replay-{adapter}", f"recover-{adapter}"), "恢复云舟"
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT location_key, spirit_stones, stamina FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    session = connection.execute(
+                        "SELECT status, result_json FROM cloud_boat_sessions WHERE session_id=?",
+                        (started.data["session_id"],),
+                    ).fetchone()
+                assert state == ("demon.abyss_gate", 500, 20)
+                assert session[0] == "arrived"
+                assert json.loads(session[1])["recovered"] is True
             await runtime.close()
 
     asyncio.run(run())

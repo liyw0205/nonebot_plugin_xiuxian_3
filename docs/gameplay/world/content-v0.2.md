@@ -1,10 +1,9 @@
-# v0.2 世界地点内容基线：玄天中层与魔界引导
+# 世界地点内容基线：玄天中层与魔界引导
 
 本文件遵守 [版本内容开发合同](../../content-development-contract.md)。
 
-- `content_version`：`content-0.2`
-- `rule_version`：`world-0.2.0`（筑基矿区路线修订为 `world-0.2.1`）
-- 新用例：`world.board_cloud_boat`、`world.accept_demon_intro`、`world.read_beast_history`、`world.complete_beast_intro`、`world.use_array_hall`。
+本页保留历史文件名，当前运行行为以现行地点、路线、任务和奖励内容记录为准。
+当前用例：`world.board_cloud_boat`、`world.accept_demon_intro`、`world.read_beast_history`、`world.complete_beast_intro`、`world.use_array_hall`。
 
 | `location_key` | 准入 | 耗时/成本 | 环境与动作 | 关闭/失败 |
 |:--|:--|:--|:--|:--|
@@ -23,13 +22,13 @@
 | `route.cloud_to_abyss_intro` | `demon.abyss_gate` | 筑基 | 500 灵石、10 体力 | 5 分钟 | 到达锁定入口，只可接引导 |
 | `route.cloud_return` | `xuantian.cloud_city` | 位于任一云舟终点 | 200 灵石、3 体力 | 3 分钟 | 返回玄天城 |
 
-云舟会话开始时扣费用、保存航线/资格/版本；取消仅限 `created` 且返还全部费用。`running` 后不能取消，超时 24 小时由恢复任务按原快照到达；云舟不随机失事，避免把移动费用变成不可控损失。
+云舟会话开始时扣费用、保存航线与资格快照；取消仅限 `created` 且返还全部费用。`running` 后不能取消，超时 24 小时由恢复任务按原快照到达；云舟不随机失事，避免把移动费用变成不可控损失。
 
 ## 阵堂与魔界引导
 
 阵堂的生产/学习不是地点自动效果：每个 `production` 或 `paths` 用例需再次校验宗门/邀请和订单成本；当前开放 v0.2 表中的五条个人配方。`quest.demon_intro` 只提供魔界风险、污染与契约说明，完成后开放入口资格但不开放魔渊集市、战斗或掉落；魔界核心区相关动作返回 `CONTENT_CLOSED` 至 v0.3。
 
-错误：`CLOUD_ROUTE_LOCKED`、`CLOUD_FARE_INSUFFICIENT`、`ARRAY_HALL_PERMISSION_DENIED`、`ADVANCED_CAVE_PASS_MISSING`。关闭 v0.2 时新航线/洞天二层停止，已运行航线按原版本结算。验收：云舟费用不因重试双扣；洞天二层凭证锁定正确；阵堂无权限不泄露生产结果；魔界引导不产生魔界资源。洞天二层设施槽位认领、维护和订单占槽由生产域 `production.claim_facility_slot` 负责。
+错误：`CLOUD_ROUTE_LOCKED`、`CLOUD_FARE_INSUFFICIENT`、`ARRAY_HALL_PERMISSION_DENIED`、`ADVANCED_CAVE_PASS_MISSING`。内容关闭后新航线/洞天二层停止，已运行航线按原快照结算。验收：云舟费用不因重试双扣；洞天二层凭证锁定正确；阵堂无权限不泄露生产结果；魔界引导不产生魔界资源。洞天二层设施槽位认领、维护和订单占槽由生产域 `production.claim_facility_slot` 负责。
 
 ## 当前运行时边界
 
@@ -37,6 +36,6 @@
 `explore.cloud_mine`/`explore.cloud_boat_trial`/`explore.mist_grotto_2` 探索入口。矿区采集要求采矿标记/许可或有效期内已接取的云铁矿区悬赏，
 云舟试炼要求位于云舟渡口且达到金丹 L1；洞天二层入口要求已经抵达该地点；v0.2 五条个人配方已开放预览、生产和结算，阵堂地点仍会再次校验宗门成员/教学邀请；魔界核心区和魔界资源仍
 返回关闭或未满足前置；已创建云舟按会话快照结算。`world.accept_demon_intro` 只写入入口资格和
-`faction_reputation.demon=20`，不发魔核或妖血。
+`faction_reputation.demon` 按当前奖励内容记录结算，不发魔核或妖血。
 
-妖界引导由 `阅读妖界史` 和 `完成妖界引导` 提供：后者要求筑基、本人阅读事件、本人已结算的近郊采集或短历练，以及 100 灵石；一次事务内扣费并发放 `access.beast_ten_thousand_hills` 与 20 妖界声望。每角色限一次，失败不扣费。
+妖界引导由 `阅读妖界史` 和 `完成妖界引导` 提供：后者要求筑基、本人阅读事件、本人已结算的近郊采集或短历练，以及内容记录声明的灵石成本；一次事务内扣费并发放入口资格与当前奖励内容。每角色限一次，失败不扣费。

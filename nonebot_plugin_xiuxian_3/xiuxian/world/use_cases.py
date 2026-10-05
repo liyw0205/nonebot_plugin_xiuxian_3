@@ -412,14 +412,14 @@ class WorldApplication:
         except DemonIntroAlreadyCompletedError:
             return CommandResult(False, "DEMON_INTRO_ALREADY_COMPLETED", "魔界引导已经完成，入口资格不会重复发放。", context.request_id, operation_id)
         except ResourceInsufficientError:
-            return CommandResult(False, "DEMON_INTRO_STONES_INSUFFICIENT", "提交魔界引导需要 100 灵石，未写入入口资格。", context.request_id, operation_id)
+            return CommandResult(False, "DEMON_INTRO_STONES_INSUFFICIENT", "当前灵石不足，未写入魔界入口资格。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        return CommandResult(True, "DEMON_INTRO_ACCEPTED", "## 魔界引导已完成\n\n已记录污染与契约风险说明，获得魔界入口资格和 20 点魔界声望。魔界核心区、战斗和魔核掉落仍未开放。", context.request_id, operation_id, data={"quest_key": record.quest_key, "status": record.status, "reward": record.reward, "idempotent_replay": record.already_completed})
+        return CommandResult(True, "DEMON_INTRO_ACCEPTED", "## 魔界引导已完成\n\n已记录污染与契约风险说明，获得魔界入口资格与相应声望。魔界核心区、战斗和魔核掉落仍未开放。", context.request_id, operation_id, data={"quest_key": record.quest_key, "status": record.status, "reward": record.reward, "idempotent_replay": record.already_completed})
 
     async def read_beast_history(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -438,7 +438,7 @@ class WorldApplication:
         return CommandResult(
             True,
             "BEAST_HISTORY_RECORDED",
-            "## 妖界史已阅\n\n已记下妖族源流。完成一次近郊探索后，可提交 100 灵石完成妖界引导。",
+            "## 妖界史已阅\n\n已记下妖族源流。完成一次近郊探索后，可继续完成妖界引导。",
             context.request_id,
             operation_id,
             data={"quest_key": record.quest_key, "component_key": record.component_key, "idempotent_replay": record.already_completed},
@@ -457,7 +457,7 @@ class WorldApplication:
         except BeastIntroAlreadyCompletedError:
             return CommandResult(False, "BEAST_INTRO_ALREADY_COMPLETED", "妖界引导已经完成，入口资格不会重复发放。", context.request_id, operation_id)
         except ResourceInsufficientError:
-            return CommandResult(False, "BEAST_INTRO_STONES_INSUFFICIENT", "提交妖界引导需要 100 灵石，未写入入口资格。", context.request_id, operation_id)
+            return CommandResult(False, "BEAST_INTRO_STONES_INSUFFICIENT", "当前灵石不足，未写入妖界入口资格。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except PlayerNotFoundError:
@@ -467,7 +467,7 @@ class WorldApplication:
         return CommandResult(
             True,
             "BEAST_INTRO_COMPLETED",
-            "## 妖界引导已完成\n\n获得万兽山入口资格和 20 点妖界声望，未发放妖血或开放妖界核心区。",
+            "## 妖界引导已完成\n\n获得万兽山入口资格与相应声望，未发放妖血或开放妖界核心区。",
             context.request_id,
             operation_id,
             data={"quest_key": record.quest_key, "status": record.status, "reward": record.reward, "idempotent_replay": record.already_completed},

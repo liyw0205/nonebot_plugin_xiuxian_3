@@ -14,7 +14,14 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_currency
-from ..utils.player import change_player_state, player_integer, player_reputation, spend_player_state
+from ..utils.operations import operation_replay, record_operation
+from ..utils.player import (
+    change_player_state,
+    grant_player_reward_actual,
+    player_integer,
+    spend_player_state,
+)
+from ..rewards.rules import reward_grant_from_snapshot, reward_totals
 from .cloud_models import (
     ArrayHallRecord,
     BeastHistoryRecord,
@@ -24,12 +31,11 @@ from .cloud_models import (
     DemonIntroRecord,
 )
 from .cloud_rules import (
-    BEAST_INTRO_FLAG,
     BEAST_INTRO_QUEST,
     CLOUD_ROUTES,
-    DEMON_INTRO_FLAG,
     DEMON_INTRO_QUEST,
     cloud_route_definition,
+    world_intro_definition,
 )
 from .permissions import array_hall_permission
 from ..utils.json import json_object
@@ -62,7 +68,6 @@ class CloudRepositoryMixin:
             CloudRouteLockedError,
             CurrencyInsufficientError,
             LocationRequirementError,
-            OperationConflictError,
             ResourceInsufficientError,
         )
 
@@ -79,14 +84,9 @@ class CloudRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._cloud_start_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._cloud_start_from_payload(replay, replay=True)
 
             player = self._require_player(connection, platform, platform_user_id)
             player_id = int(player["id"])
@@ -175,7 +175,7 @@ class CloudRepositoryMixin:
                 "pass_key": definition.pass_key,
                 "pass_quantity": definition.pass_quantity,
             }
-            self._cloud_insert_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
             return self._cloud_start_from_payload(payload)
 
     async def settle_cloud_boat(
@@ -201,7 +201,7 @@ class CloudRepositoryMixin:
     def _settle_cloud_boat_once(
         self, platform: str, platform_user_id: str, operation_id: str
     ) -> CloudBoatSettlementRecord:
-        from ..repository import CloudBoatNotFoundError, CloudBoatNotReadyError, OperationConflictError
+        from ..repository import CloudBoatNotFoundError, CloudBoatNotReadyError
 
         operation_name = "world.settle_cloud_boat"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
@@ -209,14 +209,9 @@ class CloudRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._cloud_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._cloud_settlement_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             session = connection.execute(
                 "SELECT * FROM cloud_boat_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
@@ -251,13 +246,13 @@ class CloudRepositoryMixin:
                 "pass_key": session["pass_key"],
                 "pass_quantity": int(session["pass_quantity"]),
             }
-            self._cloud_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._cloud_settlement_from_payload(payload)
 
     def _recover_cloud_boat_once(
         self, platform: str, platform_user_id: str, operation_id: str
     ) -> CloudBoatSettlementRecord:
-        from ..repository import CloudBoatNotFoundError, CloudBoatNotReadyError, OperationConflictError
+        from ..repository import CloudBoatNotFoundError, CloudBoatNotReadyError
 
         operation_name = "world.recover_cloud_boat"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
@@ -265,14 +260,9 @@ class CloudRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._cloud_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._cloud_settlement_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             session = connection.execute(
                 "SELECT * FROM cloud_boat_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
@@ -303,7 +293,7 @@ class CloudRepositoryMixin:
                 "stamina_cost": int(session["stamina_cost"]), "currency_cost": int(session["currency_cost"]),
                 "pass_key": session["pass_key"], "pass_quantity": int(session["pass_quantity"]),
             }
-            self._cloud_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._cloud_settlement_from_payload(payload)
 
     async def accept_demon_intro(
@@ -330,17 +320,24 @@ class CloudRepositoryMixin:
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._demon_intro_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._demon_intro_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             player_id = int(player["id"])
-            if str(player["location_key"]) != "demon.abyss_gate" or not self._cloud_quest_route_arrived(connection, player_id):
+            definition = world_intro_definition(
+                DEMON_INTRO_QUEST, self.content, expected_operation=operation_name
+            )
+            if str(player["location_key"]) != definition.required_location_key:
+                raise DemonIntroRequirementError("demon introduction requires the arrived gate route")
+            if not self._cloud_meets_realm(
+                str(player["realm_key"]), player_integer(player, "realm_layer"),
+                definition.required_realm_key, definition.required_realm_layer,
+            ):
+                raise DemonIntroRequirementError("demon introduction realm requirement is not met")
+            if definition.arrival_route_key and not self._cloud_quest_route_arrived(
+                connection, player_id, definition.arrival_route_key
+            ):
                 raise DemonIntroRequirementError("demon introduction requires the arrived gate route")
             progress = connection.execute(
                 "SELECT status FROM quest_progress WHERE player_id = ? AND quest_key = ?",
@@ -348,24 +345,26 @@ class CloudRepositoryMixin:
             ).fetchone()
             if progress is not None and str(progress["status"]) in {"completed", "claimed"}:
                 raise DemonIntroAlreadyCompletedError("demon introduction already completed")
-            if player_currency(player) < 100:
-                raise ResourceInsufficientError("demon introduction requires 100 spirit stones")
-            intro = self._json_object(player["intro_json"], {})
+            asset_costs, value_costs = self._world_intro_costs(definition.costs)
+            intro = self._world_intro_state(player["intro_json"])
             flags = [str(item) for item in intro.get("flags", [])]
-            for flag in (DEMON_INTRO_QUEST, DEMON_INTRO_FLAG):
+            for flag in (definition.key, definition.access_flag):
                 if flag not in flags:
                     flags.append(flag)
             intro["flags"] = flags
-            spend_player_state(
-                connection,
-                player,
-                updated_at=now_text,
-                costs={"spirit_stones": 100},
-                reputation_delta={"faction_reputation.demon": 20},
-                player_values={
-                    "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
-                },
+            try:
+                spend_player_state(
+                    connection, player, updated_at=now_text, costs=asset_costs or None,
+                    value_delta=value_costs or None,
+                    player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
+                )
+            except ValueError as exc:
+                raise ResourceInsufficientError("demon introduction costs are insufficient") from exc
+            current_player = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+            actual_reward = grant_player_reward_actual(
+                connection, current_player, reward_totals(definition.reward), now_text
             )
+            reward_snapshot = definition.reward.snapshot()
             self._insert_quest_event(
                 connection,
                 player_id=player_id,
@@ -373,7 +372,7 @@ class CloudRepositoryMixin:
                 component_key="risk_confirmation",
                 source_operation_id=operation_id,
                 outcome="success",
-                payload={"route": "route.cloud_to_abyss_intro", "submitted_stones": 100, "reputation": 20},
+                payload={"route": definition.arrival_route_key, "costs": definition.costs, "reward": actual_reward},
                 now_text=now_text,
             )
             self._upsert_progress(
@@ -382,7 +381,7 @@ class CloudRepositoryMixin:
                 DEMON_INTRO_QUEST,
                 "completed",
                 {"risk_confirmation": 1},
-                {"access_flag": DEMON_INTRO_FLAG, "faction": "demon"},
+                {"access_flag": definition.access_flag, "faction": "demon", "costs": definition.costs, "reward": reward_snapshot},
                 operation_id,
                 now_text,
             )
@@ -391,9 +390,11 @@ class CloudRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "quest_key": DEMON_INTRO_QUEST,
                 "status": "completed",
-                "reward": {"faction_reputation.demon": 20},
+                "reward": actual_reward,
+                "reward_snapshot": reward_snapshot,
+                "costs": dict(definition.costs),
             }
-            self._cloud_insert_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
             return self._demon_intro_from_payload(payload)
 
     async def read_beast_history(
@@ -418,14 +419,8 @@ class CloudRepositoryMixin:
         component_key = "beast_history_read"
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing["result_json"])
+            payload = operation_replay(connection, operation_id, operation_name, request_hash)
+            if payload is not None:
                 return BeastHistoryRecord(
                     quest_key=str(payload["quest_key"]),
                     component_key=str(payload["component_key"]),
@@ -460,7 +455,7 @@ class CloudRepositoryMixin:
                     now_text,
                 )
             payload = {"quest_key": BEAST_INTRO_QUEST, "component_key": component_key}
-            self._cloud_insert_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
             return BeastHistoryRecord(quest_key=BEAST_INTRO_QUEST, component_key=component_key)
 
     async def complete_beast_intro(
@@ -489,17 +484,15 @@ class CloudRepositoryMixin:
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._beast_intro_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._beast_intro_from_payload(replay, replay=True)
 
             player = self._require_player(connection, platform, platform_user_id)
             player_id = int(player["id"])
+            definition = world_intro_definition(
+                BEAST_INTRO_QUEST, self.content, expected_operation=operation_name
+            )
             progress = connection.execute(
                 "SELECT status FROM quest_progress WHERE player_id = ? AND quest_key = ?",
                 (player_id, BEAST_INTRO_QUEST),
@@ -507,36 +500,39 @@ class CloudRepositoryMixin:
             if progress is not None and str(progress["status"]) in {"completed", "claimed"}:
                 raise BeastIntroAlreadyCompletedError("beast introduction already completed")
             if not self._cloud_meets_realm(
-                str(player["realm_key"]), player_integer(player, "realm_layer"), "foundation", 1
+                str(player["realm_key"]), player_integer(player, "realm_layer"),
+                definition.required_realm_key, definition.required_realm_layer,
             ):
                 raise BeastIntroRequirementError("beast introduction requires foundation")
             history = connection.execute(
                 "SELECT 1 FROM quest_events WHERE player_id = ? AND quest_key = ? "
-                "AND component_key = 'beast_history_read' AND outcome = 'read' LIMIT 1",
-                (player_id, BEAST_INTRO_QUEST),
+                "AND component_key = ? AND outcome = 'read' LIMIT 1",
+                (player_id, BEAST_INTRO_QUEST, definition.required_read_component),
             ).fetchone()
-            if history is None:
+            if definition.required_read_component and history is None:
                 raise BeastIntroRequirementError("beast history has not been read")
-            observation = self._valid_beast_observation(connection, player_id)
+            observation = self._valid_beast_observation(connection, player_id, definition.required_evidence)
             if observation is None:
                 raise BeastIntroRequirementError("outskirts beast observation is incomplete")
-            if player_currency(player) < 100:
-                raise ResourceInsufficientError("beast introduction requires 100 spirit stones")
+            asset_costs, value_costs = self._world_intro_costs(definition.costs)
 
-            intro = self._json_object(player["intro_json"], {})
+            intro = self._world_intro_state(player["intro_json"])
             flags = {str(item) for item in intro.get("flags", [])}
-            flags.update({BEAST_INTRO_QUEST, BEAST_INTRO_FLAG})
+            flags.update({definition.key, definition.access_flag})
             intro["flags"] = sorted(flags)
-            spend_player_state(
-                connection,
-                player,
-                updated_at=now_text,
-                costs={"spirit_stones": 100},
-                reputation_delta={"faction_reputation.beast": 20},
-                player_values={
-                    "intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True),
-                },
+            try:
+                spend_player_state(
+                    connection, player, updated_at=now_text, costs=asset_costs or None,
+                    value_delta=value_costs or None,
+                    player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
+                )
+            except ValueError as exc:
+                raise ResourceInsufficientError("beast introduction costs are insufficient") from exc
+            current_player = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+            actual_reward = grant_player_reward_actual(
+                connection, current_player, reward_totals(definition.reward), now_text
             )
+            reward_snapshot = definition.reward.snapshot()
             self._insert_quest_event(
                 connection,
                 player_id=player_id,
@@ -554,12 +550,14 @@ class CloudRepositoryMixin:
                 component_key="submission",
                 source_operation_id=operation_id,
                 outcome="success",
-                payload={"submitted_stones": 100, "reputation": 20},
+                payload={"costs": definition.costs, "reward": actual_reward},
                 now_text=now_text,
             )
             quest_snapshot = {
                 "quest_key": BEAST_INTRO_QUEST,
-                "access_flag": BEAST_INTRO_FLAG,
+                "access_flag": definition.access_flag,
+                "costs": definition.costs,
+                "reward": reward_snapshot,
                 "exploration_id": str(observation["exploration_id"]),
                 "exploration_operation_id": str(observation["settlement_operation_id"]),
                 "exploration_start_operation_id": str(observation["start_operation_id"]),
@@ -580,15 +578,23 @@ class CloudRepositoryMixin:
                 "player": self._player_payload(self._row_to_player(updated)),
                 "quest_key": BEAST_INTRO_QUEST,
                 "status": "completed",
-                "reward": {"faction_reputation.beast": 20},
+                "reward": actual_reward,
+                "reward_snapshot": reward_snapshot,
+                "costs": dict(definition.costs),
             }
-            self._cloud_insert_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
             return self._beast_intro_from_payload(payload)
 
     @staticmethod
-    def _valid_beast_observation(connection: Any, player_id: int) -> Any | None:
+    def _valid_beast_observation(
+        connection: Any, player_id: int, evidence: dict[str, Any] | None
+    ) -> Any | None:
+        if evidence is None:
+            return None
+        mode_keys = tuple(str(value) for value in evidence["mode_keys"])
+        placeholders = ",".join("?" for _ in mode_keys)
         return connection.execute(
-            """
+            f"""
             SELECT e.exploration_id, e.operation_id AS start_operation_id, e.mode_key,
                 (
                     SELECT o.operation_id FROM operations AS o
@@ -599,9 +605,9 @@ class CloudRepositoryMixin:
                     ORDER BY o.created_at ASC LIMIT 1
                 ) AS settlement_operation_id
             FROM exploration_sessions AS e
-            WHERE e.player_id = ? AND e.location_key = 'xuantian.outskirts'
-                AND e.mode_key IN ('explore.gather_outskirts', 'explore.trial_outskirts')
-                AND e.status = 'settled'
+            WHERE e.player_id = ? AND e.location_key = ?
+                AND e.mode_key IN ({placeholders})
+                AND e.status = ?
                 AND EXISTS (
                     SELECT 1 FROM operations AS o
                     WHERE o.player_id = e.player_id
@@ -612,7 +618,7 @@ class CloudRepositoryMixin:
             ORDER BY e.id ASC
             LIMIT 1
             """,
-            (player_id,),
+            (player_id, evidence["location_key"], *mode_keys, evidence["status"]),
         ).fetchone()
 
     async def use_array_hall(
@@ -638,14 +644,9 @@ class CloudRepositoryMixin:
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._array_hall_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._array_hall_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["location_key"]) != "xuantian.array_hall":
                 raise ArrayHallPermissionDeniedError("array hall location is required")
@@ -669,7 +670,7 @@ class CloudRepositoryMixin:
                 "permission": permission,
                 "action": "formation_learning_or_production_request",
             }
-            self._cloud_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._array_hall_from_payload(payload)
 
     @staticmethod
@@ -693,18 +694,37 @@ class CloudRepositoryMixin:
         return quest_key in {str(item) for item in flags}
 
     @staticmethod
-    def _cloud_quest_route_arrived(connection: Any, player_id: int) -> bool:
+    def _cloud_quest_route_arrived(connection: Any, player_id: int, route_key: str) -> bool:
         return connection.execute(
-            "SELECT 1 FROM cloud_boat_sessions WHERE player_id = ? AND route_key = 'route.cloud_to_abyss_intro' AND status = 'arrived' LIMIT 1",
-            (player_id,),
+            "SELECT 1 FROM cloud_boat_sessions WHERE player_id = ? AND route_key = ? AND status = 'arrived' LIMIT 1",
+            (player_id, route_key),
         ).fetchone() is not None
 
     @staticmethod
-    def _cloud_insert_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
-        connection.execute(
-            "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
+    def _world_intro_costs(costs: dict[str, int]) -> tuple[dict[str, int], dict[str, int]]:
+        assets: dict[str, int] = {}
+        values: dict[str, int] = {}
+        for key, amount in costs.items():
+            if key == "currency.spirit_stone":
+                assets["spirit_stones"] = amount
+            elif key.startswith("resource."):
+                values[key.removeprefix("resource.")] = -amount
+            else:
+                raise ValueError(f"unsupported world introduction cost: {key}")
+        return assets, values
+
+    @staticmethod
+    def _world_intro_state(raw: Any) -> dict[str, Any]:
+        try:
+            value = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("player introduction state is malformed") from exc
+        if not isinstance(value, dict):
+            raise ValueError("player introduction state must be an object")
+        flags = value.get("flags", [])
+        if not isinstance(flags, list) or any(not isinstance(flag, str) for flag in flags):
+            raise ValueError("player introduction flags are malformed")
+        return dict(value)
 
     @staticmethod
     def _cloud_start_from_payload(payload: dict[str, Any], *, replay: bool = False) -> CloudBoatStartRecord:
@@ -737,6 +757,7 @@ class CloudRepositoryMixin:
     def _demon_intro_from_payload(payload: dict[str, Any], *, replay: bool = False) -> DemonIntroRecord:
         from ..repository import SQLitePlayerRepository
 
+        reward_grant_from_snapshot(payload["reward_snapshot"], operation="world.accept_demon_intro")
         return DemonIntroRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]), quest_key=str(payload["quest_key"]),
             status=str(payload["status"]), reward={str(k): int(v) for k, v in payload.get("reward", {}).items()},
@@ -747,6 +768,7 @@ class CloudRepositoryMixin:
     def _beast_intro_from_payload(payload: dict[str, Any], *, replay: bool = False) -> BeastIntroRecord:
         from ..repository import SQLitePlayerRepository
 
+        reward_grant_from_snapshot(payload["reward_snapshot"], operation="world.complete_beast_intro")
         return BeastIntroRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             quest_key=str(payload["quest_key"]),

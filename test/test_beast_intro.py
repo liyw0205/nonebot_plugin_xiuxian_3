@@ -211,3 +211,59 @@ def test_beast_intro_uses_owned_evidence_and_unlocks_hills_on_both_adapters() ->
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_beast_intro_never_uses_another_player_observation() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=Path(data_dir) / adapter)
+                owner = f"beast-evidence-owner-{adapter}"
+                claimant = f"beast-evidence-claimant-{adapter}"
+                for user in (owner, claimant):
+                    await runtime.adapters.dispatch(
+                        adapter, _context(adapter, user, f"create-{user}"), "开始修仙"
+                    )
+                    _prepare_foundation_outskirts(runtime, adapter, user)
+
+                operation = next(
+                    f"beast-owned-evidence-{index}"
+                    for index in range(1000)
+                    if battle_roll_bp(f"beast-owned-evidence-{index}:battle") >= 1000
+                )
+                started = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, owner, "owner-start", operation),
+                    "开始探索 近郊采集",
+                )
+                assert started.code == "EXPLORATION_STARTED"
+                _expire_exploration(runtime, started.data["exploration_id"])
+                settled = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, owner, "owner-settle", "owner-settle"),
+                    "结算探索",
+                )
+                assert settled.code == "EXPLORATION_SETTLED"
+
+                history = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, claimant, "claimant-history", "claimant-history"),
+                    "阅读妖界史",
+                )
+                assert history.code == "BEAST_HISTORY_RECORDED"
+                denied = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, claimant, "claimant-intro", "claimant-intro"),
+                    "完成妖界引导",
+                )
+                assert denied.code == "BEAST_INTRO_REQUIREMENT_MISSING"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT spirit_stones, faction_reputation_json, intro_json "
+                        "FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, claimant),
+                    ).fetchone()
+                assert state == (0, "{}", "{}")
+                await runtime.close()
+
+    asyncio.run(run())
