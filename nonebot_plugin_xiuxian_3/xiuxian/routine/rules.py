@@ -9,6 +9,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from ..content import ContentBundle
+from ..rewards.rules import reward_definition, reward_totals
 
 CHECKIN_ACTIVITY = "ritual.checkin.daily"
 MAKEUP_ACTIVITY = "ritual.makeup.daily"
@@ -431,16 +433,34 @@ def parse_iso_date(value: str) -> date:
         raise ValueError("invalid business date") from exc
 
 
-def checkin_reward(streak: int) -> dict[str, int]:
-    reward = {"spirit_stones": 20, "energy": 3}
+def checkin_reward(streak: int, content: ContentBundle) -> dict[str, int]:
+    reward = reward_totals(
+        reward_definition(
+            "reward.routine.checkin.daily",
+            content,
+            operation="routine.checkin.daily",
+        )
+    )
     if streak > 0 and streak % 7 == 0:
-        reward[FATE_TICKET] = 1
+        for key, quantity in reward_totals(
+            reward_definition(
+                "reward.routine.checkin.streak",
+                content,
+                operation="routine.checkin.daily",
+            )
+        ).items():
+            reward[key] = reward.get(key, 0) + quantity
     return reward
 
 
-def makeup_reward() -> dict[str, int]:
-    # The documented 80% reward is rounded down for integer assets.
-    return {"spirit_stones": 16, "energy": 2}
+def makeup_reward(content: ContentBundle) -> dict[str, int]:
+    return reward_totals(
+        reward_definition(
+            "reward.routine.makeup.daily",
+            content,
+            operation="routine.makeup.daily",
+        )
+    )
 
 
 def tree_status(water_count: int, cooldown_until: str | None, now_iso: str) -> str:

@@ -457,3 +457,20 @@ PvE/PvP 结算不在本条范围，切磋与训练傀儡仍保持只读观战。
 
 剩余缺口：云舟恢复和妖界史/引导的损坏 operation JSON 仍可补充独立夹具；其他世界剧情与活动的声望
 写入继续按单独垂直切片迁移，不能把本条已闭合的引导流程重新设计。
+
+### 道历问安与补录奖励内容化
+
+本条只处理 `道历问安` 与 `补录道历` 的奖励来源。当前两条路径仍由
+`xiuxian/routine/rules.py` 内置灵石、精力和连续七日机缘签数值，违反奖励内容唯一来源合同；灵木、
+功业、道契、机缘寻宝、问道行卷和七日目标已闭合的奖励不在本条重新设计。新增
+`reward.routine.checkin.daily`、`reward.routine.checkin.streak` 与 `reward.routine.makeup.daily`
+固定奖励记录，规则层通过共享 `reward_definition` 严格解析，问安/补录事务继续使用现有角色状态
+写入口，并把实际到账结果写入 operation 和业务记录快照。新请求读取当前内容，已完成 operation
+只回放原快照；内容改值、关闭、重启、输入冲突和坏内容均不得造成重复扣发或半笔奖励。
+
+入口与主线文件：`data/奖励/奖励.json`、`routine/rules.py`、`routine/repository.py`、道历专项测试及
+本文件/当前状态。主线代理负责内容、解析、事务接线、玩家文案与最终验收；`routine_contract_audit`
+只读核对字段、共享奖励事务和快照边界；`routine_test_audit` 只读核对 QQ 官方、OneBot V11、
+重启、operation 幂等/冲突、坏内容与故障回滚。两个子代理不修改仓储或测试夹具，其他已闭合 routine
+能力冻结，不新增运行时版本标识或旧格式兼容分支。切磋与训练傀儡仍为只读观战，正式 PvE/PvP 结算
+不在本条范围。

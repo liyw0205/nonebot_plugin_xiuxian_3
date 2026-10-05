@@ -272,7 +272,7 @@ class RoutineRepositoryMixin:
                 streak_before += 1
                 cursor -= timedelta(days=1)
             streak_after = streak_before + 1
-            requested_reward = checkin_reward(streak_after)
+            requested_reward = checkin_reward(streak_after, self.content)
             current_energy = player_integer(row, "energy")
             energy_gain = min(
                 int(requested_reward.get("energy", 0)),
@@ -426,7 +426,7 @@ class RoutineRepositoryMixin:
             if player_currency(row) < 30:
                 raise CurrencyInsufficientError("makeup requires 30 spirit stones")
 
-            requested_reward = makeup_reward()
+            requested_reward = makeup_reward(self.content)
             current_energy = player_integer(row, "energy")
             energy_gain = min(
                 int(requested_reward.get("energy", 0)),

@@ -1149,6 +1149,58 @@
       "once_per_player": true,
       "status": "active",
       "key": "reward.daily_task_claim"
+    },
+    {
+      "name": "道历问安基础奖励",
+      "desc": "每日问安所得的灵石与精力。",
+      "operation": "routine.checkin.daily",
+      "entries": [
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 20
+        },
+        {
+          "kind": "resource",
+          "resource_key": "energy",
+          "quantity": 3
+        }
+      ],
+      "status": "active",
+      "key": "reward.routine.checkin.daily"
+    },
+    {
+      "name": "七日问安额外奖励",
+      "desc": "连续七日问安所得的机缘签。",
+      "operation": "routine.checkin.daily",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.ticket.fate_basic",
+          "quantity": 1
+        }
+      ],
+      "status": "active",
+      "key": "reward.routine.checkin.streak"
+    },
+    {
+      "name": "道历补录奖励",
+      "desc": "补录旧日问安所得的灵石与精力。",
+      "operation": "routine.makeup.daily",
+      "entries": [
+        {
+          "kind": "currency",
+          "currency_key": "currency.spirit_stone",
+          "quantity": 16
+        },
+        {
+          "kind": "resource",
+          "resource_key": "energy",
+          "quantity": 2
+        }
+      ],
+      "status": "active",
+      "key": "reward.routine.makeup.daily"
     }
   ],
   "schema": "xiuxian.content"

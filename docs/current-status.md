@@ -137,6 +137,12 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 道历运营的功业领取、机缘密令、道契权益和问道行卷奖励现统一经过
 `utils.player.grant_player_reward_actual`：灵石、背包、精力、地方名望和服务信誉在同一角色状态事务中校验与写入，地点上限和资源上限只由调用规则传入，结果只记录实际到账数量。损坏的名望 JSON 在任何奖励写入前拒绝；同一 operation 重放不重复结算，账本故障可用原 operation 重试。QQ 官方与 OneBot V11 均覆盖功业封顶、密令组合奖励、重启重放和坏 JSON 回滚；切磋与训练傀儡仍为只读观战，正式 PvE/PvP 结算未改写。
 
+道历问安与补录的灵石、精力及连续七日机缘签现由 `data/奖励/奖励.json` 的
+`reward.routine.checkin.daily`、`reward.routine.checkin.streak` 与 `reward.routine.makeup.daily` 提供，
+规则通过共享奖励解析器读取；精力封顶后的实际所得和原奖励快照写入问安记录与 operation。内容改值只影响
+新请求，停机重启后旧 operation 仍回放原结果；坏内容、关闭内容和 operation 写入故障均在资产、问安记录
+及账本写入前原子拒绝，修复内容后可用原 operation 重试。QQ 官方与 OneBot V11 均已覆盖。
+
 ## 3. 当前未开放或端到端不完整
 
 以下内容可以在文档中有完整设计，但当前不能创建可运行会话，或尚不能由玩家端完成完整流程：
