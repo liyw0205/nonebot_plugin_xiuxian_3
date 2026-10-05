@@ -1,0 +1,84 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "mist_trial_tower",
+  "records": [
+    {
+      "key": "tower.mist_trial",
+      "name": "雾隐试炼塔",
+      "desc": "逐层挑战雾隐塔中守关敌手。",
+      "status": "active",
+      "max_floor": 45,
+      "practice_weekly_limit": 3,
+      "codex_first_clear_floors": [5, 10, 35, 40, 45],
+      "codex_entry_prefix": "codex.challenge.mist_trial.floor_",
+      "segments": [
+        {
+          "floor_min": 1,
+          "floor_max": 10,
+          "required_realm": "qi_sensing",
+          "required_layer": 1,
+          "stamina_cost": 4,
+          "daily_limit": 5,
+          "enemy_key": "enemy.mist_trial.sensing",
+          "boss_enemy_key": "enemy.mist_trial.sensing_boss",
+          "boss_floors": [5, 10],
+          "first_clear_rewards": [{"weight": 1, "rewards": {"spirit_stones": 10, "item.mat.array_sand": 1}}],
+          "repeat_rewards": [{"weight": 1, "rewards": {"item.mat.array_sand": 1}}, {"weight": 1, "no_reward": true}]
+        },
+        {
+          "floor_min": 11,
+          "floor_max": 20,
+          "required_realm": "qi_gathering",
+          "required_layer": 4,
+          "stamina_cost": 6,
+          "daily_limit": 4,
+          "enemy_key": "enemy.mist_trial.gathering",
+          "boss_enemy_key": "enemy.mist_trial.gathering_boss",
+          "boss_floors": [15, 20],
+          "first_clear_rewards": [
+            {"weight": 1, "rewards": {"spirit_stones": 20, "item.mat.array_sand": 1}},
+            {"weight": 1, "rewards": {"spirit_stones": 20, "item.mat.array_sand": 2}}
+          ],
+          "repeat_rewards": [{"weight": 1, "rewards": {"item.mat.array_sand": 1}}, {"weight": 1, "no_reward": true}]
+        },
+        {
+          "floor_min": 21,
+          "floor_max": 30,
+          "required_realm": "foundation",
+          "required_layer": 4,
+          "stamina_cost": 8,
+          "daily_limit": 3,
+          "enemy_key": "enemy.mist_trial.foundation",
+          "boss_enemy_key": "enemy.mist_trial.foundation_boss",
+          "boss_floors": [25, 30],
+          "first_clear_rewards": [{"weight": 1, "rewards": {"spirit_stones": 35, "item.mat.array_sand": 2}}],
+          "repeat_rewards": [{"weight": 1, "rewards": {"item.mat.array_sand": 1}}, {"weight": 1, "no_reward": true}]
+        },
+        {
+          "floor_min": 31,
+          "floor_max": 45,
+          "required_realm": "golden_core",
+          "required_layer": 3,
+          "stamina_cost": 10,
+          "daily_limit": 3,
+          "enemy_key": "enemy.mist_trial.golden_core",
+          "boss_enemy_key": "enemy.mist_trial.golden_core_boss",
+          "boss_floors": [35, 40, 45],
+          "first_clear_rewards": [{"weight": 1, "rewards": {"spirit_stones": 60, "item.mat.array_sand": 2}}],
+          "repeat_rewards": [{"weight": 1, "rewards": {"item.mat.array_sand": 1}}, {"weight": 1, "no_reward": true}]
+        }
+      ],
+      "special_rewards": {
+        "5": {"local.xuantian.new_town": 5},
+        "10": {"local.xuantian.new_town": 5},
+        "15": {"item.clue.recipe_basic": 1},
+        "20": {"item.clue.recipe_basic": 1},
+        "25": {"item.clue.mist_cave_route": 1},
+        "30": {"item.clue.mist_cave_route": 1},
+        "35": {"item.clue.recipe_basic": 1},
+        "40": {"item.clue.recipe_basic": 1},
+        "45": {"item.clue.recipe_basic": 1}
+      }
+    }
+  ]
+}

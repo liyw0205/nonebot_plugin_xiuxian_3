@@ -29,6 +29,8 @@ class TowerRunRecord:
     status: str
     battle_id: str | None
     first_clear: bool
+    enemy_key: str | None = None
+    stamina_cost: int = 0
     outcome: str | None = None
     reason: str | None = None
     reward: dict[str, int] = field(default_factory=dict)

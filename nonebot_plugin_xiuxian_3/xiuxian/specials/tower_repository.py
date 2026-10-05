@@ -10,21 +10,26 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import ContentError
 from .codex_projection import record_codex_discovery, record_material_discoveries
+from .codex_rules import category_for_entry
 from .tower_models import TowerPreviewRecord, TowerRewardRecord, TowerRunRecord
 from .tower_rules import (
-    MAX_FLOOR,
     TOWER_KEY,
     attempt_band_for,
+    codex_first_clear_floors,
+    codex_entry_key,
     floor_definition,
+    max_floor,
+    practice_weekly_limit,
     practice_week_start,
+    reward_local_reputation_maximums,
     reward_for,
 )
 from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
     ResourceInsufficientError,
-    TowerAlreadyClaimedError,
     TowerBusyError,
     TowerFloorLockedError,
     TowerNotFoundError,
@@ -54,12 +59,13 @@ class TowerRepositoryMixin:
                 "SELECT floor_no, status FROM tower_runs WHERE player_id=? AND status IN ('battle_running', 'reward_pending') ORDER BY id DESC LIMIT 1",
                 (player["id"],),
             ).fetchone()
-            next_floor = min(highest + 1, MAX_FLOOR)
-            definition = floor_definition(max(next_floor, 1))
+            tower_max_floor = max_floor(self.content)
+            next_floor = min(highest + 1, tower_max_floor)
+            definition = floor_definition(max(next_floor, 1), self.content)
             start = now.date().isoformat()
             daily_used = int(connection.execute(
                 "SELECT COUNT(*) FROM tower_runs WHERE player_id=? AND tower_key=? AND status<>'aborted' AND substr(created_at,1,10)=? AND floor_no BETWEEN ? AND ?",
-                (player["id"], TOWER_KEY, start, *attempt_band_for(next_floor)),
+                (player["id"], TOWER_KEY, start, *attempt_band_for(next_floor, self.content)),
             ).fetchone()[0])
             week_start = practice_week_start(now)
             practice_used = int(connection.execute(
@@ -93,7 +99,7 @@ class TowerRepositoryMixin:
             battle = await self.start_quest_battle(
                 platform=platform,
                 platform_user_id=platform_user_id,
-                enemy_key=floor_definition(floor_no).enemy_key,
+                enemy_key=record.enemy_key or "",
                 battle_type="pve.tower",
                 operation_id=battle_operation,
                 ignore_tower_run_id=record.run_id,
@@ -107,10 +113,6 @@ class TowerRepositoryMixin:
     def _start_tower_run_once(
         self, platform: str, platform_user_id: str, floor_no: int, operation_id: str
     ) -> TowerRunRecord:
-        try:
-            definition = floor_definition(floor_no)
-        except ValueError as exc:
-            raise TowerRequirementError(str(exc)) from exc
         operation_name = "specials.start_tower"
         payload = {
             "platform": platform,
@@ -136,6 +138,11 @@ class TowerRepositoryMixin:
                     raise TowerNotFoundError("tower run no longer exists")
                 player = connection.execute("SELECT * FROM players WHERE id=?", (run["player_id"],)).fetchone()
                 return self._tower_run_from_rows(run, player, replay=True)
+
+            try:
+                definition = floor_definition(floor_no, self.content)
+            except (ContentError, ValueError, KeyError) as exc:
+                raise TowerRequirementError(str(exc)) from exc
 
             player = self._require_player(connection, platform, platform_user_id)
             if not self._meets_realm_values(
@@ -163,7 +170,10 @@ class TowerRepositoryMixin:
                 (player["id"], TOWER_KEY, floor_no),
             ).fetchone()
             first_clear = existing_clear is None
-            band_start, band_end = attempt_band_for(floor_no)
+            try:
+                band_start, band_end = attempt_band_for(floor_no, self.content)
+            except (ContentError, ValueError, KeyError) as exc:
+                raise TowerRequirementError(str(exc)) from exc
             daily_used = int(connection.execute(
                 "SELECT COUNT(*) FROM tower_runs WHERE player_id=? AND tower_key=? AND status<>'aborted' AND substr(created_at,1,10)=? AND floor_no BETWEEN ? AND ?",
                 (player["id"], TOWER_KEY, now.date().isoformat(), band_start, band_end),
@@ -176,12 +186,33 @@ class TowerRepositoryMixin:
                     "SELECT COUNT(*) FROM tower_runs WHERE player_id=? AND tower_key=? AND floor_no=? AND first_clear=0 AND status<>'aborted' AND substr(created_at,1,10)>=?",
                     (player["id"], TOWER_KEY, floor_no, week_start),
                 ).fetchone()[0])
-                if practice_count >= 3:
+                try:
+                    practice_limit = practice_weekly_limit(self.content)
+                except (ContentError, ValueError, KeyError) as exc:
+                    raise TowerRequirementError(str(exc)) from exc
+                if practice_count >= practice_limit:
                     raise TowerQuotaError("weekly tower practice limit is exhausted")
             if player_integer(player, "stamina") < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             run_id = uuid4().hex
-            reward = reward_for(floor_no, run_id, first_clear=first_clear)
+            try:
+                reward = reward_for(
+                    floor_no,
+                    run_id,
+                    first_clear=first_clear,
+                    content=self.content,
+                )
+                reward_maximums = reward_local_reputation_maximums(reward, self.content)
+                should_record_codex = (
+                    not first_clear
+                    or floor_no in codex_first_clear_floors(self.content)
+                )
+                codex_key = codex_entry_key(floor_no, self.content) if should_record_codex else ""
+                codex_category = category_for_entry(codex_key, self.content) if codex_key else ""
+                if codex_key and not codex_category:
+                    raise ContentError(f"codex entry is unavailable: {codex_key}")
+            except (ContentError, ValueError, KeyError) as exc:
+                raise TowerRequirementError(str(exc)) from exc
             change_player_state(
                 connection,
                 player,
@@ -192,13 +223,20 @@ class TowerRepositoryMixin:
                 """
                 INSERT INTO tower_runs(
                     run_id, player_id, tower_key, floor_no, status, battle_id, first_clear,
-                    starts_at, result_json, reward_json,
+                    enemy_key, stamina_cost,
+                    starts_at, result_json, reward_json, reward_maximums_json,
+                    codex_entry_key, codex_category,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'battle_running', NULL, ?, ?, '{}', ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, 'battle_running', NULL, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    run_id, player["id"], TOWER_KEY, floor_no, int(first_clear), now_text,
-                    json.dumps(reward, ensure_ascii=False, sort_keys=True), now_text, now_text,
+                    run_id, player["id"], TOWER_KEY, floor_no, int(first_clear),
+                    definition.enemy_key, definition.stamina_cost, now_text,
+                    json.dumps(reward, ensure_ascii=False, sort_keys=True),
+                    json.dumps(reward_maximums, ensure_ascii=False, sort_keys=True),
+                    codex_key,
+                    codex_category,
+                    now_text, now_text,
                 ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
@@ -303,42 +341,54 @@ class TowerRepositoryMixin:
                 (player["id"],),
             ).fetchone()
             if run is None:
-                claimed = connection.execute(
-                    "SELECT 1 FROM tower_reward_claims WHERE player_id=? LIMIT 1", (player["id"],)
-                ).fetchone()
-                if claimed is not None:
-                    raise TowerAlreadyClaimedError("tower reward was already claimed")
                 raise TowerRewardNotAvailableError("no tower reward is pending")
-            reward = {str(key): int(value) for key, value in json.loads(run["reward_json"]).items()}
+            try:
+                reward_payload = json.loads(run["reward_json"])
+                reward_maximums = json.loads(run["reward_maximums_json"])
+            except (TypeError, ValueError) as exc:
+                raise TowerRequirementError("tower reward snapshot is invalid") from exc
+            if not isinstance(reward_payload, dict) or any(
+                not isinstance(key, str)
+                or not key
+                or isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+                for key, value in reward_payload.items()
+            ):
+                raise TowerRequirementError("tower reward snapshot is invalid")
+            reward = {str(key): int(value) for key, value in reward_payload.items()}
+            if not isinstance(reward_maximums, dict) or any(
+                not isinstance(key, str)
+                or not key.startswith("local.")
+                or isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+                for key, value in reward_maximums.items()
+            ) or set(reward_maximums) != {
+                key for key in reward if key.startswith("local.")
+            }:
+                raise TowerRequirementError("tower reward reputation snapshot is invalid")
             settlement_reward: dict[str, int] = {}
             for key, value in reward.items():
-                if key == "local_reputation":
-                    settlement_reward["local.xuantian.new_town"] = (
-                        settlement_reward.get("local.xuantian.new_town", 0) + value
-                    )
-                else:
-                    settlement_reward[key] = value
+                settlement_reward[key] = value
             if settlement_reward:
                 grant_player_reward(
                     connection,
                     player,
                     settlement_reward,
                     now_text,
-                    local_reputation_maximums=(
-                        {"local.xuantian.new_town": 1000}
-                        if "local.xuantian.new_town" in settlement_reward
-                        else None
-                    ),
+                    local_reputation_maximums=reward_maximums or None,
                 )
             record_material_discoveries(
                 connection, player_id=int(player["id"]), operation_id=operation_id,
                 occurred_at=now, reward=reward, snapshot={"source": TOWER_KEY, "floor_no": int(run["floor_no"])},
+                content=self.content,
             )
-            if not bool(run["first_clear"]) or int(run["floor_no"]) in {5, 10, 35, 40, 45}:
+            if run["codex_entry_key"]:
                 record_codex_discovery(
                     connection,
                     player_id=int(player["id"]),
-                    entry_key=f"codex.challenge.mist_trial.floor_{run['floor_no']}",
+                    entry_key=str(run["codex_entry_key"]),
                     operation_id=operation_id,
                     occurred_at=now,
                     snapshot={
@@ -347,6 +397,8 @@ class TowerRepositoryMixin:
                         "run_id": run["run_id"],
                         "practice": not bool(run["first_clear"]),
                     },
+                    content=self.content,
+                    category_snapshot=str(run["codex_category"]),
                 )
             connection.execute(
                 "INSERT INTO tower_reward_claims(run_id,player_id,floor_no,first_clear,operation_id,reward_json,claimed_at) VALUES (?,?,?,?,?,?,?)",
@@ -378,7 +430,6 @@ class TowerRepositoryMixin:
             ).fetchone()
             if run is None:
                 return
-            definition = floor_definition(int(run["floor_no"]))
             player = connection.execute(
                 "SELECT * FROM players WHERE id = ?", (run["player_id"],)
             ).fetchone()
@@ -388,7 +439,7 @@ class TowerRepositoryMixin:
                 connection,
                 player,
                 updated_at=now_text,
-                value_delta={"stamina": definition.stamina_cost},
+                value_delta={"stamina": int(run["stamina_cost"])},
                 maximums={"stamina": player["stamina_max"]},
             )
             connection.execute(
@@ -421,6 +472,8 @@ class TowerRepositoryMixin:
             status=str(run["status"]),
             battle_id=str(run["battle_id"]) if run["battle_id"] else None,
             first_clear=bool(run["first_clear"]),
+            enemy_key=str(run["enemy_key"]) if run["enemy_key"] else None,
+            stamina_cost=int(run["stamina_cost"]),
             outcome=str(result["outcome"]) if result.get("outcome") else None,
             reason=str(result["reason"]) if result.get("reason") else None,
             reward={str(key): int(value) for key, value in json.loads(run["reward_json"]).items()} if str(run["status"]) == "reward_pending" else {},

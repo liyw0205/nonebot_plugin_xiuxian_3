@@ -400,127 +400,6 @@ ARCHIVE_KEEPER = EnemyDefinition(
     reward={},
 )
 
-MIST_TRIAL_SENSING = EnemyDefinition(
-    key="enemy.mist_trial.sensing",
-    label="雾塔试炼影",
-    location_key="tower.mist_trial",
-    required_realm="qi_sensing",
-    required_layer=1,
-    max_hp=80,
-    attack=8,
-    initiative=8,
-    agility=8,
-    skill_key="enemy_skill.dummy_tap",
-    random_pool=combat_random_pool("enemy.mist_trial.sensing"),
-    reward={},
-)
-
-MIST_TRIAL_SENSING_BOSS = EnemyDefinition(
-    key="enemy.mist_trial.sensing_boss",
-    label="雾塔层间守将",
-    location_key="tower.mist_trial",
-    required_realm="qi_sensing",
-    required_layer=1,
-    max_hp=150,
-    attack=14,
-    initiative=10,
-    agility=10,
-    skill_key="enemy_skill.dummy_tap",
-    random_pool=combat_random_pool("enemy.mist_trial.sensing_boss"),
-    reward={},
-)
-
-MIST_TRIAL_GATHERING = EnemyDefinition(
-    key="enemy.mist_trial.gathering",
-    label="聚气层试炼影",
-    location_key="tower.mist_trial",
-    required_realm="qi_gathering",
-    required_layer=4,
-    max_hp=320,
-    attack=42,
-    initiative=12,
-    agility=14,
-    skill_key="enemy_skill.scratch",
-    random_pool=combat_random_pool("enemy.mist_trial.gathering"),
-    reward={},
-)
-
-MIST_TRIAL_GATHERING_BOSS = EnemyDefinition(
-    key="enemy.mist_trial.gathering_boss",
-    label="聚气层守将",
-    location_key="tower.mist_trial",
-    required_realm="qi_gathering",
-    required_layer=4,
-    max_hp=480,
-    attack=58,
-    initiative=14,
-    agility=16,
-    skill_key="enemy_skill.scratch",
-    random_pool=combat_random_pool("enemy.mist_trial.gathering_boss"),
-    reward={},
-)
-
-MIST_TRIAL_FOUNDATION = EnemyDefinition(
-    key="enemy.mist_trial.foundation",
-    label="筑基层试炼影",
-    location_key="tower.mist_trial",
-    required_realm="foundation",
-    required_layer=4,
-    max_hp=700,
-    attack=85,
-    initiative=15,
-    agility=18,
-    skill_key="enemy_skill.scratch",
-    random_pool=combat_random_pool("enemy.mist_trial.foundation"),
-    reward={},
-)
-
-MIST_TRIAL_FOUNDATION_BOSS = EnemyDefinition(
-    key="enemy.mist_trial.foundation_boss",
-    label="筑基层守将",
-    location_key="tower.mist_trial",
-    required_realm="foundation",
-    required_layer=4,
-    max_hp=1000,
-    attack=120,
-    initiative=18,
-    agility=20,
-    skill_key="enemy_skill.scratch",
-    random_pool=combat_random_pool("enemy.mist_trial.foundation_boss"),
-    reward={},
-)
-
-MIST_TRIAL_GOLDEN_CORE = EnemyDefinition(
-    key="enemy.mist_trial.golden_core",
-    label="金丹层试炼影",
-    location_key="tower.mist_trial",
-    required_realm="golden_core",
-    required_layer=3,
-    max_hp=2400,
-    attack=250,
-    initiative=20,
-    agility=22,
-    skill_key="enemy_skill.mist_exposed",
-    random_pool=combat_random_pool("enemy.mist_trial.golden_core"),
-    reward={},
-)
-
-MIST_TRIAL_GOLDEN_CORE_BOSS = EnemyDefinition(
-    key="enemy.mist_trial.golden_core_boss",
-    label="金丹层守将",
-    location_key="tower.mist_trial",
-    required_realm="golden_core",
-    required_layer=3,
-    max_hp=3600,
-    attack=330,
-    initiative=25,
-    agility=28,
-    skill_key="enemy_skill.mist_exposed",
-    random_pool=combat_random_pool("enemy.mist_trial.golden_core_boss"),
-    reward={},
-)
-
-
 def _content_enemy(key: str, content: ContentBundle) -> EnemyDefinition:
     record = content.require("enemy", key, include_locked=False)
     profile = record.get("combat_profile")
@@ -630,14 +509,6 @@ ENEMIES = {
     TIME_FORT_KEEPER.key: TIME_FORT_KEEPER,
     BOUNDARY_TRIAL_GUARDIAN.key: BOUNDARY_TRIAL_GUARDIAN,
     ARCHIVE_KEEPER.key: ARCHIVE_KEEPER,
-    MIST_TRIAL_SENSING.key: MIST_TRIAL_SENSING,
-    MIST_TRIAL_SENSING_BOSS.key: MIST_TRIAL_SENSING_BOSS,
-    MIST_TRIAL_GATHERING.key: MIST_TRIAL_GATHERING,
-    MIST_TRIAL_GATHERING_BOSS.key: MIST_TRIAL_GATHERING_BOSS,
-    MIST_TRIAL_FOUNDATION.key: MIST_TRIAL_FOUNDATION,
-    MIST_TRIAL_FOUNDATION_BOSS.key: MIST_TRIAL_FOUNDATION_BOSS,
-    MIST_TRIAL_GOLDEN_CORE.key: MIST_TRIAL_GOLDEN_CORE,
-    MIST_TRIAL_GOLDEN_CORE_BOSS.key: MIST_TRIAL_GOLDEN_CORE_BOSS,
 }
 ENEMIES.update(_VOID_SPIRE_ENEMIES)
 
@@ -698,6 +569,10 @@ def enemy_definition(enemy_key: str, *, content: ContentBundle | None = None) ->
     if enemy_key.startswith("enemy.void_spire."):
         return _void_spire_enemy(enemy_key, content=bundle)
     record = bundle.get("enemy", enemy_key, include_locked=False)
+    if enemy_key.startswith("enemy.mist_trial."):
+        if record is None:
+            raise ContentError(f"enemy content is unavailable: {enemy_key}")
+        return _content_enemy(enemy_key, bundle)
     if record is not None and isinstance(record.get("combat_profile"), dict):
         return _content_enemy(enemy_key, bundle)
     try:

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
-from .tower_rules import MAX_FLOOR
+from ..content import ContentError, bundled_content
+from .tower_rules import TOWER_KEY, max_floor, practice_weekly_limit
 from ..persistence.errors import (
     BattleBusyError,
     BattleRequirementError,
@@ -12,7 +13,6 @@ from ..persistence.errors import (
     PlayerSuspendedError,
     RepositoryBusyError,
     ResourceInsufficientError,
-    TowerAlreadyClaimedError,
     TowerBusyError,
     TowerFloorLockedError,
     TowerNotFoundError,
@@ -28,6 +28,7 @@ from .tower_repository import TowerRepositoryMixin
 class TowerApplication:
     def __init__(self, repository: TowerRepositoryMixin):
         self.repository = repository
+        self.content = repository.content or bundled_content()
 
     @staticmethod
     def _operation_id(context: CommandContext, name: str) -> str:
@@ -36,16 +37,21 @@ class TowerApplication:
         key = context.message_id or context.request_id
         return f"{name}:{context.adapter}:{context.user_id}:{key}"
 
-    @staticmethod
-    def _reward_text(reward: dict[str, int]) -> str:
+    def _reward_text(self, reward: dict[str, int]) -> str:
         labels = {
-            "item.mat.array_sand": "阵砂",
-            "item.clue.recipe_basic": "配方线索",
-            "item.clue.mist_cave_route": "雾隐洞天路线提示",
             "spirit_stones": "灵石",
-            "local_reputation": "地方名望",
         }
-        return "、".join(f"{labels.get(key, key)} +{value}" for key, value in reward.items()) or "无"
+        rendered: list[str] = []
+        for key, value in reward.items():
+            if key.startswith("item."):
+                label = self.content.label("item", key, fallback="物品")
+            elif key.startswith("local."):
+                location_key = key.removeprefix("local.")
+                label = f"{self.content.label('location', location_key, fallback='地方')}名望"
+            else:
+                label = labels.get(key, "资源")
+            rendered.append(f"{label} +{value}")
+        return "、".join(rendered) or "无"
 
     @staticmethod
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
@@ -60,7 +66,6 @@ class TowerApplication:
             TowerNotReadyError: ("TOWER_NOT_READY", "自动战斗尚未完成，请稍后重试。"),
             TowerStartFailedError: ("TOWER_START_FAILED", "自动战未能启动，入场体力已退回。请用新消息重新挑战。"),
             TowerRewardNotAvailableError: ("TOWER_REWARD_NOT_AVAILABLE", "当前没有待领取的试炼塔奖励。"),
-            TowerAlreadyClaimedError: ("TOWER_REWARD_ALREADY_CLAIMED", "试炼塔奖励已经领取。"),
             ResourceInsufficientError: ("RESOURCE_INSUFFICIENT", "体力不足，未扣除任何资源。"),
             BattleBusyError: ("TOWER_BUSY", "当前角色已有进行中的战斗或其他行动。"),
             BattleRequirementError: ("TOWER_REQUIREMENT_MISSING", "当前境界或状态不满足该层挑战条件。"),
@@ -95,18 +100,18 @@ class TowerApplication:
             state = "无进行中的塔层"
         message = (
             "## 雾隐试炼塔\n\n"
-            f"- **最高首通**：{record.highest_floor}/{MAX_FLOOR} 层\n"
+            f"- **最高首通**：{record.highest_floor}/{max_floor(self.content)} 层\n"
             f"- **下一层**：{record.next_floor}\n"
             f"- **入场体力**：{record.stamina_cost}\n"
             f"- **今日层段次数**：{record.daily_used}/{record.daily_limit}\n"
-            f"- **本周本层练习**：{record.practice_used}/3\n"
+            f"- **本周本层练习**：{record.practice_used}/{practice_weekly_limit(self.content)}\n"
             f"- **当前状态**：{state}\n\n"
             "> 发送 `挑战试炼塔 <层数>` 挑战，胜利后发送 `领取试炼塔奖励`。"
         )
         return CommandResult(
             True, "TOWER_PREVIEW", message, context.request_id,
             data={
-                "tower_key": "tower.mist_trial",
+                "tower_key": TOWER_KEY,
                 "highest_floor": record.highest_floor,
                 "next_floor": record.next_floor,
                 "active_floor": record.active_floor,
@@ -119,12 +124,12 @@ class TowerApplication:
         )
 
     async def challenge(self, context: CommandContext) -> CommandResult:
-        if len(context.command_args) != 1 or not context.command_args[0].isdigit():
-            return CommandResult(False, "INVALID_TOWER_COMMAND", f"请使用 `挑战试炼塔 <1-{MAX_FLOOR}>`。", context.request_id)
-        floor_no = int(context.command_args[0])
-        if not 1 <= floor_no <= MAX_FLOOR:
-            return CommandResult(False, "INVALID_TOWER_COMMAND", f"试炼塔楼层范围为 1 至 {MAX_FLOOR}。", context.request_id)
         operation_id = self._operation_id(context, "specials.start_tower")
+        if len(context.command_args) != 1 or not context.command_args[0].isdigit():
+            return CommandResult(False, "INVALID_TOWER_COMMAND", "请使用 `挑战试炼塔 <楼层>`。", context.request_id)
+        floor_no = int(context.command_args[0])
+        if floor_no < 1:
+            return CommandResult(False, "INVALID_TOWER_COMMAND", "试炼塔楼层必须为正整数。", context.request_id)
         try:
             record = await self.repository.start_tower_run(
                 platform=context.adapter,
@@ -152,12 +157,12 @@ class TowerApplication:
             result_text = "已完成"
             next_action = "这条请求已处理。"
         else:
-            result_text = record.status
+            result_text = "战果已记入修行记录"
             next_action = "请稍后重试查看结果。"
         return CommandResult(
             True,
             "TOWER_CHALLENGE_SETTLED",
-            f"## 试炼塔第 {floor_no} 层\n\n- **结果**：{result_text}\n- **首通**：{'是' if record.first_clear and record.outcome == 'won' else '否'}\n- **自动战**：`{record.battle_id or '未创建'}`\n\n> {next_action}",
+            f"## 试炼塔第 {floor_no} 层\n\n- **结果**：{result_text}\n- **首通**：{'是' if record.first_clear and record.outcome == 'won' else '否'}\n\n> {next_action}",
             context.request_id,
             operation_id,
             data={
@@ -190,7 +195,7 @@ class TowerApplication:
         return CommandResult(
             True,
             "TOWER_REWARD_CLAIMED",
-            f"## 试炼塔第 {record.floor_no} 层奖励\n\n- **首通**：{'是' if record.first_clear else '否'}\n- **领取**：{reward_text}\n\n> 同一 operation 重放不会重复发奖。",
+            f"## 试炼塔第 {record.floor_no} 层奖励\n\n- **首通**：{'是' if record.first_clear else '否'}\n- **领取**：{reward_text}\n\n> 所得已收入囊中。",
             context.request_id,
             operation_id,
             data={

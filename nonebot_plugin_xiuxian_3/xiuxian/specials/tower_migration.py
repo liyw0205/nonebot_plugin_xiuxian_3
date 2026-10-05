@@ -13,13 +13,18 @@ def ensure_tower_schema(connection: sqlite3.Connection) -> None:
             run_id TEXT NOT NULL UNIQUE,
             player_id INTEGER NOT NULL REFERENCES players(id),
             tower_key TEXT NOT NULL,
-            floor_no INTEGER NOT NULL CHECK (floor_no BETWEEN 1 AND 45),
+            floor_no INTEGER NOT NULL CHECK (floor_no > 0),
             status TEXT NOT NULL CHECK (status IN ('battle_running', 'reward_pending', 'lost', 'claimed', 'aborted')),
             battle_id TEXT UNIQUE,
             first_clear INTEGER NOT NULL CHECK (first_clear IN (0, 1)),
+            enemy_key TEXT NOT NULL DEFAULT '',
+            stamina_cost INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0),
             starts_at TEXT NOT NULL,
             result_json TEXT NOT NULL DEFAULT '{}',
             reward_json TEXT NOT NULL DEFAULT '{}',
+            reward_maximums_json TEXT NOT NULL DEFAULT '{}',
+            codex_entry_key TEXT NOT NULL DEFAULT '',
+            codex_category TEXT NOT NULL DEFAULT '',
             claim_operation_id TEXT UNIQUE,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -40,6 +45,20 @@ def ensure_tower_schema(connection: sqlite3.Connection) -> None:
         );
         """
     )
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(tower_runs)").fetchall()
+    }
+    additions = {
+        "enemy_key": "TEXT NOT NULL DEFAULT ''",
+        "stamina_cost": "INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0)",
+        "reward_maximums_json": "TEXT NOT NULL DEFAULT '{}'",
+        "codex_entry_key": "TEXT NOT NULL DEFAULT ''",
+        "codex_category": "TEXT NOT NULL DEFAULT ''",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            connection.execute(f"ALTER TABLE tower_runs ADD COLUMN {name} {definition}")
 
 
 __all__ = ["ensure_tower_schema"]
