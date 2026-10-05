@@ -211,7 +211,7 @@ class SkillApplication:
             else:
                 effect_values.append(str(value))
         resource_costs = "、".join(
-            f"{content.label('resource', key, fallback=key)} {amount}"
+            f"{content.label('resource', key, fallback='所需资源')} {amount}"
             for key, amount in record.resource_costs.items()
         )
         return CommandResult(
