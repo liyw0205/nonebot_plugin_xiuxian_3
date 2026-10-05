@@ -745,7 +745,7 @@ class PlayerRepositoryMixin:
         operation_id: str,
     ) -> TravelRecord:
         from ..player.intro_rules import GUIDE_GATHER_BLOOD_GRASS, TRAVEL_COSTS
-        from ..progression.rules import REALM_QI_SENSING, SPIRIT_FIELD_LOCATION
+        from ..progression.rules import MODE_SPIRIT_SPRING, REALM_QI_SENSING
 
         operation_payload = {
             "platform": platform,
@@ -776,11 +776,13 @@ class PlayerRepositoryMixin:
                 )
 
             row = self._require_player(connection, platform, platform_user_id)
+            spirit_mode = self.content.get("cultivation", MODE_SPIRIT_SPRING, include_locked=True) if self.content else None
+            spirit_field_location = spirit_mode.get("required_location") if spirit_mode else "xuantian.spirit_field"
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 raise PlayerStageConflictError("player is not ready for travel")
             if destination not in TRAVEL_COSTS:
                 raise LocationRequirementError("destination is not available")
-            if destination == SPIRIT_FIELD_LOCATION:
+            if destination == spirit_field_location:
                 if row["realm_key"] != REALM_QI_SENSING or player_integer(row, "realm_layer") < 2:
                     raise LocationRequirementError("spirit field requires qi sensing layer 2")
                 intro_state = json_object(row["intro_json"], {})
@@ -820,7 +822,7 @@ class PlayerRepositoryMixin:
             weakness_until = row["weakness_until"]
             if weakness_until and now < datetime.fromisoformat(str(weakness_until)):
                 raise WeaknessActiveError("breakthrough weakness blocks travel")
-            if destination == SPIRIT_FIELD_LOCATION and current not in {
+            if destination == spirit_field_location and current not in {
                 "xuantian.new_town",
                 "xuantian.outskirts",
             }:

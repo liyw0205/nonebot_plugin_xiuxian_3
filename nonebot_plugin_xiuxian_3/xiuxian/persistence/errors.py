@@ -8,6 +8,10 @@ class RepositoryBusyError(RuntimeError):
     """The database did not become available before the retry budget ended."""
 
 
+class InvalidCultivationModeError(RuntimeError):
+    """The requested cultivation mode is not active or cannot be resolved."""
+
+
 class OperationConflictError(RuntimeError):
     """An operation ID was reused with a different actor or input."""
 

@@ -13,6 +13,7 @@ from ..repository import (
     CultivationNotReadyError,
     CultivationRequirementError,
     CultivationRecoveryRequiredError,
+    InvalidCultivationModeError,
     LocationRequiredError,
     LocationRequirementError,
     OperationConflictError,
@@ -28,13 +29,10 @@ from ..repository import (
 )
 from .rules import (
     MODE_BREATHING,
-    MODE_SECLUSION,
-    MODE_SOUL_REFINEMENT,
     MODE_SPIRIT_SPRING,
-    can_advance_layer,
-    cultivation_mode,
-    cultivation_mode_label,
+    cultivation_definitions,
     next_layer_threshold,
+    resolve_cultivation_mode,
     segment_for_layer,
 )
 from ..player.rules import REALM_LABELS, realm_display_name
@@ -48,16 +46,50 @@ class ProgressionApplication:
         self.repository = repository
 
     @staticmethod
-    def _resolve_mode(args: tuple[str, ...]) -> str | None:
-        if not args or args == ("调息",):
-            return MODE_BREATHING
-        if len(args) == 1 and args[0] in {"灵泉", "灵泉修炼", "灵泉谷"}:
-            return MODE_SPIRIT_SPRING
-        if len(args) == 1 and args[0] in {"静修", "静修修炼"}:
-            return MODE_SECLUSION
-        if len(args) == 1 and args[0] in {"神魂淬炼", "淬炼神魂", "凝魂"}:
-            return MODE_SOUL_REFINEMENT
-        return None
+    def _cultivation_reference(args: tuple[str, ...]) -> str | None:
+        """Normalize the command shape without resolving against mutable content."""
+
+        if len(args) > 1:
+            return None
+        return args[0] if args else ""
+
+    def _cultivation_hint(self) -> str:
+        labels = [definition.label for definition in cultivation_definitions(self.repository.content).values()]
+        return "、".join(labels)
+
+    def _mode_label(self, reference: str) -> str:
+        try:
+            return self._mode_definition(reference).label
+        except (ValueError, KeyError):
+            return reference or "调息修炼"
+
+    def _mode_definition(self, reference: str):
+        key = resolve_cultivation_mode(reference, self.repository.content)
+        return cultivation_definitions(self.repository.content)[key]
+
+    def _location_label(self, location_key: str | None) -> str:
+        if not location_key:
+            return "指定地点"
+        content = self.repository.content
+        if content is not None:
+            return content.label("location", location_key, fallback="指定地点")
+        return "指定地点"
+
+    def _realm_requirement(self, mode_reference: str) -> str:
+        try:
+            mode = self._mode_definition(mode_reference)
+        except (ValueError, KeyError):
+            return f"{self._mode_label(mode_reference)}所需境界尚未达到。"
+        if mode.required_realm:
+            labels = dict(REALM_LABELS)
+            content = self.repository.content
+            if content is not None:
+                realm = content.get("realm", mode.required_realm, include_locked=True)
+                if realm and isinstance(realm.get("name"), str) and realm["name"].strip():
+                    labels[mode.required_realm] = realm["name"].strip()
+            required = realm_display_name(mode.required_realm, mode.required_layer, labels=labels)
+            return f"{mode.label}需要达到{required}。"
+        return f"{mode.label}所需境界尚未达到。"
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -77,29 +109,37 @@ class ProgressionApplication:
             .replace("~", "\\~")
         )
 
-    @staticmethod
-    def _realm_text(player) -> str:
-        text = realm_display_name(player.realm_key, player.realm_layer, labels=REALM_LABELS)
+    def _realm_text(self, player) -> str:
+        labels = dict(REALM_LABELS)
+        record = (
+            self.repository.content.get("realm", player.realm_key, include_locked=True)
+            if self.repository.content
+            else None
+        )
+        if record is not None and isinstance(record.get("name"), str) and record["name"].strip():
+            labels[player.realm_key] = record["name"].strip()
+        text = realm_display_name(player.realm_key, player.realm_layer, labels=labels)
         try:
             return f"{text}（{segment_for_layer(int(player.realm_layer))}）"
         except (TypeError, ValueError):
             return text
 
     async def start_cultivation(self, context: CommandContext) -> CommandResult:
-        mode_key = self._resolve_mode(context.command_args)
-        if mode_key is None:
+        if len(context.command_args) > 1:
             return CommandResult(
                 False,
                 "INVALID_CULTIVATION_MODE",
-                "目前支持 `开始修炼`（调息）、`开始修炼 灵泉`、`开始修炼 静修` 或元婴后的 `开始修炼 神魂淬炼`。",
+                f"目前支持 `开始修炼`（{self._cultivation_hint()}）。",
                 context.request_id,
             )
+        mode_reference = self._cultivation_reference(context.command_args)
         operation_id = self._operation_id(context, "progression.start_cultivation")
         try:
             record = await self.repository.start_cultivation(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                mode_key=mode_key,
+                mode_key=MODE_BREATHING,
+                mode_reference=mode_reference,
                 operation_id=operation_id,
             )
         except PlayerNotFoundError:
@@ -111,19 +151,16 @@ class ProgressionApplication:
         except CultivationBusyError:
             return CommandResult(False, "CULTIVATION_BUSY", "你已经有一场修炼正在进行，请先结算或取消。", context.request_id, operation_id)
         except CultivationDailyLimitError:
+            mode_label = self._mode_label(mode_reference or "cultivate.breathing")
             return CommandResult(
                 False,
                 "CULTIVATION_DAILY_LIMIT",
-                f"{cultivation_mode_label(mode_key)}今日次数已用尽，明日再来。",
+                f"{mode_label}今日次数已用尽，明日再来。",
                 context.request_id,
                 operation_id,
             )
         except CultivationRequirementError:
-            requirement_message = (
-                "静修需要达到聚气一层。"
-                if mode_key == MODE_SECLUSION
-                else f"{cultivation_mode_label(mode_key)}所需境界尚未达到。"
-            )
+            requirement_message = self._realm_requirement(mode_reference or MODE_BREATHING)
             return CommandResult(
                 False,
                 "CULTIVATION_REQUIREMENT_MISSING",
@@ -132,22 +169,41 @@ class ProgressionApplication:
                 operation_id,
             )
         except LocationRequiredError:
-            return CommandResult(False, "LOCATION_REQUIRED", "灵泉修炼需要先抵达灵泉谷。", context.request_id, operation_id)
+            try:
+                location_key = self._mode_definition(mode_reference or MODE_SPIRIT_SPRING).required_location
+            except (ValueError, KeyError):
+                location_key = None
+            mode_label = self._mode_label(mode_reference or MODE_SPIRIT_SPRING)
+            return CommandResult(False, "LOCATION_REQUIRED", f"{mode_label}需要先抵达{self._location_label(location_key)}。", context.request_id, operation_id)
         except LocationRequirementError:
-            return CommandResult(False, "LOCATION_REQUIREMENT_MISSING", "灵泉修炼需要感气二层，并完成教学采集。", context.request_id, operation_id)
+            return CommandResult(
+                False,
+                "LOCATION_REQUIREMENT_MISSING",
+                f"{self._realm_requirement(mode_reference or MODE_SPIRIT_SPRING)}完成入门历练后，方可在此地修炼。",
+                context.request_id,
+                operation_id,
+            )
         except CultivationRecoveryRequiredError:
             return CommandResult(False, "CULTIVATION_RECOVERY_REQUIRED", "上一场修炼已过期，请先发送 `恢复修炼` 完成结算。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "RESOURCE_INSUFFICIENT", "体力或精力不足，暂时无法开始修炼。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求的操作编号已用于其他修炼，请重新发起。", context.request_id, operation_id)
+        except InvalidCultivationModeError:
+            return CommandResult(
+                False,
+                "INVALID_CULTIVATION_MODE",
+                f"目前支持 `开始修炼`（{self._cultivation_hint()}）。",
+                context.request_id,
+                operation_id,
+            )
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
         player = record.player
-        mode = cultivation_mode(record.mode_key)
+        mode_label = record.mode_label
         energy_lines = (
             f"- **消耗精力**：{record.energy_cost}\n"
             f"- **剩余精力**：{player.energy}/{player.energy_max}\n"
@@ -156,11 +212,11 @@ class ProgressionApplication:
         )
         message = (
             "## 修炼已开始\n\n"
-            f"**{self._display_name(player)}**已开始{mode.label}。\n\n"
+            f"**{self._display_name(player)}**已开始{mode_label}。\n\n"
             f"- **消耗体力**：{record.stamina_cost}\n"
             f"- **剩余体力**：{player.stamina}/{player.stamina_max}\n"
             f"{energy_lines}"
-            f"- **预计时长**：{mode.duration_seconds // 60} 分钟\n\n"
+            f"- **预计时长**：{record.duration_seconds // 60} 分钟\n\n"
             "> 下一步：修炼结束后发送 `结算修炼`；也可以发送 `取消修炼` 返还已消耗资源。"
         )
         return CommandResult(
@@ -173,7 +229,7 @@ class ProgressionApplication:
                 "dao_name": player.dao_name,
                 "session_id": record.session_id,
                 "mode_key": record.mode_key,
-                "mode_label": mode.label,
+                "mode_label": record.mode_label,
                 "status": record.status,
                 "stamina": player.stamina,
                 "stamina_cost": record.stamina_cost,
@@ -221,9 +277,9 @@ class ProgressionApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
         player = record.player
-        threshold = next_layer_threshold(player.realm_key, player.realm_layer)
+        threshold = next_layer_threshold(player.realm_key, player.realm_layer, self.repository.content)
         next_step = "发送 `晋升境界`，尝试进入下一层。" if threshold is not None and player.cultivation >= threshold else "继续发送 `开始修炼`，积累境内修为。"
-        mode_label = cultivation_mode_label(record.mode_key)
+        mode_label = record.mode_label
         soul_line = (
             f"- **神魂**：{player.soul_power}/{player.soul_power_max}（+{record.soul_power_gain}）\n"
             if record.soul_power_gain
@@ -288,8 +344,8 @@ class ProgressionApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
         player = record.player
-        threshold = next_layer_threshold(player.realm_key, player.realm_layer)
-        mode_label = cultivation_mode_label(record.mode_key)
+        threshold = next_layer_threshold(player.realm_key, player.realm_layer, self.repository.content)
+        mode_label = record.mode_label
         return CommandResult(
             True,
             "CULTIVATION_RECOVERED",
@@ -399,7 +455,7 @@ class ProgressionApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         player = record.player
-        threshold = next_layer_threshold(player.realm_key, player.realm_layer)
+        threshold = next_layer_threshold(player.realm_key, player.realm_layer, self.repository.content)
         unlock_lines = ""
         if record.unlocks:
             unlock_lines = "\n\n### 本层解锁\n\n" + "\n".join(

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
 from nonebot_plugin_xiuxian_3.xiuxian.player.rules import realm_display_name
-from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import _content_thresholds, next_layer_threshold
+from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import _content_thresholds, formal_realms, next_layer_threshold
 
 
 def test_runtime_content_uses_normalized_records() -> None:
@@ -139,3 +140,18 @@ def test_active_realm_with_incomplete_thresholds_fails_instead_of_falling_back(t
 
     with pytest.raises(ContentError, match="must configure thresholds"):
         _content_thresholds(ContentBundle.load(tmp_path))
+
+
+def test_progression_rules_read_thresholds_from_runtime_content(tmp_path: Path) -> None:
+    source = Path(__file__).parents[1] / "data"
+    data_root = tmp_path / "data"
+    shutil.copytree(source, data_root)
+    realm_path = data_root / "境界" / "境界.json"
+    document = json.loads(realm_path.read_text(encoding="utf-8"))
+    sensing = next(row for row in document["records"] if row["key"] == "qi_sensing")
+    sensing["layer_thresholds"]["2"] = 987654
+    realm_path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+
+    bundle = ContentBundle.load(data_root)
+    assert next_layer_threshold("qi_sensing", 1, bundle) == 987654
+    assert "qi_sensing" in formal_realms(bundle)

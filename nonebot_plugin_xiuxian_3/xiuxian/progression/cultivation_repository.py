@@ -339,6 +339,7 @@ class CultivationRepositoryMixin:
         platform: str,
         platform_user_id: str,
         mode_key: str,
+        mode_reference: str | None = None,
         operation_id: str,
     ) -> CultivationSessionRecord:
         await self.initialize()
@@ -348,6 +349,7 @@ class CultivationRepositoryMixin:
                 platform,
                 platform_user_id,
                 mode_key,
+                mode_reference,
                 operation_id,
             )
 
@@ -356,12 +358,13 @@ class CultivationRepositoryMixin:
         platform: str,
         platform_user_id: str,
         mode_key: str,
+        mode_reference: str | None,
         operation_id: str,
     ) -> CultivationSessionRecord:
         last_error: Exception | None = None
         for attempt in range(5):
             try:
-                return self._start_cultivation_once(platform, platform_user_id, mode_key, operation_id)
+                return self._start_cultivation_once(platform, platform_user_id, mode_key, mode_reference, operation_id)
             except sqlite3.OperationalError as exc:
                 if "locked" not in str(exc).lower():
                     raise
@@ -376,19 +379,17 @@ class CultivationRepositoryMixin:
         platform: str,
         platform_user_id: str,
         mode_key: str,
+        mode_reference: str | None,
         operation_id: str,
     ) -> CultivationSessionRecord:
-        from ..progression.rules import (
-            FORMAL_REALMS,
-            SOUL_REFINEMENT_SOUL_POWER_MAX,
-            cultivation_mode,
-        )
+        from ..progression.rules import cultivation_mode, formal_realms, resolve_cultivation_mode
         from ..items.manual_rules import manual_effect_totals
 
         operation_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
             "mode_key": mode_key,
+            "mode_reference": mode_reference if mode_reference is not None else "",
         }
         request_hash = self._request_hash("progression.start_cultivation", operation_payload)
         now = self._now()
@@ -413,19 +414,22 @@ class CultivationRepositoryMixin:
                     starts_at=str(payload["starts_at"]),
                     ends_at=str(payload["ends_at"]),
                     stamina_cost=int(payload["stamina_cost"]),
-                    energy_cost=int(payload.get("energy_cost", 0)),
-                    state_bp=int(payload.get("state_bp", 10000)),
-                    state_bonus_bp=int(payload.get("state_bonus_bp", 0)),
+                    energy_cost=int(payload["energy_cost"]),
+                    mode_label=str(payload["mode_label"]),
+                    duration_seconds=int(payload["duration_seconds"]),
+                    state_bp=int(payload["state_bp"]),
+                    state_bonus_bp=int(payload["state_bonus_bp"]),
                     already_completed=True,
                 )
 
             row = self._require_player(connection, platform, platform_user_id)
-            if row["stage"] != "cultivator" or row["realm_key"] not in FORMAL_REALMS:
+            if row["stage"] != "cultivator" or row["realm_key"] not in formal_realms(self.content):
                 raise PlayerStageConflictError("player is not ready for cultivation")
             try:
-                mode = cultivation_mode(mode_key)
+                selected_mode_key = mode_key if not mode_reference else resolve_cultivation_mode(mode_reference, self.content)
+                mode = cultivation_mode(selected_mode_key, self.content)
             except ValueError as exc:
-                raise ValueError("unsupported cultivation mode") from exc
+                raise InvalidCultivationModeError("unsupported cultivation mode") from exc
             if mode.required_location and row["location_key"] != mode.required_location:
                 raise LocationRequiredError("selected cultivation mode requires a specific location")
             if not meets_realm(
@@ -535,6 +539,8 @@ class CultivationRepositoryMixin:
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "location_key": row["location_key"],
                 "mode_key": mode.key,
+                "mode_label": mode.label,
+                "duration_seconds": mode.duration_seconds,
                 "stamina_cost": mode.stamina_cost,
                 "energy_cost": mode.energy_cost,
                 "state_bp": state_bp,
@@ -544,6 +550,7 @@ class CultivationRepositoryMixin:
                 "environment_bp": mode.environment_bp,
                 "manual_cultivation_gain_bp": int(manual_effects["cultivation_gain_bp"]),
                 "soul_power_gain": mode.soul_power_gain,
+                "soul_power_max": mode.soul_power_max,
             }
             change_player_state(
                 connection,
@@ -557,7 +564,7 @@ class CultivationRepositoryMixin:
                     "soul_power_max": max(
                         int(row["soul_power_max"]),
                         int(row["soul_power"]),
-                        SOUL_REFINEMENT_SOUL_POWER_MAX if mode.soul_power_gain else 0,
+                        mode.soul_power_max,
                     ),
                     "item_effects_json": json.dumps(item_effects, ensure_ascii=False, sort_keys=True),
                 },
@@ -573,7 +580,7 @@ class CultivationRepositoryMixin:
                     session_id,
                     row["id"],
                     operation_id,
-                    mode_key,
+                    mode.key,
                     starts_at,
                     ends_at,
                     mode.stamina_cost,
@@ -590,11 +597,15 @@ class CultivationRepositoryMixin:
                 "player": self._player_payload(player),
                 "session_id": session_id,
                 "mode_key": mode.key,
+                "mode_label": mode.label,
+                "duration_seconds": mode.duration_seconds,
                 "status": "running",
                 "starts_at": starts_at,
                 "ends_at": ends_at,
                 "stamina_cost": mode.stamina_cost,
                 "energy_cost": mode.energy_cost,
+                "state_bp": state_bp,
+                "state_bonus_bp": state_bonus_bp,
             }
             connection.execute(
                 """
@@ -620,6 +631,8 @@ class CultivationRepositoryMixin:
                 ends_at=ends_at,
                 stamina_cost=mode.stamina_cost,
                 energy_cost=mode.energy_cost,
+                mode_label=mode.label,
+                duration_seconds=mode.duration_seconds,
                 state_bp=state_bp,
                 state_bonus_bp=state_bonus_bp,
             )
@@ -678,8 +691,9 @@ class CultivationRepositoryMixin:
                     player=self._row_to_player(payload["player"]),
                     session_id=str(payload["session_id"]),
                     cultivation_gain=int(payload["cultivation_gain"]),
-                    mode_key=str(payload.get("mode_key", "cultivate.breathing")),
-                    soul_power_gain=int(payload.get("soul_power_gain", 0)),
+                    mode_key=str(payload["mode_key"]),
+                    soul_power_gain=int(payload["soul_power_gain"]),
+                    mode_label=str(payload["mode_label"]),
                     already_completed=True,
                 )
 
@@ -727,15 +741,15 @@ class CultivationRepositoryMixin:
                 connection.commit()
                 raise CultivationExpiredError("cultivation settlement window expired")
             snapshot = self._json_object(session["snapshot_json"], {})
-            qualification = self._json_object(snapshot.get("qualification", {}), {})
+            qualification = self._json_object(snapshot["qualification"], {})
             gain = cultivation_gain(
-                int(snapshot.get("base_cultivation", 40)),
+                int(snapshot["base_cultivation"]),
                 qualification,
-                environment_bp=int(snapshot.get("environment_bp", 10000)),
-                state_bp=int(snapshot.get("state_bp", 10000)),
-                manual_bonus_bp=int(snapshot.get("manual_cultivation_gain_bp", 0)),
+                environment_bp=int(snapshot["environment_bp"]),
+                state_bp=int(snapshot["state_bp"]),
+                manual_bonus_bp=int(snapshot["manual_cultivation_gain_bp"]),
             )
-            soul_power_gain = int(snapshot.get("soul_power_gain", 0))
+            soul_power_gain = int(snapshot["soul_power_gain"])
             change_player_state(
                 connection,
                 row,
@@ -745,7 +759,7 @@ class CultivationRepositoryMixin:
                     "total_cultivation": gain,
                     "soul_power": soul_power_gain,
                 },
-                maximums={"soul_power": row["soul_power_max"]},
+                maximums={"soul_power": max(int(row["soul_power_max"]), int(snapshot["soul_power_max"]))},
             )
             settlement_result = {
                 "cultivation_gain": gain,
@@ -764,7 +778,8 @@ class CultivationRepositoryMixin:
                 "session_id": session["session_id"],
                 "cultivation_gain": gain,
                 "soul_power_gain": soul_power_gain,
-                "mode_key": str(snapshot.get("mode_key", session["mode_key"])),
+                "mode_key": str(snapshot["mode_key"]),
+                "mode_label": str(snapshot["mode_label"]),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -781,8 +796,9 @@ class CultivationRepositoryMixin:
                 player=player,
                 session_id=session["session_id"],
                 cultivation_gain=gain,
-                mode_key=str(snapshot.get("mode_key", session["mode_key"])),
+                mode_key=str(snapshot["mode_key"]),
                 soul_power_gain=soul_power_gain,
+                mode_label=str(snapshot["mode_label"]),
             )
 
     async def recover_cultivation(
@@ -851,8 +867,9 @@ class CultivationRepositoryMixin:
                     player=self._row_to_player(payload["player"]),
                     session_id=str(payload["session_id"]),
                     cultivation_gain=int(payload["cultivation_gain"]),
-                    mode_key=str(payload.get("mode_key", "cultivate.breathing")),
-                    soul_power_gain=int(payload.get("soul_power_gain", 0)),
+                    mode_key=str(payload["mode_key"]),
+                    soul_power_gain=int(payload["soul_power_gain"]),
+                    mode_label=str(payload["mode_label"]),
                     already_completed=True,
                 )
 
@@ -872,15 +889,15 @@ class CultivationRepositoryMixin:
             if now <= ends_at + timedelta(seconds=CULTIVATION_SETTLEMENT_GRACE_SECONDS):
                 raise CultivationNotReadyError("cultivation is still within the normal settlement window")
             snapshot = self._json_object(session["snapshot_json"], {})
-            qualification = self._json_object(snapshot.get("qualification", {}), {})
+            qualification = self._json_object(snapshot["qualification"], {})
             gain = cultivation_gain(
-                int(snapshot.get("base_cultivation", 40)),
+                int(snapshot["base_cultivation"]),
                 qualification,
-                environment_bp=int(snapshot.get("environment_bp", 10000)),
-                state_bp=int(snapshot.get("state_bp", 10000)),
-                manual_bonus_bp=int(snapshot.get("manual_cultivation_gain_bp", 0)),
+                environment_bp=int(snapshot["environment_bp"]),
+                state_bp=int(snapshot["state_bp"]),
+                manual_bonus_bp=int(snapshot["manual_cultivation_gain_bp"]),
             )
-            soul_power_gain = int(snapshot.get("soul_power_gain", 0))
+            soul_power_gain = int(snapshot["soul_power_gain"])
             change_player_state(
                 connection,
                 row,
@@ -890,7 +907,7 @@ class CultivationRepositoryMixin:
                     "total_cultivation": gain,
                     "soul_power": soul_power_gain,
                 },
-                maximums={"soul_power": row["soul_power_max"]},
+                maximums={"soul_power": max(int(row["soul_power_max"]), int(snapshot["soul_power_max"]))},
             )
             connection.execute(
                 "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
@@ -917,7 +934,8 @@ class CultivationRepositoryMixin:
                 "session_id": session["session_id"],
                 "cultivation_gain": gain,
                 "soul_power_gain": soul_power_gain,
-                "mode_key": str(snapshot.get("mode_key", session["mode_key"])),
+                "mode_key": str(snapshot["mode_key"]),
+                "mode_label": str(snapshot["mode_label"]),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -934,8 +952,9 @@ class CultivationRepositoryMixin:
                 player=player,
                 session_id=session["session_id"],
                 cultivation_gain=gain,
-                mode_key=str(snapshot.get("mode_key", session["mode_key"])),
+                mode_key=str(snapshot["mode_key"]),
                 soul_power_gain=soul_power_gain,
+                mode_label=str(snapshot["mode_label"]),
             )
 
     async def cancel_cultivation(
@@ -992,7 +1011,7 @@ class CultivationRepositoryMixin:
                     player=self._row_to_player(payload["player"]),
                     session_id=str(payload["session_id"]),
                     stamina_refund=int(payload["stamina_refund"]),
-                    energy_refund=int(payload.get("energy_refund", 0)),
+                    energy_refund=int(payload["energy_refund"]),
                     already_completed=True,
                 )
             row = self._require_player(connection, platform, platform_user_id)
@@ -1042,7 +1061,7 @@ class CultivationRepositoryMixin:
                 raise CultivationAlreadyReadyError("cultivation must be settled")
             snapshot = self._json_object(session["snapshot_json"], {})
             refund = int(session["stamina_cost"])
-            energy_refund = int(snapshot.get("energy_cost", 0))
+            energy_refund = int(snapshot["energy_cost"])
             change_player_state(
                 connection,
                 row,
@@ -1343,9 +1362,9 @@ class CultivationRepositoryMixin:
                 raise CultivationBusyError("retreat is still running")
             layer = player_integer(row, "realm_layer")
             realm_key = str(row["realm_key"])
-            if layer >= 10 or next_layer_threshold(realm_key, layer) is None:
+            if next_layer_threshold(realm_key, layer, self.content) is None:
                 raise RealmLayerInvalidError("realm is already at its maximum layer")
-            if not can_advance_layer(realm_key, layer, player_integer(row, "cultivation")):
+            if not can_advance_layer(realm_key, layer, player_integer(row, "cultivation"), self.content):
                 raise RealmCultivationInsufficientError("realm cultivation is insufficient")
             trial_layers = {trial_definition(key, self.content).required_layer for key in tribulation_trials.trial_order}
             if realm_key == "tribulation" and layer in trial_layers:

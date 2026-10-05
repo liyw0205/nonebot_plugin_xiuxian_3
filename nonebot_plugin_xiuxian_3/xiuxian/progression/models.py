@@ -16,6 +16,8 @@ class CultivationSessionRecord:
     starts_at: str
     ends_at: str
     stamina_cost: int
+    mode_label: str
+    duration_seconds: int
     energy_cost: int = 0
     state_bp: int = 10000
     state_bonus_bp: int = 0
@@ -34,11 +36,13 @@ class CultivationMode:
     base_cultivation: int
     environment_bp: int
     daily_limit: int | None
+    aliases: tuple[str, ...] = ()
     required_location: str | None = None
     required_realm: str | None = None
     required_layer: int = 0
     requires_solitude: bool = False
     soul_power_gain: int = 0
+    soul_power_max: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +50,7 @@ class CultivationSettlementRecord:
     player: PlayerView
     session_id: str
     cultivation_gain: int
+    mode_label: str
     mode_key: str = ""
     soul_power_gain: int = 0
     already_completed: bool = False
@@ -58,6 +63,7 @@ class CultivationRecoveryRecord:
     player: PlayerView
     session_id: str
     cultivation_gain: int
+    mode_label: str
     mode_key: str = ""
     soul_power_gain: int = 0
     already_completed: bool = False
