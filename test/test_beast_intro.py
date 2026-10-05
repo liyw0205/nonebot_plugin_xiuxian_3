@@ -129,6 +129,29 @@ def test_beast_intro_uses_owned_evidence_and_unlocks_hills_on_both_adapters() ->
                     adapter, _context(adapter, user, "history-replay", "history"), "阅读妖界史"
                 )
                 assert history_replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_history_operation = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?", ("history",)
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE operations SET result_json='{' WHERE operation_id=?", ("history",)
+                    )
+                await runtime.close()
+                runtime = create_runtime(data_dir=Path(data_dir) / adapter)
+                malformed_history = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "history-malformed", "history"), "阅读妖界史"
+                )
+                assert malformed_history.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (original_history_operation, "history"),
+                    )
+                repaired_history = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "history-repaired", "history"), "阅读妖界史"
+                )
+                assert repaired_history.code == "BEAST_HISTORY_RECORDED"
+                assert repaired_history.data["idempotent_replay"] is True
 
                 completed = await runtime.adapters.dispatch(
                     adapter, _context(adapter, user, "intro", "intro"), "完成妖界引导"
@@ -138,6 +161,29 @@ def test_beast_intro_uses_owned_evidence_and_unlocks_hills_on_both_adapters() ->
                     adapter, _context(adapter, user, "intro-replay", "intro"), "完成妖界引导"
                 )
                 assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_intro_operation = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?", ("intro",)
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE operations SET result_json='{' WHERE operation_id=?", ("intro",)
+                    )
+                await runtime.close()
+                runtime = create_runtime(data_dir=Path(data_dir) / adapter)
+                malformed_intro = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "intro-malformed", "intro"), "完成妖界引导"
+                )
+                assert malformed_intro.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (original_intro_operation, "intro"),
+                    )
+                repaired_intro = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "intro-repaired", "intro"), "完成妖界引导"
+                )
+                assert repaired_intro.code == "BEAST_INTRO_COMPLETED"
+                assert repaired_intro.data["idempotent_replay"] is True
                 duplicate = await runtime.adapters.dispatch(
                     adapter, _context(adapter, user, "intro-duplicate", "intro-duplicate"), "完成妖界引导"
                 )

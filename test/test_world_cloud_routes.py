@@ -223,6 +223,119 @@ def test_cloud_boat_recovery_uses_frozen_route_after_24_hours() -> None:
     asyncio.run(run())
 
 
+def test_demon_intro_recovery_rejects_malformed_operation_on_both_adapters() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir, adapters=(adapter,))
+                user = f"demon-intro-malformed-{adapter}"
+                await runtime.dispatch(_context(adapter, user, "create"), "开始修仙")
+                await runtime.dispatch(_context(adapter, user, "seek"), "寻仙问道")
+                _prepare_player(runtime, adapter, user, realm="foundation", location="xuantian.cloud_city")
+                started = await runtime.dispatch(
+                    _context(adapter, user, "board", "board"), "登上云舟 魔界引导"
+                )
+                assert started.code == "CLOUD_BOAT_STARTED"
+                _expire_boat(runtime, started.data["session_id"])
+                settled = await runtime.dispatch(
+                    _context(adapter, user, "settle", "settle"), "结算云舟"
+                )
+                assert settled.code == "CLOUD_BOAT_ARRIVED"
+                accepted = await runtime.dispatch(
+                    _context(adapter, user, "intro", "intro"), "接受魔界引导"
+                )
+                assert accepted.code == "DEMON_INTRO_ACCEPTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_operation = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?", ("intro",)
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE operations SET result_json='{' WHERE operation_id=?", ("intro",)
+                    )
+                await runtime.close()
+                restarted = create_runtime(data_dir=data_dir, adapters=(adapter,))
+                malformed = await restarted.dispatch(
+                    _context(adapter, user, "intro-malformed", "intro"), "接受魔界引导"
+                )
+                assert malformed.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(restarted.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (original_operation, "intro"),
+                    )
+                replay = await restarted.dispatch(
+                    _context(adapter, user, "intro-replay", "intro"), "接受魔界引导"
+                )
+                assert replay.code == "DEMON_INTRO_ACCEPTED"
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(restarted.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT spirit_stones, faction_reputation_json FROM players "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert state == (400, '{"demon": 20}')
+                await restarted.close()
+
+    asyncio.run(run())
+
+
+def test_cloud_boat_recovery_rejects_malformed_operation_after_restart() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir, adapters=(adapter,))
+                user = f"cloud-recovery-malformed-{adapter}"
+                await runtime.dispatch(_context(adapter, user, "create"), "开始修仙")
+                await runtime.dispatch(_context(adapter, user, "seek"), "寻仙问道")
+                _prepare_player(runtime, adapter, user, realm="foundation", location="xuantian.cloud_city")
+                started = await runtime.dispatch(
+                    _context(adapter, user, "board", "board"), "登上云舟 魔界引导"
+                )
+                assert started.code == "CLOUD_BOAT_STARTED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE cloud_boat_sessions SET ends_at=? WHERE session_id=?",
+                        ((datetime.now(timezone.utc) - timedelta(hours=25)).isoformat(), started.data["session_id"]),
+                    )
+                recovered = await runtime.dispatch(
+                    _context(adapter, user, "recover", "recover"), "恢复云舟"
+                )
+                assert recovered.code == "CLOUD_BOAT_RECOVERED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_operation = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?", ("recover",)
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE operations SET result_json='{' WHERE operation_id=?", ("recover",)
+                    )
+                await runtime.close()
+                restarted = create_runtime(data_dir=data_dir, adapters=(adapter,))
+                malformed = await restarted.dispatch(
+                    _context(adapter, user, "recover-malformed", "recover"), "恢复云舟"
+                )
+                assert malformed.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(restarted.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (original_operation, "recover"),
+                    )
+                replay = await restarted.dispatch(
+                    _context(adapter, user, "recover-replay", "recover"), "恢复云舟"
+                )
+                assert replay.code == "CLOUD_BOAT_RECOVERED"
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(restarted.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT location_key, spirit_stones, stamina FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert state == ("demon.abyss_gate", 500, 20)
+                await restarted.close()
+
+    asyncio.run(run())
+
+
 def test_array_hall_permission_does_not_leak_production_and_replays() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
