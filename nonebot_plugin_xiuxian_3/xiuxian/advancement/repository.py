@@ -568,13 +568,15 @@ class AdvancementRepositoryMixin:
         *,
         replay: bool = False,
     ) -> ConstitutionRecord:
-        definition = constitution_definition(str(profile_row["constitution_key"]), self.content)
+        snapshot = json.loads(str(profile_row["snapshot_json"]))
+        if not isinstance(snapshot, dict):
+            raise ValueError("constitution snapshot must be an object")
         return ConstitutionRecord(
             player=SQLitePlayerRepository._row_to_player(player_row),
-            constitution_key=definition.key,
-            label=definition.label,
-            description=definition.description,
-            effect=dict(definition.effect),
+            constitution_key=str(snapshot["constitution_key"]),
+            label=str(snapshot["label"]),
+            description=str(snapshot["description"]),
+            effect={str(key): value for key, value in dict(snapshot["effect"]).items()},
             status=str(profile_row["status"]),
             selected_at=str(profile_row["selected_at"]),
             last_reshaped_at=(
@@ -636,17 +638,14 @@ class AdvancementRepositoryMixin:
         constitution_key: str,
         operation_id: str,
     ) -> ConstitutionRecord:
-        try:
-            definition = constitution_definition(constitution_key, self.content)
-        except ValueError as exc:
-            raise ValueError("unsupported constitution") from exc
+        normalized_reference = constitution_key.strip()
         operation_name = "constitution.select"
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "constitution_key": definition.key,
+                "constitution_reference": normalized_reference,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -660,6 +659,11 @@ class AdvancementRepositoryMixin:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._constitution_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            try:
+                definition = constitution_definition(normalized_reference, self.content)
+            except ValueError as exc:
+                raise ValueError("unsupported constitution") from exc
 
             row = self._require_player(connection, platform, platform_user_id)
             if str(row["stage"]) != "cultivator" or not row["path_key"]:
@@ -675,6 +679,8 @@ class AdvancementRepositoryMixin:
 
             snapshot = {
                 "constitution_key": definition.key,
+                "label": definition.label,
+                "description": definition.description,
                 "effect": dict(definition.effect),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "path_key": row["path_key"],
@@ -796,17 +802,14 @@ class AdvancementRepositoryMixin:
         constitution_key: str,
         operation_id: str,
     ) -> ConstitutionRecord:
-        try:
-            definition = constitution_definition(constitution_key, self.content)
-        except ValueError as exc:
-            raise ValueError("unsupported constitution") from exc
+        normalized_reference = constitution_key.strip()
         operation_name = "constitution.reshape"
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "constitution_key": definition.key,
+                "constitution_reference": normalized_reference,
             },
         )
         now = self._now()
@@ -821,6 +824,11 @@ class AdvancementRepositoryMixin:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._constitution_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            try:
+                definition = constitution_definition(normalized_reference, self.content)
+            except ValueError as exc:
+                raise ValueError("unsupported constitution") from exc
 
             row = self._require_player(connection, platform, platform_user_id)
             if str(row["stage"]) != "cultivator" or not row["path_key"]:
@@ -846,6 +854,8 @@ class AdvancementRepositoryMixin:
                 raise ResourceInsufficientError("constitution reset token is missing")
             snapshot = {
                 "constitution_key": definition.key,
+                "label": definition.label,
+                "description": definition.description,
                 "effect": dict(definition.effect),
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "path_key": row["path_key"],
@@ -1197,24 +1207,20 @@ class AdvancementRepositoryMixin:
         *,
         replay: bool = False,
     ) -> SkillMasteryRecord:
-        definition = skill_definition(str(mastery_row["skill_key"]), self.content)
         snapshot = SQLitePlayerRepository._json_object(mastery_row["snapshot_json"], {})
+        if not snapshot.get("label") or not snapshot.get("max_level"):
+            raise ValueError("skill mastery snapshot is incomplete")
         return SkillMasteryRecord(
             player=None,
             skill_key=str(mastery_row["skill_key"]),
-            label=definition.label,
-            path_key=definition.path_key,
+            label=str(snapshot["label"]),
+            path_key=snapshot.get("path_key"),
             level=int(mastery_row["level"]),
-            max_level=definition.max_level,
-            base_effect={str(key): value for key, value in dict(snapshot.get("base_effect", definition.effect)).items()},
+            max_level=int(snapshot["max_level"]),
+            base_effect={str(key): value for key, value in dict(snapshot["base_effect"]).items()},
             effective_effect={
                 str(key): value
-                for key, value in dict(
-                    snapshot.get(
-                        "effective_effect",
-                        effective_skill_effect(definition, int(mastery_row["level"])),
-                    )
-                ).items()
+                for key, value in dict(snapshot["effective_effect"]).items()
             },
             trained_at=str(mastery_row["trained_at"]),
             already_completed=replay,
@@ -2083,7 +2089,6 @@ class AdvancementRepositoryMixin:
         skill_reference: str,
         operation_id: str,
     ) -> SkillMasteryRecord:
-        definition = skill_definition(skill_reference, self.content)
         normalized_reference = skill_reference.strip()
         operation_name = "skill.train"
         request_hash = self._request_hash(
@@ -2092,7 +2097,6 @@ class AdvancementRepositoryMixin:
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "skill_reference": normalized_reference,
-                "skill_key": definition.key,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -2106,6 +2110,8 @@ class AdvancementRepositoryMixin:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._skill_mastery_from_payload(json.loads(existing["result_json"]), replay=True)
+
+            definition = skill_definition(normalized_reference, self.content)
 
             row = self._require_player(connection, platform, platform_user_id)
             if str(row["stage"]) != "cultivator" or not row["path_key"]:
@@ -2159,8 +2165,20 @@ class AdvancementRepositoryMixin:
                         asset_resource_costs.get("currency.spirit_stone", 0) + int(amount)
                     )
             effective_effect = effective_skill_effect(definition, target_level)
+            skill_record = (self.content or bundled_content()).require(
+                "skill", definition.key, include_locked=True
+            )
+            raw_cost = skill_record.get("cost", {})
+            mana_cost = (
+                max(0, int(raw_cost.get("amount", 0)))
+                if isinstance(raw_cost, dict) and raw_cost.get("resource_key") == "mana"
+                else 0
+            )
             snapshot = {
                 "skill_key": definition.key,
+                "label": definition.label,
+                "path_key": definition.path_key,
+                "max_level": definition.max_level,
                 "level": target_level,
                 "base_effect": dict(definition.effect),
                 "effective_effect": dict(effective_effect),
@@ -2168,6 +2186,7 @@ class AdvancementRepositoryMixin:
                     "key": definition.style_key,
                     "effect": definition.combat_effect or {},
                 },
+                "mana_cost": mana_cost,
                 "acquisition_item_key": definition.acquisition_item_key,
                 "qualification": self._json_object(row["qualification_json"], {}),
                 "realm_key": row["realm_key"],

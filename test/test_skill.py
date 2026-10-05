@@ -4,12 +4,13 @@ import asyncio
 import json
 import sqlite3
 import shutil
+import pytest
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
+from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError, bundled_content
 from nonebot_plugin_xiuxian_3.xiuxian.advancement.skill_rules import (
     available_skill_keys,
     effective_skill_effect,
@@ -49,6 +50,22 @@ def _set_resources(runtime, user_id: str, *, insights: int, stones: int, adapter
             "UPDATE players SET skill_insights = ?, spirit_stones = ? WHERE platform = ? AND platform_user_id = ?",
             (insights, stones, adapter, user_id),
         )
+
+
+def test_skill_duplicate_alias_is_rejected(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    path = data_dir / "技能" / "技能.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    player_skills = [row for row in document["records"] if row.get("owner_type") == "player"]
+    player_skills[1]["aliases"] = [player_skills[0]["name"]]
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        skill_definitions(ContentBundle.load(data_dir))
+    except ContentError as exc:
+        assert "duplicated" in str(exc)
+    else:
+        raise AssertionError("duplicate skill aliases must be rejected")
 
 
 def test_skill_progression_costs_snapshots_and_operation_replay() -> None:
@@ -109,6 +126,50 @@ def test_skill_progression_costs_snapshots_and_operation_replay() -> None:
             assert json.loads(mastery[1])["realm_key"] == "qi_sensing"
             assert events == 6
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_skill_operation_replay_uses_frozen_result_after_content_closes_skill(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+
+    async def run() -> None:
+        user = "skill-replay-content-change"
+        runtime = create_runtime(data_dir=data_dir)
+        await _enter_cultivator(runtime, user)
+        _set_resources(runtime, user, insights=1, stones=20)
+        trained = await runtime.dispatch(
+            _context(user, "train", operation_id="skill-replay-content-change-1"),
+            "参悟神通 基础攻击",
+        )
+        assert trained.code == "SKILL_TRAINED"
+        await runtime.close()
+
+        skill_path = data_dir / "技能" / "技能.json"
+        document = json.loads(skill_path.read_text(encoding="utf-8"))
+        skill = next(row for row in document["records"] if row["key"] == "skill.basic_attack")
+        skill["name"] = "已封神通"
+        skill["status"] = "locked"
+        skill["effect"]["value"] = 19000
+        skill_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        runtime = create_runtime(data_dir=data_dir)
+        replay = await runtime.repository.train_skill(
+            platform="web",
+            platform_user_id=user,
+            skill_reference="基础攻击",
+            operation_id="skill-replay-content-change-1",
+        )
+        assert replay.already_completed is True
+        assert replay.label == "基础攻击"
+        assert replay.effective_effect["value"] == 10300
+        profile = await runtime.repository.get_skill_profile(
+            platform="web", platform_user_id=user
+        )
+        assert profile.skills[0].label == "基础攻击"
+        assert profile.skills[0].effective_effect["value"] == 10300
+        await runtime.close()
 
     asyncio.run(run())
 

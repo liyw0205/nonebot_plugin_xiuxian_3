@@ -12,7 +12,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..content import bundled_content
+from ..content import ContentError, bundled_content
 from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..items.manual_rules import manual_effect_totals
 from ..persistence.errors import (
@@ -63,7 +63,6 @@ from .spectator_rules import (
     training_dummy_preview_rounds,
 )
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
-from ..advancement.skill_rules import effective_skill_effect, skill_definition
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
 from ..utils.player import grant_player_state, player_combat_values, player_realm_values
 from ..utils.equipment import equipment_instance_rows
@@ -1436,35 +1435,25 @@ class CombatRepositoryMixin:
         ).fetchall()
         skills: list[dict[str, object]] = []
         for row in rows:
-            try:
-                definition = skill_definition(str(row["skill_key"]), self.content)
-            except ValueError:
-                continue
-            if definition.path_key not in {None, path_key}:
-                continue
-            level = int(row["level"])
             stored = self._json_object(row["snapshot_json"], {})
-            effect = dict(stored.get("effective_effect", effective_skill_effect(definition, level)))
-            raw_skill = (self.content or bundled_content()).require(
-                "skill", str(row["skill_key"]), include_locked=False
-            )
-            raw_cost = raw_skill.get("cost", {})
-            mana_cost = (
-                max(0, int(raw_cost.get("amount", 0)))
-                if isinstance(raw_cost, dict) and raw_cost.get("resource_key") == "mana"
-                else 0
-            )
+            try:
+                stored_path = stored["path_key"]
+                effect = dict(stored["effective_effect"])
+                style = dict(stored["combat_style"])
+                mana_cost = max(0, int(stored["mana_cost"]))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ContentError("mastered skill snapshot is invalid") from exc
+            if stored_path not in {None, path_key}:
+                continue
+            level = int(stored.get("level", row["level"]))
             skills.append(
                 {
                     "skill_key": str(row["skill_key"]),
-                    "path_key": definition.path_key,
+                    "path_key": stored_path,
                     "level": level,
                     "effect": effect,
                     "mana_cost": mana_cost,
-                    "combat_style": {
-                        "key": definition.style_key,
-                        "effect": definition.combat_effect or {},
-                    },
+                    "combat_style": style,
                 }
             )
         return skills

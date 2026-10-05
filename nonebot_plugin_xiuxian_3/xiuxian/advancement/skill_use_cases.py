@@ -201,16 +201,17 @@ class SkillApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         content = self.repository.content or bundled_content()
-        definition = skill_definitions(content)[record.skill_key]
         effect_values = []
-        for field in definition.effect_deltas:
-            value = record.effective_effect[field]
-            if field.endswith("_bp") or (field == "value" and str(definition.effect.get("type", "")).endswith("_bp")):
+        effect_type = str(record.base_effect.get("type", ""))
+        for field, value in record.effective_effect.items():
+            if field in {"type", "level"}:
+                continue
+            if field.endswith("_bp") or (field == "value" and effect_type.endswith("_bp")):
                 effect_values.append(f"{int(value) / 100:g}%")
             else:
                 effect_values.append(str(value))
         resource_costs = "、".join(
-            f"{content.label('resource', key)} {amount}"
+            f"{content.label('resource', key, fallback=key)} {amount}"
             for key, amount in record.resource_costs.items()
         )
         return CommandResult(

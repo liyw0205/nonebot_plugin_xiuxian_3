@@ -51,6 +51,7 @@ def skill_definitions(content: ContentBundle | None = None) -> dict[str, SkillDe
     if orphan_growth:
         raise ContentError(f"skill_growth references unknown player skills: {sorted(orphan_growth)}")
 
+    used_references: dict[str, str] = {}
     for key, row in player_skills.items():
         name = row.get("name")
         description = row.get("desc")
@@ -142,6 +143,11 @@ def skill_definitions(content: ContentBundle | None = None) -> dict[str, SkillDe
         if acquisition_item_key is not None:
             if not isinstance(acquisition_item_key, str) or not bundle.has("item", acquisition_item_key):
                 raise ContentError(f"player skill {key} references an unknown acquisition item")
+        aliases = row.get("aliases", [])
+        if not isinstance(aliases, list) or any(
+            not isinstance(alias, str) or not alias.strip() for alias in aliases
+        ):
+            raise ContentError(f"player skill {key} aliases must be a string list")
         cost_rows = growth.get("cost_by_target_level")
         growth_values = growth.get("growth")
         max_level = growth.get("max_level")
@@ -186,7 +192,7 @@ def skill_definitions(content: ContentBundle | None = None) -> dict[str, SkillDe
                 costs[level][resource_key] = amount
         if set(costs) != set(range(1, max_level + 1)):
             raise ContentError(f"skill_growth {key} must configure every level through max_level")
-        definitions[key] = SkillDefinition(
+        definition = SkillDefinition(
             key=key,
             label=name.strip(),
             path_key=path_key,
@@ -203,6 +209,17 @@ def skill_definitions(content: ContentBundle | None = None) -> dict[str, SkillDe
             combat_effect=dict(combat_effect),
             acquisition_item_key=acquisition_item_key,
         )
+        for reference in (definition.key, definition.label, *aliases):
+            if not isinstance(reference, str) or not reference.strip():
+                raise ContentError(f"player skill {key} has an invalid name or alias")
+            normalized_reference = reference.strip()
+            previous = used_references.get(normalized_reference)
+            if previous is not None and previous != key:
+                raise ContentError(
+                    f"player skill name or alias is duplicated: {normalized_reference!r}"
+                )
+            used_references[normalized_reference] = key
+        definitions[key] = definition
     return definitions
 
 
@@ -236,12 +253,17 @@ def skill_resource_definition(resource_key: str, content: ContentBundle | None =
 
 
 def skill_definition(value: str | None, content: ContentBundle | None = None) -> SkillDefinition:
-    definitions = skill_definitions(content)
+    bundle = content or _default_content()
+    definitions = skill_definitions(bundle)
     aliases = {
         alias: key
         for key, definition in definitions.items()
         for alias in (key, definition.label)
     }
+    for row in bundle.list("skill"):
+        key = row.get("key")
+        if key in definitions:
+            aliases.update({str(alias).strip(): str(key) for alias in row.get("aliases", [])})
     normalized = (value or "").strip()
     key = aliases.get(normalized, normalized)
     try:

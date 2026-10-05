@@ -4,7 +4,6 @@
     {
       "key": "cultivate.breathing",
       "name": "调息修炼",
-      "desc": "吐纳灵息，稳步积累境内修为。",
       "aliases": ["调息"],
       "status": "active",
       "stamina_cost": 2,
@@ -22,7 +21,6 @@
     {
       "key": "cultivate.spirit_spring",
       "name": "灵泉修炼",
-      "desc": "借灵泉清气洗炼经脉，增进修为。",
       "aliases": ["灵泉", "灵泉谷"],
       "status": "active",
       "stamina_cost": 3,
@@ -41,7 +39,6 @@
     {
       "key": "cultivate.seclusion",
       "name": "静修",
-      "desc": "闭关静养，凝神沉淀境内修为。",
       "aliases": ["静修修炼"],
       "status": "active",
       "stamina_cost": 6,
@@ -59,7 +56,6 @@
     {
       "key": "cultivate.soul_refinement",
       "name": "神魂淬炼",
-      "desc": "以神魂磨砺道心，兼修境内修为与神魂之力。",
       "aliases": ["淬炼神魂", "凝魂"],
       "status": "active",
       "stamina_cost": 8,

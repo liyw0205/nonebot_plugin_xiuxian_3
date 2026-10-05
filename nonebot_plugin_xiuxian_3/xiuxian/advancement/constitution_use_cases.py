@@ -18,7 +18,6 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .constitution_rules import (
-    constitution_definition,
     constitution_options,
     constitution_reshape_rules,
     default_content_bundle,
@@ -66,13 +65,10 @@ class ConstitutionApplication:
             return f"{seconds // 60} 分钟"
         return f"{seconds} 秒"
 
-    def _resolve_key(self, args: tuple[str, ...]) -> str | None:
+    def _reference(self, args: tuple[str, ...]) -> str | None:
         if len(args) != 1:
             return None
-        try:
-            return constitution_definition(args[0], self.repository.content).key
-        except ValueError:
-            return None
+        return args[0]
 
     async def preview(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -90,7 +86,7 @@ class ConstitutionApplication:
         return CommandResult(True, "CONSTITUTION_PREVIEW", "\n".join(lines), context.request_id)
 
     async def select(self, context: CommandContext) -> CommandResult:
-        key = self._resolve_key(context.command_args)
+        key = self._reference(context.command_args)
         if key is None:
             return CommandResult(False, "INVALID_CONSTITUTION", "请选择一项体质，例如 `选择体质 铁骨`。", context.request_id)
         operation_id = self._operation_id(context, "constitution.select")
@@ -120,7 +116,7 @@ class ConstitutionApplication:
         return self._success_result(context, record, operation_id, title="体质已定")
 
     async def reshape(self, context: CommandContext) -> CommandResult:
-        key = self._resolve_key(context.command_args)
+        key = self._reference(context.command_args)
         if key is None:
             return CommandResult(False, "INVALID_CONSTITUTION", "请指定要重塑的体质，例如 `重塑体质 风行`。", context.request_id)
         operation_id = self._operation_id(context, "constitution.reshape")

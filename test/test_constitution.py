@@ -4,12 +4,15 @@ import asyncio
 import json
 import sqlite3
 import shutil
+import pytest
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
+from nonebot_plugin_xiuxian_3.xiuxian.advancement.constitution_rules import constitution_definitions
 
 
 class MutableClock:
@@ -55,6 +58,21 @@ def _add_item(runtime, user_id: str, item_key: str, quantity: int) -> None:
         )
 
 
+def test_constitution_duplicate_name_is_rejected(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    path = data_dir / "养成" / "体质.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["records"][1]["name"] = document["records"][0]["name"]
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        constitution_definitions(ContentBundle.load(data_dir))
+    except ContentError as exc:
+        assert "duplicated" in str(exc)
+    else:
+        raise AssertionError("duplicate constitution names must be rejected")
+
+
 def test_constitution_preview_selection_and_profile_are_idempotent() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
@@ -86,6 +104,53 @@ def test_constitution_preview_selection_and_profile_are_idempotent() -> None:
             assert profile.code == "CONSTITUTION_PROFILE"
             assert profile.data["label"] == "铁骨"
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_constitution_operation_replay_uses_frozen_result_after_content_closes_choice(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+
+    async def run() -> None:
+        user = "constitution-replay-content-change"
+        runtime = create_runtime(data_dir=data_dir)
+        await _enter_cultivator(runtime, user)
+        selected = await runtime.dispatch(
+            _context(user, "select", operation_id="constitution-replay-content-change-1"),
+            "选择体质 铁骨",
+        )
+        assert selected.code == "CONSTITUTION_SELECTED"
+        await runtime.close()
+
+        constitution_path = data_dir / "养成" / "体质.json"
+        document = json.loads(constitution_path.read_text(encoding="utf-8"))
+        constitution = next(
+            row for row in document["records"] if row["key"] == "constitution.iron_bone"
+        )
+        constitution["name"] = "已封体质"
+        constitution["status"] = "locked"
+        constitution["effect"]["value"] = 1
+        constitution_path.write_text(
+            json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        runtime = create_runtime(data_dir=data_dir)
+        replay = await runtime.repository.select_constitution(
+            platform="web",
+            platform_user_id=user,
+            constitution_key="铁骨",
+            operation_id="constitution-replay-content-change-1",
+        )
+        assert replay.already_completed is True
+        assert replay.label == "铁骨"
+        assert replay.effect == {"type": "max_hp_bp", "value": 300}
+        profile = await runtime.repository.get_constitution(
+            platform="web", platform_user_id=user
+        )
+        assert profile.label == "铁骨"
+        assert profile.effect == {"type": "max_hp_bp", "value": 300}
+        await runtime.close()
 
     asyncio.run(run())
 

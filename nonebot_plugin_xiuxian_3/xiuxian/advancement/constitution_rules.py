@@ -38,6 +38,7 @@ def default_content_bundle() -> ContentBundle:
 def constitution_definitions(content: ContentBundle | None = None) -> dict[str, ConstitutionDefinition]:
     bundle = content or _default_content()
     definitions: dict[str, ConstitutionDefinition] = {}
+    used_references: dict[str, str] = {}
     for row in bundle.list("constitution"):
         key = row.get("key")
         name = row.get("name")
@@ -66,13 +67,27 @@ def constitution_definitions(content: ContentBundle | None = None) -> dict[str, 
             raise ContentError(f"active constitution {key} has an unsupported effect: {effect['type']}")
         if effect["value"] < 0:
             raise ContentError(f"constitution {key} effect value cannot be negative")
-        definitions[key] = ConstitutionDefinition(
+        aliases = row.get("aliases", [])
+        if not isinstance(aliases, list) or any(
+            not isinstance(alias, str) or not alias.strip() for alias in aliases
+        ):
+            raise ContentError(f"constitution {key} aliases must be a string list")
+        definition = ConstitutionDefinition(
             key=key,
             label=name.strip(),
             description=description.strip(),
             effect=dict(effect),
             status=status,
         )
+        for reference in (definition.key, definition.label, *aliases):
+            normalized_reference = reference.strip()
+            previous = used_references.get(normalized_reference)
+            if previous is not None and previous != key:
+                raise ContentError(
+                    f"constitution name or alias is duplicated: {normalized_reference!r}"
+                )
+            used_references[normalized_reference] = key
+        definitions[key] = definition
     return definitions
 
 
@@ -100,12 +115,17 @@ def constitution_definition(
     value: str | None,
     content: ContentBundle | None = None,
 ) -> ConstitutionDefinition:
-    definitions = constitution_definitions(content)
+    bundle = content or _default_content()
+    definitions = constitution_definitions(bundle)
     aliases = {
         alias: key
         for key, definition in definitions.items()
         for alias in (key, definition.label)
     }
+    for row in bundle.list("constitution"):
+        key = row.get("key")
+        if key in definitions:
+            aliases.update({str(alias).strip(): str(key) for alias in row.get("aliases", [])})
     normalized = (value or "").strip()
     key = aliases.get(normalized, normalized)
     definition = definitions.get(key)

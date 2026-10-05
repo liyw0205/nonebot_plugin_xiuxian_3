@@ -24,6 +24,15 @@ MODE_SPIRIT_SPRING = "cultivate.spirit_spring"
 MODE_SECLUSION = "cultivate.seclusion"
 MODE_SOUL_REFINEMENT = "cultivate.soul_refinement"
 
+# Fixed command guidance belongs to the progression domain, not the content
+# contract. It does not affect rules or historical session snapshots.
+CULTIVATION_GUIDANCE: dict[str, str] = {
+    MODE_BREATHING: "吐纳灵息，稳步积累境内修为。",
+    MODE_SPIRIT_SPRING: "借灵泉清气洗炼经脉，增进修为。",
+    MODE_SECLUSION: "闭关静养，凝神沉淀境内修为。",
+    MODE_SOUL_REFINEMENT: "以神魂磨砺道心，兼修境内修为与神魂之力。",
+}
+
 def _content_thresholds(
     content: ContentBundle | None = None,
 ) -> tuple[dict[str, tuple[int, ...]], dict[str, int]]:
@@ -171,9 +180,8 @@ def cultivation_definitions(content: ContentBundle | None = None) -> dict[str, C
         if mode_key in definitions:
             raise ContentError(f"duplicate cultivation key: {mode_key}")
         name = row.get("name")
-        desc = row.get("desc")
-        if not isinstance(name, str) or not name.strip() or not isinstance(desc, str) or not desc.strip():
-            raise ContentError(f"cultivation {mode_key} requires name and desc")
+        if not isinstance(name, str) or not name.strip():
+            raise ContentError(f"cultivation {mode_key} requires name")
         aliases = row.get("aliases", [])
         if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
             raise ContentError(f"cultivation {mode_key} aliases must be a string list")

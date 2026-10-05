@@ -76,6 +76,8 @@ def test_named_core_records_require_player_descriptions() -> None:
     for path in data_root.rglob("*.json"):
         document = json.loads(path.read_text(encoding="utf-8"))
         for row in document.get("records", []):
+            if document.get("kind") == "cultivation":
+                continue
             if row.get("name"):
                 assert isinstance(row.get("desc"), str) and row["desc"].strip(), (
                     f"{path}:{row.get('key')} requires player-facing desc"

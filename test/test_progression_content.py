@@ -13,7 +13,11 @@ import pytest
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
-from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import cultivation_definitions, cultivation_gain
+from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import (
+    CULTIVATION_GUIDANCE,
+    cultivation_definitions,
+    cultivation_gain,
+)
 
 
 def _context(adapter: str, user: str, request: str, *, operation_id: str = "") -> CommandContext:
@@ -37,6 +41,15 @@ def _copy_data(tmp_path: Path) -> Path:
 def _cultivation_document(data_root: Path) -> tuple[Path, dict]:
     path = data_root / "养成" / "修炼.json"
     return path, json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_cultivation_content_keeps_only_rule_inputs() -> None:
+    path = Path(__file__).parents[1] / "data" / "养成" / "修炼.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    assert all("desc" not in row for row in document["records"])
+    assert set(CULTIVATION_GUIDANCE) == {row["key"] for row in document["records"]}
+    assert all(CULTIVATION_GUIDANCE[key] for key in CULTIVATION_GUIDANCE)
+    assert set(cultivation_definitions()) == set(CULTIVATION_GUIDANCE)
 
 
 def _write_document(path: Path, document: dict) -> None:
