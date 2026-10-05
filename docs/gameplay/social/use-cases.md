@@ -2,7 +2,7 @@
 
 ## 用例
 
-`create_sect`、`apply_sect`、`review_member`、`contribute_sect`、`change_role`、`leave_sect`、
+`create_sect`、`apply_sect`、`withdraw_sect_application`、`review_member`、`contribute_sect`、`change_role`、`leave_sect`、
 `invite_mentor`、`accept_mentor`、`reject_mentor`、`graduate_apprentice`、
 `invite_partner`、`accept_partner`、`reject_partner`、`get_partner`、`request_partner_dissolution`、`confirm_partner_dissolution`、`reject_partner_dissolution`、
 `create_party`、`create_boundary_rift_party`、`invite_party`、`accept_party`、`reject_party`、`confirm_party`、`leave_party`、
@@ -11,6 +11,10 @@
 
 宗门战命令为 `宗门战 [轮次]`、`报名宗门战 [轮次]`、`贡献宗门战 占点|击败|运输|维修 [来源operation] [轮次]`
 和 `领取宗门战奖励 <轮次>`。查询为只读操作；报名、贡献和领奖均要求可验证消息身份并使用 operation ledger。
+
+入宗申请由申请人以 `撤回入宗申请 <申请号>` 撤回；只有 `pending` 申请可以撤回，撤回不会改变离宗冷却、
+宗门成员或任何资产。撤回与申请、审批一样写入 operation ledger，重复请求回放原结果，改用同一操作号提交
+不同申请会被拒绝。
 
 报名只允许等级至少 4 的宗门宗主，扣除 2000 宗门灵石并冻结最多 10 人；普通成员、等级不足、重复报名或余额不足均拒绝。
 贡献只能由冻结成员提交，来源 operation 必须属于本人；占点/击败/运输/维修每轮分别最多 2/3/4/4 次，

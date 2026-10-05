@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..persistence.errors import (
-    OperationConflictError,
     PlayerNotFoundError,
     PlayerSuspendedError,
     ResourceInsufficientError,
@@ -39,6 +37,7 @@ from .sect_rules import (
     validate_sect_name,
 )
 from ..utils.assets import spend_player_currency, player_currency
+from ..utils.operations import operation_replay, record_operation
 from ..utils.player import change_player_state
 
 
@@ -92,10 +91,16 @@ class SectRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._sect_operation(connection, operation_id, operation_name, request_hash)
+            player = self._require_player(connection, platform, platform_user_id)
+            existing = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player_id=int(player["id"]),
+            )
             if existing is not None:
                 return self._sect_record_from_payload(existing, replay=True)
-            player = self._require_player(connection, platform, platform_user_id)
             self._sect_require_no_membership(connection, player)
             self._sect_require_no_cooldown(player, now)
             if str(player["realm_key"]) not in {
@@ -147,7 +152,7 @@ class SectRepositoryMixin:
             )
             spend_player_currency(connection, player, SECT_DEFINITION.create_cost, now_text)
             payload = self._sect_payload(connection, sect_id, player_id=int(player["id"]), role="leader")
-            self._sect_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
@@ -198,10 +203,16 @@ class SectRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._sect_operation(connection, operation_id, operation_name, request_hash)
+            player = self._require_player(connection, platform, platform_user_id)
+            existing = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player_id=int(player["id"]),
+            )
             if existing is not None:
                 return self._sect_application_from_payload(existing, replay=True)
-            player = self._require_player(connection, platform, platform_user_id)
             self._sect_require_no_membership(connection, player)
             self._sect_require_no_cooldown(player, now)
             sect = self._sect_find(connection, sect_ref)
@@ -232,11 +243,92 @@ class SectRepositoryMixin:
                 (application_id, sect["sect_id"], player["id"], normalized_reason, operation_id, serialize_datetime(expires_at), now_text, now_text),
             )
             payload = self._sect_application_payload(connection, application_id)
-            self._sect_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
                 int(player["id"]),
+                request_hash,
+                payload,
+                now_text,
+            )
+            return self._sect_application_from_payload(payload)
+
+    async def withdraw_sect_application(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        application_id: str,
+        operation_id: str,
+    ) -> SectApplicationRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._sect_withdraw_once,
+                platform,
+                platform_user_id,
+                application_id,
+                operation_id,
+            )
+
+    def _sect_withdraw_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        application_id: str,
+        operation_id: str,
+    ) -> SectApplicationRecord:
+        normalized_application_id = application_id.strip()
+        operation_name = "social.withdraw_sect_application"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "application_id": normalized_application_id,
+            },
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            applicant = self._require_player(connection, platform, platform_user_id)
+            existing = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player_id=int(applicant["id"]),
+            )
+            if existing is not None:
+                return self._sect_application_from_payload(existing, replay=True)
+            application = connection.execute(
+                "SELECT * FROM sect_applications WHERE application_id = ? AND applicant_id = ?",
+                (normalized_application_id, applicant["id"]),
+            ).fetchone()
+            if application is None:
+                raise SectApplicationNotFoundError("application does not exist")
+            if str(application["status"]) == "expired":
+                raise SectApplicationExpiredError("application has expired")
+            if str(application["status"]) != "pending":
+                raise SectApplicationNotFoundError("application is no longer pending")
+            if now >= datetime.fromisoformat(str(application["expires_at"])):
+                connection.execute(
+                    "UPDATE sect_applications SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'pending'",
+                    (now_text, application["id"]),
+                )
+                raise SectApplicationExpiredError("application has expired")
+            connection.execute(
+                "UPDATE sect_applications SET status = 'withdrawn', updated_at = ? WHERE id = ? AND status = 'pending'",
+                (now_text, application["id"]),
+            )
+            payload = self._sect_application_payload(connection, normalized_application_id)
+            record_operation(
+                connection,
+                operation_id,
+                operation_name,
+                int(applicant["id"]),
                 request_hash,
                 payload,
                 now_text,
@@ -314,10 +406,16 @@ class SectRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._sect_operation(connection, operation_id, operation_name, request_hash)
+            reviewer = self._require_player(connection, platform, platform_user_id)
+            existing = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player_id=int(reviewer["id"]),
+            )
             if existing is not None:
                 return self._sect_application_from_payload(existing, replay=True)
-            reviewer = self._require_player(connection, platform, platform_user_id)
             membership = self._sect_member(connection, int(reviewer["id"]))
             if membership is None or SectRole(str(membership["role"])) not in MANAGEMENT_ROLES:
                 raise SectPermissionDeniedError("sect application review requires management role")
@@ -362,7 +460,7 @@ class SectRepositoryMixin:
                 (status, normalized_reason, reviewer["id"], operation_id, now_text, application["id"]),
             )
             payload = self._sect_application_payload(connection, application_id)
-            self._sect_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
@@ -391,10 +489,16 @@ class SectRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._sect_operation(connection, operation_id, operation_name, request_hash)
+            player = self._require_player(connection, platform, platform_user_id)
+            existing = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player_id=int(player["id"]),
+            )
             if existing is not None:
                 return self._sect_record_from_payload(existing, replay=True)
-            player = self._require_player(connection, platform, platform_user_id)
             membership = self._sect_member(connection, int(player["id"]))
             if membership is None:
                 raise SectNotFoundError("player is not in a sect")
@@ -418,7 +522,7 @@ class SectRepositoryMixin:
                 player_id=int(player["id"]),
                 role="left",
             )
-            self._sect_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
@@ -548,10 +652,12 @@ class SectRepositoryMixin:
         row = connection.execute(
             """
             SELECT a.*, s.name AS sect_name, s.sect_id,
-                   p.player_id AS applicant_player_id, p.dao_name AS applicant_dao_name
+                   p.player_id AS applicant_player_id, p.dao_name AS applicant_dao_name,
+                   reviewer.player_id AS reviewer_player_id
             FROM sect_applications a
             JOIN sects s ON s.sect_id = a.sect_id
             JOIN players p ON p.id = a.applicant_id
+            LEFT JOIN players reviewer ON reviewer.id = a.reviewer_id
             WHERE a.application_id = ?
             """,
             (application_id,),
@@ -569,27 +675,24 @@ class SectRepositoryMixin:
             "review_reason": str(row["review_reason"]),
             "expires_at": str(row["expires_at"]),
             "created_at": str(row["created_at"]),
-            "reviewer_player_id": None,
+            "reviewer_player_id": str(row["reviewer_player_id"]) if row["reviewer_player_id"] is not None else None,
         }
 
     @staticmethod
     def _sect_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
-        existing = connection.execute(
-            "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-            (operation_id,),
-        ).fetchone()
-        if existing is None:
-            return None
-        if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-            raise OperationConflictError("operation input differs from its original request")
-        return json.loads(existing["result_json"])
+        return operation_replay(connection, operation_id, operation_name, request_hash)
 
     @staticmethod
-    def _sect_record_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
-        connection.execute(
-            "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
+    def _sect_record_operation(
+        connection: Any,
+        operation_id: str,
+        operation_name: str,
+        player_id: int,
+        request_hash: str,
+        payload: dict[str, Any],
+        now_text: str,
+    ) -> None:
+        record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
 
     @staticmethod
     def _sect_record_from_payload(payload: dict[str, Any], *, replay: bool = False) -> SectRecord:

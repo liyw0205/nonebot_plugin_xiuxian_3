@@ -1040,6 +1040,13 @@ class XiuxianApplication:
     async def list_sect_applications(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.social.list_applications(context), require_write=False)
 
+    async def withdraw_sect_application(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.social.withdraw_application(context),
+            write_message="当前事件不允许撤回入宗申请。",
+        )
+
     async def review_sect_application(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

@@ -187,6 +187,44 @@ class SectApplication:
             data.append({"application_id": record.application_id, "applicant_name": record.applicant_name, "reason": record.reason, "expires_at": record.expires_at, "status": record.status})
         return CommandResult(True, "SECT_APPLICATIONS", "\n".join(lines), context.request_id, data={"applications": data})
 
+    async def withdraw_application(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_SECT", "请使用 `撤回入宗申请 申请号`。", context.request_id)
+        application_id = context.command_args[0]
+        operation_id = self._operation_id(context, "social.withdraw_sect_application")
+        try:
+            record = await self.repository.withdraw_sect_application(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                application_id=application_id,
+                operation_id=operation_id,
+            )
+        except SectApplicationExpiredError:
+            return CommandResult(False, "APPLICATION_EXPIRED", "这份入宗申请已经过期。", context.request_id, operation_id)
+        except SectApplicationNotFoundError:
+            return CommandResult(False, "APPLICATION_NOT_FOUND", "没有找到仍在等待中的入宗申请。", context.request_id, operation_id)
+        except (PlayerNotFoundError, PlayerSuspendedError):
+            return CommandResult(False, "PLAYER_NOT_FOUND", "当前角色不存在或暂时不可用。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "SECT_APPLICATION_WITHDRAWN",
+            f"## 入宗申请已撤回\n\n你已撤回向 **{self._display_name(record.sect_name)}** 提交的入宗申请。",
+            context.request_id,
+            operation_id,
+            data={
+                "application_id": record.application_id,
+                "sect_id": record.sect_id,
+                "status": record.status,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
     async def review_application(self, context: CommandContext) -> CommandResult:
         parsed = self._parse_review_args(context.command_args)
         if parsed is None:
@@ -233,7 +271,7 @@ class SectApplication:
             f"## 入宗申请{verb}\n\n- **申请号**：`{record.application_id}`\n- **申请人**：{self._display_name(record.applicant_name)}\n- **宗门**：{self._display_name(record.sect_name)}",
             context.request_id,
             operation_id,
-            data={"application_id": record.application_id, "sect_id": record.sect_id, "status": record.status, "review_reason": record.review_reason, "idempotent_replay": record.already_completed},
+            data={"application_id": record.application_id, "sect_id": record.sect_id, "status": record.status, "review_reason": record.review_reason, "reviewer_player_id": record.reviewer_player_id, "idempotent_replay": record.already_completed},
         )
 
     async def leave_sect(self, context: CommandContext) -> CommandResult:

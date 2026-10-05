@@ -266,6 +266,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("创建宗门", application.create_sect, aliases=("建立宗门",))
     router.register("申请入宗", application.apply_sect, aliases=("宗门申请",))
     router.register("宗门申请列表", application.list_sect_applications, aliases=("待审宗门申请",))
+    router.register("撤回入宗申请", application.withdraw_sect_application, aliases=("撤回宗门申请",))
     router.register("审批入宗", application.review_sect_application, aliases=("审批宗门申请",))
     router.register("离开宗门", application.leave_sect, aliases=("离宗",))
     router.register("我的宗门", application.get_sect_profile, aliases=("宗门信息",))

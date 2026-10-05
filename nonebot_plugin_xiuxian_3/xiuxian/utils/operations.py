@@ -42,9 +42,9 @@ def operation_replay(
     operation_name: str,
     request_hash: str,
     *,
-    player_id: int,
+    player_id: int | None = None,
 ) -> dict[str, Any] | None:
-    """Load one operation result when its owner and input still match."""
+    """Load one operation result when its input, and optionally its owner, match."""
 
     row = connection.execute(
         "SELECT operation_name, player_id, request_hash, result_json "
@@ -53,7 +53,7 @@ def operation_replay(
     ).fetchone()
     if row is None:
         return None
-    if int(row["player_id"]) != int(player_id):
+    if player_id is not None and int(row["player_id"]) != int(player_id):
         raise OperationConflictError("operation belongs to another player")
     if str(row["operation_name"]) != operation_name or str(row["request_hash"]) != request_hash:
         raise OperationConflictError("operation input differs from its original request")

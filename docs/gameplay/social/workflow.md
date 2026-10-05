@@ -1,7 +1,7 @@
 # 社交域：状态机
 
 ```text
-application -> accepted/rejected/expired
+application -> accepted/rejected/expired/withdrawn
 member -> active -> left/kicked
 mentor -> invited -> active -> graduated/rejected/expired
 partner -> invited -> active -> dissolution_pending -> dissolved
