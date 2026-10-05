@@ -213,6 +213,7 @@
     {
       "name": "青石镇客房",
       "desc": "镇中简洁安稳的落脚处，可供歇息、存放少量行李并打理一方小田。",
+      "aliases": ["客房", "小屋"],
       "requirements": [
         {
           "type": "stage_min",
@@ -236,6 +237,7 @@
     {
       "name": "小院",
       "desc": "带有数间静室与小片灵田的独门院落，适合长期修整和栽种灵植。",
+      "aliases": [],
       "requirements": [
         {
           "type": "reputation",
@@ -260,6 +262,7 @@
     {
       "name": "止血草",
       "desc": "容易照料的常见药草，成熟后可采下止血草供炼药使用。",
+      "aliases": ["血草", "blood_grass"],
       "requirements": [
         {
           "type": "residence_plot",
@@ -288,6 +291,10 @@
         }
       ],
       "daily_limit": 2,
+      "reputation": {
+        "key": "local.xuantian.new_town",
+        "amount": 1
+      },
       "key": "crop.blood_grass",
       "record_type": "crop",
       "status": "active"
@@ -295,6 +302,7 @@
     {
       "name": "灵叶",
       "desc": "喜受灵气滋养的灵植，悉心照料后可收获灵叶与少量阵材。",
+      "aliases": ["spirit_leaf"],
       "requirements": [
         {
           "type": "residence_key",
@@ -306,6 +314,7 @@
         "quantity": 1
       },
       "growth_seconds": 28800,
+      "random_pool": "livelihood.harvest",
       "maintenance": {
         "energy": 2,
         "minimum_count": 2

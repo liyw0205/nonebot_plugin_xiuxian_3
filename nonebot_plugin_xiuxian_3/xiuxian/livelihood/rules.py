@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 
-import hashlib
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
 from ..rewards.rules import local_reputation_maximum
+from ..utils.randomness import deterministic_integer
 
 
 TOWN_ROOM = "residence.town_room"
 COURTYARD = "residence.courtyard"
+_STAGE_ORDER = {"mortal": 0, "seeker": 1, "cultivator": 2}
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,42 +26,154 @@ class ResidenceDefinition:
     required_stage: str
     required_local_reputation: int = 0
     plot_count: int = 0
+    local_reputation_key: str | None = None
+    aliases: tuple[str, ...] = ()
 
 
-RESIDENCE_DEFINITIONS = {
-    TOWN_ROOM: ResidenceDefinition(
-        key=TOWN_ROOM,
-        label="青石镇客房",
-        rent_cost=20,
-        lease_days=3,
-        required_stage="mortal",
-        plot_count=1,
-    ),
-    COURTYARD: ResidenceDefinition(
-        key=COURTYARD,
-        label="小院",
-        rent_cost=80,
-        lease_days=7,
-        required_stage="mortal",
-        required_local_reputation=40,
-        plot_count=1,
-    ),
-}
-
-RESIDENCE_ALIASES = {
-    "客房": TOWN_ROOM,
-    "青石镇客房": TOWN_ROOM,
-    "小屋": TOWN_ROOM,
-    "小院": COURTYARD,
-}
+def _identity(row: dict[str, Any], record_type: str) -> tuple[str, str, tuple[str, ...]]:
+    key, label = row.get("key"), row.get("name")
+    if not isinstance(key, str) or not key or not isinstance(label, str) or not label.strip():
+        raise ContentError(f"{record_type} requires key and name")
+    aliases = row.get("aliases", [])
+    if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
+        raise ContentError(f"{record_type} {key} aliases must be non-empty strings")
+    return key, label.strip(), tuple(alias.strip() for alias in aliases)
 
 
-def residence_definition(value: str | None = None) -> ResidenceDefinition:
-    key = RESIDENCE_ALIASES.get((value or "客房").strip(), value or TOWN_ROOM)
+def _item_reference(bundle: ContentBundle, key: Any, owner: str) -> str:
+    if not isinstance(key, str) or not key or not bundle.has("item", key, include_locked=False):
+        raise ContentError(f"{owner} references an unknown item")
+    return key
+
+
+def _harvest_map(
+    bundle: ContentBundle,
+    owner: str,
+    raw: Any,
+) -> tuple[dict[str, int], dict[str, tuple[int, int]]]:
+    if not isinstance(raw, list) or not raw:
+        raise ContentError(f"{owner} harvest must be a non-empty list")
+    fixed: dict[str, int] = {}
+    ranges: dict[str, tuple[int, int]] = {}
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise ContentError(f"{owner} harvest entry must be an object")
+        item_key = _item_reference(bundle, entry.get("item_key"), owner)
+        if item_key in fixed or item_key in ranges:
+            raise ContentError(f"{owner} contains duplicate harvest item")
+        quantity = entry.get("quantity")
+        quantity_range = entry.get("quantity_range")
+        if quantity is not None and quantity_range is not None:
+            raise ContentError(f"{owner} harvest entry cannot define quantity and quantity_range")
+        if quantity is not None:
+            if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+                raise ContentError(f"{owner} harvest quantities must be positive integers")
+            fixed[item_key] = quantity
+            continue
+        if (
+            not isinstance(quantity_range, list)
+            or len(quantity_range) != 2
+            or any(isinstance(value, bool) or not isinstance(value, int) for value in quantity_range)
+            or quantity_range[0] < 0
+            or quantity_range[1] < quantity_range[0]
+        ):
+            raise ContentError(f"{owner} has an invalid harvest quantity range")
+        ranges[item_key] = (quantity_range[0], quantity_range[1])
+    return fixed, ranges
+
+
+def _resolve_definition(
+    definitions: dict[str, Any],
+    value: str | None,
+    default_key: str,
+    record_type: str,
+) -> Any:
+    normalized = (value or default_key).strip()
+    selectors = {
+        selector: definition.key
+        for definition in definitions.values()
+        for selector in (definition.key, definition.label, *definition.aliases)
+    }
     try:
-        return RESIDENCE_DEFINITIONS[key]
+        return definitions[selectors[normalized]]
     except KeyError as exc:
-        raise ValueError(f"unsupported residence key: {value}") from exc
+        raise ValueError(f"unsupported {record_type} key: {value}") from exc
+
+
+def residence_definitions(content: ContentBundle | None = None) -> dict[str, ResidenceDefinition]:
+    bundle = content if content is not None else _default_livelihood_content()
+    result: dict[str, ResidenceDefinition] = {}
+    selectors: dict[str, str] = {}
+    for row in bundle.list("livelihood", include_locked=False):
+        if row.get("record_type") != "residence":
+            continue
+        key, label, aliases = _identity(row, "residence")
+        rent = row.get("rent")
+        capacity = row.get("capacity")
+        requirements = row.get("requirements")
+        if not isinstance(rent, dict) or rent.get("currency_key") != "currency.spirit_stone":
+            raise ContentError(f"residence {key} has an unsupported rent")
+        amount = rent.get("amount")
+        periods = [name for name in ("period_days", "period_business_days") if name in rent]
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0 or len(periods) != 1:
+            raise ContentError(f"residence {key} has invalid rent values")
+        lease_days = rent[periods[0]]
+        if isinstance(lease_days, bool) or not isinstance(lease_days, int) or lease_days <= 0:
+            raise ContentError(f"residence {key} has an invalid lease period")
+        if not isinstance(capacity, dict):
+            raise ContentError(f"residence {key} requires capacity")
+        plots = capacity.get("plots")
+        if isinstance(plots, bool) or not isinstance(plots, int) or plots < 0:
+            raise ContentError(f"residence {key} has an invalid plot count")
+        if not isinstance(requirements, list) or not requirements:
+            raise ContentError(f"residence {key} requires requirements")
+        required_stage = "mortal"
+        required_local_reputation = 0
+        reputation_key: str | None = None
+        for requirement in requirements:
+            if not isinstance(requirement, dict):
+                raise ContentError(f"residence {key} has an invalid requirement")
+            requirement_type = requirement.get("type")
+            if requirement_type == "stage_min":
+                if not isinstance(requirement.get("stage"), str) or not requirement["stage"]:
+                    raise ContentError(f"residence {key} has an invalid stage requirement")
+                if requirement["stage"] not in _STAGE_ORDER:
+                    raise ContentError(f"residence {key} has an unsupported stage requirement")
+                required_stage = requirement["stage"]
+            elif requirement_type == "reputation":
+                reputation_key = requirement.get("reputation_key")
+                minimum = requirement.get("min")
+                if not isinstance(reputation_key, str) or isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 0:
+                    raise ContentError(f"residence {key} has an invalid reputation requirement")
+                local_reputation_maximum(reputation_key, bundle)
+                required_local_reputation = minimum
+            else:
+                raise ContentError(f"residence {key} has an unsupported requirement")
+        definition = ResidenceDefinition(
+            key=key,
+            label=label,
+            rent_cost=amount,
+            lease_days=lease_days,
+            required_stage=required_stage,
+            required_local_reputation=required_local_reputation,
+            plot_count=plots,
+            local_reputation_key=reputation_key,
+            aliases=aliases,
+        )
+        if key in result:
+            raise ContentError(f"duplicate residence key: {key}")
+        for selector in (key, label, *aliases):
+            if selector in selectors:
+                raise ContentError(f"duplicate residence name or alias: {selector}")
+            selectors[selector] = key
+        result[key] = definition
+    if not result:
+        raise ContentError("no active residence records")
+    return result
+
+
+def residence_definition(value: str | None = None, content: ContentBundle | None = None) -> ResidenceDefinition:
+    return _resolve_definition(residence_definitions(content), value, TOWN_ROOM, "residence")
 
 
 BLOOD_GRASS = "crop.blood_grass"
@@ -81,6 +194,12 @@ class CropDefinition:
     daily_limit: int
     residence_key: str | None = None
     random_pool: str | None = None
+    maintained_harvest_ranges: dict[str, tuple[int, int]] | None = None
+    reputation_key: str | None = None
+    reputation_delta: int = 0
+    reputation_maximum: int | None = None
+    seed_quantity: int = 1
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,57 +220,117 @@ class TownCommissionDefinition:
     reward_bonus_key: str | None = None
 
 
-CROP_DEFINITIONS = {
-    BLOOD_GRASS: CropDefinition(
-        key=BLOOD_GRASS,
-        label="止血草",
-        seed_key="item.herb.blood_grass",
-        growth_seconds=4 * 60 * 60,
-        maintenance_energy=1,
-        required_maintenance=1,
-        maintained_harvest={"item.herb.blood_grass": 3},
-        unmaintained_harvest={"item.herb.blood_grass": 1},
-        daily_limit=2,
-    ),
-    SPIRIT_LEAF: CropDefinition(
-        key=SPIRIT_LEAF,
-        label="灵叶",
-        seed_key="item.herb.spirit_leaf",
-        growth_seconds=8 * 60 * 60,
-        maintenance_energy=2,
-        required_maintenance=2,
-        maintained_harvest={"item.herb.spirit_leaf": 3},
-        unmaintained_harvest={"item.herb.spirit_leaf": 1},
-        daily_limit=1,
-        residence_key=COURTYARD,
-        random_pool=SPIRIT_LEAF_HARVEST_POOL,
-    ),
-}
+def crop_definitions(content: ContentBundle | None = None) -> dict[str, CropDefinition]:
+    bundle = content if content is not None else _default_livelihood_content()
+    residences = residence_definitions(bundle)
+    result: dict[str, CropDefinition] = {}
+    selectors: dict[str, str] = {}
+    for row in bundle.list("livelihood", include_locked=False):
+        if row.get("record_type") != "crop":
+            continue
+        key, label, aliases = _identity(row, "crop")
+        seed = row.get("seed")
+        if not isinstance(seed, dict):
+            raise ContentError(f"crop {key} requires seed")
+        seed_key = _item_reference(bundle, seed.get("item_key"), f"crop {key} seed")
+        seed_quantity = seed.get("quantity")
+        if isinstance(seed_quantity, bool) or not isinstance(seed_quantity, int) or seed_quantity <= 0:
+            raise ContentError(f"crop {key} has an invalid seed quantity")
+        growth_seconds = row.get("growth_seconds")
+        daily_limit = row.get("daily_limit")
+        if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in (growth_seconds, daily_limit)):
+            raise ContentError(f"crop {key} has invalid growth or daily limit")
+        maintenance = row.get("maintenance")
+        if not isinstance(maintenance, dict):
+            raise ContentError(f"crop {key} requires maintenance")
+        energy, required = maintenance.get("energy"), maintenance.get("minimum_count")
+        if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in (energy, required)):
+            raise ContentError(f"crop {key} has invalid maintenance values")
+        maintained, ranges = _harvest_map(bundle, f"crop {key}", row.get("harvest"))
+        unmaintained, unmaintained_ranges = _harvest_map(bundle, f"crop {key} unmaintained", row.get("unmaintained_harvest"))
+        if unmaintained_ranges:
+            raise ContentError(f"crop {key} unmaintained harvest cannot be random")
+        requirements = row.get("requirements", [])
+        if not isinstance(requirements, list):
+            raise ContentError(f"crop {key} requirements must be a list")
+        residence_key: str | None = None
+        for requirement in requirements:
+            if not isinstance(requirement, dict):
+                raise ContentError(f"crop {key} has an invalid requirement")
+            if requirement.get("type") == "residence_key":
+                residence_key = requirement.get("value")
+                if not isinstance(residence_key, str) or residence_key not in residences:
+                    raise ContentError(f"crop {key} references an unknown residence")
+            elif requirement.get("type") == "residence_plot":
+                if requirement.get("status") != "active":
+                    raise ContentError(f"crop {key} has an invalid plot requirement")
+            else:
+                raise ContentError(f"crop {key} has an unsupported requirement")
+        random_pool = row.get("random_pool")
+        if ranges and (not isinstance(random_pool, str) or not random_pool):
+            raise ContentError(f"crop {key} random harvest requires random_pool")
+        reputation = row.get("reputation")
+        reputation_key: str | None = None
+        reputation_delta = 0
+        reputation_maximum: int | None = None
+        if reputation is not None:
+            if not isinstance(reputation, dict):
+                raise ContentError(f"crop {key} reputation must be an object")
+            reputation_key = reputation.get("key")
+            reputation_delta = reputation.get("amount")
+            if not isinstance(reputation_key, str) or isinstance(reputation_delta, bool) or not isinstance(reputation_delta, int) or reputation_delta < 0:
+                raise ContentError(f"crop {key} has invalid reputation")
+            reputation_maximum = local_reputation_maximum(reputation_key, bundle)
+        definition = CropDefinition(
+            key=key,
+            label=label,
+            seed_key=seed_key,
+            growth_seconds=growth_seconds,
+            maintenance_energy=energy,
+            required_maintenance=required,
+            maintained_harvest=maintained,
+            unmaintained_harvest=unmaintained,
+            daily_limit=daily_limit,
+            residence_key=residence_key,
+            random_pool=random_pool,
+            maintained_harvest_ranges=ranges,
+            reputation_key=reputation_key,
+            reputation_delta=reputation_delta,
+            reputation_maximum=reputation_maximum,
+            seed_quantity=seed_quantity,
+            aliases=aliases,
+        )
+        if key in result:
+            raise ContentError(f"duplicate crop key: {key}")
+        for selector in (key, label, *aliases):
+            if selector in selectors:
+                raise ContentError(f"duplicate crop name or alias: {selector}")
+            selectors[selector] = key
+        result[key] = definition
+    if not result:
+        raise ContentError("no active crop records")
+    return result
 
-CROP_ALIASES = {
-    "止血草": BLOOD_GRASS,
-    "血草": BLOOD_GRASS,
-    "blood_grass": BLOOD_GRASS,
-    "灵叶": SPIRIT_LEAF,
-    "spirit_leaf": SPIRIT_LEAF,
-}
+
+def crop_definition(value: str | None = None, content: ContentBundle | None = None) -> CropDefinition:
+    return _resolve_definition(crop_definitions(content), value, BLOOD_GRASS, "crop")
 
 
-def crop_definition(value: str | None = None) -> CropDefinition:
-    key = CROP_ALIASES.get((value or "止血草").strip(), value or BLOOD_GRASS)
-    try:
-        return CROP_DEFINITIONS[key]
-    except KeyError as exc:
-        raise ValueError(f"unsupported crop key: {value}") from exc
+def crop_harvest_bonus(crop: CropDefinition, operation_id: str) -> dict[str, int]:
+    """Freeze each configured random harvest quantity from the planting operation."""
 
-
-def spirit_leaf_array_sand_roll(operation_id: str) -> int:
-    """Return the frozen 0/1副产物 roll for a spirit-leaf planting."""
-
-    digest = hashlib.blake2b(
-        f"{SPIRIT_LEAF_HARVEST_POOL}:{operation_id}".encode("utf-8"), digest_size=2
-    ).digest()
-    return int.from_bytes(digest, "big") % 2
+    if not crop.maintained_harvest_ranges or not crop.random_pool:
+        return {}
+    result: dict[str, int] = {}
+    ranges = tuple(crop.maintained_harvest_ranges.items())
+    for item_key, (minimum, maximum) in ranges:
+        seed = f"{crop.random_pool}:{operation_id}"
+        if len(ranges) > 1:
+            seed = f"{seed}:{item_key}"
+        quantity = minimum + deterministic_integer(seed, maximum - minimum + 1)
+        if quantity:
+            result[item_key] = quantity
+    return result
 
 
 @lru_cache(maxsize=1)
@@ -590,18 +769,18 @@ __all__ = [
     "SPIRIT_LEAF",
     "SPIRIT_LEAF_HARVEST_POOL",
     "COURTYARD",
-    "CROP_DEFINITIONS",
-    "CROP_ALIASES",
     "TownCommissionDefinition",
     "TOWN_ROOM",
     "CropDefinition",
     "ResidenceDefinition",
     "crop_definition",
-    "spirit_leaf_array_sand_roll",
+    "crop_definitions",
+    "crop_harvest_bonus",
     "commission_definition",
     "resolve_commission_key",
     "town_commission_definitions",
     "residence_definition",
+    "residence_definitions",
     "HERB_SEED_BUNDLE",
     "PROJECT_DOMAIN_REFUGE",
     "PROJECT_ABYSS_PURIFICATION",

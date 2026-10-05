@@ -16,6 +16,7 @@ class ResidenceRecord:
     starts_at: str
     ends_at: str
     rent_cost: int
+    label: str
     already_completed: bool = False
 
 
@@ -28,6 +29,7 @@ class FieldPlotRecord:
     status: str
     planted_at: str | None
     harvest_at: str | None
+    crop_label: str
     maintenance_count: int = 0
     required_maintenance: int = 0
     harvest: dict[str, int] = field(default_factory=dict)

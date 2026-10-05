@@ -10,6 +10,19 @@ from typing import TypeVar
 T = TypeVar("T")
 
 
+def deterministic_integer(seed: str, upper_bound: int, *, digest_size: int = 2) -> int:
+    """Return a stable integer in ``[0, upper_bound)`` for a content seed."""
+
+    if not isinstance(seed, str) or not seed:
+        raise ValueError("random seed must be a non-empty string")
+    if isinstance(upper_bound, bool) or not isinstance(upper_bound, int) or upper_bound <= 0:
+        raise ValueError("random upper bound must be a positive integer")
+    if isinstance(digest_size, bool) or not isinstance(digest_size, int) or digest_size <= 0:
+        raise ValueError("random digest size must be a positive integer")
+    digest = hashlib.blake2b(seed.encode("utf-8"), digest_size=digest_size).digest()
+    return int.from_bytes(digest, "big") % upper_bound
+
+
 def deterministic_weighted_choice(outcomes: Iterable[tuple[int, T]], seed: str) -> T:
     """Choose from positive integer weights using a stable seed."""
 
@@ -37,4 +50,4 @@ def deterministic_weighted_choice(outcomes: Iterable[tuple[int, T]], seed: str) 
     raise AssertionError("weighted choice fell through")
 
 
-__all__ = ["deterministic_weighted_choice"]
+__all__ = ["deterministic_integer", "deterministic_weighted_choice"]

@@ -33,7 +33,7 @@ from ..persistence.errors import (
 )
 from ..specials.codex_projection import record_material_discoveries
 from .models import FieldPlotRecord
-from .rules import crop_definition, residence_definition, spirit_leaf_array_sand_roll
+from .rules import crop_definition, crop_harvest_bonus
 
 
 class FieldPlotRepositoryMixin:
@@ -54,14 +54,11 @@ class FieldPlotRepositoryMixin:
             )
 
     def _plant_plot_once(self, platform: str, platform_user_id: str, crop_key: str, operation_id: str) -> FieldPlotRecord:
-        try:
-            crop = crop_definition(crop_key)
-        except ValueError as exc:
-            raise CropContentClosedError("unsupported crop") from exc
         operation_name = "livelihood.plant"
+        request_value = (crop_key or "").strip() or "<default>"
         request_hash = self._request_hash(
             operation_name,
-            {"platform": platform, "platform_user_id": platform_user_id, "crop_key": crop.key},
+            {"platform": platform, "platform_user_id": platform_user_id, "crop_key": request_value},
         )
         now = self._now()
         now_text = serialize_datetime(now)
@@ -71,14 +68,19 @@ class FieldPlotRepositoryMixin:
             existing = self._operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
                 return self._field_from_payload(existing, replay=True)
+            try:
+                crop = crop_definition(crop_key, self.content)
+            except ValueError as exc:
+                raise CropContentClosedError("unsupported crop") from exc
             row = self._require_player(connection, platform, platform_user_id)
             residence = self._active_residence(connection, int(row["id"]), now, now_text)
             if residence is None:
                 raise ResidenceRequiredError("planting requires an active residence")
-            residence_definition_value = residence_definition(str(residence["residence_key"]))
-            if crop.residence_key and crop.residence_key != residence_definition_value.key:
+            residence_snapshot = self._residence_snapshot(residence)
+            plot_count = int(residence_snapshot["plot_count"])
+            if crop.residence_key and crop.residence_key != str(residence["residence_key"]):
                 raise ResidencePlotRequiredError("the residence does not support this crop")
-            if residence_definition_value.plot_count < 1:
+            if plot_count < 1:
                 raise ResidencePlotRequiredError("the residence has no field plot")
             active = connection.execute(
                 "SELECT * FROM field_plots WHERE residence_id = ? AND status IN ('growing', 'harvestable') LIMIT 1",
@@ -93,34 +95,39 @@ class FieldPlotRepositoryMixin:
             if used is not None and int(used["count"]) >= crop.daily_limit:
                 raise CropDailyLimitError("crop daily limit reached")
             inventory = player_inventory(row)
-            if inventory_amount(inventory, crop.seed_key) < 1:
+            if inventory_amount(inventory, crop.seed_key) < crop.seed_quantity:
                 raise ResourceInsufficientError("seed is insufficient")
             if player_integer(row, "energy") < crop.maintenance_energy:
                 raise ResourceInsufficientError("energy is insufficient")
             harvest_at = serialize_datetime(now + timedelta(seconds=crop.growth_seconds))
+            random_harvest = crop_harvest_bonus(crop, operation_id)
             plot_id = uuid4().hex
             snapshot = {
                 "crop_key": crop.key,
+                "crop_label": crop.label,
                 "seed_key": crop.seed_key,
+                "seed_quantity": crop.seed_quantity,
+                "growth_seconds": crop.growth_seconds,
                 "required_maintenance": crop.required_maintenance,
                 "maintenance_energy": crop.maintenance_energy,
                 "maintained_harvest": crop.maintained_harvest,
+                "maintained_harvest_ranges": crop.maintained_harvest_ranges or {},
                 "unmaintained_harvest": crop.unmaintained_harvest,
+                "random_pool": crop.random_pool,
+                "random_harvest": random_harvest,
+                "reputation_key": crop.reputation_key,
+                "reputation_delta": crop.reputation_delta,
+                "reputation_maximum": crop.reputation_maximum,
                 "wither_at": serialize_datetime(now + timedelta(seconds=crop.growth_seconds + 24 * 60 * 60)),
             }
             if crop.random_pool:
-                snapshot.update(
-                    {
-                        "random_pool": crop.random_pool,
-                        "random_seed": operation_id,
-                        "array_sand_roll": spirit_leaf_array_sand_roll(operation_id),
-                    }
-                )
+                snapshot["random_seed"] = operation_id
+                snapshot["array_sand_roll"] = random_harvest.get("item.mat.array_sand", 0)
             spend_player_state(
                 connection,
                 row,
                 updated_at=now_text,
-                costs={crop.seed_key: 1},
+                costs={crop.seed_key: crop.seed_quantity},
                 value_delta={"energy": -crop.maintenance_energy},
             )
             connection.execute(
@@ -158,6 +165,7 @@ class FieldPlotRepositoryMixin:
                 harvest_at=harvest_at,
                 maintenance_count=0,
                 required_maintenance=crop.required_maintenance,
+                crop_label=crop.label,
             )
             self._record_operation(connection, operation_id, operation_name, row["id"], request_hash, payload, now_text)
             return self._field_from_payload(payload)
@@ -193,20 +201,25 @@ class FieldPlotRepositoryMixin:
             if plot is None:
                 raise FieldPlotNotFoundError("no field plot")
             status = str(plot["status"])
-            snapshot = self._json_object(plot["snapshot_json"], {})
+            snapshot = self._field_snapshot(plot)
             if status == "growing" and now >= datetime.fromisoformat(str(plot["harvest_at"])):
                 status = "harvestable"
                 connection.execute(
                     "UPDATE field_plots SET status = 'harvestable', updated_at = ? WHERE id = ? AND status = 'growing'",
                     (now_text, plot["id"]),
                 )
-            if status in {"growing", "harvestable"} and now > datetime.fromisoformat(str(snapshot.get("wither_at", plot["harvest_at"]))):
+            if status in {"growing", "harvestable"} and now > datetime.fromisoformat(str(snapshot["wither_at"])):
                 status = "withered"
                 connection.execute(
                     "UPDATE field_plots SET status = 'withered', updated_at = ? WHERE id = ? AND status IN ('growing', 'harvestable')",
                     (now_text, plot["id"]),
                 )
             result = self._json_object(plot["result_json"], {})
+            harvest = (
+                {str(key): int(value) for key, value in dict(result["harvest"]).items()}
+                if status == "harvested"
+                else {}
+            )
             payload = self._field_payload(
                 row,
                 plot_id=str(plot["plot_id"]),
@@ -216,9 +229,10 @@ class FieldPlotRepositoryMixin:
                 planted_at=str(plot["planted_at"]),
                 harvest_at=str(plot["harvest_at"]),
                 maintenance_count=int(plot["maintenance_count"]),
-                required_maintenance=int(snapshot.get("required_maintenance", 1)),
-                harvest={str(key): int(value) for key, value in dict(result.get("harvest", {})).items()},
-                local_reputation_delta=int(result.get("local_reputation_delta", 0)),
+                required_maintenance=int(snapshot["required_maintenance"]),
+                crop_label=str(snapshot["crop_label"]),
+                harvest=harvest,
+                local_reputation_delta=int(result["local_reputation_delta"]) if status == "harvested" else 0,
             )
             return self._field_from_payload(payload)
 
@@ -255,8 +269,8 @@ class FieldPlotRepositoryMixin:
                 if latest is not None and str(latest["status"]) == "harvested":
                     raise FieldPlotAlreadyHarvestedError("field plot already harvested")
                 raise FieldPlotNotFoundError("no active field plot")
-            snapshot = self._json_object(plot["snapshot_json"], {})
-            wither_at = datetime.fromisoformat(str(snapshot.get("wither_at", plot["harvest_at"])))
+            snapshot = self._field_snapshot(plot)
+            wither_at = datetime.fromisoformat(str(snapshot["wither_at"]))
             harvest_at = datetime.fromisoformat(str(plot["harvest_at"]))
             if now > wither_at:
                 connection.execute(
@@ -273,18 +287,18 @@ class FieldPlotRepositoryMixin:
                         (now_text, plot["id"]),
                     )
                     raise FieldPlotNotReadyError("maintenance window has ended")
-                required = int(snapshot.get("required_maintenance", 1))
+                required = int(snapshot["required_maintenance"])
                 count = int(plot["maintenance_count"])
                 if count >= required:
                     raise FieldPlotNotReadyError("field plot maintenance is complete")
-                if player_integer(row, "energy") < int(snapshot.get("maintenance_energy", 1)):
+                if player_integer(row, "energy") < int(snapshot["maintenance_energy"]):
                     raise ResourceInsufficientError("energy is insufficient")
                 count += 1
                 change_player_state(
                     connection,
                     row,
                     updated_at=now_text,
-                    value_delta={"energy": -int(snapshot.get("maintenance_energy", 1))},
+                    value_delta={"energy": -int(snapshot["maintenance_energy"])},
                 )
                 connection.execute(
                     "UPDATE field_plots SET maintenance_count = ?, updated_at = ? WHERE id = ? AND status = 'growing'",
@@ -303,6 +317,7 @@ class FieldPlotRepositoryMixin:
                     harvest_at=str(plot["harvest_at"]),
                     maintenance_count=count,
                     required_maintenance=required,
+                    crop_label=str(snapshot["crop_label"]),
                 )
             else:
                 if now < harvest_at:
@@ -313,23 +328,24 @@ class FieldPlotRepositoryMixin:
                         "UPDATE field_plots SET status = 'harvestable', updated_at = ? WHERE id = ? AND status = 'growing'",
                         (now_text, plot["id"]),
                     )
-                maintained = int(plot["maintenance_count"]) >= int(snapshot.get("required_maintenance", 1))
-                harvest = dict(snapshot.get("maintained_harvest" if maintained else "unmaintained_harvest", {}))
-                if maintained and int(snapshot.get("array_sand_roll", 0)):
-                    harvest["item.mat.array_sand"] = int(harvest.get("item.mat.array_sand", 0)) + 1
-                reputation_delta = 1 if str(plot["crop_key"]) == "crop.blood_grass" else 0
+                maintained = int(plot["maintenance_count"]) >= int(snapshot["required_maintenance"])
+                harvest = dict(snapshot["maintained_harvest" if maintained else "unmaintained_harvest"])
+                if maintained:
+                    for item_key, quantity in dict(snapshot["random_harvest"]).items():
+                        harvest[item_key] = int(harvest.get(item_key, 0)) + int(quantity)
+                reputation_key = snapshot.get("reputation_key")
+                reputation_delta = int(snapshot["reputation_delta"])
                 reward = dict(harvest)
-                local_reputation_key = "local.xuantian.new_town"
-                if reputation_delta:
-                    reward[local_reputation_key] = reputation_delta
+                if reputation_delta and isinstance(reputation_key, str) and reputation_key:
+                    reward[reputation_key] = reputation_delta
                 grant_player_reward(
                     connection,
                     row,
                     reward,
                     now_text,
                     local_reputation_maximums=(
-                        {local_reputation_key: local_reputation_maximum(local_reputation_key, self.content)}
-                        if reputation_delta
+                        {reputation_key: int(snapshot["reputation_maximum"])}
+                        if reputation_delta and isinstance(reputation_key, str) and reputation_key
                         else None
                     ),
                 )
@@ -349,7 +365,8 @@ class FieldPlotRepositoryMixin:
                     planted_at=str(plot["planted_at"]),
                     harvest_at=str(plot["harvest_at"]),
                     maintenance_count=int(plot["maintenance_count"]),
-                    required_maintenance=int(snapshot.get("required_maintenance", 1)),
+                    required_maintenance=int(snapshot["required_maintenance"]),
+                    crop_label=str(snapshot["crop_label"]),
                     harvest=harvest,
                     local_reputation_delta=reputation_delta,
                 )
@@ -380,6 +397,57 @@ class FieldPlotRepositoryMixin:
             raise OperationConflictError("operation input differs from its original request")
         return json.loads(existing["result_json"])
 
+    def _field_snapshot(self, plot: Any) -> dict[str, Any]:
+        snapshot = self._json_object(plot["snapshot_json"], {})
+        required = (
+            "crop_key",
+            "crop_label",
+            "seed_key",
+            "seed_quantity",
+            "growth_seconds",
+            "required_maintenance",
+            "maintenance_energy",
+            "maintained_harvest",
+            "maintained_harvest_ranges",
+            "unmaintained_harvest",
+            "random_pool",
+            "random_harvest",
+            "reputation_key",
+            "reputation_delta",
+            "reputation_maximum",
+            "wither_at",
+        )
+        for field in required:
+            snapshot[field]
+        if (
+            not isinstance(snapshot["crop_key"], str)
+            or not isinstance(snapshot["crop_label"], str)
+            or not snapshot["crop_label"].strip()
+            or not isinstance(snapshot["seed_key"], str)
+            or isinstance(snapshot["seed_quantity"], bool)
+            or not isinstance(snapshot["seed_quantity"], int)
+            or snapshot["seed_quantity"] <= 0
+            or isinstance(snapshot["growth_seconds"], bool)
+            or not isinstance(snapshot["growth_seconds"], int)
+            or snapshot["growth_seconds"] <= 0
+            or isinstance(snapshot["required_maintenance"], bool)
+            or not isinstance(snapshot["required_maintenance"], int)
+            or snapshot["required_maintenance"] < 0
+            or isinstance(snapshot["maintenance_energy"], bool)
+            or not isinstance(snapshot["maintenance_energy"], int)
+            or snapshot["maintenance_energy"] < 0
+            or any(not isinstance(snapshot[field], dict) for field in ("maintained_harvest", "maintained_harvest_ranges", "unmaintained_harvest", "random_harvest"))
+            or (snapshot["random_pool"] is not None and not isinstance(snapshot["random_pool"], str))
+            or (snapshot["reputation_key"] is not None and not isinstance(snapshot["reputation_key"], str))
+            or isinstance(snapshot["reputation_delta"], bool)
+            or not isinstance(snapshot["reputation_delta"], int)
+            or snapshot["reputation_delta"] < 0
+            or (snapshot["reputation_maximum"] is not None and (isinstance(snapshot["reputation_maximum"], bool) or not isinstance(snapshot["reputation_maximum"], int)))
+            or not isinstance(snapshot["wither_at"], str)
+        ):
+            raise ValueError("invalid field plot snapshot")
+        return snapshot
+
     @staticmethod
     def _record_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
         connection.execute(
@@ -387,12 +455,13 @@ class FieldPlotRepositoryMixin:
             (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
         )
 
-    def _field_payload(self, player: Any, *, plot_id: str, residence_id: str, crop_key: str, status: str, planted_at: str, harvest_at: str, maintenance_count: int, required_maintenance: int, harvest: dict[str, int] | None = None, local_reputation_delta: int = 0) -> dict[str, Any]:
+    def _field_payload(self, player: Any, *, plot_id: str, residence_id: str, crop_key: str, status: str, planted_at: str, harvest_at: str, maintenance_count: int, required_maintenance: int, crop_label: str, harvest: dict[str, int] | None = None, local_reputation_delta: int = 0) -> dict[str, Any]:
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "plot_id": plot_id,
             "residence_id": residence_id,
             "crop_key": crop_key,
+            "crop_label": crop_label,
             "status": status,
             "planted_at": planted_at,
             "harvest_at": harvest_at,
@@ -409,14 +478,15 @@ class FieldPlotRepositoryMixin:
             player=player,
             plot_id=str(payload["plot_id"]),
             residence_id=str(payload["residence_id"]),
-            crop_key=payload.get("crop_key"),
+            crop_key=str(payload["crop_key"]),
             status=str(payload["status"]),
-            planted_at=payload.get("planted_at"),
-            harvest_at=payload.get("harvest_at"),
-            maintenance_count=int(payload.get("maintenance_count", 0)),
-            required_maintenance=int(payload.get("required_maintenance", 0)),
-            harvest={str(key): int(value) for key, value in dict(payload.get("harvest", {})).items()},
-            local_reputation_delta=int(payload.get("local_reputation_delta", 0)),
+            planted_at=str(payload["planted_at"]),
+            harvest_at=str(payload["harvest_at"]),
+            crop_label=str(payload["crop_label"]),
+            maintenance_count=int(payload["maintenance_count"]),
+            required_maintenance=int(payload["required_maintenance"]),
+            harvest={str(key): int(value) for key, value in dict(payload["harvest"]).items()},
+            local_reputation_delta=int(payload["local_reputation_delta"]),
             already_completed=replay,
         )
 

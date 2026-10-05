@@ -38,7 +38,7 @@ from ..repository import (
     TradePermitContentClosedError,
     TradePermitRequirementError,
 )
-from .rules import crop_definition, residence_definition, resolve_commission_key
+from .rules import resolve_commission_key
 from .trade_permit_rules import resolve_trade_permit
 
 
@@ -60,23 +60,15 @@ class LivelihoodApplication:
         value = player.dao_name or "未命名"
         return value.replace("\\", "\\\\").replace("`", "\\`").replace("*", "\\*").replace("_", "\\_").replace("~", "\\~")
 
-    @staticmethod
-    def _resolve_args(args: tuple[str, ...]) -> str | None:
+    def _resolve_args(self, args: tuple[str, ...]) -> str | None:
         if len(args) > 1:
             return None
-        try:
-            return residence_definition(args[0] if args else None).key
-        except ValueError:
-            return None
+        return args[0].strip() if args else ""
 
-    @staticmethod
-    def _resolve_crop(args: tuple[str, ...]) -> str | None:
+    def _resolve_crop(self, args: tuple[str, ...]) -> str | None:
         if len(args) > 1:
             return None
-        try:
-            return crop_definition(args[0] if args else None).key
-        except ValueError:
-            return None
+        return args[0].strip() if args else ""
 
     def _resolve_commission(self, args: tuple[str, ...], *, required: bool = True) -> str | None:
         if len(args) > 1:
@@ -120,13 +112,12 @@ class LivelihoodApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = residence_definition(record.residence_key)
         return CommandResult(
             True,
             "RESIDENCE_LEASED",
             (
                 "## 居所已登记\n\n"
-                f"**{self._display_name(record.player)}**租下了{definition.label}。\n\n"
+                f"**{self._display_name(record.player)}**租下了{record.label}。\n\n"
                 f"- **租金**：灵石 {record.rent_cost}\n"
                 f"- **有效至**：{record.ends_at}\n"
                 "- **用途**：可进行静养闭关与后续居所经营\n\n"
@@ -197,11 +188,10 @@ class LivelihoodApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看居所。", context.request_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
-        definition = residence_definition(record.residence_key)
         return CommandResult(
             True,
             "RESIDENCE_PROFILE",
-            f"## 我的居所\n\n**{self._display_name(record.player)}**当前居住在{definition.label}。\n\n- **状态**：{record.status}\n- **有效至**：{record.ends_at}\n- **静养闭关**：可用",
+            f"## 我的居所\n\n**{self._display_name(record.player)}**当前居住在{record.label}。\n\n- **状态**：{record.status}\n- **有效至**：{record.ends_at}\n- **静养闭关**：可用",
             context.request_id,
             data={"residence_id": record.residence_id, "residence_key": record.residence_key, "status": record.status, "ends_at": record.ends_at},
         )
@@ -241,7 +231,7 @@ class LivelihoodApplication:
         return CommandResult(
             True,
             "FIELD_PLOT_PLANTED",
-            f"## 灵田已播种\n\n已种下**{crop_definition(record.crop_key).label}**。\n\n- **预计成熟**：{record.harvest_at}\n- **维护**：需要 {record.required_maintenance} 次\n- **状态**：生长中",
+            f"## 灵田已播种\n\n已种下**{record.crop_label}**。\n\n- **预计成熟**：{record.harvest_at}\n- **维护**：需要 {record.required_maintenance} 次\n- **状态**：生长中",
             context.request_id,
             operation_id,
             data={"plot_id": record.plot_id, "crop_key": record.crop_key, "status": record.status, "harvest_at": record.harvest_at, "maintenance_count": record.maintenance_count, "required_maintenance": record.required_maintenance, "idempotent_replay": record.already_completed},
@@ -328,7 +318,7 @@ class LivelihoodApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
-        label = crop_definition(record.crop_key).label if record.crop_key else "无"
+        label = record.crop_label if record.crop_key else "无"
         return CommandResult(
             True,
             "FIELD_PLOT_PROFILE",
