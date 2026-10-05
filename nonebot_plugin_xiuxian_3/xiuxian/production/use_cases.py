@@ -99,7 +99,7 @@ class ProductionApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
-        tool_text = f"- **工具**：{item_label(record.tool_key)}\n" if record.tool_key else ""
+        tool_text = f"- **工具**：{item_label(record.tool_key, self.repository.content)}\n" if record.tool_key else ""
         return CommandResult(
             True,
             "RECIPE_PREVIEW",
@@ -111,7 +111,7 @@ class ProductionApplication:
                 f"- **灵石消耗**：{record.currency_cost}\n"
                 + tool_text
                 + "\n### 所需材料\n\n"
-                + "\n".join(f"- **{item_label(key)}** ×{value}" for key, value in record.inputs.items())
+                + "\n".join(f"- **{item_label(key, self.repository.content)}** ×{value}" for key, value in record.inputs.items())
                 + f"\n\n> 下一步：发送 `开始生产 {record.recipe_name}`，锁定材料并开始。"
             ),
             context.request_id,
@@ -391,8 +391,8 @@ class ProductionApplication:
     def _settlement_result(self, context: CommandContext, operation_id: str, record, *, recovered: bool = False) -> CommandResult:
         result_text = "恢复生产完成" if recovered else "生产完成"
         outcome = "成功" if record.success else "失败"
-        outputs = "、".join(f"{item_label(key)} ×{value}" for key, value in record.outputs.items()) or "无成品"
-        refunds = "、".join(f"{item_label(key)} ×{value}" for key, value in record.refunds.items()) or "无"
+        outputs = "、".join(f"{item_label(key, self.repository.content)} ×{value}" for key, value in record.outputs.items()) or "无成品"
+        refunds = "、".join(f"{item_label(key, self.repository.content)} ×{value}" for key, value in record.refunds.items()) or "无"
         binding = f"\n- **绑定至**：{record.binding_expires_at}" if record.binding_expires_at else ""
         return CommandResult(
             True,
