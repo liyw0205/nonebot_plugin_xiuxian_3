@@ -11,6 +11,10 @@ from ..content import ContentBundle, ContentError, bundled_content
 
 
 ENDING_KEYS = frozenset({"ascend", "remain_in_world"})
+PUBLIC_ENDING_CODEX_KEYS = {
+    "ascend": "codex.ending.public_ascend",
+    "remain_in_world": "codex.ending.public_remain",
+}
 ASCENSION_READY_STATUS = "ascension_ready"
 ASCENDED_STATUS = "ascended"
 REMAINED_IN_WORLD_STATUS = "remained_in_world"
@@ -34,6 +38,13 @@ FINAL_BATTLE_ENEMY_AGILITY = 800
 FINAL_BATTLE_ASSIST_MERIT_PER_DAMAGE = 1_000
 FINAL_BATTLE_ASSIST_MERIT_CAP = 100
 THREE_REALM_KEYS = ("xuantian", "demon", "beast")
+
+
+def public_ending_codex_key(ending_key: str) -> str:
+    try:
+        return PUBLIC_ENDING_CODEX_KEYS[ending_key]
+    except KeyError as exc:
+        raise ValueError(f"unsupported ending key: {ending_key}") from exc
 
 
 @dataclass(frozen=True, slots=True)

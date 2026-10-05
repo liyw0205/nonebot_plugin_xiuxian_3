@@ -41,7 +41,7 @@ class CodexRepositoryMixin:
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             entries = connection.execute(
-                "SELECT entry_key, category, first_seen_at FROM codex_entries "
+                "SELECT entry_key, category, first_seen_at, payload_json FROM codex_entries "
                 "WHERE player_id = ? ORDER BY category, first_seen_at, entry_key",
                 (player["id"],),
             ).fetchall()
@@ -59,7 +59,7 @@ class CodexRepositoryMixin:
                     CodexEntryRecord(
                         entry_key=str(row["entry_key"]),
                         category=str(row["category"]),
-                        label=label_for_entry(str(row["entry_key"]), self.content),
+                        label=_entry_label(row, self.content),
                         first_seen_at=str(row["first_seen_at"]),
                     )
                     for row in entries
@@ -245,3 +245,14 @@ class CodexRepositoryMixin:
 
 
 __all__ = ["CodexRepositoryMixin"]
+
+
+def _entry_label(row: Any, content) -> str:
+    try:
+        payload = json.loads(row["payload_json"] or "{}")
+    except (TypeError, json.JSONDecodeError):
+        payload = {}
+    label = payload.get("label") if isinstance(payload, dict) else None
+    if isinstance(label, str) and label.strip():
+        return label.strip()
+    return label_for_entry(str(row["entry_key"]), content)

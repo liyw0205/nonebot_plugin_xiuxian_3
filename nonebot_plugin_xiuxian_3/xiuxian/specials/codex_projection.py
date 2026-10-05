@@ -31,6 +31,11 @@ def record_codex_discovery(
     if category is None:
         return False
     now_text = serialize_datetime(occurred_at) if isinstance(occurred_at, datetime) else occurred_at
+    payload = _discovery_payload(snapshot)
+    bundle = content or bundled_content()
+    definition = bundle.get("codex_entry", entry_key, include_locked=True)
+    if isinstance(definition, dict) and isinstance(definition.get("name"), str):
+        payload.setdefault("label", definition["name"].strip())
     connection.execute(
         """
         INSERT INTO codex_entries(
@@ -46,7 +51,7 @@ def record_codex_discovery(
             category,
             operation_id,
             now_text,
-            json.dumps(_discovery_payload(snapshot), ensure_ascii=False, sort_keys=True),
+            json.dumps(payload, ensure_ascii=False, sort_keys=True),
             now_text,
         ),
     )

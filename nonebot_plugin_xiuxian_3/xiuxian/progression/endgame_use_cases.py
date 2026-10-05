@@ -188,6 +188,8 @@ class EndgameApplication:
             return self._failure(context, operation_id, "ASCENSION_REQUIREMENT_MISSING", "尚未满足终局选择条件，或留界尚未锁定道果。")
         except EndingAlreadyChosenError:
             return self._failure(context, operation_id, "ENDING_ALREADY_CHOSEN", "终局已经选择，不能改选另一条结局。")
+        except ContentError:
+            return self._failure(context, operation_id, "CONTENT_CLOSED", "这条终局见闻暂未开放。")
         except PlayerNotFoundError:
             return self._failure(context, operation_id, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。")
         except PlayerSuspendedError:

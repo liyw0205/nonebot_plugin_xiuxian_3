@@ -140,6 +140,8 @@ def category_for_entry(entry_key: str, content: ContentBundle | None = None) -> 
         return "route"
     if entry_key.startswith("codex.dao.service_"):
         return "service"
+    if entry_key.startswith("codex.ending.public_"):
+        return "story"
     return None
 
 

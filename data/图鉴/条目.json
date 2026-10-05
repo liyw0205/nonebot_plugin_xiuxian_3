@@ -206,6 +206,20 @@
       "status": "active"
     },
     {
+      "key": "codex.ending.public_ascend",
+      "name": "飞升终局",
+      "desc": "亲自走过飞升终局后，留下可供后来修士观览的世界见闻。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.ending.public_remain",
+      "name": "留界终局",
+      "desc": "亲自留下守界后，留下可供后来修士观览的世界见闻。",
+      "category": "story",
+      "status": "active"
+    },
+    {
       "key": "codex.story.xuantian.road.merchant",
       "name": "商路旧识",
       "desc": "数次受托往来之后，青石镇的人情与商路都留下了你的名字。",

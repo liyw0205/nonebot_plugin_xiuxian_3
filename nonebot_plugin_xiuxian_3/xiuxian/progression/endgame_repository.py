@@ -6,6 +6,7 @@ import asyncio
 import json
 
 from ...contracts import serialize_datetime
+from ..content import ContentError, bundled_content
 from .endgame_models import (
     DaoUnionRecord,
     EndgameEndingRecord,
@@ -23,12 +24,14 @@ from .endgame_rules import (
     ENDING_KEYS,
     FINAL_BATTLE_MIN_MERIT,
     FINAL_BATTLE_MIN_PROGRESS,
+    public_ending_codex_key,
     REMAINED_IN_WORLD_STATUS,
     TRIBULATION_TOTAL_CULTIVATION,
     tribulation_definition,
 )
 from ..utils.assets import inventory_amount, player_currency
 from ..utils.player import change_player_state, grant_player_state, player_integer, player_inventory, spend_player_state
+from ..specials.codex_projection import record_codex_discovery
 
 
 class EndgameRepositoryMixin:
@@ -235,6 +238,14 @@ class EndgameRepositoryMixin:
             raise AscensionRequirementError("player is not ready for an ending")
         if ending_key == "remain_in_world" and not fruit_key:
             raise AscensionRequirementError("remain in world requires a locked dao fruit")
+        content = self.content or bundled_content()
+        codex_entry_key = public_ending_codex_key(ending_key)
+        try:
+            codex_entry = content.require("codex_entry", codex_entry_key, include_locked=False)
+        except KeyError as exc:
+            raise ContentError(f"public ending codex entry is unavailable: {codex_entry_key}") from exc
+        if codex_entry.get("category") != "story":
+            raise ContentError(f"public ending codex entry has an invalid category: {codex_entry_key}")
         status = ASCENDED_STATUS if ending_key == "ascend" else REMAINED_IN_WORLD_STATUS
         title_quantity = 0 if inventory_amount(player_inventory(row), "item.title.ascended") else 1
         grant_player_state(
@@ -247,7 +258,22 @@ class EndgameRepositoryMixin:
         updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
         if updated is None:
             raise RuntimeError("ending choice returned no player")
-        payload = self._ending_payload(updated, ending_key=ending_key, status=status)
+        record_codex_discovery(
+            connection,
+            player_id=int(updated["id"]),
+            entry_key=codex_entry_key,
+            operation_id=operation_id,
+            occurred_at=now_text,
+            snapshot={"ending_key": ending_key, "label": str(codex_entry["name"])},
+            content=content,
+            category_snapshot="story",
+        )
+        payload = self._ending_payload(
+            updated,
+            ending_key=ending_key,
+            status=status,
+            codex_entry_key=codex_entry_key,
+        )
         connection.execute(
             "INSERT INTO endgame_endings(player_id, ending_key, status, fruit_key, snapshot_json, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
@@ -377,7 +403,7 @@ class EndgameRepositoryMixin:
             return TribulationEntryRecord(player=player, changed=True)
 
     @staticmethod
-    def _ending_payload(row, *, ending_key: str, status: str) -> dict:
+    def _ending_payload(row, *, ending_key: str, status: str, codex_entry_key: str | None = None) -> dict:
         from ..repository import SQLitePlayerRepository
 
         player = SQLitePlayerRepository._row_to_player(row)
@@ -387,6 +413,7 @@ class EndgameRepositoryMixin:
             "ending_key": ending_key,
             "status": status,
             "fruit_key": player.dao_fruit_key,
+            "codex_entry_key": codex_entry_key or public_ending_codex_key(ending_key),
             "snapshot": player_payload,
         }
 

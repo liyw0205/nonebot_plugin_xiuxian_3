@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
@@ -447,6 +449,118 @@ def test_qq_and_onebot_choose_ascension_endings_and_freeze_writes() -> None:
                     ).fetchone()
                 assert ending == ("ascend", "ascended", f"ending-{adapter}")
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_public_ending_codex_is_frozen_across_content_closure_and_retries_atomically() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "content"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            runtime = create_runtime(data_dir=data_dir)
+            ending_cases = (
+                ("qq.official", "public-ending-ascend", "ascend", "codex.ending.public_ascend", "飞升终局"),
+                ("onebot.v11", "public-ending-remain", "remain_in_world", "codex.ending.public_remain", "留界终局"),
+            )
+            for adapter, user, ending_key, codex_key, label in ending_cases:
+                await _created(runtime, adapter, user)
+                _set_player(
+                    runtime,
+                    adapter,
+                    user,
+                    stage="cultivator",
+                    realm_key="tribulation",
+                    realm_layer=10,
+                    total_cultivation=8_998_960,
+                    endgame_status="ascension_ready",
+                    dao_fruit_key="fruit.immortal_body" if ending_key == "remain_in_world" else None,
+                )
+                chosen = await runtime.dispatch(
+                    _ctx(adapter, user, f"public-ending-{ending_key}"),
+                    f"选择结局 {'飞升' if ending_key == 'ascend' else '留界'}",
+                )
+                assert chosen.code == "ENDING_CHOSEN"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    row = connection.execute(
+                        "SELECT category, payload_json FROM codex_entries "
+                        "WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) "
+                        "AND entry_key=?",
+                        (adapter, user, codex_key),
+                    ).fetchone()
+                    assert row is not None
+                    assert row[0] == "story"
+                    assert json.loads(row[1])["label"] == label
+            await runtime.close()
+
+            entries_path = data_dir / "图鉴" / "条目.json"
+            entries = json.loads(entries_path.read_text(encoding="utf-8"))
+            for row in entries["records"]:
+                if row["key"] in {case[3] for case in ending_cases}:
+                    row["name"] = f"改名后的{row['name']}"
+                    row["status"] = "closed"
+            entries_path.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+
+            recovered = create_runtime(data_dir=data_dir)
+            for adapter, user, ending_key, codex_key, label in ending_cases:
+                replay = await recovered.dispatch(
+                    _ctx(adapter, user, f"public-ending-{ending_key}"),
+                    f"选择结局 {'飞升' if ending_key == 'ascend' else '留界'}",
+                )
+                assert replay.code == "ENDING_CHOSEN"
+                assert replay.data["idempotent_replay"] is True
+                overview = await recovered.dispatch(_ctx(adapter, user, f"codex-{ending_key}"), "我的图鉴 故事")
+                assert overview.code == "CODEX_OVERVIEW"
+                assert any(item["entry_key"] == codex_key and item["label"] == label for item in overview.data["entries"])
+            await recovered.close()
+
+            retry_data_dir = Path(temp_dir) / "retry-content"
+            shutil.copytree(Path(__file__).parents[1] / "data", retry_data_dir)
+            retry_runtime = create_runtime(data_dir=retry_data_dir)
+            adapter, user = "qq.official", "public-ending-retry"
+            await _created(retry_runtime, adapter, user)
+            _set_player(
+                retry_runtime,
+                adapter,
+                user,
+                stage="cultivator",
+                realm_key="tribulation",
+                realm_layer=10,
+                total_cultivation=8_998_960,
+                endgame_status="ascension_ready",
+            )
+            operation_id = "public-ending-transaction"
+            with sqlite3.connect(retry_runtime.settings.database_path) as connection:
+                connection.execute(
+                    """
+                    CREATE TRIGGER fail_public_ending_codex
+                    BEFORE INSERT ON codex_entries
+                    WHEN NEW.entry_key = 'codex.ending.public_ascend'
+                    BEGIN SELECT RAISE(ABORT, 'injected public ending codex failure'); END
+                    """
+                )
+            failed = await retry_runtime.dispatch(
+                _ctx(adapter, user, operation_id),
+                "选择结局 飞升",
+            )
+            assert failed.code == "PERSISTENCE_ERROR"
+            with sqlite3.connect(retry_runtime.settings.database_path) as connection:
+                player = connection.execute(
+                    "SELECT endgame_status, ending_key FROM players WHERE platform=? AND platform_user_id=?",
+                    (adapter, user),
+                ).fetchone()
+                assert player == ("ascension_ready", None)
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM endgame_endings WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                    (adapter, user),
+                ).fetchone()[0] == 0
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM operations WHERE operation_id=?", (operation_id,)
+                ).fetchone()[0] == 0
+                connection.execute("DROP TRIGGER fail_public_ending_codex")
+            retried = await retry_runtime.dispatch(_ctx(adapter, user, operation_id), "选择结局 飞升")
+            assert retried.code == "ENDING_CHOSEN"
+            await retry_runtime.close()
 
     asyncio.run(run())
 
