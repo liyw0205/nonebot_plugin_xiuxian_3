@@ -57,7 +57,6 @@ def _set_guardian_stats(data_dir: Path, *, outcome: str) -> None:
         data_dir / "战斗" / "敌人.json",
         "enemy.mist_guardian",
         stats=stats,
-        skills=[],
     )
 
 

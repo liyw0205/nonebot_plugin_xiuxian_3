@@ -47,7 +47,8 @@
       "stats": {
         "hp": 45,
         "attack": 8,
-        "initiative": 10
+        "initiative": 10,
+        "agility": 8
       },
       "skills": [
         "enemy_skill.scratch"
@@ -56,6 +57,14 @@
         "reward.battle.wood_rat"
       ],
       "codex_entry_key": "codex.creature.wood_rat",
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.wood_rat",
+        "reward": {},
+        "party_profile": {
+          "party_type": "standard_pve",
+          "reward": {"cultivation": 30, "spirit_stones": 10}
+        }
+      },
       "key": "enemy.wood_rat",
       "status": "active"
     },
@@ -118,13 +127,14 @@
         {
           "type": "realm",
           "realm_key": "qi_gathering",
-          "min_layer": 6
+          "min_layer": 4
         }
       ],
       "stats": {
         "hp": 320,
         "attack": 42,
-        "initiative": 10
+        "initiative": 10,
+        "agility": 14
       },
       "skills": [
         "enemy_skill.mist_shield"
@@ -133,6 +143,14 @@
         "reward.battle.mist_guardian"
       ],
       "codex_entry_key": "codex.creature.mist_guardian",
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.mist_guardian",
+        "reward": {},
+        "party_profile": {
+          "party_type": "standard_pve",
+          "reward": {"cultivation": 30, "spirit_stones": 10}
+        }
+      },
       "key": "enemy.mist_guardian",
       "status": "active"
     },

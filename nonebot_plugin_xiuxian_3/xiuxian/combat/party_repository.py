@@ -35,7 +35,6 @@ from ..persistence.errors import (
 from .party_models import PartyBattleReplayRecord, PartyBattleResolutionRecord, PartyBattleStartRecord
 from .party_rules import (
     PARTY_BATTLE_MAX_TURNS,
-    PARTY_BATTLE_REWARD,
     PARTY_BATTLE_TYPE,
     BOUNDARY_REALM_LOCATION,
     BOUNDARY_REALM_REWARD,
@@ -381,7 +380,9 @@ class PartyCombatRepositoryMixin:
                 enemy = enemy_definition(TIME_FORT_ENEMY)
             try:
                 if not tower_duo_party and not secret_rift_party and not ancient_domain_party and not void_ruins_party and not time_fort_party:
-                    enemy = party_enemy_for_location(str(party["location_key"]))
+                    enemy = party_enemy_for_location(
+                        str(party["location_key"]), content=self.content
+                    )
             except ValueError as exc:
                 raise PartyBattleRequirementError("party PVE is not available at this location") from exc
             snapshots: list[dict[str, Any]] = []
@@ -574,7 +575,7 @@ class PartyCombatRepositoryMixin:
                 if boundary_party
                 else {}
                 if tower_duo_party
-                else PARTY_BATTLE_REWARD
+                else enemy.party_reward
             )
             battle_id = f"party-battle-{uuid4().hex}"
             snapshot = {
@@ -1305,9 +1306,11 @@ class PartyCombatRepositoryMixin:
             ancient_domain_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_SECRET_REALM_ANCIENT
             void_ruins_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_SECRET_REALM_VOID_RUINS
             fatigue_party = cross_realm_party or secret_rift_party
+            snapshot_reward = snapshot.get("reward")
+            if not isinstance(snapshot_reward, dict):
+                raise PartyBattleRequirementError("party battle reward snapshot is invalid")
             reward_template = {
-                str(key): int(value)
-                for key, value in dict(snapshot.get("reward", {} if secret_rift_party or ancient_domain_party or void_ruins_party else BOUNDARY_REALM_REWARD if boundary_party else PARTY_BATTLE_REWARD)).items()
+                str(key): int(value) for key, value in snapshot_reward.items()
             }
             battle_members = connection.execute("SELECT * FROM party_battle_members WHERE battle_id = ? ORDER BY id", (battle_id,)).fetchall()
             state = self._json_object(session["state_json"], {})

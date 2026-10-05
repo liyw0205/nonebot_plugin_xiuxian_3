@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -34,6 +34,7 @@ class EnemyDefinition:
     skill_key: str
     random_pool: str
     reward: dict[str, int]
+    party_reward: dict[str, int] = field(default_factory=dict)
 
 
 TRAINING_DUMMY = EnemyDefinition(
@@ -438,6 +439,18 @@ def _content_enemy(key: str, content: ContentBundle) -> EnemyDefinition:
         for reward_key, amount in reward.items()
     ):
         raise ContentError(f"enemy {key} has an invalid battle reward")
+    party_profile = profile.get("party_profile", {})
+    if not isinstance(party_profile, dict):
+        raise ContentError(f"enemy {key} has an invalid party profile")
+    party_reward = party_profile.get("reward", {})
+    if not isinstance(party_reward, dict) or any(
+        not isinstance(reward_key, str)
+        or isinstance(amount, bool)
+        or not isinstance(amount, int)
+        or amount < 0
+        for reward_key, amount in party_reward.items()
+    ):
+        raise ContentError(f"enemy {key} has an invalid party reward")
     return EnemyDefinition(
         key=key,
         label=str(record["name"]),
@@ -451,6 +464,7 @@ def _content_enemy(key: str, content: ContentBundle) -> EnemyDefinition:
         skill_key=skills[0],
         random_pool=random_pool,
         reward=dict(reward),
+        party_reward=dict(party_reward),
     )
 
 

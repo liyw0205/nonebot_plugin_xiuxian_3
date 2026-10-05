@@ -1,13 +1,13 @@
-"""Pure rules for the first two-player automatic PVE session."""
+"""Pure rules for explicit automatic party PVE sessions."""
 
 from __future__ import annotations
 
-from .rules import EnemyDefinition
+from ..content import ContentBundle, ContentError, bundled_content
+from .rules import EnemyDefinition, enemy_definition
 
 
 PARTY_BATTLE_TYPE = "pve.party"
 PARTY_BATTLE_MAX_TURNS = 20
-PARTY_BATTLE_REWARD = {"cultivation": 30, "spirit_stones": 10}
 BOUNDARY_REALM_LOCATION = "cave.boundary_realm"
 BOUNDARY_REALM_ENEMY = "enemy.boundary_watcher"
 BOUNDARY_REALM_STAMINA_COST = 30
@@ -32,25 +32,41 @@ BEAST_REALM_REWARD = {
 }
 
 
-def party_enemy_for_location(location_key: str) -> EnemyDefinition:
-    from .rules import enemy_definition
-
-    if location_key == "xuantian.outskirts":
-        return enemy_definition("enemy.wood_rat")
-    if location_key == "cave.mist_grotto":
-        return enemy_definition("enemy.mist_guardian")
+def party_enemy_for_location(
+    location_key: str, *, content: ContentBundle | None = None
+) -> EnemyDefinition:
+    bundle = content if content is not None else bundled_content()
+    candidates: list[str] = []
+    for row in bundle.list("enemy", include_locked=False):
+        profile = row.get("combat_profile")
+        party_profile = profile.get("party_profile") if isinstance(profile, dict) else None
+        if (
+            row.get("location_key") == location_key
+            and isinstance(party_profile, dict)
+            and party_profile.get("party_type") == "standard_pve"
+        ):
+            key = row.get("key")
+            if not isinstance(key, str) or not key:
+                raise ContentError("standard party enemy has no stable key")
+            candidates.append(key)
+    if len(candidates) == 1:
+        enemy = enemy_definition(candidates[0], content=bundle)
+        if not enemy.party_reward:
+            raise ContentError(f"party enemy {enemy.key} has no reward")
+        return enemy
+    if len(candidates) > 1:
+        raise ContentError("standard party location has multiple enemies")
     if location_key == BOUNDARY_REALM_LOCATION:
-        return enemy_definition(BOUNDARY_REALM_ENEMY)
+        return enemy_definition(BOUNDARY_REALM_ENEMY, content=bundle)
     if location_key == DEMON_REALM_LOCATION:
-        return enemy_definition("enemy.demon_overlord")
+        return enemy_definition("enemy.demon_overlord", content=bundle)
     if location_key == BEAST_REALM_LOCATION:
-        return enemy_definition("enemy.beast_ancestor")
+        return enemy_definition("enemy.beast_ancestor", content=bundle)
     raise ValueError("party PVE is not available at this location")
 
 
 __all__ = [
     "PARTY_BATTLE_MAX_TURNS",
-    "PARTY_BATTLE_REWARD",
     "PARTY_BATTLE_TYPE",
     "BOUNDARY_REALM_ENEMY",
     "BOUNDARY_REALM_LOCATION",
