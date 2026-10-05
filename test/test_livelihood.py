@@ -430,6 +430,7 @@ def test_town_commission_shared_reward_transaction_caps_and_recovers(failure_sta
                     platform_user_id=user,
                     commission_key="town_commission.herb_supply",
                     operation_id="commission-retry",
+                    request_args=("止血草供应",),
                 )
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 state = connection.execute(

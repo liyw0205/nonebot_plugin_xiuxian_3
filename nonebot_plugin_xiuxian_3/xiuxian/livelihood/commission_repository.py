@@ -80,6 +80,7 @@ class CommissionRepositoryMixin:
         platform_user_id: str,
         commission_key: str,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> TownCommissionRecord:
         await self.initialize()
         async with self._inflight:
@@ -89,6 +90,29 @@ class CommissionRepositoryMixin:
                 platform_user_id,
                 commission_key,
                 operation_id,
+                request_args,
+            )
+
+    async def replay_commission_accept(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> TownCommissionRecord | None:
+        """Replay an acceptance before resolving its selector from current content."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._replay_commission_once,
+                platform,
+                platform_user_id,
+                operation_id,
+                request_args,
+                "livelihood.accept_commission",
+                "accepted",
             )
 
     def _accept_commission_once(
@@ -97,7 +121,21 @@ class CommissionRepositoryMixin:
         platform_user_id: str,
         commission_key: str,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> TownCommissionRecord:
+        request_args = self._coerce_request_args(request_args)
+        if len(request_args) != 1 or not request_args[0].strip():
+            raise ValueError("commission acceptance request shape is invalid")
+        replay = self._replay_commission_once(
+            platform,
+            platform_user_id,
+            operation_id,
+            request_args,
+            "livelihood.accept_commission",
+            "accepted",
+        )
+        if replay is not None:
+            return replay
         try:
             normalized_key = resolve_commission_key(commission_key, self.content)
         except ValueError as exc:
@@ -118,6 +156,9 @@ class CommissionRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
+                self._validate_payload(existing, "accepted")
+                if not self._commission_request_matches(existing, request_args, "accepted"):
+                    raise OperationConflictError("operation input differs from its original request")
                 return self._record_from_payload(existing, replay=True)
             try:
                 definition = commission_definition(normalized_key, self.content)
@@ -196,6 +237,7 @@ class CommissionRepositoryMixin:
                 status="accepted",
                 claim_id=claim_id,
                 stock_remaining=int(offer["stock_remaining"]) - 1,
+                request_args=request_args,
             )
             self._record_operation(connection, operation_id, operation_name, player["id"], request_hash, payload, now_text)
             return self._record_from_payload(payload)
@@ -207,6 +249,7 @@ class CommissionRepositoryMixin:
         platform_user_id: str,
         commission_key: str | None,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> TownCommissionRecord:
         await self.initialize()
         async with self._inflight:
@@ -216,6 +259,29 @@ class CommissionRepositoryMixin:
                 platform_user_id,
                 commission_key,
                 operation_id,
+                request_args,
+            )
+
+    async def replay_commission_deliver(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+    ) -> TownCommissionRecord | None:
+        """Replay a delivery before resolving its optional selector from current content."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._replay_commission_once,
+                platform,
+                platform_user_id,
+                operation_id,
+                request_args,
+                "livelihood.deliver_commission",
+                "delivered",
             )
 
     def _deliver_commission_once(
@@ -224,7 +290,21 @@ class CommissionRepositoryMixin:
         platform_user_id: str,
         commission_key: str | None,
         operation_id: str,
+        request_args: tuple[str, ...],
     ) -> TownCommissionRecord:
+        request_args = self._coerce_request_args(request_args)
+        if len(request_args) > 1 or any(not value.strip() for value in request_args):
+            raise ValueError("commission delivery request shape is invalid")
+        replay = self._replay_commission_once(
+            platform,
+            platform_user_id,
+            operation_id,
+            request_args,
+            "livelihood.deliver_commission",
+            "delivered",
+        )
+        if replay is not None:
+            return replay
         normalized_key = ""
         if commission_key:
             try:
@@ -242,6 +322,9 @@ class CommissionRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
+                self._validate_payload(existing, "delivered")
+                if not self._commission_request_matches(existing, request_args, "delivered"):
+                    raise OperationConflictError("operation input differs from its original request")
                 return self._record_from_payload(existing, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             if normalized_key:
@@ -333,6 +416,7 @@ class CommissionRepositoryMixin:
                 claim_id=str(claim["claim_id"]),
                 stock_remaining=int(claim["stock_remaining"]),
                 result=result,
+                request_args=request_args,
             )
             self._record_operation(connection, operation_id, operation_name, player["id"], request_hash, payload, now_text)
             return self._record_from_payload(payload)
@@ -350,8 +434,14 @@ class CommissionRepositoryMixin:
             stock = definition.stock * stock_multiplier // 100
             reward_stones = definition.reward_stones * reward_multiplier // 100
             snapshot = {
+                "commission_key": definition.key,
+                "commission_references": [definition.key, definition.label, *definition.aliases],
                 "label": definition.label,
                 "inputs": definition.inputs,
+                "input_labels": {
+                    key: (self.content or bundled_content()).label("item", key)
+                    for key in definition.inputs
+                },
                 "reward_stones": reward_stones,
                 "local_reputation": definition.local_reputation,
                 "local_reputation_key": definition.local_reputation_key,
@@ -467,6 +557,7 @@ class CommissionRepositoryMixin:
     def _snapshot(definition: TownCommissionDefinition, offer: Any, now_text: str) -> dict[str, Any]:
         snapshot = CommissionRepositoryMixin._snapshot_object(offer["snapshot_json"])
         snapshot["commission_key"] = definition.key
+        snapshot["commission_references"] = [definition.key, definition.label, *definition.aliases]
         snapshot["accepted_at"] = now_text
         snapshot["expires_at"] = str(offer["expires_at"])
         return snapshot
@@ -502,7 +593,18 @@ class CommissionRepositoryMixin:
             raise ValueError("commission snapshot must be an object")
         return dict(decoded)
 
-    def _payload(self, player: Any, offer: Any, *, snapshot: dict[str, Any], status: str, claim_id: str, stock_remaining: int, result: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _payload(
+        self,
+        player: Any,
+        offer: Any,
+        *,
+        snapshot: dict[str, Any],
+        status: str,
+        claim_id: str,
+        stock_remaining: int,
+        request_args: tuple[str, ...],
+        result: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         result = result or {}
         local_reputation = int(snapshot["local_reputation"])
         service_reputation = int(snapshot["service_reputation"])
@@ -519,10 +621,13 @@ class CommissionRepositoryMixin:
             "status": status,
             "stock_remaining": stock_remaining,
             "inputs": {str(key): int(value) for key, value in dict(snapshot.get("inputs", {})).items()},
+            "input_labels": {str(key): str(value) for key, value in dict(snapshot["input_labels"]).items()},
             "reward_stones": int(snapshot.get("reward_stones", 0)),
             "local_reputation": local_reputation,
             "service_reputation": service_reputation,
             "expires_at": str(offer["expires_at"]),
+            "request_args": list(request_args),
+            "commission_references": list(snapshot["commission_references"]),
             "result": result,
         }
 
@@ -537,12 +642,234 @@ class CommissionRepositoryMixin:
             status=str(payload["status"]),
             stock_remaining=int(payload["stock_remaining"]),
             inputs={str(key): int(value) for key, value in dict(payload.get("inputs", {})).items()},
+            input_labels={str(key): str(value) for key, value in dict(payload.get("input_labels", {})).items()},
             reward_stones=int(payload.get("reward_stones", 0)),
             local_reputation=int(payload.get("local_reputation", 0)),
             service_reputation=int(payload.get("service_reputation", 0)),
             expires_at=str(payload.get("expires_at", "")),
             already_completed=replay,
         )
+
+    @staticmethod
+    def _coerce_request_args(
+        request_args: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if not isinstance(request_args, tuple) or any(not isinstance(value, str) for value in request_args):
+            raise ValueError("commission request arguments must be strings")
+        return request_args
+
+    def _replay_commission_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        request_args: tuple[str, ...],
+        operation_name: str,
+        status: str,
+    ) -> TownCommissionRecord | None:
+        request_args = self._coerce_request_args(request_args)
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT o.operation_name, o.player_id, o.request_hash, o.result_json,
+                       p.player_id AS external_player_id, p.platform, p.platform_user_id
+                FROM operations AS o
+                JOIN players AS p ON p.id = o.player_id
+                WHERE o.operation_id = ?
+                """,
+                (operation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        if (
+            row["operation_name"] != operation_name
+            or row["platform"] != platform
+            or row["platform_user_id"] != platform_user_id
+        ):
+            raise OperationConflictError("operation input differs from its original request")
+        try:
+            payload = json.loads(row["result_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("commission operation snapshot is invalid") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("commission operation snapshot must be an object")
+        self._validate_payload(payload, status)
+        player_payload = payload["player"]
+        raw_player_id = player_payload.get("player_id")
+        raw_id = player_payload.get("id")
+        try:
+            payload_player_id = str(raw_player_id)
+            payload_id = str(raw_id)
+        except (TypeError, ValueError):
+            raise ValueError("commission operation player identity is invalid") from None
+        if (
+            isinstance(raw_player_id, bool)
+            or isinstance(raw_id, bool)
+            or not payload_player_id.strip()
+            or payload_player_id != str(row["external_player_id"])
+            or payload_id != payload_player_id
+            or player_payload.get("platform") != platform
+            or player_payload.get("platform_user_id") != platform_user_id
+        ):
+            raise ValueError("commission operation player identity is invalid")
+        request_key = payload["commission_key"] if status == "accepted" or payload["request_args"] else ""
+        expected_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "commission_key": request_key,
+            },
+        )
+        if row["request_hash"] != expected_hash:
+            raise OperationConflictError("operation input differs from its original request")
+        if not self._commission_request_matches(payload, request_args, status):
+            raise OperationConflictError("operation input differs from its original request")
+        try:
+            return self._record_from_payload(payload, replay=True)
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            raise ValueError("commission operation snapshot is invalid") from exc
+
+    @staticmethod
+    def _commission_request_matches(
+        payload: dict[str, Any],
+        request_args: tuple[str, ...],
+        status: str,
+    ) -> bool:
+        stored = payload["request_args"]
+        if len(stored) != len(request_args):
+            return False
+        if status == "accepted" and len(stored) != 1:
+            return False
+        if status == "delivered" and len(stored) > 1:
+            return False
+        if not stored:
+            return not request_args
+        return request_args[0] in set(payload["commission_references"])
+
+    @staticmethod
+    def _validate_payload(payload: dict[str, Any], status: str) -> None:
+        required = {
+            "player",
+            "claim_id",
+            "commission_id",
+            "commission_key",
+            "label",
+            "business_date",
+            "status",
+            "stock_remaining",
+            "inputs",
+            "input_labels",
+            "reward_stones",
+            "local_reputation",
+            "service_reputation",
+            "expires_at",
+            "request_args",
+            "commission_references",
+            "result",
+        }
+        if set(payload) != required:
+            raise ValueError("commission operation snapshot is incomplete")
+        if not isinstance(payload["player"], dict):
+            raise ValueError("commission operation player is invalid")
+        for key in ("claim_id", "commission_id", "commission_key", "label", "business_date", "expires_at"):
+            if not isinstance(payload[key], str) or not payload[key].strip():
+                raise ValueError("commission operation identity is invalid")
+        if payload["status"] != status:
+            raise ValueError("commission operation status is invalid")
+        for key, minimum in (
+            ("stock_remaining", 0),
+            ("reward_stones", 0),
+            ("local_reputation", 0),
+            ("service_reputation", 0),
+        ):
+            value = payload[key]
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                raise ValueError("commission operation numeric value is invalid")
+        inputs = payload["inputs"]
+        if not isinstance(inputs, dict) or not inputs or any(
+            not isinstance(key, str)
+            or not key
+            or isinstance(value, bool)
+            or not isinstance(value, int)
+            or value <= 0
+            for key, value in inputs.items()
+        ):
+            raise ValueError("commission operation inputs are invalid")
+        input_labels = payload["input_labels"]
+        if (
+            not isinstance(input_labels, dict)
+            or set(input_labels) != set(inputs)
+            or any(
+                not isinstance(key, str)
+                or not isinstance(value, str)
+                or not value.strip()
+                for key, value in input_labels.items()
+            )
+        ):
+            raise ValueError("commission operation input labels are invalid")
+        references = payload["commission_references"]
+        if (
+            not isinstance(references, list)
+            or not references
+            or any(not isinstance(value, str) or not value.strip() for value in references)
+            or payload["commission_key"] not in references
+            or payload["label"] not in references
+        ):
+            raise ValueError("commission operation references are invalid")
+        request_args = payload["request_args"]
+        if (
+            not isinstance(request_args, list)
+            or len(request_args) > 1
+            or any(not isinstance(value, str) or not value.strip() for value in request_args)
+            or status == "accepted" and len(request_args) != 1
+            or request_args and request_args[0] not in references
+        ):
+            raise ValueError("commission operation request arguments are invalid")
+        result = payload["result"]
+        if not isinstance(result, dict):
+            raise ValueError("commission operation result is invalid")
+        if status == "accepted" and result:
+            raise ValueError("commission acceptance result is invalid")
+        if status == "delivered":
+            result_required = {
+                "inputs",
+                "reward_stones",
+                "local_reputation_before",
+                "local_reputation_after",
+                "service_reputation_before",
+                "service_reputation_after",
+                "delivered_at",
+            }
+            if set(result) != result_required:
+                raise ValueError("commission delivery result is incomplete")
+            if result["inputs"] != inputs or any(
+                isinstance(result[key], bool) or not isinstance(result[key], int) or result[key] < 0
+                for key in (
+                    "reward_stones",
+                    "local_reputation_before",
+                    "local_reputation_after",
+                    "service_reputation_before",
+                    "service_reputation_after",
+                )
+            ):
+                raise ValueError("commission delivery result is invalid")
+            if (
+                result["reward_stones"] != payload["reward_stones"]
+                or result["local_reputation_after"] - result["local_reputation_before"]
+                != payload["local_reputation"]
+                or result["service_reputation_after"] - result["service_reputation_before"]
+                != payload["service_reputation"]
+            ):
+                raise ValueError("commission delivery result is inconsistent")
+            try:
+                datetime.fromisoformat(result["delivered_at"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("commission delivery timestamp is invalid") from exc
+        try:
+            datetime.fromisoformat(payload["expires_at"])
+        except ValueError as exc:
+            raise ValueError("commission operation timestamp is invalid") from exc
 
     @staticmethod
     def _operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
@@ -554,7 +881,13 @@ class CommissionRepositoryMixin:
             return None
         if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return json.loads(existing["result_json"])
+        try:
+            payload = json.loads(existing["result_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("commission operation result is invalid") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("commission operation result must be an object")
+        return payload
 
     @staticmethod
     def _record_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:

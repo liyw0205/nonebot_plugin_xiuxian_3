@@ -64,6 +64,7 @@ class TownCommissionRecord:
     status: str
     stock_remaining: int
     inputs: dict[str, int] = field(default_factory=dict)
+    input_labels: dict[str, str] = field(default_factory=dict)
     reward_stones: int = 0
     local_reputation: int = 0
     service_reputation: int = 0

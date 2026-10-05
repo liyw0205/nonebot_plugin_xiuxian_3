@@ -386,16 +386,32 @@ class LivelihoodApplication:
         return CommandResult(True, "COMMISSION_LIST", "\n".join(lines).rstrip(), context.request_id, data={"commissions": data})
 
     async def accept_commission(self, context: CommandContext) -> CommandResult:
+        operation_id = self._operation_id(context, "livelihood.accept_commission")
+        try:
+            replay = await self.repository.replay_commission_accept(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+                request_args=context.command_args,
+            )
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "仙缘簿中已记有另一项委托，请重新传讯。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if replay is not None:
+            return self._accepted_commission_result(context, operation_id, replay)
         key = self._resolve_commission(context.command_args)
         if key is None:
             return CommandResult(False, "INVALID_COMMISSION", "请使用 `接取委托 <订单名>`，订单名可从 `城镇委托` 查询。", context.request_id)
-        operation_id = self._operation_id(context, "livelihood.accept_commission")
         try:
             record = await self.repository.accept_commission(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 commission_key=key,
                 operation_id=operation_id,
+                request_args=context.command_args,
             )
         except CommissionNotFoundError:
             return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该城镇委托今天未开放。", context.request_id, operation_id)
@@ -419,30 +435,35 @@ class LivelihoodApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        content = self.repository.content or bundled_content()
-        inputs = "、".join(
-            f"{content.label('item', key)} ×{value}" for key, value in record.inputs.items()
-        )
-        return CommandResult(
-            True,
-            "COMMISSION_ACCEPTED",
-            f"## 委托已接取\n\n**{record.label}**已记入委托簿，备齐所需物品即可交付。\n\n- **需求**：{inputs}\n- **截止**：{record.expires_at}\n- **剩余库存**：{record.stock_remaining}",
-            context.request_id,
-            operation_id,
-            data={"claim_id": record.claim_id, "commission_id": record.commission_id, "commission_key": record.commission_key, "status": record.status, "stock_remaining": record.stock_remaining, "idempotent_replay": record.already_completed},
-        )
+        return self._accepted_commission_result(context, operation_id, record)
 
     async def deliver_commission(self, context: CommandContext) -> CommandResult:
+        operation_id = self._operation_id(context, "livelihood.deliver_commission")
+        try:
+            replay = await self.repository.replay_commission_deliver(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+                request_args=context.command_args,
+            )
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "仙缘簿中已记有另一项委托，请重新传讯。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        if replay is not None:
+            return self._delivered_commission_result(context, operation_id, replay)
         key = self._resolve_commission(context.command_args, required=False)
         if len(context.command_args) > 1 or (context.command_args and key is None):
             return CommandResult(False, "INVALID_COMMISSION", "可用 `交付委托 [订单名]`。", context.request_id)
-        operation_id = self._operation_id(context, "livelihood.deliver_commission")
         try:
             record = await self.repository.deliver_commission(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 commission_key=key,
                 operation_id=operation_id,
+                request_args=context.command_args,
             )
         except CommissionNotAcceptedError:
             return CommandResult(False, "COMMISSION_NOT_ACCEPTED", "没有可交付的城镇委托。", context.request_id, operation_id)
@@ -464,6 +485,23 @@ class LivelihoodApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return self._delivered_commission_result(context, operation_id, record)
+
+    def _accepted_commission_result(self, context: CommandContext, operation_id: str, record) -> CommandResult:
+        inputs = "、".join(
+            f"{record.input_labels[key]} ×{value}" for key, value in record.inputs.items()
+        )
+        return CommandResult(
+            True,
+            "COMMISSION_ACCEPTED",
+            f"## 委托已接取\n\n**{record.label}**已记入委托簿，备齐所需物品即可交付。\n\n- **需求**：{inputs}\n- **截止**：{record.expires_at}\n- **剩余库存**：{record.stock_remaining}",
+            context.request_id,
+            operation_id,
+            data={"claim_id": record.claim_id, "commission_id": record.commission_id, "commission_key": record.commission_key, "status": record.status, "stock_remaining": record.stock_remaining, "idempotent_replay": record.already_completed},
+        )
+
+    @staticmethod
+    def _delivered_commission_result(context: CommandContext, operation_id: str, record) -> CommandResult:
         return CommandResult(
             True,
             "COMMISSION_DELIVERED",

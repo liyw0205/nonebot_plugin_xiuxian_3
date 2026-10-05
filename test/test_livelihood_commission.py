@@ -138,6 +138,116 @@ def test_commission_snapshot_survives_content_change_restart_and_conflict(
 
 
 @pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_commission_replays_original_selector_after_content_identity_changes(
+    tmp_path: Path, adapter: str,
+) -> None:
+    async def run() -> None:
+        data_dir = _content(tmp_path)
+        clock = MutableClock()
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
+        base = CommandContext(adapter=adapter, user_id="commission-identity-replay")
+
+        async def send(operation: str, text: str):
+            return await runtime.adapters.dispatch(
+                adapter, replace(base, operation_id=operation), text
+            )
+
+        assert (await send("create", "开始修仙")).ok
+        assert (await send("seek", "寻仙问道")).ok
+        accepted = await send("accept-old-alias", "接取委托 草药供应")
+        delivered = await send("deliver-old-alias", "交付委托 草药供应")
+        assert accepted.code == "COMMISSION_ACCEPTED"
+        assert delivered.code == "COMMISSION_DELIVERED"
+        await runtime.close()
+
+        path = data_dir / "生活" / "生活.json"
+        content = json.loads(path.read_text(encoding="utf-8"))
+        herb = next(row for row in content["records"] if row["key"] == "town_commission.herb_supply")
+        herb["name"] = "新名委托"
+        herb["aliases"] = []
+        herb["status"] = "locked"
+        path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
+        replay_accept = await send("accept-old-alias", "接取委托 草药供应")
+        replay_deliver = await send("deliver-old-alias", "交付委托 草药供应")
+        conflict = await send("deliver-old-alias", "交付委托")
+        assert replay_accept.data["idempotent_replay"] is True
+        assert replay_deliver.data["idempotent_replay"] is True
+        assert conflict.code == "OPERATION_CONFLICT"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            player_id, stones, inventory = connection.execute(
+                "SELECT id, spirit_stones, inventory_json FROM players "
+                "WHERE platform=? AND platform_user_id=?",
+                (adapter, base.user_id),
+            ).fetchone()
+            operation_count = connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE player_id=?", (player_id,)
+            ).fetchone()[0]
+        assert stones == 118
+        assert json.loads(inventory) == {"item.food.coarse_spirit_rice": 3}
+        assert operation_count == 4
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_commission_bad_operation_snapshot_is_read_only_until_repaired(
+    tmp_path: Path, adapter: str,
+) -> None:
+    async def run() -> None:
+        data_dir = _content(tmp_path)
+        clock = MutableClock()
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
+        base = CommandContext(adapter=adapter, user_id="commission-bad-operation")
+
+        async def send(operation: str, text: str):
+            return await runtime.adapters.dispatch(
+                adapter, replace(base, operation_id=operation), text
+            )
+
+        assert (await send("create", "开始修仙")).ok
+        assert (await send("seek", "寻仙问道")).ok
+        accepted = await send("accept", "接取委托 草药供应")
+        assert accepted.ok
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            player_id, before = connection.execute(
+                "SELECT id, spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, base.user_id),
+            ).fetchone()
+            result_json = connection.execute(
+                "SELECT result_json FROM operations WHERE operation_id=?", ("accept",)
+            ).fetchone()[0]
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id=?", ("[]", "accept")
+            )
+
+        failed = await send("accept", "接取委托 草药供应")
+        assert failed.code == "PERSISTENCE_ERROR"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            after, claim_status, operation_count = connection.execute(
+                "SELECT p.spirit_stones, c.status, "
+                "(SELECT COUNT(*) FROM operations WHERE operation_id=?) "
+                "FROM players p JOIN town_commission_claims c ON c.player_id=p.id "
+                "WHERE p.id=? ORDER BY c.id DESC LIMIT 1",
+                ("accept", player_id),
+            ).fetchone()
+        assert (after, claim_status, operation_count) == (before, "accepted", 1)
+
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id=?",
+                (result_json, "accept"),
+            )
+        repaired = await send("accept", "接取委托 草药供应")
+        assert repaired.data["idempotent_replay"] is True
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
 @pytest.mark.parametrize("change", ["locked_location", "missing_cap", "locked_commission", "different_location"])
 def test_frozen_commission_can_finish_and_replay_after_content_changes(
     tmp_path: Path, adapter: str, change: str,
@@ -286,6 +396,7 @@ def test_commission_invalid_stored_reputation_rolls_back_assets(tmp_path: Path, 
             await runtime.repository.deliver_commission(
                 platform=base.adapter, platform_user_id=base.user_id,
                 commission_key="town_commission.herb_supply", operation_id="bad-deliver",
+                request_args=("止血草供应",),
             )
         with sqlite3.connect(runtime.settings.database_path) as connection:
             after = connection.execute(
