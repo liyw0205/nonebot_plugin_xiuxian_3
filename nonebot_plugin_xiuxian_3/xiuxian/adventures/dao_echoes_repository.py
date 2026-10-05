@@ -18,12 +18,13 @@ from ..persistence.errors import (
 )
 from .dao_echoes import (
     DAO_ECHOES_LANES,
-    DAO_ECHOES_LANE_LABELS,
-    DAO_ECHOES_STAGES,
     DAO_ECHOES_STORY_KEY,
     DaoEchoesStage,
     dao_echoes_definition,
+    dao_echoes_definitions,
+    dao_echoes_lane_labels,
 )
+from .mainline import meets_realm
 from .dao_echoes_models import DaoEchoesLaneProgress, DaoEchoesStatusRecord
 from .mainline_models import MainlineClaimRecord, MainlineStageView, MainlineStartRecord
 
@@ -64,9 +65,11 @@ class DaoEchoesRepositoryMixin:
         }
         stages: list[MainlineStageView] = []
         progress: list[DaoEchoesLaneProgress] = []
+        definitions = dao_echoes_definitions(self.content)
+        lane_labels = dao_echoes_lane_labels(self.content)
         for lane in DAO_ECHOES_LANES:
             lane_definitions = tuple(
-                stage for stage in DAO_ECHOES_STAGES if stage.lane == lane
+                stage for stage in definitions if stage.lane == lane
             )
             lane_completed = 0
             next_stage: int | None = None
@@ -88,7 +91,7 @@ class DaoEchoesRepositoryMixin:
                 elif claimed:
                     status = "claimed"
                 elif DaoEchoesRepositoryMixin._dao_echoes_prerequisites_met(
-                    definition, completed, str(player["realm_key"]), int(player["realm_layer"])
+                    definition, completed, str(player["realm_key"]), int(player["realm_layer"]), self.content
                 ):
                     status = "available"
                 else:
@@ -99,7 +102,7 @@ class DaoEchoesRepositoryMixin:
                         story_key=DAO_ECHOES_STORY_KEY,
                         chapter=1,
                         stage=definition.stage,
-                        label=f"{DAO_ECHOES_LANE_LABELS[lane]}·{definition.label}",
+                        label=f"{lane_labels[lane]}·{definition.label}",
                         description=definition.description,
                         status=status,
                         first_clear_reward={definition.codex_flag: 1},
@@ -128,8 +131,15 @@ class DaoEchoesRepositoryMixin:
         completed: set[str],
         realm_key: str,
         realm_layer: int,
+        content=None,
     ) -> bool:
-        if realm_key != "void_refining" or realm_layer < 10:
+        if not meets_realm(
+            realm_key,
+            realm_layer,
+            definition.required_realm,
+            definition.required_layer,
+            content,
+        ):
             return False
         return all(prerequisite in completed for prerequisite in definition.prerequisites)
 
@@ -142,7 +152,7 @@ class DaoEchoesRepositoryMixin:
         stage: int | str,
         operation_id: str,
     ) -> MainlineStartRecord:
-        definition = dao_echoes_definition(lane, stage)
+        definition = dao_echoes_definition(lane, stage, self.content)
         await self.initialize()
         async with self._inflight:
             last_error: Exception | None = None
@@ -200,6 +210,7 @@ class DaoEchoesRepositoryMixin:
                 completed,
                 str(player["realm_key"]),
                 int(player["realm_layer"]),
+                self.content,
             ):
                 raise MainlineRequirementError("dao echoes prerequisites are not met")
             run = connection.execute(
@@ -216,9 +227,14 @@ class DaoEchoesRepositoryMixin:
                 raise MainlineAlreadyRunningError("dao echoes stage is already running")
             repeat_pending = bool(run is not None and run["first_clear_claimed"])
             first_clear_key = f"{DAO_ECHOES_STORY_KEY}:{definition.key}:{player['id']}"
+            lane_label = dao_echoes_lane_labels(self.content)[definition.lane or ""]
             snapshot = {
                 "lane": definition.lane,
+                "lane_label": lane_label,
                 "stage_key": definition.key,
+                "label": definition.label,
+                "description": definition.description,
+                "codex_flag": definition.codex_flag,
                 "realm_key": str(player["realm_key"]),
                 "realm_layer": int(player["realm_layer"]),
                 "location_key": str(player["location_key"]),
@@ -266,7 +282,7 @@ class DaoEchoesRepositoryMixin:
                 "stage_key": definition.key,
                 "status": "running",
                 "first_clear": not repeat_pending,
-                "label": f"{DAO_ECHOES_LANE_LABELS[definition.lane]}·{definition.label}",
+                "label": f"{lane_label}·{definition.label}",
                 "description": definition.description,
             }
             self._record_dao_echoes_operation(
@@ -284,7 +300,7 @@ class DaoEchoesRepositoryMixin:
         stage: int | str,
         operation_id: str,
     ) -> MainlineClaimRecord:
-        definition = dao_echoes_definition(lane, stage)
+        definition = dao_echoes_definition(lane, stage, self.content)
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
@@ -333,14 +349,31 @@ class DaoEchoesRepositoryMixin:
             ):
                 raise MainlineNotStartedError("dao echoes stage has not been started")
             first_clear = not bool(run["first_clear_claimed"])
-            reward = {definition.codex_flag: 1} if first_clear else {}
+            snapshot_label = run_snapshot.get("label")
+            snapshot_lane_label = run_snapshot.get("lane_label")
+            snapshot_description = run_snapshot.get("description")
+            snapshot_codex_flag = run_snapshot.get("codex_flag")
+            if any(
+                not isinstance(value, str) or not value.strip()
+                for value in (
+                    snapshot_label,
+                    snapshot_lane_label,
+                    snapshot_description,
+                    snapshot_codex_flag,
+                )
+            ) or (
+                run_snapshot.get("stage_key") != definition.key
+                or run_snapshot.get("lane") != definition.lane
+            ):
+                raise ValueError("dao echoes snapshot is missing frozen content")
+            reward = {snapshot_codex_flag: 1} if first_clear else {}
             connection.execute(
                 "UPDATE mainline_runs SET status='reward_pending', updated_at=? WHERE id=?",
                 (now_text, run["id"]),
             )
             event_keys = [f"{DAO_ECHOES_STORY_KEY}:{definition.key}"]
             if first_clear:
-                event_keys.append(definition.codex_flag)
+                event_keys.append(snapshot_codex_flag)
             for event_key in event_keys:
                 connection.execute(
                     """
@@ -392,7 +425,7 @@ class DaoEchoesRepositoryMixin:
                 "status": "claimed",
                 "reward": reward,
                 "first_clear": first_clear,
-                "label": f"{DAO_ECHOES_LANE_LABELS[definition.lane]}·{definition.label}",
+                "label": f"{snapshot_lane_label}·{snapshot_label}",
                 "source_operation_id": operation_id,
             }
             self._record_dao_echoes_operation(

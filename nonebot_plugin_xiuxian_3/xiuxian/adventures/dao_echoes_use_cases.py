@@ -14,7 +14,12 @@ from ..persistence.errors import (
     RepositoryBusyError,
 )
 from ..repository import SQLitePlayerRepository
-from .dao_echoes import DAO_ECHOES_LANE_LABELS, dao_echoes_definition, resolve_dao_echoes_lane
+from .dao_echoes import (
+    DAO_ECHOES_STORY_KEY,
+    dao_echoes_definition,
+    dao_echoes_lane_labels,
+    resolve_dao_echoes_lane,
+)
 
 
 class DaoEchoesApplication:
@@ -28,13 +33,12 @@ class DaoEchoesApplication:
         request_key = context.message_id or context.request_id
         return f"{operation_name}:{context.adapter}:{context.user_id}:{request_key}"
 
-    @staticmethod
-    def _args(context: CommandContext) -> tuple[str, int] | None:
+    def _args(self, context: CommandContext) -> tuple[str, int] | None:
         if len(context.command_args) != 2:
             return None
-        lane = resolve_dao_echoes_lane(context.command_args[0])
+        lane = resolve_dao_echoes_lane(context.command_args[0], self.repository.content)
         try:
-            definition = dao_echoes_definition(lane or "", context.command_args[1])
+            definition = dao_echoes_definition(lane or "", context.command_args[1], self.repository.content)
         except ValueError:
             return None
         return definition.lane, definition.stage
@@ -56,14 +60,15 @@ class DaoEchoesApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         lines = ["## 三界回响", ""]
+        lane_labels = dao_echoes_lane_labels(self.repository.content)
         lanes: list[dict[str, object]] = []
         for item in record.lanes:
             next_text = f"，下一关 {item.next_stage:02d}" if item.next_stage is not None else "，本线已完成"
-            lines.append(f"- **{DAO_ECHOES_LANE_LABELS[item.lane]}**：{item.completed}/{item.total}{next_text}")
+            lines.append(f"- **{lane_labels[item.lane]}**：{item.completed}/{item.total}{next_text}")
             lanes.append(
                 {
                     "lane": item.lane,
-                    "label": DAO_ECHOES_LANE_LABELS[item.lane],
+                    "label": lane_labels[item.lane],
                     "completed": item.completed,
                     "total": item.total,
                     "next_stage": item.next_stage,
@@ -81,7 +86,7 @@ class DaoEchoesApplication:
             "\n".join(lines),
             context.request_id,
             data={
-                "story_key": "story.mainline.dao_echoes",
+                "story_key": DAO_ECHOES_STORY_KEY,
                 "lanes": lanes,
                 "stages": [
                     {

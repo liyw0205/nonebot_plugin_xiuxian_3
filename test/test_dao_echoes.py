@@ -2,16 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 from tempfile import TemporaryDirectory
+from pathlib import Path
+
+import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.xiuxian.adventures.dao_echoes import (
     DAO_ECHOES_LANES,
-    DAO_ECHOES_STAGES,
     DAO_ECHOES_STORY_KEY,
     dao_echoes_definition,
+    dao_echoes_definitions,
 )
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
+from nonebot_plugin_xiuxian_3.xiuxian.adventures.dao_echoes import dao_echoes_definitions
 
 
 def _context(operation_id: str) -> CommandContext:
@@ -19,17 +25,18 @@ def _context(operation_id: str) -> CommandContext:
 
 
 def test_dao_echoes_contract_has_three_sequential_ten_stage_lanes() -> None:
-    assert len(DAO_ECHOES_STAGES) == 30
-    assert tuple(dict.fromkeys(stage.lane for stage in DAO_ECHOES_STAGES)) == DAO_ECHOES_LANES
+    stages = dao_echoes_definitions()
+    assert len(stages) == 30
+    assert tuple(dict.fromkeys(stage.lane for stage in stages)) == DAO_ECHOES_LANES
     for lane in DAO_ECHOES_LANES:
-        stages = [stage for stage in DAO_ECHOES_STAGES if stage.lane == lane]
-        assert [stage.stage for stage in stages] == list(range(1, 11))
-        assert stages[0].prerequisites == ()
+        lane_stages = [stage for stage in stages if stage.lane == lane]
+        assert [stage.stage for stage in lane_stages] == list(range(1, 11))
+        assert lane_stages[0].prerequisites == ()
         assert all(
             stage.prerequisites == (f"lane.{lane}.chapter.{stage.stage - 1:02d}",)
-            for stage in stages[1:]
+            for stage in lane_stages[1:]
         )
-        assert len({stage.codex_flag for stage in stages}) == 10
+        assert len({stage.codex_flag for stage in lane_stages}) == 10
     assert dao_echoes_definition("建设者", "01").key == "lane.builder.chapter.01"
     assert dao_echoes_definition("traveler", 10).key == "lane.traveler.chapter.10"
 
@@ -130,3 +137,80 @@ def test_dao_echoes_all_stages_produce_mainline_qualification_evidence() -> None
             await runtime.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_dao_echoes_content_snapshot_and_close_are_adapter_consistent(
+    tmp_path: Path, adapter: str
+) -> None:
+    source = Path(__file__).parents[1] / "data"
+    data_dir = tmp_path / adapter.replace(".", "-")
+    shutil.copytree(source, data_dir)
+    mainline_path = data_dir / "剧情" / "主线.json"
+    document = json.loads(mainline_path.read_text(encoding="utf-8"))
+    first = next(row for row in document["records"] if row["key"] == "lane.builder.chapter.01")
+    for row in document["records"]:
+        if row["key"].startswith("lane.builder."):
+            row["lane_name"] = "新名建设者"
+    first["name"] = "新碑初校"
+    first["desc"] = "你以新法校正旧碑，三界道路重新显出脉络。"
+    mainline_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    user = f"dao-snapshot-{adapter}"
+
+    async def run() -> None:
+        runtime = create_runtime(data_dir=data_dir)
+        context = lambda operation_id: CommandContext(
+            adapter=adapter, user_id=user, operation_id=f"{adapter}:{operation_id}"
+        )
+        assert (await runtime.adapters.dispatch(adapter, context("create"), "开始修仙")).ok
+        assert (await runtime.adapters.dispatch(adapter, context("seek"), "寻仙问道")).ok
+        with runtime.repository._connect() as connection:
+            connection.execute(
+                "UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=10 "
+                "WHERE platform=? AND platform_user_id=?",
+                (adapter, user),
+            )
+        started = await runtime.adapters.dispatch(
+            adapter, context("start"), "开始道源主线 builder 1"
+        )
+        assert started.ok
+        assert "新名建设者·新碑初校" in started.message
+        await runtime.close()
+
+        document = json.loads(mainline_path.read_text(encoding="utf-8"))
+        first = next(row for row in document["records"] if row["key"] == "lane.builder.chapter.01")
+        first["status"] = "locked"
+        for row in document["records"]:
+            if row["key"].startswith("lane.builder."):
+                row["lane_name"] = "闭关建设者"
+        first["name"] = "不应覆盖旧快照"
+        mainline_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        restored = create_runtime(data_dir=data_dir)
+        claimed = await restored.adapters.dispatch(
+            adapter, context("claim"), "领取道源主线奖励 builder 1"
+        )
+        assert claimed.ok
+        assert "新名建设者·新碑初校" in claimed.message
+        closed = await restored.adapters.dispatch(
+            adapter, context("start-closed"), "开始道源主线 builder 1"
+        )
+        assert closed.code == "CONTENT_CLOSED"
+        await restored.close()
+
+    asyncio.run(run())
+
+
+def test_dao_echoes_rejects_incomplete_lane_contract(tmp_path: Path) -> None:
+    source = Path(__file__).parents[1] / "data"
+    data_dir = tmp_path / "broken-content"
+    shutil.copytree(source, data_dir)
+    mainline_path = data_dir / "剧情" / "主线.json"
+    document = json.loads(mainline_path.read_text(encoding="utf-8"))
+    document["records"] = [
+        row for row in document["records"] if row["key"] != "lane.traveler.chapter.10"
+    ]
+    mainline_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    with pytest.raises(ContentError, match="exactly 30"):
+        dao_echoes_definitions(ContentBundle.load(data_dir))

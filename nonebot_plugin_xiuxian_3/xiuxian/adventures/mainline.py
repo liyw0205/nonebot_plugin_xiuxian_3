@@ -50,6 +50,17 @@ class MainlineStageDefinition:
     aliases: tuple[str, ...] = ()
     reputation_key: str | None = None
     local_reputation_maximum: int | None = None
+    lane: str | None = None
+    lane_label: str | None = None
+
+    @property
+    def codex_flag(self) -> str:
+        """Return the single codex entry declared by a first-clear reward."""
+
+        flags = tuple(key for key, value in self.first_clear_reward if key.startswith("codex.") and value == 1)
+        if len(flags) != 1:
+            raise ValueError(f"mainline stage {self.key} does not declare one codex flag")
+        return flags[0]
 
     def first_clear_reward_map(self) -> dict[str, int | str]:
         return dict(self.first_clear_reward)
@@ -97,9 +108,17 @@ def _string_tuple(value: object, field: str, key: str) -> tuple[str, ...]:
     return tuple(str(item).strip() for item in value)
 
 
-def _reward_map(bundle: ContentBundle, value: object, field: str, key: str) -> tuple[tuple[str, int | str], ...]:
-    if not isinstance(value, dict) or not value:
-        raise ContentError(f"mainline {key} {field} must be a non-empty object")
+def _reward_map(
+    bundle: ContentBundle,
+    value: object,
+    field: str,
+    key: str,
+    *,
+    allow_empty: bool = False,
+) -> tuple[tuple[str, int | str], ...]:
+    if not isinstance(value, dict) or (not allow_empty and not value):
+        expected = "object" if allow_empty else "non-empty object"
+        raise ContentError(f"mainline {key} {field} must be an {expected}")
     result: list[tuple[str, int | str]] = []
     for reward_key, reward_value in value.items():
         if not isinstance(reward_key, str) or not reward_key:
@@ -181,6 +200,12 @@ def mainline_definitions(
         if isinstance(required_layer, bool) or not isinstance(required_layer, int) or required_layer < 0:
             raise ContentError(f"mainline {key} required_layer must be a non-negative integer")
         aliases = _string_tuple(row.get("aliases", []), "aliases", key)
+        lane = row.get("lane")
+        if lane is not None and (not isinstance(lane, str) or not lane.strip()):
+            raise ContentError(f"mainline {key} lane must be a non-empty string")
+        lane_label = row.get("lane_name")
+        if lane_label is not None and (not isinstance(lane_label, str) or not lane_label.strip()):
+            raise ContentError(f"mainline {key} lane_name must be a non-empty string")
         runtime_status = row.get("status", "locked")
         if runtime_status not in {"open", "active", "locked"}:
             raise ContentError(f"mainline {key} has unsupported status {runtime_status}")
@@ -188,7 +213,9 @@ def mainline_definitions(
         if reputation_key is not None and (not isinstance(reputation_key, str) or not reputation_key.strip()):
             raise ContentError(f"mainline {key} reputation_key must be a non-empty string")
         first_clear_reward = _reward_map(bundle, row.get("first_clear_reward"), "first_clear_reward", key)
-        repeat_reward = _reward_map(bundle, row.get("repeat_reward"), "repeat_reward", key)
+        repeat_reward = _reward_map(
+            bundle, row.get("repeat_reward"), "repeat_reward", key, allow_empty=True
+        )
         if ("local_reputation" in dict(first_clear_reward) or "local_reputation" in dict(repeat_reward)) and reputation_key is None:
             raise ContentError(f"mainline {key} requires reputation_key for local_reputation")
         definitions.append(
@@ -208,6 +235,8 @@ def mainline_definitions(
                 runtime_status="open" if runtime_status == "active" else str(runtime_status),
                 aliases=aliases,
                 reputation_key=reputation_key,
+                lane=lane.strip() if isinstance(lane, str) else None,
+                lane_label=lane_label.strip() if isinstance(lane_label, str) else None,
             )
         )
     definitions.sort(key=lambda item: (item.chapter, item.stage, item.key))

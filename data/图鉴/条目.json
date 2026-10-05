@@ -1464,6 +1464,216 @@
       "desc": "妖界群山连绵，兽迹与药香交错；抵达后方能辨认山中栖地与旧日灵脉。",
       "category": "place",
       "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.01",
+      "name": "建设者·检校旧碑",
+      "desc": "完成道源主线后，三界道路的旧碑见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.02",
+      "name": "建设者·补绘河图",
+      "desc": "完成道源主线后，三界共用地图的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.03",
+      "name": "建设者·修复灵脉",
+      "desc": "完成道源主线后，灵脉节点的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.04",
+      "name": "建设者·搭建互市",
+      "desc": "完成道源主线后，三界互市的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.05",
+      "name": "建设者·重立界标",
+      "desc": "完成道源主线后，新界标的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.06",
+      "name": "建设者·补缀界壁",
+      "desc": "完成道源主线后，修补界壁的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.07",
+      "name": "建设者·汇合三源",
+      "desc": "完成道源主线后，道源校验印的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.08",
+      "name": "建设者·立约共修",
+      "desc": "完成道源主线后，三界共修的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.09",
+      "name": "建设者·回望代价",
+      "desc": "完成道源主线后，工程代价的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.builder.chapter.10",
+      "name": "建设者·道统新章",
+      "desc": "完成道源主线后，道统新章的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.01",
+      "name": "见证者·收录旧誓",
+      "desc": "完成道源主线后，三界旧誓的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.02",
+      "name": "见证者·听取三界",
+      "desc": "完成道源主线后，三界陈述的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.03",
+      "name": "见证者·辨清旧争",
+      "desc": "完成道源主线后，旧争档案的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.04",
+      "name": "见证者·见证守卫",
+      "desc": "完成道源主线后，边境守卫的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.05",
+      "name": "见证者·见证互助",
+      "desc": "完成道源主线后，跨界互助的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.06",
+      "name": "见证者·核验盟约",
+      "desc": "完成道源主线后，盟约履行的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.07",
+      "name": "见证者·保留异议",
+      "desc": "完成道源主线后，未署盟约意见的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.08",
+      "name": "见证者·确认代价",
+      "desc": "完成道源主线后，停战合作代价的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.09",
+      "name": "见证者·保存全录",
+      "desc": "完成道源主线后，三界档案副本的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.witness.chapter.10",
+      "name": "见证者·不替众人选择",
+      "desc": "完成道源主线后，共同结局记录的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.01",
+      "name": "远行者·走访玄天",
+      "desc": "完成道源主线后，玄天旧路的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.02",
+      "name": "远行者·渡过魔土",
+      "desc": "完成道源主线后，魔界行路的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.03",
+      "name": "远行者·寻访妖庭",
+      "desc": "完成道源主线后，妖界访行的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.04",
+      "name": "远行者·巡查界隙",
+      "desc": "完成道源主线后，界隙巡查的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.05",
+      "name": "远行者·抵达档案",
+      "desc": "完成道源主线后，虚空档案遗迹的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.06",
+      "name": "远行者·重返三界",
+      "desc": "完成道源主线后，三界路线副本的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.07",
+      "name": "远行者·交接道路",
+      "desc": "完成道源主线后，道路交接的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.08",
+      "name": "远行者·携行消息",
+      "desc": "完成道源主线后，三界消息往来的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.09",
+      "name": "远行者·拒绝捷径",
+      "desc": "完成道源主线后，守规行路的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.dao_echoes.traveler.chapter.10",
+      "name": "远行者·归来开篇",
+      "desc": "完成道源主线后，后来者续写道路的见闻收入图鉴。",
+      "category": "story",
+      "status": "active"
     }
   ]
 }
