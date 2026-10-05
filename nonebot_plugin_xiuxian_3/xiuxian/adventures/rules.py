@@ -135,7 +135,7 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
                     ) from exc
             elif target_kind == "dispatch_successes":
                 try:
-                    resolved_dispatch = resolve_dispatch(target_key)
+                    resolved_dispatch = resolve_dispatch(target_key, bundle)
                 except ValueError as exc:
                     raise ContentError(
                         f"bounty {key} references unknown dispatch {target_key}"

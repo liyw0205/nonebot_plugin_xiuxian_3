@@ -69,6 +69,148 @@
       "status": "active"
     },
     {
+      "name": "城镇送货",
+      "desc": "替镇中商铺护送货物，沿途积攒灵石与青石镇名望。",
+      "aliases": ["送货", "镇中送货"],
+      "duration_seconds": 1800,
+      "daily_limit": 3,
+      "cost": {"stamina": 3},
+      "risk_pool": "dispatch.town",
+      "requirements": {"stage": "mortal"},
+      "risk": {
+        "weights": {"success": 7500, "delayed": 1500, "partial": 1000}
+      },
+      "rewards": {
+        "success": {"spirit_stones": 30, "local.xuantian.new_town": 3},
+        "partial": {"spirit_stones": 15, "local.xuantian.new_town": 1}
+      },
+      "key": "dispatch.town_delivery",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "药材搜寻",
+      "desc": "替药铺寻回近郊灵草，积累草木见闻。",
+      "aliases": ["搜寻药材", "寻药"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 4},
+      "risk_pool": "dispatch.herb",
+      "requirements": {"stage": "mortal", "intro_flag": "guide.gather_blood_grass"},
+      "risk": {
+        "weights": {"success": 7000, "partial": 2000, "failed": 1000}
+      },
+      "failure_refunds": {"stamina": 2},
+      "rewards": {
+        "success": {
+          "item.herb.blood_grass": {"quantity_range": [3, 5]},
+          "item.herb.spirit_leaf": {"quantity_range": [0, 1]},
+          "codex.dispatch.herb_search": 1
+        },
+        "partial": {"item.herb.blood_grass": {"quantity_range": [1, 2]}}
+      },
+      "key": "dispatch.herb_search",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "作坊帮工",
+      "desc": "在作坊照看炉火与阵材，换取灵石和工匠信任。",
+      "aliases": ["作坊帮忙", "帮工"],
+      "duration_seconds": 7200,
+      "daily_limit": 2,
+      "cost": {"energy": 4, "item.mat.wood": 2},
+      "risk_pool": "dispatch.workshop",
+      "requirements": {"stage": "mortal", "intro_flag": "guide.choose_service"},
+      "risk": {
+        "weights": {"success": 6500, "delayed": 2000, "failed": 1500}
+      },
+      "failure_refunds": {"item.mat.wood": 1},
+      "rewards": {
+        "success": {
+          "spirit_stones": 45,
+          "service_reputation": 2,
+          "item.mat.array_sand": {"quantity_range": [1, 2]}
+        }
+      },
+      "key": "dispatch.workshop_help",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "魔界救援",
+      "desc": "将药材与灵米送往魔界商路，替受困行旅解围。",
+      "aliases": ["魔界援助"],
+      "duration_seconds": 14400,
+      "daily_limit": 3,
+      "cost": {"item.herb.blood_grass": 2, "item.food.coarse_spirit_rice": 2},
+      "risk_pool": "dispatch.demon_relief",
+      "requirements": {"stage": "mortal", "required_permit": "permit.demon_trade"},
+      "required_permit": "permit.demon_trade",
+      "risk": {
+        "weights": {"success": 7000, "partial": 2000, "failed": 1000}
+      },
+      "failure_refunds": {"item.herb.blood_grass": 1, "item.food.coarse_spirit_rice": 1},
+      "rewards": {
+        "success": {"local.demon.abyss_market": 6, "codex.story.dispatch_demon_relief": 1},
+        "partial": {"local.demon.abyss_market": 3}
+      },
+      "key": "dispatch.demon_relief",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "妖界迁徙",
+      "desc": "护送灵叶与灵米越过商路，替迁徙的灵兽寻得安稳去处。",
+      "aliases": ["妖界护送"],
+      "duration_seconds": 14400,
+      "daily_limit": 3,
+      "cost": {"item.herb.spirit_leaf": 2, "item.food.coarse_spirit_rice": 2},
+      "risk_pool": "dispatch.beast_relocation",
+      "requirements": {"stage": "mortal", "required_permit": "permit.beast_trade"},
+      "required_permit": "permit.beast_trade",
+      "risk": {
+        "weights": {"success": 7000, "partial": 2000, "failed": 1000}
+      },
+      "failure_refunds": {"item.herb.spirit_leaf": 1, "item.food.coarse_spirit_rice": 1},
+      "rewards": {
+        "success": {"local.beast.three_realms_trade_port": 6, "codex.story.dispatch_beast_relocation": 1},
+        "partial": {"local.beast.three_realms_trade_port": 3}
+      },
+      "key": "dispatch.beast_relocation",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "道统服务",
+      "desc": "替道统修缮灵脉与居所，积攒道统名望与服务信誉。",
+      "aliases": ["道统帮办"],
+      "duration_seconds": 28800,
+      "daily_limit": 2,
+      "cost": {"stamina": 6, "energy": 4},
+      "risk_pool": "dispatch.dao_service",
+      "requirements": {
+        "stage": "mortal",
+        "realm": {"key": "dao_union", "min_layer": 1},
+        "service_reputation": 80
+      },
+      "risk": {
+        "weights": {"success": 8500, "partial": 1000, "failed": 500}
+      },
+      "rewards": {
+        "success": {
+          "local.dao_service": 8,
+          "service_reputation": 4,
+          "codex.dao.service_origin": 1,
+          "codex.story.dao_service_origin": 1
+        },
+        "partial": {"local.dao_service": 4}
+      },
+      "key": "dispatch.dao_service",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
       "name": "青石镇客房",
       "desc": "镇中简洁安稳的落脚处，可供歇息、存放少量行李并打理一方小田。",
       "requirements": [

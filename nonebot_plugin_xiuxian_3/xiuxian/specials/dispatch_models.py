@@ -11,6 +11,7 @@ from ...contracts import PlayerView
 class DispatchPreviewRecord:
     dispatch_key: str
     label: str
+    description: str
     duration_seconds: int
     daily_limit: int
     daily_used: int

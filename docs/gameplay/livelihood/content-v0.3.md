@@ -26,7 +26,7 @@
 | `trade.beast_feed` | 妖界许可；灵米饭 10、灵叶 4 | 灵石 260 | 妖界 +6、城镇 +2 | 80/日，12h |
 | `trade.boundary_repair` | 界隙许可；云铁 5、阵砂 5 | 灵石 500 | 世界名望 +5、信誉 +3 | 30/周，24h |
 
-地区名望 `local.demon.trade_post`、`local.beast.trade_post`、`local.boundary.station` 各上限 1000，独立于阵营声望；只能解锁该地区设施、订单和折扣。完成来源 operation 唯一，订单取消/过期不增加名望。
+地区名望 `local.demon.abyss_market`、`local.beast.three_realms_trade_port`、`local.boundary.station` 各上限 1000，独立于阵营声望；只能解锁该地区设施、订单和折扣。完成来源 operation 唯一，订单取消/过期不增加名望。
 
 ## 3. 合作工坊与服务信誉
 

@@ -315,6 +315,15 @@
       "key": "xuantian.cloud_city"
     },
     {
+      "name": "道统服务处",
+      "desc": "各大道统在此登记修缮与护持事务，积攒的名望独立于通用服务信誉。",
+      "world": "玄天界",
+      "status": "active",
+      "local_reputation_maximum": 1000,
+      "actions": ["specials.dispatch.dao_service"],
+      "key": "dao_service"
+    },
+    {
       "name": "玄天阵堂",
       "desc": "玄天宗研习阵法之地，殿内阵纹流转，守护着往来弟子。",
       "world": "玄天界",

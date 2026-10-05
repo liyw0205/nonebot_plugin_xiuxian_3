@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
 from ..persistence.errors import (
     DispatchAlreadySettledError,
     DispatchBusyError,
@@ -27,15 +28,12 @@ from .dispatch_models import (
     DispatchSettlementRecord,
 )
 from ..utils.assets import inventory_amount
+from ..rewards.rules import local_reputation_maximum
 from .dispatch_rules import (
     CANCEL_WINDOW_SECONDS,
-    DAO_SERVICE,
-    DISPATCHES,
-    HERB_SEARCH,
-    TOWN_DELIVERY,
-    WORKSHOP_HELP,
     DispatchDefinition,
     choose_outcome,
+    dispatch_definitions,
     resolve_dispatch,
     reward_for,
 )
@@ -65,7 +63,8 @@ class DispatchRepositoryMixin:
     def _preview_dispatch_once(
         self, platform: str, platform_user_id: str, dispatch_key: str | None
     ) -> tuple[DispatchPreviewRecord, ...]:
-        requested = (resolve_dispatch(dispatch_key),) if dispatch_key else tuple(DISPATCHES.values())
+        definitions = dispatch_definitions(self.content)
+        requested = (resolve_dispatch(dispatch_key, self.content),) if dispatch_key else tuple(definitions.values())
         now = self._now()
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
@@ -85,22 +84,28 @@ class DispatchRepositoryMixin:
         if stage_order.get(str(player["stage"]), 0) < stage_order["mortal"]:
             missing.append("需要凡人角色")
         intro_flags = set(player_intro_flags(player))
-        if definition.key == HERB_SEARCH:
-            if "guide.gather_blood_grass" not in intro_flags:
-                missing.append("需要完成教学采集")
-        if definition.key == WORKSHOP_HELP:
-            if "guide.choose_service" not in intro_flags:
-                missing.append("需要完成任一教学服务")
-        if definition.key == DAO_SERVICE:
+        if definition.required_intro_flag and definition.required_intro_flag not in intro_flags:
+            missing.append("需要完成对应引导")
+        if definition.required_realm and definition.required_layer is not None:
             service = player_reputation_state(connection, int(player["id"])).service
-            if service < 80 and not self._meets_realm_values(
-                str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union", 1
+            meets_realm = self._meets_realm_values(
+                str(player["realm_key"]),
+                player_integer(player, "realm_layer"),
+                definition.required_realm,
+                definition.required_layer,
+            )
+            if definition.required_service_reputation is None or (
+                service < definition.required_service_reputation and not meets_realm
             ):
-                missing.append("需要合道一层或通用服务信誉 80")
+                missing.append("需要满足道统境界或服务信誉要求")
+        elif definition.required_service_reputation is not None:
+            service = player_reputation_state(connection, int(player["id"])).service
+            if service < definition.required_service_reputation:
+                missing.append("服务信誉不足")
         if definition.required_permit and self._active_dispatch_permit(
             connection, int(player["id"]), definition.required_permit, now
         ) is None:
-            missing.append(f"需要有效 {definition.required_permit}")
+            missing.append("需要有效的贸易许可")
         costs = dict(definition.costs)
         if player_integer(player, "stamina") < costs.get("stamina", 0):
             missing.append("体力不足")
@@ -109,7 +114,8 @@ class DispatchRepositoryMixin:
         inventory = player_inventory(player)
         for key, amount in costs.items():
             if key.startswith("item.") and inventory_amount(inventory, key) < amount:
-                missing.append(f"{key} 不足")
+                content = self.content or bundled_content()
+                missing.append(f"{content.label('item', key)}不足")
         if self._has_active_long_action(connection, int(player["id"])):
             missing.append("已有进行中的长时行动")
         used_row = connection.execute(
@@ -122,6 +128,7 @@ class DispatchRepositoryMixin:
         return DispatchPreviewRecord(
             dispatch_key=definition.key,
             label=definition.label,
+            description=definition.description,
             duration_seconds=definition.duration_seconds,
             daily_limit=definition.daily_limit,
             daily_used=daily_used,
@@ -165,26 +172,26 @@ class DispatchRepositoryMixin:
     def _accept_dispatch_once(
         self, platform: str, platform_user_id: str, dispatch_key: str, operation_id: str
     ) -> DispatchAssignmentRecord:
-        try:
-            definition = resolve_dispatch(dispatch_key)
-        except ValueError as exc:
-            raise DispatchRequirementError(str(exc)) from exc
         operation_name = "specials.accept_dispatch"
         request_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
-            "dispatch_key": definition.key,
+            "dispatch_key": dispatch_key.strip(),
         }
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
         now_text = serialize_datetime(now)
         running_at = now + timedelta(seconds=CANCEL_WINDOW_SECONDS)
-        costs = dict(definition.costs)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             replay = self._dispatch_operation(connection, operation_id, operation_name, request_hash)
             if replay is not None:
                 return self._dispatch_assignment_from_payload(replay, replay=True)
+            try:
+                definition = resolve_dispatch(dispatch_key, self.content)
+            except ValueError as exc:
+                raise DispatchRequirementError(str(exc)) from exc
+            costs = dict(definition.costs)
             player = self._require_player(connection, platform, platform_user_id)
             self._dispatch_promote_confirmations(connection, int(player["id"]), now)
             preview = self._dispatch_preview(connection, player, definition, now)
@@ -198,7 +205,12 @@ class DispatchRepositoryMixin:
 
             seed = uuid4().hex
             outcome = choose_outcome(definition, seed)
-            reward = reward_for(definition, seed, outcome)
+            reward = reward_for(definition, seed, outcome, self.content)
+            local_maximums = {
+                key: local_reputation_maximum(key, self.content)
+                for key in reward
+                if key.startswith("local.")
+            }
             permit_snapshot = self._active_dispatch_permit(
                 connection, int(player["id"]), definition.required_permit, now
             )
@@ -225,6 +237,7 @@ class DispatchRepositoryMixin:
                 "failure_refunds": dict(definition.failure_refunds),
                 "outcome": outcome,
                 "reward": reward,
+                "local_reputation_maximums": local_maximums,
                 "random_seed": seed,
                 "duration_seconds": definition.duration_seconds,
                 "ends_at": serialize_datetime(ends_at),
@@ -374,10 +387,6 @@ class DispatchRepositoryMixin:
                     refunded.update(
                         {str(key): int(value) for key, value in dict(snapshot["failure_refunds"]).items()}
                     )
-                elif str(assignment["dispatch_key"]) == HERB_SEARCH:
-                    refunded["stamina"] = 2
-                elif str(assignment["dispatch_key"]) == WORKSHOP_HELP:
-                    refunded["item.mat.wood"] = 1
             settlement_reward = {
                 str(key): int(amount)
                 for key, amount in reward.items()
@@ -422,7 +431,9 @@ class DispatchRepositoryMixin:
                 value_delta={"stamina": stamina_refund, "energy": energy_refund},
                 maximums={"stamina": player["stamina_max"], "energy": player["energy_max"]},
                 local_reputation_maximums={
-                    key: 1000 for key in settlement_reward if key.startswith("local.")
+                    key: int(value)
+                    for key, value in dict(snapshot.get("local_reputation_maximums", {})).items()
+                    if key in settlement_reward and key.startswith("local.")
                 } or None,
             )
             result = {

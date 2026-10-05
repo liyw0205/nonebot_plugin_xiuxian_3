@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..persistence.errors import (
     DispatchAlreadySettledError,
     DispatchBusyError,
@@ -75,6 +76,7 @@ class DispatchApplication:
         return {
             "dispatch_key": record.dispatch_key,
             "label": record.label,
+            "description": record.description,
             "duration_seconds": record.duration_seconds,
             "daily_limit": record.daily_limit,
             "daily_used": record.daily_used,
@@ -82,6 +84,31 @@ class DispatchApplication:
             "ready": record.ready,
             "missing": list(record.missing),
         }
+
+    def _content(self):
+        return self.repository.content or bundled_content()
+
+    def _label(self, key: str) -> str:
+        content = self._content()
+        if key in {"stamina", "energy"}:
+            return {"stamina": "体力", "energy": "精力"}[key]
+        if key in {"spirit_stones", "currency.spirit_stone"}:
+            return "灵石"
+        if key == "service_reputation":
+            return "服务信誉"
+        if key.startswith("item."):
+            return content.label("item", key)
+        if key.startswith("codex."):
+            return content.label("codex_entry", key)
+        if key.startswith("local."):
+            return content.label("location", key.removeprefix("local.")) + "名望"
+        return key
+
+    def _cost_text(self, costs: dict[str, int]) -> str:
+        return "、".join(f"{self._label(key)} {value}" for key, value in costs.items()) or "无成本"
+
+    def _reward_text(self, rewards: dict[str, int]) -> str:
+        return "、".join(f"{self._label(key)} +{value}" for key, value in rewards.items()) or "无产出"
 
     @staticmethod
     def _assignment_data(record: DispatchAssignmentRecord) -> dict[str, object]:
@@ -103,7 +130,7 @@ class DispatchApplication:
             return CommandResult(False, "INVALID_DISPATCH_COMMAND", "派遣预览最多接收一个任务键。", context.request_id)
         if context.command_args:
             try:
-                resolve_dispatch(context.command_args[0])
+                resolve_dispatch(context.command_args[0], self.repository.content)
             except ValueError:
                 return CommandResult(False, "DISPATCH_NOT_FOUND", "没有找到这条派遣任务。", context.request_id)
         try:
@@ -119,23 +146,27 @@ class DispatchApplication:
         for record in records:
             duration = record.duration_seconds // 60
             state = "可接受" if record.ready else f"不可接受：{'、'.join(record.missing)}"
-            costs = "、".join(f"{key} × {value}" for key, value in record.costs.items()) or "无成本"
-            lines.append(f"- `{record.dispatch_key}` · **{record.label}** · {duration} 分钟 · {costs} · {state}")
+            costs = self._cost_text(record.costs)
+            lines.append(f"- **{record.label}**：{record.description} · {duration} 分钟 · {costs} · {state}")
         return CommandResult(True, "DISPATCH_PREVIEW", "\n".join(lines), context.request_id, data=data)
 
     async def accept(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
             return CommandResult(False, "INVALID_DISPATCH_COMMAND", "请使用 `接受派遣 <任务键>`。", context.request_id)
+        definition = None
         try:
-            definition = resolve_dispatch(context.command_args[0])
+            definition = resolve_dispatch(context.command_args[0], self.repository.content)
         except ValueError:
-            return CommandResult(False, "DISPATCH_NOT_FOUND", "没有找到这条派遣任务。", context.request_id)
+            # Let the repository inspect the operation ledger first so a stable-key
+            # replay remains available after its content record is closed.
+            if not context.command_args[0].strip().startswith("dispatch."):
+                return CommandResult(False, "DISPATCH_NOT_FOUND", "没有找到这条派遣任务。", context.request_id)
         operation_id = self._operation_id(context, "specials.accept_dispatch")
         try:
             record = await self.repository.accept_dispatch(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                dispatch_key=definition.key,
+                dispatch_key=definition.key if definition is not None else context.command_args[0],
                 operation_id=operation_id,
             )
         except Exception as exc:
@@ -143,7 +174,7 @@ class DispatchApplication:
         return CommandResult(
             True,
             "DISPATCH_ACCEPTED",
-            f"已接受 **{definition.label}**。60 秒内可取消；预计结算：{record.ends_at}。",
+            f"已接受 **{definition.label if definition is not None else '这项派遣'}**。60 秒内可取消；预计结算：{record.ends_at}。",
             context.request_id,
             operation_id,
             data=self._assignment_data(record),
@@ -174,13 +205,19 @@ class DispatchApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        reward = "、".join(f"{key} × {value}" for key, value in record.reward.items()) or "无产出"
-        refund = "、".join(f"{key} +{value}" for key, value in record.refunded.items())
+        reward = self._reward_text(record.reward)
+        refund = self._reward_text(record.refunded)
         suffix = f"；返还 {refund}" if refund else ""
+        outcome = {
+            "success": "顺利完成",
+            "delayed": "途中稍有耽搁",
+            "partial": "只取得部分成果",
+            "failed": "未能完成",
+        }.get(record.outcome, "结果已定")
         return CommandResult(
             True,
             "DISPATCH_SETTLED",
-            f"派遣已结算，结果：**{record.outcome}**；收益：{reward}{suffix}。",
+            f"派遣已结算，{outcome}；收益：{reward}{suffix}。",
             context.request_id,
             operation_id,
             data=self._settlement_data(record),

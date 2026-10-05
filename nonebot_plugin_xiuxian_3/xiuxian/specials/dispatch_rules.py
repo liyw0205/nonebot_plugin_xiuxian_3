@@ -1,28 +1,16 @@
-"""Rules for dispatch tasks."""
+"""Content-backed rules for asynchronous dispatch tasks."""
 
 from __future__ import annotations
 
-
 import hashlib
 from dataclasses import dataclass
+from typing import Any
+
+from ..content import ContentBundle, ContentError, bundled_content
+from ..rewards.rules import local_reputation_maximum
 
 
 CANCEL_WINDOW_SECONDS = 60
-
-
-@dataclass(frozen=True, slots=True)
-class DispatchDefinition:
-    key: str
-    label: str
-    duration_seconds: int
-    daily_limit: int
-    costs: tuple[tuple[str, int], ...]
-    risk_pool: str
-    risk_weights: tuple[tuple[str, int], ...]
-    requirement: str
-    required_permit: str | None = None
-    failure_refunds: tuple[tuple[str, int], ...] = ()
-
 
 TOWN_DELIVERY = "dispatch.town_delivery"
 HERB_SEARCH = "dispatch.herb_search"
@@ -31,88 +19,69 @@ DEMON_RELIEF = "dispatch.demon_relief"
 BEAST_RELOCATION = "dispatch.beast_relocation"
 DAO_SERVICE = "dispatch.dao_service"
 
-DISPATCHES: dict[str, DispatchDefinition] = {
-    TOWN_DELIVERY: DispatchDefinition(
-        key=TOWN_DELIVERY,
-        label="城镇送货",
-        duration_seconds=30 * 60,
-        daily_limit=3,
-        costs=(("stamina", 3),),
-        risk_pool="dispatch.town",
-        risk_weights=(("success", 7500), ("delayed", 1500), ("partial", 1000)),
-        requirement="mortal",
-    ),
-    HERB_SEARCH: DispatchDefinition(
-        key=HERB_SEARCH,
-        label="药材搜寻",
-        duration_seconds=60 * 60,
-        daily_limit=2,
-        costs=(("stamina", 4),),
-        risk_pool="dispatch.herb",
-        risk_weights=(("success", 7000), ("partial", 2000), ("failed", 1000)),
-        requirement="guide.gather_blood_grass",
-    ),
-    WORKSHOP_HELP: DispatchDefinition(
-        key=WORKSHOP_HELP,
-        label="作坊帮工",
-        duration_seconds=2 * 60 * 60,
-        daily_limit=2,
-        costs=(("energy", 4), ("item.mat.wood", 2)),
-        risk_pool="dispatch.workshop",
-        risk_weights=(("success", 6500), ("delayed", 2000), ("failed", 1500)),
-        requirement="guide.choose_service",
-    ),
-    DEMON_RELIEF: DispatchDefinition(
-        key=DEMON_RELIEF,
-        label="魔界救援",
-        duration_seconds=4 * 60 * 60,
-        daily_limit=3,
-        costs=(("item.herb.blood_grass", 2), ("item.food.coarse_spirit_rice", 2)),
-        risk_pool="dispatch.demon_relief",
-        risk_weights=(("success", 7000), ("partial", 2000), ("failed", 1000)),
-        requirement="permit.demon_trade",
-        required_permit="permit.demon_trade",
-        failure_refunds=(("item.herb.blood_grass", 1), ("item.food.coarse_spirit_rice", 1)),
-    ),
-    BEAST_RELOCATION: DispatchDefinition(
-        key=BEAST_RELOCATION,
-        label="妖界迁徙",
-        duration_seconds=4 * 60 * 60,
-        daily_limit=3,
-        costs=(("item.herb.spirit_leaf", 2), ("item.food.coarse_spirit_rice", 2)),
-        risk_pool="dispatch.beast_relocation",
-        risk_weights=(("success", 7000), ("partial", 2000), ("failed", 1000)),
-        requirement="permit.beast_trade",
-        required_permit="permit.beast_trade",
-        failure_refunds=(("item.herb.spirit_leaf", 1), ("item.food.coarse_spirit_rice", 1)),
-    ),
-    DAO_SERVICE: DispatchDefinition(
-        key=DAO_SERVICE,
-        label="道统服务",
-        duration_seconds=8 * 60 * 60,
-        daily_limit=2,
-        costs=(("stamina", 6), ("energy", 4)),
-        risk_pool="dispatch.dao_service",
-        risk_weights=(("success", 8500), ("partial", 1000), ("failed", 500)),
-        requirement="dao_union_or_service_reputation_80",
-    ),
-}
-
-ALIASES = {
-    "城镇送货": TOWN_DELIVERY,
-    "药材搜寻": HERB_SEARCH,
-    "作坊帮工": WORKSHOP_HELP,
-    "魔界救援": DEMON_RELIEF,
-    "妖界迁徙": BEAST_RELOCATION,
-    "道统服务": DAO_SERVICE,
-}
+_STAGE_ORDER = {"new_user": 0, "mortal": 1, "seeker": 2, "cultivator": 3, "suspended": -1}
+_REWARD_KEYS = {"spirit_stones", "service_reputation"}
 
 
-def resolve_dispatch(value: str | None) -> DispatchDefinition:
+@dataclass(frozen=True, slots=True)
+class DispatchDefinition:
+    key: str
+    label: str
+    description: str
+    aliases: tuple[str, ...]
+    duration_seconds: int
+    daily_limit: int
+    costs: tuple[tuple[str, int], ...]
+    risk_pool: str
+    risk_weights: tuple[tuple[str, int], ...]
+    requirement: str
+    rewards: tuple[tuple[str, tuple[tuple[str, int | tuple[int, int]], ...]], ...]
+    required_stage: str | None = None
+    required_intro_flag: str | None = None
+    required_realm: str | None = None
+    required_layer: int | None = None
+    required_service_reputation: int | None = None
+    required_permit: str | None = None
+    failure_refunds: tuple[tuple[str, int], ...] = ()
+
+    def reward_specs(self, outcome: str) -> dict[str, int | tuple[int, int]]:
+        rewards = dict(self.rewards)
+        values = dict(rewards.get(outcome, ()))
+        if outcome == "delayed" and not values:
+            values = dict(rewards.get("success", ()))
+        return values
+
+
+def dispatch_definitions(content: ContentBundle | None = None) -> dict[str, DispatchDefinition]:
+    bundle = content or bundled_content()
+    definitions: dict[str, DispatchDefinition] = {}
+    selectors: dict[str, str] = {}
+    for row in bundle.list("livelihood", include_locked=False):
+        if row.get("record_type") != "dispatch":
+            continue
+        definition = _parse_dispatch(row, bundle)
+        if definition.key in definitions:
+            raise ContentError(f"dispatch {definition.key} is duplicated")
+        for selector in (definition.key, definition.label, *definition.aliases):
+            if selector in selectors:
+                raise ContentError(f"dispatch {definition.key} has a duplicate name or alias")
+            selectors[selector] = definition.key
+        definitions[definition.key] = definition
+    if not definitions:
+        raise ContentError("no active dispatch content records")
+    return definitions
+
+
+def resolve_dispatch(value: str | None, content: ContentBundle | None = None) -> DispatchDefinition:
     normalized = (value or "").strip()
-    key = ALIASES.get(normalized, normalized)
+    definitions = dispatch_definitions(content)
+    selectors = {
+        selector: definition
+        for definition in definitions.values()
+        for selector in (definition.key, definition.label, *definition.aliases)
+    }
     try:
-        return DISPATCHES[key]
+        return selectors[normalized]
     except KeyError as exc:
         raise ValueError(f"unsupported dispatch: {value}") from exc
 
@@ -137,62 +106,234 @@ def roll_range(seed: str, key: str, low: int, high: int) -> int:
     return low + roll_bp(seed, key) % (high - low + 1)
 
 
-def reward_for(definition: DispatchDefinition, seed: str, outcome: str) -> dict[str, int]:
+def reward_for(
+    definition: DispatchDefinition,
+    seed: str,
+    outcome: str,
+    content: ContentBundle | None = None,
+) -> dict[str, int]:
+    del content
     if outcome == "failed":
         return {}
-    if definition.key == TOWN_DELIVERY:
-        if outcome == "partial":
-            return {"spirit_stones": 15, "local.xuantian.new_town": 1}
-        return {"spirit_stones": 30, "local.xuantian.new_town": 3}
-    if definition.key == HERB_SEARCH:
-        reward = {
-            "item.herb.blood_grass": roll_range(seed, "blood_grass", 3, 5),
-            "item.herb.spirit_leaf": roll_range(seed, "spirit_leaf", 0, 1),
-            "codex.dispatch.herb_search": 1,
-        }
-        if outcome == "partial":
-            reward = {
-                key: quantity // 2
-                for key, quantity in reward.items()
-                if key.startswith("item.") and quantity // 2 > 0
-            }
-        return reward
-    if definition.key == WORKSHOP_HELP:
-        return {
-            "spirit_stones": 45,
-            "service_reputation": 2,
-            "item.mat.array_sand": roll_range(seed, "array_sand", 1, 2),
-        }
-    if definition.key in {DEMON_RELIEF, BEAST_RELOCATION}:
-        local_key = "local.demon.trade_post" if definition.key == DEMON_RELIEF else "local.beast.trade_post"
-        if outcome == "partial":
-            return {local_key: 3}
-        clue_key = "codex.story.dispatch_demon_relief" if definition.key == DEMON_RELIEF else "codex.story.dispatch_beast_relocation"
-        return {local_key: 6, clue_key: 1}
-    if definition.key == DAO_SERVICE:
-        if outcome == "partial":
-            return {"local.dao_service": 4}
-        return {
-            "local.dao_service": 8,
-            "service_reputation": 4,
-            "codex.dao.service_origin": 1,
-            "codex.story.dao_service_origin": 1,
-        }
-    raise ValueError(f"unsupported dispatch reward: {definition.key}")
+    result: dict[str, int] = {}
+    for reward_key, value in definition.reward_specs(outcome).items():
+        quantity = value if isinstance(value, int) else roll_range(
+            seed, f"{definition.key}:{outcome}:{reward_key}", value[0], value[1]
+        )
+        if quantity > 0:
+            result[reward_key] = quantity
+    return result
+
+
+def _parse_dispatch(row: dict[str, Any], bundle: ContentBundle) -> DispatchDefinition:
+    key = _required_string(row.get("key"), "dispatch", "key")
+    label = _required_string(row.get("name"), key, "name")
+    description = _required_string(row.get("desc"), key, "desc")
+    aliases = row.get("aliases", [])
+    if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
+        raise ContentError(f"dispatch {key} aliases must be non-empty strings")
+    duration = _positive_int(row.get("duration_seconds"), key, "duration_seconds")
+    if not 10 * 60 <= duration <= 12 * 60 * 60:
+        raise ContentError(f"dispatch {key} duration is outside the allowed range")
+    daily_limit = _positive_int(row.get("daily_limit"), key, "daily_limit")
+    costs = _parse_costs(row.get("cost"), key, bundle)
+    requirements = row.get("requirements")
+    if not isinstance(requirements, dict):
+        raise ContentError(f"dispatch {key} requirements must be an object")
+    required_stage = requirements.get("stage")
+    if required_stage is not None and required_stage not in _STAGE_ORDER:
+        raise ContentError(f"dispatch {key} has an unsupported stage requirement")
+    intro_flag = requirements.get("intro_flag")
+    if intro_flag is not None and (not isinstance(intro_flag, str) or not intro_flag):
+        raise ContentError(f"dispatch {key} intro_flag must be a stable key")
+    realm = requirements.get("realm")
+    required_realm = required_layer = None
+    if realm is not None:
+        if not isinstance(realm, dict) or not isinstance(realm.get("key"), str) or not realm["key"]:
+            raise ContentError(f"dispatch {key} realm requirement is invalid")
+        if isinstance(realm.get("min_layer"), bool) or not isinstance(realm.get("min_layer"), int) or realm["min_layer"] < 1:
+            raise ContentError(f"dispatch {key} realm layer requirement is invalid")
+        required_realm, required_layer = realm["key"], realm["min_layer"]
+    service_reputation = requirements.get("service_reputation")
+    if service_reputation is not None and (
+        isinstance(service_reputation, bool) or not isinstance(service_reputation, int) or service_reputation < 0
+    ):
+        raise ContentError(f"dispatch {key} service reputation requirement is invalid")
+    required_permit = row.get("required_permit", requirements.get("required_permit"))
+    if required_permit is not None and (not isinstance(required_permit, str) or not required_permit):
+        raise ContentError(f"dispatch {key} required_permit must be a stable key")
+    risk = row.get("risk")
+    if not isinstance(risk, dict) or not isinstance(risk.get("weights"), dict) or not risk["weights"]:
+        raise ContentError(f"dispatch {key} risk weights are required")
+    risk_weights = []
+    for outcome, weight in risk["weights"].items():
+        if not isinstance(outcome, str) or outcome not in {"success", "delayed", "partial", "failed"}:
+            raise ContentError(f"dispatch {key} has an unsupported outcome")
+        if isinstance(weight, bool) or not isinstance(weight, int) or weight <= 0:
+            raise ContentError(f"dispatch {key} risk weights must be positive integers")
+        risk_weights.append((outcome, weight))
+    if sum(weight for _, weight in risk_weights) != 10000:
+        raise ContentError(f"dispatch {key} risk weights must total 10000")
+    rewards = _parse_rewards(row.get("rewards"), key, bundle)
+    risk_pool = _required_string(row.get("risk_pool"), key, "risk_pool")
+    failure_refunds = _parse_refunds(row.get("failure_refunds", {}), key, costs)
+    return DispatchDefinition(
+        key=key,
+        label=label,
+        description=description,
+        aliases=tuple(alias.strip() for alias in aliases),
+        duration_seconds=duration,
+        daily_limit=daily_limit,
+        costs=tuple(costs.items()),
+        risk_pool=risk_pool,
+        risk_weights=tuple(risk_weights),
+        requirement=_requirement_label(requirements, required_permit, intro_flag, required_realm, required_layer, service_reputation),
+        rewards=tuple(rewards.items()),
+        required_stage=required_stage,
+        required_intro_flag=intro_flag,
+        required_realm=required_realm,
+        required_layer=required_layer,
+        required_service_reputation=service_reputation,
+        required_permit=required_permit,
+        failure_refunds=tuple(failure_refunds.items()),
+    )
+
+
+def _parse_costs(value: Any, key: str, bundle: ContentBundle) -> dict[str, int]:
+    if not isinstance(value, dict) or not value:
+        raise ContentError(f"dispatch {key} cost must be a non-empty object")
+    result: dict[str, int] = {}
+    for cost_key, amount in value.items():
+        if not isinstance(cost_key, str) or not cost_key or isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
+            raise ContentError(f"dispatch {key} has invalid cost")
+        if cost_key not in {"stamina", "energy"} and cost_key.startswith("item."):
+            try:
+                bundle.require("item", cost_key, include_locked=False)
+            except KeyError as exc:
+                raise ContentError(f"dispatch {key} references inactive cost item {cost_key}") from exc
+        elif cost_key not in {"stamina", "energy"}:
+            raise ContentError(f"dispatch {key} has unsupported cost {cost_key}")
+        result[cost_key] = amount
+    return result
+
+
+def _parse_rewards(value: Any, key: str, bundle: ContentBundle) -> dict[str, dict[str, int | tuple[int, int]]]:
+    if not isinstance(value, dict) or not value:
+        raise ContentError(f"dispatch {key} rewards must be a non-empty object")
+    result: dict[str, dict[str, int | tuple[int, int]]] = {}
+    for outcome, entries in value.items():
+        if outcome not in {"success", "partial"} or not isinstance(entries, dict) or not entries:
+            raise ContentError(f"dispatch {key} has invalid {outcome} rewards")
+        parsed: dict[str, int | tuple[int, int]] = {}
+        for reward_key, amount in entries.items():
+            _validate_reward_key(reward_key, key, bundle)
+            if isinstance(amount, int) and not isinstance(amount, bool):
+                if amount <= 0:
+                    raise ContentError(f"dispatch {key} reward quantities must be positive")
+                parsed[reward_key] = amount
+                continue
+            if (
+                not isinstance(amount, dict)
+                or set(amount) != {"quantity_range"}
+                or not isinstance(amount["quantity_range"], list)
+                or len(amount["quantity_range"]) != 2
+                or any(isinstance(item, bool) or not isinstance(item, int) for item in amount["quantity_range"])
+                or amount["quantity_range"][0] < 0
+                or amount["quantity_range"][0] > amount["quantity_range"][1]
+            ):
+                raise ContentError(f"dispatch {key} reward range is invalid")
+            parsed[reward_key] = tuple(amount["quantity_range"])
+        result[outcome] = parsed
+    return result
+
+
+def _validate_reward_key(reward_key: Any, dispatch_key: str, bundle: ContentBundle) -> None:
+    if not isinstance(reward_key, str) or not reward_key:
+        raise ContentError(f"dispatch {dispatch_key} reward key is invalid")
+    if reward_key.startswith("item."):
+        try:
+            bundle.require("item", reward_key, include_locked=False)
+        except KeyError as exc:
+            raise ContentError(f"dispatch {dispatch_key} references inactive item {reward_key}") from exc
+    elif reward_key.startswith("codex."):
+        try:
+            bundle.require("codex_entry", reward_key, include_locked=False)
+        except KeyError as exc:
+            raise ContentError(f"dispatch {dispatch_key} references inactive codex {reward_key}") from exc
+    elif reward_key.startswith("local."):
+        try:
+            local_reputation_maximum(reward_key, bundle)
+        except (ContentError, ValueError) as exc:
+            raise ContentError(f"dispatch {dispatch_key} references invalid local reputation {reward_key}") from exc
+    elif reward_key not in _REWARD_KEYS:
+        raise ContentError(f"dispatch {dispatch_key} has unsupported reward {reward_key}")
+
+
+def _parse_refunds(value: Any, key: str, costs: dict[str, int]) -> dict[str, int]:
+    if not isinstance(value, dict):
+        raise ContentError(f"dispatch {key} failure_refunds must be an object")
+    result: dict[str, int] = {}
+    for cost_key, amount in value.items():
+        if cost_key not in costs or isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0 or amount > costs[cost_key]:
+            raise ContentError(f"dispatch {key} has invalid failure refund")
+        result[cost_key] = amount
+    return result
+
+
+def _requirement_label(
+    requirements: dict[str, Any],
+    permit: str | None,
+    intro_flag: str | None,
+    realm: str | None,
+    layer: int | None,
+    service_reputation: int | None,
+) -> str:
+    if permit:
+        return permit
+    if intro_flag:
+        return intro_flag
+    if realm and layer is not None and service_reputation is not None:
+        return f"{realm}_or_service_reputation_{service_reputation}"
+    if realm and layer is not None:
+        return f"{realm}_{layer}"
+    if service_reputation is not None:
+        return f"service_reputation_{service_reputation}"
+    return str(requirements.get("stage", ""))
+
+
+def _required_string(value: Any, owner: str, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ContentError(f"{owner} requires {field}")
+    return value.strip()
+
+
+def _positive_int(value: Any, owner: str, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ContentError(f"{owner} {field} must be positive")
+    return value
+
+
+DISPATCHES: dict[str, DispatchDefinition] = dispatch_definitions()
+ALIASES = {
+    alias: definition.key
+    for definition in DISPATCHES.values()
+    for alias in (definition.label, *definition.aliases)
+}
 
 
 __all__ = [
     "ALIASES",
     "BEAST_RELOCATION",
     "CANCEL_WINDOW_SECONDS",
-    "DISPATCHES",
     "DAO_SERVICE",
     "DEMON_RELIEF",
+    "DISPATCHES",
+    "DispatchDefinition",
     "HERB_SEARCH",
     "TOWN_DELIVERY",
     "WORKSHOP_HELP",
-    "DispatchDefinition",
     "choose_outcome",
+    "dispatch_definitions",
     "resolve_dispatch",
     "reward_for",
 ]

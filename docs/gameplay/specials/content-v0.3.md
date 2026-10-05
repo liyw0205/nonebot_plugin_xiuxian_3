@@ -7,8 +7,8 @@
 | 挂机 | `idle.demon_trade_post`：魔界贸易许可 | 8h；灵石 80–130、魔界贸易站名望 +3、图鉴线索；超时保底灵石 40 |
 | 挂机 | `idle.beast_habitat_watch`：妖界贸易许可 | 8h；灵米/灵叶、妖界贸易站名望 +3；不产妖血/血脉物 |
 | 派遣 | `dispatch.boundary_caravan`：界隙许可、2–5 人确认或 NPC 合同 | 6h；灵石 300–500、信誉 +3；风险 failed 返 50% 可返货物，无跨界材料 |
-| 派遣 | `dispatch.demon_relief`：有效 `permit.demon_trade`；消耗止血草 2、粗糙灵米 2 | 4h；每日 3 次；success 给 `local.demon.trade_post` +6、`codex.story.dispatch_demon_relief`；partial 只给地区名望 +3；failed 各返还 1 份材料 |
-| 派遣 | `dispatch.beast_relocation`：有效 `permit.beast_trade`；消耗灵叶 2、粗糙灵米 2 | 4h；每日 3 次；success 给 `local.beast.trade_post` +6、`codex.story.dispatch_beast_relocation`；partial 只给地区名望 +3；failed 各返还 1 份材料 |
+| 派遣 | `dispatch.demon_relief`：有效 `permit.demon_trade`；消耗止血草 2、粗糙灵米 2 | 4h；每日 3 次；成功给魔渊集市名望 +6、魔界救援线索；部分成果只给名望 +3；失败各返还 1 份材料 |
+| 派遣 | `dispatch.beast_relocation`：有效 `permit.beast_trade`；消耗灵叶 2、粗糙灵米 2 | 4h；每日 3 次；成功给三界贸易口名望 +6、妖界迁徙线索；部分成果只给名望 +3；失败各返还 1 份材料 |
 | 图鉴 | `codex.story.dispatch_demon_relief`、`codex.story.dispatch_beast_relocation` | 对应派遣 success 首次发现；只记录线索，不代表完成故事或悬赏 |
 | 图鉴 | `codex.place.demon_market`、`codex.place.beast_hills`、`codex.route.boundary` | 三界路线 3 条：世界名望 +10、派遣任务额外展示 1 条 |
 | 试炼塔 | `tower.three_realms` 1–20：元婴 L1 或 `story.mainline.three_realms` 许可旗标 | 单人；每次体力 12；每角色/层/UTC 周最多 2 次；首通灵石 60、阵砂 2 和楼层图鉴；10/20 层另发现阵营故事线索；禁止神魂晶/突破物 |

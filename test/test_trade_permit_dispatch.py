@@ -104,7 +104,7 @@ def test_trade_permits_dispatches_and_beast_bounty_close_on_both_adapters(adapte
 
             preview = await _send(runtime, adapter, user, "dispatch-locked", "派遣预览 dispatch.beast_relocation")
             assert preview.data["dispatches"][0]["ready"] is False
-            assert "permit.beast_trade" in " ".join(preview.data["dispatches"][0]["missing"])
+            assert "需要有效的贸易许可" in " ".join(preview.data["dispatches"][0]["missing"])
 
             demon_permit = await _send(runtime, adapter, user, "demon-permit", "申请贸易许可 魔界")
             beast_permit = await _send(runtime, adapter, user, "beast-permit", "申请贸易许可 妖界")
@@ -164,7 +164,7 @@ def test_trade_permits_dispatches_and_beast_bounty_close_on_both_adapters(adapte
                 assert settled.code == "DISPATCH_SETTLED"
                 assert settled.data["reward"] == {
                     "codex.story.dispatch_beast_relocation": 1,
-                    "local.beast.trade_post": 6,
+                    "local.beast.three_realms_trade_port": 6,
                 }
 
             completed = await _send(runtime, adapter, user, "bounty-completed", "悬赏榜")
@@ -204,7 +204,7 @@ def test_trade_permits_dispatches_and_beast_bounty_close_on_both_adapters(adapte
             demon_settled = await _send(runtime, adapter, user, "demon-success-settle", "结算派遣")
             assert demon_settled.data["reward"] == {
                 "codex.story.dispatch_demon_relief": 1,
-                "local.demon.trade_post": 6,
+                "local.demon.abyss_market": 6,
             }
 
             with sqlite3.connect(runtime.settings.database_path) as connection:
