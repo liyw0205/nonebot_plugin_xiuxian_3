@@ -30,6 +30,13 @@
       "status": "active"
     },
     {
+      "key": "resource.void_merit",
+      "name": "虚空功勋",
+      "desc": "记录修士在虚空档案与前线所立的功绩。",
+      "storage": "void_merit",
+      "status": "active"
+    },
+    {
       "key": "resource.faction_reputation.xuantian",
       "name": "玄天界声望",
       "desc": "记录修士在玄天界各方势力中的声望。",

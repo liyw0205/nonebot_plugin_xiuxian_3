@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentError
 from ..persistence.errors import (
     BattleNotReadyError,
     OperationConflictError,
@@ -18,9 +19,11 @@ from ..persistence.errors import (
     VoidArchiveTaskInvalidError,
     VoidArchiveTaskNotCompleteError,
 )
+from ..rewards.rules import RewardContentError
 from .void_archive_models import VoidArchiveStatusRecord
 from .void_archive_repository import VoidArchiveRepositoryMixin
-from .void_archive_rules import TASKS, TASK_TARGETS
+from .presentation import public_event_reward_lines
+from .void_archive_rules import resolve_archive_task, void_archive_definition
 
 
 class VoidArchiveApplication:
@@ -57,7 +60,7 @@ class VoidArchiveApplication:
             ),
             VoidArchiveTaskInvalidError: (
                 "INVALID_ARCHIVE_TASK",
-                "档案碎片任务只能选择 alpha、beta 或 gamma。",
+                "请指定有效的档案碎片任务。",
             ),
             QuestRequirementError: ("QUEST_REQUIREMENT_MISSING", "当前境界不满足档案遗迹前置。"),
             QuestResourceInsufficientError: ("QUEST_RESOURCE_INSUFFICIENT", "任务材料不足。"),
@@ -66,6 +69,8 @@ class VoidArchiveApplication:
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能执行档案操作。"),
             OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "档案簿暂时繁忙，请稍后再试。"),
+            ContentError: ("CONTENT_UNAVAILABLE", "档案内容暂不可用，角色状态未改变。"),
+            RewardContentError: ("CONTENT_UNAVAILABLE", "档案嘉奖暂不可用，角色状态未改变。"),
         }
         code, message = mapping.get(type(exc), ("PERSISTENCE_ERROR", "档案簿暂时不可用，请稍后再试。"))
         return CommandResult(
@@ -91,6 +96,7 @@ class VoidArchiveApplication:
         if context.command_args:
             return CommandResult(False, "INVALID_ARCHIVE_COMMAND", "档案状态无需附加参数。", context.request_id)
         try:
+            definition = void_archive_definition(self.repository.content)
             record = await self.repository.get_void_archive_status(
                 platform=context.adapter, platform_user_id=context.user_id
             )
@@ -103,10 +109,12 @@ class VoidArchiveApplication:
             f"**周次**：`{record.week_id}`",
             f"**档案航道**：{state}",
         ]
-        for task_key in TASKS:
+        status_labels = {"claimed": "已领取", "complete": "待领取", "active": "进行中"}
+        for task_definition in definition.tasks:
+            task_key = task_definition.key
             task = record.tasks[task_key]
             lines.append(
-                f"**{task_key.rsplit('.', 1)[-1]}**：{task['progress']}/{task['target']} · {task['status']}"
+                f"**{task['name']}**：{task['progress']}/{task['target']} · {status_labels[str(task['status'])]}"
             )
         return CommandResult(
             True,
@@ -137,11 +145,12 @@ class VoidArchiveApplication:
         except Exception as exc:
             return self._error(context, operation_id, exc)
         outcome = "胜利" if record.outcome == "won" else "失败"
-        reward = "、".join(f"{key} ×{value}" for key, value in record.reward.items()) or "无"
+        reward_lines = public_event_reward_lines(record.reward, self.repository.content)
+        reward = "\n".join(reward_lines) if reward_lines else "- 无"
         return CommandResult(
             True,
             "ARCHIVE_RUN_SETTLED",
-            f"## 档案遗迹守卫战已结算\n\n- **结果**：{outcome}\n- **奖励**：{reward}\n\n> beta 周任务只统计服务器确认的守卫胜利。",
+            f"## 档案遗迹守卫战已结算\n\n- **结果**：{outcome}\n- **奖励**：\n{reward}\n\n> 守卫战的胜负只按已结算的战斗记录计入档案。",
             context.request_id,
             operation_id,
             data={
@@ -156,37 +165,48 @@ class VoidArchiveApplication:
 
     async def claim_task(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
-            return CommandResult(False, "INVALID_ARCHIVE_TASK", "请使用 `领取档案碎片 alpha|beta|gamma`。", context.request_id)
-        task_key = context.command_args[0].lower()
-        aliases = {name.rsplit(".", 1)[-1]: name for name in TASKS}
-        task_key = aliases.get(task_key, task_key)
-        if task_key not in TASK_TARGETS:
-            return CommandResult(False, "INVALID_ARCHIVE_TASK", "档案碎片任务只能选择 alpha、beta 或 gamma。", context.request_id)
-        operation_id = self._operation_id(context, task_key.rsplit(".", 1)[-1])
+            return CommandResult(False, "INVALID_ARCHIVE_TASK", "请指定要领取的档案碎片任务。", context.request_id)
+        task_ref = context.command_args[0].strip()
+        operation_id = self._operation_id(context, "task")
         try:
-            record = await self.repository.claim_void_archive_task(
-                platform=context.adapter,
-                platform_user_id=context.user_id,
-                task_key=task_key,
+            record = await self.repository.replay_void_archive_task(
                 operation_id=operation_id,
+                task_ref=task_ref,
             )
+            if record is None:
+                try:
+                    task_key = resolve_archive_task(task_ref, self.repository.content).key
+                except KeyError as exc:
+                    raise VoidArchiveTaskInvalidError("unknown archive task") from exc
+                record = await self.repository.claim_void_archive_task(
+                    platform=context.adapter,
+                    platform_user_id=context.user_id,
+                    task_key=task_key,
+                    operation_id=operation_id,
+                )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        reward = "、".join(f"{key} ×{value}" for key, value in record.reward.items())
-        unlock = "；三项任务已完成，档案航道资格已激活" if record.unlock_activated else ""
+        reward_lines = list(public_event_reward_lines(record.reward, self.repository.content))
+        if record.unlock_activated:
+            reward_lines.extend(public_event_reward_lines(record.unlock_reward, self.repository.content))
+        reward = "\n".join(reward_lines) if reward_lines else "- 无"
+        unlock = "\n\n档案航道资格已激活。" if record.unlock_activated else ""
         return CommandResult(
             True,
             "ARCHIVE_TASK_CLAIMED",
-            f"## 档案碎片任务已领取\n\n- **任务**：{record.task_key}\n- **证据**：{record.progress}/{record.target}\n- **奖励**：{reward}、虚空功勋 ×20{unlock}",
+            f"## 档案碎片任务已领取\n\n- **任务**：{record.task_name}\n- **证据**：{record.progress}/{record.target}\n- **奖励**：\n{reward}{unlock}",
             context.request_id,
             operation_id,
             data={
                 "week_id": record.week_id,
                 "task_key": record.task_key,
+                "task_name": record.task_name,
                 "progress": record.progress,
                 "target": record.target,
                 "reward": record.reward,
                 "unlock_activated": record.unlock_activated,
+                "unlock_reward": record.unlock_reward,
+                "unlock_expires_at": record.unlock_expires_at,
                 "idempotent_replay": record.already_completed,
             },
         )

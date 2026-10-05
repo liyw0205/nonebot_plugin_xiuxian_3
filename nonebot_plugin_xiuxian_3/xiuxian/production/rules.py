@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from hashlib import blake2b
 
+from ..content import ContentBundle, bundled_content
 from .endgame_work_rules import (
     ENDGAME_WORK_RECIPES,
     ITEM_LABELS as ENDGAME_WORK_ITEM_LABELS,
@@ -472,9 +473,6 @@ ITEM_LABELS = {
     "item.void_crystal": "虚空晶",
     "item.void_anchor": "虚空锚",
     "item.void_power_crystal": "虚空能量晶",
-    "item.archive_fragment.alpha": "档案碎片 alpha",
-    "item.archive_fragment.beta": "档案碎片 beta",
-    "item.archive_fragment.gamma": "档案碎片 gamma",
     "item.pill.golden_core_guard": "金丹护脉丹",
     "item.pill.core_condense": "凝核丹",
     "item.pill.soul_condense": "凝魂丹",
@@ -504,8 +502,12 @@ def recipe_definition(recipe_key: str) -> RecipeDefinition:
         raise ValueError(f"unsupported production recipe: {recipe_key}") from exc
 
 
-def item_label(item_key: str) -> str:
-    return ITEM_LABELS.get(item_key, "生产物资")
+def item_label(item_key: str, content: ContentBundle | None = None) -> str:
+    return (content or bundled_content()).label(
+        "item",
+        item_key,
+        fallback=ITEM_LABELS.get(item_key, "生产物资"),
+    )
 
 
 def random_quality_bp(operation_id: str) -> int:

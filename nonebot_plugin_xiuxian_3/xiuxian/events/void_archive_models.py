@@ -33,10 +33,13 @@ class VoidArchiveTaskClaimRecord:
     player: PlayerView
     week_id: str
     task_key: str
+    task_name: str
     progress: int
     target: int
     reward: dict[str, int]
     unlock_activated: bool
+    unlock_reward: dict[str, int] = field(default_factory=dict)
+    unlock_expires_at: str | None = None
     already_completed: bool = False
 
 

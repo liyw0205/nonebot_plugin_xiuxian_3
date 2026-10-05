@@ -166,6 +166,41 @@
       "key": "event.heart_demon_trial"
     },
     {
+      "name": "虚空档案",
+      "desc": "档案遗迹留下每周可追索的碎片线索，集齐线索后方可再入档案航道。",
+      "status": "active",
+      "archive": {
+        "unlock_duration_seconds": 604800,
+        "route_key": "void.archive_ruins",
+        "enemy_key": "enemy.archive_keeper",
+        "weekly_cap": 1,
+        "first_reward_key": "reward.event.archive.first",
+        "repeat_reward_key": "reward.event.archive.repeat",
+        "unlock_reward_key": "reward.event.archive.unlock",
+        "tasks": [
+          {
+            "key": "task.archive_fragment.alpha",
+            "name": "初入航道",
+            "target": 2,
+            "reward_key": "reward.event.archive.fragment.alpha"
+          },
+          {
+            "key": "task.archive_fragment.beta",
+            "name": "守卫遗迹",
+            "target": 1,
+            "reward_key": "reward.event.archive.fragment.beta"
+          },
+          {
+            "key": "task.archive_fragment.gamma",
+            "name": "炼制虚空晶",
+            "target": 1,
+            "reward_key": "reward.event.archive.fragment.gamma"
+          }
+        ]
+      },
+      "key": "event.archive_unlock"
+    },
+    {
       "name": "领域前线",
       "desc": "领域裂痕附近战事渐起，各方修士集结守望，稳住动荡的天地边界。",
       "status": "active",

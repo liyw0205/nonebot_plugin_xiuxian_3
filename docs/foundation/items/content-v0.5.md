@@ -10,6 +10,9 @@
 | `item.armor.phase_robe` | 防具，唯一 | 24h 绑定 | 每日一次虚相免伤 1 回合；触发后记日配额 | 虚实试炼 |
 | `item.recipe.void_refinery` | 配方，唯一 | 绑定 | 炼虚突破前置，解锁虚空加工 | 炼虚工坊 |
 | `item.void_archive` | 任务物，9 | 绑定 | `quest.break_void` 交付；不可交易/销毁 | 虚空档案遗迹 |
+| `item.archive_fragment.alpha` | 任务物，99 | 绑定 | 档案周任务：初入航道 | 第一航道 |
+| `item.archive_fragment.beta` | 任务物，99 | 绑定 | 档案周任务：守卫遗迹 | 档案守卫 |
+| `item.archive_fragment.gamma` | 任务物，99 | 绑定 | 档案周任务：炼制虚空晶 | 虚空加工 |
 | `item.void_power_crystal` | 消耗品，99 | 绑定 24h | 恢复 `resource.void_power` 50，10 分钟冷却 | `recipe.void.crystal_refine` |
 | `item.array.void_route` | 宗门航标，唯一 | 宗门绑定，维护 7 天 | 宗门航道成本 -1，最低仍为 1 锚 | `recipe.array.void_route` |
 | `item.array.time_accelerator` | 阵法实例，唯一 | 绑定 7 天 | 一张生产订单时间 -3000 bp；每订单一次 | `recipe.time.accelerator` |

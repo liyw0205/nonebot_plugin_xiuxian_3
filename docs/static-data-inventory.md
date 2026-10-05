@@ -143,6 +143,7 @@ data/
 
 `item.void_crystal`、`item.void_anchor`、`item.weapon.void_edge`、
 `item.armor.phase_robe`、`item.recipe.void_refinery`、`item.void_archive`、
+`item.archive_fragment.alpha`、`item.archive_fragment.beta`、`item.archive_fragment.gamma`、
 `item.void_power_crystal`、`item.array.void_route`、
 `item.array.time_accelerator`。
 

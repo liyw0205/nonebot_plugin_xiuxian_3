@@ -15,9 +15,9 @@
 | `quest_or_task_key` | 目标 | 奖励/状态 | 上限 |
 |:--|:--|:--|:--|
 | `quest.break_void` | 完成界壁试炼至少 3 次、从档案航道结算并击败档案守卫、交付 `item.void_archive` 1 | 炼虚突破许可 | 许可每角色一次；试炼每 UTC 周最多 5 次 |
-| `task.archive_fragment.alpha` | 第一航道成功探索 2 次 | 档案碎片 alpha、虚空功勋 20 | 每周一次 |
-| `task.archive_fragment.beta` | 击败 `enemy.archive_keeper` 1 次 | 档案碎片 beta、虚空功勋 20 | 每周一次 |
-| `task.archive_fragment.gamma` | 完成虚空加工订单 1 次 | 档案碎片 gamma、虚空功勋 20 | 每周一次 |
+| `task.archive_fragment.alpha` | 第一航道成功探索 2 次 | 档案碎片·初入、虚空功勋 20 | 每周一次 |
+| `task.archive_fragment.beta` | 击败 `enemy.archive_keeper` 1 次 | 档案碎片·守卫、虚空功勋 20 | 每周一次 |
+| `task.archive_fragment.gamma` | 完成虚空加工订单 1 次 | 档案碎片·炼晶、虚空功勋 20 | 每周一次 |
 
 三种碎片任务完成后，由 `event.archive_unlock` 按角色/周唯一开放新航道资格。化神角色完成三次界壁试炼后，可以进入档案航道并由服务端自动结算档案守卫；炼虚角色也可以使用该航道。`探索档案遗迹` 不再兼容旧版直接发放档案物品的入口，只接受已结算航道和守卫战 operation。`quest.break_void`（`quests-0.5.1`）只在累计三次试炼参与、档案守卫胜利和档案交付都完成后可领取；失败试炼仍计参与但不产资源，胜利每次发放虚空锚 2 与虚空晶 2，每 UTC 周最多开始 5 次。许可不自动消耗锚或创建突破。所有任务以来源 operation 去重，赛季关闭后已完成许可可保留。
 

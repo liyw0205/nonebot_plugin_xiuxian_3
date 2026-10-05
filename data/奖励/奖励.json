@@ -1201,6 +1201,105 @@
       ],
       "status": "active",
       "key": "reward.routine.makeup.daily"
+    },
+    {
+      "name": "档案守卫首通所得",
+      "desc": "本周首次击退档案守卫后取得的档案凭证。",
+      "operation": "event.archive_ruins",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.void_archive",
+          "quantity": 1
+        }
+      ],
+      "status": "active",
+      "key": "reward.event.archive.first"
+    },
+    {
+      "name": "档案守卫再战所得",
+      "desc": "本周再次击退档案守卫后凝成的虚空晶。",
+      "operation": "event.archive_ruins",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.void_crystal",
+          "quantity": 3
+        }
+      ],
+      "status": "active",
+      "key": "reward.event.archive.repeat"
+    },
+    {
+      "name": "档案航道解锁功勋",
+      "desc": "集齐本周三项档案碎片后取得的虚空功勋。",
+      "operation": "event.archive_unlock",
+      "entries": [
+        {
+          "kind": "resource",
+          "resource_key": "void_merit",
+          "quantity": 50
+        }
+      ],
+      "status": "active",
+      "key": "reward.event.archive.unlock"
+    },
+    {
+      "name": "初入航道嘉奖",
+      "desc": "完成初入航道周任务后取得的功勋与档案碎片。",
+      "operation": "task.archive_fragment.alpha.claim",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.archive_fragment.alpha",
+          "quantity": 1
+        },
+        {
+          "kind": "resource",
+          "resource_key": "void_merit",
+          "quantity": 20
+        }
+      ],
+      "status": "active",
+      "key": "reward.event.archive.fragment.alpha"
+    },
+    {
+      "name": "守卫遗迹嘉奖",
+      "desc": "完成守卫遗迹周任务后取得的功勋与档案碎片。",
+      "operation": "task.archive_fragment.beta.claim",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.archive_fragment.beta",
+          "quantity": 1
+        },
+        {
+          "kind": "resource",
+          "resource_key": "void_merit",
+          "quantity": 20
+        }
+      ],
+      "status": "active",
+      "key": "reward.event.archive.fragment.beta"
+    },
+    {
+      "name": "炼制虚空晶嘉奖",
+      "desc": "完成炼制虚空晶周任务后取得的功勋与档案碎片。",
+      "operation": "task.archive_fragment.gamma.claim",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.archive_fragment.gamma",
+          "quantity": 1
+        },
+        {
+          "kind": "resource",
+          "resource_key": "void_merit",
+          "quantity": 20
+        }
+      ],
+      "status": "active",
+      "key": "reward.event.archive.fragment.gamma"
     }
   ],
   "schema": "xiuxian.content"

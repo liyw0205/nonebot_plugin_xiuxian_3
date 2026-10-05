@@ -526,6 +526,48 @@
       "key": "item.dao_fruit_fragment"
     },
     {
+      "name": "档案碎片·初入",
+      "desc": "从虚空航道中寻得的档案残片，记录着遗迹最初的坐标。",
+      "item_type": "quest_item",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.archive_fragment.alpha"
+    },
+    {
+      "name": "档案碎片·守卫",
+      "desc": "记下档案守卫气息的残片，仍留有战斗时的余威。",
+      "item_type": "quest_item",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.archive_fragment.beta"
+    },
+    {
+      "name": "档案碎片·炼晶",
+      "desc": "炼制虚空晶时留下的片段，映着微弱的星辉。",
+      "item_type": "quest_item",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.archive_fragment.gamma"
+    },
+    {
       "name": "天劫凭证",
       "desc": "记有天劫台印记的凭证，可供渡劫修士开启试炼。",
       "item_type": "tribulation_token",
