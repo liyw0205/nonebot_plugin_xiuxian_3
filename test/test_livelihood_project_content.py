@@ -88,6 +88,19 @@ def test_public_project_content_rejects_unknown_asset_reference(tmp_path: Path) 
         public_project_definitions(bundle)
 
 
+def test_public_project_content_rejects_unknown_codex_reference(tmp_path: Path) -> None:
+    content_dir = _copy_content(tmp_path)
+    source = content_dir / "生活" / "生活.json"
+    document = json.loads(source.read_text(encoding="utf-8"))
+    project = next(row for row in document["records"] if row["key"] == "project.town_well")
+    project["codex_entry_key"] = "codex.missing.public_works"
+    source.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    bundle = ContentBundle.load(content_dir)
+    with pytest.raises(ContentError, match="inactive codex entry"):
+        public_project_definitions(bundle)
+
+
 @pytest.mark.parametrize(
     "invalid_reference",
     ["missing_reputation_key", "closed_location", "missing_location_cap"],

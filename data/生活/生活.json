@@ -599,6 +599,7 @@
         "spirit_stones": 30,
         "local_reputation": 5
       },
+      "codex_entry_key": "codex.dao.service_public_works",
       "local_reputation_key": "local.xuantian.new_town",
       "reputation_location_key": "xuantian.new_town",
       "key": "project.town_well",
@@ -620,6 +621,7 @@
         "service_reputation": 3,
         "item": "item.token.transport_coupon"
       },
+      "codex_entry_key": "codex.dao.service_public_works",
       "key": "project.market_road",
       "record_type": "public_project",
       "status": "active"
@@ -637,6 +639,7 @@
       "reward": {
         "item": "item.seed.herb_bundle"
       },
+      "codex_entry_key": "codex.dao.service_public_works",
       "key": "project.herb_garden",
       "record_type": "public_project",
       "status": "active"
@@ -661,6 +664,7 @@
         "service_reputation": 3,
         "item": "item.token.construction_coupon"
       },
+      "codex_entry_key": "codex.dao.service_public_works",
       "local_reputation_key": "local.xuantian.domain_front",
       "reputation_location_key": "xuantian.domain_front",
       "required_sect_level": 4,
@@ -691,6 +695,7 @@
         "service_reputation": 3,
         "item": "item.token.construction_coupon"
       },
+      "codex_entry_key": "codex.dao.service_public_works",
       "local_reputation_key": "local.demon.abyss_market",
       "reputation_location_key": "demon.abyss_market",
       "required_faction": "demon",
@@ -722,6 +727,7 @@
         "service_reputation": 3,
         "item": "item.token.construction_coupon"
       },
+      "codex_entry_key": "codex.dao.service_public_works",
       "local_reputation_key": "local.beast.three_realms_trade_port",
       "reputation_location_key": "beast.three_realms_trade_port",
       "required_faction": "beast",

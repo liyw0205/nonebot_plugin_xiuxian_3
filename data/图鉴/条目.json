@@ -199,6 +199,13 @@
       "status": "active"
     },
     {
+      "key": "codex.dao.service_public_works",
+      "name": "道统公共建设",
+      "desc": "亲自完成一项公共建设后，留下道统建设见闻。",
+      "category": "service",
+      "status": "active"
+    },
+    {
       "key": "codex.story.dao_service_origin",
       "name": "道统服务缘起",
       "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",

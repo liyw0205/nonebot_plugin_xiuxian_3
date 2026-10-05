@@ -342,6 +342,8 @@ class PublicProjectDefinition:
     required_access_key: str | None = None
     aliases: tuple[str, ...] = ()
     service_sources: tuple["ProjectServiceSource", ...] = ()
+    codex_entry_key: str | None = None
+    codex_entry_label: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -425,6 +427,18 @@ def public_project_definitions(content: ContentBundle | None = None) -> dict[str
         aliases = row.get("aliases", [])
         if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
             raise ContentError(f"public project {key} aliases must be non-empty strings")
+        codex_entry_key = row.get("codex_entry_key")
+        codex_entry_label: str | None = None
+        if codex_entry_key is not None:
+            if not isinstance(codex_entry_key, str) or not codex_entry_key:
+                raise ContentError(f"public project {key} has invalid codex_entry_key")
+            try:
+                codex_entry = bundle.require("codex_entry", codex_entry_key, include_locked=False)
+            except KeyError as exc:
+                raise ContentError(
+                    f"public project {key} references inactive codex entry {codex_entry_key!r}"
+                ) from exc
+            codex_entry_label = str(codex_entry["name"]).strip()
         local_reputation_key = row.get("local_reputation_key")
         reputation_location_key = row.get("reputation_location_key")
         local_reputation = normalized_reward.get("local_reputation", 0)
@@ -512,6 +526,8 @@ def public_project_definitions(content: ContentBundle | None = None) -> dict[str
             required_access_key=permission_fields["required_access_key"],
             aliases=tuple(alias.strip() for alias in aliases),
             service_sources=tuple(service_sources),
+            codex_entry_key=codex_entry_key,
+            codex_entry_label=codex_entry_label,
         )
     if not result:
         raise ContentError("no active public project content records")

@@ -33,6 +33,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..utils.json import json_object
+from ..specials.codex_projection import record_codex_discovery
 from .project_models import ProjectContributionRecord, ProjectSettlementRecord, PublicProjectView
 from .rules import (
     PublicProjectDefinition,
@@ -509,6 +510,22 @@ class ProjectRepositoryMixin:
                 reward, local_reputation_before, local_reputation_after = self._grant_reward(
                     connection, player, snapshot, now_text
                 )
+                codex_entry_key = snapshot.get("codex_entry_key")
+                if codex_entry_key:
+                    if not record_codex_discovery(
+                        connection,
+                        player_id=int(player["id"]),
+                        entry_key=str(codex_entry_key),
+                        operation_id=operation_id,
+                        occurred_at=now_text,
+                        snapshot={
+                            "project_key": str(project["project_key"]),
+                            "project_id": str(project["project_id"]),
+                            "label": str(snapshot["codex_entry_label"]),
+                        },
+                        content=self.content,
+                    ):
+                        raise ValueError("project codex discovery could not be recorded")
                 updated_player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
                 award = {
                     "reward": reward,
@@ -607,6 +624,8 @@ class ProjectRepositoryMixin:
                             }
                             for source in definition.service_sources
                         ],
+                        "codex_entry_key": definition.codex_entry_key,
+                        "codex_entry_label": definition.codex_entry_label,
                     },
                     ensure_ascii=False,
                     sort_keys=True,
@@ -783,6 +802,15 @@ class ProjectRepositoryMixin:
             raise ValueError("project snapshot labels are invalid")
         if not isinstance(snapshot["service_sources"], list):
             raise ValueError("project snapshot service sources are invalid")
+        codex_entry_key = snapshot.get("codex_entry_key")
+        codex_entry_label = snapshot.get("codex_entry_label")
+        if codex_entry_key is not None and (
+            not isinstance(codex_entry_key, str)
+            or not codex_entry_key
+            or not isinstance(codex_entry_label, str)
+            or not codex_entry_label.strip()
+        ):
+            raise ValueError("project snapshot codex entry is invalid")
         return snapshot
 
     @staticmethod
