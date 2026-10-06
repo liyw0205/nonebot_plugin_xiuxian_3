@@ -146,7 +146,7 @@ class TowerRepositoryMixin:
 
             player = self._require_player(connection, platform, platform_user_id)
             if not self._meets_realm_values(
-                str(player["realm_key"]), int(player["realm_layer"]),
+                str(player["realm_key"]), player_integer(player, "realm_layer"),
                 definition.required_realm, definition.required_layer,
             ):
                 raise TowerRequirementError("realm requirement is not met")

@@ -107,7 +107,7 @@ class TribulationTrialRepositoryMixin:
                 or player_integer(row, "realm_layer") < max(event_definition.required_layer, definition.required_layer)
             ):
                 raise TrialSequenceError("tribulation layer is insufficient")
-            if int(row["tribulation_debt"]) >= 100:
+            if player_integer(row, "tribulation_debt") >= 100:
                 raise TribulationDebtBlockedError("tribulation debt is too high")
             if connection.execute(
                 "SELECT 1 FROM tribulation_trial_sessions WHERE player_id=? AND status='preparing' LIMIT 1",
@@ -156,7 +156,7 @@ class TribulationTrialRepositoryMixin:
                         pass
 
             if definition.choice_minimum_progress is not None:
-                if int(row["dao_fruit_progress"]) < definition.choice_minimum_progress:
+                if player_integer(row, "dao_fruit_progress") < definition.choice_minimum_progress:
                     raise TrialSequenceError("dao fruit progress is insufficient")
                 expected_fruit = fruit_for_path(row["path_key"], self.content)
                 if not choice_key or (definition.choice_match_path_fruit and choice_key != expected_fruit):
@@ -193,7 +193,7 @@ class TribulationTrialRepositoryMixin:
                 stats["attack"] = max(5_000, stats["attack"] * 3 // 5)
             session_id = uuid4().hex
             battle_id = uuid4().hex
-            shield_bp = debt_shield_bp(int(row["tribulation_debt"]))
+            shield_bp = debt_shield_bp(player_integer(row, "tribulation_debt"))
             snapshot = {
                 "profile_key": PROFILE_KEY,
                 "battle_type": "pve.tribulation_trial",
@@ -208,11 +208,11 @@ class TribulationTrialRepositoryMixin:
                     "realm_key": str(row["realm_key"]),
                     "realm_layer": player_integer(row, "realm_layer"),
                     "dao_fruit_key": row["dao_fruit_key"],
-                    "dao_fruit_progress": int(row["dao_fruit_progress"]),
+                    "dao_fruit_progress": player_integer(row, "dao_fruit_progress"),
                     "domain_key": row["domain_key"],
-                    "domain_power": int(row["domain_power"]),
-                    "domain_charge": int(row["domain_charge"]),
-                    "realm_resistance_bp": int(row["realm_resistance_bp"]),
+                    "domain_power": player_integer(row, "domain_power"),
+                    "domain_charge": player_integer(row, "domain_charge"),
+                    "realm_resistance_bp": player_integer(row, "realm_resistance_bp"),
                 },
                 "enemy": {
                     "key": ENEMY_KEY,
@@ -238,7 +238,7 @@ class TribulationTrialRepositoryMixin:
                 "tribulation": {
                     "trial_key": trial_key,
                     "choice_key": choice_key,
-                    "debt_before": int(row["tribulation_debt"]),
+                    "debt_before": player_integer(row, "tribulation_debt"),
                     "difficulty_bp": shield_bp,
                     "debt_shield_bp": shield_bp,
                     "guard_used": guard_used,
@@ -303,7 +303,7 @@ class TribulationTrialRepositoryMixin:
                 "status": "preparing",
                 "starts_at": now_text,
                 "ends_at": ends_at,
-                "debt_before": int(row["tribulation_debt"]),
+                "debt_before": player_integer(row, "tribulation_debt"),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -406,8 +406,8 @@ class TribulationTrialRepositoryMixin:
                 if success and definition.choice_match_path_fruit
                 else None
             )
-            new_progress = min(1300, int(row["dao_fruit_progress"]) + progress)
-            new_debt = int(row["tribulation_debt"]) + debt_delta
+            new_progress = min(1300, player_integer(row, "dao_fruit_progress") + progress)
+            new_debt = player_integer(row, "tribulation_debt") + debt_delta
             cooldown_until = serialize_datetime(now + timedelta(seconds=definition.cooldown_seconds)) if not success else None
             reward_assets = dict(reward_items)
             if guard_refund:

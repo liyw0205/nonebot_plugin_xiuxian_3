@@ -388,7 +388,7 @@ class ProductionRepositoryMixin:
                 "recipe_key": recipe.key,
                 "recipe_name": recipe.name,
                 "realm_key": row["realm_key"],
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
                 "location_key": row["location_key"],
@@ -734,11 +734,11 @@ class ProductionRepositoryMixin:
             raise RecipeRequirementError("当前道途或生产教学不满足这条配方")
         if teaching and recipe.required_realm == "qi_sensing":
             realm_ok = (
-                (str(row["realm_key"]) == "qi_sensing" and int(row["realm_layer"]) >= recipe.min_realm_layer)
+                (str(row["realm_key"]) == "qi_sensing" and player_integer(row, "realm_layer") >= recipe.min_realm_layer)
                 or str(row["realm_key"]) == "qi_gathering"
             )
         else:
-            realm_ok = str(row["realm_key"]) in (recipe.required_realm, *recipe.additional_realms) and int(row["realm_layer"]) >= recipe.min_realm_layer
+            realm_ok = str(row["realm_key"]) in (recipe.required_realm, *recipe.additional_realms) and player_integer(row, "realm_layer") >= recipe.min_realm_layer
         if not realm_ok:
             if cross_realm:
                 raise CrossRealmRecipeLockedError("当前境界不满足这条跨界配方")

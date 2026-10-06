@@ -26,6 +26,7 @@ from .dao_echoes import (
 )
 from .mainline import meets_realm
 from .dao_echoes_models import DaoEchoesLaneProgress, DaoEchoesStatusRecord
+from ..utils.player import player_integer
 from .mainline_models import MainlineClaimRecord, MainlineStageView, MainlineStartRecord
 
 
@@ -91,7 +92,7 @@ class DaoEchoesRepositoryMixin:
                 elif claimed:
                     status = "claimed"
                 elif DaoEchoesRepositoryMixin._dao_echoes_prerequisites_met(
-                    definition, completed, str(player["realm_key"]), int(player["realm_layer"]), self.content
+                    definition, completed, str(player["realm_key"]), player_integer(player, "realm_layer"), self.content
                 ):
                     status = "available"
                 else:
@@ -209,7 +210,7 @@ class DaoEchoesRepositoryMixin:
                 definition,
                 completed,
                 str(player["realm_key"]),
-                int(player["realm_layer"]),
+                player_integer(player, "realm_layer"),
                 self.content,
             ):
                 raise MainlineRequirementError("dao echoes prerequisites are not met")
@@ -236,7 +237,7 @@ class DaoEchoesRepositoryMixin:
                 "description": definition.description,
                 "codex_flag": definition.codex_flag,
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "location_key": str(player["location_key"]),
                 "repeat_pending": repeat_pending,
             }

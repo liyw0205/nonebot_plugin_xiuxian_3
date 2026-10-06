@@ -28,7 +28,7 @@ from .three_realms import (
     three_realms_definition,
 )
 from .three_realms_models import ThreeRealmsLaneProgress, ThreeRealmsStatusRecord
-from ..utils.player import grant_player_reward
+from ..utils.player import grant_player_reward, player_integer
 
 
 class ThreeRealmsRepositoryMixin:
@@ -69,7 +69,7 @@ class ThreeRealmsRepositoryMixin:
                 running = run is not None and str(run["status"]) == "running"
                 available = (
                     str(player["realm_key"]) == "nascent_soul"
-                    and int(player["realm_layer"]) >= 1
+                    and player_integer(player, "realm_layer") >= 1
                     and (chosen_lane is None or chosen_lane == lane)
                     and all(item in completed for item in definition.prerequisites)
                 )
@@ -129,7 +129,7 @@ class ThreeRealmsRepositoryMixin:
             if definition.runtime_status != "open":
                 raise MainlineContentClosedError("three-realms mainline stage is closed")
             player = self._require_player(connection, platform, platform_user_id)
-            if not meets_realm(str(player["realm_key"]), int(player["realm_layer"]), "nascent_soul", 1):
+            if not meets_realm(str(player["realm_key"]), player_integer(player, "realm_layer"), "nascent_soul", 1):
                 raise MainlineRequirementError("nascent soul is required")
             rows = connection.execute(
                 "SELECT * FROM mainline_runs WHERE player_id=? AND story_key=?",
@@ -157,7 +157,7 @@ class ThreeRealmsRepositoryMixin:
                 "lane": definition.lane,
                 "stage_key": definition.key,
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "location_key": str(player["location_key"]),
                 "repeat_pending": repeat_pending,
             }

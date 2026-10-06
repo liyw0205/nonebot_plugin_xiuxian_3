@@ -553,8 +553,8 @@ class CultivationRepositoryMixin:
                 },
                 player_values={
                     "soul_power_max": max(
-                        int(row["soul_power_max"]),
-                        int(row["soul_power"]),
+                        player_integer(row, "soul_power_max"),
+                        player_integer(row, "soul_power"),
                         mode.soul_power_max,
                     ),
                     "item_effects_json": json.dumps(item_effects, ensure_ascii=False, sort_keys=True),
@@ -750,7 +750,7 @@ class CultivationRepositoryMixin:
                     "total_cultivation": gain,
                     "soul_power": soul_power_gain,
                 },
-                maximums={"soul_power": max(int(row["soul_power_max"]), int(snapshot["soul_power_max"]))},
+                maximums={"soul_power": max(player_integer(row, "soul_power_max"), int(snapshot["soul_power_max"]))},
             )
             settlement_result = {
                 "cultivation_gain": gain,
@@ -898,7 +898,7 @@ class CultivationRepositoryMixin:
                     "total_cultivation": gain,
                     "soul_power": soul_power_gain,
                 },
-                maximums={"soul_power": max(int(row["soul_power_max"]), int(snapshot["soul_power_max"]))},
+                maximums={"soul_power": max(player_integer(row, "soul_power_max"), int(snapshot["soul_power_max"]))},
             )
             connection.execute(
                 "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",

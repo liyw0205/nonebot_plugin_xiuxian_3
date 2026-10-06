@@ -20,7 +20,7 @@ from ..persistence.errors import (
     TeamArenaSnapshotRequirementError,
 )
 from .team_arena_models import TeamArenaMatchRecord, TeamArenaReplayRecord, TeamArenaSnapshotRecord
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer
 from .team_arena_rules import (
     TEAM_ARENA_MODE_KEY,
     TEAM_DAILY_CHALLENGE_LIMIT,
@@ -105,9 +105,9 @@ class TeamArenaRepositoryMixin:
             self._team_arena_expire_due(connection, now_text)
             rows = connection.execute(
                 "SELECT * FROM arena_team_snapshots WHERE status = 'published' AND matchable_at <= ? AND expires_at > ? AND party_id NOT IN (SELECT party_id FROM party_members WHERE player_id = ? AND status = 'active') ORDER BY ABS(rating - ?), created_at",
-                (now_text, now_text, player["id"], player["arena_rating"]),
+                (now_text, now_text, player["id"], player_integer(player, "arena_rating", 1000)),
             ).fetchall()
-            return tuple(self._team_snapshot_from_row(row) for row in rows if compatible_team_rating(int(player["arena_rating"]), int(row["rating"])))
+            return tuple(self._team_snapshot_from_row(row) for row in rows if compatible_team_rating(player_integer(player, "arena_rating", 1000), int(row["rating"])))
 
     def _challenge_team_arena_once(self, platform: str, platform_user_id: str, requested_snapshot_id: str | None, operation_id: str, request_id: str = "") -> TeamArenaMatchRecord:
         operation_name = "specials.challenge_team_arena"
@@ -265,7 +265,7 @@ class TeamArenaRepositoryMixin:
             player_row = dict(member)
             player_row["id"] = member["player_id"]
             player_snapshot = self._arena_player_snapshot(connection, player_row, snapshot_id + ":" + str(member["stable_player_id"]))
-            player_snapshot.update({"player_id": str(member["stable_player_id"]), "database_id": int(member["player_id"]), "dao_name": str(member["dao_name"] or ""), "arena_rating": int(member["arena_rating"])})
+            player_snapshot.update({"player_id": str(member["stable_player_id"]), "database_id": int(member["player_id"]), "dao_name": str(member["dao_name"] or ""), "arena_rating": player_integer(member, "arena_rating", 1000)})
             result.append(player_snapshot)
         return {"mode_key": TEAM_ARENA_MODE_KEY, "snapshot_id": snapshot_id, "party_id": str(party["party_id"]), "members": result}
 

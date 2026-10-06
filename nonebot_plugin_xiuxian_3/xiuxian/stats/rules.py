@@ -9,7 +9,7 @@ from typing import Any, Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
 from ..utils.json import json_object
-from ..utils.player import player_values
+from ..utils.player import player_integer, player_values
 
 STAT_KEYS = ("body", "spirit", "insight", "root", "agility", "fortune")
 DERIVED_KEYS = (
@@ -112,7 +112,7 @@ def _realm_index(row: Mapping[str, Any], content: ContentBundle) -> tuple[str, i
         or realm["layer_min"] > realm["layer_max"]
     ):
         raise StatError("STAT_RULE_NOT_FOUND", "当前境界没有可用的属性推演规则。")
-    layer = row["realm_layer"] if "realm_layer" in row.keys() else row.get("realm_layer", 0)
+    layer = player_integer(row, "realm_layer")
     if isinstance(layer, bool) or not isinstance(layer, int) or not realm["layer_min"] <= layer <= realm["layer_max"]:
         raise StatError("STAT_VALUE_OUT_OF_RANGE", "境界层数无效。")
     layer_tail = max(layer - 1, 0)
@@ -160,7 +160,7 @@ def build_stat_preview(row: Mapping[str, Any], content: ContentBundle | None = N
         "formula_fingerprint": formula.fingerprint,
         "warnings": warnings,
         "realm_key": realm_key,
-        "realm_layer": int(row["realm_layer"] if "realm_layer" in row.keys() else row.get("realm_layer", 0)),
+        "realm_layer": player_integer(row, "realm_layer"),
     }
 
 

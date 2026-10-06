@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..content import ContentBundle, ContentError
+from ..utils.player import player_integer
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +72,7 @@ def partner_eligible(player: Any, definition: PartnerDefinition, content: Conten
     if realm is None or not isinstance(realm.get("rank"), int):
         return False
     rank = int(realm["rank"])
-    layer = int(player["realm_layer"])
+    layer = player_integer(player, "realm_layer")
     return rank > definition.required_rank or (rank == definition.required_rank and layer >= definition.required_layer)
 
 

@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.player import change_player_values
+from ..utils.player import change_player_values, player_integer
 from ..persistence.errors import (
     OperationConflictError,
     SectNotFoundError,
@@ -156,8 +156,8 @@ class SectWarRepositoryMixin:
                 member_snapshot = {
                     "player_id": int(member["id"]),
                     "realm_key": str(member["realm_key"]),
-                    "realm_layer": int(member["realm_layer"]),
-                    "cultivation": int(member["cultivation"]),
+                    "realm_layer": player_integer(member, "realm_layer"),
+                    "cultivation": player_integer(member, "cultivation"),
                 }
                 snapshot["members"].append(member_snapshot)
             connection.execute(

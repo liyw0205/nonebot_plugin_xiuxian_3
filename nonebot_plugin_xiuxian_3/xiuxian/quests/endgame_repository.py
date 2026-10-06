@@ -10,7 +10,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount, spend_player_items
-from ..utils.player import grant_player_state, player_inventory
+from ..utils.player import grant_player_state, player_integer, player_inventory
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
     DaoOriginTaskRequirementError,
@@ -162,7 +162,7 @@ class EndgameQuestRepositoryMixin:
             if replay is not None:
                 return self._action_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
-            if not meets_realm(str(player["realm_key"]), int(player["realm_layer"]), "void_refining", 10):
+            if not meets_realm(str(player["realm_key"]), player_integer(player, "realm_layer"), "void_refining", 10):
                 raise QuestRequirementError("dao union qualification requires void refining L10")
             count = (
                 self._valid_dao_union_mainline_event_count(connection, int(player["id"]))
@@ -301,7 +301,7 @@ class EndgameQuestRepositoryMixin:
                 "path_key": player["path_key"],
                 "subprofession_key": player["subprofession_key"],
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "components": progress,
                 "reward": qualification_reward,
             }
@@ -367,7 +367,7 @@ class EndgameQuestRepositoryMixin:
             if replay is not None:
                 return self._action_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
-            if not meets_realm(str(player["realm_key"]), int(player["realm_layer"]), "dao_union"):
+            if not meets_realm(str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union"):
                 raise DaoOriginTaskRequirementError("dao-origin tasks require 合道")
             if str(player["endgame_status"] or "none") not in {"dao_union", "tribulation"}:
                 raise DaoOriginTaskRequirementError("dao-origin tasks require an active endgame route")

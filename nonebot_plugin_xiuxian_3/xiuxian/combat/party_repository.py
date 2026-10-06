@@ -412,7 +412,7 @@ class PartyCombatRepositoryMixin:
                 )
                 member_location = str(entry_snapshot.get("location_key", row["location_key"]) if entry_snapshot else row["location_key"])
                 member_realm = str(entry_snapshot.get("realm_key", row["realm_key"]) if entry_snapshot else row["realm_key"])
-                member_realm_layer = int(entry_snapshot.get("realm_layer", row["realm_layer"]) if entry_snapshot else row["realm_layer"])
+                member_realm_layer = int(entry_snapshot.get("realm_layer", player_state["realm_layer"]) if entry_snapshot else player_state["realm_layer"])
                 if member_location != str(party["location_key"]):
                     if boundary_rift_combat:
                         raise BoundaryRealmRequirementError("party members must share the frozen location")

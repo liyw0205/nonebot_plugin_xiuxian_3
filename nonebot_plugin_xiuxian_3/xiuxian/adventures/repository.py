@@ -549,7 +549,7 @@ class AdventuresRepositoryMixin:
         if stage not in {STAGE_MORTAL, "seeker", "cultivator"}:
             return False
         realm_key = str(row["realm_key"] if isinstance(row, sqlite3.Row) else row.get("realm_key", "mortal"))
-        layer = int(row["realm_layer"] if isinstance(row, sqlite3.Row) else row.get("realm_layer", 0))
+        layer = player_integer(row, "realm_layer")
         path_key = row["path_key"] if isinstance(row, sqlite3.Row) else row.get("path_key")
         if definition.path_keys and path_key not in definition.path_keys:
             return False
@@ -1479,7 +1479,7 @@ class AdventuresRepositoryMixin:
             snapshot = {
                 "stage": str(row["stage"]),
                 "realm_key": str(row["realm_key"]),
-                "realm_layer": int(row["realm_layer"]),
+                "realm_layer": player_integer(row, "realm_layer"),
                 "location_key": str(row["location_key"]),
                 "intro_flags": list(SQLitePlayerRepository._json_object(row["intro_json"], {}).get("flags", [])),
                 "definition": {

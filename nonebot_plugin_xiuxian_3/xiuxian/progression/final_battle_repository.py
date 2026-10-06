@@ -712,7 +712,7 @@ class FinalBattleRepositoryMixin:
         trials = {str(row["trial_key"]) for row in connection.execute("SELECT trial_key FROM tribulation_trial_sessions WHERE player_id=? AND status='succeeded'", (player["id"],)).fetchall()}
         if not set(tribulation_definition(self.content).trial_order).issubset(trials):
             raise FinalBattleRequirementError("all three tribulation trials must be complete")
-        if int(player["dao_fruit_progress"]) < FINAL_BATTLE_MIN_PROGRESS or int(player["ascension_merit"]) < FINAL_BATTLE_MIN_MERIT or int(player["tribulation_debt"]) >= 100:
+        if player_integer(player, "dao_fruit_progress") < FINAL_BATTLE_MIN_PROGRESS or player_integer(player, "ascension_merit") < FINAL_BATTLE_MIN_MERIT or player_integer(player, "tribulation_debt") >= 100:
             raise FinalBattleRequirementError("final battle progression requirements are not met")
         inventory = player_inventory(player)
         if inventory_amount(inventory, ASCENSION_CERTIFICATE_KEY) < 1:

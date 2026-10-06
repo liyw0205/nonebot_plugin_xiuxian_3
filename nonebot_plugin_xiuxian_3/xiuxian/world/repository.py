@@ -114,7 +114,7 @@ class WorldRepositoryMixin:
                 ).fetchone()
                 if sect_access is None:
                     raise VoidRouteLockedError("an active member of a level-five sect is required")
-            if route_key == "void.void_market" and int(row["void_merit"]) < 1000:
+            if route_key == "void.void_market" and player_integer(row, "void_merit") < 1000:
                 raise VoidRouteLockedError("void merit 1000 is required")
             instability_until = row["void_instability_until"]
             unstable = False
@@ -138,7 +138,7 @@ class WorldRepositoryMixin:
                 raise VoidTravelBusyError("another long action is active")
             inventory = player_inventory(row)
             available_anchor = inventory_amount(inventory, "item.void_anchor")
-            anchor_cost = navigation_anchor_cost(definition.anchor_cost, int(row["space_resistance_bp"]), unstable)
+            anchor_cost = navigation_anchor_cost(definition.anchor_cost, player_integer(row, "space_resistance_bp"), unstable)
             beacon_discount = 0
             if route_key == "void.sect_fortress":
                 beacon_discount = int(self._active_void_beacon_discount(connection, int(row["id"]), now))
@@ -166,7 +166,7 @@ class WorldRepositoryMixin:
                 "route_key": route_key,
                 "random_pool": definition.random_pool,
                 "storm_roll_bp": storm_roll,
-                "space_resistance_bp": int(row["space_resistance_bp"]),
+                "space_resistance_bp": player_integer(row, "space_resistance_bp"),
                 "void_instability_until": instability_until,
                 "anchor_cost": anchor_cost,
                 "beacon_discount": beacon_discount,
@@ -201,7 +201,7 @@ class WorldRepositoryMixin:
                 "ends_at": ends_at,
                 "anchor_cost": anchor_cost,
                 "stamina_cost": definition.stamina_cost,
-                "space_resistance_bp": int(row["space_resistance_bp"]),
+                "space_resistance_bp": player_integer(row, "space_resistance_bp"),
                 "storm_roll_bp": storm_roll,
             }
             connection.execute(
@@ -217,7 +217,7 @@ class WorldRepositoryMixin:
                 ends_at=ends_at,
                 anchor_cost=anchor_cost,
                 stamina_cost=definition.stamina_cost,
-                space_resistance_bp=int(row["space_resistance_bp"]),
+                space_resistance_bp=player_integer(row, "space_resistance_bp"),
                 storm_roll_bp=storm_roll,
             )
 

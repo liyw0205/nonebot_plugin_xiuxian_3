@@ -12,6 +12,8 @@ import sqlite3
 from collections.abc import Mapping
 from typing import Any
 
+from ..utils.player import player_integer
+
 
 LOCAL_SHARD_KEY = "local"
 
@@ -120,10 +122,10 @@ def freeze_arena_season_snapshot(
     for row in rows:
         payload = {
             "player_id": int(row["id"]),
-            "arena_rating": int(row["arena_rating"]),
-            "arena_wins": int(row["arena_wins"]),
-            "arena_losses": int(row["arena_losses"]),
-            "arena_draws": int(row["arena_draws"]),
+            "arena_rating": player_integer(row, "arena_rating", 1000),
+            "arena_wins": player_integer(row, "arena_wins"),
+            "arena_losses": player_integer(row, "arena_losses"),
+            "arena_draws": player_integer(row, "arena_draws"),
         }
         connection.execute(
             """
@@ -136,10 +138,10 @@ def freeze_arena_season_snapshot(
                 season_key,
                 shard_key,
                 row["id"],
-                row["arena_rating"],
-                row["arena_wins"],
-                row["arena_losses"],
-                row["arena_draws"],
+                player_integer(row, "arena_rating", 1000),
+                player_integer(row, "arena_wins"),
+                player_integer(row, "arena_losses"),
+                player_integer(row, "arena_draws"),
                 json.dumps(payload, ensure_ascii=False, sort_keys=True),
                 frozen_at,
                 frozen_at,

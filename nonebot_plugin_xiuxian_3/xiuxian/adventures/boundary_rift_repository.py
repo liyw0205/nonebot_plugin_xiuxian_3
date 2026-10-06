@@ -168,7 +168,7 @@ class BoundaryRiftRepositoryMixin:
                     (row["id"], quota_key),
                 ).fetchone():
                     raise BoundaryRiftQuotaError("a party member already entered this UTC week")
-                if int(row["soul_power"]) <= 0:
+                if player_integer(row, "soul_power") <= 0:
                     raise BoundaryRiftRequirementError("a party member has no soul power")
                 fatigue_until = row["soul_fatigue_until"]
                 if fatigue_until:

@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_assets_missing
-from ..utils.player import change_player_state_actual, player_reputation_state
+from ..utils.player import change_player_state_actual, player_integer, player_reputation_state
 from ..content import bundled_content
 from ..rewards.rules import local_reputation_maximum
 from ..persistence.errors import (
@@ -539,7 +539,7 @@ class CommissionRepositoryMixin:
             if requirement.get("type") == "realm":
                 current_rank = realm_order.get(str(player["realm_key"]), -1)
                 required_rank = realm_order.get(str(requirement["realm_key"]), -1)
-                if (current_rank, int(player["realm_layer"])) >= (
+                if (current_rank, player_integer(player, "realm_layer")) >= (
                     required_rank,
                     int(requirement["min_layer"]),
                 ):

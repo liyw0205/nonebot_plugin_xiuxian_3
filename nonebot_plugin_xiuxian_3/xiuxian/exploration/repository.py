@@ -661,9 +661,9 @@ class ExplorationRepositoryMixin:
             soul_power_loss = 0
             soul_fatigue_until = row["soul_fatigue_until"]
             snapshot = self._json_object(session["snapshot_json"], {})
-            bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
+            bloodline_stability_after = int(snapshot.get("bloodline_stability_after", player_integer(row, "bloodline_stability")))
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
-                soul_power_loss = min(20, int(row["soul_power"]))
+                soul_power_loss = min(20, player_integer(row, "soul_power"))
                 soul_fatigue_until = serialize_datetime(self._now() + timedelta(minutes=30))
             grant_player_reward(
                 connection,
@@ -675,7 +675,7 @@ class ExplorationRepositoryMixin:
                     "soul_fatigue_until": soul_fatigue_until,
                     "bloodline_stability": bloodline_stability_after,
                 },
-                maximums={"soul_power": row["soul_power_max"]},
+                maximums={"soul_power": player_integer(row, "soul_power_max")},
             )
             result_json = {
                 "status": "settled",
@@ -964,7 +964,7 @@ class ExplorationRepositoryMixin:
                 if battle_pending:
                     status = "combat_pending"
 
-            bloodline_stability_after = int(snapshot.get("bloodline_stability_after", int(row["bloodline_stability"])))
+            bloodline_stability_after = int(snapshot.get("bloodline_stability_after", player_integer(row, "bloodline_stability")))
             if status == "settled":
                 grant_player_reward(
                     connection,

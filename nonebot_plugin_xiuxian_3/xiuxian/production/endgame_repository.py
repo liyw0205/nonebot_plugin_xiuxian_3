@@ -104,7 +104,7 @@ class EndgameProductionRepositoryMixin:
             if recipe.required_location and str(player["location_key"]) != recipe.required_location:
                 raise EndgameRecipeRequirementError("endgame recipe requires its designated location")
             if recipe.key == "recipe.dao.fruit_fragment":
-                if int(player["dao_fruit_progress"]) + recipe.output_progress > DAO_FRUIT_PROGRESS_CAP:
+                if player_integer(player, "dao_fruit_progress") + recipe.output_progress > DAO_FRUIT_PROGRESS_CAP:
                     raise EndgameRecipeRequirementError("dao fruit progress cap would be exceeded")
                 used = connection.execute(
                     "SELECT COUNT(*) AS count FROM endgame_sessions WHERE player_id = ? AND session_type = ?",
@@ -130,9 +130,9 @@ class EndgameProductionRepositoryMixin:
                     "trial.body_and_mind", "trial.three_realms", "trial.dao_choice"
                 }:
                     raise EndgameRecipeRequirementError("all three trials must succeed")
-                if int(player["dao_fruit_progress"]) < recipe.required_progress:
+                if player_integer(player, "dao_fruit_progress") < recipe.required_progress:
                     raise EndgameRecipeRequirementError("dao fruit progress is insufficient")
-                if int(player["ascension_merit"]) < recipe.required_ascension_merit:
+                if player_integer(player, "ascension_merit") < recipe.required_ascension_merit:
                     raise EndgameRecipeRequirementError("ascension merit is insufficient")
                 if player_integer(player, "world_merit") < recipe.world_merit_cost:
                     raise QuestResourceInsufficientError("world merit is insufficient")
@@ -157,7 +157,7 @@ class EndgameProductionRepositoryMixin:
                 "world_merit_cost": recipe.world_merit_cost,
                 "location_key": str(player["location_key"]),
                 "endgame_status": current_endgame_status,
-                "progress_before": int(player["dao_fruit_progress"]),
+                "progress_before": player_integer(player, "dao_fruit_progress"),
                 "roll_bp": roll_bp,
             }
             spend_player_state(
@@ -233,7 +233,7 @@ class EndgameProductionRepositoryMixin:
                 if recipe.output_item:
                     rewards[recipe.output_item] = 1
                 if recipe.output_progress:
-                    progress_reward = min(recipe.output_progress, DAO_FRUIT_PROGRESS_CAP - int(player["dao_fruit_progress"]))
+                    progress_reward = min(recipe.output_progress, DAO_FRUIT_PROGRESS_CAP - player_integer(player, "dao_fruit_progress"))
                     rewards["dao_fruit_progress"] = progress_reward
                 status = "succeeded"
             else:

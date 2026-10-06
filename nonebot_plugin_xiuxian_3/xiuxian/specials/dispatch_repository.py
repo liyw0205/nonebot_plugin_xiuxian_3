@@ -227,7 +227,7 @@ class DispatchRepositoryMixin:
                 "permit": permit_snapshot,
                 "stage": str(player["stage"]),
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "location_key": str(player["location_key"]),
                 "path_key": player["path_key"],
                 "selected_service": player["selected_service"],

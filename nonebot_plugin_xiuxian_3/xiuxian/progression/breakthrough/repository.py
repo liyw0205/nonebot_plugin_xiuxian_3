@@ -201,7 +201,7 @@ class BreakthroughRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if row["realm_key"] != "golden_core" or player_integer(row, "realm_layer") != 10 or player_integer(row, "total_cultivation") < 58960:
                 raise BreakthroughRequirementError("golden core preparation requirement is missing")
-            if int(row["foundation_quality"]) < 5500:
+            if player_integer(row, "foundation_quality") < 5500:
                 raise FoundationQualityInsufficientError("foundation quality is insufficient")
             intro = self._json_object(row["intro_json"], {})
             flags = [str(item) for item in intro.get("flags", [])]
@@ -329,7 +329,7 @@ class BreakthroughRepositoryMixin:
                 if target_realm == "soul_transformation":
                     raise CultivationInsufficientError("total cultivation is insufficient")
                 raise BreakthroughRequirementError("total cultivation is insufficient")
-            if int(row["foundation_quality"]) < definition.required_foundation_quality:
+            if player_integer(row, "foundation_quality") < definition.required_foundation_quality:
                 raise FoundationQualityInsufficientError("foundation quality is insufficient")
             is_nascent = target_realm == "nascent_soul"
             is_soul_transformation = target_realm == "soul_transformation"
@@ -464,7 +464,7 @@ class BreakthroughRepositoryMixin:
                 raise CurrencyInsufficientError("spirit stones are insufficient")
 
             pity_before = player_integer(row, "breakthrough_pity_bp")
-            foundation_quality = int(row["foundation_quality"])
+            foundation_quality = player_integer(row, "foundation_quality")
             quality_bonus_bp = 0
             if definition.quality_bonus_divisor:
                 quality_bonus_bp = min(
@@ -726,7 +726,7 @@ class BreakthroughRepositoryMixin:
             if str(row["path_key"] or "") != path_key:
                 raise DomainNotEligibleError("domain does not match primary path")
             talent_level = connection.execute("SELECT COALESCE(MAX(tier), 0) AS level FROM talent_node_states WHERE player_id = ? AND tree_key = ? AND status = 'learned'", (row["id"], path_key)).fetchone()
-            if max(int(row["domain_level"]), int(talent_level["level"] if talent_level else 0)) < 5:
+            if max(player_integer(row, "domain_level"), int(talent_level["level"] if talent_level else 0)) < 5:
                 raise DomainNotEligibleError("primary path level is insufficient")
             pending = connection.execute("SELECT id, ends_at FROM domain_selection_sessions WHERE player_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
             if pending is not None:
@@ -1115,7 +1115,7 @@ class BreakthroughRepositoryMixin:
                         updated_at=now_text,
                         player_values={
                             "foundation_quality": max(
-                                int(row["foundation_quality"]),
+                                player_integer(row, "foundation_quality"),
                                 int(snapshot.get("foundation_quality_on_success") or 5500),
                             )
                         },

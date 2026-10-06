@@ -544,7 +544,7 @@ class AncientDomainRepositoryMixin:
                         player,
                         updated_at=now_text,
                         value_delta={"domain_charge": int(row["amount"])},
-                        maximums={"domain_charge": player["domain_charge_max"]},
+                        maximums={"domain_charge": player_integer(player, "domain_charge_max")},
                     )
             if party["current_session_id"]:
                 battle_id = str(party["current_session_id"])

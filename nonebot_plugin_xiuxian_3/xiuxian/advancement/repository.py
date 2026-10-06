@@ -970,7 +970,7 @@ class AdvancementRepositoryMixin:
                 tree_key=tree_key,
                 tree_label=tree_label,
                 nodes=nodes,
-                points_available=int(row["talent_points"]),
+                points_available=player_integer(row, "talent_points"),
                 points_spent=spent,
             )
 
@@ -1076,7 +1076,7 @@ class AdvancementRepositoryMixin:
                 if prerequisite is None:
                     raise TalentPrerequisiteError("talent prerequisites are not learned")
 
-            points_before = int(row["talent_points"])
+            points_before = player_integer(row, "talent_points")
             if points_before < definition.cost_points:
                 raise ResourceInsufficientError("talent points are insufficient")
             points_after = points_before - definition.cost_points

@@ -332,11 +332,11 @@ class EndgameRepositoryMixin:
                 missing.append("TRIBULATION_L10_REQUIRED")
             if not set(tribulation_definition(self.content).trial_order).issubset(completed_set):
                 missing.append("TRIBULATION_TRIALS_INCOMPLETE")
-            if int(row["dao_fruit_progress"]) < FINAL_BATTLE_MIN_PROGRESS:
+            if player_integer(row, "dao_fruit_progress") < FINAL_BATTLE_MIN_PROGRESS:
                 missing.append("DAO_FRUIT_PROGRESS_INSUFFICIENT")
-            if int(row["ascension_merit"]) < FINAL_BATTLE_MIN_MERIT:
+            if player_integer(row, "ascension_merit") < FINAL_BATTLE_MIN_MERIT:
                 missing.append("ASCENSION_MERIT_INSUFFICIENT")
-            if int(row["tribulation_debt"]) >= 100:
+            if player_integer(row, "tribulation_debt") >= 100:
                 missing.append("TRIBULATION_DEBT_BLOCKED")
             certificate_count = inventory_amount(inventory, ASCENSION_CERTIFICATE_KEY)
             if certificate_count < 1:

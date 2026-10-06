@@ -164,7 +164,7 @@ class ThreeRealmsTowerRepositoryMixin:
             has_story_permit = "story.mainline.three_realms" in {str(value) for value in flags}
             meets_realm = self._meets_realm_values(
                 str(player["realm_key"]),
-                int(player["realm_layer"]),
+                player_integer(player, "realm_layer"),
                 definition.required_realm,
                 definition.required_layer,
             )

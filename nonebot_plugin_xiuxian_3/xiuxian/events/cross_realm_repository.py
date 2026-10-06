@@ -10,6 +10,7 @@ from typing import Any
 from ...contracts import serialize_datetime
 from ..adventures.rules import meets_realm
 from ..utils.assets import spend_player_items
+from ..utils.player import player_integer
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -141,7 +142,7 @@ class CrossRealmEventRepositoryMixin:
             definition = public_event_snapshot(str(event["event_key"]), str(event["result_json"]))
             if definition.required_realm_key is not None and not meets_realm(
                 str(player["realm_key"]),
-                int(player["realm_layer"]),
+                player_integer(player, "realm_layer"),
                 definition.required_realm_key,
                 definition.required_realm_layer,
                 self.content,

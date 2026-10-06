@@ -361,7 +361,7 @@ class TravelRepositoryMixin:
                     has_flag = progress is not None and str(progress["status"]) in {"completed", "claimed"}
                 if not has_flag:
                     raise LocationRequirementError("destination quest permission is missing")
-            if not meets_realm(str(row["realm_key"]), int(row["realm_layer"]), definition.required_realm, definition.required_layer):
+            if not meets_realm(str(row["realm_key"]), player_integer(row, "realm_layer"), definition.required_realm, definition.required_layer):
                 raise LocationRequirementError("realm requirement is not met")
             if definition.requires_selected_domain and not row["domain_key"]:
                 raise LocationRequirementError("a selected domain is required")
@@ -374,7 +374,7 @@ class TravelRepositoryMixin:
                 )
                 if not has_beast_hills_access:
                     raise FactionReputationInsufficientError("destination faction reputation is insufficient")
-            if int(row["dao_fruit_progress"]) < definition.required_dao_fruit_progress:
+            if player_integer(row, "dao_fruit_progress") < definition.required_dao_fruit_progress:
                 raise LocationRequirementError("dao fruit progress is insufficient")
 
             player_id = int(row["id"])

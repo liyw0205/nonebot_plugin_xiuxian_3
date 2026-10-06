@@ -15,6 +15,7 @@ from typing import Any, Mapping
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..utils.player import player_integer
 from ..persistence.errors import (
     CrossServerBranchLockedError,
     CrossServerFortressBuildError,
@@ -274,7 +275,7 @@ class SectWarCrossServerRepositoryMixin:
                 raise SectWarRequirementError("cross-server registration fee is insufficient")
             roster = []
             for slot, member in enumerate(members, 1):
-                roster.append({"player_id": int(member["id"]), "platform": str(member["platform"]), "platform_user_id": str(member["platform_user_id"]), "void_power": int(member["void_power"]), "void_anchor_capacity": int(member["void_anchor_capacity"]), "space_resistance_bp": int(member["space_resistance_bp"]), "void_instability_until": member["void_instability_until"], "roster_slot": slot})
+                roster.append({"player_id": int(member["id"]), "platform": str(member["platform"]), "platform_user_id": str(member["platform_user_id"]), "void_power": player_integer(member, "void_power"), "void_anchor_capacity": player_integer(member, "void_anchor_capacity"), "space_resistance_bp": player_integer(member, "space_resistance_bp"), "void_instability_until": member["void_instability_until"], "roster_slot": slot})
             snapshot = {"round_id": window.round_id, "week_id": window.week_id, "shard_key": "local", "sect_id": str(sect["sect_id"]), "sect_name": str(sect["name"]), "level": int(sect["level"]), "members": roster, "enemy_pool": ["enemy.sect_war_engine"]}
             connection.execute("UPDATE sects SET spirit_stones=spirit_stones-?, updated_at=? WHERE sect_id=?", (CROSS_SERVER_REGISTRATION_FEE, now_text, sect["sect_id"]))
             connection.execute("INSERT INTO sect_cross_server_war_registrations(round_id,sect_id,operation_id,entry_fee,status,roster_size,score,snapshot_json,registered_at) VALUES (?, ?, ?, ?, 'registered', ?, 0, ?, ?)", (window.round_id, sect["sect_id"], operation_id, CROSS_SERVER_REGISTRATION_FEE, len(roster), json.dumps(snapshot, sort_keys=True), now_text))

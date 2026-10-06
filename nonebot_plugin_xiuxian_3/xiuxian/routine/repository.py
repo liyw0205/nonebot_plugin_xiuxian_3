@@ -1859,7 +1859,7 @@ class RoutineRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id)
             if definition.required_realm is not None and (
                 str(row["realm_key"]) != definition.required_realm
-                or int(row["realm_layer"]) < definition.required_layer
+                or player_integer(row, "realm_layer") < definition.required_layer
             ):
                 raise FatePoolRequirementError("fate pool admission is not met")
             if definition.required_service_reputation is not None:

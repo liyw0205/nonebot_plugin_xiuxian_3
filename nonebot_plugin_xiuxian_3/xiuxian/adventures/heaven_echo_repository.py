@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..utils.player import change_player_state
+from ..utils.player import change_player_state, player_integer
 from ..persistence.errors import (
     HeavenEchoBusyError,
     HeavenEchoFinalBattleError,
@@ -163,7 +163,7 @@ class HeavenEchoRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             if str(player["endgame_status"] or "none") in {"ascension_ready", "ascended", "remained_in_world"}:
                 raise HeavenEchoRequirementError("the player already has a terminal ending")
-            if not realm_at_least(str(player["realm_key"]), int(player["realm_layer"]), "tribulation", 1, self.content):
+            if not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "tribulation", 1, self.content):
                 raise HeavenEchoRequirementError("tribulation L1 is required")
             if connection.execute(
                 "SELECT 1 FROM final_battle_members m JOIN final_battle_sessions s ON s.battle_id=m.battle_id "
@@ -183,8 +183,8 @@ class HeavenEchoRepositoryMixin:
             snapshot = {
                 "instance_key": HEAVEN_ECHO_KEY,
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
-                "tribulation_debt": int(player["tribulation_debt"]),
+                "realm_layer": player_integer(player, "realm_layer"),
+                "tribulation_debt": player_integer(player, "tribulation_debt"),
                 "endgame_status": str(player["endgame_status"] or "none"),
                 "node_keys": list(HEAVEN_ECHO_NODES),
                 "first_clear": HEAVEN_ECHO_STORY_FLAG not in flags,

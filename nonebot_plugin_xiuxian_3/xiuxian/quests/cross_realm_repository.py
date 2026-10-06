@@ -8,7 +8,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
-from ..utils.player import change_player_state, player_reputation
+from ..utils.player import change_player_state, player_integer, player_reputation
 from ..persistence.errors import (
     QuestAlreadyCompletedError,
     QuestNotCompletedError,
@@ -67,7 +67,7 @@ class DemonQuestRepositoryMixin:
             ).fetchone()
             if existing is not None and str(existing["status"]) in {"completed", "claimed"}:
                 raise QuestAlreadyCompletedError("demon mainline is already claimed")
-            if not demon_mainline_realm_ready(str(player["realm_key"]), int(player["realm_layer"])):
+            if not demon_mainline_realm_ready(str(player["realm_key"]), player_integer(player, "realm_layer")):
                 raise QuestRequirementError("demon mainline requires nascent soul L1")
 
             demon_reputation = player_reputation(player).get("demon", 0)

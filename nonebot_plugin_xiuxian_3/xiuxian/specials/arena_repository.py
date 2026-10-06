@@ -422,7 +422,7 @@ class ArenaRepositoryMixin:
             defender_snapshot = self._select_opponent_snapshot(
                 connection,
                 challenger_id,
-                int(challenger["arena_rating"]),
+                player_integer(challenger, "arena_rating", 1000),
                 requested_snapshot_id,
                 now_text,
                 mode_key,
@@ -459,8 +459,8 @@ class ArenaRepositoryMixin:
             score_counted = mode_key != ARENA_PRACTICE_MODE_KEY and int(counted_row["total"]) < DAILY_COUNTED_OPPONENT_LIMIT
             challenger_delta = rating_delta(outcome, challenger=True) if score_counted else 0
             defender_delta = rating_delta(outcome, challenger=False) if score_counted else 0
-            challenger_rating = max(0, int(challenger["arena_rating"]) + challenger_delta)
-            defender_rating = max(0, int(defender["arena_rating"]) + defender_delta)
+            challenger_rating = max(0, player_integer(challenger, "arena_rating", 1000) + challenger_delta)
+            defender_rating = max(0, player_integer(defender, "arena_rating", 1000) + defender_delta)
             if score_counted:
                 change_player_state(
                     connection,
@@ -488,8 +488,8 @@ class ArenaRepositoryMixin:
                     },
                 )
             else:
-                challenger_rating = int(challenger["arena_rating"])
-                defender_rating = int(defender["arena_rating"])
+                challenger_rating = player_integer(challenger, "arena_rating", 1000)
+                defender_rating = player_integer(defender, "arena_rating", 1000)
             snapshot = {
                 "challenger": challenger_snapshot,
                 "defender": defender_snapshot_data,
@@ -517,11 +517,11 @@ class ArenaRepositoryMixin:
                     challenger_snapshot_id,
                     challenger_id,
                     mode_key,
-                    challenger["arena_rating"],
+                    player_integer(challenger, "arena_rating", 1000),
                     now_text,
                     now_text,
                     json.dumps(challenger_snapshot, ensure_ascii=False, sort_keys=True),
-                    json.dumps(public_summary(challenger_snapshot, snapshot_id=challenger_snapshot_id, rating=int(challenger["arena_rating"]), created_at=now_text), ensure_ascii=False, sort_keys=True),
+                    json.dumps(public_summary(challenger_snapshot, snapshot_id=challenger_snapshot_id, rating=player_integer(challenger, "arena_rating", 1000), created_at=now_text), ensure_ascii=False, sort_keys=True),
                     now_text,
                     now_text,
                 ),

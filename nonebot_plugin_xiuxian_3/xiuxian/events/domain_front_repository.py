@@ -170,9 +170,9 @@ class DomainFrontRepositoryMixin:
                 raise ResourceInsufficientError("domain-front stamina is insufficient")
             snapshot = {
                 "realm_key": str(player["realm_key"]),
-                "realm_layer": int(player["realm_layer"]),
+                "realm_layer": player_integer(player, "realm_layer"),
                 "domain_key": str(player["domain_key"]),
-                "domain_power": int(player["domain_power"]),
+                "domain_power": player_integer(player, "domain_power"),
                 "sect_id": str(sect["sect_id"]),
                 "sect_level": int(sect["level"]),
             }
@@ -447,7 +447,7 @@ class DomainFrontRepositoryMixin:
             raise DomainEventRoundNotActiveError("domain-front round is not active")
 
     def _domain_requirements(self, connection: Any, player: Any, now: datetime) -> tuple[Any, Any]:
-        if not meets_domain_front_realm(str(player["realm_key"]), int(player["realm_layer"])) or not player["domain_key"]:
+        if not meets_domain_front_realm(str(player["realm_key"]), player_integer(player, "realm_layer")) or not player["domain_key"]:
             raise DomainEventRequirementError("domain-front requires a selected soul-transformation domain")
         crack = player["domain_crack_until"]
         if crack and now < datetime.fromisoformat(str(crack)):

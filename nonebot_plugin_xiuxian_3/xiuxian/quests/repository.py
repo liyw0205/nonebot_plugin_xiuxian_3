@@ -9,7 +9,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..utils.assets import change_player_assets, grant_player_items, inventory_amount, spend_player_items
-from ..utils.player import grant_player_state, player_inventory
+from ..utils.player import grant_player_state, player_integer, player_inventory
 from ..rewards.rules import RewardContentError, reward_definition, reward_totals, reward_value_delta
 from ..events.rules import final_heaven_season_window
 from ..persistence.errors import (
@@ -475,7 +475,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             if replay is not None:
                 return self._action_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
-            if str(player["realm_key"]) != "soul_transformation" or int(player["realm_layer"]) < 1:
+            if str(player["realm_key"]) != "soul_transformation" or player_integer(player, "realm_layer") < 1:
                 raise QuestRequirementError("archive ruins require soul transformation")
             if self._event_count(connection, int(player["id"]), VOID_QUEST, "archive_source") >= 1:
                 raise QuestAlreadyCompletedError("archive source is already claimed")
@@ -623,7 +623,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             if replay is not None:
                 return self._action_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
-            if not meets_realm(str(player["realm_key"]), int(player["realm_layer"]), required_realm):
+            if not meets_realm(str(player["realm_key"]), player_integer(player, "realm_layer"), required_realm):
                 raise QuestRequirementError(f"{quest_key} requires {required_realm}")
             event_source_operation_id = operation_id
             if evidence_battle_id is not None:

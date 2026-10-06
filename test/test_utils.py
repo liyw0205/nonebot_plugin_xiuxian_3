@@ -922,6 +922,33 @@ def test_player_integer_projection_is_shared_by_profile_and_combat_reads() -> No
     assert player_values(row)["spirit_stones"] == resources["spirit_stones"]
 
 
+def test_player_views_share_numeric_normalization_and_reject_boolean_values() -> None:
+    row = {
+        "spirit_stones": "12",
+        "void_merit": "9",
+        "soul_power": "7",
+        "soul_power_max": "20",
+        "dao_fruit_progress": "4",
+        "domain_power": "11",
+        "domain_charge": "3",
+        "domain_charge_max": "10",
+        "realm_resistance_bp": "125",
+    }
+
+    profile = player_profile_values(row)
+    status = player_status_values(row)
+    combat = player_combat_values(row)
+    for view in (profile, status, combat):
+        assert view["soul_power"] == 7
+    assert profile["spirit_stones"] == status["spirit_stones"] == 12
+    assert profile["dao_fruit_progress"] == 4
+    assert profile["domain_power"] == 11
+    assert combat["domain_charge"] == 3
+
+    with pytest.raises(ValueError, match="must be an integer"):
+        player_combat_values({"soul_power": True})
+
+
 def test_player_projection_uses_one_numeric_field_table() -> None:
     row = {
         "spirit_stones": "12",
