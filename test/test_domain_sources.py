@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
     battle_roll_bp,
     exploration_definition,
@@ -69,6 +70,71 @@ async def _prepare_nascent_player(runtime, adapter: str, user: str) -> None:
             """,
             (json.dumps({"insight": 30}), adapter, user),
         )
+
+
+def test_ancestral_lake_is_open_and_reachable_on_qq_and_onebot() -> None:
+    async def run() -> None:
+        location = bundled_content().require(
+            "location", "beast.ancestral_lake", include_locked=False
+        )
+        assert location["status"] == "open"
+        assert "explore.ancestral_lake" in location["actions"]
+
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime_dir = Path(data_dir) / adapter
+                runtime = create_runtime(data_dir=runtime_dir)
+                user = f"ancestral-lake-travel-{adapter}"
+                await _prepare_soul_player(runtime, adapter, user, "beast.ten_thousand_hills")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET faction_reputation_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"beast": 3000}), adapter, user),
+                    )
+
+                context = lambda request, operation="": _context(
+                    adapter, user, request, operation
+                )
+                preview = await runtime.adapters.dispatch(
+                    adapter, context("preview"), "移动预览 祖灵湖"
+                )
+                assert preview.code == "TRAVEL_PREVIEW"
+                assert preview.data["ready"] is True
+
+                started = await runtime.adapters.dispatch(
+                    adapter, context("start", "lake-travel-start"), "前往 祖灵湖"
+                )
+                assert started.code == "TRAVEL_STARTED"
+
+                await runtime.close()
+                runtime = create_runtime(data_dir=runtime_dir)
+                replay = await runtime.adapters.dispatch(
+                    adapter, context("start-replay", "lake-travel-start"), "前往 祖灵湖"
+                )
+                assert replay.data["idempotent_replay"] is True
+                _expire(runtime, "travel_sessions", "session_id", started.data["session_id"])
+
+                arrived = await runtime.adapters.dispatch(
+                    adapter, context("settle", "lake-travel-settle"), "结算移动"
+                )
+                assert arrived.code == "TRAVEL_COMPLETED"
+
+                await runtime.close()
+                runtime = create_runtime(data_dir=runtime_dir)
+                settled_replay = await runtime.adapters.dispatch(
+                    adapter, context("settle-replay", "lake-travel-settle"), "结算移动"
+                )
+                assert settled_replay.data["idempotent_replay"] is True
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    state = connection.execute(
+                        "SELECT location_key, stamina FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                assert state == ("beast.ancestral_lake", 75)
+                await runtime.close()
+
+    asyncio.run(run())
 
 
 def test_soul_refinement_grows_nascent_cultivation_and_soul_once_per_day() -> None:

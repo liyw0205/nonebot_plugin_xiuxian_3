@@ -369,7 +369,7 @@
       "name": "祖灵湖",
       "desc": "万兽山深处的静谧湖泊，湖水映照着群山，也流传着远古血脉的传说。",
       "world": "妖界",
-      "status": "locked",
+      "status": "open",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "faction_reputation", "faction": "beast", "min": 3000}],
       "actions": ["explore.ancestral_lake"],
       "key": "beast.ancestral_lake"
