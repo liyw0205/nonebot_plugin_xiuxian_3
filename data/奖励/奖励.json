@@ -679,6 +679,21 @@
       "status": "active"
     },
     {
+      "name": "远古洞天开门嘉奖",
+      "desc": "为远古洞天开门积累声势后所得的领域碎片。",
+      "operation": "event.ancient_domain_open.claim_reward",
+      "entries": [
+        {
+          "kind": "item",
+          "item_key": "item.domain_core_fragment",
+          "quantity": 10
+        }
+      ],
+      "once_per_event_round": true,
+      "key": "reward.event.ancient_domain_open",
+      "status": "active"
+    },
+    {
       "name": "基础机缘池",
       "aliases": ["基础机缘", "日常机缘"],
       "desc": "供修士寻觅日常机缘的签筒，常见灵材居多，也藏有少量珍稀线索。",

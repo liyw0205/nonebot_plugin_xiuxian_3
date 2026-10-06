@@ -21,6 +21,8 @@ from ..persistence.errors import (
 from .repository import EventsRepositoryMixin
 from .demon_rules import DEMON_ACTION_VALUES
 from .cross_realm_rules import (
+    ANCIENT_DOMAIN_OPEN_ACTION_VALUES,
+    ANCIENT_DOMAIN_OPEN_EVENT_KEY,
     BEAST_TRADE_ACTION_VALUES,
     BEAST_TRADE_EVENT_KEY,
     BOUNDARY_RIFT_ACTION_VALUES,
@@ -93,7 +95,7 @@ class EventsApplication:
             EventContributionInsufficientError: ("EVENT_CONTRIBUTION_INSUFFICIENT", contribution_message),
             EventRewardAlreadyClaimedError: ("EVENT_REWARD_ALREADY_CLAIMED", f"本轮{event_label}事件奖励已经领取。"),
             EventRewardExpiredError: ("EVENT_REWARD_EXPIRED", f"{event_label}事件领奖窗口已经结束。"),
-            EventSourceNotEligibleError: ("EVENT_CONTRIBUTION_SOURCE_INVALID", "没有可核验的已结算战斗、运输或维修记录。"),
+            EventSourceNotEligibleError: ("EVENT_CONTRIBUTION_SOURCE_INVALID", "没有可核验的、符合本轮规则的已结算来源记录。"),
             DailyTasksUnavailableError: ("DAILY_TASKS_UNAVAILABLE", "今日修行簿暂不可用，角色状态未改变。"),
             DailyTasksIncompleteError: ("DAILY_TASKS_INCOMPLETE", "日课尚未满足嘉奖条件，暂不能领取。"),
             DailyTaskRewardAlreadyClaimedError: ("DAILY_TASK_REWARD_CLAIMED", "今日修行嘉奖已经领取。"),
@@ -441,7 +443,7 @@ class EventsApplication:
                 f"**全服贡献**：{record.total_contribution}/{record.target_quantity}\n"
                 f"**你的贡献**：{record.player_contribution}/{record.minimum_contribution}（领取嘉奖所需）\n"
                 f"**时间**：{record.starts_at} 至 {record.ends_at}\n\n"
-                "> 贡献须有已结算的贸易、妖血或队伍胜利记录；事件结束后在领奖期限内领取。"
+                "> 贡献须有符合本轮规则的已结算来源记录；事件结束后在领奖期限内领取。"
             ),
             context.request_id,
             data=self._data(record),
@@ -455,6 +457,11 @@ class EventsApplication:
     async def get_boundary_rift_event(self, context: CommandContext) -> CommandResult:
         return await self._get_cross_realm_event(
             context, BOUNDARY_RIFT_EVENT_KEY, "界隙裂痕", "请使用 `界隙裂痕 [轮次]`。"
+        )
+
+    async def get_ancient_domain_open_event(self, context: CommandContext) -> CommandResult:
+        return await self._get_cross_realm_event(
+            context, ANCIENT_DOMAIN_OPEN_EVENT_KEY, "远古洞天开门", "请使用 `远古洞天事件 [轮次]`。"
         )
 
     async def _contribute_cross_realm_event(
@@ -509,6 +516,38 @@ class EventsApplication:
             "请使用 `贡献界隙裂痕 [来源记录编号]`。",
         )
 
+    async def contribute_ancient_domain_open_event(self, context: CommandContext) -> CommandResult:
+        if not context.command_args or len(context.command_args) > 2:
+            return CommandResult(False, "INVALID_EVENT_COMMAND", "请使用 `贡献远古洞天 <秘境结算凭证>`。", context.request_id)
+        if len(context.command_args) == 1:
+            action_key = "complete"
+            source_operation_id = context.command_args[0]
+        else:
+            action_key = ANCIENT_DOMAIN_OPEN_ACTION_VALUES.get(context.command_args[0])
+            source_operation_id = context.command_args[1]
+        if action_key is None:
+            return CommandResult(False, "INVALID_EVENT_COMMAND", "请使用 `贡献远古洞天 <秘境结算凭证>`。", context.request_id)
+        operation_id = self._operation_id(context, f"{ANCIENT_DOMAIN_OPEN_EVENT_KEY}.contribute")
+        try:
+            record = await self.repository.record_cross_realm_contribution(
+                event_key=ANCIENT_DOMAIN_OPEN_EVENT_KEY,
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                action_key=action_key,
+                source_operation_id=source_operation_id,
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc, event_label="远古洞天开门")
+        return CommandResult(
+            True,
+            "EVENT_CONTRIBUTION_RECORDED",
+            f"## 远古洞天开门贡献已记录\n\n- **本轮贡献**：{record.player_contribution}/{record.minimum_contribution}\n- **全服贡献**：{record.total_contribution}/{record.target_quantity}",
+            context.request_id,
+            operation_id,
+            data=self._data(record),
+        )
+
     async def _claim_cross_realm_event(self, context: CommandContext, event_key: str, label: str, usage: str) -> CommandResult:
         round_id = self._cross_event_round_id(context.command_args)
         if not round_id or round_id == "":
@@ -541,6 +580,11 @@ class EventsApplication:
     async def claim_boundary_rift_event(self, context: CommandContext) -> CommandResult:
         return await self._claim_cross_realm_event(
             context, BOUNDARY_RIFT_EVENT_KEY, "界隙裂痕", "请使用 `领取界隙裂痕奖励 <轮次>`。"
+        )
+
+    async def claim_ancient_domain_open_event(self, context: CommandContext) -> CommandResult:
+        return await self._claim_cross_realm_event(
+            context, ANCIENT_DOMAIN_OPEN_EVENT_KEY, "远古洞天开门", "请使用 `领取远古洞天奖励 <轮次>`。"
         )
 
 

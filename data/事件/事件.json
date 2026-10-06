@@ -157,6 +157,38 @@
       "key": "event.boundary_rift"
     },
     {
+      "name": "远古洞天开门",
+      "desc": "远古洞天重现世间，已完成秘境历练的修士可为洞天开门积累声势。",
+      "status": "active",
+      "public_event": {
+        "location_key": "xuantian.domain_front",
+        "schedule": {
+          "kind": "weekly",
+          "weekday_utc": 5,
+          "hour_utc": 0,
+          "minute_utc": 0,
+          "duration_seconds": 604800,
+          "claim_window_seconds": 86400
+        },
+        "target_quantity": 5,
+        "requirement": {
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        },
+        "contributions": {
+          "complete": {
+            "source": "completed_ancient_domain",
+            "quantity": 1
+          }
+        },
+        "claim": {
+          "min_contribution": 5,
+          "reward_key": "reward.event.ancient_domain_open"
+        }
+      },
+      "key": "event.ancient_domain_open"
+    },
+    {
       "name": "心魔试炼",
       "desc": "突破受挫后心魔乘隙而起，修士须在限期内直面它、净化心神或寻求化解。",
       "status": "open",

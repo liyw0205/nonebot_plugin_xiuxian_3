@@ -1605,6 +1605,15 @@ class XiuxianApplication:
     async def claim_boundary_rift_event(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.events.claim_boundary_rift_event(context), write_message="当前事件不允许领取界隙裂痕奖励。")
 
+    async def get_ancient_domain_open_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.get_ancient_domain_open_event(context), require_write=False)
+
+    async def contribute_ancient_domain_open_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.contribute_ancient_domain_open_event(context), write_message="当前事件不允许贡献远古洞天。")
+
+    async def claim_ancient_domain_open_event(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.events.claim_ancient_domain_open_event(context), write_message="当前事件不允许领取远古洞天开门奖励。")
+
     async def get_final_heaven_season(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,

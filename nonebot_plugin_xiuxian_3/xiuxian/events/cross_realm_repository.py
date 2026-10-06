@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..adventures.rules import meets_realm
 from ..utils.assets import spend_player_items
 from ..persistence.errors import (
     EventContributionInsufficientError,
@@ -138,6 +139,14 @@ class CrossRealmEventRepositoryMixin:
             if str(event["status"]) not in {"open", "running"} or now >= datetime.fromisoformat(str(event["ends_at"])):
                 raise EventNotActiveError("cross-realm event is not open")
             definition = public_event_snapshot(str(event["event_key"]), str(event["result_json"]))
+            if definition.required_realm_key is not None and not meets_realm(
+                str(player["realm_key"]),
+                int(player["realm_layer"]),
+                definition.required_realm_key,
+                definition.required_realm_layer,
+                self.content,
+            ):
+                raise EventSourceNotEligibleError("event realm requirement is not met")
             source = self._cross_event_find_source(
                 connection,
                 event_key,
@@ -326,6 +335,29 @@ class CrossRealmEventRepositoryMixin:
             row = connection.execute(query, tuple(params)).fetchone()
             if row is not None:
                 return {"source_operation_id": str(row["start_operation_id"]), "quantity": int(contribution["quantity"])}
+        elif source == "completed_ancient_domain":
+            query = (
+                "SELECT operations.operation_id FROM operations "
+                "JOIN ancient_domain_runs runs "
+                "  ON runs.run_id=json_extract(operations.result_json, '$.run_id') "
+                "JOIN ancient_domain_members members ON members.run_id=runs.run_id "
+                "WHERE operations.operation_name='ancient_domain.settle' "
+                "AND json_extract(operations.result_json, '$.outcome')='won' "
+                "AND runs.status='settled' AND members.status='cleared' "
+                "AND members.player_id=? "
+                "AND operations.created_at>=? AND operations.created_at<?"
+            )
+            params: list[object] = [player_id, starts_at, ends_at]
+            if source_operation_id:
+                query += " AND operations.operation_id=?"
+                params.append(source_operation_id)
+            else:
+                query += " AND NOT EXISTS (SELECT 1 FROM world_event_contribution_events used WHERE used.round_id=? AND used.player_id=? AND used.source_operation_id=operations.operation_id)"
+                params.extend([round_id, player_id])
+            query += " ORDER BY operations.created_at DESC LIMIT 1"
+            row = connection.execute(query, tuple(params)).fetchone()
+            if row is not None:
+                return {"source_operation_id": str(row["operation_id"]), "quantity": int(contribution["quantity"])}
         raise EventSourceNotEligibleError("no eligible settled source operation")
 
     def _cross_event_select_round(self, connection: Any, event_key: str, round_id: str | None, now: datetime) -> Any:

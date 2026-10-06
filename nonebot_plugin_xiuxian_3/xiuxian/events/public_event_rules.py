@@ -17,6 +17,7 @@ _CONTRIBUTION_FIELDS = {
     "completed_cross_realm_trade": {"source", "quantity", "trade_keys"},
     "consume_item": {"source", "item_key", "item_quantity", "quantity"},
     "settled_boundary_party_battle": {"source", "quantity", "party_types"},
+    "completed_ancient_domain": {"source", "quantity"},
 }
 
 
