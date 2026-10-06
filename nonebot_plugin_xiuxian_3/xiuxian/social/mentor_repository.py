@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..rewards.rules import local_reputation_maximum
-from ..utils.player import change_player_state, player_reputation_state
+from ..utils.player import change_player_state, player_integer, player_reputation_state
 from ..persistence.errors import (
     MentorGraduationNotReadyError,
     MentorInvitationExpiredError,
@@ -138,7 +138,7 @@ class MentorRepositoryMixin:
                 return self._mentor_record_from_payload(existing, replay=True)
             master = self._require_player(connection, platform, platform_user_id)
             self._mentor_expire_due(connection, now_text)
-            if not is_master_eligible(str(master["realm_key"]), int(master["realm_layer"])):
+            if not is_master_eligible(str(master["realm_key"]), player_integer(master, "realm_layer")):
                 raise MentorRequirementError("master does not meet foundation L4 requirement")
             count = connection.execute(
                 """
@@ -159,7 +159,9 @@ class MentorRepositoryMixin:
                 raise PlayerSuspendedError("target player is not active")
             if int(target["id"]) == int(master["id"]):
                 raise MentorRelationConflictError("master cannot invite self")
-            if not is_apprentice_eligible(str(target["stage"]), str(target["realm_key"]), int(target["realm_layer"])):
+            if not is_apprentice_eligible(
+                str(target["stage"]), str(target["realm_key"]), player_integer(target, "realm_layer")
+            ):
                 raise MentorRequirementError("target is outside the apprentice realm range")
             conflict = connection.execute(
                 """
@@ -238,9 +240,11 @@ class MentorRepositoryMixin:
             master = connection.execute("SELECT * FROM players WHERE id = ?", (relation["master_id"],)).fetchone()
             if master is None:
                 raise PlayerNotFoundError("master does not exist")
-            if not is_master_eligible(str(master["realm_key"]), int(master["realm_layer"])):
+            if not is_master_eligible(str(master["realm_key"]), player_integer(master, "realm_layer")):
                 raise MentorRequirementError("master no longer meets the mentor requirement")
-            if not is_apprentice_eligible(str(apprentice["stage"]), str(apprentice["realm_key"]), int(apprentice["realm_layer"])):
+            if not is_apprentice_eligible(
+                str(apprentice["stage"]), str(apprentice["realm_key"]), player_integer(apprentice, "realm_layer")
+            ):
                 raise MentorRequirementError("apprentice no longer meets the realm requirement")
             current = connection.execute(
                 "SELECT 1 FROM mentor_relations WHERE apprentice_id = ? AND status = 'active' LIMIT 1",
@@ -332,7 +336,9 @@ class MentorRepositoryMixin:
             apprentice = connection.execute("SELECT * FROM players WHERE id = ?", (relation["apprentice_id"],)).fetchone()
             if apprentice is None:
                 raise PlayerNotFoundError("apprentice does not exist")
-            if not is_graduation_ready(str(apprentice["stage"]), str(apprentice["realm_key"]), int(apprentice["realm_layer"])):
+            if not is_graduation_ready(
+                str(apprentice["stage"]), str(apprentice["realm_key"]), player_integer(apprentice, "realm_layer")
+            ):
                 raise MentorGraduationNotReadyError("apprentice has not reached qi gathering L3 after entry")
             if not self._mentor_has_completed_service(connection, int(apprentice["id"])):
                 raise MentorGraduationNotReadyError("apprentice has not completed production or livelihood service")

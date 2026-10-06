@@ -15,6 +15,7 @@ import pytest
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.social.mentor_repository import MentorRepositoryMixin
+from nonebot_plugin_xiuxian_3.xiuxian.utils.player import player_integer
 
 
 ROOT = Path(__file__).parents[1]
@@ -81,7 +82,12 @@ def test_mentor_invite_accept_reject_and_expiry() -> None:
                 await _create_player(runtime, user)
             _set_realm(runtime, "master", "foundation", 4)
 
-            invited = await runtime.dispatch(_context("master", "mentor-invite"), "邀请拜师 apprentice")
+            with patch(
+                "nonebot_plugin_xiuxian_3.xiuxian.social.mentor_repository.player_integer",
+                wraps=player_integer,
+            ) as shared_integer:
+                invited = await runtime.dispatch(_context("master", "mentor-invite"), "邀请拜师 apprentice")
+            assert any(call.args[1] == "realm_layer" for call in shared_integer.call_args_list)
             assert invited.code == "MENTOR_INVITED"
             replay = await runtime.dispatch(_context("master", "mentor-invite"), "邀请拜师 apprentice")
             assert replay.data["idempotent_replay"] is True
