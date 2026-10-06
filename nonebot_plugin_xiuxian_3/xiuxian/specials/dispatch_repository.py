@@ -40,7 +40,7 @@ from .dispatch_rules import (
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from ..utils.player import (
     change_player_state,
-    grant_player_reward,
+    grant_player_reward_actual,
     grant_player_state,
     player_integer,
     player_inventory,
@@ -423,7 +423,7 @@ class DispatchRepositoryMixin:
                     settlement_reward[key] = settlement_reward.get(key, 0) + amount
             stamina_refund = min(int(costs.get("stamina", 0)), int(refunded.get("stamina", 0)))
             energy_refund = min(int(costs.get("energy", 0)), int(refunded.get("energy", 0)))
-            grant_player_reward(
+            actual_changes = grant_player_reward_actual(
                 connection,
                 player,
                 settlement_reward,
@@ -436,10 +436,28 @@ class DispatchRepositoryMixin:
                     if key in settlement_reward and key.startswith("local.")
                 } or None,
             )
+            actual_reward = {
+                key: amount
+                for key, amount in reward.items()
+                if amount > 0
+                and key.startswith("codex.")
+            }
+            actual_reward.update(
+                {
+                    key: actual_changes[key]
+                    for key in reward
+                    if key in actual_changes and actual_changes[key] > 0
+                }
+            )
+            actual_refunded = {
+                key: actual_changes.get(key, amount)
+                for key, amount in refunded.items()
+                if actual_changes.get(key, amount) > 0
+            }
             result = {
                 "outcome": outcome,
-                "reward": reward,
-                "refunded": refunded,
+                "reward": actual_reward,
+                "refunded": actual_refunded,
                 "settled_at": now_text,
             }
             connection.execute(
@@ -482,8 +500,8 @@ class DispatchRepositoryMixin:
                 "dispatch_key": str(assignment["dispatch_key"]),
                 "status": "settled",
                 "outcome": outcome,
-                "reward": reward,
-                "refunded": refunded,
+                "reward": actual_reward,
+                "refunded": actual_refunded,
             }
             self._record_dispatch_operation(
                 connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text
