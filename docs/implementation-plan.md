@@ -17,6 +17,66 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 
 ## 1. 范围分层
 
+### 已闭合切片：道侣缘契快照与重启续行
+
+开工证据：QQ 官方与 OneBot V11 的公开邀请、接受已成功，关闭 `social.partner` 并重建 runtime 后，
+原邀请/接受 operation 和已有缘契的解除申请均返回 `CONTENT_ERROR`；改动当前解除期限/重结缘冷却后，
+旧缘契采用新值而非邀请快照。领域合同已规定邀请冻结本次参数；本条修复既有关系履约，不新增双修、奖励或资产共享。
+
+候选比较如下；三名代理先并行只读核对，确认缺陷后转入独立文件编码：
+
+| 候选玩家域 | 入口、缺口与复用 | 最近处理与选择 |
+|:--|:--|:--|
+| 道侣关系 | `邀请结为道侣`、接受及解除命令已双适配器复现；沿用 `PartnerApplication`、关系表、`operation_replay`/`record_operation`、严格JSON工具 | 社交运行时不在最近十条；选中，已有快照未消费且关闭后无法履约 |
+| 师徒毕业 | `mentor_rules.is_graduation_ready` 仅接受聚气，筑基后反而不满足“达到聚气L3”；现有师徒仓储与名望事务可复用 | 独立候选，尚待真实入口专项复现；不把两种关系混改 |
+| 拍卖恢复 | 新建拍卖先校验现行物品再回放，展示名也重读内容；可复用经济仓储与公共operation | `31616c6`已触及库存，候选待双适配器复现；本轮先解决已有缘契无法解除 |
+| 功法/灵具来源与斗法分享 | 朝阳吐纳篇、小型灵兽行囊缺来源/配方；分享缺签名、期限和公开授权合同 | 不臆造来源或授权，保持未开放边界 |
+| 其他副本、跨服、Web/支付 | 高阶副本缺现行规则；跨服身份、资产隔离及Web写入前置不全 | 继续锁定；属性/战斗、灵田、行卷、道源近期闭合，不重复重构 |
+
+最近十条玩法切片（均验收QQ/OneBot，不计纯文档提交）依次为：`5388b03`属性/普通战斗
+（stats/combat/advancement/adventures/exploration/player/progression/specials），`de527ce`灵田
+（livelihood/utils），`0b1d92e`行卷（routine/persistence/utils，另八处仅删导入），`cf72c83`道源
+（quests/progression），`4ab072f`灵兽（companions），`da1a8df`移动（world），`dbcfb4a`行卷称号
+（routine/adventures/events/utils），`70963ed`生产（production），`58b69b6`派遣（specials），
+`31616c6`交易库存（economy/items/persistence/utils）。计入纯导入改动时：utils四次，adventures/progression
+各三次，advancement/exploration/player/world/routine/persistence/production/specials各两次，其余各一次；
+最近五条重复为utils/progression及仅导入触及的advancement/adventures/exploration/player，均默认冷却。
+social没有运行时改动（灵田提交仅校正宗门测试断言），本条不借此扩改宗门、师徒或战斗。
+
+文件所有权：主线独占 `social/partner_repository.py`、必要的 `partner_use_cases.py`、状态/计划/内容合同，
+负责事务和统一验收；`wayfaring_contract_candidate` 独占 `social/partner_rules.py`、新
+`test/test_partner_rules.py`、社交域五份当前文档，负责共用严格参数解析与快照合同；
+`source_contract_candidate` 独占新 `test/test_partner_snapshot.py`，负责QQ/OneBot公开生命周期、
+改值/关闭/移除内容后的历史回放与续行；`gather_transaction_reuse` 独占新
+`test/test_partner_recovery.py`，负责坏JSON/字段、权限、并发、账本故障回滚与原请求重试。
+代理不改彼此文件或共享工具；完成后只读审阅，不同时编辑同一仓储。
+
+验收边界：仅新邀请读取当前开放内容；旧缘契接受/拒绝、解除申请/确认/拒绝及查询读取邀请快照，
+历史operation先回放，身份与双方同意仍校验，当前角色状态不能由旧快照绕过。拒绝坏快照而不补默认字段；
+全程零资产/奖励/图鉴写入。保持既有过期投影语义，不重做生命周期；切磋/训练傀儡只读，正式PvP/PvE不改。
+聚焦测试、源码及测试compileall、全部内容JSON严格校验与diff检查后提交推送，不启动飞升长链。
+
+完成记录：新邀请与持久化快照共用九字段严格解析，关系转换/查询实际消费邀请快照，移除现行定义对
+历史回放的前置阻断。沿用公共JSON与operation工具，不复制事务、不改schema或内容数值；坏账本同样
+拒绝缺字段、错误类型和无时区时间。玩家提示不再硬写元婴门槛或“规则未完备”，固定短句仍留代码。
+
+三路交付均已合并：规则72项、双适配器内容/生命周期12项、故障/权限/并发恢复10项；主线合并复验94项
+通过。社交/师徒/文档/仓储/无版本标识32项，内容/工具/适配器归一化/正式战斗/只读观战111项通过，
+三组共237项不重复测试。代理另行复验有重叠，不累加总数。规则代理和生命周期代理独立只读审查仓储，
+未发现本条新增阻断。专项使用临时库，元婴是明确的境界夹具，所有关系均经公开命令创建；不声称完整成长链验收。
+
+```bash
+/root/myenv/bin/python -m pytest -q --tb=short test/test_partner_rules.py test/test_partner_snapshot.py test/test_partner_recovery.py
+/root/myenv/bin/python -m pytest -q --tb=short test/test_partner.py test/test_social.py test/test_mentor.py test/test_documentation.py test/test_repository_boundaries.py test/test_runtime_versionless.py
+/root/myenv/bin/python -m pytest -q --tb=short test/test_utils.py test/test_content.py test/test_adapter_normalization.py test/test_combat.py test/test_arena.py test/test_spar_interactions.py
+/root/myenv/bin/python -m compileall -q nonebot_plugin_xiuxian_3 test
+git diff --check
+```
+
+47份内容JSON已严格校验重复键和非有限数值。未运行整仓全量或飞升长链，未修改用户数据库；不增加版本
+标识或兼容分支。当前境界序位记录本身的重排不在本条冻结合同中。社交本条完成后冷却；师徒毕业上界与
+拍卖历史恢复保留为待真实入口专项复现的独立候选，不把初筛结论当已修复；来源不明和跨服/Web继续关闭。
+
 ### 已闭合切片：角色属性与普通战斗构筑同源
 
 开工证据：`我的属性`/`我的状态`按养成内容中的 `stats.formula` 推演，普通PvE、竞技PvP和组队竞技却分别维护旧的 `100 + 4 * body` 气血公式；正式战斗不读取突破永久灵力，组队与三类秘境遗漏功法，探索入场后遭遇还重新读取现行功法。此为已开放玩家路径的数值与快照正确性缺口，不是重命名工具。范围包含普通面板、单人/队伍PvE、竞技PvP、只读切磋/训练傀儡及探索/秘境入场冻结。天劫/终局的显式高阶场景映射保留，不将其数万气血尺度替换为普通面板，也不借此改奖励、敌人或开放条件。

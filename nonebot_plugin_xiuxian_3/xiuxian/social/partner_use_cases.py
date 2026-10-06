@@ -91,11 +91,11 @@ class PartnerApplication:
                 operation_id=operation_id,
             )
         except PartnerRequirementError:
-            return self._failure(context, "PARTNER_REQUIREMENT_MISSING", "双方需达到元婴境，方可结下道侣缘契。", operation_id)
+            return self._failure(context, "PARTNER_REQUIREMENT_MISSING", "你或对方的修为尚不足以结下道侣缘契。", operation_id)
         except PartnerRelationConflictError:
             return self._failure(context, "PARTNER_RELATION_CONFLICT", "你或对方已有未完的道侣缘契。", operation_id)
         except PartnerBreakCooldownError:
-            return self._failure(context, "PARTNER_BREAK_COOLDOWN", "这对道侣的缘契冷却尚未结束。", operation_id)
+            return self._failure(context, "PARTNER_BREAK_COOLDOWN", "旧缘初解，尚需静候些时日，方可重结缘契。", operation_id)
         except PlayerNotFoundError:
             return self._failure(context, "PLAYER_NOT_FOUND", "没有找到这位道友的道号。", operation_id)
         except PlayerSuspendedError:
@@ -103,7 +103,7 @@ class PartnerApplication:
         except OperationConflictError:
             return self._failure(context, "OPERATION_CONFLICT", "这道缘契请求已对应另一番心意。", operation_id)
         except ContentError:
-            return self._failure(context, "CONTENT_ERROR", "道侣缘契的天地规则暂未完备。", operation_id)
+            return self._failure(context, "CONTENT_ERROR", "此时尚无法缔结缘契，请稍后再试。", operation_id)
         except RepositoryBusyError:
             return self._failure(context, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", operation_id, retryable=True)
         except Exception:
@@ -142,7 +142,7 @@ class PartnerApplication:
         except OperationConflictError:
             return self._failure(context, "OPERATION_CONFLICT", "这道缘契请求已对应另一番心意。", operation_id)
         except ContentError:
-            return self._failure(context, "CONTENT_ERROR", "道侣缘契的天地规则暂未完备。", operation_id)
+            return self._failure(context, "CONTENT_ERROR", "仙缘簿暂时无法查阅，请稍后再试。", operation_id)
         except RepositoryBusyError:
             return self._failure(context, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", operation_id, retryable=True)
         except Exception:
@@ -159,7 +159,7 @@ class PartnerApplication:
         except PlayerSuspendedError:
             return self._failure(context, "PLAYER_SUSPENDED", "当前角色暂时无法查看缘契。")
         except ContentError:
-            return self._failure(context, "CONTENT_ERROR", "道侣缘契的天地规则暂未完备。")
+            return self._failure(context, "CONTENT_ERROR", "仙缘簿暂时无法查阅，请稍后再试。")
         except Exception:
             return self._failure(context, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", retryable=True)
         if record is None:
@@ -205,7 +205,7 @@ class PartnerApplication:
         except OperationConflictError:
             return self._failure(context, "OPERATION_CONFLICT", "这道缘契请求已对应另一番心意。", operation_id)
         except ContentError:
-            return self._failure(context, "CONTENT_ERROR", "道侣缘契的天地规则暂未完备。", operation_id)
+            return self._failure(context, "CONTENT_ERROR", "仙缘簿暂时无法查阅，请稍后再试。", operation_id)
         except RepositoryBusyError:
             return self._failure(context, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", operation_id, retryable=True)
         except Exception:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import fields
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
@@ -11,7 +12,6 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..content import ContentBundle, bundled_content
 from ..persistence.errors import (
-    OperationConflictError,
     PartnerBreakCooldownError,
     PartnerDissolutionExpiredError,
     PartnerDissolutionNotFoundError,
@@ -24,9 +24,15 @@ from ..persistence.errors import (
     PlayerNotFoundError,
     PlayerSuspendedError,
 )
+from ..utils.json_cache import decode_json_strict
 from ..utils.operations import operation_replay, record_operation
 from .partner_models import PartnerRelationRecord
-from .partner_rules import PartnerDefinition, partner_definition, partner_eligible
+from .partner_rules import (
+    PartnerDefinition,
+    partner_definition,
+    partner_definition_from_snapshot,
+    partner_eligible,
+)
 
 
 class PartnerRepositoryMixin:
@@ -154,7 +160,6 @@ class PartnerRepositoryMixin:
             )
 
     def _partner_invite_once(self, platform: str, platform_user_id: str, target_ref: str, operation_id: str) -> PartnerRelationRecord:
-        definition = partner_definition(self._partner_content())
         target_ref = target_ref.strip()
         operation_name = "social.invite_partner"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "target_ref": target_ref})
@@ -166,6 +171,7 @@ class PartnerRepositoryMixin:
             existing = operation_replay(connection, operation_id, operation_name, request_hash, player_id=int(actor["id"]))
             if existing is not None:
                 return self._partner_record_from_payload(existing, replay=True)
+            definition = partner_definition(self._partner_content())
             self._partner_expire_due(connection, now_text, operation_id)
             if not partner_eligible(actor, definition, self._partner_content()):
                 raise PartnerRequirementError("initiator is below the configured partner realm")
@@ -230,7 +236,6 @@ class PartnerRepositoryMixin:
         return self._partner_invitation_transition(platform, platform_user_id, relation_id, operation_id, accept=False)
 
     def _partner_invitation_transition(self, platform: str, platform_user_id: str, relation_id: str, operation_id: str, *, accept: bool) -> PartnerRelationRecord:
-        definition = partner_definition(self._partner_content())
         relation_id = relation_id.strip()
         operation_name = "social.accept_partner" if accept else "social.reject_partner"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "relation_id": relation_id})
@@ -249,6 +254,7 @@ class PartnerRepositoryMixin:
             ).fetchone()
             if relation is None:
                 raise PartnerInvitationNotFoundError("partner invitation does not exist")
+            definition = self._partner_snapshot(relation)
             if str(relation["status"]) == "expired" or now >= datetime.fromisoformat(str(relation["invitation_expires_at"])):
                 connection.execute(
                     "UPDATE partner_relations SET status='expired', expired_at=?, invitation_expiry_operation_id=?, updated_at=? "
@@ -299,18 +305,15 @@ class PartnerRepositoryMixin:
             return self._partner_record_from_payload(payload)
 
     def _partner_request_dissolution_once(self, platform: str, platform_user_id: str, relation_id: str, operation_id: str) -> PartnerRelationRecord:
-        definition = partner_definition(self._partner_content())
-        return self._partner_dissolution_transition(platform, platform_user_id, relation_id, operation_id, definition, action="request")
+        return self._partner_dissolution_transition(platform, platform_user_id, relation_id, operation_id, action="request")
 
     def _partner_confirm_dissolution_once(self, platform: str, platform_user_id: str, relation_id: str, operation_id: str) -> PartnerRelationRecord:
-        definition = partner_definition(self._partner_content())
-        return self._partner_dissolution_transition(platform, platform_user_id, relation_id, operation_id, definition, action="confirm")
+        return self._partner_dissolution_transition(platform, platform_user_id, relation_id, operation_id, action="confirm")
 
     def _partner_reject_dissolution_once(self, platform: str, platform_user_id: str, relation_id: str, operation_id: str) -> PartnerRelationRecord:
-        definition = partner_definition(self._partner_content())
-        return self._partner_dissolution_transition(platform, platform_user_id, relation_id, operation_id, definition, action="reject")
+        return self._partner_dissolution_transition(platform, platform_user_id, relation_id, operation_id, action="reject")
 
-    def _partner_dissolution_transition(self, platform: str, platform_user_id: str, relation_id: str, operation_id: str, definition: PartnerDefinition, *, action: str) -> PartnerRelationRecord:
+    def _partner_dissolution_transition(self, platform: str, platform_user_id: str, relation_id: str, operation_id: str, *, action: str) -> PartnerRelationRecord:
         relation_id = relation_id.strip()
         operation_name = f"social.{action}_partner_dissolution"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "relation_id": relation_id})
@@ -329,6 +332,7 @@ class PartnerRepositoryMixin:
             ).fetchone()
             if relation is None:
                 raise PartnerDissolutionNotFoundError("partner relation does not exist")
+            definition = self._partner_snapshot(relation)
             status = str(relation["status"])
             dissolution_expired = (
                 status == "dissolution_pending"
@@ -395,7 +399,11 @@ class PartnerRepositoryMixin:
             )
 
     @staticmethod
-    def _partner_payload(connection: Any, relation_id: str) -> dict[str, Any]:
+    def _partner_snapshot(relation: Any) -> PartnerDefinition:
+        return partner_definition_from_snapshot(decode_json_strict(relation["snapshot_json"]))
+
+    @classmethod
+    def _partner_payload(cls, connection: Any, relation_id: str) -> dict[str, Any]:
         row = connection.execute(
             "SELECT r.*, ip.dao_name AS initiator_dao_name, ep.dao_name AS invitee_dao_name, "
             "ap.dao_name AS player_a_dao_name, bp.dao_name AS player_b_dao_name, dp.dao_name AS dissolution_dao_name "
@@ -406,6 +414,7 @@ class PartnerRepositoryMixin:
         ).fetchone()
         if row is None:
             raise PartnerInvitationNotFoundError("partner relation does not exist")
+        cls._partner_snapshot(row)
         return {
             "relation_id": str(row["relation_id"]),
             "status": str(row["status"]),
@@ -425,23 +434,24 @@ class PartnerRepositoryMixin:
 
     @staticmethod
     def _partner_record_from_payload(payload: dict[str, Any], *, replay: bool = False) -> PartnerRelationRecord:
-        return PartnerRelationRecord(
-            relation_id=str(payload["relation_id"]),
-            status=str(payload["status"]),
-            initiator_dao_name=str(payload["initiator_dao_name"]),
-            invitee_dao_name=str(payload["invitee_dao_name"]),
-            player_a_dao_name=str(payload["player_a_dao_name"]),
-            player_b_dao_name=str(payload["player_b_dao_name"]),
-            invited_at=str(payload["invited_at"]),
-            invitation_expires_at=str(payload["invitation_expires_at"]),
-            accepted_at=payload.get("accepted_at"),
-            dissolution_requested_by_dao_name=payload.get("dissolution_requested_by_dao_name"),
-            dissolution_requested_at=payload.get("dissolution_requested_at"),
-            dissolution_expires_at=payload.get("dissolution_expires_at"),
-            dissolved_at=payload.get("dissolved_at"),
-            cooldown_until=payload.get("cooldown_until"),
-            already_completed=replay,
-        )
+        expected = {field.name for field in fields(PartnerRelationRecord)} - {"already_completed"}
+        optional = {
+            "accepted_at", "dissolution_requested_by_dao_name", "dissolution_requested_at",
+            "dissolution_expires_at", "dissolved_at", "cooldown_until",
+        }
+        if set(payload) != expected:
+            raise ValueError("partner result fields are invalid")
+        for key, value in payload.items():
+            if value is None and key in optional:
+                continue
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"partner result field is invalid: {key}")
+            if key.endswith("_at") or key == "cooldown_until":
+                if datetime.fromisoformat(value).utcoffset() is None:
+                    raise ValueError(f"partner result timestamp is invalid: {key}")
+        if payload["status"] not in {"invited", "active", "dissolution_pending", "dissolved", "rejected", "expired"}:
+            raise ValueError("partner result status is invalid")
+        return PartnerRelationRecord(**payload, already_completed=replay)
 
 
 __all__ = ["PartnerRepositoryMixin"]

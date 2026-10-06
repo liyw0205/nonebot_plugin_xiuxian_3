@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, fields
 from typing import Any
 
 from ..content import ContentBundle, ContentError
@@ -25,43 +26,66 @@ class PartnerDefinition:
         return asdict(self)
 
 
+_SNAPSHOT_FIELDS = frozenset(field.name for field in fields(PartnerDefinition))
+
+
+def partner_definition_from_snapshot(value: object) -> PartnerDefinition:
+    if not isinstance(value, Mapping) or set(value) != _SNAPSHOT_FIELDS:
+        raise ValueError("partner snapshot fields are incomplete or unsupported")
+    if value["key"] != "social.partner":
+        raise ValueError("partner snapshot key is invalid")
+    required_realm = value["required_realm"]
+    if not isinstance(required_realm, str) or not required_realm or required_realm != required_realm.strip():
+        raise ValueError("partner snapshot required_realm is invalid")
+
+    def integer(name: str, minimum: int) -> int:
+        item = value[name]
+        if isinstance(item, bool) or not isinstance(item, int) or item < minimum:
+            raise ValueError(f"partner snapshot {name} is invalid")
+        return item
+
+    required_rank = integer("required_rank", 0)
+    required_layer = integer("required_layer", 0)
+    invitation_ttl_seconds = integer("invitation_ttl_seconds", 1)
+    dissolution_ttl_seconds = integer("dissolution_ttl_seconds", 1)
+    reunion_cooldown_seconds = integer("reunion_cooldown_seconds", 1)
+    max_active_relations = integer("max_active_relations", 1)
+    if max_active_relations != 1:
+        raise ValueError("partner snapshot max_active_relations is unsupported")
+    if value["cooldown_scope"] != "pair":
+        raise ValueError("partner snapshot cooldown_scope is unsupported")
+    return PartnerDefinition(
+        key=value["key"],
+        required_realm=required_realm,
+        required_rank=required_rank,
+        required_layer=required_layer,
+        invitation_ttl_seconds=invitation_ttl_seconds,
+        dissolution_ttl_seconds=dissolution_ttl_seconds,
+        reunion_cooldown_seconds=reunion_cooldown_seconds,
+        max_active_relations=max_active_relations,
+        cooldown_scope=value["cooldown_scope"],
+    )
+
+
 def partner_definition(content: ContentBundle) -> PartnerDefinition:
     try:
         row = content.require("social_interaction", "social.partner", include_locked=True)
     except KeyError as exc:
-        raise ContentError("缺少道侣关系内容") from exc
+        raise ContentError("missing social_interaction content: social.partner") from exc
     if row.get("status") not in {"active", "open"}:
-        raise ContentError("道侣关系内容尚未开放")
+        raise ContentError("social.partner status is not open")
     required_realm = row.get("required_realm")
-    required_layer = row.get("required_layer")
     if not isinstance(required_realm, str) or not required_realm.strip():
-        raise ContentError("道侣关系缺少准入境界")
-    if isinstance(required_layer, bool) or not isinstance(required_layer, int) or required_layer < 0:
-        raise ContentError("道侣关系准入层数无效")
+        raise ContentError("social.partner required_realm is invalid")
     realm = content.get("realm", required_realm, include_locked=False)
-    if realm is None or isinstance(realm.get("rank"), bool) or not isinstance(realm.get("rank"), int):
-        raise ContentError("道侣关系准入境界引用无效")
-
-    def positive_int(name: str) -> int:
-        value = row.get(name)
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            raise ContentError(f"道侣关系字段无效: {name}")
-        return value
-
-    cooldown_scope = row.get("cooldown_scope")
-    if cooldown_scope != "pair":
-        raise ContentError("道侣关系冷却范围无效")
-    return PartnerDefinition(
-        key="social.partner",
-        required_realm=required_realm,
-        required_rank=int(realm["rank"]),
-        required_layer=required_layer,
-        invitation_ttl_seconds=positive_int("invitation_ttl_seconds"),
-        dissolution_ttl_seconds=positive_int("dissolution_ttl_seconds"),
-        reunion_cooldown_seconds=positive_int("reunion_cooldown_seconds"),
-        max_active_relations=positive_int("max_active_relations"),
-        cooldown_scope=cooldown_scope,
-    )
+    if realm is None:
+        raise ContentError("social.partner required_realm reference is not open")
+    try:
+        snapshot = {name: row[name] for name in _SNAPSHOT_FIELDS if name != "required_rank"}
+        snapshot["required_rank"] = realm["rank"]
+        return partner_definition_from_snapshot(snapshot)
+    except (KeyError, ValueError) as exc:
+        raise ContentError(f"invalid social.partner content: {exc}") from exc
 
 
 def partner_eligible(player: Any, definition: PartnerDefinition, content: ContentBundle) -> bool:
@@ -76,4 +100,4 @@ def partner_eligible(player: Any, definition: PartnerDefinition, content: Conten
     return rank > definition.required_rank or (rank == definition.required_rank and layer >= definition.required_layer)
 
 
-__all__ = ["PartnerDefinition", "partner_definition", "partner_eligible"]
+__all__ = ["PartnerDefinition", "partner_definition", "partner_definition_from_snapshot", "partner_eligible"]

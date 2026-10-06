@@ -20,6 +20,11 @@
 
 `SocialLink` 是概念模型；师徒继续使用已有 `mentor_relations`，道侣使用独立的 `partner_relations`。直接切磋仅为即时观战，不产生社交关系或持久对局。不要为套用这个抽象而迁移或复制现有师徒数据。边界见[玩家互动开发说明](player-interactions.md)。
 
+道侣 `snapshot_json` 必须完整保存 `key`、`required_realm`、`required_rank`、`required_layer`、
+`invitation_ttl_seconds`、`dissolution_ttl_seconds`、`reunion_cooldown_seconds`、`max_active_relations`
+和 `cooldown_scope` 九项邀请规则。境界序位与层数为非负整数，三项时限为正整数；当前只支持每人一段待确认/有效关系与同对冷却。
+快照不接受布尔值、字符串数值、缺字段或额外字段，不依赖当前内容补齐；静态定义与持久化快照共用同一结构校验，前者另检查当前开放状态及境界引用。
+
 当前运行时将师徒关系落在 `mentor_relations`：保存师傅/徒弟身份、邀请状态、过期时间、接受与
 毕业时间、毕业 operation 和师傅贡献快照；毕业奖励通过同一事务写入 `player_reputations`，
 不会修改修为、突破材料或突破概率。
