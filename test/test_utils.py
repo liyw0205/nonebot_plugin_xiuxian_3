@@ -48,6 +48,11 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
 )
 from nonebot_plugin_xiuxian_3.contracts import PlayerView
 from nonebot_plugin_xiuxian_3.xiuxian.combat.repository import CombatRepositoryMixin
+from nonebot_plugin_xiuxian_3.xiuxian.persistence.errors import (
+    OperationConflictError,
+    OperationResultMalformedError,
+)
+from nonebot_plugin_xiuxian_3.xiuxian.utils.operations import operation_replay, record_operation
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_list, json_object
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
     DuplicateJSONKeyError,
@@ -1338,3 +1343,28 @@ def test_change_player_state_commits_json_player_fields_with_assets() -> None:
     ).fetchone()
     assert tuple(stored) == (15, '{"item.sand": 1}', '{"flags":["guide.one"]}', "after")
     connection.close()
+
+
+@pytest.mark.parametrize("malformed", ["{", "[]", '{"amount": 1, "amount": 2}', '{"reward": {"item.herb": 1, "item.herb": 2}}'])
+def test_operation_replay_rejects_malformed_json_without_changing_ledger(malformed: str) -> None:
+    with sqlite3.connect(":memory:") as connection:
+        connection.row_factory = sqlite3.Row
+        connection.execute(
+            "CREATE TABLE operations (operation_id TEXT PRIMARY KEY, operation_name TEXT, "
+            "player_id INTEGER, request_hash TEXT, result_json TEXT, created_at TEXT)"
+        )
+        record_operation(connection, "op", "harvest", 1, "hash", {"amount": 1}, "now")
+        assert operation_replay(connection, "missing", "harvest", "hash") is None
+        assert operation_replay(connection, "op", "harvest", "hash", player_id=1) == {"amount": 1}
+        connection.execute("UPDATE operations SET result_json=? WHERE operation_id='op'", (malformed,))
+        before = tuple(connection.execute("SELECT * FROM operations").fetchone())
+
+        with pytest.raises(OperationConflictError):
+            operation_replay(connection, "op", "harvest", "hash", player_id=2)
+        with pytest.raises(OperationConflictError):
+            operation_replay(connection, "op", "maintain", "hash")
+        with pytest.raises(OperationConflictError):
+            operation_replay(connection, "op", "harvest", "other-hash")
+        with pytest.raises(OperationResultMalformedError):
+            operation_replay(connection, "op", "harvest", "hash", player_id=1)
+        assert tuple(connection.execute("SELECT * FROM operations").fetchone()) == before

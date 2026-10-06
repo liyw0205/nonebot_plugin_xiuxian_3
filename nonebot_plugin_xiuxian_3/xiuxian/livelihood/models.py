@@ -30,6 +30,7 @@ class FieldPlotRecord:
     planted_at: str | None
     harvest_at: str | None
     crop_label: str
+    harvest_labels: dict[str, str]
     maintenance_count: int = 0
     required_maintenance: int = 0
     harvest: dict[str, int] = field(default_factory=dict)

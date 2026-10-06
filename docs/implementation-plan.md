@@ -17,6 +17,42 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 
 ## 1. 范围分层
 
+### 已闭合切片：重租居所后的灵田收获与维护
+
+开工证据：QQ 官方与 OneBot V11 均可经真实命令在租约第48小时播种并维护，第72小时重租并播种新地块，第74小时收获却返回 `PLOT_NOT_READY`；旧作物此时已熟且未枯，等新作物成熟后旧作物已枯。播种按居所分配地块，维护、收获和查询却只取角色最新地块，造成旧收成被遮挡。既有合同允许租约到期后的已开始事项继续结算；不新增产量、租期、成本或随机规则。
+
+范围限定 `我的灵田`、`灵田维护`、`灵田收获` 的目标选择、快照校验和原事务恢复。收获选择仍在收获期限内且最早到期的成熟地块；维护选择尚在生长期且未完成维护、最早成熟的地块；查询先展示可收获地块，再展示生长地块，无活动地块才展示最近结果。过期或已收获地块不能遮挡可处理地块，选择范围始终限定本人。沿用现有 application、`FieldPlotRepositoryMixin`、共享 JSON 解码与角色资产/奖励事务，不复制背包、名望和玩家数值写入；operation 先回放，选中地块、产物、名望、图鉴和账本原子提交。
+
+并行文件所有权：主线独占 `livelihood/field_repository.py`、必要的灵田应用文案以及本计划/当前状态，负责核心事务和最终验收；`source_contract_candidate` 独占新 `test/test_livelihood_field_selection.py`，编写双适配器真实重租、维护/收获顺序、期限边界与重启重放测试；`wayfaring_contract_candidate` 独占新 `test/test_livelihood_field_recovery.py`，编写并发、JSON损坏、事务故障与原请求重试测试；复用空闲代理 `gather_transaction_reuse` 独占生活域 README/model/workflow/use-cases，同步选择与恢复合同并只读审查实现。测试不依赖互相尚未完成的新夹具，代理不得改同一仓储、资产工具或彼此测试文件。三项在开工时并行，避免把测试和审阅全部留到收尾。
+
+候选比较：属性显示/普通PvE/正式PvP确有公式分叉，且永久灵力增长被部分路径忽略，但需同时闭合构筑效果、队伍、秘境及历史开战快照，不能用改一行公式伪装统一，本轮登记为独立待办；朝阳吐纳篇、小型灵兽行囊和斗法分享扩展仍缺来源/配方/权限合同，不臆造；取消服务已有入口和验收，不重复开发。灵田丢收成已由公开命令双适配器复现，合同完整且生活子插件不在最近十条中，优先处理。
+
+最近十条玩法切片及触及子插件：`0b1d92e` 道历（routine/persistence/utils，另八处仅删除无用导入）；`cf72c83` 道源（quests/progression）；`4ab072f` 灵兽（companions）；`da1a8df` 移动（world）；`dbcfb4a` 行卷称号（routine/adventures/events/utils）；`70963ed` 生产（production）；`58b69b6` 派遣（specials）；`31616c6` 交易（economy/items/persistence/utils）；`bf91ccd` 设施（production/utils）；`3e771a7` 装备（advancement）。均验收QQ/OneBot。utils四次，routine/persistence/production各两次，其余各一次；最近五条routine/utils重复，继续冷却。生活域仅因本条新复现缺陷重入，不重做此前内容化。
+
+明确不改：行卷/道源、服务/委托/运输/生产、属性与战斗数值、正式PvP/PvE和只读切磋/训练傀儡。验收聚焦灵田双适配器、JSON严格解析、幂等冲突、并发、故障回滚和runtime重建，随后相关回归、源码及测试compileall、全部内容JSON和diff检查；不重复启动整条飞升长测。
+
+实现核查补充：灵田原 `_operation` 被服务仓储的同名方法遮蔽，修改本地解码不会生效。主线直接复用 `utils.operations.operation_replay/record_operation`，删除灵田重复方法；共享回放解码改用已有 `decode_json_strict`，修复重复JSON键被覆盖的问题，并补工具测试。这是具体回放缺陷所需的共享工具改动，不全仓重写调用方。主线另独占 `livelihood/models.py` 与 `use_cases.py`：播种冻结潜在收成的物品名称，收获回复及历史回放不泄露稳定键，查询使用中文状态；固定短句不进入data，不为旧快照补字段。
+
+并行审阅还复现了同一地块选择链的后续阻断：旧租约慢熟作物仍在生长，当前租约作物已枯，查询优先显示旧作物后，当前租约按存储状态被判为永久占用。播种现复用灵田时间窗口核验，只清理本人当前租约已枯地块，并与种子/精力、新地块、operation同事务提交；失败不单独提交腾地状态。另对坏快照补产物/名望语义校验，拒绝把修为伪装成灵田产物或名望键，不查询现行内容改写旧产量。
+
+三名代理的交付均已合并：选择与双适配器文件14项通过，JSON/故障/并发恢复文件46项通过；主线最终合并复验两文件60项通过。生活/内容/适配器相邻回归58项、工具/仓储/无版本标识/文档84项、正式PvP/PvE与只读观战19项通过。所有测试均用临时数据库，除明确的故障与坏快照注入外，重租、播种、维护和收获由真实公开命令创建；没有伪造角色成长或来源账本。默认4小时作物链与临时改成长时长的边界链分别说明，不把测试配置当成默认玩法。
+
+源码与测试compileall、47份内容JSON严格解析和diff检查通过；未运行整仓全量测试，未重启此前中止的飞升长链。没有改动或清理用户数据库。未发布存档若缺少本轮必需的收成名称快照将明确拒绝，须备份后由开发者选择新测试库，不自动迁移、清库或补旧格式。生活域本条闭合后冷却；下一轮独立比较属性口径缺口与其他未闭合路径，来源/配方合同不足的能力仍不开放。
+
+共享回放调用方的相邻组另验收生活服务/委托、属性、道侣/宗门、云舟和道历。初跑80项中78项通过，宗门撤回的两适配器测试把坏JSON期待为输入冲突；审阅代理将HEAD `0b1d92e` 原始回放函数在内存替换，证实两项在基线同样失败。主线仅修正 `test/test_social.py` 断言为既有 `PERSISTENCE_ERROR`/可重试，不改社交实现或返回语义；不同输入仍是冲突。这是共享函数回归验收校正，不是社交玩法重入。
+
+宗门两项与工具/文档组最终复验86项通过，以上聚焦组共301项分组通过。额外检查中既有应用层宽泛异常捕获等ruff告警仍保留，没有借此扩改其他用例。主要复验命令：
+
+```bash
+$HOME/myenv/bin/python -m pytest -q --tb=short test/test_livelihood_field_selection.py test/test_livelihood_field_recovery.py
+$HOME/myenv/bin/python -m pytest -q --tb=short test/test_livelihood.py test/test_livelihood_residence_content.py test/test_content.py test/test_adapter_simulation.py
+$HOME/myenv/bin/python -m pytest -q --tb=short test/test_livelihood_service.py test/test_livelihood_commission.py test/test_stats.py test/test_partner.py test/test_social.py test/test_world_cloud_routes.py test/test_routine.py
+$HOME/myenv/bin/python -m pytest -q --tb=short test/test_combat.py test/test_arena.py test/test_spar_interactions.py
+$HOME/myenv/bin/python -m pytest -q --tb=short test/test_social.py::test_sect_application_withdraw_recovery_and_replay test/test_utils.py test/test_repository_boundaries.py test/test_runtime_versionless.py test/test_documentation.py
+$HOME/myenv/bin/python -m compileall -q nonebot_plugin_xiuxian_3 test
+git diff --check
+```
+
 ### 已闭合切片：问道行卷满级可达与周期快照
 
 开工证据：28日、30级、每级80点需要2400点，而每日100、自然周500的共同上限使任意开启星期最多获得2000至2200点，28至30级无法领取。本轮不是重复称号修复或单纯搬迁配置。保持28日/30级/80点/每日100与所有既有奖励不变，将默认周上限改为能完成四周2400点目标的最低值600；禁止配置形成任意起始星期不可满级的周期。来源只登记现有实际投影的八种，不把未投影的接取悬赏或近郊专用键另算一次。

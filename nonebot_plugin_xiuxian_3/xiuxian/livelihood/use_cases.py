@@ -294,7 +294,7 @@ class LivelihoodApplication:
             return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        items = "、".join(f"{key} ×{value}" for key, value in record.harvest.items()) or "无"
+        items = "、".join(f"{record.harvest_labels[key]} ×{value}" for key, value in record.harvest.items()) or "无"
         return CommandResult(
             True,
             "FIELD_PLOT_HARVESTED",
@@ -319,10 +319,11 @@ class LivelihoodApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         label = record.crop_label if record.crop_key else "无"
+        state = {"growing": "生长中", "harvestable": "待收获", "harvested": "已收获", "withered": "已枯萎"}[record.status]
         return CommandResult(
             True,
             "FIELD_PLOT_PROFILE",
-            f"## 我的灵田\n\n- **作物**：{label}\n- **状态**：{record.status}\n- **维护**：{record.maintenance_count}/{record.required_maintenance}\n- **预计成熟**：{record.harvest_at or '无'}",
+            f"## 我的灵田\n\n- **作物**：{label}\n- **状态**：{state}\n- **维护**：{record.maintenance_count}/{record.required_maintenance}\n- **预计成熟**：{record.harvest_at or '无'}",
             context.request_id,
             data={"plot_id": record.plot_id, "crop_key": record.crop_key, "status": record.status, "harvest_at": record.harvest_at, "maintenance_count": record.maintenance_count, "required_maintenance": record.required_maintenance},
         )

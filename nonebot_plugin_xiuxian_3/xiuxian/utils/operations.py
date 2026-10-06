@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from ..persistence.errors import OperationConflictError, OperationResultMalformedError
+from .json_cache import decode_json_strict
 
 
 def player_operation(
@@ -58,7 +59,7 @@ def operation_replay(
     if str(row["operation_name"]) != operation_name or str(row["request_hash"]) != request_hash:
         raise OperationConflictError("operation input differs from its original request")
     try:
-        payload = json.loads(str(row["result_json"]))
+        payload = decode_json_strict(str(row["result_json"]))
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
         raise OperationResultMalformedError("operation result is malformed") from exc
     if not isinstance(payload, dict):

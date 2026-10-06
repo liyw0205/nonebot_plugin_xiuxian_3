@@ -165,7 +165,8 @@ def test_sect_application_withdraw_recovery_and_replay(adapter: str) -> None:
                 adapter,
                 _adapter_context(adapter, "applicant", "withdraw"), f"撤回入宗申请 {application_id}"
             )
-            assert malformed.code == "OPERATION_CONFLICT"
+            assert malformed.code == "PERSISTENCE_ERROR"
+            assert malformed.retryable is True
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
                     "UPDATE operations SET result_json = ? WHERE operation_id = 'withdraw'", (valid_result,)
