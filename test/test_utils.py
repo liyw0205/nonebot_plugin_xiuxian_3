@@ -42,6 +42,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     spend_player_assets,
     spend_player_currency,
     spend_player_items,
+    spend_sect_currency,
     write_player_values,
 )
 from nonebot_plugin_xiuxian_3.contracts import PlayerView
@@ -713,6 +714,26 @@ def test_signed_currency_and_item_changes_share_the_same_kernel() -> None:
             "rejected",
         )
     assert connection.execute("SELECT spirit_stones FROM players WHERE id = 1").fetchone()[0] == 20
+    connection.close()
+
+
+def test_sect_currency_spending_is_atomic_and_checks_owner_state() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.execute(
+        "CREATE TABLE sects (sect_id TEXT PRIMARY KEY, status TEXT NOT NULL, spirit_stones INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.executemany(
+        "INSERT INTO sects(sect_id, status, spirit_stones, updated_at) VALUES (?, ?, ?, 'before')",
+        (("active", "active", 80), ("inactive", "inactive", 80)),
+    )
+
+    assert spend_sect_currency(connection, "active", 50, "spent") is True
+    assert spend_sect_currency(connection, "active", 40, "insufficient") is False
+    assert spend_sect_currency(connection, "inactive", 1, "inactive") is False
+    with pytest.raises(AssetDeltaError):
+        spend_sect_currency(connection, "active", -1, "invalid")
+    balances = dict(connection.execute("SELECT sect_id, spirit_stones FROM sects"))
+    assert balances == {"active": 30, "inactive": 80}
     connection.close()
 
 

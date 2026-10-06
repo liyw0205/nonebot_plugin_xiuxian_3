@@ -613,3 +613,167 @@ def test_facility_claim_maintenance_and_order_slot_lifecycle_for_qq_and_onebot()
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_sect_facility_maintenance_is_member_scoped_atomic_and_recoverable() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime_dir = Path(data_dir) / adapter
+                current = [datetime(2026, 9, 23, 20, 5, tzinfo=timezone.utc)]
+                clock = lambda: current[0]
+                runtime = create_runtime(data_dir=runtime_dir, clock=clock)
+                user = f"sect-facility-{adapter}"
+                await runtime.adapters.dispatch(
+                    adapter, _adapter_context(adapter, user, f"create-{adapter}"), "开始修仙"
+                )
+                await runtime.adapters.dispatch(
+                    adapter, _adapter_context(adapter, user, f"seek-{adapter}"), "寻仙问道"
+                )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET realm_key='foundation', realm_layer=1, spirit_stones=2000 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                created_sect = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"sect-create-{adapter}", f"sect-create-{adapter}"),
+                    "创建宗门 青云门",
+                )
+                assert created_sect.code == "SECT_CREATED"
+                sect_id = created_sect.data["sect_id"]
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET realm_key='golden_core', realm_layer=1, location_key='cave.mist_grotto_2' WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+
+                claim = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"facility-claim-{adapter}", f"facility-claim-{adapter}"),
+                    "认领设施槽位 炼丹房 宗门",
+                )
+                assert claim.code == "FACILITY_SLOT_CLAIMED"
+                assert claim.data["owner_type"] == "sect"
+
+                outsider = f"facility-outsider-{adapter}"
+                await runtime.adapters.dispatch(
+                    adapter, _adapter_context(adapter, outsider, f"outsider-create-{adapter}"), "开始修仙"
+                )
+                denied = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, outsider, f"outsider-maintain-{adapter}", f"outsider-maintain-{adapter}"),
+                    "维护设施",
+                )
+                assert denied.code == "FACILITY_NOT_CLAIMED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM production_facility_maintenance"
+                    ).fetchone()[0] == 0
+
+                donation = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"donate-{adapter}", f"donate-{adapter}"),
+                    "宗门捐献 灵石 100",
+                )
+                assert donation.code == "SECT_DONATED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT spirit_stones FROM sects WHERE sect_id=?", (sect_id,)
+                    ).fetchone()[0] == 100
+                    connection.execute(
+                        """CREATE TRIGGER reject_sect_facility_maintenance
+                        BEFORE INSERT ON production_facility_maintenance
+                        WHEN NEW.owner_type = 'sect'
+                        BEGIN SELECT RAISE(ABORT, 'maintenance write rejected'); END"""
+                    )
+
+                first_operation = f"sect-maintenance-day1-{adapter}"
+                failed = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"maintain-fail-{adapter}", first_operation),
+                    "维护设施",
+                )
+                assert failed.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    balance, slot_status, rows, operations = connection.execute(
+                        """SELECT s.spirit_stones, f.status,
+                        (SELECT COUNT(*) FROM production_facility_maintenance),
+                        (SELECT COUNT(*) FROM operations WHERE operation_id=?)
+                        FROM sects s JOIN production_facility_slots f ON f.owner_id=s.sect_id
+                        WHERE s.sect_id=?""",
+                        (first_operation, sect_id),
+                    ).fetchone()
+                    assert (balance, slot_status, rows, operations) == (100, "active", 0, 0)
+                    connection.execute("DROP TRIGGER reject_sect_facility_maintenance")
+
+                first = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"maintain-{adapter}", first_operation),
+                    "维护设施",
+                )
+                assert first.code == "FACILITY_MAINTENANCE_SETTLED"
+                assert first.data["paid_count"] == 1
+                assert first.data["records"][0]["owner_type"] == "sect"
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"maintain-replay-{adapter}", first_operation),
+                    "维护设施",
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT spirit_stones FROM sects WHERE sect_id=?", (sect_id,)
+                    ).fetchone()[0] == 0
+
+                current[0] += timedelta(days=1)
+                unpaid_operation = f"sect-maintenance-day2-{adapter}"
+                unpaid = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"maintain-unpaid-{adapter}", unpaid_operation),
+                    "维护设施",
+                )
+                assert unpaid.code == "FACILITY_MAINTENANCE_SETTLED"
+                assert unpaid.data["inactive_count"] == 1
+                unpaid_replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"maintain-unpaid-replay-{adapter}", unpaid_operation),
+                    "维护设施",
+                )
+                assert unpaid_replay.data["idempotent_replay"] is True
+
+                donation = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"donate-again-{adapter}", f"donate-again-{adapter}"),
+                    "宗门捐献 灵石 100",
+                )
+                assert donation.code == "SECT_DONATED"
+                current[0] += timedelta(days=1)
+                restored_operation = f"sect-maintenance-day3-{adapter}"
+                restored = await runtime.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"maintain-restored-{adapter}", restored_operation),
+                    "维护设施",
+                )
+                assert restored.data["paid_count"] == 1
+                await runtime.close()
+
+                restarted = create_runtime(data_dir=runtime_dir, clock=clock)
+                recovered = await restarted.adapters.dispatch(
+                    adapter,
+                    _adapter_context(adapter, user, f"maintain-recovered-{adapter}", restored_operation),
+                    "维护设施",
+                )
+                assert recovered.data["idempotent_replay"] is True
+                with sqlite3.connect(restarted.settings.database_path) as connection:
+                    balance, status, count = connection.execute(
+                        """SELECT s.spirit_stones, f.status,
+                        (SELECT COUNT(*) FROM production_facility_maintenance)
+                        FROM sects s JOIN production_facility_slots f ON f.owner_id=s.sect_id
+                        WHERE s.sect_id=?""",
+                        (sect_id,),
+                    ).fetchone()
+                assert (balance, status, count) == (0, "active", 3)
+                await restarted.close()
+
+    asyncio.run(run())

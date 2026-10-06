@@ -103,16 +103,16 @@ class FacilityApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         if not records:
-            return CommandResult(False, "FACILITY_NOT_CLAIMED", "你还没有认领可维护的个人设施槽位。", context.request_id, operation_id)
+            return CommandResult(False, "FACILITY_NOT_CLAIMED", "你名下还没有认领可维护的设施槽位。", context.request_id, operation_id)
         paid = sum(1 for record in records if record.paid)
         inactive = len(records) - paid
-        status_text = f"已缴费 {paid} 个"
+        status_text = f"已结清 {paid} 个槽位的维护费"
         if inactive:
             status_text += f"，欠费停用 {inactive} 个"
         return CommandResult(
             True,
             "FACILITY_MAINTENANCE_SETTLED",
-            f"## 设施维护完成\n\n本业务日{status_text}。每个槽位维护费 100 灵石；欠费槽位已停用。",
+            f"## 设施维护完成\n\n本业务日{status_text}。每个槽位维护费 100 灵石。",
             context.request_id,
             operation_id,
             data={
@@ -120,6 +120,8 @@ class FacilityApplication:
                 "records": [
                     {
                         "slot_key": record.slot_key,
+                        "owner_type": record.owner_type,
+                        "owner_id": record.owner_id,
                         "business_date": record.business_date,
                         "fee": record.fee,
                         "paid": record.paid,

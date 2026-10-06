@@ -331,6 +331,18 @@ def spend_player_currency(
     )
 
 
+def spend_sect_currency(connection: Any, sect_id: str, amount: Any, updated_at: str) -> bool:
+    """Spend shared sect currency atomically inside the caller's transaction."""
+
+    required = _non_negative_amount(amount, "currency amount")
+    changed = connection.execute(
+        """UPDATE sects SET spirit_stones = spirit_stones - ?, updated_at = ?
+        WHERE sect_id = ? AND status = 'active' AND spirit_stones >= ?""",
+        (required, updated_at, str(sect_id), required),
+    ).rowcount
+    return changed == 1
+
+
 def apply_player_assets(
     connection: Any,
     row: Any,
@@ -763,6 +775,7 @@ __all__ = [
     "spend_player_assets",
     "spend_player_currency",
     "spend_player_items",
+    "spend_sect_currency",
     "write_player_values",
     "write_player_assets",
 ]

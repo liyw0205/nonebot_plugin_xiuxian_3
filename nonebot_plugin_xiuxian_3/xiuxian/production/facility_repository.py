@@ -9,7 +9,7 @@ from datetime import date
 from typing import Any
 
 from ...contracts import serialize_datetime
-from ..utils.assets import inventory_amount, spend_player_assets, player_currency
+from ..utils.assets import inventory_amount, spend_player_assets, spend_sect_currency, player_currency
 from ..utils.player import player_inventory
 from .facility_models import FacilityMaintenanceRecord, FacilitySlotRecord
 from .facility_rules import FACILITY_DURATION_BONUS_BP, FACILITY_MAINTENANCE_FEE, resolve_facility
@@ -173,38 +173,23 @@ class FacilityRepositoryMixin:
                 return tuple(self._maintenance_record_from_payload(item, replay=True) for item in payload["records"])
 
             player = self._require_player(connection, platform, platform_user_id)
+            membership = connection.execute(
+                """SELECT sm.sect_id FROM sect_members sm JOIN sects s ON s.sect_id = sm.sect_id
+                WHERE sm.player_id = ? AND sm.status = 'active' AND s.status = 'active' LIMIT 1""",
+                (player["id"],),
+            ).fetchone()
+            ownership = ["(owner_type = 'personal' AND owner_id = ?)"]
+            parameters: list[str] = [str(player["id"])]
+            if membership is not None:
+                ownership.append("(owner_type = 'sect' AND owner_id = ?)")
+                parameters.append(str(membership["sect_id"]))
             slots = connection.execute(
-                "SELECT * FROM production_facility_slots WHERE owner_type = 'personal' AND owner_id = ? AND status IN ('active', 'inactive') ORDER BY id",
-                (str(player["id"]),),
+                f"SELECT * FROM production_facility_slots WHERE status IN ('active', 'inactive') AND ({' OR '.join(ownership)}) ORDER BY id",
+                tuple(parameters),
             ).fetchall()
             records: list[FacilityMaintenanceRecord] = []
             for slot in slots:
-                existing_maintenance = connection.execute(
-                    "SELECT m.*, s.slot_key FROM production_facility_maintenance m JOIN production_facility_slots s ON s.id = m.slot_id WHERE m.slot_id = ? AND m.business_date = ?",
-                    (slot["id"], day),
-                ).fetchone()
-                if existing_maintenance is not None:
-                    records.append(self._maintenance_record(existing_maintenance, replay=True))
-                    continue
-                paid = player_currency(player) >= FACILITY_MAINTENANCE_FEE
-                if paid:
-                    spend_player_assets(connection, player, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
-                    player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
-                status = "active" if paid else "inactive"
-                maintenance_operation_id = f"production.facility.maintenance:{slot['slot_key']}:{day}"
-                connection.execute(
-                    "INSERT INTO production_facility_maintenance(slot_id, business_date, owner_type, owner_id, fee, paid, status, operation_id, created_at) VALUES (?, ?, 'personal', ?, ?, ?, ?, ?, ?)",
-                    (slot["id"], day, str(player["id"]), FACILITY_MAINTENANCE_FEE, int(paid), status, maintenance_operation_id, now_text),
-                )
-                connection.execute(
-                    "UPDATE production_facility_slots SET status = ?, last_maintenance_date = ?, updated_at = ? WHERE id = ?",
-                    (status, day, now_text, slot["id"]),
-                )
-                created = connection.execute(
-                    "SELECT m.*, s.slot_key FROM production_facility_maintenance m JOIN production_facility_slots s ON s.id = m.slot_id WHERE m.operation_id = ?",
-                    (maintenance_operation_id,),
-                ).fetchone()
-                records.append(self._maintenance_record(created, replay=False))
+                records.append(self._maintain_facility_slot_once(connection, slot, day, now_text))
             payload = {"business_date": day, "records": [self._maintenance_payload(record) for record in records]}
             self._record_facility_operation(
                 connection,
@@ -227,46 +212,48 @@ class FacilityRepositoryMixin:
                 "SELECT * FROM production_facility_slots WHERE status IN ('active', 'inactive') ORDER BY id"
             ).fetchall()
             for slot in slots:
-                owner_type = str(slot["owner_type"])
-                owner_id = str(slot["owner_id"])
-                existing = connection.execute(
-                    "SELECT m.*, s.slot_key FROM production_facility_maintenance m JOIN production_facility_slots s ON s.id = m.slot_id WHERE m.slot_id = ? AND m.business_date = ?",
-                    (slot["id"], day),
-                ).fetchone()
-                if existing is not None:
-                    records.append(self._maintenance_record(existing, replay=True))
-                    continue
-                paid = False
-                if owner_type == "personal":
-                    owner = connection.execute("SELECT * FROM players WHERE id = ? AND status = 'active'", (owner_id,)).fetchone()
-                    if owner is not None and player_currency(owner) >= FACILITY_MAINTENANCE_FEE:
-                        spend_player_assets(connection, owner, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
-                        paid = True
-                else:
-                    owner = connection.execute("SELECT spirit_stones FROM sects WHERE sect_id = ? AND status = 'active'", (owner_id,)).fetchone()
-                    if owner is not None and int(owner["spirit_stones"]) >= FACILITY_MAINTENANCE_FEE:
-                        connection.execute(
-                            "UPDATE sects SET spirit_stones = spirit_stones - ?, updated_at = ? WHERE sect_id = ?",
-                            (FACILITY_MAINTENANCE_FEE, now_text, owner_id),
-                        )
-                        paid = True
-                status = "active" if paid else "inactive"
-                operation_id = f"production.facility.maintenance:{slot['slot_key']}:{day}"
-                connection.execute(
-                    """INSERT INTO production_facility_maintenance(
-                    slot_id, business_date, owner_type, owner_id, fee, paid, status, operation_id, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (slot["id"], day, owner_type, owner_id, FACILITY_MAINTENANCE_FEE, int(paid), status, operation_id, now_text),
-                )
-                connection.execute(
-                    "UPDATE production_facility_slots SET status = ?, last_maintenance_date = ?, updated_at = ? WHERE id = ?",
-                    (status, day, now_text, slot["id"]),
-                )
-                created = connection.execute(
-                    "SELECT m.*, s.slot_key FROM production_facility_maintenance m JOIN production_facility_slots s ON s.id = m.slot_id WHERE m.operation_id = ?", (operation_id,)
-                ).fetchone()
-                records.append(self._maintenance_record(created, replay=False))
+                records.append(self._maintain_facility_slot_once(connection, slot, day, now_text))
         return tuple(records)
+
+    def _maintain_facility_slot_once(
+        self, connection: sqlite3.Connection, slot: sqlite3.Row, day: str, now_text: str
+    ) -> FacilityMaintenanceRecord:
+        existing = connection.execute(
+            "SELECT m.*, s.slot_key FROM production_facility_maintenance m JOIN production_facility_slots s ON s.id = m.slot_id WHERE m.slot_id = ? AND m.business_date = ?",
+            (slot["id"], day),
+        ).fetchone()
+        if existing is not None:
+            return self._maintenance_record(existing, replay=True)
+
+        owner_type = str(slot["owner_type"])
+        owner_id = str(slot["owner_id"])
+        if owner_type == "personal":
+            owner = connection.execute(
+                "SELECT * FROM players WHERE id = ? AND status = 'active'", (owner_id,)
+            ).fetchone()
+            paid = owner is not None and player_currency(owner) >= FACILITY_MAINTENANCE_FEE
+            if paid:
+                spend_player_assets(connection, owner, {"spirit_stones": FACILITY_MAINTENANCE_FEE}, now_text)
+        else:
+            paid = spend_sect_currency(connection, owner_id, FACILITY_MAINTENANCE_FEE, now_text)
+
+        status = "active" if paid else "inactive"
+        operation_id = f"production.facility.maintenance:{slot['slot_key']}:{day}"
+        connection.execute(
+            """INSERT INTO production_facility_maintenance(
+            slot_id, business_date, owner_type, owner_id, fee, paid, status, operation_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (slot["id"], day, owner_type, owner_id, FACILITY_MAINTENANCE_FEE, int(paid), status, operation_id, now_text),
+        )
+        connection.execute(
+            "UPDATE production_facility_slots SET status = ?, last_maintenance_date = ?, updated_at = ? WHERE id = ?",
+            (status, day, now_text, slot["id"]),
+        )
+        created = connection.execute(
+            "SELECT m.*, s.slot_key FROM production_facility_maintenance m JOIN production_facility_slots s ON s.id = m.slot_id WHERE m.operation_id = ?",
+            (operation_id,),
+        ).fetchone()
+        return self._maintenance_record(created, replay=False)
 
     def _facility_reserve_for_recipe(self, connection: sqlite3.Connection, row: sqlite3.Row, recipe) -> sqlite3.Row | None:
         """Find and reserve the owner's active slot before material deduction."""
