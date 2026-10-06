@@ -327,7 +327,67 @@ def test_foundation_late_milestone_is_recorded_with_the_layer_advance() -> None:
                     "total_cultivation": 10000,
                     "required_void_route_count": 0,
                     "void_route_count": 0,
+                    "title": "筑基圆满",
+                    "description": "根基已稳，可启程前往云舟，探访更深的洞天。",
+                    "unlock_status": "open",
                 }
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_milestone_write_failure_rolls_back_advance_and_same_operation_can_retry() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "milestone-recovery-user"
+            await _enter_cultivator(runtime, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key='foundation', realm_layer=8, cultivation=6300, "
+                    "total_cultivation=10000 WHERE platform_user_id=?",
+                    (user,),
+                )
+                connection.execute(
+                    """
+                    CREATE TRIGGER reject_progression_milestone
+                    BEFORE INSERT ON progression_milestones
+                    BEGIN
+                        SELECT RAISE(ABORT, 'injected milestone write failure');
+                    END
+                    """
+                )
+
+            rejected = await runtime.dispatch(
+                _context(user, "advance-rejected", operation_id="milestone-retry"),
+                "晋升境界",
+            )
+            assert rejected.code == "PERSISTENCE_ERROR"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                state = connection.execute(
+                    "SELECT realm_layer FROM players WHERE platform_user_id=?", (user,)
+                ).fetchone()
+                assert state == (8,)
+                assert connection.execute("SELECT COUNT(*) FROM progression_milestones").fetchone()[0] == 0
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM operations WHERE operation_id='milestone-retry'"
+                ).fetchone()[0] == 0
+                connection.execute("DROP TRIGGER reject_progression_milestone")
+
+            retried = await runtime.dispatch(
+                _context(user, "advance-retried", operation_id="milestone-retry"),
+                "晋升境界",
+            )
+            assert retried.code == "REALM_LAYER_ADVANCED"
+            assert {item["key"] for item in retried.data["unlocks"]} == {
+                "milestone.foundation_late"
+            }
+            replay = await runtime.dispatch(
+                _context(user, "advance-replay", operation_id="milestone-retry"),
+                "晋升境界",
+            )
+            assert replay.data["idempotent_replay"] is True
+            assert replay.data["unlocks"] == retried.data["unlocks"]
             await runtime.close()
 
     asyncio.run(run())

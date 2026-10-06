@@ -163,6 +163,7 @@ data/
 | 文件 | 首版内容 | 参考快照（总表裁决） |
 |:--|:--|:--|
 | `境界/境界.json` | 境界键、中文名、开放状态、L1–L10 阈值、跨境门槛 | `foundation/progression/layers.md`、`content-v0.1.md` |
+| `境界/晋升.json` | 同境晋升提示与条件里程碑的稳定键、玩家文案、触发境界/层数及资格门槛 | `foundation/progression/layers.md`、`content-data-contract.md` |
 | `道途/道途.json` | 六大道途、被动、主动技能和状态资源 | `foundation/paths/content-v0.1.md` |
 | `技能/技能.json` | 基础攻击、六大道途在九境各自的稳定攻势与战术备选（108 条）、敌方技能及天劫阶段技能；技能名按招式意象命名，战斗消费器结算爆发、辅御、持续、削弱、蓄力、中毒、灼烧和反伤，高阶备选要求悬赏可得的传承残卷 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/workflow.md` |
 | `战斗/实体.json` | 独立战斗实体注册；未接入消费器的召唤机关保持锁定 | `gameplay/combat/content-v0.1.md` |

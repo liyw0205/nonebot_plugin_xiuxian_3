@@ -6,6 +6,7 @@ import json
 import sqlite3
 from typing import Any, Mapping
 
+from ..content import ContentBundle
 from .milestone_rules import due_milestones
 from .models import LayerUnlock
 from ..utils.player import player_integer, player_reputation
@@ -17,6 +18,7 @@ def record_due_milestones(
     player: Mapping[str, Any],
     source_operation_id: str,
     now_text: str,
+    content: ContentBundle | None = None,
 ) -> tuple[LayerUnlock, ...]:
     """Persist each newly qualified milestone and return its player-facing unlock."""
 
@@ -36,6 +38,7 @@ def record_due_milestones(
         maximum_faction_reputation=maximum_faction_reputation,
         domain_level=domain_level,
         void_route_count=void_route_count,
+        content=content,
     ):
         snapshot = {
             "realm_key": str(player["realm_key"]),
@@ -50,6 +53,9 @@ def record_due_milestones(
             "required_domain_level": definition.required_domain_level,
             "void_route_count": void_route_count,
             "required_void_route_count": definition.required_void_route_count,
+            "title": definition.title,
+            "description": definition.description,
+            "unlock_status": definition.unlock_status,
         }
         cursor = connection.execute(
             """

@@ -6,6 +6,7 @@ from .rules import (
     MODE_SPIRIT_SPRING,
     NASCENT_SOUL_THRESHOLDS,
     SOUL_TRANSFORMATION_THRESHOLDS,
+    ProgressionUnlockDefinition,
     REALM_NASCENT_SOUL,
     REALM_SOUL_TRANSFORMATION,
     REALM_VOID_REFINING,
@@ -20,6 +21,7 @@ from .rules import (
     resolve_cultivation_mode,
     formal_realms,
     layer_unlocks,
+    progression_unlock_definitions,
     segment_for_layer,
     unlocks_for_layer,
 )
@@ -29,18 +31,15 @@ from .endgame_rules import (
     THREE_REALM_KEYS,
 )
 from .milestone_rules import (
-    FOUNDATION_LATE_MILESTONE,
-    MILESTONE_DEFINITIONS,
-    NASCENT_SOUL_LATE_MILESTONE,
-    SOUL_TRANSFORMATION_LATE_MILESTONE,
-    VOID_REFINING_LATE_MILESTONE,
     due_milestones,
+    milestone_definitions,
 )
 
 __all__ = [
     "CULTIVATION_SETTLEMENT_GRACE_SECONDS",
     "FORMAL_REALMS",
     "MODE_SPIRIT_SPRING",
+    "ProgressionUnlockDefinition",
     "NASCENT_SOUL_THRESHOLDS",
     "SOUL_TRANSFORMATION_THRESHOLDS",
     "REALM_NASCENT_SOUL",
@@ -57,15 +56,12 @@ __all__ = [
     "resolve_cultivation_mode",
     "formal_realms",
     "layer_unlocks",
+    "progression_unlock_definitions",
     "segment_for_layer",
     "unlocks_for_layer",
     "DAO_UNION_TOTAL_CULTIVATION",
     "TRIBULATION_TOTAL_CULTIVATION",
     "THREE_REALM_KEYS",
-    "FOUNDATION_LATE_MILESTONE",
-    "MILESTONE_DEFINITIONS",
-    "NASCENT_SOUL_LATE_MILESTONE",
-    "SOUL_TRANSFORMATION_LATE_MILESTONE",
-    "VOID_REFINING_LATE_MILESTONE",
     "due_milestones",
+    "milestone_definitions",
 ]

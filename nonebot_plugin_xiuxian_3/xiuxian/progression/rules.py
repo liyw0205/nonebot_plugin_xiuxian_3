@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -81,56 +81,135 @@ FORMAL_REALMS = frozenset(REALM_THRESHOLDS)
 RECOVERY_PERIOD_SECONDS = 30 * 60
 CULTIVATION_SETTLEMENT_GRACE_SECONDS = 24 * 60 * 60
 
-# These are deliberately previews/qualifications, not direct access to future
-# systems.  The application can expose them before the corresponding domain is
-# implemented without accidentally opening a new write path.
-QI_SENSING_LAYER_UNLOCKS: dict[int, tuple[LayerUnlock, ...]] = {
-    3: (
-        LayerUnlock(
-            key="guidance.path",
-            title="道途指导",
-            description="可查看当前道途的进阶指导。",
-            status="open",
-        ),
-        LayerUnlock(
-            key="livelihood.service.second.preview",
-            title="常驻经营第二类服务预览",
-            description="可预览下一类常驻经营服务，正式承接将在对应玩法开放后解锁。",
-        ),
-    ),
-    6: (
-        LayerUnlock(
-            key="cultivate.seclusion.preview",
-            title="闭关修炼预览",
-            description="可查看闭关修炼的开放条件；聚气后才可执行。",
-        ),
-        LayerUnlock(
-            key="sect.regular_task",
-            title="宗门常规任务资格",
-            description="获得宗门常规任务的资格提示。",
-            status="open",
-        ),
-    ),
-    9: (
-        LayerUnlock(
-            key="progression.breakthrough.preview",
-            title="跨境突破预览",
-            description="可查看下一境界的突破准备，但感气九层尚不能闭关突破。",
-        ),
-        LayerUnlock(
-            key="exploration.elite.preview",
-            title="精英历练准备提示",
-            description="可查看精英历练和洞天深层的准备要求。",
-        ),
-    ),
-    10: (
-        LayerUnlock(
-            key="progression.cross_realm.preview",
-            title="跨境突破资格预览",
-            description="已达到感气混元，可检查聚气突破所需的材料、地点和状态。",
-        ),
-    ),
-}
+
+@dataclass(frozen=True, slots=True)
+class ProgressionUnlockDefinition:
+    key: str
+    title: str
+    description: str
+    trigger: str
+    unlock_status: str
+    realm_key: str | None = None
+    required_realm: str | None = None
+    required_layer: int | None = None
+    required_total_cultivation: int | None = None
+    required_max_faction_reputation: int | None = None
+    required_domain_level: int | None = None
+    required_void_route_count: int | None = None
+
+
+def _nonnegative_content_int(row: Mapping[str, Any], field: str, key: str) -> int:
+    value = row.get(field)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ContentError(f"progression unlock {key} {field} must be a non-negative integer")
+    return value
+
+
+def progression_unlock_definitions(
+    content: ContentBundle | None = None,
+) -> tuple[ProgressionUnlockDefinition, ...]:
+    bundle = content or bundled_content()
+    definitions: list[ProgressionUnlockDefinition] = []
+    for row in bundle.list("progression_unlock"):
+        key = row.get("key")
+        status = row.get("status")
+        if not isinstance(status, str) or status not in {
+            "active",
+            "open",
+            "locked",
+            "closed",
+            "admin_only",
+        }:
+            raise ContentError(f"progression unlock {key} has an unsupported status")
+        if status not in {"active", "open"}:
+            continue
+        name = row.get("name")
+        description = row.get("desc")
+        trigger = row.get("trigger")
+        unlock_status = row.get("unlock_status")
+        if not isinstance(key, str) or not key.strip():
+            raise ContentError("progression unlock requires a stable key")
+        if not isinstance(name, str) or not name.strip():
+            raise ContentError(f"progression unlock {key} requires name")
+        if not isinstance(description, str) or not description.strip():
+            raise ContentError(f"progression unlock {key} requires desc")
+        if not isinstance(trigger, str) or trigger not in {"layer", "qualification"}:
+            raise ContentError(f"progression unlock {key} has an unsupported trigger")
+        if not isinstance(unlock_status, str) or unlock_status not in {"open", "preview"}:
+            raise ContentError(f"progression unlock {key} has an unsupported unlock_status")
+
+        if trigger == "layer":
+            realm_key = row.get("realm_key")
+            if not isinstance(realm_key, str) or not bundle.has(
+                "realm", realm_key, include_locked=False
+            ):
+                raise ContentError(f"progression unlock {key} references an unknown active realm")
+            realm = bundle.require("realm", realm_key, include_locked=False)
+            layer = _nonnegative_content_int(row, "required_layer", key)
+            minimum = realm.get("layer_min")
+            maximum = realm.get("layer_max")
+            if (
+                not isinstance(minimum, int)
+                or isinstance(minimum, bool)
+                or not isinstance(maximum, int)
+                or isinstance(maximum, bool)
+                or layer < minimum
+                or layer > maximum
+            ):
+                raise ContentError(f"progression unlock {key} required_layer is outside {realm_key}")
+            definitions.append(
+                ProgressionUnlockDefinition(
+                    key=key,
+                    title=name.strip(),
+                    description=description.strip(),
+                    trigger=trigger,
+                    unlock_status=unlock_status,
+                    realm_key=realm_key,
+                    required_layer=layer,
+                )
+            )
+            continue
+
+        required_realm = row.get("required_realm")
+        if not isinstance(required_realm, str) or not bundle.has(
+            "realm", required_realm, include_locked=False
+        ):
+            raise ContentError(f"progression unlock {key} references an unknown active required_realm")
+        required_layer = _nonnegative_content_int(row, "required_layer", key)
+        realm = bundle.require("realm", required_realm, include_locked=False)
+        minimum = realm.get("layer_min")
+        maximum = realm.get("layer_max")
+        if (
+            not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or not isinstance(maximum, int)
+            or isinstance(maximum, bool)
+            or required_layer < max(1, minimum)
+            or required_layer > maximum
+        ):
+            raise ContentError(f"progression unlock {key} required_layer is outside {required_realm}")
+        definitions.append(
+            ProgressionUnlockDefinition(
+                key=key,
+                title=name.strip(),
+                description=description.strip(),
+                trigger=trigger,
+                unlock_status=unlock_status,
+                required_realm=required_realm,
+                required_layer=required_layer,
+                required_total_cultivation=_nonnegative_content_int(
+                    row, "required_total_cultivation", key
+                ),
+                required_max_faction_reputation=_nonnegative_content_int(
+                    row, "required_max_faction_reputation", key
+                ),
+                required_domain_level=_nonnegative_content_int(row, "required_domain_level", key),
+                required_void_route_count=_nonnegative_content_int(
+                    row, "required_void_route_count", key
+                ),
+            )
+        )
+    return tuple(definitions)
 
 
 def formal_realms(content: ContentBundle | None = None) -> frozenset[str]:
@@ -281,17 +360,29 @@ def can_advance_layer(
     return threshold is not None and cultivation >= threshold
 
 
-def layer_unlocks(realm_key: str, layer: int) -> tuple[LayerUnlock, ...]:
+def layer_unlocks(
+    realm_key: str,
+    layer: int,
+    content: ContentBundle | None = None,
+) -> tuple[LayerUnlock, ...]:
     """Return milestone unlocks reached by entering ``layer``.
 
-    Unlocks are derived from the destination layer and are therefore stable for
-    a repeated operation.  Other realms are intentionally empty until their
-    content snapshots define their own contracts.
+    Unlocks are derived from the destination layer and are frozen in the
+    promotion operation result.
     """
 
-    if realm_key != REALM_QI_SENSING or layer < 1 or layer > 10:
-        return ()
-    return QI_SENSING_LAYER_UNLOCKS.get(layer, ())
+    return tuple(
+        LayerUnlock(
+            key=definition.key,
+            title=definition.title,
+            description=definition.description,
+            status=definition.unlock_status,
+        )
+        for definition in progression_unlock_definitions(content)
+        if definition.trigger == "layer"
+        and definition.realm_key == realm_key
+        and definition.required_layer == layer
+    )
 
 
 unlocks_for_layer = layer_unlocks

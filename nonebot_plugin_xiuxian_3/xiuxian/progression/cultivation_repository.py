@@ -1398,7 +1398,7 @@ class CultivationRepositoryMixin:
                     eligible_seasons = set.intersection(*task_seasons) if task_seasons else set()
                     if not eligible_seasons:
                         raise TrialSequenceError("dao origin tasks are incomplete")
-            layer_unlocks_reached = layer_unlocks(realm_key, layer + 1)
+            layer_unlocks_reached = layer_unlocks(realm_key, layer + 1, self.content)
             change_player_state(
                 connection,
                 row,
@@ -1415,6 +1415,7 @@ class CultivationRepositoryMixin:
                 player=updated,
                 source_operation_id=operation_id,
                 now_text=now_text,
+                content=self.content,
             )
             unlocks = (*layer_unlocks_reached, *milestone_unlocks)
             player = self._row_to_player(updated)

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..content import ContentBundle
 from .models import LayerUnlock
+from .rules import progression_unlock_definitions
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,9 +17,10 @@ class ProgressionMilestoneDefinition:
     required_realm: str
     required_layer: int
     required_total_cultivation: int
-    required_max_faction_reputation: int = 0
-    required_domain_level: int = 0
-    required_void_route_count: int = 0
+    required_max_faction_reputation: int
+    required_domain_level: int
+    required_void_route_count: int
+    unlock_status: str
 
     def is_eligible(
         self,
@@ -39,54 +42,33 @@ class ProgressionMilestoneDefinition:
         )
 
     def as_unlock(self) -> LayerUnlock:
-        return LayerUnlock(key=self.key, title=self.title, description=self.description, status="open")
+        return LayerUnlock(
+            key=self.key,
+            title=self.title,
+            description=self.description,
+            status=self.unlock_status,
+        )
 
 
-FOUNDATION_LATE_MILESTONE = ProgressionMilestoneDefinition(
-    key="milestone.foundation_late",
-    title="筑基圆满里程碑",
-    description="已解锁云舟、精英悬赏和洞天二层的资格检查。",
-    required_realm="foundation",
-    required_layer=9,
-    required_total_cultivation=10_000,
-)
-
-NASCENT_SOUL_LATE_MILESTONE = ProgressionMilestoneDefinition(
-    key="milestone.nascent_soul_late",
-    title="元婴圆满里程碑",
-    description="已解锁跨界秘境、赛季首领和道统前置资格。",
-    required_realm="nascent_soul",
-    required_layer=9,
-    required_total_cultivation=210_000,
-    required_max_faction_reputation=1_000,
-)
-
-SOUL_TRANSFORMATION_LATE_MILESTONE = ProgressionMilestoneDefinition(
-    key="milestone.soul_transformation_late",
-    title="化神圆满里程碑",
-    description="已解锁远古洞天、界壁试炼和领域前线资格。",
-    required_realm="soul_transformation",
-    required_layer=9,
-    required_total_cultivation=720_000,
-    required_domain_level=3,
-)
-
-VOID_REFINING_LATE_MILESTONE = ProgressionMilestoneDefinition(
-    key="milestone.void_refining_late",
-    title="炼虚圆满里程碑",
-    description="已解锁合道前置和跨服宗门战资格。",
-    required_realm="void_refining",
-    required_layer=9,
-    required_total_cultivation=2_500_000,
-    required_void_route_count=3,
-)
-
-MILESTONE_DEFINITIONS = (
-    FOUNDATION_LATE_MILESTONE,
-    NASCENT_SOUL_LATE_MILESTONE,
-    SOUL_TRANSFORMATION_LATE_MILESTONE,
-    VOID_REFINING_LATE_MILESTONE,
-)
+def milestone_definitions(
+    content: ContentBundle | None = None,
+) -> tuple[ProgressionMilestoneDefinition, ...]:
+    return tuple(
+        ProgressionMilestoneDefinition(
+            key=definition.key,
+            title=definition.title,
+            description=definition.description,
+            required_realm=definition.required_realm,
+            required_layer=definition.required_layer,
+            required_total_cultivation=definition.required_total_cultivation,
+            required_max_faction_reputation=definition.required_max_faction_reputation,
+            required_domain_level=definition.required_domain_level,
+            required_void_route_count=definition.required_void_route_count,
+            unlock_status=definition.unlock_status,
+        )
+        for definition in progression_unlock_definitions(content)
+        if definition.trigger == "qualification"
+    )
 
 
 def due_milestones(
@@ -97,12 +79,13 @@ def due_milestones(
     maximum_faction_reputation: int = 0,
     domain_level: int = 0,
     void_route_count: int = 0,
+    content: ContentBundle | None = None,
 ) -> tuple[ProgressionMilestoneDefinition, ...]:
     """Return milestones newly eligible from the player's current progression state."""
 
     return tuple(
         definition
-        for definition in MILESTONE_DEFINITIONS
+        for definition in milestone_definitions(content)
         if definition.is_eligible(
             realm_key=realm_key,
             realm_layer=realm_layer,
@@ -115,11 +98,7 @@ def due_milestones(
 
 
 __all__ = [
-    "FOUNDATION_LATE_MILESTONE",
-    "MILESTONE_DEFINITIONS",
-    "NASCENT_SOUL_LATE_MILESTONE",
-    "SOUL_TRANSFORMATION_LATE_MILESTONE",
-    "VOID_REFINING_LATE_MILESTONE",
     "ProgressionMilestoneDefinition",
     "due_milestones",
+    "milestone_definitions",
 ]

@@ -60,7 +60,7 @@ Progression = realm_key + realm_layer(0..10) + realm_cultivation + total_cultiva
 
 输入：`player_id`、目标层数（仅当前层 +1）、`operation_id`。前置：角色 active、无互斥会话、`realm_cultivation` 达到目标阈值。成功只改 `realm_layer`，不消耗材料、不随机、不扣修为；相同 operation 回放同一结果。
 
-晋层奖励按每个 `realm_key` 的内容包定义，默认只解锁状态卡/内容准入，不直接发灵石或稀有物品。L3/L6/L9 可触发道途/生产/社交指导任务；L10 开启跨境预览，但预览不锁材料。
+晋层提示与圆满里程碑从 `data/境界/晋升.json` 读取。层级提示按 `realm_key + realm_layer` 匹配；条件里程碑还要核验总修为、最高阵营声望、领域等级或已结算航道数。资格只记录于晋升事务，不直接发灵石或稀有物品；展示文字随记录冻结进晋升 operation，历史重放不重新解释当前内容。L3/L6/L9 的提示只说明当前可见的机缘或门槛，不代替对应玩法自己的准入校验。
 
 ### 4.2 跨境突破：`progression.breakthrough_<target>`
 

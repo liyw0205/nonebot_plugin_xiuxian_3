@@ -1,0 +1,132 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "progression_unlock",
+  "records": [
+    {
+      "key": "guidance.path",
+      "name": "道途指引",
+      "desc": "可向道师请教本门修行要诀。",
+      "status": "active",
+      "trigger": "layer",
+      "realm_key": "qi_sensing",
+      "required_layer": 3,
+      "unlock_status": "open"
+    },
+    {
+      "key": "livelihood.service.second.preview",
+      "name": "旅修见闻",
+      "desc": "青石镇尚有新的委托与营生，待修为渐进后可再探访。",
+      "status": "active",
+      "trigger": "layer",
+      "realm_key": "qi_sensing",
+      "required_layer": 3,
+      "unlock_status": "preview"
+    },
+    {
+      "key": "cultivate.seclusion.preview",
+      "name": "静室闭关",
+      "desc": "聚气之后，可入静室闭关，暂息外事以养神凝气。",
+      "status": "active",
+      "trigger": "layer",
+      "realm_key": "qi_sensing",
+      "required_layer": 6,
+      "unlock_status": "preview"
+    },
+    {
+      "key": "sect.regular_task",
+      "name": "山门日课",
+      "desc": "可向宗门执事问询日常差事，在同门往来中积累修行资粮。",
+      "status": "active",
+      "trigger": "layer",
+      "realm_key": "qi_sensing",
+      "required_layer": 6,
+      "unlock_status": "open"
+    },
+    {
+      "key": "progression.breakthrough.preview",
+      "name": "跨境问道",
+      "desc": "境界渐至圆满，可先查看下一境所需的丹药与灵石。",
+      "status": "active",
+      "trigger": "layer",
+      "realm_key": "qi_sensing",
+      "required_layer": 9,
+      "unlock_status": "preview"
+    },
+    {
+      "key": "exploration.elite.preview",
+      "name": "洞天深探",
+      "desc": "欲入更深洞天，需先备妥通行门符与护身之物。",
+      "status": "active",
+      "trigger": "layer",
+      "realm_key": "qi_sensing",
+      "required_layer": 9,
+      "unlock_status": "preview"
+    },
+    {
+      "key": "progression.cross_realm.preview",
+      "name": "聚气机缘",
+      "desc": "感气已至混元，可查看聚气所需的丹药、灵石与突破之所。",
+      "status": "active",
+      "trigger": "layer",
+      "realm_key": "qi_sensing",
+      "required_layer": 10,
+      "unlock_status": "preview"
+    },
+    {
+      "key": "milestone.foundation_late",
+      "name": "筑基圆满",
+      "desc": "根基已稳，可启程前往云舟，探访更深的洞天。",
+      "status": "active",
+      "trigger": "qualification",
+      "required_realm": "foundation",
+      "required_layer": 9,
+      "required_total_cultivation": 10000,
+      "required_max_faction_reputation": 0,
+      "required_domain_level": 0,
+      "required_void_route_count": 0,
+      "unlock_status": "open"
+    },
+    {
+      "key": "milestone.nascent_soul_late",
+      "name": "元婴圆满",
+      "desc": "神魂渐成，可赴三界秘境探访，也可查阅道统旧约。",
+      "status": "active",
+      "trigger": "qualification",
+      "required_realm": "nascent_soul",
+      "required_layer": 9,
+      "required_total_cultivation": 210000,
+      "required_max_faction_reputation": 1000,
+      "required_domain_level": 0,
+      "required_void_route_count": 0,
+      "unlock_status": "open"
+    },
+    {
+      "key": "milestone.soul_transformation_late",
+      "name": "化神圆满",
+      "desc": "领域渐成，可入远古洞天、试炼界壁，亦可投身领域前线。",
+      "status": "active",
+      "trigger": "qualification",
+      "required_realm": "soul_transformation",
+      "required_layer": 9,
+      "required_total_cultivation": 720000,
+      "required_max_faction_reputation": 0,
+      "required_domain_level": 3,
+      "required_void_route_count": 0,
+      "unlock_status": "open"
+    },
+    {
+      "key": "milestone.void_refining_late",
+      "name": "炼虚圆满",
+      "desc": "三条虚空航道已历，合道之路渐次显现。",
+      "status": "active",
+      "trigger": "qualification",
+      "required_realm": "void_refining",
+      "required_layer": 9,
+      "required_total_cultivation": 2500000,
+      "required_max_faction_reputation": 0,
+      "required_domain_level": 0,
+      "required_void_route_count": 3,
+      "unlock_status": "open"
+    }
+  ]
+}
