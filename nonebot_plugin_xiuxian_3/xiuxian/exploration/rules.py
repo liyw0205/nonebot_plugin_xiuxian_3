@@ -4,7 +4,9 @@ from __future__ import annotations
 
 
 import hashlib
+from typing import Any
 
+from ..companions.rules import companion_exploration_discovery_bp
 from ..content import ContentBundle
 from ..rewards.rules import (
     RewardContentError,
@@ -21,6 +23,7 @@ CLOUD_BOAT_STORM_CHANCE_BP = 2500
 CLOUD_BOAT_STORM_WAIT_SECONDS = 2 * 60
 CLOUD_BOAT_STORM_PAY_COST = 100
 CLOUD_BOAT_STORM_CHOICES = ("wait", "pay", "turn_back")
+MAX_EXPLORATION_DISCOVERY_BP = 5_000
 CLOUD_MINE_ACCESS_FLAGS = frozenset({
     "permit.cloud_mine",
     "cloud_mine.permit",
@@ -309,6 +312,24 @@ def settlement_result(
     raise ValueError(f"unsupported exploration mode: {mode_key}")
 
 
+def exploration_discovery_weight_bp(
+    constitution_effect: object,
+    companions: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+) -> int:
+    """Combine frozen discovery effects under the shared exploration cap."""
+
+    constitution_bonus = 0
+    if isinstance(constitution_effect, dict) and constitution_effect.get("type") == "drop_weight_bp":
+        value = constitution_effect.get("value")
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise RewardContentError("constitution exploration weight bonus is invalid")
+        constitution_bonus = value
+    return min(
+        MAX_EXPLORATION_DISCOVERY_BP,
+        constitution_bonus + companion_exploration_discovery_bp(companions),
+    )
+
+
 def settlement_failure_result(
     mode_key: str,
     *,
@@ -333,6 +354,7 @@ __all__ = [
     "CLOUD_MINE_ACCESS_FLAGS",
     "CLOUD_MINE_ACCESS_ITEMS",
     "exploration_definition",
+    "exploration_discovery_weight_bp",
     "exploration_enemy_key",
     "exploration_reward_pool",
     "EXPLORATION_REWARD_POOLS",

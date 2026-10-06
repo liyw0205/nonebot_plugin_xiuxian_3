@@ -90,6 +90,7 @@ from ..exploration.rules import (
     CLOUD_BOAT_STORM_PAY_COST,
     CLOUD_BOAT_STORM_WAIT_SECONDS,
     cloud_boat_storm_roll_bp,
+    exploration_discovery_weight_bp,
     has_cloud_mine_access,
     battle_roll_bp,
     exploration_definition,
@@ -361,6 +362,10 @@ class ExplorationRepositoryMixin:
                 )
             battle_chance_bp = max(0, definition.battle_chance_bp - barrier_risk_reduction_bp)
             player_state = player_combat_values(row)
+            companion_snapshots = [
+                dict(item)
+                for item in self.companion_battle_snapshot(connection, player_id).companions
+            ]
             snapshot = {
                 "mode_key": definition.key,
                 "location_key": definition.location_key,
@@ -393,23 +398,17 @@ class ExplorationRepositoryMixin:
                 "initiative": player_state["initiative"],
                 "constitution_effect": constitution_effect_snapshot(connection, player_id),
                 "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
-                "companions": [
-                    dict(item)
-                    for item in self.companion_battle_snapshot(connection, player_id).companions
-                ],
+                "companions": companion_snapshots,
             }
+            snapshot["exploration_discovery_bp"] = exploration_discovery_weight_bp(
+                snapshot["constitution_effect"], companion_snapshots
+            )
             reward_pool_key = exploration_reward_pool(definition.key)
             if reward_pool_key is not None:
-                drop_weight_bp = (
-                    int(snapshot["constitution_effect"].get("value", 0))
-                    if isinstance(snapshot["constitution_effect"], dict)
-                    and snapshot["constitution_effect"].get("type") == "drop_weight_bp"
-                    else 0
-                )
                 snapshot["frozen_result"] = settlement_result(
                     definition.key,
                     operation_id,
-                    drop_weight_bp=drop_weight_bp,
+                    drop_weight_bp=int(snapshot["exploration_discovery_bp"]),
                     content=self.content,
                 )
                 battle_failure_result = settlement_failure_result(

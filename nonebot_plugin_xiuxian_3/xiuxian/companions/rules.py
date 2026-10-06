@@ -77,6 +77,18 @@ def companion_definitions(content: ContentBundle | None = None) -> dict[str, Com
         effect = row.get("effect")
         if effect is not None and not isinstance(effect, dict):
             raise ValueError(f"灵兽效果无效: {key}")
+        if isinstance(effect, dict) and effect.get("type") == "exploration_discovery_bp":
+            value = effect.get("value")
+            cap = effect.get("cap")
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+                or isinstance(cap, bool)
+                or not isinstance(cap, int)
+                or cap < 0
+            ):
+                raise ValueError(f"灵兽探索发现效果无效: {key}")
         transport_experience = row.get("transport_experience", 0)
         injury_chance_bp = row.get("transport_injury_chance_bp", 0)
         injury_recovery_seconds = row.get("transport_injury_recovery_seconds", 0)
@@ -236,6 +248,31 @@ def mount_transport_injury_roll_bp(operation_id: str) -> int:
     return int.from_bytes(digest, "big") % 10_000
 
 
+def companion_exploration_discovery_bp(
+    companions: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+) -> int:
+    """Sum the configured discovery effect from the frozen deployed companions."""
+
+    total = 0
+    for companion in companions:
+        effect = companion.get("effect")
+        if not isinstance(effect, dict) or effect.get("type") != "exploration_discovery_bp":
+            continue
+        value = effect["value"]
+        cap = effect["cap"]
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 0
+            or isinstance(cap, bool)
+            or not isinstance(cap, int)
+            or cap < 0
+        ):
+            raise ValueError("灵兽探索发现效果无效")
+        total += min(value, cap)
+    return total
+
+
 __all__ = [
     "CompanionDefinition",
     "CompanionEvolutionDefinition",
@@ -243,6 +280,7 @@ __all__ = [
     "companion_definitions",
     "companion_evolution_definition",
     "companion_evolution_definitions",
+    "companion_exploration_discovery_bp",
     "level_after_experience",
     "mount_transport_duration",
     "mount_transport_stamina",
