@@ -16,6 +16,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
     DAO_UNION_MAINLINE_LANES,
     DAO_UNION_MAINLINE_STAGE_KEYS,
     DAO_UNION_MAINLINE_STORY_KEY,
+    dao_origin_task_definition,
 )
 
 
@@ -366,7 +367,10 @@ def test_tribulation_l10_requires_three_events_per_origin_task_in_a_shared_seaso
                                     player_id,
                                     task_key,
                                     f"{user}-{task_key}-{index}",
-                                    json.dumps({"season_id": event_season}),
+                                    json.dumps({
+                                        "season_id": event_season,
+                                        "task_snapshot": dao_origin_task_definition(task_key).snapshot(event_season),
+                                    }),
                                 ),
                             )
 
@@ -383,7 +387,10 @@ def test_tribulation_l10_requires_three_events_per_origin_task_in_a_shared_seaso
                     ):
                         connection.execute(
                             "UPDATE quest_events SET payload_json = ? WHERE player_id = ? AND quest_key = ?",
-                            (json.dumps({"season_id": historical_season_id}), player_id, task_key),
+                            (json.dumps({
+                                "season_id": historical_season_id,
+                                "task_snapshot": dao_origin_task_definition(task_key).snapshot(historical_season_id),
+                            }), player_id, task_key),
                         )
 
                 advanced = await runtime.dispatch(

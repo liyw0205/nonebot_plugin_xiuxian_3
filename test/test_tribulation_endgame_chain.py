@@ -11,7 +11,7 @@ from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import trial_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import next_layer_threshold
-from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_TASKS
+from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_TASKS, dao_origin_task_definition
 
 
 class MutableClock:
@@ -177,7 +177,10 @@ def test_dao_origin_gate_accepts_same_historical_season_on_both_adapters() -> No
                                         player_id,
                                         task_key,
                                         f"{user}-{task_key}-{attempt}",
-                                        json.dumps({"season_id": season_id}),
+                                        json.dumps({
+                                            "season_id": season_id,
+                                            "task_snapshot": dao_origin_task_definition(task_key).snapshot(season_id),
+                                        }),
                                         season_created_at[season_id].isoformat(),
                                     ),
                                 )

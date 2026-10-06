@@ -23,11 +23,10 @@ from ..persistence.errors import (
 from ..specials.codex_projection import record_codex_discovery
 from .models import DaoUnionQualificationRecord, QuestActionRecord
 from .rules import (
-    DAO_ORIGIN_REWARDS,
-    DAO_ORIGIN_TARGET,
     DAO_ORIGIN_TASKS,
-    DAO_ORIGIN_WORLD_MERIT,
-    dao_origin_codex_entry_key,
+    dao_origin_task_definition,
+    dao_origin_task_snapshot_from_event,
+    parse_dao_origin_task_snapshot,
     DAO_UNION_CHALLENGE,
     DAO_UNION_FRAGMENT_REWARD,
     DAO_UNION_MAINLINE,
@@ -375,9 +374,16 @@ class EndgameQuestRepositoryMixin:
             if str(player["endgame_status"] or "none") not in {"dao_union", "tribulation"}:
                 raise DaoOriginTaskRequirementError("dao-origin tasks require an active endgame route")
             content = self.content or bundled_content()
-            codex_entry_key = dao_origin_codex_entry_key(task_key, content)
-            count = self._dao_origin_task_count(connection, int(player["id"]), task_key, season_id)
-            if count >= DAO_ORIGIN_TARGET:
+            if not content.has("quest", task_key, include_locked=False):
+                raise DaoOriginTaskRequirementError("dao-origin task is not open")
+            count, task_snapshot = self._dao_origin_task_progress(
+                connection, int(player["id"]), task_key, season_id
+            )
+            if task_snapshot is None:
+                task_snapshot = dao_origin_task_definition(task_key, content).snapshot(season_id)
+            target = int(task_snapshot["target"])
+            codex_entry_key = task_snapshot["codex_entry_key"]
+            if count >= target:
                 raise QuestAlreadyCompletedError("dao-origin task is already complete for this season")
             source = self._find_dao_origin_source(
                 connection, int(player["id"]), task_key, season_id, season_start, season_end
@@ -385,13 +391,12 @@ class EndgameQuestRepositoryMixin:
             if source is None:
                 raise QuestNotCompletedError("no eligible server activity is available for this dao-origin task")
             count += 1
-            reward = dict(DAO_ORIGIN_REWARDS[task_key]) if count == DAO_ORIGIN_TARGET else {}
-            world_merit_reward = DAO_ORIGIN_WORLD_MERIT[task_key] if count == DAO_ORIGIN_TARGET else 0
+            reward = dict(task_snapshot["reward"]) if count == target else {}
             discovery: dict[str, object] = {}
-            if count == DAO_ORIGIN_TARGET and codex_entry_key is not None:
+            if count == target and codex_entry_key is not None:
                 discovery = {
                     "entry_key": codex_entry_key,
-                    "label": content.label("codex_entry", codex_entry_key),
+                    "label": task_snapshot["codex_label"],
                     "task_key": task_key,
                     "task_operation_id": operation_id,
                     "source_operation_id": str(source["source_operation_id"]),
@@ -410,22 +415,26 @@ class EndgameQuestRepositoryMixin:
                     occurred_at=now_text,
                     snapshot=discovery,
                     content=content,
+                    category_snapshot="service",
                 ):
                     raise ContentError(f"unable to record dao-origin service discovery: {codex_entry_key}")
-            token_reward = int(reward.get("item.tribulation_token", 0))
-            grant_player_state(
-                connection,
-                player,
-                updated_at=now_text,
-                rewards={"item.tribulation_token": token_reward},
-                value_delta={
-                    "dao_fruit_progress": int(reward.get("dao_fruit_progress", 0)),
-                    "ascension_merit": int(reward.get("ascension_merit", 0)),
-                    "world_merit": world_merit_reward,
-                },
-            )
-            if world_merit_reward:
-                reward["world_merit"] = world_merit_reward
+            if reward:
+                grant_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    rewards={key: amount for key, amount in reward.items() if key.startswith("item.")},
+                    value_delta={key: amount for key, amount in reward.items() if not key.startswith("item.")},
+                )
+            event_payload = {
+                "count": count,
+                "reward": reward,
+                "season_id": season_id,
+                "task_snapshot": task_snapshot,
+                "event_key": "event.dao_origin",
+                "discovery": discovery,
+                **source,
+            }
             self._insert_quest_event(
                 connection,
                 player_id=int(player["id"]),
@@ -433,13 +442,7 @@ class EndgameQuestRepositoryMixin:
                 component_key="completed",
                 source_operation_id=str(source["source_operation_id"]),
                 outcome="success",
-                payload={
-                    "count": count,
-                    "reward": reward,
-                    "event_key": "event.dao_origin",
-                    "discovery": discovery,
-                    **source,
-                },
+                payload=event_payload,
                 now_text=now_text,
             )
             self._insert_quest_event(
@@ -449,22 +452,17 @@ class EndgameQuestRepositoryMixin:
                 component_key=task_key,
                 source_operation_id=str(source["source_operation_id"]),
                 outcome="success",
-                payload={"count": count, "reward": reward, "discovery": discovery, **source},
+                payload=event_payload,
                 now_text=now_text,
             )
-            progress = {"completed": count}
+            progress = {"completed": count, "target": target}
             self._upsert_progress(
                 connection,
                 int(player["id"]),
                 task_key,
-                "completed" if count >= DAO_ORIGIN_TARGET else "active",
+                "completed" if count >= target else "active",
                 progress,
-                {
-                    "target": DAO_ORIGIN_TARGET,
-                    "season_id": season_id,
-                    "reward": DAO_ORIGIN_REWARDS[task_key],
-                    "world_merit_on_completion": DAO_ORIGIN_WORLD_MERIT[task_key],
-                },
+                task_snapshot,
                 operation_id,
                 now_text,
             )
@@ -475,9 +473,10 @@ class EndgameQuestRepositoryMixin:
                 "completed",
                 progress,
                 reward,
-                status="completed" if count >= DAO_ORIGIN_TARGET else "active",
-                display_name=content.label("quest", task_key),
+                status="completed" if count >= target else "active",
+                display_name=str(task_snapshot["name"]),
                 discovery=discovery,
+                reward_labels=task_snapshot["reward_labels"],
             )
             self._insert_operation(
                 connection,
@@ -490,19 +489,58 @@ class EndgameQuestRepositoryMixin:
             )
             return self._action_from_payload(payload)
 
-    def _dao_origin_task_count(
-        self, connection: sqlite3.Connection, player_id: int, task_key: str, season_id: str
-    ) -> int:
+    def _dao_origin_task_seasons(
+        self, connection: sqlite3.Connection, player_id: int, task_key: str
+    ) -> dict[str, tuple[int, dict[str, Any]]]:
         rows = connection.execute(
             "SELECT payload_json FROM quest_events WHERE player_id = ? AND quest_key = ? "
             "AND component_key = 'completed' AND outcome = 'success'",
             (player_id, task_key),
         ).fetchall()
-        return sum(
-            1
-            for row in rows
-            if self._json_object(row["payload_json"], {}).get("season_id") == season_id
-        )
+        seasons: dict[str, tuple[int, dict[str, Any]]] = {}
+        for row in rows:
+            try:
+                payload = json.loads(row["payload_json"])
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise ContentError(f"dao-origin task event cannot be read: {task_key}") from exc
+            snapshot = dao_origin_task_snapshot_from_event(task_key, payload)
+            season_id = snapshot["season_id"]
+            count, previous = seasons.get(season_id, (0, snapshot))
+            if previous != snapshot or count >= snapshot["target"]:
+                raise ContentError(f"dao-origin task events are inconsistent: {task_key}")
+            seasons[season_id] = (count + 1, snapshot)
+        return seasons
+
+    def _dao_origin_task_progress(
+        self,
+        connection: sqlite3.Connection,
+        player_id: int,
+        task_key: str,
+        season_id: str,
+    ) -> tuple[int, dict[str, Any] | None]:
+        count, evidence_snapshot = self._dao_origin_task_seasons(
+            connection, player_id, task_key
+        ).get(season_id, (0, None))
+        row = connection.execute(
+            "SELECT snapshot_json FROM quest_progress WHERE player_id = ? AND quest_key = ?",
+            (player_id, task_key),
+        ).fetchone()
+        if row is None:
+            if count:
+                raise ContentError(f"dao-origin task progress snapshot is missing: {task_key}")
+            return 0, None
+        try:
+            value = json.loads(row["snapshot_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ContentError(f"dao-origin task progress snapshot cannot be read: {task_key}") from exc
+        snapshot = parse_dao_origin_task_snapshot(task_key, value)
+        if snapshot["season_id"] == season_id:
+            if snapshot != evidence_snapshot:
+                raise ContentError(f"dao-origin task progress differs from its events: {task_key}")
+            return count, snapshot
+        if count:
+            raise ContentError(f"dao-origin task events differ from progress snapshot: {task_key}")
+        return 0, None
 
     def _find_dao_origin_source(
         self,

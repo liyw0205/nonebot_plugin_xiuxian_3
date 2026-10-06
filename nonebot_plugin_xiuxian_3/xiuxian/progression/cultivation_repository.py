@@ -1374,25 +1374,16 @@ class CultivationRepositoryMixin:
                 if any(item not in completed for item in required):
                     raise TrialSequenceError("the required tribulation trial has not succeeded")
                 if layer == 9:
-                    from ..quests.rules import DAO_ORIGIN_TARGET, DAO_ORIGIN_TASKS
+                    from ..quests.rules import DAO_ORIGIN_TASKS
 
                     task_seasons: list[set[str]] = []
                     for task_key in DAO_ORIGIN_TASKS:
-                        evidence_rows = connection.execute(
-                            "SELECT payload_json FROM quest_events WHERE player_id = ? AND quest_key = ? "
-                            "AND component_key = 'completed' AND outcome = 'success'",
-                            (row["id"], task_key),
-                        ).fetchall()
-                        season_counts: dict[str, int] = {}
-                        for item in evidence_rows:
-                            season_id = self._json_object(item["payload_json"], {}).get("season_id")
-                            if isinstance(season_id, str) and season_id:
-                                season_counts[season_id] = season_counts.get(season_id, 0) + 1
+                        seasons = self._dao_origin_task_seasons(connection, int(row["id"]), task_key)
                         task_seasons.append(
                             {
                                 season_id
-                                for season_id, count in season_counts.items()
-                                if count >= DAO_ORIGIN_TARGET
+                                for season_id, (count, snapshot) in seasons.items()
+                                if count >= snapshot["target"]
                             }
                         )
                     eligible_seasons = set.intersection(*task_seasons) if task_seasons else set()

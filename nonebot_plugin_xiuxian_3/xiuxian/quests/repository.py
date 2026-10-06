@@ -8,6 +8,7 @@ import sqlite3
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
 from ..utils.assets import change_player_assets, grant_player_items, inventory_amount, spend_player_items
 from ..utils.player import grant_player_state, player_integer, player_inventory
 from ..rewards.rules import RewardContentError, reward_definition, reward_totals, reward_value_delta
@@ -38,11 +39,11 @@ from .rules import (
     VOID_TRIAL_TARGET,
     VOID_TRIAL_WEEKLY_LIMIT,
     VOID_WALL_TRIAL,
-    DAO_ORIGIN_TARGET,
     DAO_ORIGIN_TASKS,
     GUIDANCE_CLAIM_OPERATION,
     GuidanceQuestDefinition,
     guidance_quest_definitions,
+    dao_origin_task_definition,
     DAO_UNION_QUEST,
     meets_realm,
     utc_week_bounds,
@@ -852,12 +853,24 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         for quest_key in (DAO_UNION_QUEST, *DAO_ORIGIN_TASKS):
             result[quest_key] = self._quest_status_for_player(connection, player_id, quest_key)
         season_id, _, _ = final_heaven_season_window(self._now())
+        content = self.content or bundled_content()
         for task_key in DAO_ORIGIN_TASKS:
-            count = self._dao_origin_task_count(connection, player_id, task_key, season_id)
+            count, snapshot = self._dao_origin_task_progress(
+                connection, player_id, task_key, season_id
+            )
+            is_open = content.has("quest", task_key, include_locked=False)
+            if snapshot is None:
+                if not is_open:
+                    result[task_key] = {"status": "closed", "progress": {}, "season_id": season_id}
+                    continue
+                snapshot = dao_origin_task_definition(task_key, content).snapshot(season_id)
+            target = int(snapshot["target"])
             result[task_key].update(
-                status="completed" if count >= DAO_ORIGIN_TARGET else "active",
-                progress={"completed": count, "target": DAO_ORIGIN_TARGET},
+                status=("completed" if count >= target else "active")
+                if is_open else "closed",
+                progress={"completed": count, "target": target},
                 season_id=season_id,
+                snapshot=snapshot,
             )
         return result
 
@@ -1002,6 +1015,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         status: str | None = None,
         display_name: str = "",
         discovery: dict[str, object] | None = None,
+        reward_labels: dict[str, str] | None = None,
     ) -> dict[str, object]:
         return {
             "player": self._player_payload(self._row_to_player(player)),
@@ -1012,6 +1026,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             "reward": reward,
             "display_name": display_name,
             "discovery": discovery or {},
+            "reward_labels": reward_labels or {},
         }
 
     @staticmethod
@@ -1027,6 +1042,7 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             display_name=str(payload.get("display_name", "")),
             discovery=dict(payload.get("discovery", {})),
+            reward_labels=dict(payload.get("reward_labels", {})),
             already_completed=replay,
         )
 

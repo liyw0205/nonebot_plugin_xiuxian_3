@@ -23,6 +23,7 @@ class QuestActionRecord:
     reward: dict[str, int] = field(default_factory=dict)
     display_name: str = ""
     discovery: dict[str, object] = field(default_factory=dict)
+    reward_labels: dict[str, str] = field(default_factory=dict)
     already_completed: bool = False
 
 

@@ -23,6 +23,31 @@ class GuidanceQuestDefinition:
     result: dict[str, Any]
 
 
+@dataclass(frozen=True, slots=True)
+class DaoOriginTaskDefinition:
+    key: str
+    name: str
+    status: str
+    target: int
+    reward: dict[str, int]
+    codex_entry_key: str | None
+    reward_labels: dict[str, str]
+    codex_label: str | None
+
+    def snapshot(self, season_id: str) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "name": self.name,
+            "status": self.status,
+            "target": self.target,
+            "reward": dict(self.reward),
+            "codex_entry_key": self.codex_entry_key,
+            "reward_labels": dict(self.reward_labels),
+            "codex_label": self.codex_label,
+            "season_id": season_id,
+        }
+
+
 def guidance_quest_definitions(
     content: ContentBundle | None = None,
 ) -> tuple[GuidanceQuestDefinition, ...]:
@@ -133,18 +158,147 @@ DAO_ORIGIN_GUARD = "task.dao_origin.guard"
 DAO_ORIGIN_BUILD = "task.dao_origin.build"
 DAO_ORIGIN_TEACH = "task.dao_origin.teach"
 DAO_ORIGIN_TASKS = (DAO_ORIGIN_GUARD, DAO_ORIGIN_BUILD, DAO_ORIGIN_TEACH)
-DAO_ORIGIN_TARGET = 3
-# These values close the documented 1,000/1,000 endgame resource path.
-DAO_ORIGIN_REWARDS = {
-    DAO_ORIGIN_GUARD: {"dao_fruit_progress": 150, "ascension_merit": 150, "item.tribulation_token": 1},
-    DAO_ORIGIN_BUILD: {"dao_fruit_progress": 160, "ascension_merit": 150, "item.tribulation_token": 1},
-    DAO_ORIGIN_TEACH: {"dao_fruit_progress": 160, "ascension_merit": 150, "item.tribulation_token": 1},
-}
-DAO_ORIGIN_WORLD_MERIT = {
-    DAO_ORIGIN_GUARD: 300,
-    DAO_ORIGIN_BUILD: 300,
-    DAO_ORIGIN_TEACH: 400,
-}
+_DAO_ORIGIN_VALUE_REWARDS = frozenset(
+    {"dao_fruit_progress", "ascension_merit", "world_merit"}
+)
+_DAO_ORIGIN_REQUIRED_REWARDS = _DAO_ORIGIN_VALUE_REWARDS | {"item.tribulation_token"}
+
+
+def dao_origin_task_definition(
+    task_key: str, content: ContentBundle | None = None
+) -> DaoOriginTaskDefinition:
+    if task_key not in DAO_ORIGIN_TASKS:
+        raise ContentError(f"unknown dao-origin task: {task_key}")
+    bundle = content or bundled_content()
+    row = bundle.get("quest", task_key, include_locked=False)
+    if row is None:
+        raise ContentError(f"dao-origin task is missing: {task_key}")
+    name = row.get("name")
+    status = row.get("status")
+    target = row.get("target")
+    codex_entry_key = row.get("codex_entry_key")
+    if (
+        not isinstance(name, str)
+        or not name.strip()
+        or not isinstance(status, str)
+        or not status.strip()
+        or isinstance(target, bool)
+        or not isinstance(target, int)
+        or target <= 0
+    ):
+        raise ContentError(f"dao-origin task definition is invalid: {task_key}")
+    reward = _dao_origin_reward_map(task_key, row.get("reward"), bundle)
+    if row.get("claim_policy") != "once_per_season" or row.get("expires") is not False:
+        raise ContentError(f"dao-origin task claim policy is invalid: {task_key}")
+    if task_key == DAO_ORIGIN_BUILD:
+        if not isinstance(codex_entry_key, str) or not codex_entry_key.strip():
+            raise ContentError(f"dao-origin task {task_key} requires codex_entry_key")
+        dao_origin_codex_entry_key(task_key, bundle)
+    elif codex_entry_key is not None:
+        raise ContentError(f"dao-origin task {task_key} cannot reference a codex entry")
+    return DaoOriginTaskDefinition(
+        key=task_key,
+        name=name.strip(),
+        status=status,
+        target=target,
+        reward=reward,
+        codex_entry_key=codex_entry_key,
+        reward_labels={key: bundle.label("item", key) for key in reward if key.startswith("item.")},
+        codex_label=bundle.label("codex_entry", codex_entry_key) if codex_entry_key else None,
+    )
+
+
+def parse_dao_origin_task_snapshot(
+    task_key: str, value: Any
+) -> dict[str, Any]:
+    expected = {
+        "key", "name", "status", "target", "reward", "codex_entry_key",
+        "season_id", "reward_labels", "codex_label",
+    }
+    if (
+        task_key not in DAO_ORIGIN_TASKS
+        or not isinstance(value, dict)
+        or set(value) != expected
+        or value.get("key") != task_key
+    ):
+        raise ContentError(f"dao-origin task snapshot is invalid: {task_key}")
+    name = value.get("name")
+    status = value.get("status")
+    target = value.get("target")
+    season_id = value.get("season_id")
+    codex_entry_key = value.get("codex_entry_key")
+    if (
+        not isinstance(name, str)
+        or not name.strip()
+        or not isinstance(status, str)
+        or status not in {"active", "open"}
+        or isinstance(target, bool)
+        or not isinstance(target, int)
+        or target <= 0
+        or not isinstance(season_id, str)
+        or not season_id.strip()
+        or (task_key == DAO_ORIGIN_BUILD and (not isinstance(codex_entry_key, str) or not codex_entry_key))
+        or (task_key != DAO_ORIGIN_BUILD and codex_entry_key is not None)
+    ):
+        raise ContentError(f"dao-origin task snapshot is invalid: {task_key}")
+    reward = _dao_origin_reward_map(task_key, value.get("reward"), None)
+    reward_labels = value["reward_labels"]
+    if (
+        not isinstance(reward_labels, dict)
+        or set(reward_labels) != {key for key in reward if key.startswith("item.")}
+        or any(not isinstance(label, str) or not label.strip() for label in reward_labels.values())
+        or (codex_entry_key is not None and (
+            not isinstance(value["codex_label"], str) or not value["codex_label"].strip()
+        ))
+        or (codex_entry_key is None and value["codex_label"] is not None)
+    ):
+        raise ContentError(f"dao-origin task snapshot labels are invalid: {task_key}")
+    return {
+        "key": task_key,
+        "name": name.strip(),
+        "status": status,
+        "target": target,
+        "reward": reward,
+        "codex_entry_key": codex_entry_key,
+        "reward_labels": dict(reward_labels),
+        "codex_label": value["codex_label"],
+        "season_id": season_id,
+    }
+
+
+def dao_origin_task_snapshot_from_event(
+    task_key: str, payload: Any
+) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ContentError(f"dao-origin task event is invalid: {task_key}")
+    snapshot = parse_dao_origin_task_snapshot(task_key, payload.get("task_snapshot"))
+    if payload.get("season_id") != snapshot["season_id"]:
+        raise ContentError(f"dao-origin task event season differs from its snapshot: {task_key}")
+    return snapshot
+
+
+def _dao_origin_reward_map(
+    task_key: str, value: Any, content: ContentBundle | None
+) -> dict[str, int]:
+    if not isinstance(value, dict) or not _DAO_ORIGIN_REQUIRED_REWARDS.issubset(value):
+        raise ContentError(f"dao-origin task reward is incomplete: {task_key}")
+    result: dict[str, int] = {}
+    for key, amount in value.items():
+        if (
+            not isinstance(key, str)
+            or (key not in _DAO_ORIGIN_VALUE_REWARDS and not key.startswith("item."))
+            or key == "item."
+            or isinstance(amount, bool)
+            or not isinstance(amount, int)
+            or amount < 0
+        ):
+            raise ContentError(f"dao-origin task reward is invalid: {task_key}:{key}")
+        if key.startswith("item.") and content is not None and not content.has(
+            "item", key, include_locked=False
+        ):
+            raise ContentError(f"dao-origin task reward references an inactive item: {task_key}:{key}")
+        result[key] = amount
+    return result
 
 
 def dao_origin_codex_entry_key(
@@ -200,12 +354,11 @@ __all__ = [
     "VOID_WALL_TRIAL",
     "DAO_ORIGIN_BUILD",
     "DAO_ORIGIN_GUARD",
-    "DAO_ORIGIN_REWARDS",
-    "DAO_ORIGIN_TARGET",
     "DAO_ORIGIN_TASKS",
     "DAO_ORIGIN_TEACH",
-    "DAO_ORIGIN_WORLD_MERIT",
     "dao_origin_codex_entry_key",
+    "dao_origin_task_definition",
+    "dao_origin_task_snapshot_from_event",
     "DAO_UNION_CHALLENGE",
     "DAO_UNION_FRAGMENT_REWARD",
     "DAO_UNION_MAINLINE",
@@ -217,7 +370,9 @@ __all__ = [
     "DAO_UNION_WORK",
     "GUIDANCE_CLAIM_OPERATION",
     "GuidanceQuestDefinition",
+    "DaoOriginTaskDefinition",
     "guidance_quest_definitions",
+    "parse_dao_origin_task_snapshot",
     "meets_realm",
     "utc_week_bounds",
 ]

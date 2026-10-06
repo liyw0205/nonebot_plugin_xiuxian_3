@@ -12,11 +12,11 @@ from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_wi
 from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import ENDGAME_RECIPES, recipe_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
-    DAO_ORIGIN_REWARDS,
     DAO_ORIGIN_TASKS,
     DAO_UNION_MAINLINE_LANES,
     DAO_UNION_MAINLINE_STAGE_KEYS,
     DAO_UNION_MAINLINE_STORY_KEY,
+    dao_origin_task_definition,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import (
     tribulation_definition,
@@ -161,8 +161,9 @@ def test_dao_origin_resource_closure_and_qq_onebot_task_producers() -> None:
                         if index < 2:
                             assert completed.data["reward"] == {}
                         else:
-                            assert completed.data["reward"]["dao_fruit_progress"] == DAO_ORIGIN_REWARDS[task_key]["dao_fruit_progress"]
-                            assert completed.data["reward"]["ascension_merit"] == DAO_ORIGIN_REWARDS[task_key]["ascension_merit"]
+                            expected_reward = dao_origin_task_definition(task_key).reward
+                            assert completed.data["reward"]["dao_fruit_progress"] == expected_reward["dao_fruit_progress"]
+                            assert completed.data["reward"]["ascension_merit"] == expected_reward["ascension_merit"]
                             assert completed.data["reward"]["item.tribulation_token"] == 1
                             assert completed.data["reward"]["world_merit"] > 0
                         replay = await runtime.dispatch(
@@ -451,15 +452,16 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
 
 def test_tribulation_and_dao_origin_rewards_match_documented_totals() -> None:
     trials = tribulation_definition().trials
+    rewards = [dao_origin_task_definition(key).reward for key in DAO_ORIGIN_TASKS]
     assert sum(trial.progress_reward for trial in trials) == 530
     assert sum(trial.merit_reward for trial in trials) == 550
-    assert sum(reward["dao_fruit_progress"] for reward in DAO_ORIGIN_REWARDS.values()) == 470
-    assert sum(reward["ascension_merit"] for reward in DAO_ORIGIN_REWARDS.values()) == 450
+    assert sum(reward["dao_fruit_progress"] for reward in rewards) == 470
+    assert sum(reward["ascension_merit"] for reward in rewards) == 450
     assert sum(trial.progress_reward for trial in trials) + sum(
-        reward["dao_fruit_progress"] for reward in DAO_ORIGIN_REWARDS.values()
+        reward["dao_fruit_progress"] for reward in rewards
     ) == 1_000
     assert sum(trial.merit_reward for trial in trials) + sum(
-        reward["ascension_merit"] for reward in DAO_ORIGIN_REWARDS.values()
+        reward["ascension_merit"] for reward in rewards
     ) == 1_000
 
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
-from ..content import bundled_content
+from ..content import ContentError, bundled_content
 from ..persistence.errors import (
     BattleBusyError,
     BattleNotReadyError,
@@ -47,6 +47,7 @@ class QuestApplication:
             GuidanceQuestNotCompletedError: ("QUEST_REQUIREMENT_MISSING", "这份引路嘉奖尚未齐备，暂不能领取。"),
             GuidanceQuestAlreadyClaimedError: ("QUEST_ALREADY_COMPLETED", "这份引路嘉奖已经领取。"),
             RewardContentError: ("CONTENT_UNAVAILABLE", "引路嘉奖暂不可领取，角色状态未改变。"),
+            ContentError: ("CONTENT_UNAVAILABLE", "任务簿暂不可用，此番未记功，亦未发放嘉奖。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能推进任务。"),
             QuestRequirementError: ("QUEST_REQUIREMENT_MISSING", "当前境界或任务前置不满足，未修改进度。"),
@@ -97,7 +98,7 @@ class QuestApplication:
         return CommandResult(
             True,
             "QUEST_STATUS",
-            "## 高阶任务\n\n任务进度已按来源 operation 汇总。",
+            "## 高阶任务\n\n诸般历练已记入任务簿。",
             context.request_id,
             data={"quests": record.quests},
         )
@@ -396,7 +397,6 @@ class QuestApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        content = self.repository.content or bundled_content()
         task_name = record.display_name
         reward_names = {
             "dao_fruit_progress": "道果进境",
@@ -404,10 +404,10 @@ class QuestApplication:
             "world_merit": "世界功勋",
         }
         rewards = []
-        for key, amount in record.reward.items():
+        for key, amount in sorted(record.reward.items()):
             name = reward_names.get(key)
             if key.startswith("item."):
-                name = content.label("item", key)
+                name = record.reward_labels[key]
             if name is not None and amount > 0:
                 rewards.append(f"{name} ×{amount}" if key.startswith("item.") else f"{name} +{amount}")
         reward_summary = "、".join(rewards) if rewards else "历练尚未圆满，嘉奖待后续奉上"
@@ -415,7 +415,7 @@ class QuestApplication:
             "## 道源行历",
             "",
             f"- **篇章**：{task_name}",
-            f"- **历数**：已历 {record.progress.get('completed', 0)}/3 次",
+            f"- **历数**：已历 {record.progress['completed']}/{record.progress['target']} 次",
             f"- **所得**：{reward_summary}",
         ]
         if record.discovery:

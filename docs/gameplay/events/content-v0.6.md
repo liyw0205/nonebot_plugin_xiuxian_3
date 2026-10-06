@@ -1,6 +1,6 @@
 # v0.6 活动内容基线：道源、天劫与终局赛季
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.6`，`rule_version=events-0.6.1`。
+本文件遵守 [内容开发合同](../../content-development-contract.md)与[数据内容开发合同](../../content-data-contract.md)。运行时只保存业务快照，不保存内容或规则版本标识。
 
 | `event_key` | 时长/前置 | 结算 | 限制 |
 |:--|:--|:--|:--|
@@ -23,11 +23,11 @@
 | `task.dao_origin.build` | 合道；完成留界建设/领域维护任务 3 次 | +160 | +150 | 每赛季一次；完成时另给世界功勋 300 |
 | `task.dao_origin.teach` | 合道；完成师徒/道统传承任务 3 次 | +160 | +150 | 每赛季一次；完成时另给世界功勋 400 |
 
-三道源任务与三次天劫试炼合计提供 1000 道果进度和 1000 `resource.ascension_merit`，满足最终战可达性。每项任务目标为 3 次，奖励在第 3 次结算；三项任务的世界功勋奖励合计 1,000。任务完成时在同一 operation 写进度、功勋和 `event.dao_origin` 贡献；重复请求只返回原结果。合道资格的职业作品必须先由炼虚 L10 玩家通过 `recipe.masterwork.<path>` 生产；辅修道途还必须完成三件辅修大师作品并以 `recipe.masterwork.support` 合成。`quest.dao_union` 只消费服务端生产订单成功后进入背包的对应 `item.masterwork.*`，不接受旧终局配方或手工资格标记。
+上表列出当前默认值；三道源任务与三次天劫试炼默认合计提供 1000 道果进度和 1000 `resource.ascension_merit`，满足最终战可达性。任务目标与完整奖励由 `任务/任务.json` 提供，不在 Python 另存数值表；默认目标为 3 次，三项任务的世界功勋默认合计 1,000。首笔有效进度冻结任务名称、目标、奖励、物品/见闻展示名和赛季到进度及来源事件，同赛季后续只读该快照，在达到目标时发奖一次。任务进度、资产、建设见闻、`event.dao_origin` 贡献和 operation 同事务提交；重复请求只返回首次结果。当前任务关闭时拒绝新增进度，但改值、改名或关闭不得破坏历史 operation 回放。渡劫 L9→L10 按三项任务的历史目标核验共同完成赛季，不按当前内容重算。
 
-合道许可领取事务另发放 1 张绑定 `item.tribulation_token`；每项道源任务在当季完成 3/3 时各发放 1 张。此来源合计 4 张，供天劫台移动和三次独立试炼消耗。凭证随发放 operation 幂等入账，不可摆摊交易。
+合道资格的职业作品必须先由炼虚 L10 玩家通过 `recipe.masterwork.<path>` 生产；辅修道途还必须完成三件辅修大师作品并以 `recipe.masterwork.support` 合成。`quest.dao_union` 只消费服务端生产订单成功后进入背包的对应 `item.masterwork.*`，不接受旧终局配方或手工资格标记。
 
-`quest.dao_union` 的资格快照和碎片奖励使用 `content-0.6` / `quests-0.6.1`；三界回响主线证据仍固定要求 `content-0.6` / `adventures-0.6.0`。
+合道许可领取事务另发放 1 张绑定 `item.tribulation_token`；每项道源任务按冻结奖励发放凭证，默认在当季完成 3/3 时各发放 1 张。默认来源合计 4 张，供天劫台移动和三次独立试炼消耗。凭证随发放 operation 幂等入账，不可摆摊交易。
 
 展示快照只保存匿名别名、榜单键、名次、分数、赛季 ID 和完成时间；内部领奖索引单独保存数据库角色外键，不进入快照或 DTO。不得保存平台用户 ID、token、私聊数据或角色展示名。错误：`FINAL_RANKING_NOT_FINALIZED`、`FINAL_RANKING_NOT_ELIGIBLE`、`FINAL_RANKING_REWARD_CLAIMED`、`FINAL_RANKING_CLAIM_EXPIRED`。验收：正式天劫唯一；三榜归属正确；匿名展示；赛季奖励不回流普通经济；新篇章确认幂等。
 
