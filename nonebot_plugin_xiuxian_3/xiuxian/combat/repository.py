@@ -142,6 +142,34 @@ class CombatRepositoryMixin:
                 "pve.demon_war_front",
             )
 
+    async def start_domain_front_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        operation_id: str,
+        event_operation_id: str,
+    ) -> BattleStartRecord:
+        """Start a domain-front battle and bind its round in the same transaction."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync,
+                self._start_training_battle_once,
+                platform,
+                platform_user_id,
+                operation_id,
+                "enemy.domain_front_guardian",
+                "pve.domain_front",
+                None,
+                None,
+                None,
+                None,
+                None,
+                event_operation_id,
+            )
+
     async def start_exploration_battle(
         self,
         *,
@@ -264,20 +292,19 @@ class CombatRepositoryMixin:
         ignore_tower_run_id: str | None = None,
         ignore_void_spire_run_id: str | None = None,
         ignore_ancestral_hall_run_id: str | None = None,
+        domain_front_operation_id: str | None = None,
     ) -> BattleStartRecord:
-        content = getattr(self, "content", None)
-        enemy = enemy_definition(enemy_key, content=content)
         operation_name = f"battle.start.{battle_type}"
-        request_hash = self._request_hash(
-            operation_name,
-            {
-                "platform": platform,
-                "platform_user_id": platform_user_id,
-                "enemy_key": enemy.key,
-                "battle_type": battle_type,
-                "exploration_id": exploration_id,
-            },
-        )
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "enemy_key": enemy_key,
+            "battle_type": battle_type,
+            "exploration_id": exploration_id,
+        }
+        if domain_front_operation_id is not None:
+            request_payload["domain_front_operation_id"] = domain_front_operation_id
+        request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
@@ -291,6 +318,9 @@ class CombatRepositoryMixin:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._battle_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
+            content = getattr(self, "content", None)
+            enemy = enemy_definition(enemy_key, content=content)
+
             if battle_type == "pve.demon_war_front":
                 from ..events.demon_rules import DEMON_EVENT_KEY
                 from ..events.public_event_rules import public_event_is_open
@@ -300,6 +330,22 @@ class CombatRepositoryMixin:
                     raise EventNotActiveError("demon invasion war front is closed")
 
             player = self._require_player(connection, platform, platform_user_id)
+            domain_front_round_id = None
+            if battle_type == "pve.domain_front":
+                if not domain_front_operation_id:
+                    raise ValueError("domain-front battle requires its event operation")
+                event = self._domain_refresh_round(
+                    connection,
+                    self._domain_select_round(connection, None, now),
+                    now,
+                )
+                self._domain_require_open(event, now)
+                self._domain_require_participant(
+                    connection, int(player["id"]), str(event["round_id"])
+                )
+                domain_front_round_id = str(event["round_id"])
+            elif domain_front_operation_id is not None:
+                raise ValueError("event operation is only valid for domain-front battles")
             player_state = player_combat_values(player)
             if battle_type == "pve.void_wall_trial":
                 from ..quests.rules import (
@@ -484,6 +530,23 @@ class CombatRepositoryMixin:
                     now_text,
                 ),
             )
+            if domain_front_round_id is not None:
+                connection.execute(
+                    """
+                    INSERT INTO domain_front_battle_links(
+                        battle_id, round_id, player_id, event_operation_id,
+                        combat_operation_id, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        battle_id,
+                        domain_front_round_id,
+                        player["id"],
+                        domain_front_operation_id,
+                        operation_id,
+                        now_text,
+                    ),
+                )
             payload = {
                 "player": self._player_payload(self._row_to_player(player)),
                 "battle_id": battle_id,

@@ -22,6 +22,10 @@ QQ 官方和 OneBot V11 验收覆盖真实问安、修炼及采集来源，失�
 `get_domain_war_season`、`claim_domain_war_reward` 和 `redeem_domain_core`。活动参与、来源投影、个人门槛、轮次恢复、
 赛季冻结与奖励都由独立 repository 事务完成。
 
+`start_domain_front_battle` 复用共享战斗 application 与 repository。正式战斗会话、回合行动和事件关联在开战事务内
+建立；结算读取正式战斗结果，只有同角色、同轮次、同事件请求的 `pve.domain_front` 胜利可成为贡献来源。
+同地点的其他遭遇、其他战斗类型和战败均不计贡献；战斗启动、行动落库、战斗结算与事件投影之间中断时，沿原请求恢复。
+
 赛季分数由冻结前实时投影：领域前线贡献按贡献量计分，宗门建设贡献按 `quantity * 2`，化神配方成品每件 `+5`；
 客户端不能提交分数或伪造来源 operation。
 

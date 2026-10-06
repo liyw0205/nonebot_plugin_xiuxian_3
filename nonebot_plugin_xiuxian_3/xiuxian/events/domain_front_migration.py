@@ -56,17 +56,16 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_domain_front_contributions_round
             ON domain_front_contributions(round_id, domain_key, occurred_at);
-        CREATE TABLE IF NOT EXISTS domain_front_battles (
-            battle_id TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS domain_front_battle_links (
+            battle_id TEXT PRIMARY KEY REFERENCES battle_sessions(battle_id),
             round_id TEXT NOT NULL REFERENCES domain_front_rounds(round_id),
             player_id INTEGER NOT NULL REFERENCES players(id),
-            operation_id TEXT NOT NULL UNIQUE,
-            status TEXT NOT NULL CHECK (status IN ('settled', 'failed')),
-            outcome TEXT NOT NULL CHECK (outcome IN ('won', 'lost')),
-            snapshot_json TEXT NOT NULL DEFAULT '{}',
-            result_json TEXT NOT NULL DEFAULT '{}',
+            event_operation_id TEXT NOT NULL UNIQUE,
+            combat_operation_id TEXT NOT NULL UNIQUE,
             created_at TEXT NOT NULL
         );
+        CREATE INDEX IF NOT EXISTS idx_domain_front_battle_links_round_player
+            ON domain_front_battle_links(round_id, player_id, created_at);
         CREATE TABLE IF NOT EXISTS domain_front_point_operations (
             point_id TEXT PRIMARY KEY,
             round_id TEXT NOT NULL REFERENCES domain_front_rounds(round_id),

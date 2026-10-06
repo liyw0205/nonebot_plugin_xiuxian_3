@@ -488,6 +488,36 @@
       "status": "active"
     },
     {
+      "name": "领域守望者",
+      "desc": "镇守领域前线的古老身影，只有稳住自身气机，方能在它的攻势下寻得破绽。",
+      "location_key": "xuantian.domain_front",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 3600,
+        "attack": 330,
+        "initiative": 25,
+        "agility": 28
+      },
+      "skills": ["enemy_skill.scratch"],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.domain_front_guardian",
+        "reward": {}
+      },
+      "key": "enemy.domain_front_guardian",
+      "status": "active"
+    },
+    {
       "name": "三劫天尊",
       "desc": "天劫幻境中的至强身影，依次引动雷劫、心劫与道劫。",
       "location_key": "tribulation.sky_terrace",

@@ -1220,7 +1220,17 @@ class AdventuresRepositoryMixin:
         ).fetchone() is not None:
             events.add("event.domain_front.joined")
         if connection.execute(
-            "SELECT 1 FROM domain_front_battles WHERE player_id = ? AND status = 'settled' AND outcome = 'won' LIMIT 1",
+            """
+            SELECT 1
+            FROM domain_front_battle_links AS links
+            JOIN battle_sessions AS sessions ON sessions.battle_id = links.battle_id
+            WHERE links.player_id = ?
+              AND sessions.player_id = links.player_id
+              AND sessions.battle_type = 'pve.domain_front'
+              AND sessions.status = 'settled'
+              AND json_extract(sessions.result_json, '$.outcome') = 'won'
+            LIMIT 1
+            """,
             (player["id"],),
         ).fetchone() is not None:
             events.add("event.domain_front.battle")

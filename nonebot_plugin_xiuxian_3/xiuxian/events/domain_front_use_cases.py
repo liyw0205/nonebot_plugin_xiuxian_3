@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
 from ..persistence.errors import (
+    BattleBusyError,
+    BattleCooldownError,
+    BattleNotReadyError,
+    BattleRequirementError,
     DomainCrackActiveError,
     DomainCoreFragmentInsufficientError,
     DomainCoreRedeemAlreadyUsedError,
@@ -33,8 +37,9 @@ from .domain_front_rules import ACTION_VALUES
 class DomainFrontApplication:
     """Expose the same domain-front contract to QQ, OneBot, and tests."""
 
-    def __init__(self, repository: DomainFrontRepositoryMixin):
+    def __init__(self, repository: DomainFrontRepositoryMixin, combat):
         self.repository = repository
+        self.combat = combat
 
     @staticmethod
     def _operation_id(context: CommandContext, name: str) -> str:
@@ -51,9 +56,13 @@ class DomainFrontApplication:
             DomainEventParticipantCapError: ("EVENT_PARTICIPANT_CAP", "本轮宗门参战人数已达到 20 人上限。"),
             DomainEventAlreadyJoinedError: ("EVENT_ALREADY_JOINED", "你已经加入本轮领域前线。"),
             DomainEventRoundNotActiveError: ("EVENT_NOT_ACTIVE", "当前领域前线轮次不接受这个操作。"),
-            DomainEventSourceInvalidError: ("EVENT_CONTRIBUTION_SOURCE_INVALID", "没有找到属于你的已结算领域前线来源 operation。"),
+            DomainEventSourceInvalidError: ("EVENT_CONTRIBUTION_SOURCE_INVALID", "本轮没有找到可记入的对应功绩。"),
             DomainEventRewardNotEligibleError: ("EVENT_CONTRIBUTION_INSUFFICIENT", "个人领域前线贡献尚未达到 100。"),
             DomainEventRewardAlreadyClaimedError: ("EVENT_REWARD_ALREADY_CLAIMED", "本轮领域前线奖励已经领取。"),
+            BattleRequirementError: ("DOMAIN_BATTLE_REQUIREMENT_MISSING", "眼下还不能开启这场领域斗法。"),
+            BattleBusyError: ("BATTLE_PLAYER_OCCUPIED", "你正处于另一场斗法或行程中，暂不能开始领域战。"),
+            BattleCooldownError: ("BATTLE_COOLDOWN_ACTIVE", "战败后的调息尚未结束，请稍后再试。"),
+            BattleNotReadyError: ("BATTLE_NOT_READY", "这场斗法尚未结束，请稍后再试。"),
             DomainSeasonRankingNotFinalizedError: ("DOMAIN_SEASON_NOT_FINALIZED", "领域战赛季尚未结束，排名还没有冻结。"),
             DomainSeasonRewardNotEligibleError: ("DOMAIN_SEASON_REWARD_NOT_ELIGIBLE", "该赛季没有可领取的领域战奖励。"),
             DomainSeasonRewardAlreadyClaimedError: ("DOMAIN_SEASON_REWARD_ALREADY_CLAIMED", "该赛季领域战奖励已经领取。"),
@@ -120,37 +129,61 @@ class DomainFrontApplication:
             record = await self.repository.join_domain_front(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "DOMAIN_EVENT_JOINED", f"已加入领域前线本轮 ` {record.round_id}`，冻结参战快照并消耗体力 20。", context.request_id, operation_id, data=self._record_data(record))
+        return CommandResult(True, "DOMAIN_EVENT_JOINED", "你已加入本轮领域前线，消耗体力 20。", context.request_id, operation_id, data=self._record_data(record))
 
     async def start_domain_front_battle(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "开始领域战不接受额外参数。", context.request_id)
         operation_id = self._operation_id(context, "battle")
         try:
-            payload = await self.repository.start_domain_front_battle(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id)
+            resolution = await self.combat.resolve_domain_front_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                event_operation_id=operation_id,
+            )
+            payload = await self.repository.record_domain_front_battle(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                battle_id=resolution.battle_id,
+                operation_id=operation_id,
+            )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "DOMAIN_BATTLE_SETTLED", "领域战已由服务器自动结算为胜利；发送 `贡献领域前线 战斗` 投影 100 点贡献。", context.request_id, operation_id, data={**payload, "idempotent_replay": bool(payload.get("idempotent_replay", False))})
+        outcome_text = "获胜" if payload["outcome"] == "won" else "落败"
+        contribution = int(payload["contribution"])
+        contribution_text = (
+            f"可凭此战计入 {contribution} 点贡献。"
+            if contribution
+            else "此战未能计入领域战贡献。"
+        )
+        return CommandResult(
+            True,
+            "DOMAIN_BATTLE_SETTLED",
+            f"领域战已结束，{outcome_text}。{contribution_text}",
+            context.request_id,
+            operation_id,
+            data={**payload, "idempotent_replay": bool(payload.get("idempotent_replay", False))},
+        )
 
     async def create_domain_front_point(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1:
-            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "请使用 `占点领域前线 [分钟]`。", context.request_id)
+            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "请使用“占点领域前线”，也可在后面填写分钟数。", context.request_id)
         try:
             minutes = int(context.command_args[0]) if context.command_args else 1
         except ValueError:
-            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "占点分钟必须是 1 至 30 的整数。", context.request_id)
+            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "占点时间须为 1 至 30 分钟。", context.request_id)
         if not 1 <= minutes <= 30:
-            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "占点分钟必须是 1 至 30 的整数。", context.request_id)
+            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "占点时间须为 1 至 30 分钟。", context.request_id)
         operation_id = self._operation_id(context, "point")
         try:
             payload = await self.repository.create_domain_front_point(platform=context.adapter, platform_user_id=context.user_id, minutes=minutes, operation_id=operation_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "DOMAIN_POINT_SETTLED", f"已记录领域前线占点 {minutes} 分钟；发送 `贡献领域前线 占点` 投影 {payload['contribution']} 点贡献。", context.request_id, operation_id, data={**payload, "idempotent_replay": bool(payload.get("idempotent_replay", False))})
+        return CommandResult(True, "DOMAIN_POINT_SETTLED", f"已守住领域前线 {minutes} 分钟，可将此番功绩记入本轮。", context.request_id, operation_id, data={**payload, "idempotent_replay": bool(payload.get("idempotent_replay", False))})
 
     async def contribute_domain_front(self, context: CommandContext) -> CommandResult:
         if not context.command_args or len(context.command_args) > 2:
-            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "请使用 `贡献领域前线 战斗|占点 [来源operation]`。", context.request_id)
+            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "请使用“贡献领域前线 战斗”或“贡献领域前线 占点”。", context.request_id)
         action = ACTION_VALUES.get(context.command_args[0], context.command_args[0])
         source = context.command_args[1] if len(context.command_args) == 2 else None
         operation_id = self._operation_id(context, "contribute")
@@ -158,7 +191,7 @@ class DomainFrontApplication:
             record = await self.repository.record_domain_front_contribution(platform=context.adapter, platform_user_id=context.user_id, action_key=action, source_operation_id=source, operation_id=operation_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "DOMAIN_EVENT_CONTRIBUTION_RECORDED", f"领域前线贡献已记录，本轮个人贡献 {record.player_contribution}。", context.request_id, operation_id, data=self._record_data(record))
+        return CommandResult(True, "DOMAIN_EVENT_CONTRIBUTION_RECORDED", f"此番功绩已记入领域前线，本轮个人贡献 {record.player_contribution}。", context.request_id, operation_id, data=self._record_data(record))
 
     async def claim_domain_front_reward(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:

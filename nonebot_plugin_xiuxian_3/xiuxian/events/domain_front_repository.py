@@ -79,10 +79,23 @@ class DomainFrontRepositoryMixin:
         async with self._inflight:
             return await asyncio.to_thread(self._join_domain_front_once, platform, platform_user_id, operation_id)
 
-    async def start_domain_front_battle(self, *, platform: str, platform_user_id: str, operation_id: str) -> dict[str, object]:
+    async def record_domain_front_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        battle_id: str,
+        operation_id: str,
+    ) -> dict[str, object]:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._start_domain_front_battle_once, platform, platform_user_id, operation_id)
+            return await asyncio.to_thread(
+                self._record_domain_front_battle_once,
+                platform,
+                platform_user_id,
+                battle_id,
+                operation_id,
+            )
 
     async def create_domain_front_point(self, *, platform: str, platform_user_id: str, minutes: int, operation_id: str) -> dict[str, object]:
         await self.initialize()
@@ -190,9 +203,22 @@ class DomainFrontRepositoryMixin:
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._domain_record_from_payload(payload)
 
-    def _start_domain_front_battle_once(self, platform: str, platform_user_id: str, operation_id: str) -> dict[str, object]:
+    def _record_domain_front_battle_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        battle_id: str,
+        operation_id: str,
+    ) -> dict[str, object]:
         operation_name = "event.domain_front.battle"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "battle_id": battle_id,
+            },
+        )
         now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
@@ -201,17 +227,40 @@ class DomainFrontRepositoryMixin:
             if replay is not None:
                 return {**replay, "idempotent_replay": True}
             player = self._require_player(connection, platform, platform_user_id)
-            event = self._domain_refresh_round(connection, self._domain_select_round(connection, None, now), now)
-            self._domain_require_open(event, now)
-            participant = self._domain_require_participant(connection, int(player["id"]), str(event["round_id"]))
-            battle_id = f"domain-front-battle:{uuid4().hex}"
-            result = {"outcome": "won", "contribution": BATTLE_CONTRIBUTION, "enemy_key": "enemy.domain_front_guardian"}
-            snapshot = self._json_object(participant["snapshot_json"], {})
-            connection.execute(
-                "INSERT INTO domain_front_battles(battle_id,round_id,player_id,operation_id,status,outcome,snapshot_json,result_json,created_at) VALUES (?, ?, ?, ?, 'settled', 'won', ?, ?, ?)",
-                (battle_id, event["round_id"], player["id"], operation_id, json.dumps(snapshot, sort_keys=True), json.dumps(result, sort_keys=True), now_text),
-            )
-            payload = {"battle_id": battle_id, "round_id": str(event["round_id"]), "outcome": "won", "contribution": BATTLE_CONTRIBUTION, "source_operation_id": operation_id}
+            battle = connection.execute(
+                """
+                SELECT links.round_id, links.player_id, links.event_operation_id,
+                       links.combat_operation_id, sessions.battle_id,
+                       sessions.start_operation_id, sessions.battle_type,
+                       sessions.status, sessions.result_json
+                FROM domain_front_battle_links AS links
+                JOIN battle_sessions AS sessions ON sessions.battle_id = links.battle_id
+                WHERE links.battle_id = ? AND links.event_operation_id = ?
+                """,
+                (battle_id, operation_id),
+            ).fetchone()
+            if battle is None or int(battle["player_id"]) != int(player["id"]):
+                raise DomainEventSourceInvalidError("formal domain-front battle link is missing")
+            if (
+                str(battle["battle_type"]) != "pve.domain_front"
+                or str(battle["combat_operation_id"])
+                != str(battle["start_operation_id"])
+            ):
+                raise DomainEventSourceInvalidError("formal domain-front battle identity is invalid")
+            if str(battle["status"]) != "settled":
+                raise DomainEventRoundNotActiveError("domain-front battle has not settled")
+            result = self._json_object(battle["result_json"], {})
+            outcome = str(result.get("outcome", ""))
+            if outcome not in {"won", "lost"}:
+                raise DomainEventSourceInvalidError("formal domain-front battle has no final outcome")
+            payload = {
+                "battle_id": str(battle["battle_id"]),
+                "round_id": str(battle["round_id"]),
+                "outcome": outcome,
+                "contribution": BATTLE_CONTRIBUTION if outcome == "won" else 0,
+                "source_operation_id": operation_id,
+                "idempotent_replay": False,
+            }
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return payload
 
@@ -471,25 +520,24 @@ class DomainFrontRepositoryMixin:
 
     def _domain_find_source(self, connection: Any, player_id: int, round_id: str, action: str, source_operation_id: str | None) -> dict[str, object]:
         if action == "battle":
-            query = "SELECT operation_id FROM domain_front_battles WHERE round_id=? AND player_id=? AND status='settled' AND outcome='won'"
+            query = """
+                SELECT links.event_operation_id AS operation_id
+                FROM domain_front_battle_links AS links
+                JOIN battle_sessions AS sessions ON sessions.battle_id = links.battle_id
+                WHERE links.round_id = ? AND links.player_id = ?
+                  AND sessions.player_id = links.player_id
+                  AND sessions.battle_type = 'pve.domain_front'
+                  AND sessions.status = 'settled'
+                  AND json_extract(sessions.result_json, '$.outcome') = 'won'
+            """
             params: list[object] = [round_id, player_id]
             if source_operation_id:
-                query += " AND operation_id=?"
+                query += " AND links.event_operation_id=?"
                 params.append(source_operation_id)
             else:
-                query += " AND NOT EXISTS (SELECT 1 FROM domain_front_contributions used WHERE used.round_id=? AND used.player_id=? AND used.source_operation_id=domain_front_battles.operation_id)"
-                params.extend([round_id, player_id])
-            query += " ORDER BY created_at DESC LIMIT 1"
+                query += " AND NOT EXISTS (SELECT 1 FROM domain_front_contributions used WHERE used.round_id=links.round_id AND used.player_id=links.player_id AND used.source_operation_id=links.event_operation_id)"
+            query += " ORDER BY links.created_at DESC LIMIT 1"
             row = connection.execute(query, tuple(params)).fetchone()
-            if row is None:
-                # A settled combat session is accepted as server evidence too.
-                query = "SELECT start_operation_id AS operation_id FROM battle_sessions WHERE player_id=? AND location_key=? AND status IN ('won','settled') AND json_extract(result_json,'$.outcome')='won'"
-                params = [player_id, LOCATION_KEY]
-                if source_operation_id:
-                    query += " AND start_operation_id=?"
-                    params.append(source_operation_id)
-                query += " ORDER BY updated_at DESC LIMIT 1"
-                row = connection.execute(query, tuple(params)).fetchone()
             if row is not None:
                 return {"source_operation_id": str(row["operation_id"]), "quantity": BATTLE_CONTRIBUTION}
         if action == "point":

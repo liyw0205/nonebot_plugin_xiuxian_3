@@ -140,7 +140,7 @@ class CombatApplication:
                 platform_user_id=context.user_id,
                 operation_id=operation_id,
             )
-            resolved = await self._run_to_resolution(started.battle_id, started.round_no)
+            resolved = await self.run_to_resolution(started.battle_id, started.round_no)
         except EventNotActiveError:
             return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战只在活动窗口内开放。", context.request_id, operation_id)
         except BattleRequirementError:
@@ -210,6 +210,21 @@ class CombatApplication:
             },
         )
 
+    async def resolve_domain_front_battle(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        event_operation_id: str,
+    ):
+        started = await self.repository.start_domain_front_battle(
+            platform=platform,
+            platform_user_id=platform_user_id,
+            operation_id=f"{event_operation_id}:combat",
+            event_operation_id=event_operation_id,
+        )
+        return await self.run_to_resolution(started.battle_id, started.round_no)
+
     async def replay_battle(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1:
             return CommandResult(False, "INVALID_BATTLE_COMMAND", "战斗回放最多接收一个战斗编号。", context.request_id)
@@ -250,7 +265,7 @@ class CombatApplication:
             },
         )
 
-    async def _run_to_resolution(self, battle_id: str, completed_round: int):
+    async def run_to_resolution(self, battle_id: str, completed_round: int):
         turn = None
         for expected_round in range(completed_round + 1, 21):
             turn = await self.repository.run_battle_turn(

@@ -31,8 +31,8 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> int:
     with sqlite3.connect(runtime.settings.database_path) as connection:
         player_id = int(connection.execute("SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)).fetchone()[0])
         connection.execute(
-            "UPDATE players SET stage='cultivator', realm_key='soul_transformation', realm_layer=1, domain_key='domain.fire', location_key='xuantian.domain_front', stamina=100 WHERE id=?",
-            (player_id,),
+            "UPDATE players SET stage='cultivator', realm_key='soul_transformation', realm_layer=1, domain_key='domain.fire', location_key='xuantian.domain_front', stamina=100, max_hp=100000, initiative=1000, qualification_json=? WHERE id=?",
+            (json.dumps({"body": 100000, "agility": 1000}), player_id),
         )
         connection.execute(
             "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?)",
@@ -92,6 +92,33 @@ def test_domain_front_round_and_season_are_playable_on_qq_and_onebot() -> None:
                     ).fetchone()[0] == 0
                 battle = await runtime.adapters.dispatch(adapter, _context(adapter, user, "battle", "domain-battle"), "开始领域战")
                 assert battle.code == "DOMAIN_BATTLE_SETTLED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    battle_count = connection.execute(
+                        "SELECT COUNT(*) FROM domain_front_battle_links links "
+                        "JOIN battle_sessions sessions ON sessions.battle_id=links.battle_id "
+                        "WHERE links.event_operation_id='domain-battle' AND sessions.battle_type='pve.domain_front' "
+                        "AND sessions.status='settled' AND json_extract(sessions.result_json,'$.outcome')='won'"
+                    ).fetchone()[0]
+                assert battle_count == 1
+
+                unrelated = await runtime.repository.start_quest_battle(
+                    platform=adapter,
+                    platform_user_id=user,
+                    enemy_key="enemy.domain_front_guardian",
+                    battle_type="pve.unrelated_encounter",
+                    operation_id="unrelated-domain-battle:combat",
+                )
+                unrelated_result = await runtime.application.combat.run_to_resolution(
+                    unrelated.battle_id, unrelated.round_no
+                )
+                assert unrelated_result.outcome == "won"
+                unrelated_contribution = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "unrelated-contribution", "unrelated-domain-contribution"),
+                    "贡献领域前线 战斗 unrelated-domain-battle:combat",
+                )
+                assert unrelated_contribution.code == "EVENT_CONTRIBUTION_SOURCE_INVALID"
+
                 contributed = await runtime.adapters.dispatch(adapter, _context(adapter, user, "contribute", "domain-contribution"), "贡献领域前线 战斗")
                 assert contributed.code == "DOMAIN_EVENT_CONTRIBUTION_RECORDED"
                 replay = await runtime.adapters.dispatch(adapter, _context(adapter, user, "contribute-replay", "domain-contribution"), "贡献领域前线 战斗")
@@ -156,6 +183,148 @@ def test_domain_front_round_and_season_are_playable_on_qq_and_onebot() -> None:
                     (adapter, user),
                 ).fetchone()
                 assert codex == ("codex.domain.frontline", "domain-claim")
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_domain_front_battle_recovers_between_combat_and_event_projection() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            clock = MutableClock(datetime(2026, 9, 25, 12, 5, tzinfo=timezone.utc))
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=Path(data_dir), clock=clock)
+                user = f"domain-recovery-{adapter}"
+                assert (await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")).ok
+                _prepare_player(runtime, adapter, user, f"sect-recovery-{adapter}")
+                status = await runtime.adapters.dispatch(adapter, _context(adapter, user, "status"), "领域前线")
+                assert status.code == "DOMAIN_EVENT_STATUS"
+                joined = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "join", "domain-recovery-join"), "加入领域前线"
+                )
+                assert joined.code == "DOMAIN_EVENT_JOINED"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "CREATE TRIGGER reject_domain_front_battle_link BEFORE INSERT ON domain_front_battle_links "
+                        "BEGIN SELECT RAISE(ABORT, 'injected domain-front link failure'); END"
+                    )
+                try:
+                    await runtime.repository.start_domain_front_battle(
+                        platform=adapter,
+                        platform_user_id=user,
+                        operation_id="domain-recovery:combat",
+                        event_operation_id="domain-recovery",
+                    )
+                except sqlite3.IntegrityError:
+                    pass
+                else:
+                    raise AssertionError("battle link failure should abort combat creation")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM battle_sessions WHERE start_operation_id='domain-recovery:combat'"
+                    ).fetchone()[0] == 0
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM operations WHERE operation_id='domain-recovery:combat'"
+                    ).fetchone()[0] == 0
+                    connection.execute("DROP TRIGGER reject_domain_front_battle_link")
+
+                started = await runtime.repository.start_domain_front_battle(
+                    platform=adapter,
+                    platform_user_id=user,
+                    operation_id="domain-recovery:combat",
+                    event_operation_id="domain-recovery",
+                )
+                await runtime.close()
+
+                runtime = create_runtime(data_dir=Path(data_dir), clock=clock)
+                resumed_start = await runtime.repository.start_domain_front_battle(
+                    platform=adapter,
+                    platform_user_id=user,
+                    operation_id="domain-recovery:combat",
+                    event_operation_id="domain-recovery",
+                )
+                assert resumed_start.battle_id == started.battle_id
+                await runtime.repository.run_battle_turn(battle_id=started.battle_id, expected_round=1)
+                await runtime.close()
+
+                runtime = create_runtime(data_dir=Path(data_dir), clock=clock)
+                recovered = await runtime.application.combat.resolve_domain_front_battle(
+                    platform=adapter,
+                    platform_user_id=user,
+                    event_operation_id="domain-recovery",
+                )
+                assert recovered.battle_id == started.battle_id
+                assert recovered.outcome == "won"
+                await runtime.close()
+
+                runtime = create_runtime(data_dir=Path(data_dir), clock=clock)
+                projected = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "project", "domain-recovery"),
+                    "开始领域战",
+                )
+                assert projected.code == "DOMAIN_BATTLE_SETTLED"
+                assert projected.data["battle_id"] == started.battle_id
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "project-replay", "domain-recovery"),
+                    "开始领域战",
+                )
+                assert replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM battle_sessions WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND battle_type='pve.domain_front'",
+                        (adapter, user),
+                    ).fetchone()[0] == 1
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM domain_front_battle_links WHERE event_operation_id='domain-recovery'"
+                    ).fetchone()[0] == 1
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM domain_front_battle_links links JOIN domain_front_contributions c "
+                        "ON c.round_id=links.round_id AND c.player_id=links.player_id "
+                        "AND c.source_operation_id=links.event_operation_id WHERE links.event_operation_id='domain-recovery'"
+                    ).fetchone()[0] == 0
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_domain_front_lost_battle_cannot_be_projected_as_contribution() -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            clock = MutableClock(datetime(2026, 9, 25, 12, 5, tzinfo=timezone.utc))
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=Path(data_dir), clock=clock)
+                user = f"domain-lost-{adapter}"
+                assert (await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")).ok
+                player_id = _prepare_player(runtime, adapter, user, f"sect-lost-{adapter}")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET max_hp=100, initiative=0, qualification_json=? WHERE id=?",
+                        (json.dumps({"body": 0, "agility": 0}), player_id),
+                    )
+                status = await runtime.adapters.dispatch(adapter, _context(adapter, user, "status"), "领域前线")
+                assert status.code == "DOMAIN_EVENT_STATUS"
+                joined = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "join", "domain-lost-join"), "加入领域前线"
+                )
+                assert joined.code == "DOMAIN_EVENT_JOINED"
+                battle = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "battle", "domain-lost-battle"), "开始领域战"
+                )
+                assert battle.code == "DOMAIN_BATTLE_SETTLED"
+                assert battle.data["outcome"] == "lost"
+                denied = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "lost-contribution", "domain-lost-contribution"),
+                    "贡献领域前线 战斗",
+                )
+                assert denied.code == "EVENT_CONTRIBUTION_SOURCE_INVALID"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM domain_front_contributions WHERE player_id=?", (player_id,)
+                    ).fetchone()[0] == 0
                 await runtime.close()
 
     asyncio.run(run())

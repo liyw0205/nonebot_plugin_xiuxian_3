@@ -149,7 +149,7 @@ class XiuxianApplication:
         self.events = EventsApplication(repository)
         self.seasons = FinalHeavenSeasonApplication(repository)
         self.three_realms_seasons = ThreeRealmsSeasonApplication(repository)
-        self.domain_front = DomainFrontApplication(repository)
+        self.domain_front = DomainFrontApplication(repository, self.combat)
         self.void_archive = VoidArchiveApplication(repository)
         self.void_frontier = VoidFrontierApplication(repository)
         self.arena = ArenaApplication(repository)
