@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from combat_fixtures import equip_damage_weapon
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
@@ -28,21 +29,24 @@ def _ctx(adapter: str, user: str, operation: str) -> CommandContext:
 
 
 async def _player(
-    runtime, adapter: str, user: str, *, body: int = 20_000, max_hp: int = 500_000,
+    runtime, adapter: str, user: str, *, damage: int = 10_000, max_hp: int = 500_000,
     realm: str = "soul_transformation", location: str = "beast.ancestral_lake",
     reputation: int = 3000, stability: int = 50, initiative: int = 9999,
 ) -> None:
     assert (await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"{user}:create"), "开始修仙")).ok
+    assert (await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"{user}:seek"), "寻仙问道")).ok
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET realm_key=?, realm_layer=1, location_key=?, stamina=100, stamina_max=100, "
-            "max_hp=?, initiative=?, qualification_json=?, faction_reputation_json=?, bloodline_stability=? "
+            "max_hp=?, initiative=?, faction_reputation_json=?, bloodline_stability=? "
             "WHERE platform=? AND platform_user_id=?",
             (
-                realm, location, max_hp, initiative, json.dumps({"body": body, "agility": 100}),
+                realm, location, max_hp, initiative,
                 json.dumps({"beast": reputation}), stability, adapter, user,
             ),
         )
+    if damage:
+        equip_damage_weapon(runtime, adapter, user, damage)
 
 
 async def _command(runtime, adapter: str, user: str, operation: str, command: str):
@@ -208,7 +212,7 @@ def test_ancestral_hall_failure_expiry_and_system_compensation() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, clock=clock)
             loser = "ancestral-loser"
-            await _player(runtime, "onebot.v11", loser, body=0, max_hp=100, initiative=0)
+            await _player(runtime, "onebot.v11", loser, damage=0, max_hp=100, initiative=0)
             entered, _ = await _reach_spirit(runtime, "onebot.v11", loser, "loss")
             lost = await _command(runtime, "onebot.v11", loser, "loss:settle", "结算秘境")
             assert lost.code == "ANCESTRAL_HALL_SETTLED"
@@ -287,7 +291,7 @@ def test_ancestral_spirit_summon_clear_and_timeout_recovery_are_persisted() -> N
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, clock=clock)
             user = "ancestral-shadow"
-            await _player(runtime, "qq.official", user, body=0, max_hp=1_000_000, initiative=9999)
+            await _player(runtime, "qq.official", user, damage=0, max_hp=1_000_000, initiative=9999)
             entered, spirit = await _reach_spirit(runtime, "qq.official", user, "shadow")
             battle_id = spirit.data["battle_id"]
             for round_no in range(1, 5):

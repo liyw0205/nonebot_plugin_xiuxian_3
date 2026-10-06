@@ -5,6 +5,8 @@ import json
 import sqlite3
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -33,7 +35,7 @@ async def _prepare(runtime, adapter: str, user: str, *, pollution: int, pills: i
             """,
             (
                 pollution,
-                json.dumps({"body": 100000, "agility": 100000}),
+                json.dumps(BALANCED_QUALIFICATION),
                 json.dumps({"flags": ["access.demon.fallen_ruins"]}),
                 json.dumps({"item.pill.soul_restore": pills}),
                 adapter,

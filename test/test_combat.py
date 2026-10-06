@@ -17,7 +17,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.combat.skill_effects import (
     prepare_skill_action,
     reflected_enemy_damage,
 )
-from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import player_stat_snapshot
+from nonebot_plugin_xiuxian_3.xiuxian.stats.rules import build_stat_preview
 
 
 def _context(user_id: str, request_id: str, *, operation_id: str = "") -> CommandContext:
@@ -282,6 +282,7 @@ def test_owned_manual_combat_passives_are_frozen_and_reflect_damage() -> None:
         effects = replay.snapshot["player"]["manual_effects"]
         assert effects["combat_stat_bonus_bp"]["attack"] == 1000
         assert effects["damage_reflection_bp"] == 5000
+        assert replay.snapshot["player"]["stats"]["damage_reflection_bp"] == 5000
         assert any(
             action["actor_key"] == "enemy"
             and action["state"].get("reflected_damage", 0) > 0
@@ -316,19 +317,17 @@ def test_equipment_flat_stats_are_loaded_from_content_and_frozen_in_battle() -> 
         await _enter_cultivator(runtime, user)
         _insert_weapon(runtime, user, durability_bp=10_000)
         _insert_armor(runtime, user)
-        with sqlite3.connect(runtime.settings.database_path) as connection:
+        with runtime.repository._connect() as connection:
             player = connection.execute(
-                "SELECT max_hp, qualification_json FROM players WHERE platform = 'web' AND platform_user_id = ?",
-                (user,),
+                "SELECT * FROM players WHERE platform = 'web' AND platform_user_id = ?", (user,)
             ).fetchone()
-        qualification = json.loads(player[1])
+            expected = runtime.repository._build_player_stat_snapshot(connection, player)
 
         _, settled, replay = await _run_real_pve(runtime, user, "equipment-content-battle")
         assert settled.outcome == "won"
         battle_snapshot = replay.snapshot
         stats = battle_snapshot["player"]["stats"]
-        assert stats["attack"] == 10 + qualification.get("body", 0) // 2 + 17
-        assert stats["max_hp"] == max(100 + qualification.get("body", 0) * 4, player[0]) + 35
+        assert stats == expected["combat_stats"]
         assert stats["initiative"] >= 800
         assert stats["agility"] >= 900
         effects = {item["item_key"]: item["effects"] for item in battle_snapshot["player"]["equipment"]}
@@ -410,16 +409,18 @@ def test_equipment_effects_cover_the_full_combat_stat_set() -> None:
             )
         ],
     ]
-    stats = player_stat_snapshot(
-        {"body": 4, "agility": 2, "spirit": 2},
-        max_hp=100,
-        initiative=8,
-        equipment=({"slot": "accessory", "durability_bp": 10_000, "effects": effects},),
-    )
-    assert stats["attack"] == 17
-    assert stats["max_hp"] == 136
-    assert stats["max_mana"] == 130
-    assert stats["initiative"] == 11
+    row = {"realm_key": "mortal", "realm_layer": 0,
+           "qualification": dict.fromkeys(("body", "spirit", "insight", "root", "agility", "fortune"), 10)}
+    base = build_stat_preview(row)["combat_stats"]
+    stats = build_stat_preview(
+        row,
+        equipment=({"item_key": "item.accessory.test", "slot": "accessory", "durability_bp": 10_000,
+                    "temper_level": 0, "affixes": {}, "effects": effects},),
+    )["combat_stats"]
+    assert stats["attack"] == base["attack"] + 5
+    assert stats["max_hp"] == base["max_hp"] + 20
+    assert stats["max_mana"] == base["max_mana"] + 30
+    assert stats["initiative"] == base["initiative"] + 2
     assert stats["hp_regen"] == 4
     assert stats["mana_regen"] == 3
     assert {stat: stats[stat] for stat in (

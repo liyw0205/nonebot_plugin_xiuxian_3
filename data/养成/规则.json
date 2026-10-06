@@ -28,11 +28,27 @@
         "exploration_base_bp": 10000,
         "exploration_agility_bp": 50,
         "exploration_layer_bp": 15,
-        "breakthrough_root_bp": 20
+        "breakthrough_root_bp": 20,
+        "attack_base": 10,
+        "attack_body_divisor": 2,
+        "weapon_temper_attack": 2
       },
       "caps": {
         "training_rate_bp": {"permanent": 4000, "temporary": 6000},
         "exploration_rate_bp": {"permanent": 3000, "temporary": 5000}
+      },
+      "combat_caps": {
+        "damage_reduction_bp": 7000,
+        "crit_chance_bp": 5000,
+        "crit_damage_bp": 15000,
+        "evasion_bp": 7500,
+        "accuracy_bp": 5000,
+        "anti_crit_bp": 5000,
+        "damage_reflection_bp": 5000,
+        "lifesteal_bp": 5000,
+        "mana_leech_bp": 5000,
+        "healing_reduction_bp": 9000,
+        "recovery_reduction_bp": 9000
       },
       "status": "active"
     },

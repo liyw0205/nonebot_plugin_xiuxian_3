@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from typing import Any
+
+from ..utils.json_cache import decode_json_strict
 
 
 def constitution_effect_snapshot(connection: sqlite3.Connection, player_id: int) -> dict[str, Any]:
@@ -15,8 +16,8 @@ def constitution_effect_snapshot(connection: sqlite3.Connection, player_id: int)
     if row is None:
         return {}
     try:
-        snapshot = json.loads(str(row["snapshot_json"]))
-    except (TypeError, json.JSONDecodeError) as exc:
+        snapshot = decode_json_strict(str(row["snapshot_json"]))
+    except (TypeError, ValueError) as exc:
         raise ValueError("constitution profile snapshot is invalid JSON") from exc
     effect = snapshot.get("effect") if isinstance(snapshot, dict) else None
     if not isinstance(effect, dict):

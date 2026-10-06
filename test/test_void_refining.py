@@ -6,6 +6,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.persistence.sqlite_repository import SQLitePlayerRepository
@@ -67,10 +69,11 @@ async def _prepare_void_player(runtime, user: str, *, adapter: str = "web") -> N
     assert (await runtime.dispatch(_ctx(adapter, user, f"create-{user}"), "开始修仙")).ok
     with sqlite3.connect(runtime.settings.database_path) as db:
         db.execute(
-            "UPDATE players SET stage='cultivator', realm_key='soul_transformation', realm_layer=10, cultivation=500000, total_cultivation=848960, spirit_stones=100000, world_merit=1000, domain_charge=150, domain_power=500, location_key='void.first_route', stamina=100, stamina_max=100, inventory_json=?, intro_json=? WHERE platform_user_id=? AND platform=?",
+            "UPDATE players SET stage='cultivator', realm_key='soul_transformation', realm_layer=10, cultivation=500000, total_cultivation=848960, spirit_stones=100000, world_merit=1000, domain_charge=150, domain_power=500, location_key='void.first_route', stamina=100, stamina_max=100, inventory_json=?, intro_json=?, qualification_json=? WHERE platform_user_id=? AND platform=?",
             (
                 json.dumps({"item.void_crystal": 5, "item.void_anchor": 5}),
                 json.dumps({"flags": ["quest.break_void"]}),
+                json.dumps(BALANCED_QUALIFICATION),
                 user,
                 adapter,
             ),
@@ -258,12 +261,13 @@ def test_void_refining_materials_can_be_replenished_after_failure_on_both_adapte
                         "WHERE platform=? AND platform_user_id=?",
                         (
                             json.dumps({"item.void_anchor": 10}),
-                            json.dumps({"body": 10000, "spirit": 10000, "insight": 10000, "root": 10000, "agility": 10000}),
+                            json.dumps(BALANCED_QUALIFICATION),
                             adapter,
                             user,
                         ),
                     )
 
+                equip_damage_weapon(runtime, adapter, user, 5000)
                 to_portal = await runtime.adapters.dispatch(
                     adapter, _ctx(adapter, user, f"{user}-portal-start"), "前往 虚空门户"
                 )
@@ -510,12 +514,13 @@ def test_void_refining_world_merit_can_be_replenished_by_public_events_before_re
                         "UPDATE players SET world_merit=500, spirit_stones=160000, inventory_json=?, max_hp=10000, initiative=100, stamina=100, stamina_max=100, domain_charge_max=150, qualification_json=? WHERE platform=? AND platform_user_id=?",
                         (
                             json.dumps({"item.void_crystal": 5, "item.void_anchor": 8}),
-                            json.dumps({"body": 10000, "spirit": 10000, "insight": 10000, "root": 10000, "agility": 10000}),
+                            json.dumps(BALANCED_QUALIFICATION),
                             adapter,
                             user,
                         ),
                     )
 
+                equip_damage_weapon(runtime, adapter, user, 5000)
                 failed_operation = next(
                     f"{user}-failed-{index}"
                     for index in range(1000)

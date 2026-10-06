@@ -4,6 +4,7 @@ import asyncio
 import json
 import sqlite3
 from tempfile import TemporaryDirectory
+from combat_fixtures import equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -19,16 +20,18 @@ def _ctx(adapter: str, user: str, operation: str = "") -> CommandContext:
 async def _player(runtime, adapter: str, user: str, *, strong: bool = True, ticket: int = 0) -> None:
     created = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"create:{adapter}:{user}"), "开始修仙")
     assert created.code == "PLAYER_CREATED"
-    qualification = {"body": 2_000, "agility": 2_000} if strong else {"body": 1, "agility": 1}
+    assert (await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"seek:{adapter}:{user}"), "寻仙问道")).ok
     intro = {"flags": ["story.mainline.three_realms"]}
     inventory = {"item.soul_crystal": ticket} if ticket else {}
     with sqlite3.connect(runtime.settings.database_path) as db:
         db.execute(
             "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, "
             "location_key='cave.boundary_realm', stamina=30, max_hp=?, initiative=99, soul_power=10000, "
-            "qualification_json=?, intro_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
-            (50000 if strong else 1, json.dumps(qualification), json.dumps(intro), json.dumps(inventory), adapter, user),
+            "intro_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
+            (50000 if strong else 1, json.dumps(intro), json.dumps(inventory), adapter, user),
         )
+    if strong:
+        equip_damage_weapon(runtime, adapter, user, 1000)
 
 
 def test_boundary_party_qq_onebot_three_members_is_atomic_and_unique() -> None:

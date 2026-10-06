@@ -19,6 +19,7 @@ from nonebot_plugin_xiuxian_3.adapters.nonebot import _canonical_command
 from nonebot_plugin_xiuxian_3.adapters.onebot import is_onebot_v11_event, normalize_event
 from nonebot_plugin_xiuxian_3.adapters.qq import is_qq_event, normalize_event as normalize_qq_event
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.stats.rules import build_stat_preview
 from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
 
 
@@ -317,7 +318,7 @@ def test_qq_and_onebot_constitution_effect_reaches_spectator_combat_snapshot() -
                         (base.adapter, base.user_id),
                     ).fetchone()
                     snapshot, _ = runtime.repository._spectator_player_snapshot(connection, player)
-                base_mana = 80 + int(snapshot["qualification"]["spirit"]) * 10
+                base_mana = build_stat_preview(dict(player), runtime.content)["derived_stats"]["max_mp"]
                 assert snapshot["stats"]["max_mana"] == base_mana + base_mana * 300 // 10_000
             await runtime.close()
 

@@ -13,6 +13,7 @@ from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
 from nonebot_plugin_xiuxian_3.xiuxian.advancement.constitution_rules import constitution_definitions
+from nonebot_plugin_xiuxian_3.xiuxian.stats.rules import build_stat_preview
 
 
 class MutableClock:
@@ -181,7 +182,7 @@ def test_spirit_root_is_frozen_into_training_spectator_stats() -> None:
                     "SELECT * FROM players WHERE platform_user_id = ?", (user,)
                 ).fetchone()
                 snapshot, _ = runtime.repository._spectator_player_snapshot(connection, player)
-            base_mana = 80 + int(snapshot["qualification"]["spirit"]) * 10
+            base_mana = build_stat_preview(dict(player), runtime.content)["derived_stats"]["max_mp"]
             assert snapshot["stats"]["max_mana"] == base_mana + base_mana * 300 // 10_000
             await runtime.close()
 
@@ -255,7 +256,7 @@ def test_modified_spirit_root_json_changes_frozen_mana_stats(tmp_path: Path) -> 
                 "SELECT * FROM players WHERE platform_user_id = ?", (user,)
             ).fetchone()
             snapshot, _ = runtime.repository._spectator_player_snapshot(connection, player)
-        base_mana = 80 + int(snapshot["qualification"]["spirit"]) * 10
+        base_mana = build_stat_preview(dict(player), runtime.content)["derived_stats"]["max_mp"]
         assert snapshot["stats"]["max_mana"] == base_mana + base_mana * 1_250 // 10_000
         await runtime.close()
 

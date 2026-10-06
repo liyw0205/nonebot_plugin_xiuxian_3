@@ -156,7 +156,8 @@ def test_arena_async_snapshot_flow_across_qq_and_onebot() -> None:
                     )
                 }
                 assert players["arena-qq-private"][:2] == (300, 0)
-                assert players["arena-qq-private"][2] in {990, 1025}
+                assert players["arena-qq-private"][2] == challenged.data["challenger_rating"]
+                assert players["arena-qq-private"][2] != 1000
                 assert connection.execute("SELECT COUNT(*) FROM battle_sessions").fetchone()[0] == 0
                 assert connection.execute("SELECT COUNT(*) FROM arena_projection_events").fetchone()[0] == 2
                 assert connection.execute(

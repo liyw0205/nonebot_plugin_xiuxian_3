@@ -6,6 +6,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
@@ -785,7 +787,7 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         WHERE platform=? AND platform_user_id=?
                         """,
                         (
-                            json.dumps({"body": 20000, "agility": 20000, "spirit": 30, "root": 30, "insight": 30, "fortune": 10}),
+                            json.dumps(BALANCED_QUALIFICATION),
                             json.dumps({"beast": 200}),
                             json.dumps({"flags": ["story.mainline.three_realms"]}),
                             json.dumps({"item.soul_crystal": 100}),
@@ -796,6 +798,7 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
 
                 clock.advance(hours=10)
                 await _dispatch(runtime, adapter, user, 2660, "恢复状态")
+                equip_damage_weapon(runtime, helper_adapter, helper, 10000)
                 await _dispatch(runtime, helper_adapter, helper, 2661, "恢复状态")
                 helper_party = await runtime.adapters.dispatch(
                     helper_adapter,
@@ -2342,13 +2345,14 @@ def test_void_archive_return_enables_qq_and_onebot_dao_union_challenge() -> None
                         WHERE platform=? AND platform_user_id=?
                         """,
                         (
-                            json.dumps({"body": 100000}),
+                            json.dumps(BALANCED_QUALIFICATION),
                             json.dumps({"flags": ["story.mainline.three_realms"]}),
                             adapter,
                             user,
                         ),
                     )
 
+                equip_damage_weapon(runtime, adapter, user, 50000)
                 preview = await _dispatch(runtime, adapter, user, 4, "移动预览 界隙秘境")
                 assert preview.data["ready"] is True
                 assert preview.data["pass_key"] is None

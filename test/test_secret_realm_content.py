@@ -4,6 +4,7 @@ import asyncio
 import json
 import shutil
 import sqlite3
+from combat_fixtures import equip_damage_weapon
 from pathlib import Path
 
 import pytest
@@ -127,10 +128,11 @@ def test_active_secret_realm_uses_frozen_content_after_restart(tmp_path: Path, a
                 connection.execute(
                     "UPDATE players SET stage='cultivator', realm_key='qi_gathering', realm_layer=4, "
                     "location_key='cave.mist_grotto', stamina=30, stamina_max=30, max_hp=5000, "
-                    "initiative=100, qualification_json=?, inventory_json=? "
+                    "initiative=100, inventory_json=? "
                     "WHERE platform=? AND platform_user_id=?",
-                    (json.dumps({"body": 1000, "agility": 100}), json.dumps({"item.cave_pass_basic": 1}), adapter, user),
+                    (json.dumps({"item.cave_pass_basic": 1}), adapter, user),
                 )
+            equip_damage_weapon(runtime, adapter, user, 500)
             entered = await runtime.dispatch(
                 _context(adapter, user, "enter"), "进入秘境 雾隐秘境"
             )

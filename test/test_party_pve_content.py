@@ -4,6 +4,7 @@ import asyncio
 import json
 import shutil
 import sqlite3
+from combat_fixtures import equip_damage_weapon
 from pathlib import Path
 
 import pytest
@@ -41,14 +42,16 @@ async def _create_player(runtime, adapter: str, user: str) -> None:
         adapter, _context(adapter, user, f"create:{user}"), "开始修仙"
     )
     assert created.code == "PLAYER_CREATED"
+    assert (await runtime.adapters.dispatch(adapter, _context(adapter, user, f"seek:{user}"), "寻仙问道")).ok
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key='mortal', realm_layer=0, "
             "location_key='xuantian.outskirts', stamina=100, stamina_max=100, "
-            "max_hp=999, initiative=99, qualification_json=? "
+            "max_hp=999, initiative=99, spirit_stones=0, inventory_json='{}' "
             "WHERE platform=? AND platform_user_id=?",
-            (json.dumps({"body": 2_000, "agility": 2_000}), adapter, user),
+            (adapter, user),
         )
+    equip_damage_weapon(runtime, adapter, user, 1000)
 
 
 async def _make_party(runtime) -> tuple[str, str, str, tuple[tuple[str, str], ...]]:

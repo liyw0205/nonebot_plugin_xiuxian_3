@@ -4,6 +4,7 @@ import asyncio
 import json
 import shutil
 import sqlite3
+from combat_fixtures import equip_damage_weapon
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -58,13 +59,12 @@ def _prepare_player(
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key=?, realm_layer=?, location_key=?, "
-            "stamina=100, stamina_max=100, max_hp=5000, initiative=100, qualification_json=?, "
+            "stamina=100, stamina_max=100, max_hp=5000, initiative=100, "
             "inventory_json=? WHERE platform=? AND platform_user_id=?",
             (
                 realm,
                 layer,
                 location,
-                json.dumps({"body": 1000, "agility": 100}),
                 json.dumps(inventory),
                 adapter,
                 user,
@@ -79,6 +79,7 @@ def _prepare_player(
                 "VALUES (?, ?, 0, 'test')",
                 (player_id, json.dumps({LOCAL_KEY: reputation})),
             )
+    equip_damage_weapon(runtime, adapter, user, 500)
 
 
 async def _clear(runtime, adapter: str, user: str, prefix: str, realm: str) -> None:

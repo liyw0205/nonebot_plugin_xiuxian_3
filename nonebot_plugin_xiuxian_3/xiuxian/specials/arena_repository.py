@@ -15,7 +15,8 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.json import json_object
-from ..utils.equipment import equipment_instance_rows
+from ..utils.json_cache import decode_json_strict
+from ..utils.operations import operation_replay, record_operation
 from ..utils.player import change_player_state, player_combat_values, player_integer
 from ..persistence.errors import (
     ArenaChallengeCapError,
@@ -29,7 +30,6 @@ from ..persistence.errors import (
     ArenaSnapshotNotFoundError,
     ArenaSnapshotRequirementError,
     ThreeRealmsArenaRequirementError,
-    OperationConflictError,
     PlayerNotFoundError,
 )
 from .arena_models import (
@@ -433,13 +433,13 @@ class ArenaRepositoryMixin:
             if defender is None or str(defender["stage"]) != "cultivator":
                 raise ArenaOpponentUnavailableError("opponent is no longer eligible")
             if mode_key == THREE_REALMS_ARENA_MODE_KEY:
-                defender_snapshot_data = json_object(defender_snapshot["snapshot_json"])
+                defender_snapshot_data = decode_json_strict(defender_snapshot["snapshot_json"])
                 if not bool(defender_snapshot_data.get("three_realms_permit", False)):
                     raise ArenaOpponentUnavailableError("opponent lacks the three-realms arena permit")
             match_id = f"arena.match:{uuid4().hex}"
             challenger_snapshot_id = f"arena.match_snapshot:{uuid4().hex}"
             challenger_snapshot = self._arena_player_snapshot(connection, challenger, challenger_snapshot_id)
-            defender_snapshot_data = json_object(defender_snapshot["snapshot_json"])
+            defender_snapshot_data = decode_json_strict(defender_snapshot["snapshot_json"])
             environment = (
                 tactical_environment(challenger_snapshot, defender_snapshot_data)
                 if mode_key == THREE_REALMS_ARENA_MODE_KEY
@@ -636,7 +636,7 @@ class ArenaRepositoryMixin:
                 outcome=str(match["outcome"]),
                 rounds=int(match["rounds"]),
                 score_counted=bool(match["score_counted"]),
-                snapshot=json_object(match["snapshot_json"]),
+                snapshot=decode_json_strict(match["snapshot_json"]),
                 result=json_object(match["result_json"]),
                 actions=tuple(
                     {
@@ -748,7 +748,7 @@ class ArenaRepositoryMixin:
                 if consent is None:
                     raise ArenaMatchRequirementError("practice requires the snapshot owner's consent")
             if mode_key == THREE_REALMS_ARENA_MODE_KEY:
-                frozen = json_object(row["snapshot_json"])
+                frozen = decode_json_strict(row["snapshot_json"])
                 if not bool(frozen.get("three_realms_permit", False)):
                     raise ArenaOpponentUnavailableError("opponent lacks the three-realms arena permit")
             return row
@@ -770,7 +770,7 @@ class ArenaRepositoryMixin:
                 ).fetchone()
                 if consent is None:
                     continue
-            if mode_key == THREE_REALMS_ARENA_MODE_KEY and not bool(json_object(row["snapshot_json"]).get("three_realms_permit", False)):
+            if mode_key == THREE_REALMS_ARENA_MODE_KEY and not bool(decode_json_strict(row["snapshot_json"]).get("three_realms_permit", False)):
                 continue
             if (
                 (mode_key == ARENA_RANK_MODE_KEY and rating_band(challenger_rating) == rating_band(int(row["rating"])))
@@ -837,50 +837,28 @@ class ArenaRepositoryMixin:
         self, connection: sqlite3.Connection, player: sqlite3.Row, snapshot_id: str
     ) -> dict[str, object]:
         player_state = player_combat_values(player)
-        qualification = player_state["qualification"]
-        equipment = []
-        attack_bonus = 0
-        equipment_rows = equipment_instance_rows(
-            connection, int(player["id"]), equipped_only=True, durable_only=True, active_only=True
-        )
-        for item in equipment_rows:
-            affixes = json_object(item["affixes_json"])
-            attack_bonus += max(0, int(affixes.get("damage", 0)))
-            attack_bonus += max(0, int(item["temper_level"])) * 4 if str(item["slot"]) == "weapon" else 0
-            equipment.append(
-                {
-                    "item_key": str(item["item_key"]),
-                    "slot": str(item["slot"]),
-                    "durability_bp": int(item["durability_bp"]),
-                    "temper_level": int(item["temper_level"]),
-                    "affixes": {str(key): int(value) for key, value in affixes.items()},
-                }
-            )
+        projection = self._build_player_stat_snapshot(connection, player)
         skills = tuple(
             str(row["skill_key"])
             for row in connection.execute(
                 "SELECT skill_key FROM skill_masteries WHERE player_id = ? ORDER BY skill_key", (player["id"],)
             ).fetchall()
         )
-        qualification_snapshot: dict[str, object] = {}
-        for key, value in qualification.items():
-            try:
-                qualification_snapshot[str(key)] = int(value)
-            except (TypeError, ValueError):
-                qualification_snapshot[str(key)] = str(value)
-
         return {
             "snapshot_id": snapshot_id,
             "dao_name": player_state["dao_name"],
-            "qualification": qualification_snapshot,
-            "max_hp": player_state["max_hp"],
-            "initiative": player_state["initiative"],
-            "attack_bonus": attack_bonus,
+            "qualification": dict(projection["base_stats"]),
+            "stats": dict(projection["combat_stats"]),
+            "derived_stats": dict(projection["derived_stats"]),
+            "source_refs": list(projection["source_refs"]),
+            "formula_fingerprint": projection["formula_fingerprint"],
             "path_key": player_state["path_key"],
             "realm_key": player_state["realm_key"],
             "realm_layer": player_state["realm_layer"],
             "skills": list(skills),
-            "equipment": equipment,
+            "equipment": list(projection["equipment"]),
+            "constitution_effect": dict(projection["constitution_effect"]),
+            "manual_effects": dict(projection["manual_effects"]),
             "faction_key": player_faction(player),
             "alliance_key": player_faction(player),
             "pollution": int(player_state["pollution"]),
@@ -892,15 +870,7 @@ class ArenaRepositoryMixin:
     def _arena_operation(
         connection: sqlite3.Connection, operation_id: str, operation_name: str, request_hash: str
     ) -> dict[str, Any] | None:
-        existing = connection.execute(
-            "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-            (operation_id,),
-        ).fetchone()
-        if existing is None:
-            return None
-        if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-            raise OperationConflictError("operation input differs from its original request")
-        return json_object(existing["result_json"])
+        return operation_replay(connection, operation_id, operation_name, request_hash)
 
     @staticmethod
     def _arena_insert_operation(
@@ -912,10 +882,7 @@ class ArenaRepositoryMixin:
         payload: dict[str, Any],
         now_text: str,
     ) -> None:
-        connection.execute(
-            "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
+        record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
 
     @staticmethod
     def _snapshot_payload_from_row(row: sqlite3.Row) -> dict[str, Any]:

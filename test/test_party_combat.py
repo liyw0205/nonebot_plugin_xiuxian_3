@@ -26,12 +26,15 @@ def test_qq_onebot_party_pve_uses_team_snapshot_locks_and_unique_rewards() -> No
                     "开始修仙",
                 )
                 assert created.code == "PLAYER_CREATED"
+                assert (await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, f"{adapter}-seek"), "寻仙问道"
+                )).ok
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
                         "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, "
                         "location_key='xuantian.outskirts', stamina=100, max_hp=999, initiative=99, "
-                        "qualification_json=? WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"body": 2_000, "agility": 2_000}), adapter, user),
+                        "inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"item.manual.basic_qi": 1}), adapter, user),
                     )
 
             created_party = await runtime.adapters.dispatch(
@@ -92,8 +95,18 @@ def test_qq_onebot_party_pve_uses_team_snapshot_locks_and_unique_rewards() -> No
                     "SELECT snapshot_json FROM party_battle_members WHERE battle_id=? ORDER BY id",
                     (started.battle_id,),
                 ).fetchall()
+                before_assets = {
+                    row[0]: (row[1], row[2]) for row in connection.execute(
+                        "SELECT platform, cultivation, spirit_stones FROM players WHERE platform_user_id IN (?, ?)",
+                        (leader, helper),
+                    ).fetchall()
+                }
             assert locked == 2
             assert {json.loads(row[0])["player_id"] for row in snapshots} == set(started.member_player_ids)
+            for row in snapshots:
+                snapshot = json.loads(row[0])
+                assert snapshot["stats"] == snapshot["stat_snapshot"]["combat_stats"]
+                assert snapshot["manual_effects"]["combat_stat_bonus_bp"]["attack"] == 150
 
             cultivation_locked = await runtime.adapters.dispatch(
                 helper_adapter,
@@ -149,7 +162,11 @@ def test_qq_onebot_party_pve_uses_team_snapshot_locks_and_unique_rewards() -> No
                 ).fetchall()
             assert reward_count == 2
             assert remaining_locks == 0
-            assert all(int(row[1]) == 30 and int(row[2]) == 10 for row in player_assets)
+            assert all(
+                int(row[1]) == before_assets[row[0]][0] + 30
+                and int(row[2]) == before_assets[row[0]][1] + 10
+                for row in player_assets
+            )
             await runtime.close()
 
             recovered = create_runtime(data_dir=data_dir)

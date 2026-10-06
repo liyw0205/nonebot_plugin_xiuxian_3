@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -32,7 +34,7 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> int:
         player_id = int(connection.execute("SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)).fetchone()[0])
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key='soul_transformation', realm_layer=1, domain_key='domain.fire', location_key='xuantian.domain_front', stamina=100, max_hp=100000, initiative=1000, qualification_json=? WHERE id=?",
-            (json.dumps({"body": 100000, "agility": 1000}), player_id),
+            (json.dumps(BALANCED_QUALIFICATION), player_id),
         )
         connection.execute(
             "INSERT INTO sects(sect_id,name,name_key,motto,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at) VALUES (?, ?, ?, '', ?, 'active', 4, 20, 100, 0, 0, 0, '{}', ?, ?)",
@@ -42,6 +44,7 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> int:
             "INSERT INTO sect_members(sect_id,player_id,role,status,contribution,joined_at,last_action_at,created_at,updated_at) VALUES (?, ?, 'leader', 'active', 0, ?, ?, ?, ?)",
             (sect_id, player_id, now, now, now, now),
         )
+    equip_damage_weapon(runtime, adapter, user, 50000)
     return player_id
 
 
@@ -302,7 +305,10 @@ def test_domain_front_lost_battle_cannot_be_projected_as_contribution() -> None:
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
                         "UPDATE players SET max_hp=100, initiative=0, qualification_json=? WHERE id=?",
-                        (json.dumps({"body": 0, "agility": 0}), player_id),
+                        (json.dumps(BALANCED_QUALIFICATION), player_id),
+                    )
+                    connection.execute(
+                        "UPDATE equipment_instances SET equipped=0 WHERE player_id=?", (player_id,)
                     )
                 status = await runtime.adapters.dispatch(adapter, _context(adapter, user, "status"), "领域前线")
                 assert status.code == "DOMAIN_EVENT_STATUS"

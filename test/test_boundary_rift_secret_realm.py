@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from combat_fixtures import equip_damage_weapon
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
@@ -30,19 +31,21 @@ def _ctx(adapter: str, user: str, operation: str = "") -> CommandContext:
 async def _player(runtime, adapter: str, user: str, *, ticket: int = 0, mainline: bool = True, strong: bool = True) -> None:
     created = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"create:{adapter}:{user}"), "开始修仙")
     assert created.code == "PLAYER_CREATED"
+    assert (await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"seek:{adapter}:{user}"), "寻仙问道")).ok
     flags = ["story.mainline.three_realms"] if mainline else []
     inventory = {"item.soul_crystal": ticket} if ticket else {}
-    body = 2000 if strong else 1
     max_hp = 50000 if strong else 1
     initiative = 9999 if strong else 1
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, "
             "location_key='cave.boundary_realm', stamina=100, stamina_max=100, max_hp=?, "
-            "initiative=?, soul_power=10000, qualification_json=?, intro_json=?, inventory_json=? "
+            "initiative=?, soul_power=10000, intro_json=?, inventory_json=? "
             "WHERE platform=? AND platform_user_id=?",
-            (max_hp, initiative, json.dumps({"body": body, "agility": body}), json.dumps({"flags": flags}), json.dumps(inventory), adapter, user),
+            (max_hp, initiative, json.dumps({"flags": flags}), json.dumps(inventory), adapter, user),
         )
+    if strong:
+        equip_damage_weapon(runtime, adapter, user, 1000)
 
 
 async def _create_party(runtime, leader: tuple[str, str], member: tuple[str, str]) -> str:

@@ -5,6 +5,8 @@ import json
 import sqlite3
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -27,7 +29,7 @@ def _eligible(runtime, identities: list[tuple[str, str]], *, realm: str = "nasce
                     realm,
                     layer,
                     hp,
-                    json.dumps({"body": 1000, "agility": 1000}),
+                    json.dumps(BALANCED_QUALIFICATION),
                     json.dumps({"flags": ["alliance.xuantian"]}),
                     json.dumps({"xuantian": 500}),
                     adapter,
@@ -42,6 +44,8 @@ def _eligible(runtime, identities: list[tuple[str, str]], *, realm: str = "nasce
                 "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,updated_at=excluded.updated_at",
                 (player_id, json.dumps({"local.xuantian.domain_front": 500})),
             )
+    for adapter, user in identities:
+        equip_damage_weapon(runtime, adapter, user, 500)
 
 
 async def _ready_duo(runtime, leader: tuple[str, str], member: tuple[str, str]) -> str:
@@ -105,14 +109,14 @@ def test_three_realms_tower_duo_qq_onebot_progression_and_isolation(monkeypatch)
             with sqlite3.connect(runtime.settings.database_path) as db:
                 db.execute(
                     "UPDATE players SET max_hp=1,initiative=0,qualification_json=? WHERE platform IN ('qq.official','onebot.v11') AND platform_user_id IN (?,?)",
-                    (json.dumps({"body": 0, "agility": 0}), leader[1], member[1]),
+                    (json.dumps(BALANCED_QUALIFICATION), leader[1], member[1]),
                 )
             from nonebot_plugin_xiuxian_3.xiuxian.combat import party_repository as party_repo
             from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import EnemyDefinition
             monkeypatch.setattr(
                 party_repo,
                 "enemy_definition",
-                lambda key: EnemyDefinition(key, "测试高阶敌人", "xuantian.new_town", "nascent_soul", 1, 100000, 100000, 100, 100, "enemy_skill.test", "test", {}),
+                lambda key, *, content=None: EnemyDefinition(key, "测试高阶敌人", "xuantian.new_town", "nascent_soul", 1, 100000, 100000, 100, 100, "enemy_skill.test", "test", {}),
             )
             failed = await _send(runtime, leader[0], leader[1], "duo-loss", "挑战三界塔双人 1")
             assert failed.ok and failed.data["outcome"] != "won"

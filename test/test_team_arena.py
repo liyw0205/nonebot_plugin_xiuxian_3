@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
@@ -28,10 +27,12 @@ def _ctx(adapter: str, user: str, operation: str) -> CommandContext:
 async def _player(runtime, adapter: str, user: str, operation: str) -> None:
     created = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, operation), "开始修仙")
     assert created.ok, (created.code, created.message)
+    seeking = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, operation + "-seek"), "寻仙问道")
+    assert seeking.ok, (seeking.code, seeking.message)
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
-            "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, location_key='xuantian.outskirts', max_hp=999, initiative=99, qualification_json=? WHERE platform=? AND platform_user_id=?",
-            (json.dumps({"body": 100, "agility": 100}), adapter, user),
+            "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, location_key='xuantian.outskirts', max_hp=999, initiative=99 WHERE platform=? AND platform_user_id=?",
+            (adapter, user),
         )
 
 
@@ -102,7 +103,7 @@ def test_qq_onebot_team_arena_uses_team_snapshots_and_server_replay() -> None:
                 assert connection.execute("SELECT COUNT(*) FROM arena_team_actions").fetchone()[0] > 0
                 assert connection.execute("SELECT COUNT(*) FROM battle_sessions").fetchone()[0] == 0
                 assert connection.execute("SELECT COUNT(*) FROM arena_projection_events").fetchone()[0] == 4
-                assert connection.execute("SELECT COUNT(*) FROM codex_entries").fetchone()[0] == 8
+                assert connection.execute("SELECT COUNT(*) FROM codex_entries WHERE entry_key LIKE 'codex.challenge.arena.%'").fetchone()[0] == 8
                 assert connection.execute("SELECT COUNT(*) FROM arena_identity_routes").fetchone()[0] == 4
                 assert connection.execute("SELECT COUNT(*) FROM arena_audit_events").fetchone()[0] == 4
                 ratings = connection.execute("SELECT arena_rating FROM players WHERE platform_user_id LIKE 'team-%'").fetchall()

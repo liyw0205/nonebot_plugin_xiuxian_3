@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from combat_fixtures import equip_damage_weapon
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
@@ -30,7 +31,7 @@ async def _create_player(
     location: str = "demon.abyss_gate",
     access: bool = True,
     reputation: int = 200,
-    body: int = 4000,
+    damage: int = 2000,
     pollution: int = 10,
     soul_restore: int = 0,
 ) -> None:
@@ -41,15 +42,14 @@ async def _create_player(
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key=?, realm_layer=?, location_key=?, "
-            "stamina=100, stamina_max=100, max_hp=?, initiative=2000, pollution=?, qualification_json=?, "
+            "stamina=100, stamina_max=100, max_hp=?, initiative=2000, pollution=?, "
             "intro_json=?, faction_reputation_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
             (
                 realm,
                 layer,
                 location,
-                50_000 if body else 100,
+                50_000 if damage else 100,
                 pollution,
-                json.dumps({"body": body, "agility": 200}),
                 json.dumps({"flags": flags}),
                 json.dumps({"demon": reputation}),
                 json.dumps(inventory),
@@ -57,6 +57,8 @@ async def _create_player(
                 user,
             ),
         )
+    if damage:
+        equip_damage_weapon(runtime, adapter, user, damage)
 
 
 async def _command(runtime, adapter: str, user: str, operation: str, command: str):
@@ -295,7 +297,7 @@ def test_demon_abyss_failure_expiry_pollution_lock_and_system_compensation() -> 
             runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11",))
 
             loser = "demon-abyss-loser"
-            await _create_player(runtime, "onebot.v11", loser, body=0)
+            await _create_player(runtime, "onebot.v11", loser, damage=0)
             await _command(runtime, "onebot.v11", loser, "loss-enter", "进入秘境 魔界深渊")
             await _command(runtime, "onebot.v11", loser, "loss-threshold", "选择秘境节点 深渊门")
             await _command(runtime, "onebot.v11", loser, "loss-risk", "选择秘境节点 污染渗流")

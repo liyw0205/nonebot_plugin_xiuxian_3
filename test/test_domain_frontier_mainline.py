@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -48,7 +50,7 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> None:
                 faction_reputation_json='{"demon":300,"beast":300}'
             WHERE id=?
             """,
-            (json.dumps({"body": 100000, "agility": 1000}), player_id),
+            (json.dumps(BALANCED_QUALIFICATION), player_id),
         )
         connection.execute(
             """
@@ -68,6 +70,7 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> None:
             """,
             (sect_id, player_id, now, now, now, now),
         )
+    equip_damage_weapon(runtime, adapter, user, 50000)
 
 
 def test_domain_frontier_mainline_runs_all_lanes_on_both_adapters() -> None:

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from typing import Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
 
@@ -619,146 +618,6 @@ def hit_chance_bp(
     )
 
 
-def player_stat_snapshot(
-    qualification: Mapping[str, object],
-    *,
-    max_hp: int,
-    initiative: int,
-    equipment: tuple[Mapping[str, object], ...],
-    constitution_effect: Mapping[str, object] | None = None,
-    manual_stat_bonus_bp: Mapping[str, int] | None = None,
-) -> dict[str, int]:
-    """Build combat stats from player projections and frozen equipment effects.
-
-    The wider stat service is intentionally not invented in the combat layer;
-    configured flat equipment effects are applied to the existing projections.
-    """
-
-    body = max(0, int(qualification.get("body", 0)))
-    agility = max(0, int(qualification.get("agility", 0)))
-    spirit = max(0, int(qualification.get("spirit", 0)))
-    damage_bonus = 0
-    hp_bonus = 0
-    initiative_bonus = 0
-    temper_bonus = 0
-    flat_stats = {"physical_damage": 0, "max_hp": 0, "initiative": 0, "agility": 0,
-                  "max_mana": 0, "hp_regen": 0, "mana_regen": 0}
-    combat_stats = {
-        "damage_reduction_bp": 0,
-        "crit_chance_bp": 0,
-        "crit_damage_bp": 0,
-        "evasion_bp": 0,
-        "accuracy_bp": 0,
-        "anti_crit_bp": 0,
-        "damage_reflection_bp": 0,
-        "lifesteal_bp": 0,
-        "mana_leech_bp": 0,
-        "healing_reduction_bp": 0,
-        "recovery_reduction_bp": 0,
-    }
-    for item in equipment:
-        durability_bp = max(0, min(10_000, int(item.get("durability_bp", 10_000))))
-        affixes = item.get("affixes", {})
-        if isinstance(affixes, Mapping):
-            damage_bonus += max(0, int(affixes.get("damage", 0))) * durability_bp // 10_000
-            hp_bonus += max(0, int(affixes.get("hp", 0))) * durability_bp // 10_000
-            initiative_bonus += max(0, int(affixes.get("initiative", 0))) * durability_bp // 10_000
-            for key, stat in _EQUIPMENT_AFFIX_STATS.items():
-                combat_stats[stat] += max(0, int(affixes.get(key, 0))) * durability_bp // 10_000
-            flat_stats["hp_regen"] += max(0, int(affixes.get("hp_regen", 0))) * durability_bp // 10_000
-            flat_stats["max_mana"] += max(0, int(affixes.get("max_mana", 0))) * durability_bp // 10_000
-            flat_stats["mana_regen"] += max(0, int(affixes.get("mana_regen", 0))) * durability_bp // 10_000
-        if str(item.get("slot", "")) == "weapon":
-            temper_bonus += max(0, int(item.get("temper_level", 0))) * 2
-        effects = item.get("effects", ())
-        if not isinstance(effects, (list, tuple)):
-            raise ValueError(f"equipment {item.get('item_key')} effects must be a list")
-        for effect in effects:
-            if not isinstance(effect, Mapping) or effect.get("type") != "flat_stat":
-                continue
-            stat = effect.get("stat")
-            value = effect.get("value")
-            if not isinstance(stat, str) or isinstance(value, bool) or not isinstance(value, int):
-                raise ValueError(f"equipment {item.get('item_key')} has an invalid flat_stat effect")
-            if stat not in flat_stats:
-                raise ValueError(f"equipment {item.get('item_key')} has unsupported combat stat: {stat}")
-            flat_stats[stat] += value * durability_bp // 10_000
-        for effect in effects:
-            if not isinstance(effect, Mapping) or effect.get("type") != "combat_stat_bp":
-                continue
-            stat = effect.get("stat")
-            value = effect.get("value")
-            if stat not in combat_stats or isinstance(value, bool) or not isinstance(value, int) or value < 0:
-                raise ValueError(f"equipment {item.get('item_key')} has an invalid combat_stat_bp effect")
-            combat_stats[str(stat)] += value * durability_bp // 10_000
-    base_hp = max(100 + body * 4, max(0, int(max_hp))) + hp_bonus + flat_stats["max_hp"]
-    stats = {
-        "max_hp": base_hp,
-        "attack": 10 + body // 2 + temper_bonus + damage_bonus + flat_stats["physical_damage"],
-        "initiative": max(
-            8 + agility // 2 + initiative_bonus + flat_stats["initiative"],
-            max(0, int(initiative)),
-        ),
-        "agility": agility + flat_stats["agility"],
-        "max_mana": 80 + spirit * 10 + flat_stats["max_mana"],
-        "hp_regen": flat_stats["hp_regen"],
-        "mana_regen": flat_stats["mana_regen"],
-    }
-    stats.update(combat_stats)
-    stats["damage_reduction_bp"] = min(7_000, stats["damage_reduction_bp"])
-    stats["crit_chance_bp"] = min(5_000, stats["crit_chance_bp"])
-    stats["crit_damage_bp"] = min(15_000, stats["crit_damage_bp"])
-    stats["evasion_bp"] = min(7_500, stats["evasion_bp"])
-    stats["accuracy_bp"] = min(5_000, stats["accuracy_bp"])
-    stats["anti_crit_bp"] = min(5_000, stats["anti_crit_bp"])
-    stats["damage_reflection_bp"] = min(5_000, stats["damage_reflection_bp"])
-    stats["lifesteal_bp"] = min(5_000, stats["lifesteal_bp"])
-    stats["mana_leech_bp"] = min(5_000, stats["mana_leech_bp"])
-    stats["healing_reduction_bp"] = min(9_000, stats["healing_reduction_bp"])
-    stats["recovery_reduction_bp"] = min(9_000, stats["recovery_reduction_bp"])
-    for stat, value in (manual_stat_bonus_bp or {}).items():
-        if stat not in stats or isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            raise ValueError(f"manual has an invalid combat stat bonus: {stat}")
-        stats[stat] += stats[stat] * value // 10_000
-    return apply_constitution_combat_effect(stats, constitution_effect)
-
-
-_EQUIPMENT_AFFIX_STATS = {
-    "damage_reduction": "damage_reduction_bp",
-    "crit_chance": "crit_chance_bp",
-    "crit_damage": "crit_damage_bp",
-    "evasion": "evasion_bp",
-    "accuracy": "accuracy_bp",
-    "anti_crit": "anti_crit_bp",
-    "reflection": "damage_reflection_bp",
-    "lifesteal": "lifesteal_bp",
-    "mana_leech": "mana_leech_bp",
-    "healing_reduction": "healing_reduction_bp",
-    "recovery_reduction": "recovery_reduction_bp",
-}
-
-
-def apply_constitution_combat_effect(
-    stats: Mapping[str, int], effect: Mapping[str, object] | None
-) -> dict[str, int]:
-    result = {str(key): int(value) for key, value in stats.items()}
-    if not effect:
-        return result
-    effect_type = effect.get("type")
-    value = effect.get("value")
-    if not isinstance(effect_type, str) or isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ValueError("constitution combat effect is invalid")
-    if effect_type == "max_hp_bp":
-        result["max_hp"] += result.get("max_hp", 0) * value // 10_000
-    elif effect_type == "max_mana_bp":
-        result["max_mana"] += result.get("max_mana", 0) * value // 10_000
-    elif effect_type == "initiative_bp":
-        result["initiative"] += result.get("initiative", 0) * value // 10_000
-    elif effect_type not in {"production_quality_bp", "drop_weight_bp"}:
-        raise ValueError(f"unsupported constitution combat effect: {effect_type}")
-    return result
-
-
 def player_goes_first(*, player_initiative: int, enemy_initiative: int, seed: str) -> bool:
     if player_initiative != enemy_initiative:
         return player_initiative > enemy_initiative
@@ -790,9 +649,7 @@ __all__ = [
     "VOID_RUINS_KEEPER_UNSTABLE",
     "battle_roll_bp",
     "clamp",
-    "apply_constitution_combat_effect",
     "enemy_definition",
     "hit_chance_bp",
     "player_goes_first",
-    "player_stat_snapshot",
 ]

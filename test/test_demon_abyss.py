@@ -10,6 +10,8 @@ from uuid import UUID
 
 import pytest
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
@@ -41,7 +43,6 @@ def _context(adapter: str, user: str, request: str, operation: str = "") -> Comm
 async def _player(runtime, adapter: str, user: str, *, strong: bool, pollution: int = 0) -> None:
     await runtime.adapters.dispatch(adapter, _context(adapter, user, f"create-{adapter}"), "开始修仙")
     with sqlite3.connect(runtime.settings.database_path) as connection:
-        qualification = {"body": 100000, "agility": 100000} if strong else {"body": 10, "agility": 10}
         connection.execute(
             """
             UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
@@ -53,13 +54,21 @@ async def _player(runtime, adapter: str, user: str, *, strong: bool, pollution: 
             """,
             (
                 pollution,
-                100000 if strong else 100,
-                100000 if strong else 20,
-                json.dumps(qualification, sort_keys=True),
+                100000 if strong else 0,
+                100000 if strong else 0,
+                json.dumps(
+                    BALANCED_QUALIFICATION if strong else {
+                        "body": 5, "spirit": 15, "insight": 15,
+                        "root": 5, "agility": 5, "fortune": 15,
+                    },
+                    sort_keys=True,
+                ),
                 adapter,
                 user,
             ),
         )
+    if strong:
+        equip_damage_weapon(runtime, adapter, user, 50000)
 
 
 def _expire(runtime, exploration_id: str) -> None:

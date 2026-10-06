@@ -5,6 +5,7 @@ import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
+from combat_fixtures import equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -14,21 +15,23 @@ def _context(adapter: str, user: str, operation_id: str) -> CommandContext:
     return CommandContext(adapter=adapter, user_id=user, operation_id=operation_id)
 
 
-def _prepare_player(runtime, adapter: str, user: str, *, realm: str, layer: int, location: str, body: int, ticket: int = 0) -> None:
+def _prepare_player(runtime, adapter: str, user: str, *, realm: str, layer: int, location: str, damage: int, ticket: int = 0) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key=?, realm_layer=?, location_key=?, stamina=30, stamina_max=30, "
-            "qualification_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
+            "max_hp=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
             (
                 realm,
                 layer,
                 location,
-                json.dumps({"body": body, "agility": 20}),
+                damage * 8,
                 json.dumps({"item.cave_pass_basic": ticket}),
                 adapter,
                 user,
             ),
     )
+    if damage:
+        equip_damage_weapon(runtime, adapter, user, damage)
 
 
 async def _create_and_seek(runtime, adapter: str, user: str) -> None:
@@ -75,7 +78,7 @@ def test_mist_grotto_enforces_nodes_and_is_idempotent() -> None:
             user = "qq-secret-mist"
             await runtime.dispatch(_context("qq.official", user, "create"), "开始修仙")
             await runtime.dispatch(_context("qq.official", user, "seek"), "寻仙问道")
-            _prepare_player(runtime, "qq.official", user, realm="qi_gathering", layer=4, location="cave.mist_grotto", body=100, ticket=1)
+            _prepare_player(runtime, "qq.official", user, realm="qi_gathering", layer=4, location="cave.mist_grotto", damage=50, ticket=1)
             jumped = await runtime.dispatch(_context("qq.official", user, "jump"), "选择秘境节点 遭遇")
             assert jumped.code == "SECRET_REALM_NOT_FOUND"
             entered = await runtime.dispatch(_context("qq.official", user, "enter"), "进入秘境 雾隐秘境")
@@ -114,7 +117,7 @@ def test_secret_realm_battle_failure_refunds_ticket_but_not_stamina() -> None:
             user = "ob-secret-fail"
             await runtime.dispatch(_context("onebot.v11", user, "create"), "开始修仙")
             await runtime.dispatch(_context("onebot.v11", user, "seek"), "寻仙问道")
-            _prepare_player(runtime, "onebot.v11", user, realm="qi_gathering", layer=4, location="cave.mist_grotto", body=0, ticket=1)
+            _prepare_player(runtime, "onebot.v11", user, realm="qi_gathering", layer=4, location="cave.mist_grotto", damage=0, ticket=1)
             await runtime.dispatch(_context("onebot.v11", user, "enter"), "进入秘境 雾隐秘境")
             await runtime.dispatch(_context("onebot.v11", user, "resource"), "选择秘境节点 资源")
             await runtime.dispatch(_context("onebot.v11", user, "encounter"), "选择秘境节点 遭遇")
@@ -142,7 +145,7 @@ def test_secret_realm_expiry_releases_locked_resources() -> None:
             user = "qq-secret-expire"
             await runtime.dispatch(_context("qq.official", user, "create"), "开始修仙")
             await runtime.dispatch(_context("qq.official", user, "seek"), "寻仙问道")
-            _prepare_player(runtime, "qq.official", user, realm="qi_gathering", layer=4, location="cave.mist_grotto", body=100, ticket=1)
+            _prepare_player(runtime, "qq.official", user, realm="qi_gathering", layer=4, location="cave.mist_grotto", damage=50, ticket=1)
             entered = await runtime.dispatch(_context("qq.official", user, "enter"), "进入秘境 雾隐秘境")
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute("UPDATE secret_realm_runs SET expires_at=? WHERE run_id=?", ((now - timedelta(seconds=1)).isoformat(), entered.data["run_id"]))
@@ -167,7 +170,7 @@ def test_spring_path_first_clear_grants_leaf_and_local_reputation() -> None:
                 realm="qi_sensing",
                 layer=3,
                 location="xuantian.spirit_field",
-                body=100,
+                damage=50,
             )
             entered = await runtime.dispatch(
                 _context("onebot.v11", user, "spring-enter"), "进入秘境 灵泉小径"
@@ -217,7 +220,7 @@ def test_mist_grotto_weekly_quota_counts_failed_runs() -> None:
                 realm="qi_gathering",
                 layer=4,
                 location="cave.mist_grotto",
-                body=0,
+                damage=0,
                 ticket=1,
             )
             for index in range(2):
@@ -263,7 +266,7 @@ def test_secret_realm_entry_resource_guards_are_atomic() -> None:
                 realm="qi_gathering",
                 layer=4,
                 location="cave.mist_grotto",
-                body=100,
+                damage=50,
                 ticket=0,
             )
             missing_ticket = await runtime.dispatch(

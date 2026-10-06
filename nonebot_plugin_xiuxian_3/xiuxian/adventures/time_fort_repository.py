@@ -9,7 +9,6 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
@@ -175,22 +174,18 @@ class TimeFortRepositoryMixin:
                     raise TimeFortBusyError("a member already has an active time-fort run")
                 if int(connection.execute("SELECT COUNT(*) FROM time_fort_members WHERE player_id=? AND quota_key=? AND status<>'system_aborted'", (player_id, quota_key)).fetchone()[0]) >= TIME_FORT_WEEKLY_LIMIT:
                     raise TimeFortQuotaError("a member already used this UTC week")
-                equipment = self._battle_equipment_snapshot(connection, player_id)
-                qualification = player_state["qualification"]
-                constitution_effect = constitution_effect_snapshot(connection, player_id)
+                stat_snapshot = self._build_player_stat_snapshot(connection, row)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
-                stats = self._battle_stats_for_snapshot(
-                    qualification, player_state["max_hp"], player_state["initiative"], equipment,
-                    constitution_effect,
-                )
                 first_clear[player_id] = connection.execute("SELECT 1 FROM time_fort_members WHERE player_id=? AND status='settled' LIMIT 1", (player_id,)).fetchone() is None
                 combat_snapshots.append({
                     "database_id": player_id, "player_id": player_state["player_id"], "platform": player_state["platform"],
                     "platform_user_id": player_state["platform_user_id"], "role": str(row["role"]),
                     "realm_key": player_state["realm_key"], "realm_layer": player_state["realm_layer"], "location_key": player_state["location_key"],
-                    "path_key": player_state["path_key"], "qualification": qualification, "stats": stats,
-                    "constitution_effect": constitution_effect,
-                    "equipment": list(equipment), "skills": skills,
+                    "path_key": player_state["path_key"], "qualification": stat_snapshot["base_stats"],
+                    "stat_snapshot": stat_snapshot, "stats": stat_snapshot["combat_stats"],
+                    "constitution_effect": stat_snapshot["constitution_effect"],
+                    "manual_effects": stat_snapshot["manual_effects"],
+                    "equipment": stat_snapshot["equipment"], "skills": skills,
                 })
             run_id = f"time-fort-{uuid4().hex}"
             expires_at = serialize_datetime(now + timedelta(seconds=TIME_FORT_EXPIRY_SECONDS))
@@ -223,16 +218,6 @@ class TimeFortRepositoryMixin:
             payload = self._time_fort_payload(run, snapshot, {})
             self._time_fort_store_operation(connection, operation_id, operation_name, int(leader["id"]), request_hash, payload, now_text)
             return self._time_fort_record(payload)
-
-    def _battle_stats_for_snapshot(
-        self, qualification: dict[str, Any], max_hp: int, initiative: int,
-        equipment, constitution_effect: dict[str, Any] | None = None,
-    ):
-        from ..combat.rules import player_stat_snapshot
-        return player_stat_snapshot(
-            qualification, max_hp=max_hp, initiative=initiative,
-            equipment=equipment, constitution_effect=constitution_effect,
-        )
 
     async def choose_time_fort_node(self, *, platform: str, platform_user_id: str, node_key: str, operation_id: str) -> TimeFortRunRecord:
         await self.initialize()

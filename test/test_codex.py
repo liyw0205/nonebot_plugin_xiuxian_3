@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
@@ -92,11 +94,12 @@ def _prepare_cloud_city_player(runtime, adapter: str, user: str) -> None:
             WHERE platform=? AND platform_user_id=?
             """,
             (
-                json.dumps({"body": 10000, "agility": 10000, "spirit": 10000}),
+                json.dumps(BALANCED_QUALIFICATION),
                 adapter,
                 user,
             ),
         )
+    equip_damage_weapon(runtime, adapter, user, 500)
 
 
 def _set_local_reputation(runtime, adapter: str, user: str, local_json: str) -> None:

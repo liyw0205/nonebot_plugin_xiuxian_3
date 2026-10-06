@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
 import pytest
+from combat_fixtures import equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -29,13 +30,15 @@ def _ctx(adapter: str, user: str, operation: str) -> CommandContext:
 
 async def _player(runtime, adapter: str, user: str) -> None:
     assert (await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"{user}:create"), "开始修仙")).ok
+    assert (await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"{user}:seek"), "寻仙问道")).ok
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET realm_key='void_refining', realm_layer=1, location_key='void.archive_ruins', "
             "stamina=100, stamina_max=100, max_hp=2000000, initiative=9999, "
-            "qualification_json=?, intro_json=? WHERE platform=? AND platform_user_id=?",
-            (json.dumps({"body": 100000, "agility": 9999}), json.dumps({"flags": ["access.void.time_fort"]}), adapter, user),
+            "intro_json=? WHERE platform=? AND platform_user_id=?",
+            (json.dumps({"flags": ["access.void.time_fort"]}), adapter, user),
         )
+    equip_damage_weapon(runtime, adapter, user, 50_000)
 
 
 async def _party(runtime, leader: tuple[str, str], member: tuple[str, str]) -> str:

@@ -17,6 +17,44 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 
 ## 1. 范围分层
 
+### 已闭合切片：角色属性与普通战斗构筑同源
+
+开工证据：`我的属性`/`我的状态`按养成内容中的 `stats.formula` 推演，普通PvE、竞技PvP和组队竞技却分别维护旧的 `100 + 4 * body` 气血公式；正式战斗不读取突破永久灵力，组队与三类秘境遗漏功法，探索入场后遭遇还重新读取现行功法。此为已开放玩家路径的数值与快照正确性缺口，不是重命名工具。范围包含普通面板、单人/队伍PvE、竞技PvP、只读切磋/训练傀儡及探索/秘境入场冻结。天劫/终局的显式高阶场景映射保留，不将其数万气血尺度替换为普通面板，也不借此改奖励、敌人或开放条件。
+
+当前合同统一为：内容中的基础公式，加数据库已获得的永久增量一次，再合成同一份已穿戴装备、功法和体质。永久字段默认零，不能取max，也不能按境界补发未实际获得的奖励。纯规则 `stats.rules.build_stat_preview(row, content, *, equipment=(), constitution_effect=None, manual_effects=None)` 生成基础、完整派生、战斗映射、来源和指纹；共享仓储 `_build_player_stat_snapshot(connection, player)` 一次读取当前构筑。普通战斗只将灵力上限字段映射为战斗灵力，不另算基础公式；已有会话只消费冻结数值，不兼容缺字段快照。普通攻击、淬炼和战斗上限沿用普通PvE数值并在当前规则JSON登记，不保留竞技场并列系数。
+
+文件所有权与并行协作：`wayfaring_contract_candidate` 独占 `stats/rules.py`、`stats/models.py`、`stats/__init__.py`、`combat/rules.py` 中旧属性合成器的迁出、`data/养成/规则.json`、属性域四份合同及新 `test/test_stat_rules.py`；`source_contract_candidate` 独占 `combat/repository.py`、`combat/party_repository.py`、`exploration/repository.py`、三类秘境 `ancient_domain/void_ruins/time_fort_repository.py` 和对应PvE/探索测试；`gather_transaction_reuse` 独占 `specials/arena_rules.py`、`team_arena_rules.py`、`arena_repository.py`、`team_arena_repository.py`、`combat/spectator_rules.py` 及竞技/观战测试；主线独占 `stats/repository.py`、`stats/use_cases.py`、玩家展示、必要共享读取函数、状态/计划/内容合同和 `test/test_stats.py`/新属性集成测试。跨所有权改动先交接，不同时编辑同一文件。三个代理从接口确定后并行编码，不将全部测试留到收尾。
+
+候选比较：灵田、行卷、道源已闭合，继续冷却；朝阳吐纳篇与小型灵兽行囊缺来源/配方合同，斗法分享缺公开读取/授权合同，Web/跨服仍锁定；取消服务已有完整路径，不重复开发。属性缺口直接违背同一角色面板、构筑和开战快照合同，有可核对公式与入口，不以其他候选未定义为理由臆造规则。最近十条为 `de527ce` 生活/utils（social仅基线测试校正）、`0b1d92e` 道历/persistence/utils（八处仅删导入）、`cf72c83` quests/progression、`4ab072f` companions、`da1a8df` world、`dbcfb4a` routine/adventures/events/utils、`70963ed` production、`58b69b6` specials、`31616c6` economy/items/persistence/utils、`bf91ccd` production/utils，均有QQ/OneBot验收。utils五次，routine/persistence/production各两次，其余各一次；最近五条utils重复。stats/combat本身不在该窗口，specials/探索若触及时仅修已证明的属性入口缺口，不重做玩法结算。
+
+验收要求：基础/永久值与装备耐久淬炼、功法体质各作用一次；面板与普通单人/队伍/竞技快照一致；内容改值会影响新构筑但不改历史会话；原operation回放、冲突、严格JSON、坏来源拒绝和故障回滚；QQ/OneBot真实入口；观战零持久化，正式PvP/PvE正常扣费结算。聚焦测试、compileall、全部内容JSON与diff检查后提交推送，不启动整条飞升长测。剩余未定义的道途/环境新乘区不凭空实现，不以本条声称所有特殊场景数值已统一。
+
+主线补充文件所有权：`stats/presentation.py` 统一状态与属性的中文标签、数值格式，固定短句留代码；`advancement/constitution_effects.py` 复用严格JSON解码；天劫/终局仓储仅迁移体质工具导入，不改高阶profile。`test/test_constitution.py` 的两处灵力断言更新为现行基础公式；新属性集成测试覆盖共用读取、故障回滚和历史冻结。属性规则完成后，规则代理接手高阶专项只读回归，不重复启动长链。
+
+合并验收发现旧普通战斗测试把资质写成稀疏字典或上千数值，违反现行六项5至15、合计60的合同。三路继续按独立测试文件并行修正，使用真实寻仙或明确合法资质、永久成长与共用装备夹具，不给运行时放宽校验：PvE代理负责探索/秘境9文件和`combat_fixtures.py`，竞技代理负责塔/事件/图鉴7文件，规则代理负责虚空/高阶任务/前线8文件；`progression_sources`只运行两个短用例，未运行新角色长链。主线额外修正`test_adapter_simulation.py`的旧灵力断言，并接回三个战斗/探索仓储补严格JSON解码与回合前完整冻结属性校验。只读终审再交PvE代理，不重叠编辑。
+
+范围说明：竞技与观战本轮统一完整属性输入，既有基本招式回合仍只消费气血、攻击、先手和身法，不声称所有比例属性或神通已参与竞技结算。未定义的复杂战斗效果另行补合同；本轮不重做竞技规则或改变奖励。队伍PvE移除重复的减伤7000上限，使用构筑中已经冻结的内容上限，避免面板改值后回合仍按另一份常量截断。
+
+终审复现并修复：战斗已胜后若快照损坏，原单人结算仍写入settled、图鉴与operation却不扣装备耐久；现单人与队伍在结算前严格解析快照和完整属性，队伍同时校验参与者与贡献映射，坏记录零写入，修复后沿原请求继续结算。构筑读取也拒绝把功法数量小数或字符串转换成整数，不扩改全仓资产工具。三份额外组队/界隙测试交PvE代理修合法夹具，终局证据三处夹具交规则代理；两个短终局证据测试运行，较长真实生产师徒项目链未运行。
+
+冻结范围据代码收窄为探索及远古洞天、虚空遗迹、时序堡垒三类既有入场构筑；其他秘境仍按每场战斗开局冻结。本条不声称全部秘境实现整趟入场冻结，也不改其准入、节点或奖励。
+
+主线合并后的最终复验：属性规则、内容、共享工具、仓储边界、无版本标识和文档185项通过；属性集成、正式单人/组队、探索冻结、天劫、界隙及多人内容55项通过。前者含92项新纯规则验收；后者含QQ/OneBot同源面板、只读整库比对、坏JSON/数值、快照并发、重启回放、故障回滚、完赛结算恢复及领域能量恢复原子性。初次适配器测试的一处旧灵力公式断言已修正，随后适配器/入门/装备/体质组52项重新通过。
+
+三名代理各自交付分组验证：竞技与观战24项；探索/秘境相邻74项；塔/事件/图鉴50项（收窄强角色夹具后再复跑其中27项）；成长/前线33项并明确排除1条长链；天劫/终局/物品/神通39项；终局局部证据2项。组队/界隙额外16项亦通过，已纳入主线55项复验。以上分组有重叠，不累加为不重复测试总数。虚空塔派遣一处既有断言把封顶后实得4写成名义8，按已实施的实得合同校正，仅改测试不改结算。较长的新角色成长链与真实生产师徒项目链只改非法夹具，未运行，不能计入通过。
+
+主要最终复验命令：
+
+```bash
+/root/myenv/bin/python -m pytest -q --tb=short test/test_documentation.py test/test_repository_boundaries.py test/test_runtime_versionless.py test/test_content.py test/test_utils.py test/test_stat_rules.py
+/root/myenv/bin/python -m pytest -q --tb=short test/test_stat_integration.py test/test_stats.py test/test_combat.py test/test_party_combat.py test/test_combat_stat_freezing.py test/test_tribulation_combat.py test/test_party_boundary.py test/test_party_pve_content.py test/test_boundary_rift_secret_realm.py
+/root/myenv/bin/python -m pytest -q --tb=short test/test_adapter_simulation.py test/test_onboarding.py test/test_adapter_normalization.py test/test_equipment.py test/test_constitution.py
+/root/myenv/bin/python -m compileall -q nonebot_plugin_xiuxian_3 test
+git diff --check
+```
+
+47份内容JSON另用严格解码验证重复键与非有限数值。未运行整仓全量或飞升长链，未新增版本标识/兼容分支，未清理用户数据。属性与战斗本条闭合后冷却，下一轮按当前状态横向选片，不按本计划历史行号继续。
+
 ### 已闭合切片：重租居所后的灵田收获与维护
 
 开工证据：QQ 官方与 OneBot V11 均可经真实命令在租约第48小时播种并维护，第72小时重租并播种新地块，第74小时收获却返回 `PLOT_NOT_READY`；旧作物此时已熟且未枯，等新作物成熟后旧作物已枯。播种按居所分配地块，维护、收获和查询却只取角色最新地块，造成旧收成被遮挡。既有合同允许租约到期后的已开始事项继续结算；不新增产量、租期、成本或随机规则。

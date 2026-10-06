@@ -15,7 +15,6 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..persistence.errors import (
     OperationConflictError,
     PartyBattleBusyError,
@@ -51,7 +50,9 @@ from .party_rules import (
     DEMON_REALM_STAMINA_COST,
     party_enemy_for_location,
 )
-from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, player_stat_snapshot, enemy_definition
+from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, enemy_definition
+from ..stats.rules import frozen_combat_stats
+from ..utils.json_cache import decode_json_strict
 from .skill_effects import prepare_skill_action
 from ..social.party_rules import (
     party_definition_for,
@@ -291,11 +292,7 @@ class PartyCombatRepositoryMixin:
             members = connection.execute(
                 "SELECT m.id AS membership_id, m.player_id AS database_player_id, m.role AS member_role, "
                 "m.confirmed_at AS member_confirmed_at, p.player_id AS stable_player_id, "
-                "p.platform_user_id, p.path_key, p.qualification_json, p.max_hp, p.initiative, "
-                "p.realm_key, p.realm_layer, p.location_key, p.status AS player_status, p.endgame_status, "
-                "p.stamina, p.inventory_json, p.pollution, p.bloodline_stability, p.cross_realm_penalty_bp, "
-                "p.faction_reputation_json, p.intro_json, p.soul_power, p.soul_power_max, p.soul_fatigue_until, "
-                "p.domain_key, p.domain_charge, p.domain_charge_max, p.domain_power "
+                "p.status AS player_status, p.* "
                 "FROM party_members m JOIN players p ON p.id = m.player_id "
                 "WHERE m.party_id = ? AND m.status = 'active' ORDER BY m.id",
                 (resolved_party_id,),
@@ -339,7 +336,7 @@ class PartyCombatRepositoryMixin:
                 ).fetchone()
                 if ancient_run is None or str(ancient_run["expires_at"]) <= now_text:
                     raise PartyBattleRequirementError("ancient-domain node is not ready for battle")
-                ancient_run_snapshot = self._json_object(ancient_run["snapshot_json"], {})
+                ancient_run_snapshot = decode_json_strict(ancient_run["snapshot_json"])
                 if (
                     ancient_run_snapshot.get("current_node") != "ancient_domain_lord"
                     or str(party["location_key"]) != ANCIENT_DOMAIN_LOCATION
@@ -355,7 +352,7 @@ class PartyCombatRepositoryMixin:
                 ).fetchone()
                 if void_run is None or str(void_run["expires_at"]) <= now_text:
                     raise PartyBattleRequirementError("void-ruins node is not ready for battle")
-                void_run_snapshot = self._json_object(void_run["snapshot_json"], {})
+                void_run_snapshot = decode_json_strict(void_run["snapshot_json"])
                 node_key = str(void_run_snapshot.get("current_node", ""))
                 unstable = any(bool(value) for value in void_run_snapshot.get("instability_active_by_player", {}).values())
                 enemy_key = VOID_RUINS_ENEMIES.get((node_key, unstable))
@@ -371,7 +368,7 @@ class PartyCombatRepositoryMixin:
                 ).fetchone()
                 if time_fort_run is None or str(time_fort_run["expires_at"]) <= now_text:
                     raise PartyBattleRequirementError("time-fort node is not ready for battle")
-                time_fort_run_snapshot = self._json_object(time_fort_run["snapshot_json"], {})
+                time_fort_run_snapshot = decode_json_strict(time_fort_run["snapshot_json"])
                 if (
                     time_fort_run_snapshot.get("current_node") != "time_keeper"
                     or str(party["location_key"]) != TIME_FORT_LOCATION
@@ -410,9 +407,11 @@ class PartyCombatRepositoryMixin:
                     or void_member_snapshots.get(int(row["database_player_id"]))
                     or time_fort_member_snapshots.get(int(row["database_player_id"]))
                 )
-                member_location = str(entry_snapshot.get("location_key", row["location_key"]) if entry_snapshot else row["location_key"])
-                member_realm = str(entry_snapshot.get("realm_key", row["realm_key"]) if entry_snapshot else row["realm_key"])
-                member_realm_layer = int(entry_snapshot.get("realm_layer", player_state["realm_layer"]) if entry_snapshot else player_state["realm_layer"])
+                if (ancient_domain_party or void_ruins_party or time_fort_party) and entry_snapshot is None:
+                    raise PartyBattleRequirementError("secret-realm member build is missing")
+                member_location = str(entry_snapshot["location_key"] if entry_snapshot else row["location_key"])
+                member_realm = str(entry_snapshot["realm_key"] if entry_snapshot else row["realm_key"])
+                member_realm_layer = int(entry_snapshot["realm_layer"] if entry_snapshot else player_state["realm_layer"])
                 if member_location != str(party["location_key"]):
                     if boundary_rift_combat:
                         raise BoundaryRealmRequirementError("party members must share the frozen location")
@@ -468,7 +467,12 @@ class PartyCombatRepositoryMixin:
                 ).fetchone()
                 if locked is not None:
                     raise PartyBattleBusyError("a party member has locked battle assets")
-                equipment = tuple(entry_snapshot["equipment"]) if entry_snapshot else self._battle_equipment_snapshot(connection, int(row["database_player_id"]))
+                stat_snapshot = (
+                    entry_snapshot["stat_snapshot"]
+                    if entry_snapshot
+                    else self._build_player_stat_snapshot(connection, row)
+                )
+                equipment = stat_snapshot["equipment"]
                 skills = list(entry_snapshot["skills"]) if entry_snapshot else self._battle_skill_snapshot(
                     connection, int(row["database_player_id"]), str(player_state["path_key"] or "")
                 )
@@ -477,22 +481,12 @@ class PartyCombatRepositoryMixin:
                     if entry_snapshot
                     else [dict(item) for item in self.companion_battle_snapshot(connection, int(row["database_player_id"])).companions]
                 )
-                qualification = dict(entry_snapshot["qualification"]) if entry_snapshot else player_state["qualification"]
-                constitution_effect = (
-                    dict(entry_snapshot.get("constitution_effect", {}))
-                    if entry_snapshot
-                    else constitution_effect_snapshot(connection, int(row["database_player_id"]))
-                )
+                qualification = stat_snapshot["base_stats"]
+                constitution_effect = stat_snapshot["constitution_effect"]
                 inventory = player_state["inventory"]
                 if boundary_party and row["database_player_id"] == leader["id"]:
                     leader_ticket_inventory = inventory
-                stats = dict(entry_snapshot["stats"]) if entry_snapshot else player_stat_snapshot(
-                    qualification,
-                    max_hp=player_state["max_hp"],
-                    initiative=player_state["initiative"],
-                    equipment=equipment,
-                    constitution_effect=constitution_effect,
-                )
+                stats = frozen_combat_stats({"stats": stat_snapshot["combat_stats"]})
                 cross_realm_snapshot = {
                     "pollution": int(entry_snapshot.get("pollution", player_state["pollution"]) if entry_snapshot else player_state["pollution"]),
                     "bloodline_stability": int(entry_snapshot.get("bloodline_stability", player_state["bloodline_stability"]) if entry_snapshot else player_state["bloodline_stability"]),
@@ -507,10 +501,12 @@ class PartyCombatRepositoryMixin:
                         "role": str(row["member_role"]),
                         "realm_key": member_realm,
                         "realm_layer": member_realm_layer,
-                        "path_key": entry_snapshot.get("path_key", player_state["path_key"]) if entry_snapshot else player_state["path_key"],
+                        "path_key": entry_snapshot["path_key"] if entry_snapshot else player_state["path_key"],
                         "qualification": qualification,
+                        "stat_snapshot": stat_snapshot,
                         "stats": stats,
                         "constitution_effect": constitution_effect,
+                        "manual_effects": stat_snapshot["manual_effects"],
                         "equipment": list(equipment),
                         "skills": skills,
                         "companions": companions,
@@ -738,6 +734,7 @@ class PartyCombatRepositoryMixin:
                 raise PartyBattleNotFoundError("party battle does not exist")
             if str(session["status"]) not in {"created", "running"}:
                 return {"battle_id": battle_id, "status": session["status"], "outcome": self._json_object(session["result_json"], {}).get("outcome"), "round_no": session["round_no"]}
+            snapshot = self._party_battle_snapshot(session["snapshot_json"])
             deadline = session["turn_deadline"]
             if deadline:
                 try:
@@ -760,8 +757,7 @@ class PartyCombatRepositoryMixin:
                     return payload
             if int(session["round_no"]) != expected_round - 1:
                 raise PartyBattleBusyError("party battle round is not next")
-            snapshot = self._json_object(session["snapshot_json"], {})
-            state = self._json_object(session["state_json"], {})
+            state = decode_json_strict(session["state_json"])
             enemy = snapshot["enemy"]
             member_hp = {str(key): int(value) for key, value in dict(state.get("member_hp", {})).items()}
             member_mana = {str(key): int(value) for key, value in dict(state.get("member_mana", {})).items()}
@@ -986,7 +982,7 @@ class PartyCombatRepositoryMixin:
                 if len(timeline_defenders) >= 2 and expected_round in {5, 10}:
                     damage = damage * 8_000 // 10_000
                 damage = damage * (
-                    10_000 - min(7_000, int(target_stats.get("damage_reduction_bp", 0)))
+                    10_000 - min(10_000, target_stats["damage_reduction_bp"])
                 ) // 10_000
                 damage = min(member_hp[target_id], damage)
                 reflected = damage * int(target_stats.get("damage_reflection_bp", 0)) // 10_000
@@ -1288,16 +1284,16 @@ class PartyCombatRepositoryMixin:
             if session is None or member is None:
                 raise PartyBattlePermissionError("actor is not a party battle member")
             if str(session["status"]) == "settled":
-                result = self._json_object(session["result_json"], {})
+                result = decode_json_strict(session["result_json"])
                 payload = {"battle_id": battle_id, "party_id": session["party_id"], "enemy_key": session["enemy_key"], "status": "settled", "outcome": result.get("outcome", "expired"), "reason": result.get("reason", "party_battle_ended"), "round_no": int(session["round_no"]), "rewards": result.get("rewards", {}), "contributions": result.get("contribution", {}), "reward_order": result.get("reward_order", []), "reward_rolls": result.get("reward_rolls", {})}
                 self._party_battle_record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
                 return self._party_battle_resolution_from_payload(payload, replay=True)
             if str(session["status"]) not in {"won", "lost", "expired"}:
                 raise PartyBattleNotReadyError("party battle is still running")
-            result = self._json_object(session["result_json"], {})
-            outcome = str(result.get("outcome", session["status"]))
+            result = decode_json_strict(session["result_json"])
+            outcome = str(result["outcome"])
             reward_map: dict[str, dict[str, int]] = {}
-            snapshot = self._json_object(session["snapshot_json"], {})
+            snapshot = self._party_battle_snapshot(session["snapshot_json"])
             boundary_party = str(snapshot.get("party_type", "")) in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}
             secret_rift_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_SECRET_REALM_BOUNDARY
             demon_party = str(snapshot.get("party_type", "")) == PARTY_TYPE_DEMON_REALM
@@ -1313,16 +1309,19 @@ class PartyCombatRepositoryMixin:
                 str(key): int(value) for key, value in snapshot_reward.items()
             }
             battle_members = connection.execute("SELECT * FROM party_battle_members WHERE battle_id = ? ORDER BY id", (battle_id,)).fetchall()
-            state = self._json_object(session["state_json"], {})
-            contribution = {
-                str(key): int(value)
-                for key, value in dict(state.get("contribution", {})).items()
-            }
+            state = decode_json_strict(session["state_json"])
+            contribution = state["contribution"]
+            if (
+                not isinstance(contribution, dict)
+                or set(contribution) != {member["player_id"] for member in snapshot["members"]}
+                or any(type(value) is not int or value < 0 for value in contribution.values())
+            ):
+                raise ValueError("party battle contribution snapshot is incomplete")
             snapshot_by_database_id = {
-                int(member.get("database_id")): member
-                for member in snapshot.get("members", [])
-                if member.get("database_id") is not None
+                member["database_id"]: member for member in snapshot["members"]
             }
+            if set(snapshot_by_database_id) != {member["player_id"] for member in battle_members}:
+                raise ValueError("party battle members differ from the frozen build")
             reward_order = sorted(
                 battle_members,
                 key=lambda row: (
@@ -1427,13 +1426,32 @@ class PartyCombatRepositoryMixin:
             return PartyBattleReplayRecord(str(row["battle_id"]), str(row["party_id"]), str(row["enemy_key"]), str(row["status"]), snapshot, result, actions)
 
     @staticmethod
+    def _party_battle_snapshot(raw: str) -> dict[str, Any]:
+        snapshot = decode_json_strict(raw)
+        members = snapshot["members"]
+        if not isinstance(members, list) or not members:
+            raise ValueError("party battle member snapshots are missing")
+        identities = set()
+        database_ids = set()
+        for member in members:
+            player_id, database_id = member["player_id"], member["database_id"]
+            if not isinstance(player_id, str) or not player_id or type(database_id) is not int or database_id <= 0:
+                raise ValueError("party battle member identity is invalid")
+            if player_id in identities or database_id in database_ids:
+                raise ValueError("party battle member identity is repeated")
+            identities.add(player_id)
+            database_ids.add(database_id)
+            member["stats"] = frozen_combat_stats(member)
+        return snapshot
+
+    @staticmethod
     def _party_battle_operation(connection: sqlite3.Connection, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
         row = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
         if row is None:
             return None
         if row["operation_name"] != operation_name or row["request_hash"] != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return json.loads(row["result_json"])
+        return decode_json_strict(row["result_json"])
 
     @staticmethod
     def _alliance_key_from_row(row: Any) -> str | None:

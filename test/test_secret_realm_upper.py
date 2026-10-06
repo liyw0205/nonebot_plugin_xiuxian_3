@@ -4,6 +4,7 @@ import asyncio
 import json
 import sqlite3
 from tempfile import TemporaryDirectory
+from combat_fixtures import equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -23,15 +24,15 @@ def _prepare_golden_core(runtime, adapter: str, user: str, location: str, invent
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key='golden_core', realm_layer=1, "
             "location_key=?, stamina=100, stamina_max=100, max_hp=5000, initiative=100, "
-            "qualification_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
+            "inventory_json=? WHERE platform=? AND platform_user_id=?",
             (
                 location,
-                json.dumps({"body": 1000, "agility": 100}),
                 json.dumps(inventory),
                 adapter,
                 user,
             ),
         )
+    equip_damage_weapon(runtime, adapter, user, 500)
 
 
 def test_qq_mist_depth_two_supports_five_nodes_and_equipment_reward() -> None:

@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
@@ -46,10 +48,10 @@ async def _prepare_soul_player(runtime, adapter: str, user: str, location: str) 
             SET stage='cultivator', realm_key='soul_transformation', realm_layer=1,
                 location_key=?, stamina=100, stamina_max=100, energy=30, energy_max=30,
                 bloodline_stability=60, max_hp=100000, max_mp=100000,
-                initiative=100000, faction_reputation_json=?
+                initiative=100000, faction_reputation_json=?, qualification_json=?
             WHERE platform=? AND platform_user_id=?
             """,
-            (location, json.dumps({"beast": 2999}), adapter, user),
+            (location, json.dumps({"beast": 2999}), json.dumps(BALANCED_QUALIFICATION), adapter, user),
         )
 
 
@@ -68,7 +70,7 @@ async def _prepare_nascent_player(runtime, adapter: str, user: str) -> None:
                 energy_max=100, qualification_json=?
             WHERE platform=? AND platform_user_id=?
             """,
-            (json.dumps({"insight": 30}), adapter, user),
+            (json.dumps(BALANCED_QUALIFICATION), adapter, user),
         )
 
 
@@ -158,7 +160,7 @@ def test_soul_refinement_grows_nascent_cultivation_and_soul_once_per_day() -> No
                     "结算修炼",
                 )
                 assert settled.code == "CULTIVATION_SETTLED"
-                assert settled.data["cultivation_gain"] == 5750
+                assert settled.data["cultivation_gain"] == 5250
                 assert settled.data["soul_power_gain"] == 50
                 replay = await runtime.adapters.dispatch(
                     adapter,
@@ -192,7 +194,7 @@ def test_soul_refinement_grows_nascent_cultivation_and_soul_once_per_day() -> No
                         "SELECT cultivation,total_cultivation,soul_power,soul_power_max FROM players WHERE platform=? AND platform_user_id=?",
                         (adapter, user),
                     ).fetchone()
-                assert player == (11500, 70460, 200, 300)
+                assert player == (10500, 69460, 200, 300)
                 await runtime.close()
 
     asyncio.run(run())

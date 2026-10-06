@@ -5,6 +5,7 @@ import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
+from combat_fixtures import equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -39,6 +40,7 @@ def test_cloud_mine_energy_gate_and_qq_onebot_settlement() -> None:
             for adapter, user in (("qq.official", "qq-mine"), ("onebot.v11", "ob-mine")):
                 created = await runtime.adapters.dispatch(adapter, _context(adapter, user, f"{adapter}-create"), "开始修仙")
                 assert created.code == "PLAYER_CREATED"
+                assert (await runtime.adapters.dispatch(adapter, _context(adapter, user, f"{adapter}-seek"), "寻仙问道")).ok
                 _set_player(
                     runtime,
                     adapter,
@@ -97,6 +99,7 @@ def test_cloud_mine_rejects_missing_access_or_energy_without_spending() -> None:
             runtime = create_runtime(data_dir=data_dir)
             adapter, user = "onebot.v11", "mine-guards"
             await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")
+            assert (await runtime.adapters.dispatch(adapter, _context(adapter, user, "seek"), "寻仙问道")).ok
             _set_player(
                 runtime,
                 adapter,
@@ -138,6 +141,7 @@ def test_mist_grotto_two_requires_arrived_location_and_uses_elite_snapshot() -> 
             runtime = create_runtime(data_dir=data_dir)
             adapter, user = "qq.official", "mist-two"
             await runtime.adapters.dispatch(adapter, _context(adapter, user, "create"), "开始修仙")
+            assert (await runtime.adapters.dispatch(adapter, _context(adapter, user, "seek"), "寻仙问道")).ok
             _set_player(
                 runtime,
                 adapter,
@@ -153,7 +157,8 @@ def test_mist_grotto_two_requires_arrived_location_and_uses_elite_snapshot() -> 
                 adapter, _context(adapter, user, "blocked"), "开始探索 洞天二层探索"
             )
             assert blocked.code == "EXPLORATION_LOCATION_FORBIDDEN"
-            _set_player(runtime, adapter, user, location_key="cave.mist_grotto_2", max_hp=10000, initiative=100, qualification_json=json.dumps({"body": 10000, "agility": 10000}))
+            _set_player(runtime, adapter, user, location_key="cave.mist_grotto_2", max_hp=10000, initiative=100)
+            equip_damage_weapon(runtime, adapter, user, 5000)
             operation = next(
                 f"mist-two-{index}"
                 for index in range(1000)

@@ -4,6 +4,7 @@ import asyncio
 import json
 import shutil
 import sqlite3
+from combat_fixtures import equip_damage_weapon
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -61,22 +62,24 @@ async def _prepare_player(
         adapter, _context(adapter, user, f"{user}-create"), "开始修仙"
     )
     assert created.code == "PLAYER_CREATED"
+    assert (await runtime.adapters.dispatch(adapter, _context(adapter, user, f"{user}-seek"), "寻仙问道")).ok
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key='soul_transformation', realm_layer=1, "
             "location_key='beast.ancestral_lake', stamina=100, stamina_max=100, "
-            "energy=30, energy_max=30, bloodline_stability=60, max_hp=?, initiative=?, "
-            "qualification_json=?, faction_reputation_json=? "
+            "energy=30, energy_max=30, bloodline_stability=60, inventory_json='{}', max_hp=?, initiative=?, "
+            "faction_reputation_json=? "
             "WHERE platform=? AND platform_user_id=?",
             (
                 100_000 if strong else 100,
                 100_000 if strong else 8,
-                json.dumps({"body": 100_000, "agility": 100_000} if strong else {"body": 0, "agility": 0}),
                 json.dumps({"beast": 3_000}),
                 adapter,
                 user,
             ),
         )
+    if strong:
+        equip_damage_weapon(runtime, adapter, user, 50_000)
 
 
 async def _send(runtime, adapter: str, user: str, operation_id: str, command: str):

@@ -28,8 +28,8 @@ from .rules import (
     validate_dao_name,
 )
 from ..utils.player import player_profile_values, player_projection
+from ..stats.presentation import PROFILE_STATS, stat_lines
 from ..content import ContentError
-from ..stats.rules import StatError
 
 
 class PlayerApplication:
@@ -271,7 +271,7 @@ class PlayerApplication:
 
     async def get_profile(self, context: CommandContext) -> CommandResult:
         try:
-            player = await self.repository.get_player(
+            player, stats = await self.repository.get_player_profile(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
             )
@@ -280,20 +280,8 @@ class PlayerApplication:
         if player is None:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送“开始修仙”。", context.request_id)
         values = player_profile_values(player)
-        stats = {}
-        try:
-            stats = await self.repository.preview_stats(
-                platform=context.adapter,
-                platform_user_id=context.user_id,
-            )
-        except (StatError, ContentError, KeyError):
-            stats = {}
         stats_summary = (
-            "\n\n### 派生属性\n\n"
-            f"- **气血上限**：{stats['derived_stats']['max_hp']}\n"
-            f"- **灵力上限**：{stats['derived_stats']['max_mp']}\n"
-            f"- **负重**：{stats['derived_stats']['carry_capacity']}\n"
-            f"- **先手**：{stats['derived_stats']['initiative']}"
+            "\n\n### 周身气象\n\n" + "\n".join(stat_lines(stats["derived_stats"], PROFILE_STATS))
             if stats
             else ""
         )

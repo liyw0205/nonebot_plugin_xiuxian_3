@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from combat_fixtures import equip_damage_weapon
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -28,6 +29,7 @@ def _context(adapter: str, user: str, request: str, operation: str = "") -> Comm
 
 async def _prepare_player(runtime, adapter: str, user: str, *, reputation: int) -> None:
     await runtime.adapters.dispatch(adapter, _context(adapter, user, f"create-{adapter}"), "开始修仙")
+    assert (await runtime.adapters.dispatch(adapter, _context(adapter, user, f"seek-{adapter}"), "寻仙问道")).ok
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             """
@@ -36,16 +38,16 @@ async def _prepare_player(runtime, adapter: str, user: str, *, reputation: int) 
                 location_key='xuantian.floating_boat', stamina=60, stamina_max=60,
                 energy=30, energy_max=30, spirit_stones=1000,
                 bloodline_stability=33, max_hp=100000, initiative=100000,
-                qualification_json=?, faction_reputation_json=?
+                faction_reputation_json=?
             WHERE platform=? AND platform_user_id=?
             """,
             (
-                json.dumps({"body": 100000, "agility": 100000}, sort_keys=True),
                 json.dumps({"beast": reputation}),
                 adapter,
                 user,
             ),
         )
+    equip_damage_weapon(runtime, adapter, user, 50_000)
 
 
 def _expire(runtime, table: str, key: str, value: str) -> None:

@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -371,8 +373,9 @@ def test_demon_war_front_travel_and_battle_are_server_authoritative_on_qq_and_on
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
                         "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, location_key='xuantian.outskirts', stamina=60, stamina_max=60, max_hp=10000, initiative=10000, qualification_json=? WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"body": 10000, "agility": 10000}), adapter, user),
+                        (json.dumps(BALANCED_QUALIFICATION), adapter, user),
                     )
+                equip_damage_weapon(runtime, adapter, user, 500)
                 started_travel = await runtime.adapters.dispatch(
                     adapter, _context(adapter, user, "travel", "war-travel"), "前往 魔界战场"
                 )

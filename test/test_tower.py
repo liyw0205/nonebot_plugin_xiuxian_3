@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import enemy_definition
@@ -200,6 +202,7 @@ def test_mist_trial_tower_upper_floors_and_quotas_on_both_adapters() -> None:
                 users = {floor_no: f"tower-{prefix}-{floor_no}" for floor_no in (31, 35, 40, 45)}
                 for floor_no, user in users.items():
                     await _enter_tower_eligible_path(runtime, adapter, user, f"{prefix}-{floor_no}")
+                    equip_damage_weapon(runtime, adapter, user, 500)
                     with sqlite3.connect(runtime.settings.database_path) as connection:
                         player_id = connection.execute(
                             "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
@@ -209,7 +212,7 @@ def test_mist_trial_tower_upper_floors_and_quotas_on_both_adapters() -> None:
                             "UPDATE players SET realm_key='golden_core',realm_layer=2,stamina=100,"
                             "stamina_max=100,qualification_json=?,max_hp=30000,initiative=30000 "
                             "WHERE id=?",
-                            (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                            (json.dumps(BALANCED_QUALIFICATION), player_id),
                         )
                         connection.execute(
                             "UPDATE players SET realm_layer=3 WHERE id=?", (player_id,)
@@ -405,11 +408,12 @@ def test_tower_boss_honor_quotas_and_realm_band_transition_on_both_adapters() ->
             for adapter, user in (("qq.official", "tower-boss-qq"), ("onebot.v11", "tower-boss-onebot")):
                 prefix = adapter.replace(".", "-")
                 await _enter_tower_eligible_path(runtime, adapter, user, prefix)
+                equip_damage_weapon(runtime, adapter, user, 500)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
                         "UPDATE players SET qualification_json=?,max_hp=30000,initiative=30000,"
                         "stamina=100,stamina_max=100 WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"body": 1000, "agility": 1000}), adapter, user),
+                        (json.dumps(BALANCED_QUALIFICATION), adapter, user),
                     )
 
                 for floor_no in range(1, 6):
@@ -646,6 +650,7 @@ def test_tower_upper_floor_clue_rewards_are_claimed_on_both_adapters() -> None:
                     user = f"tower-upper-{adapter}-{floor_no}"
                     prefix = f"{adapter.replace('.', '-')}-{floor_no}"
                     await _enter_tower_eligible_path(runtime, adapter, user, prefix)
+                    equip_damage_weapon(runtime, adapter, user, 500)
                     realm_key = "qi_gathering" if floor_no == 20 else "foundation"
                     with sqlite3.connect(runtime.settings.database_path) as connection:
                         player_id = connection.execute(
@@ -655,7 +660,7 @@ def test_tower_upper_floor_clue_rewards_are_claimed_on_both_adapters() -> None:
                         connection.execute(
                             "UPDATE players SET realm_key=?,realm_layer=4,qualification_json=?,"
                             "max_hp=30000,initiative=30000,stamina=100,stamina_max=100 WHERE id=?",
-                            (realm_key, json.dumps({"body": 1000, "agility": 1000}), player_id),
+                            (realm_key, json.dumps(BALANCED_QUALIFICATION), player_id),
                         )
                         connection.execute(
                             "UPDATE players SET realm_layer=3 WHERE id=?", (player_id,)

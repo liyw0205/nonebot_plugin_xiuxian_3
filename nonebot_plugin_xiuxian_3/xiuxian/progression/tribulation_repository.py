@@ -11,7 +11,8 @@ from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount, spend_player_items
 from ..utils.player import grant_player_state, player_integer, player_inventory, player_object
 from ..advancement.constitution_effects import constitution_effect_snapshot
-from ..combat.rules import apply_constitution_combat_effect, MAX_TURNS, TURN_TIMEOUT_SECONDS
+from ..combat.rules import MAX_TURNS, TURN_TIMEOUT_SECONDS
+from ..stats.rules import apply_constitution_combat_effect
 from ..combat.tribulation_rules import (
     ENEMY_AGILITY,
     ENEMY_ATTACK,

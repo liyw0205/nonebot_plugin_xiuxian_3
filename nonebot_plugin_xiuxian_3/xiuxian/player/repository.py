@@ -985,39 +985,56 @@ class PlayerRepositoryMixin:
 
     def _get_player_sync(self, platform: str, platform_user_id: str) -> PlayerView | None:
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-                (platform, platform_user_id),
-            ).fetchone()
+            row = self._profile_player_row(connection, platform, platform_user_id)
+            return self._row_to_player(row) if row is not None else None
+
+    async def get_player_profile(self, *, platform: str, platform_user_id: str) -> tuple[PlayerView | None, dict[str, Any]]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._get_player_profile_sync, platform, platform_user_id)
+
+    def _get_player_profile_sync(self, platform: str, platform_user_id: str) -> tuple[PlayerView | None, dict[str, Any]]:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = self._profile_player_row(connection, platform, platform_user_id)
             if row is None:
-                return None
-            if str(row["realm_key"]) == "soul_transformation" and player_integer(row, "domain_charge_max") > 0:
-                business_date = self._now().date().isoformat()
-                if str(row["domain_charge_reset_date"] or "") != business_date:
+                return None, {}
+            stats = {} if row["stage"] == STAGE_NEW_USER else self._build_player_stat_snapshot(connection, row)
+            return self._row_to_player(row), stats
+
+    def _profile_player_row(self, connection: sqlite3.Connection, platform: str, platform_user_id: str) -> sqlite3.Row | None:
+        row = connection.execute(
+            "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+            (platform, platform_user_id),
+        ).fetchone()
+        if row is None:
+            return None
+        if str(row["realm_key"]) == "soul_transformation" and player_integer(row, "domain_charge_max") > 0:
+            business_date = self._now().date().isoformat()
+            if str(row["domain_charge_reset_date"] or "") != business_date:
+                change_player_state(
+                    connection,
+                    row,
+                    updated_at=serialize_datetime(self._now()),
+                    player_values={
+                        "domain_charge": player_integer(row, "domain_charge_max"),
+                        "domain_charge_reset_date": business_date,
+                    },
+                )
+                row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+        if row["domain_crack_until"]:
+            try:
+                if self._now() >= datetime.fromisoformat(str(row["domain_crack_until"])):
                     change_player_state(
                         connection,
                         row,
                         updated_at=serialize_datetime(self._now()),
-                        player_values={
-                            "domain_charge": player_integer(row, "domain_charge_max"),
-                            "domain_charge_reset_date": business_date,
-                        },
+                        player_values={"domain_crack_until": None},
                     )
                     row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
-            if row["domain_crack_until"]:
-                try:
-                    if self._now() >= datetime.fromisoformat(str(row["domain_crack_until"])):
-                        change_player_state(
-                            connection,
-                            row,
-                            updated_at=serialize_datetime(self._now()),
-                            player_values={"domain_crack_until": None},
-                        )
-                        row = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
-                except ValueError:
-                    pass
-        player = self._row_to_player(row)
-        return player
+            except ValueError:
+                pass
+        return row
 
     @staticmethod
     def _row_to_player(row: sqlite3.Row | dict[str, Any]) -> PlayerView:

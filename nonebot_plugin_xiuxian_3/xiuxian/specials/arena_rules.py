@@ -65,20 +65,6 @@ def mode_attempt_limit(mode_key: str) -> int:
     return DAILY_CHALLENGE_LIMIT
 
 
-def _stats(player: Mapping[str, object]) -> dict[str, int]:
-    qualification = player.get("qualification", {})
-    if not isinstance(qualification, Mapping):
-        qualification = {}
-    body = max(0, int(qualification.get("body", 0)))
-    agility = max(0, int(qualification.get("agility", 0)))
-    return {
-        "max_hp": max(1, int(player.get("max_hp", 0)), 100 + body * 4),
-        "attack": max(1, 10 + body // 2 + int(player.get("attack_bonus", 0))),
-        "initiative": max(1, 8 + agility // 2, int(player.get("initiative", 0))),
-        "agility": agility,
-    }
-
-
 def simulate_match(
     challenger: Mapping[str, object],
     defender: Mapping[str, object],

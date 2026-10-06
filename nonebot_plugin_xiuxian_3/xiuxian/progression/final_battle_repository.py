@@ -21,7 +21,8 @@ from ..persistence.errors import (
     FinalBattleRequirementError,
     OperationConflictError,
 )
-from ..combat.rules import apply_constitution_combat_effect, TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp
+from ..combat.rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp
+from ..stats.rules import apply_constitution_combat_effect
 from ..combat.tribulation_rules import stat_snapshot
 from .endgame_models import (
     FinalBattleReplayRecord,

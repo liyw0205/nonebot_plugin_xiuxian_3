@@ -6,6 +6,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
@@ -232,9 +234,10 @@ def test_elite_bounty_grants_advanced_cave_pass_after_exploration_win() -> None:
                     stamina=30,
                     max_hp=10000,
                     initiative=100,
-                    qualification_json=json.dumps({"body": 10000, "agility": 10000}),
+                    qualification_json=json.dumps(BALANCED_QUALIFICATION),
                     inventory_json=json.dumps({}),
                 )
+                equip_damage_weapon(runtime, adapter, user, 500)
                 accepted = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "accept", operation_id=f"{adapter}:elite-accept"),

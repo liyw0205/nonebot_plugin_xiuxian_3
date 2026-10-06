@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
 import pytest
+from combat_fixtures import equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -30,20 +31,21 @@ def _ctx(adapter: str, user: str, operation: str) -> CommandContext:
 async def _player(runtime, adapter: str, user: str, *, strong: bool = True, unstable_until: str | None = None) -> None:
     created = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"{user}:create"), "开始修仙")
     assert created.code == "PLAYER_CREATED"
-    body = 100_000 if strong else 0
+    assert (await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"{user}:seek"), "寻仙问道")).ok
     max_hp = 2_000_000 if strong else 1
     initiative = 9_999 if strong else 0
-    agility = 9_999 if strong else 0
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET realm_key='void_refining', realm_layer=1, location_key='void.archive_ruins', "
-            "stamina=100, stamina_max=100, max_hp=?, initiative=?, qualification_json=?, inventory_json=?, "
+            "stamina=100, stamina_max=100, max_hp=?, initiative=?, inventory_json=?, "
             "void_instability_until=? WHERE platform=? AND platform_user_id=?",
             (
-                max_hp, initiative, json.dumps({"body": body, "agility": agility}),
+                max_hp, initiative,
                 json.dumps({"item.void_anchor": 1}), unstable_until, adapter, user,
             ),
         )
+    if strong:
+        equip_damage_weapon(runtime, adapter, user, 50_000)
 
 
 async def _party(runtime, leader: tuple[str, str], member: tuple[str, str]) -> str:

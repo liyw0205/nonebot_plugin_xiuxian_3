@@ -13,8 +13,6 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..content import ContentError, bundled_content
-from ..advancement.constitution_effects import constitution_effect_snapshot
-from ..items.manual_rules import manual_effect_totals
 from ..persistence.errors import (
     BattleAlreadySettledError,
     BattleBusyError,
@@ -53,7 +51,6 @@ from .rules import (
     enemy_definition,
     hit_chance_bp,
     player_goes_first,
-    player_stat_snapshot,
 )
 from .spectator_rules import (
     public_spectator_summary,
@@ -65,7 +62,8 @@ from .spectator_rules import (
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
 from ..utils.player import grant_player_state, player_combat_values, player_realm_values
-from ..utils.equipment import equipment_instance_rows
+from ..stats.rules import COMBAT_STAT_KEYS, frozen_combat_stats
+from ..utils.json_cache import decode_json_strict
 
 
 class CombatRepositoryMixin:
@@ -316,7 +314,7 @@ class CombatRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._battle_start_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._battle_start_from_payload(decode_json_strict(existing["result_json"]), replay=True)
 
             content = getattr(self, "content", None)
             enemy = enemy_definition(enemy_key, content=content)
@@ -400,7 +398,7 @@ class CombatRepositoryMixin:
                 ).fetchone()
                 if exploration is None:
                     raise BattleRequirementError("exploration encounter is not pending")
-                exploration_snapshot = self._json_object(exploration["snapshot_json"], {})
+                exploration_snapshot = decode_json_strict(exploration["snapshot_json"])
                 if str(exploration_snapshot.get("location_key", "")) != enemy.location_key:
                     raise BattleRequirementError("battle location differs from exploration snapshot")
                 if not self._meets_realm_values(
@@ -425,42 +423,24 @@ class CombatRepositoryMixin:
             if active is not None:
                 raise BattleBusyError("battle is already active")
 
-            equipment = (
-                tuple(exploration_snapshot.get("equipment", ()))
+            stat_snapshot = (
+                deepcopy(exploration_snapshot["stat_snapshot"])
                 if exploration is not None
-                else self._battle_equipment_snapshot(connection, int(player["id"]))
+                else self._build_player_stat_snapshot(connection, player)
             )
-            qualification = (
-                self._json_object(exploration_snapshot.get("qualification"), {})
+            stats = frozen_combat_stats({"stats": stat_snapshot["combat_stats"]})
+            equipment = stat_snapshot["equipment"]
+            qualification = stat_snapshot["base_stats"]
+            constitution_effect = stat_snapshot["constitution_effect"]
+            manual_effects = stat_snapshot["manual_effects"]
+            path_key = exploration_snapshot["path_key"] if exploration is not None else player_state["path_key"]
+            skills = (
+                deepcopy(exploration_snapshot["skills"])
                 if exploration is not None
-                else player_state["qualification"]
-            )
-            constitution_effect = (
-                dict(exploration_snapshot.get("constitution_effect", {}))
-                if exploration is not None
-                else constitution_effect_snapshot(connection, int(player["id"]))
-            )
-            manual_effects = manual_effect_totals(
-                player_state["inventory"], self.content
-            )
-            manual_stat_bonus = manual_effects["combat_stat_bonus_bp"]
-            if not isinstance(manual_stat_bonus, dict):
-                raise ValueError("manual combat stat bonuses must be an object")
-            stats = player_stat_snapshot(
-                qualification,
-                max_hp=int(exploration_snapshot.get("max_hp", player_state["max_hp"])),
-                initiative=int(exploration_snapshot.get("initiative", player_state["initiative"])),
-                equipment=equipment,
-                constitution_effect=constitution_effect,
-                manual_stat_bonus_bp=manual_stat_bonus,
-            )
-            skills = self._battle_skill_snapshot(
-                connection,
-                int(player["id"]),
-                str(player_state["path_key"] or ""),
+                else self._battle_skill_snapshot(connection, int(player["id"]), str(path_key or ""))
             )
             companion_snapshot = (
-                tuple(dict(item) for item in exploration_snapshot.get("companions", ()))
+                tuple(dict(item) for item in exploration_snapshot["companions"])
                 if exploration is not None
                 else self.companion_battle_snapshot(connection, int(player["id"])).companions
             )
@@ -471,7 +451,8 @@ class CombatRepositoryMixin:
                 "location_key": location_key,
                 "player": {
                     "player_id": player_state["player_id"],
-                    "path_key": player_state["path_key"],
+                    "path_key": path_key,
+                    "stat_snapshot": stat_snapshot,
                     "qualification": qualification,
                     "stats": stats,
                     "constitution_effect": constitution_effect,
@@ -479,7 +460,7 @@ class CombatRepositoryMixin:
                     "equipment": list(equipment),
                     "skills": skills,
                     "companions": [dict(item) for item in companion_snapshot],
-                    "cross_realm_penalty_bp": int(exploration_snapshot.get("cross_realm_penalty_bp", 0)),
+                    "cross_realm_penalty_bp": int(exploration_snapshot["cross_realm_penalty_bp"]) if exploration is not None else 0,
                 },
                 "enemy": {
                     "key": enemy.key,
@@ -499,11 +480,7 @@ class CombatRepositoryMixin:
                 "player_hp": stats["max_hp"],
                 "player_mana": stats["max_mana"],
                 "enemy_hp": enemy.max_hp,
-                "manual_reflect_damage_bp": min(
-                    10_000,
-                    int(manual_effects["damage_reflection_bp"])
-                    + int(stats.get("damage_reflection_bp", 0)),
-                ),
+                "manual_reflect_damage_bp": stats["damage_reflection_bp"],
                 "timeout_count": 0,
             }
             turn_deadline = serialize_datetime(now + timedelta(seconds=TURN_TIMEOUT_SECONDS))
@@ -581,6 +558,7 @@ class CombatRepositoryMixin:
         enemy = enemy_definition("enemy.training_dummy", content=content)
         max_rounds = training_dummy_preview_rounds(content)
         with self._connect() as connection:
+            connection.execute("BEGIN")
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             realm = player_realm_values(player)
             if (
@@ -596,6 +574,7 @@ class CombatRepositoryMixin:
             "realm_key": "mortal",
             "realm_layer": 0,
             "stats": {
+                **dict.fromkeys(COMBAT_STAT_KEYS, 0),
                 "max_hp": enemy.max_hp,
                 "attack": enemy.attack,
                 "initiative": enemy.initiative,
@@ -631,6 +610,7 @@ class CombatRepositoryMixin:
         content = getattr(self, "content", None) or bundled_content()
         definition = spar_definition(content)
         with self._connect() as connection:
+            connection.execute("BEGIN")
             challenger = self._require_player(connection, platform, platform_user_id, writable=False)
             target = target_ref.strip()
             defender = connection.execute(
@@ -677,21 +657,8 @@ class CombatRepositoryMixin:
         self, connection: sqlite3.Connection, player: sqlite3.Row
     ) -> tuple[dict[str, object], str]:
         player_state = player_combat_values(player)
-        qualification = player_state["qualification"]
-        equipment = self._battle_equipment_snapshot(connection, int(player["id"]))
-        constitution_effect = constitution_effect_snapshot(connection, int(player["id"]))
-        manual_effects = manual_effect_totals(player_state["inventory"], self.content)
-        manual_bonus = manual_effects["combat_stat_bonus_bp"]
-        if not isinstance(manual_bonus, dict):
-            raise ValueError("manual combat stat bonuses must be an object")
-        stats = player_stat_snapshot(
-            qualification,
-            max_hp=player_state["max_hp"],
-            initiative=player_state["initiative"],
-            equipment=equipment,
-            constitution_effect=constitution_effect,
-            manual_stat_bonus_bp=manual_bonus,
-        )
+        stat_snapshot = self._build_player_stat_snapshot(connection, player)
+        stats = frozen_combat_stats({"stats": stat_snapshot["combat_stats"]})
         skills = self._battle_skill_snapshot(connection, int(player["id"]), str(player_state["path_key"] or ""))
         selected_skill = self._select_battle_skill(skills, available_mana=stats["max_mana"])
         return (
@@ -700,9 +667,10 @@ class CombatRepositoryMixin:
                 "path_key": str(player_state["path_key"] or ""),
                 "realm_key": player_state["realm_key"],
                 "realm_layer": player_state["realm_layer"],
-                "qualification": qualification,
+                "qualification": stat_snapshot["base_stats"],
+                "stat_snapshot": stat_snapshot,
                 "stats": stats,
-                "equipment": list(equipment),
+                "equipment": stat_snapshot["equipment"],
                 "selected_skill_key": str(selected_skill["skill_key"]),
             },
             str(selected_skill["skill_key"]),
@@ -746,22 +714,22 @@ class CombatRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("automatic battle operation conflicts")
-                return self._battle_turn_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._battle_turn_from_payload(decode_json_strict(existing["result_json"]), replay=True)
 
             session = connection.execute(
                 "SELECT * FROM battle_sessions WHERE battle_id = ?", (battle_id,)
             ).fetchone()
             if session is None:
                 raise BattleNotFoundError("battle does not exist")
-            state = self._json_object(session["state_json"], {})
+            state = decode_json_strict(session["state_json"])
             current_round = int(state.get("round_no", session["round_no"]))
             if current_round >= expected_round or str(session["status"]) not in {"created", "running"}:
                 return self._battle_turn_record(session, state, already_completed=True)
             if current_round + 1 != expected_round:
                 return self._battle_turn_record(session, state, already_completed=True)
 
-            snapshot = self._json_object(session["snapshot_json"], {})
-            player_stats = dict(snapshot["player"]["stats"])
+            snapshot = decode_json_strict(session["snapshot_json"])
+            player_stats = frozen_combat_stats(snapshot["player"])
             enemy = dict(snapshot["enemy"])
             is_tribulation_trial = str(snapshot.get("profile_key", "")) == PROFILE_KEY
             tribulation = self._json_object(snapshot.get("tribulation"), {})
@@ -1164,7 +1132,7 @@ class CombatRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("battle resolution conflicts")
-                return self._battle_resolution_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._battle_resolution_from_payload(decode_json_strict(existing["result_json"]), replay=True)
             session = connection.execute(
                 "SELECT * FROM battle_sessions WHERE battle_id = ?", (battle_id,)
             ).fetchone()
@@ -1179,20 +1147,21 @@ class CombatRepositoryMixin:
             ).fetchone()
             if player is None:
                 raise PlayerNotFoundError("battle player does not exist")
-            result = self._json_object(session["result_json"], {})
-            outcome = str(result.get("outcome", session["status"]))
+            result = decode_json_strict(session["result_json"])
+            outcome = str(result["outcome"])
             reason = str(result.get("reason", "battle_ended"))
-            snapshot = self._json_object(session["snapshot_json"], {})
+            snapshot = decode_json_strict(session["snapshot_json"])
+            frozen_combat_stats(snapshot["player"])
             reward = {
                 str(key): int(value)
-                for key, value in dict(snapshot.get("reward", {})).items()
+                for key, value in snapshot["reward"].items()
             } if outcome == "won" else {}
             reward_status = "pending" if outcome == "won" and reward else "none"
             durability_loss = 0
             if outcome == "won" and str(session["battle_type"]) not in {"pve.tribulation_trial", "pve.tower"}:
                 durable_ids = [
                     str(item["instance_id"])
-                    for item in list(snapshot.get("player", {}).get("equipment", []))
+                    for item in snapshot["player"]["equipment"]
                     if str(item.get("slot", "")) in {"weapon", "armor", "accessory"}
                 ]
                 if durable_ids:
@@ -1296,7 +1265,7 @@ class CombatRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("battle reward claim conflicts")
-                return self._battle_reward_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._battle_reward_from_payload(decode_json_strict(existing["result_json"]), replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 """
@@ -1314,8 +1283,8 @@ class CombatRepositoryMixin:
                 if claimed is not None:
                     raise BattleRewardAlreadyClaimedError("battle reward is already claimed")
                 raise BattleRewardNotAvailableError("no battle reward is pending")
-            result = self._json_object(session["result_json"], {})
-            reward = {str(key): int(value) for key, value in dict(result.get("reward", {})).items()}
+            result = decode_json_strict(session["result_json"])
+            reward = {str(key): int(value) for key, value in result["reward"].items()}
             if not reward:
                 raise BattleRewardNotAvailableError("battle has no claimable reward")
             asset_reward = {key: quantity for key, quantity in reward.items() if key != "cultivation"}
@@ -1451,37 +1420,6 @@ class CombatRepositoryMixin:
         player_rank = ranks.get(str(realm_key), -1)
         required_rank = ranks.get(required_realm, 99)
         return (player_rank, int(layer)) >= (required_rank, required_layer)
-
-    def _battle_equipment_snapshot(
-        self, connection: sqlite3.Connection, player_id: int
-    ) -> tuple[dict[str, object], ...]:
-        rows = equipment_instance_rows(
-            connection, player_id, equipped_only=True, durable_only=True, active_only=True
-        )
-        content = self.content or bundled_content()
-        player = connection.execute("SELECT path_key FROM players WHERE id = ?", (player_id,)).fetchone()
-        path_key = str(player["path_key"] or "") if player is not None else ""
-        equipment = []
-        for row in rows:
-            item_key = str(row["item_key"])
-            item_definition = content.require("item", item_key, include_locked=False)
-            if item_definition.get("path_key") not in {None, path_key}:
-                continue
-            equipment.append(
-                {
-                    "instance_id": str(row["instance_id"]),
-                    "item_key": item_key,
-                    "slot": str(row["slot"]),
-                    "effects": list(item_definition.get("effects", [])),
-                    "durability_bp": int(row["durability_bp"]),
-                    "temper_level": int(row["temper_level"]),
-                    "affixes": {
-                        str(key): int(value)
-                        for key, value in self._json_object(row["affixes_json"], {}).items()
-                    },
-                }
-            )
-        return tuple(equipment)
 
     def _battle_skill_snapshot(
         self,

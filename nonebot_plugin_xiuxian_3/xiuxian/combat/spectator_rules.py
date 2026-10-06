@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..content import ContentError
+from ..stats.rules import frozen_combat_stats
 
 SPAR_CONTENT_KEY = "social.spar"
 TRAINING_DUMMY_KEY = "enemy.training_dummy"
@@ -59,8 +60,8 @@ def simulate_spectator_match(
 ) -> tuple[str, int, list[dict[str, object]]]:
     """Resolve two frozen stat maps without accepting player-supplied actions."""
 
-    left = _stats(challenger)
-    right = _stats(defender)
+    left = frozen_combat_stats(challenger)
+    right = frozen_combat_stats(defender)
     hp = {"challenger": left["max_hp"], "defender": right["max_hp"]}
     stats = {"challenger": left, "defender": right}
     skills = {"challenger": challenger_skill_key, "defender": defender_skill_key}
@@ -144,23 +145,6 @@ def public_spectator_summary(snapshot: Mapping[str, object]) -> dict[str, object
         "path_key": str(snapshot.get("path_key") or "未定道途"),
         "realm_key": realm_key,
         "realm_layer": realm_layer,
-    }
-
-
-def _stats(combatant: Mapping[str, object]) -> dict[str, int]:
-    qualification = combatant.get("qualification", {})
-    if not isinstance(qualification, Mapping):
-        qualification = {}
-    raw_stats = combatant.get("stats", combatant)
-    if not isinstance(raw_stats, Mapping):
-        raw_stats = combatant
-    body = max(0, int(qualification.get("body", 0)))
-    agility = max(0, int(qualification.get("agility", raw_stats.get("agility", 0))))
-    return {
-        "max_hp": max(1, int(raw_stats.get("max_hp", 0)), 100 + body * 4),
-        "attack": max(1, int(raw_stats.get("attack", 10 + body // 2 + int(combatant.get("attack_bonus", 0))))),
-        "initiative": max(1, int(raw_stats.get("initiative", 0)), 8 + agility // 2),
-        "agility": agility,
     }
 
 

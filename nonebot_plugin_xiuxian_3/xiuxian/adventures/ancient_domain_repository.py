@@ -10,7 +10,6 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..persistence.errors import (
     AncientDomainBusyError,
     AncientDomainNodeError,
@@ -23,7 +22,6 @@ from ..persistence.errors import (
 )
 from ..social.party_rules import PARTY_TYPE_SECRET_REALM_ANCIENT
 from ..specials.codex_projection import record_codex_discovery
-from ..combat.rules import player_stat_snapshot
 from ..utils.assets import grant_player_assets
 from ..utils.player import change_player_state, player_combat_values, player_integer
 from .ancient_domain_models import AncientDomainRunRecord
@@ -164,17 +162,8 @@ class AncientDomainRepositoryMixin:
                     raise AncientDomainQuotaError("a member already used this UTC week")
 
                 player_state = player_combat_values(row)
-                equipment = self._battle_equipment_snapshot(connection, player_id)
-                qualification = player_state["qualification"]
-                constitution_effect = constitution_effect_snapshot(connection, player_id)
+                stat_snapshot = self._build_player_stat_snapshot(connection, row)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
-                stats = player_stat_snapshot(
-                    qualification,
-                    max_hp=player_state["max_hp"],
-                    initiative=player_state["initiative"],
-                    equipment=equipment,
-                    constitution_effect=constitution_effect,
-                )
                 first_clear[player_id] = connection.execute(
                     "SELECT 1 FROM ancient_domain_members WHERE player_id=? AND status='cleared' LIMIT 1",
                     (player_id,),
@@ -189,10 +178,12 @@ class AncientDomainRepositoryMixin:
                     "realm_layer": player_state["realm_layer"],
                     "location_key": player_state["location_key"],
                     "path_key": player_state["path_key"],
-                    "qualification": qualification,
-                    "stats": stats,
-                    "constitution_effect": constitution_effect,
-                    "equipment": list(equipment),
+                    "qualification": stat_snapshot["base_stats"],
+                    "stat_snapshot": stat_snapshot,
+                    "stats": stat_snapshot["combat_stats"],
+                    "constitution_effect": stat_snapshot["constitution_effect"],
+                    "manual_effects": stat_snapshot["manual_effects"],
+                    "equipment": stat_snapshot["equipment"],
                     "skills": skills,
                     "soul_power": player_state["soul_power"],
                     "pollution": player_state["pollution"],

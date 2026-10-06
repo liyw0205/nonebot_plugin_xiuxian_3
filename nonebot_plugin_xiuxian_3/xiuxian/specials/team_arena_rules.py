@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Mapping, Sequence
 
+from ..stats.rules import frozen_combat_stats
 from .arena_rules import MAX_ROUNDS, battle_roll_bp, rating_band
 
 TEAM_ARENA_MODE_KEY = "arena.team"
@@ -26,20 +27,6 @@ def compatible_team_rating(challenger_rating: int, defender_rating: int) -> bool
     return abs(rating_band(challenger_rating) - rating_band(defender_rating)) <= 1
 
 
-def _stats(member: Mapping[str, object]) -> dict[str, int]:
-    qualification = member.get("qualification", {})
-    if not isinstance(qualification, Mapping):
-        qualification = {}
-    body = max(0, int(qualification.get("body", 0)))
-    agility = max(0, int(qualification.get("agility", 0)))
-    return {
-        "max_hp": max(1, int(member.get("max_hp", 0)), 100 + body * 4),
-        "attack": max(1, 10 + body // 2 + int(member.get("attack_bonus", 0))),
-        "initiative": max(1, 8 + agility // 2, int(member.get("initiative", 0))),
-        "agility": agility,
-    }
-
-
 def simulate_team_match(
     challenger: Sequence[Mapping[str, object]],
     defender: Sequence[Mapping[str, object]],
@@ -50,7 +37,7 @@ def simulate_team_match(
 
     sides = {"challenger": list(challenger), "defender": list(defender)}
     stats = {
-        side: {str(member["player_id"]): _stats(member) for member in members}
+        side: {str(member["player_id"]): frozen_combat_stats(member) for member in members}
         for side, members in sides.items()
     }
     hp = {

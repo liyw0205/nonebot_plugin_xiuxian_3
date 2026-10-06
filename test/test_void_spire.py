@@ -10,6 +10,8 @@ from shutil import copytree
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.combat.rules import enemy_definition
@@ -28,7 +30,7 @@ async def _send(runtime, adapter: str, user: str, operation_id: str, command: st
     )
 
 
-async def _setup(runtime, adapter: str, user: str, prefix: str) -> None:
+async def _setup(runtime, adapter: str, user: str, prefix: str, *, damage: int | None = None) -> None:
     for index, command in enumerate(
         (
             "开始修仙",
@@ -48,6 +50,8 @@ async def _setup(runtime, adapter: str, user: str, prefix: str) -> None:
             "WHERE platform=? AND platform_user_id=?",
             (adapter, user),
         )
+    if damage is not None:
+        equip_damage_weapon(runtime, adapter, user, damage)
 
 
 def _seed_claimed_floors(connection: sqlite3.Connection, player_id: int, start: int, stop: int) -> None:
@@ -202,7 +206,7 @@ def test_void_spire_reputation_read_failure_is_atomic_and_recoverable() -> None:
             runtime = create_runtime(data_dir=data_dir)
             cases = (("qq.official", "reputation-json-qq"), ("onebot.v11", "reputation-json-onebot"))
             for adapter, user in cases:
-                await _setup(runtime, adapter, user, user)
+                await _setup(runtime, adapter, user, user, damage=500)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     player_id = connection.execute(
                         "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
@@ -315,7 +319,7 @@ def test_void_spire_route_bosses_keep_battle_and_claim_snapshots() -> None:
             runtime = create_runtime(data_dir=data_dir)
             for floor_no, adapter in ((15, "qq.official"), (30, "onebot.v11")):
                 user = f"boss-{floor_no}"
-                await _setup(runtime, adapter, user, user)
+                await _setup(runtime, adapter, user, user, damage=500)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     player_id = connection.execute(
                         "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
@@ -323,7 +327,7 @@ def test_void_spire_route_bosses_keep_battle_and_claim_snapshots() -> None:
                     ).fetchone()[0]
                     connection.execute(
                         "UPDATE players SET qualification_json=?,max_hp=30000,initiative=30000 WHERE id=?",
-                        (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                        (json.dumps(BALANCED_QUALIFICATION), player_id),
                     )
                     history = "2026-01-01T00:00:00+00:00"
                     connection.executemany(
@@ -436,7 +440,7 @@ def test_void_spire_upper_floors_have_independent_weekly_quota_on_both_adapters(
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
             for adapter, user in (("qq.official", "upper-qq"), ("onebot.v11", "upper-onebot")):
-                await _setup(runtime, adapter, user, user)
+                await _setup(runtime, adapter, user, user, damage=500)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     player_id = connection.execute(
                         "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
@@ -445,7 +449,7 @@ def test_void_spire_upper_floors_have_independent_weekly_quota_on_both_adapters(
                     connection.execute(
                         "UPDATE players SET realm_key='dao_union',realm_layer=1,stamina=200,stamina_max=200,"
                         "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                        (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                        (json.dumps(BALANCED_QUALIFICATION), player_id),
                     )
                 preview = await _send(runtime, adapter, user, f"{user}-preview", "虚空塔")
                 assert (preview.data["next_floor"], preview.data["weekly_used"], preview.data["weekly_limit"]) == (31, 0, 1)
@@ -495,7 +499,7 @@ def test_void_spire_upper_reputation_gate_boss_stories_and_display_title() -> No
             runtime = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
             for floor_no, adapter in ((31, "qq.official"), (45, "onebot.v11"), (60, "qq.official")):
                 user = f"high-{floor_no}"
-                await _setup(runtime, adapter, user, user)
+                await _setup(runtime, adapter, user, user, damage=500)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     player_id = connection.execute(
                         "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
@@ -503,7 +507,7 @@ def test_void_spire_upper_reputation_gate_boss_stories_and_display_title() -> No
                     _seed_claimed_floors(connection, player_id, 1, floor_no - 1)
                     connection.execute(
                         "UPDATE players SET max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                        (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                        (json.dumps(BALANCED_QUALIFICATION), player_id),
                     )
                     connection.execute(
                         "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) "
@@ -568,7 +572,7 @@ def test_dao_service_dispatch_produces_upper_floor_admission_on_both_adapters(mo
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, clock=lambda: now[0])
             for adapter, user in (("qq.official", "service-qq"), ("onebot.v11", "service-onebot")):
-                await _setup(runtime, adapter, user, user)
+                await _setup(runtime, adapter, user, user, damage=500)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     player_id = connection.execute(
                         "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
@@ -576,7 +580,7 @@ def test_dao_service_dispatch_produces_upper_floor_admission_on_both_adapters(mo
                     _seed_claimed_floors(connection, player_id, 1, 30)
                     connection.execute(
                         "UPDATE players SET max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                        (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                        (json.dumps(BALANCED_QUALIFICATION), player_id),
                     )
                     connection.execute(
                         "INSERT INTO player_reputations(player_id,local_json,service_reputation,updated_at) "
@@ -598,7 +602,7 @@ def test_dao_service_dispatch_produces_upper_floor_admission_on_both_adapters(mo
                 now[0] += timedelta(hours=8, seconds=1)
                 settled = await _send(runtime, adapter, user, f"{user}-settle", "结算派遣")
                 assert settled.code == "DISPATCH_SETTLED"
-                assert settled.data["reward"]["local.dao_service"] == 8
+                assert settled.data["reward"]["local.dao_service"] == 4
                 replay = await _send(runtime, adapter, user, f"{user}-settle", "结算派遣")
                 assert replay.data["idempotent_replay"] is True
                 with sqlite3.connect(runtime.settings.database_path) as connection:
@@ -622,7 +626,7 @@ def test_void_spire_upper_start_failure_and_restart_keep_quota_and_stamina(monke
             clock = lambda: datetime(2026, 9, 29, tzinfo=timezone.utc)
             runtime = create_runtime(data_dir=data_dir, clock=clock)
             adapter, user = "onebot.v11", "upper-recovery"
-            await _setup(runtime, adapter, user, user)
+            await _setup(runtime, adapter, user, user, damage=500)
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 player_id = connection.execute(
                     "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
@@ -631,7 +635,7 @@ def test_void_spire_upper_start_failure_and_restart_keep_quota_and_stamina(monke
                 connection.execute(
                     "UPDATE players SET realm_key='dao_union',realm_layer=1,"
                     "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                    (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                    (json.dumps(BALANCED_QUALIFICATION), player_id),
                 )
 
             original = runtime.repository.start_quest_battle
@@ -679,7 +683,7 @@ def test_void_spire_upper_concurrent_requests_take_only_one_quota_slot() -> None
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, clock=lambda: datetime(2026, 9, 29, tzinfo=timezone.utc))
             adapter, user = "onebot.v11", "upper-concurrent"
-            await _setup(runtime, adapter, user, user)
+            await _setup(runtime, adapter, user, user, damage=500)
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 player_id = connection.execute(
                     "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
@@ -688,7 +692,7 @@ def test_void_spire_upper_concurrent_requests_take_only_one_quota_slot() -> None
                 connection.execute(
                     "UPDATE players SET realm_key='dao_union',realm_layer=1,"
                     "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                    (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                    (json.dumps(BALANCED_QUALIFICATION), player_id),
                 )
             results = await asyncio.gather(
                 _send(runtime, adapter, user, "upper-concurrent-1", "挑战虚空塔 31"),
@@ -720,7 +724,7 @@ def test_void_spire_upper_enemy_uses_host_json_override(tmp_path: Path) -> None:
         enemy_file.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
 
         runtime = create_runtime(data_dir=content_dir)
-        await _setup(runtime, "qq.official", "upper-override", "upper-override")
+        await _setup(runtime, "qq.official", "upper-override", "upper-override", damage=500)
         with sqlite3.connect(runtime.settings.database_path) as connection:
             player_id = connection.execute(
                 "SELECT id FROM players WHERE platform_user_id='upper-override'"
@@ -729,7 +733,7 @@ def test_void_spire_upper_enemy_uses_host_json_override(tmp_path: Path) -> None:
             connection.execute(
                 "UPDATE players SET realm_key='dao_union',realm_layer=1,"
                 "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                (json.dumps(BALANCED_QUALIFICATION), player_id),
             )
         challenge = await _send(runtime, "qq.official", "upper-override", "upper-override-31", "挑战虚空塔 31")
         assert challenge.data["outcome"] == "won"
@@ -754,7 +758,7 @@ def test_void_spire_final_routes_use_contract_rewards_and_boss_evidence_on_both_
                 ("qq.official", "origin-route", 75),
                 ("onebot.v11", "ascension-route", 90),
             ):
-                await _setup(runtime, adapter, user, user)
+                await _setup(runtime, adapter, user, user, damage=500)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     player_id = connection.execute(
                         "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
@@ -764,7 +768,7 @@ def test_void_spire_final_routes_use_contract_rewards_and_boss_evidence_on_both_
                     connection.execute(
                         "UPDATE players SET realm_key='tribulation',realm_layer=1,stamina=200,stamina_max=200,"
                         "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                        (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                        (json.dumps(BALANCED_QUALIFICATION), player_id),
                     )
                 challenge = await _send(runtime, adapter, user, f"{user}-challenge", f"挑战虚空塔 {floor_no}")
                 assert challenge.code == "VOID_SPIRE_CHALLENGE_SETTLED"
@@ -801,7 +805,7 @@ def test_void_spire_upper_contract_override_changes_cost_and_reward(tmp_path: Pa
 
     async def run() -> None:
         runtime = create_runtime(data_dir=content_dir)
-        await _setup(runtime, "qq.official", "upper-contract", "upper-contract")
+        await _setup(runtime, "qq.official", "upper-contract", "upper-contract", damage=500)
         with sqlite3.connect(runtime.settings.database_path) as connection:
             player_id = connection.execute(
                 "SELECT id FROM players WHERE platform_user_id='upper-contract'"
@@ -810,7 +814,7 @@ def test_void_spire_upper_contract_override_changes_cost_and_reward(tmp_path: Pa
             connection.execute(
                 "UPDATE players SET realm_key='tribulation',realm_layer=1,stamina=100,stamina_max=100,"
                 "max_hp=30000,initiative=30000,qualification_json=? WHERE id=?",
-                (json.dumps({"body": 1000, "agility": 1000}), player_id),
+                (json.dumps(BALANCED_QUALIFICATION), player_id),
             )
         challenge = await _send(runtime, "qq.official", "upper-contract", "contract-start", "挑战虚空塔 61")
         assert challenge.data["outcome"] == "won"

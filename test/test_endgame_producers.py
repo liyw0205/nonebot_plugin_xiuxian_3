@@ -6,6 +6,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
@@ -110,8 +112,9 @@ def test_dao_origin_resource_closure_and_qq_onebot_task_producers() -> None:
                     location_key="cave.boundary_realm",
                     max_hp=500_000,
                     initiative=1_000,
-                    qualification_json=json.dumps({"body": 100_000}),
+                    qualification_json=json.dumps(BALANCED_QUALIFICATION),
                 )
+                equip_damage_weapon(runtime, adapter, user, 50000)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     player_id = connection.execute(
                         "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
@@ -306,7 +309,7 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
                     path_key="body",
                     max_hp=500_000,
                     initiative=1_000,
-                    qualification_json=json.dumps({"body": 100_000}),
+                    qualification_json=json.dumps(BALANCED_QUALIFICATION),
                     energy=100,
                     energy_max=100,
                     spirit_stones=303_000,
@@ -319,6 +322,7 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
                         }
                     ),
                 )
+                equip_damage_weapon(runtime, adapter, user, 50000)
 
                 for lane in ("建设者", "见证者", "远行者"):
                     for stage in range(1, 11):
@@ -481,11 +485,12 @@ def test_dao_union_qualification_requires_server_evidence_and_freezes_snapshot()
                     location_key="cave.boundary_realm",
                     total_cultivation=2_998_960,
                     path_key="body",
-                    qualification_json=json.dumps({"body": 100_000}),
+                    qualification_json=json.dumps(BALANCED_QUALIFICATION),
                     max_hp=500_000,
                     initiative=1_000,
                     inventory_json=json.dumps({"item.masterwork.body": 1}),
                 )
+                equip_damage_weapon(runtime, adapter, user, 50000)
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     player_id = connection.execute(
                         "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",

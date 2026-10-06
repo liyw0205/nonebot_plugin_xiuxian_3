@@ -8,6 +8,8 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 
@@ -49,6 +51,7 @@ def test_spar_is_immediate_adapter_neutral_and_read_only() -> None:
                     table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                     for table in ("battle_sessions", "battle_actions", "codex_entries")
                 }
+                before_database = tuple(connection.iterdump())
 
             result = await runtime.adapters.dispatch(
                 qq.adapter, replace(qq, operation_id="spar-start"), "切磋 乙_观星*客"
@@ -94,14 +97,16 @@ def test_spar_is_immediate_adapter_neutral_and_read_only() -> None:
                     table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                     for table in before_battle_rows
                 } == before_battle_rows
+                assert tuple(connection.iterdump()) == before_database
             await runtime.close()
 
     asyncio.run(run())
 
 
-def test_training_dummy_is_read_only_and_has_no_reward_or_replay() -> None:
+@pytest.mark.parametrize("adapter", ("qq.official", "onebot.v11"))
+def test_training_dummy_is_read_only_and_has_no_reward_or_replay(adapter: str) -> None:
     async def run() -> None:
-        player = _context("web", "training-preview", "training-request")
+        player = _context(adapter, "training-preview", "training-request")
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
             await _create(runtime, player, "training-create")
@@ -119,13 +124,14 @@ def test_training_dummy_is_read_only_and_has_no_reward_or_replay() -> None:
                     table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                     for table in ("battle_sessions", "battle_actions", "codex_entries")
                 }
-            result = await runtime.dispatch(replace(player, operation_id="training-preview-start"), "开始训练战")
+                before_database = tuple(connection.iterdump())
+            result = await runtime.adapters.dispatch(adapter, replace(player, operation_id="training-preview-start"), "开始训练战")
             assert result.code == "TRAINING_SPECTATOR"
             assert result.data["status"] == "spectator"
             assert result.data["actions"]
-            claim = await runtime.dispatch(replace(player, operation_id="training-preview-claim"), "领取战斗奖励")
+            claim = await runtime.adapters.dispatch(adapter, replace(player, operation_id="training-preview-claim"), "领取战斗奖励")
             assert claim.code == "BATTLE_REWARD_NOT_AVAILABLE"
-            replay = await runtime.dispatch(replace(player, operation_id="training-replay"), "战斗回放")
+            replay = await runtime.adapters.dispatch(adapter, replace(player, operation_id="training-replay"), "战斗回放")
             assert replay.code == "BATTLE_NOT_FOUND"
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 after = connection.execute(
@@ -138,6 +144,7 @@ def test_training_dummy_is_read_only_and_has_no_reward_or_replay() -> None:
                     table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                     for table in battle_rows
                 } == battle_rows
+                assert tuple(connection.iterdump()) == before_database
             await runtime.close()
 
     asyncio.run(run())

@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -35,7 +36,7 @@ def test_qq_and_onebot_exploration_encounters_use_frozen_battle_and_replay() -> 
                         "location_key='xuantian.outskirts', stamina=100, max_hp=999, initiative=99, "
                         "qualification_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
                         (
-                            json.dumps({"body": 2_000, "agility": 2_000}),
+                            json.dumps(BALANCED_QUALIFICATION),
                             json.dumps({}),
                             adapter,
                             user,
@@ -57,7 +58,7 @@ def test_qq_and_onebot_exploration_encounters_use_frozen_battle_and_replay() -> 
                     connection.execute(
                         "UPDATE players SET qualification_json=?, max_hp=100, initiative=8 "
                         "WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"body": 0, "agility": 0}), adapter, user),
+                        (json.dumps({"body": 5, "agility": 5, "spirit": 15, "insight": 15, "root": 10, "fortune": 10}), adapter, user),
                     )
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
@@ -103,7 +104,7 @@ def test_qq_and_onebot_exploration_encounters_use_frozen_battle_and_replay() -> 
                         (adapter, user),
                     ).fetchall()
                 assert status == "settled"
-                assert json.loads(snapshot_text)["qualification"]["body"] == 2_000
+                assert json.loads(snapshot_text)["qualification"]["body"] == 10
                 assert battle_status == "settled"
                 assert reward_status == "none"
                 assert linked == exploration_id
@@ -147,9 +148,9 @@ def test_exploration_battle_loss_does_not_award_frozen_result() -> None:
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
                     "UPDATE players SET stage='cultivator', realm_key='qi_gathering', realm_layer=4, "
-                    "location_key='cave.mist_grotto', stamina=100, max_hp=100, initiative=8, "
-                    "qualification_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
-                    (json.dumps({"body": 0, "agility": 0}), json.dumps({"item.cave_pass_basic": 1}), adapter, user),
+                    "location_key='cave.mist_grotto', stamina=100, max_hp=0, initiative=0, "
+                    "inventory_json=?, qualification_json=? WHERE platform=? AND platform_user_id=?",
+                    (json.dumps({"item.cave_pass_basic": 1}), json.dumps(BALANCED_QUALIFICATION), adapter, user),
                 )
             start_operation = next(
                 f"mist-loss-{index}"
@@ -212,9 +213,9 @@ def test_exploration_auto_battle_does_not_nest_inflight_semaphore() -> None:
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
                     "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, "
-                    "location_key='xuantian.outskirts', stamina=100, max_hp=999, initiative=99, "
-                    "qualification_json=? WHERE platform=? AND platform_user_id=?",
-                    (json.dumps({"body": 2_000, "agility": 2_000}), adapter, user),
+                    "location_key='xuantian.outskirts', stamina=100, max_hp=999, initiative=99, qualification_json=? "
+                    "WHERE platform=? AND platform_user_id=?",
+                    (json.dumps(BALANCED_QUALIFICATION), adapter, user),
                 )
             operation = next(
                 f"one-inflight-{index}"

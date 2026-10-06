@@ -34,6 +34,8 @@ def _ctx(adapter: str, user: str, operation: str) -> CommandContext:
 async def _prepare_player(runtime, adapter: str, user: str, *, faction: str, permit: bool = True) -> None:
     created = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"create:{adapter}:{user}"), "开始修仙")
     assert created.code == "PLAYER_CREATED"
+    seeking = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"seek:{adapter}:{user}"), "寻仙问道")
+    assert seeking.code == "SEEKING_STARTED"
     inventory = {"item.bound.test": 2}
     flags = [f"alliance.{faction}"]
     if permit:
@@ -44,11 +46,10 @@ async def _prepare_player(runtime, adapter: str, user: str, *, faction: str, per
             UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
                 arena_rating=1000, max_hp=1000, initiative=40, pollution=37,
                 bloodline_stability=63, spirit_stones=777,
-                qualification_json=?, intro_json=?, inventory_json=?, faction_reputation_json=?
+                intro_json=?, inventory_json=?, faction_reputation_json=?
             WHERE platform=? AND platform_user_id=?
             """,
             (
-                json.dumps({"body": 40, "agility": 40, "alliance_key": faction}),
                 json.dumps({"flags": flags}),
                 json.dumps(inventory),
                 json.dumps({"xuantian": 100, "demon": 200, "beast": 300}),

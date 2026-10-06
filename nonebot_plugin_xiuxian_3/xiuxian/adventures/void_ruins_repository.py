@@ -9,8 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..advancement.constitution_effects import constitution_effect_snapshot
-from ..combat.rules import enemy_definition, player_stat_snapshot
+from ..combat.rules import enemy_definition
 from ..persistence.errors import (
     OperationConflictError,
     ResourceInsufficientError,
@@ -217,14 +216,8 @@ class VoidRuinsRepositoryMixin:
                         unstable = False
                 instability[player_id] = unstable
                 player_state = player_combat_values(row)
-                equipment = self._battle_equipment_snapshot(connection, player_id)
-                qualification = player_state["qualification"]
-                constitution_effect = constitution_effect_snapshot(connection, player_id)
+                stat_snapshot = self._build_player_stat_snapshot(connection, row)
                 skills = self._battle_skill_snapshot(connection, player_id, str(row["path_key"] or ""))
-                stats = player_stat_snapshot(
-                    qualification, max_hp=player_state["max_hp"], initiative=player_state["initiative"], equipment=equipment,
-                    constitution_effect=constitution_effect,
-                )
                 first_clear[player_id] = connection.execute(
                     "SELECT 1 FROM void_ruins_members WHERE player_id=? AND status='settled' LIMIT 1", (player_id,)
                 ).fetchone() is None
@@ -238,10 +231,12 @@ class VoidRuinsRepositoryMixin:
                     "realm_layer": player_state["realm_layer"],
                     "location_key": player_state["location_key"],
                     "path_key": player_state["path_key"],
-                    "qualification": qualification,
-                    "stats": stats,
-                    "constitution_effect": constitution_effect,
-                    "equipment": list(equipment),
+                    "qualification": stat_snapshot["base_stats"],
+                    "stat_snapshot": stat_snapshot,
+                    "stats": stat_snapshot["combat_stats"],
+                    "constitution_effect": stat_snapshot["constitution_effect"],
+                    "manual_effects": stat_snapshot["manual_effects"],
+                    "equipment": stat_snapshot["equipment"],
                     "skills": skills,
                     "void_instability_active": unstable,
                 })

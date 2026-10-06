@@ -18,7 +18,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
-from ..advancement.constitution_effects import constitution_effect_snapshot
+from ..utils.json_cache import decode_json_strict
 from ..config import XiuxianSettings
 from ..specials.codex_projection import record_material_discoveries
 from ..player.models import (
@@ -229,7 +229,7 @@ class ExplorationRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._exploration_start_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._exploration_start_from_payload(decode_json_strict(existing["result_json"]), replay=True)
 
             row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
@@ -351,6 +351,7 @@ class ExplorationRepositoryMixin:
                 )
             battle_chance_bp = max(0, definition.battle_chance_bp - barrier_risk_reduction_bp)
             player_state = player_combat_values(row)
+            stat_snapshot = self._build_player_stat_snapshot(connection, row)
             companion_snapshots = [
                 dict(item)
                 for item in self.companion_battle_snapshot(connection, player_id).companions
@@ -360,7 +361,7 @@ class ExplorationRepositoryMixin:
                 "location_key": definition.location_key,
                 "realm_key": player_state["realm_key"],
                 "realm_layer": player_state["realm_layer"],
-                "qualification": player_object(row, "qualification_json"),
+                "qualification": stat_snapshot["base_stats"],
                 "path_key": player_state["path_key"],
                 "pollution_before": pollution_before,
                 "pollution_after": pollution_after,
@@ -383,10 +384,10 @@ class ExplorationRepositoryMixin:
                 "storm_roll_bp": (
                     cloud_boat_storm_roll_bp(operation_id) if definition.key == "explore.cloud_boat_trial" else None
                 ),
-                "max_hp": player_state["max_hp"],
-                "initiative": player_state["initiative"],
-                "constitution_effect": constitution_effect_snapshot(connection, player_id),
-                "equipment": list(self._battle_equipment_snapshot(connection, player_id)),
+                "stat_snapshot": stat_snapshot,
+                "constitution_effect": stat_snapshot["constitution_effect"],
+                "equipment": stat_snapshot["equipment"],
+                "skills": self._battle_skill_snapshot(connection, player_id, str(player_state["path_key"] or "")),
                 "companions": companion_snapshots,
             }
             snapshot["exploration_discovery_bp"] = exploration_discovery_weight_bp(
@@ -600,7 +601,7 @@ class ExplorationRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._exploration_settlement_from_payload(decode_json_strict(existing["result_json"]), replay=True)
             row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM exploration_sessions WHERE exploration_id = ? AND player_id = ?",
@@ -648,7 +649,7 @@ class ExplorationRepositoryMixin:
             result = frozen_result if battle_outcome == "won" else dict(failure_result)
             soul_power_loss = 0
             soul_fatigue_until = row["soul_fatigue_until"]
-            snapshot = self._json_object(session["snapshot_json"], {})
+            snapshot = decode_json_strict(session["snapshot_json"])
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", player_integer(row, "bloodline_stability")))
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, player_integer(row, "soul_power"))
@@ -768,7 +769,7 @@ class ExplorationRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._exploration_settlement_from_payload(decode_json_strict(existing["result_json"]), replay=True)
             row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') ORDER BY id DESC LIMIT 1",
@@ -808,7 +809,7 @@ class ExplorationRepositoryMixin:
                     ),
                 )
                 return self._exploration_settlement_from_payload(payload)
-            snapshot = self._json_object(session["snapshot_json"], {})
+            snapshot = decode_json_strict(session["snapshot_json"])
             stored_result = self._json_object(session["result_json"], {})
             if (
                 str(session["mode_key"]) == "explore.cloud_boat_trial"
@@ -1152,7 +1153,7 @@ class ExplorationRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._exploration_settlement_from_payload(decode_json_strict(existing["result_json"]), replay=True)
             row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running') ORDER BY id DESC LIMIT 1",
@@ -1160,7 +1161,7 @@ class ExplorationRepositoryMixin:
             ).fetchone()
             if session is None:
                 raise ExplorationStormNotPendingError("no active cloud boat trial")
-            snapshot = self._json_object(session["snapshot_json"], {})
+            snapshot = decode_json_strict(session["snapshot_json"])
             stored = self._json_object(session["result_json"], {})
             if str(session["mode_key"]) != "explore.cloud_boat_trial" or not stored.get("storm_pending"):
                 raise ExplorationStormNotPendingError("storm choice is not pending")
@@ -1292,14 +1293,14 @@ class ExplorationRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._exploration_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+                return self._exploration_settlement_from_payload(decode_json_strict(existing["result_json"]), replay=True)
             row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM exploration_sessions WHERE player_id = ? AND status = 'created' ORDER BY id DESC LIMIT 1", (row["id"],)
             ).fetchone()
             if session is None:
                 raise ExplorationNotFoundError("exploration cannot be cancelled")
-            snapshot = self._json_object(session["snapshot_json"], {})
+            snapshot = decode_json_strict(session["snapshot_json"])
             stamina_refund = int(session["stamina_cost"])
             energy_refund = int(snapshot.get("energy_cost", 0))
             change_player_state(

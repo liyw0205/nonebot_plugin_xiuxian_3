@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from dataclasses import replace
 from tempfile import TemporaryDirectory
+
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -26,6 +29,10 @@ async def _send(runtime, adapter: str, user: str, operation: str, command: str):
     )
 
 
+def _overpowering_enemy(key: str, *, content=None):
+    return replace(enemy_definition(key, content=content), max_hp=1_000_000, attack=100_000, initiative=100_000)
+
+
 def _make_eligible(runtime, adapter: str, user: str, faction: str) -> None:
     with sqlite3.connect(runtime.settings.database_path) as db:
         db.execute(
@@ -35,7 +42,7 @@ def _make_eligible(runtime, adapter: str, user: str, faction: str) -> None:
             "qualification_json=?,intro_json=?,faction_reputation_json=? "
             "WHERE platform=? AND platform_user_id=?",
             (
-                json.dumps({"body": 15, "agility": 15}),
+                json.dumps(BALANCED_QUALIFICATION),
                 json.dumps({"flags": [f"alliance.{faction}"]}),
                 json.dumps({faction: 500}),
                 adapter,
@@ -51,6 +58,7 @@ def _make_eligible(runtime, adapter: str, user: str, faction: str) -> None:
             "ON CONFLICT(player_id) DO UPDATE SET local_json=excluded.local_json,updated_at=excluded.updated_at",
             (player_id, json.dumps({"local.xuantian.new_town": 23})),
         )
+    equip_damage_weapon(runtime, adapter, user, 500)
 
 
 def test_three_realms_tower_rules_are_faction_specific() -> None:
@@ -112,7 +120,7 @@ def _make_tower_eligible(
             "WHERE platform=? AND platform_user_id=?",
             (
                 realm,
-                json.dumps({"body": 10000, "agility": 1000, "spirit": 100}),
+                json.dumps(BALANCED_QUALIFICATION),
                 json.dumps({"flags": ["story.mainline.three_realms", f"alliance.{faction}"]}),
                 json.dumps({faction: 500}),
                 adapter,
@@ -137,6 +145,7 @@ def _make_tower_eligible(
                 ),
             ),
         )
+    equip_damage_weapon(runtime, adapter, user, 500)
 
 
 def test_three_realms_tower_progression_on_qq_and_onebot(monkeypatch) -> None:
@@ -198,9 +207,11 @@ def test_three_realms_tower_progression_on_qq_and_onebot(monkeypatch) -> None:
                         db.execute(
                             "UPDATE players SET max_hp=1,initiative=0,qualification_json=? "
                             "WHERE platform=? AND platform_user_id=?",
-                            (json.dumps({"body": 0, "agility": 0, "spirit": 0}), adapter, user),
+                            (json.dumps(BALANCED_QUALIFICATION), adapter, user),
                         )
-                    loss = await _send(runtime, adapter, user, f"{prefix}-loss-21", "挑战三界塔 21")
+                    with monkeypatch.context() as patch:
+                        patch.setattr("nonebot_plugin_xiuxian_3.xiuxian.combat.repository.enemy_definition", _overpowering_enemy)
+                        loss = await _send(runtime, adapter, user, f"{prefix}-loss-21", "挑战三界塔 21")
                     assert loss.code == "THREE_REALMS_TOWER_CHALLENGE_SETTLED"
                     assert loss.data["outcome"] != "won"
                     _make_tower_eligible(
@@ -494,7 +505,7 @@ def test_three_realms_tower_full_progression_on_qq_and_onebot() -> None:
                     "max_hp=20000,initiative=5000 WHERE platform=? AND platform_user_id=?",
                     (
                         json.dumps({"flags": ["story.mainline.three_realms", "alliance.beast"]}),
-                        json.dumps({"body": 10000, "agility": 100}),
+                        json.dumps(BALANCED_QUALIFICATION),
                         adapter,
                         user,
                     ),
@@ -521,9 +532,11 @@ def test_three_realms_tower_failed_attempt_counts_and_start_failure_refunds(monk
                     db.execute(
                         "UPDATE players SET max_hp=30,initiative=1,qualification_json=? "
                         "WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"body": 0, "agility": 0}), adapter, user),
+                        (json.dumps(BALANCED_QUALIFICATION), adapter, user),
                     )
-                lost = await _send(runtime, adapter, user, f"{prefix}-loss", "挑战三界塔 1")
+                with monkeypatch.context() as patch:
+                    patch.setattr("nonebot_plugin_xiuxian_3.xiuxian.combat.repository.enemy_definition", _overpowering_enemy)
+                    lost = await _send(runtime, adapter, user, f"{prefix}-loss", "挑战三界塔 1")
                 assert lost.code == "THREE_REALMS_TOWER_CHALLENGE_SETTLED"
                 assert lost.data["outcome"] != "won"
                 with sqlite3.connect(runtime.settings.database_path) as db:
