@@ -595,6 +595,114 @@ def test_equipment_loadout_is_idempotent_recoverable_and_adapter_neutral() -> No
     asyncio.run(run())
 
 
+def test_equipment_loadout_replays_after_content_name_changes_for_both_adapters() -> None:
+    async def run(data_dir: Path) -> None:
+        adapters = ("qq.official", "onebot.v11")
+        runtime = create_runtime(data_dir=data_dir, adapters=adapters)
+        for adapter in adapters:
+            user = f"loadout-content-{adapter}"
+            await _enter_cultivator_with_adapter(runtime, adapter, user)
+            _set_equipment_resources(
+                runtime,
+                user,
+                adapter=adapter,
+                ironstone=0,
+                stones=0,
+                sword=1,
+            )
+            result = await runtime.adapters.dispatch(
+                adapter,
+                _context(
+                    user,
+                    f"{adapter}-equip-original",
+                    adapter=adapter,
+                    operation_id=f"{adapter}:loadout:content",
+                ),
+                "穿戴装备 木纹剑",
+            )
+            assert result.code == "EQUIPMENT_EQUIPPED"
+            assert result.data["label"] == "木纹剑"
+        await runtime.close()
+
+        equipment_path = data_dir / "装备" / "法器.json"
+        document = json.loads(equipment_path.read_text(encoding="utf-8"))
+        wood_sword = next(
+            row for row in document["records"] if row["key"] == "item.weapon.wood_sword"
+        )
+        wood_sword["name"] = "青木灵剑"
+        wood_sword["aliases"] = []
+        equipment_path.write_text(
+            json.dumps(document, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        recovered = create_runtime(data_dir=data_dir, adapters=adapters)
+        for adapter in adapters:
+            user = f"loadout-content-{adapter}"
+            operation_id = f"{adapter}:loadout:content"
+            replay = await recovered.adapters.dispatch(
+                adapter,
+                _context(
+                    user,
+                    f"{adapter}-equip-replay-after-content-change",
+                    adapter=adapter,
+                    operation_id=operation_id,
+                ),
+                "穿戴装备 木纹剑",
+            )
+            assert replay.code == "EQUIPMENT_EQUIPPED"
+            assert replay.data == {
+                "label": "木纹剑",
+                "slot": "weapon",
+                "equipped": True,
+                "idempotent_replay": True,
+            }
+
+            changed_input = await recovered.adapters.dispatch(
+                adapter,
+                _context(
+                    user,
+                    f"{adapter}-equip-changed-input",
+                    adapter=adapter,
+                    operation_id=operation_id,
+                ),
+                "穿戴装备 青木灵剑",
+            )
+            assert changed_input.code == "OPERATION_CONFLICT"
+
+            stale_new_request = await recovered.adapters.dispatch(
+                adapter,
+                _context(
+                    user,
+                    f"{adapter}-equip-stale-name-new-operation",
+                    adapter=adapter,
+                    operation_id=f"{adapter}:loadout:stale-name",
+                ),
+                "穿戴装备 木纹剑",
+            )
+            assert stale_new_request.code == "INVALID_EQUIPMENT"
+
+            with recovered.repository._connect() as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                    (adapter, user),
+                ).fetchone()[0]
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM equipment_loadout_events WHERE player_id=?",
+                    (player_id,),
+                ).fetchone()[0] == 1
+                assert connection.execute(
+                    "SELECT equipped FROM equipment_instances WHERE player_id=? AND item_key=?",
+                    (player_id, "item.weapon.wood_sword"),
+                ).fetchone()[0] == 1
+        await recovered.close()
+
+    with TemporaryDirectory() as directory:
+        data_dir = Path(directory) / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        asyncio.run(run(data_dir))
+
+
 async def _enter_cultivator_with_adapter(runtime, adapter: str, user_id: str) -> None:
     commands = (
         "开始修仙",

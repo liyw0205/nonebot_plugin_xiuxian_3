@@ -1476,14 +1476,12 @@ class AdvancementRepositoryMixin:
         equipped: bool,
     ) -> EquipmentLoadoutRecord:
         operation_name = "item.equip" if equipped else "item.unequip"
-        definition = equipment_definition(equipment_reference, self.content)
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
                 "equipment_reference": equipment_reference.strip(),
-                "item_key": definition.key,
             },
         )
         now_text = serialize_datetime(self._now())
@@ -1498,6 +1496,7 @@ class AdvancementRepositoryMixin:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._loadout_from_payload(json.loads(existing["result_json"]), replay=True)
 
+            definition = equipment_definition(equipment_reference, self.content)
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["stage"]) != "cultivator":
                 raise PlayerStageConflictError("equipment loadout requires entry into cultivation")
