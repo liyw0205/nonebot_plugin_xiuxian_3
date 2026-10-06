@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from ..content import ContentBundle
 from .cloud_rules import BEAST_INTRO_FLAG
 
 
@@ -237,6 +238,13 @@ def destination_definition(destination: str) -> DestinationDefinition:
         return DESTINATIONS[destination]
     except KeyError as exc:
         raise ValueError(f"unsupported destination: {destination}") from exc
+
+
+def destination_location_is_open(destination: str, content: ContentBundle | None) -> bool:
+    if content is None:
+        return True
+    location = content.get("location", destination)
+    return location is None or location.get("status") in {"active", "open"}
 
 
 def realm_rank(realm_key: str) -> int:

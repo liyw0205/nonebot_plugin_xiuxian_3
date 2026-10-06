@@ -38,7 +38,12 @@ from ..repository import (
     EventNotActiveError,
     FactionReputationInsufficientError,
 )
-from .rules import CAVE_LOCATION, destination_definition, resolve_destination
+from .rules import (
+    CAVE_LOCATION,
+    destination_definition,
+    destination_location_is_open,
+    resolve_destination,
+)
 from .cloud_rules import cloud_route_definition, resolve_cloud_route
 from .void_rules import resolve_void_route, void_route_definition
 
@@ -183,6 +188,14 @@ class WorldApplication:
                 operation_id,
             )
         except LocationRequirementError:
+            if not destination_location_is_open(resolved, self.repository.content):
+                return CommandResult(
+                    False,
+                    "LOCATION_LOCKED",
+                    "此地尚未开放，未扣除任何资源。",
+                    context.request_id,
+                    operation_id,
+                )
             if resolved == "xuantian.domain_front":
                 return CommandResult(
                     False,

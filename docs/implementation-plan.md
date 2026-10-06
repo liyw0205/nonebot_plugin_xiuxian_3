@@ -39,6 +39,14 @@ v0.1 同时开放不依赖境界层数的常驻经营与特色起点：凡人起
 在 `current-status.md` 写出新的可复现缺口，并说明为什么不能用既有 application、repository 或
 `utils` 解决；禁止以重命名、顺手统一或历史条目靠后为理由重复重构。
 
+**已闭合切片：世界移动 - 按地点开放状态拒绝锁定路线。** 公开命令 `前往 阵堂` 可让聚气 L1 角色从云城抵达内容状态为 `locked`、且要求金丹 L1 的 `xuantian.array_hall`；`前往 虚空门户` 可让化神 L1 角色从界隙进入内容状态为 `locked`、且要求额外 `quest.break_void_intro` 的 `void.portal`。QQ 官方与 OneBot V11 真适配器均复现成功建行程并先扣 3/10 体力。地点状态和权限字段已有内容合同；`WorldApplication` 已统一，缺口是 `TravelRepositoryMixin` 在新请求事务中没有核对当前地点内容。
+
+文件所有权：主线独占 `xiuxian/world/travel_repository.py`、`test/test_world_cloud_routes.py`、世界移动/内容合同、当前状态和本计划。预览需将锁定目标标为未开放；新请求在 operation 历史重放检查之后、资源校验/扣除和 session 写入之前拒绝。QQ 官方与 OneBot V11 对阵堂和虚空门户均验收：体力/灵石/背包/位置不变，不创建 `travel_sessions` 或 operation；此前成功 operation 即使地点内容关闭也应先回放。明确不改云舟专用深渊门航线、其他路线参数、探索/奖励/战斗/图鉴及正式 PvE/PvP；切磋和训练傀儡保持只读观战。
+
+横向比较：社交审查发现宗门申请撤回/审批、道侣接受过期时返回过期错误，但异常回滚使 `expired` 未写入；QQ/OneBot 可复现。时间比较仍拒绝超时动作，后续查询或业务请求会物化状态，主要影响状态投影，低于可扣体力越过锁定地点的公开准入缺陷，且社交处于冷却，故暂缓。其他三界副本、悬赏矩阵、魔渊深层和竞技场高阶资源链仍缺现行完整合同；Web 写操作和跨服身份/资产操作仍锁定，先不建入口。最近五条闭合切片为道历/机缘、生产、特色玩法、经济、生产，世界移动不在其中；此次虽是世界移动此前地点切片后的例外重入，但有两个 QQ/OneBot 公开路线的可复现权限缺陷。只读协作由 `candidate_world_combat` 核查世界/战斗开放路线，`candidate_economy_social` 核查社交、经济、生产和共享状态；两者均未改文件。没有并行编码，因为路由准入、operation 顺序和两适配器夹具位于同一移动 repository 流程。
+
+实现由 `xiuxian/world/rules.py` 的 `destination_location_is_open` 与共享 `TravelRepositoryMixin` 共同完成；预览将锁定目标标为未开放，新行程在 operation 历史结果核对之后、资产扣除和 session 写入之前拒绝。QQ 官方与 OneBot V11 对阵堂和虚空门户均验收：体力/灵石/背包/位置不变，不创建 `travel_sessions` 或 operation；另验证地点关闭后 runtime 重建仍回放已成功 operation。`test/test_world.py`、`test/test_world_cloud_routes.py`、`test/test_world_intro_content.py`、`test/test_exploration_cloud_boat.py`、`test/test_void_refining.py` 共 30 项通过，文档测试 2 项通过；`compileall`、全部 JSON 解析和 `git diff --check` 通过。切片未改云舟专用深渊门航线、路线数值、探索/奖励/战斗/图鉴及正式 PvE/PvP。闭合后最近五条切片为世界移动、道历/机缘、生产、特色玩法和经济，世界移动重新冷却。
+
 **已闭合切片：道历/机缘 - 问道行卷称号奖励结算。** `领取行卷 <等级> 付费` 在有效月道契和真实行卷来源均满足时，首次称号奖励进入 `grant_player_reward_actual`，但 `split_player_rewards` 不接受 `title.*`，因此会返回 `PERSISTENCE_ERROR` 并回滚。只读复现通过正式命令确认：签名月道契激活、四个业务日真实问安、领取第 1 级付费称号；数据库中资产、领取数组、claim 行和 operation 均未留下部分写入。它是近期冷却领域的开放结算正确性例外；共享资产工具不负责 honor title 持久化，故补了通用 `utils.player` 称号写入函数并在同事务复用，不做行卷规则搬迁。QQ 官方与 OneBot V11 聚焦组 78 项通过，含免费/付费来源、双适配器、原子故障回滚、同 operation 重试和 runtime 重建重放。
 
 文件所有权：主线独占 `xiuxian/utils/player.py`、`xiuxian/utils/__init__.py`、`xiuxian/routine/rules.py`、`xiuxian/routine/repository.py`、`xiuxian/routine/wayfaring_use_cases.py`、已有称号发放 SQL 调用点、月道契当前奖励引用到的 `item.cosmetic.dao_name_frame` 正式物品记录、`test/test_utils.py`、`test/test_wayfaring.py` 和相关合同/状态/计划文档。该物品记录只补齐当前真实命令路径缺失的名称与内容引用，不改变奖励或道契规则。验收覆盖 QQ 官方与 OneBot V11 真实命令、真实问安来源、签名月道契、免费/付费称号归属展示、operation 重放、runtime 重建、输入冲突及 operation 写入故障回滚和原 operation 重试。称号、奖励与行卷 claim/operation 必须原子提交。
@@ -275,7 +283,7 @@ QQ/OneBot/Web 适配器、公式/并发/回放/故障测试、观测字段、关
 6. **已完成**：竞技场图鉴/地区名望正式投影；个人和组队对局在同一事务内写入不可变图鉴首见、参与/胜负活动记录、地方名望和投影 ledger，重复 operation 不重复投影。
 7. **已完成**：跨服匹配前置数据层；平台身份路由、只读赛季冻结快照和结算审计已接入，仍不开放跨服匹配或身份合并。
 8. **已完成**：跨服恢复演练与观测审计；竞技场备份工件受数据根路径约束，恢复前创建独立快照，恢复后执行 SQLite 完整性、外键、投影/身份/赛季/审计引用校验；历史 operation 可重放且不重复投影，失败保留原库并记录 request/operation、版本、结果、失败原因和耗时。
-9. **已完成（v0.2 世界垂直切片）**：云城/阵堂准入、云舟洞天二层/魔界引导航线、费用与凭证快照、`running/arrived` 恢复、operation 幂等，以及魔界风险确认和阵堂权限拒绝均已接入并通过 QQ/OneBot 模拟适配器测试；云铁采集的精力/许可门槛、矿兽自动战、洞天二层地点门槛和精英自动战也已接入并通过双适配器测试。
+9. **已完成（v0.2 世界垂直切片）**：云城普通移动、云舟洞天二层/魔界引导航线、费用与凭证快照、`running/arrived` 恢复、operation 幂等，以及魔界风险确认和阵堂生产权限拒绝均已接入并通过 QQ/OneBot 模拟适配器测试；云铁采集的精力/许可门槛、矿兽自动战、洞天二层地点门槛和精英自动战也已接入并通过双适配器测试。
 10. **已完成（v0.2 世界垂直切片）**：云铁矿区悬赏、云舟试炼（含风暴选择、QQ/OneBot 模拟适配器验收）、洞天精英悬赏凭证来源和五条个人生产配方（材料/精力/灵石扣除、工具耐久、质量快照、失败返还、权限复核、QQ/OneBot 验收）玩家路径已接入。
 11. **已完成（v0.2 世界垂直切片）**：洞天二层设施槽位锁定/维护和成品使用效果已接入；个人/宗门所有者、业务日维护幂等、欠费停用、订单占槽/释放、成品效果和 QQ/OneBot 验收均已通过。魔界核心区仍关闭，不得作为 PvP 夹具入口，也不开放跨服匹配或身份合并。
 12. **已完成（v0.3 三界单人与核心入口切片）**：魔界堕落遗迹和妖界万兽山单人探索均已接入元婴 L1/每日次数/地点声望/跨界惩罚/版本快照；魔界额外池提供魔核、魔界声望或 `item.clue.demon_contract`，失败进入神魂疲劳；万兽山额外池提供妖血、妖界声望或 `item.clue.beast_bloodline`，祖灵事件分支暂不发资产，失败不改变血脉稳定。探索与自动战斗均冻结 `content-0.3` 及对应规则版本；两个线索均为绑定展示物，首条 `recipe.contract.beast_pact` 已通过妖修道途、元婴、跨界地点、妖血/灵石/精力快照和独立 `production_item_bindings` 接入正式生产，契约成品绑定 24 小时并受单槽位限制；心魔分支已完成独立事件切片；`quest.demon_main_1` 通过已结算探索会话核验两次胜利和魔界声望 200，原子写入 `quest_events`、`quest_progress`、`intro_json` 与 operation；魔渊集市移动已接入元婴 L1、魔界声望 `>=200`、5 分钟/12 体力/500 灵石，万兽山移动已接入元婴 L1、妖界声望 `>=200`、5 分钟/12 体力，两个入口事务均原子校验声望并冻结准入快照，QQ 官方与 OneBot V11 已验收；固定 `trade.xuantian_to_demon` 和 `trade.xuantian_to_beast`、三界贸易、限量拍卖、跨界求购均已开放并通过双适配器幂等测试。`event.demon_invasion` 已接入每周三 20:00 UTC 的 3 小时轮次、运输/个人设施维护/战斗来源投影、个人贡献 50 门槛和双适配器领奖，个人设施可由玩家按服务端业务日维护，`xuantian.war_front` 可在活动窗口内移动并开始固定自动战。`cave.boundary_realm` 界隙多人副本也已完成：2–5 人/5 分钟确认窗口、元婴与三界主线证据、30 体力/队长 1 枚神魂晶的原子扣除、跨界快照、服务端自动回合、失败神魂疲劳、独立奖励和恢复锁。魔界完整核心区、化形圣地、完整技能系统和跨服匹配仍未开放。

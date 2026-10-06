@@ -72,7 +72,12 @@ from ..world.void_rules import (
 )
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
-from ..world.rules import beast_hills_entry_allowed, destination_definition, meets_realm
+from ..world.rules import (
+    beast_hills_entry_allowed,
+    destination_definition,
+    destination_location_is_open,
+    meets_realm,
+)
 from ..specials.codex_projection import record_location_discovery
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from ..exploration.rules import (
@@ -180,6 +185,8 @@ class TravelRepositoryMixin:
             raise PlayerNotFoundError("player does not exist")
         definition = destination_definition(destination)
         missing: list[str] = []
+        if not destination_location_is_open(destination, self.content):
+            missing.append("此地尚未开放")
         if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
             missing.append("云舟航线")
         if not meets_realm(player.realm_key, player.realm_layer, definition.required_realm, definition.required_layer):
@@ -328,6 +335,8 @@ class TravelRepositoryMixin:
                 return self._travel_start_from_payload(json.loads(existing["result_json"]), replay=True)
 
             row = self._require_player(connection, platform, platform_user_id, writable=False)
+            if not destination_location_is_open(destination, self.content):
+                raise LocationRequirementError("destination is not open")
             if destination == "xuantian.war_front":
                 from ..events.demon_rules import DEMON_EVENT_KEY
                 from ..events.public_event_rules import public_event_is_open

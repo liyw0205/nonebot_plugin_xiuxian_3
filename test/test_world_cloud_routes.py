@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
@@ -363,5 +365,105 @@ def test_array_hall_permission_does_not_leak_production_and_replays() -> None:
                     "SELECT stamina FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
                 ).fetchone()[0] == 27
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_locked_locations_reject_travel_without_writes_on_both_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            runtime = create_runtime(data_dir=data_dir)
+            destinations = (
+                ("array", "阵堂", "qi_gathering", "xuantian.cloud_city"),
+                ("void", "虚空门户", "soul_transformation", "cave.boundary_realm"),
+            )
+            for adapter in ("qq.official", "onebot.v11"):
+                for suffix, label, realm, location in destinations:
+                    user = f"locked-{suffix}-{adapter}"
+                    await runtime.dispatch(_context(adapter, user, f"create-{user}"), "开始修仙")
+                    await runtime.dispatch(_context(adapter, user, f"seek-{user}"), "寻仙问道")
+                    _prepare_player(runtime, adapter, user, realm=realm, location=location)
+
+                    preview = await runtime.dispatch(
+                        _context(adapter, user, f"preview-{user}"), f"移动预览 {label}"
+                    )
+                    assert preview.code == "TRAVEL_PREVIEW"
+                    assert preview.data["ready"] is False
+                    assert "此地尚未开放" in preview.data["missing"]
+
+                    operation_id = f"travel-{user}"
+                    rejected = await runtime.dispatch(
+                        _context(adapter, user, f"start-{user}", operation_id), f"前往 {label}"
+                    )
+                    assert rejected.code == "LOCATION_LOCKED"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        player = connection.execute(
+                            "SELECT location_key, stamina, spirit_stones, inventory_json FROM players "
+                            "WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()
+                        assert player == (location, 30, 1000, "{}")
+                        assert connection.execute(
+                            "SELECT COUNT(*) FROM travel_sessions WHERE player_id=(SELECT id FROM players "
+                            "WHERE platform=? AND platform_user_id=?)",
+                            (adapter, user),
+                        ).fetchone()[0] == 0
+                        assert connection.execute(
+                            "SELECT COUNT(*) FROM operations WHERE operation_id=?", (operation_id,)
+                        ).fetchone()[0] == 0
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_travel_operation_replays_before_current_location_status_check() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            locations_path = data_dir / "地图" / "地点.json"
+            locations = json.loads(locations_path.read_text(encoding="utf-8"))
+            for location in locations["records"]:
+                if location["key"] in {"xuantian.array_hall", "void.portal"}:
+                    location["status"] = "open"
+            locations_path.write_text(json.dumps(locations, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            runtime = create_runtime(data_dir=data_dir)
+            destinations = (
+                ("array", "阵堂", "qi_gathering", "xuantian.cloud_city"),
+                ("void", "虚空门户", "soul_transformation", "cave.boundary_realm"),
+            )
+            operations: list[tuple[str, str, str]] = []
+            for adapter in ("qq.official", "onebot.v11"):
+                for suffix, label, realm, location in destinations:
+                    user = f"replay-{suffix}-{adapter}"
+                    operation_id = f"travel-{user}"
+                    await runtime.dispatch(_context(adapter, user, f"create-{user}"), "开始修仙")
+                    await runtime.dispatch(_context(adapter, user, f"seek-{user}"), "寻仙问道")
+                    _prepare_player(runtime, adapter, user, realm=realm, location=location)
+                    started = await runtime.dispatch(
+                        _context(adapter, user, f"start-{user}", operation_id), f"前往 {label}"
+                    )
+                    assert started.code == "TRAVEL_STARTED"
+                    operations.append((adapter, user, operation_id))
+            await runtime.close()
+
+            locations = json.loads(locations_path.read_text(encoding="utf-8"))
+            for location in locations["records"]:
+                if location["key"] in {"xuantian.array_hall", "void.portal"}:
+                    location["status"] = "locked"
+            locations_path.write_text(json.dumps(locations, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            restarted = create_runtime(data_dir=data_dir)
+            for adapter, user, operation_id in operations:
+                replay = await restarted.dispatch(
+                    _context(adapter, user, f"replay-{user}", operation_id),
+                    "前往 阵堂" if "array" in user else "前往 虚空门户",
+                )
+                assert replay.code == "TRAVEL_STARTED"
+                assert replay.data["idempotent_replay"] is True
+            await restarted.close()
 
     asyncio.run(run())
