@@ -12,7 +12,7 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..content import bundled_content
 from ..persistence.errors import *  # noqa: F401,F403
-from ..utils.assets import inventory_amount, spend_player_items
+from ..utils.assets import inventory_amount, reserved_inventory_quantity, spend_player_items
 from ..utils.player import change_player_state_actual, player_integer, player_inventory
 from .models import ItemUseRecord
 from .rules import (
@@ -227,8 +227,11 @@ class ItemRepositoryMixin:
 
             row = self._require_player(connection, platform, platform_user_id)
             inventory = player_inventory(row)
-            if inventory_amount(inventory, definition.key) < 1:
+            owned = inventory_amount(inventory, definition.key)
+            if owned < 1:
                 raise ItemInsufficientError("item is missing")
+            if owned - reserved_inventory_quantity(connection, int(row["id"]), definition.key) < 1:
+                raise ItemReservedError("item is committed to an active trade order")
 
             effect: dict[str, object]
             if definition.effect_type == "restore_choice":

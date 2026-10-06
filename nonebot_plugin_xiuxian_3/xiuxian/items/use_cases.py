@@ -11,6 +11,7 @@ from ..repository import (
     ItemEffectAlreadyPendingError,
     ItemCooldownError,
     ItemInsufficientError,
+    ItemReservedError,
     ItemLocationRequiredError,
     ItemNotUsableError,
     OperationConflictError,
@@ -154,6 +155,8 @@ class ItemApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except ItemInsufficientError:
             return CommandResult(False, "ITEM_INSUFFICIENT", f"缺少{definition.name}，未扣除资源。", context.request_id, operation_id)
+        except ItemReservedError:
+            return CommandResult(False, "ITEM_RESERVED", f"{definition.name}已托付给交易，暂不能使用。", context.request_id, operation_id)
         except ItemLocationRequiredError:
             target = (
                 content.label("location", definition.location_key)

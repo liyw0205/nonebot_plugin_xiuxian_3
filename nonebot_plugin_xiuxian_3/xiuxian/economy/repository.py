@@ -32,6 +32,7 @@ from ..utils.assets import (
     grant_player_assets,
     inventory_amount,
     inventory_spend,
+    reserved_inventory_quantity,
     spend_player_assets,
     player_currency,
 )
@@ -312,16 +313,14 @@ class EconomyRepositoryMixin:
             if int(active_count) >= MARKET_MAX_LISTINGS:
                 raise MarketOrderLimitError("listing limit reached")
             inventory = player_inventory(player)
-            market_locked = self._market_locked_quantity(connection, int(player["id"]), item.key)
+            reserved = reserved_inventory_quantity(connection, int(player["id"]), item.key)
             bound_quantity, _ = active_binding_totals(connection, int(player["id"]), item.key, now_text)
-            unbound_inventory = inventory_amount(inventory, item.key) - market_locked
+            unbound_inventory = inventory_amount(inventory, item.key) - reserved
             available = unbound_inventory - bound_quantity
             if unbound_inventory < quantity:
                 raise MarketItemLockedError("not enough unlocked inventory")
             if available < quantity:
                 raise ItemBindingActiveError("item binding is still active")
-            if available < quantity:
-                raise MarketItemLockedError("not enough unlocked inventory")
             if player_currency(player) < fee:
                 raise BalanceInsufficientError("listing fee is not affordable")
             order_id = f"market-{uuid4().hex}"
@@ -584,14 +583,6 @@ class EconomyRepositoryMixin:
                 str(order["order_id"]), now_text,
             )
         connection.execute("DELETE FROM market_item_locks WHERE order_id = ?", (order["order_id"],))
-
-    @staticmethod
-    def _market_locked_quantity(connection: Any, player_id: int, item_key: str) -> int:
-        row = connection.execute(
-            "SELECT COALESCE(SUM(quantity), 0) FROM market_item_locks WHERE seller_player_id = ? AND item_key = ?",
-            (player_id, item_key),
-        ).fetchone()
-        return int(row[0])
 
     @staticmethod
     def _market_ledger(

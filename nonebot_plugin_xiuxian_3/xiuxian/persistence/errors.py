@@ -2152,6 +2152,10 @@ class ItemInsufficientError(RuntimeError):
     """The player does not own enough copies of the requested item."""
 
 
+class ItemReservedError(RuntimeError):
+    """The requested item is committed to an active trade order."""
+
+
 class ItemLocationRequiredError(RuntimeError):
     """The item effect requires a different binding location."""
 

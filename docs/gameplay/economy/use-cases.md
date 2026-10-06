@@ -11,6 +11,7 @@
 `TRADE_INPUT_INSUFFICIENT`、`ITEM_BINDING_ACTIVE`。
 限量拍卖另有 `AUCTION_SLOT_FULL`、`AUCTION_BID_TOO_LOW`、`AUCTION_SETTLEMENT_EXPIRED`、`AUCTION_STATE_CONFLICT`、
 `AUCTION_ITEM_LOCKED`。
+物品使用若数量全部由摆摊、求购或拍卖保留，返回 `ITEM_RESERVED`，不扣除背包物品。
 
 ## 风控
 
@@ -22,6 +23,7 @@
 匹配、成交、列表和创建重放均不因物品改名或关闭而重新解释。不同创建输入仍返回 `LEDGER_CONFLICT`。
 
 余额不足不锁卖方物品；成交重试只转移一次；撤单完整解锁；清理不重复退款；流水可重建余额。
+摆摊、求购匹配和拍卖创建必须汇总三种交易锁；物品使用不得扣除已保留数量，释放锁后相同未完成 operation 可重新执行；拒绝时不得留下物品、费用、效果或 operation 写入。
 固定贸易须覆盖魔渊集市/万兽山/三界贸易口地点准入、周限额、失败不扣、24 小时绑定、绑定期摆摊拦截和 QQ 官方/OneBot V11 operation 幂等；三界贸易口还需同时校验魔界与妖界声望 200。
 求购还须覆盖物品改名后的跨 runtime 原 operation 重放、冻结名称、资产/订单唯一性、不同输入冲突、新请求按当前内容拒绝，
 并在 QQ 官方与 OneBot V11 实际命令路径验收。

@@ -549,6 +549,22 @@ def inventory_amount(inventory: Mapping[str, Any], key: str) -> int:
     return quantity
 
 
+def reserved_inventory_quantity(connection: Any, player_id: int, item_key: str) -> int:
+    """Sum stackable items committed to active player-to-player orders."""
+
+    row = connection.execute(
+        """SELECT COALESCE(SUM(quantity), 0) FROM (
+            SELECT quantity FROM market_item_locks WHERE seller_player_id=? AND item_key=?
+            UNION ALL
+            SELECT quantity FROM purchase_item_locks WHERE seller_player_id=? AND item_key=?
+            UNION ALL
+            SELECT quantity FROM auction_item_locks WHERE seller_player_id=? AND item_key=?
+        )""",
+        (player_id, item_key) * 3,
+    ).fetchone()
+    return int(row[0])
+
+
 def player_asset_amount(row: Any, key: str) -> int:
     """Read one currency or item balance through the shared asset rules."""
 
@@ -757,6 +773,7 @@ __all__ = [
     "grant_player_assets",
     "grant_player_items",
     "inventory_amount",
+    "reserved_inventory_quantity",
     "inventory_grant",
     "inventory_json",
     "inventory_missing",

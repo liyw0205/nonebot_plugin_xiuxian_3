@@ -20,7 +20,12 @@ from ..persistence.errors import (
     OperationConflictError,
     PlayerNotFoundError,
 )
-from ..utils.assets import apply_player_asset_transition, inventory_amount, player_currency
+from ..utils.assets import (
+    apply_player_asset_transition,
+    inventory_amount,
+    player_currency,
+    reserved_inventory_quantity,
+)
 from ..utils.player import player_inventory
 from .auction_models import AuctionRecord
 from .bindings import active_binding_totals
@@ -106,16 +111,9 @@ class AuctionRepositoryMixin:
             if int(active_count) >= AUCTION_SLOT_LIMIT:
                 raise AuctionSlotFullError("weekly auction slots are full")
             inventory = player_inventory(seller)
-            locked_market = connection.execute(
-                "SELECT COALESCE(SUM(quantity), 0) FROM market_item_locks WHERE seller_player_id=? AND item_key=?",
-                (seller["id"], item.key),
-            ).fetchone()[0]
-            locked_auction = connection.execute(
-                "SELECT COALESCE(SUM(quantity), 0) FROM auction_item_locks WHERE seller_player_id=? AND item_key=?",
-                (seller["id"], item.key),
-            ).fetchone()[0]
+            reserved = reserved_inventory_quantity(connection, int(seller["id"]), item.key)
             bound, _ = active_binding_totals(connection, int(seller["id"]), item.key, now_text)
-            available = inventory_amount(inventory, item.key) - int(locked_market) - int(locked_auction)
+            available = inventory_amount(inventory, item.key) - reserved
             if available < int(quantity):
                 raise AuctionItemLockedError("auction item is not available")
             if available - int(bound) < int(quantity):

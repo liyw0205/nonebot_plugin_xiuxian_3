@@ -32,7 +32,12 @@ from ..persistence.errors import (
 )
 from .purchase_order_models import PurchaseOrderRecord
 from .bindings import active_binding_totals
-from ..utils.assets import apply_player_asset_transition, inventory_amount, player_currency
+from ..utils.assets import (
+    apply_player_asset_transition,
+    inventory_amount,
+    player_currency,
+    reserved_inventory_quantity,
+)
 from ..utils.player import player_inventory, player_qualification, player_reputation
 from .purchase_order_rules import (
     PURCHASE_ORDER_TTL_SECONDS,
@@ -270,19 +275,8 @@ class PurchaseOrderRepositoryMixin:
             item_key = str(order["item_key"])
             quantity = int(order["quantity"])
             inventory = player_inventory(seller)
-            locked_market = connection.execute(
-                "SELECT COALESCE(SUM(quantity),0) FROM market_item_locks WHERE seller_player_id=? AND item_key=?",
-                (seller["id"], item_key),
-            ).fetchone()[0]
-            locked_auction = connection.execute(
-                "SELECT COALESCE(SUM(quantity),0) FROM auction_item_locks WHERE seller_player_id=? AND item_key=?",
-                (seller["id"], item_key),
-            ).fetchone()[0]
-            locked_purchase = connection.execute(
-                "SELECT COALESCE(SUM(quantity),0) FROM purchase_item_locks WHERE seller_player_id=? AND item_key=?",
-                (seller["id"], item_key),
-            ).fetchone()[0]
-            available = inventory_amount(inventory, item_key) - int(locked_market) - int(locked_auction) - int(locked_purchase)
+            reserved = reserved_inventory_quantity(connection, int(seller["id"]), item_key)
+            available = inventory_amount(inventory, item_key) - reserved
             if available < quantity:
                 raise PurchaseItemLockedError("seller inventory is unavailable")
             bound_quantity, first_binding = active_binding_totals(connection, int(seller["id"]), item_key, now_text)

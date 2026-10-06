@@ -29,6 +29,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     inventory_grant,
     inventory_json,
     inventory_missing,
+    reserved_inventory_quantity,
     inventory_spend,
     inventory_value,
     inventory_with_delta,
@@ -687,6 +688,28 @@ def test_asset_shortcuts_share_the_same_player_transaction_kernel() -> None:
     spend_player_currency(connection, row, 3, "currency-spent")
     stored = connection.execute("SELECT spirit_stones, inventory_json, energy, updated_at FROM players WHERE id = 1").fetchone()
     assert tuple(stored) == (12, '{"item.sand": 2}', 9, "currency-spent")
+    connection.close()
+
+
+def test_reserved_inventory_quantity_sums_all_open_trade_locks() -> None:
+    connection = sqlite3.connect(":memory:")
+    for table, owner in (
+        ("market_item_locks", "order_id"),
+        ("purchase_item_locks", "order_id"),
+        ("auction_item_locks", "auction_id"),
+    ):
+        connection.execute(
+            f"CREATE TABLE {table} ({owner} TEXT, seller_player_id INTEGER, item_key TEXT, quantity INTEGER)"
+        )
+    connection.execute("INSERT INTO market_item_locks VALUES ('m1', 7, 'item.herb', 2)")
+    connection.execute("INSERT INTO purchase_item_locks VALUES ('p1', 7, 'item.herb', 3)")
+    connection.execute("INSERT INTO auction_item_locks VALUES ('a1', 7, 'item.herb', 4)")
+    connection.execute("INSERT INTO auction_item_locks VALUES ('a2', 8, 'item.herb', 10)")
+    connection.execute("INSERT INTO market_item_locks VALUES ('m2', 7, 'item.sand', 5)")
+
+    assert reserved_inventory_quantity(connection, 7, "item.herb") == 9
+    assert reserved_inventory_quantity(connection, 8, "item.herb") == 10
+    assert reserved_inventory_quantity(connection, 7, "item.unknown") == 0
     connection.close()
 
 
