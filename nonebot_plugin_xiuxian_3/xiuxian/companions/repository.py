@@ -178,17 +178,20 @@ class CompanionRepositoryMixin:
     def _bond_companion_sync(
         self, platform: str, platform_user_id: str, companion_key: str, operation_id: str
     ) -> CompanionMutationRecord:
-        definition = companion_definition(companion_key, getattr(self, "content", None))
-        if definition.kind not in {"beast", "mount"}:
-            raise CompanionRequirementError("gear cannot be bonded as a companion")
         operation_name = "companion.bond"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "key": definition.key})
+        request_hash = self._request_hash(
+            operation_name,
+            {"platform": platform, "platform_user_id": platform_user_id, "key": companion_key},
+        )
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             replay = self._companion_operation(connection, operation_id, operation_name, request_hash)
             if replay is not None:
                 return self._mutation_from_payload(replay, replay=True)
+            definition = companion_definition(companion_key, getattr(self, "content", None))
+            if definition.kind not in {"beast", "mount"}:
+                raise CompanionRequirementError("gear cannot be bonded as a companion")
             player = self._require_player(connection, platform, platform_user_id)
             if not self._source_available(connection, player, definition):
                 raise CompanionRequirementError("companion source is unavailable")

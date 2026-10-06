@@ -39,6 +39,12 @@ v0.1 同时开放不依赖境界层数的常驻经营与特色起点：凡人起
 在 `current-status.md` 写出新的可复现缺口，并说明为什么不能用既有 application、repository 或
 `utils` 解决；禁止以重命名、顺手统一或历史条目靠后为理由重复重构。
 
+**已闭合切片：灵兽结缘 - 内容关闭后的 operation 回放。** 入口为 `结缘灵兽 <灵兽稳定键>`。同一 operation 首次成功后，关闭 `beast.wood_rat` 并重建 runtime，原先 QQ 官方与 OneBot V11 均返回 `COMPANION_NOT_FOUND`，但数据库保留原实体和 operation。结缘仓储现先按原始稳定键和调用者身份核对历史 operation，只有新请求才解析当前内容、检查来源/容量并创建实体。QQ 官方与 OneBot V11 已验收成功结缘、内容关闭后的 runtime 重建回放、不同输入冲突、关闭内容下新 operation 拒绝、实体/operation 唯一性，以及 ledger 故障回滚后同 operation 重试。`test/test_companions.py` 6 项通过，`test/test_documentation.py` 2 项通过；未改灵具获取、喂养、进化、探索效果、运输或战斗快照。
+
+候选比较：灵兽灵具装备回放也有内容变更缺陷，但其当前唯一灵具记录的生产来源仍为 `pending_recipe_key`，测试通过手工发放背包物品，故不作为真实玩家入口切片。社交过期状态缺陷只延迟状态投影，仍由时间门槛拒绝超时动作，且社交近期已触及；不优先于跨 runtime 的已提交结缘请求无法回放。问道行卷缺完整现行内容合同；其他三界副本、高阶资源链合同不足；Web/跨服继续锁定。经济、生产、世界移动和道历/机缘近期反复处理，继续冷却。灵兽域此前刚完成探索发现效果切片；本条是 QQ 官方与 OneBot V11 均可复现的 operation 恢复例外，不扩改灵兽其他能力。
+
+只读协作由 `untouched_open_path_audit` 检查近期未触及的开放路径并提出灵具候选，`open_domain_test_gap_audit` 独立复现并确认结缘候选；二者均未修改工作树。没有并行编码，因为回放顺序、结缘事务和双适配器夹具属于同一仓储边界，由主线统一实现和验收。
+
 **已闭合切片：世界移动 - 按地点开放状态拒绝锁定路线。** 公开命令 `前往 阵堂` 可让聚气 L1 角色从云城抵达内容状态为 `locked`、且要求金丹 L1 的 `xuantian.array_hall`；`前往 虚空门户` 可让化神 L1 角色从界隙进入内容状态为 `locked`、且要求额外 `quest.break_void_intro` 的 `void.portal`。QQ 官方与 OneBot V11 真适配器均复现成功建行程并先扣 3/10 体力。地点状态和权限字段已有内容合同；`WorldApplication` 已统一，缺口是 `TravelRepositoryMixin` 在新请求事务中没有核对当前地点内容。
 
 文件所有权：主线独占 `xiuxian/world/travel_repository.py`、`test/test_world_cloud_routes.py`、世界移动/内容合同、当前状态和本计划。预览需将锁定目标标为未开放；新请求在 operation 历史重放检查之后、资源校验/扣除和 session 写入之前拒绝。QQ 官方与 OneBot V11 对阵堂和虚空门户均验收：体力/灵石/背包/位置不变，不创建 `travel_sessions` 或 operation；此前成功 operation 即使地点内容关闭也应先回放。明确不改云舟专用深渊门航线、其他路线参数、探索/奖励/战斗/图鉴及正式 PvE/PvP；切磋和训练傀儡保持只读观战。

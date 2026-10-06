@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
@@ -78,6 +80,103 @@ def test_companion_flow_is_shared_by_qq_and_onebot_and_survives_restart() -> Non
             assert restored.code == "COMPANION_STATUS"
             assert restored.data["companions"][0]["companion_key"] == "beast.wood_rat"
             assert restored.data["companions"][0]["gear"][0]["gear_key"] == "beast.gear.sack_small"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_companion_bond_replays_after_content_closes_on_both_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as directory:
+            data_dir = Path(directory) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            adapters = (("qq.official", "qq-user"), ("onebot.v11", "ob-user"))
+            runtime = create_runtime(data_dir=data_dir, adapters=tuple(adapter for adapter, _ in adapters))
+            for adapter, user in adapters:
+                await _prepare(runtime, adapter=adapter, user=user)
+            await runtime.repository.initialize()
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "CREATE TRIGGER fail_companion_bond_ledger BEFORE INSERT ON operations "
+                    "WHEN NEW.operation_name = 'companion.bond' "
+                    "BEGIN SELECT RAISE(ABORT, 'forced companion ledger failure'); END"
+                )
+            for adapter, user in adapters:
+                failed = await runtime.dispatch(
+                    _context(adapter, user, f"{adapter}:bond", "bond-failure"),
+                    "结缘灵兽 beast.wood_rat",
+                )
+                assert failed.code == "PERSISTENCE_ERROR"
+                with runtime.repository._connect() as connection:
+                    player = connection.execute(
+                        "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM companion_instances WHERE player_id = ?",
+                        (player["id"],),
+                    ).fetchone()[0] == 0
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM operations WHERE operation_id = ?",
+                        (f"{adapter}:bond",),
+                    ).fetchone()[0] == 0
+            with runtime.repository._connect() as connection:
+                connection.execute("DROP TRIGGER fail_companion_bond_ledger")
+
+            instance_ids: dict[str, str] = {}
+            for adapter, user in adapters:
+                bonded = await runtime.dispatch(
+                    _context(adapter, user, f"{adapter}:bond", "bond"),
+                    "结缘灵兽 beast.wood_rat",
+                )
+                assert bonded.code == "COMPANION_BONDED"
+                instance_ids[adapter] = str(bonded.data["instance_id"])
+            await runtime.close()
+
+            content_path = data_dir / "灵兽" / "灵兽.json"
+            content = json.loads(content_path.read_text(encoding="utf-8"))
+            wood_rat = next(row for row in content["records"] if row["key"] == "beast.wood_rat")
+            wood_rat["status"] = "locked"
+            content_path.write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
+
+            runtime = create_runtime(data_dir=data_dir, adapters=tuple(adapter for adapter, _ in adapters))
+            for adapter, user in adapters:
+                replay = await runtime.dispatch(
+                    _context(adapter, user, f"{adapter}:bond", "bond-retry"),
+                    "结缘灵兽 beast.wood_rat",
+                )
+                assert replay.code == "COMPANION_BONDED"
+                assert replay.data["idempotent_replay"] is True
+                assert replay.data["instance_id"] == instance_ids[adapter]
+
+                conflict = await runtime.dispatch(
+                    _context(adapter, user, f"{adapter}:bond", "bond-conflict"),
+                    "结缘灵兽 unknown.companion",
+                )
+                assert conflict.code == "OPERATION_CONFLICT"
+
+                unavailable = await runtime.dispatch(
+                    _context(adapter, user, f"{adapter}:new-bond", "bond-new"),
+                    "结缘灵兽 beast.wood_rat",
+                )
+                assert unavailable.code == "COMPANION_NOT_FOUND"
+
+                await runtime.repository.initialize()
+                with runtime.repository._connect() as connection:
+                    player = connection.execute(
+                        "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                    companion_count = connection.execute(
+                        "SELECT COUNT(*) FROM companion_instances WHERE player_id = ?",
+                        (player["id"],),
+                    ).fetchone()[0]
+                    bond_operation_count = connection.execute(
+                        "SELECT COUNT(*) FROM operations WHERE operation_id = ?",
+                        (f"{adapter}:bond",),
+                    ).fetchone()[0]
+                assert companion_count == 1
+                assert bond_operation_count == 1
             await runtime.close()
 
     asyncio.run(run())
