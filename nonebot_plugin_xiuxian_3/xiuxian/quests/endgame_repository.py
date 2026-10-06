@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..content import ContentError, bundled_content
 from ..utils.assets import inventory_amount, spend_player_items
 from ..utils.player import grant_player_state, player_integer, player_inventory
 from ..events.rules import final_heaven_season_window
@@ -19,12 +20,14 @@ from ..persistence.errors import (
     QuestRequirementError,
     QuestResourceInsufficientError,
 )
+from ..specials.codex_projection import record_codex_discovery
 from .models import DaoUnionQualificationRecord, QuestActionRecord
 from .rules import (
     DAO_ORIGIN_REWARDS,
     DAO_ORIGIN_TARGET,
     DAO_ORIGIN_TASKS,
     DAO_ORIGIN_WORLD_MERIT,
+    dao_origin_codex_entry_key,
     DAO_UNION_CHALLENGE,
     DAO_UNION_FRAGMENT_REWARD,
     DAO_UNION_MAINLINE,
@@ -371,6 +374,8 @@ class EndgameQuestRepositoryMixin:
                 raise DaoOriginTaskRequirementError("dao-origin tasks require 合道")
             if str(player["endgame_status"] or "none") not in {"dao_union", "tribulation"}:
                 raise DaoOriginTaskRequirementError("dao-origin tasks require an active endgame route")
+            content = self.content or bundled_content()
+            codex_entry_key = dao_origin_codex_entry_key(task_key, content)
             count = self._dao_origin_task_count(connection, int(player["id"]), task_key, season_id)
             if count >= DAO_ORIGIN_TARGET:
                 raise QuestAlreadyCompletedError("dao-origin task is already complete for this season")
@@ -382,6 +387,31 @@ class EndgameQuestRepositoryMixin:
             count += 1
             reward = dict(DAO_ORIGIN_REWARDS[task_key]) if count == DAO_ORIGIN_TARGET else {}
             world_merit_reward = DAO_ORIGIN_WORLD_MERIT[task_key] if count == DAO_ORIGIN_TARGET else 0
+            discovery: dict[str, object] = {}
+            if count == DAO_ORIGIN_TARGET and codex_entry_key is not None:
+                discovery = {
+                    "entry_key": codex_entry_key,
+                    "label": content.label("codex_entry", codex_entry_key),
+                    "task_key": task_key,
+                    "task_operation_id": operation_id,
+                    "source_operation_id": str(source["source_operation_id"]),
+                    "source_kind": str(source["source_kind"]),
+                    "evidence_id": str(source["evidence_id"]),
+                    "season_id": season_id,
+                    "occurred_at": str(source["occurred_at"]),
+                }
+                if "source_key" in source:
+                    discovery["source_key"] = str(source["source_key"])
+                if not record_codex_discovery(
+                    connection,
+                    player_id=int(player["id"]),
+                    entry_key=codex_entry_key,
+                    operation_id=operation_id,
+                    occurred_at=now_text,
+                    snapshot=discovery,
+                    content=content,
+                ):
+                    raise ContentError(f"unable to record dao-origin service discovery: {codex_entry_key}")
             token_reward = int(reward.get("item.tribulation_token", 0))
             grant_player_state(
                 connection,
@@ -403,7 +433,13 @@ class EndgameQuestRepositoryMixin:
                 component_key="completed",
                 source_operation_id=str(source["source_operation_id"]),
                 outcome="success",
-                payload={"count": count, "reward": reward, "event_key": "event.dao_origin", **source},
+                payload={
+                    "count": count,
+                    "reward": reward,
+                    "event_key": "event.dao_origin",
+                    "discovery": discovery,
+                    **source,
+                },
                 now_text=now_text,
             )
             self._insert_quest_event(
@@ -413,7 +449,7 @@ class EndgameQuestRepositoryMixin:
                 component_key=task_key,
                 source_operation_id=str(source["source_operation_id"]),
                 outcome="success",
-                payload={"count": count, "reward": reward, **source},
+                payload={"count": count, "reward": reward, "discovery": discovery, **source},
                 now_text=now_text,
             )
             progress = {"completed": count}
@@ -440,6 +476,8 @@ class EndgameQuestRepositoryMixin:
                 progress,
                 reward,
                 status="completed" if count >= DAO_ORIGIN_TARGET else "active",
+                display_name=content.label("quest", task_key),
+                discovery=discovery,
             )
             self._insert_operation(
                 connection,

@@ -159,6 +159,7 @@
       "desc": "投身公共建设，修缮道场与边界设施，为众生留下安身之所。",
       "status": "open",
       "requirements": ["realm.dao_union.layer1", "building_count>=3"],
+      "codex_entry_key": "codex.dao.service_settlement",
       "reward": {"dao_fruit_progress": 160, "ascension_merit": 150},
       "claim_policy": "once_per_season",
       "expires": false,

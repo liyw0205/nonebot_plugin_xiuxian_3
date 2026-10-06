@@ -1000,6 +1000,8 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
         progress: dict[str, int],
         reward: dict[str, int],
         status: str | None = None,
+        display_name: str = "",
+        discovery: dict[str, object] | None = None,
     ) -> dict[str, object]:
         return {
             "player": self._player_payload(self._row_to_player(player)),
@@ -1008,6 +1010,8 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             "status": status or ("completed" if quest_key in {CROSS_REALM_VICTORY} or component_key in {"archive_source", VOID_ARCHIVE_DELIVERY} else "active"),
             "progress": progress,
             "reward": reward,
+            "display_name": display_name,
+            "discovery": discovery or {},
         }
 
     @staticmethod
@@ -1021,6 +1025,8 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             status=str(payload.get("status", "active")),
             progress={str(key): int(value) for key, value in dict(payload.get("progress", {})).items()},
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            display_name=str(payload.get("display_name", "")),
+            discovery=dict(payload.get("discovery", {})),
             already_completed=replay,
         )
 

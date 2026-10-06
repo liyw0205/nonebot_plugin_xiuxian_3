@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import bundled_content
 from ..persistence.errors import (
     BattleBusyError,
     BattleNotReadyError,
@@ -80,6 +81,7 @@ class QuestApplication:
             "status": record.status,
             "progress": record.progress,
             "reward": record.reward,
+            "discovery": record.discovery,
             "idempotent_replay": record.already_completed,
         }
 
@@ -394,10 +396,34 @@ class QuestApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
+        content = self.repository.content or bundled_content()
+        task_name = record.display_name
+        reward_names = {
+            "dao_fruit_progress": "道果进境",
+            "ascension_merit": "道统功勋",
+            "world_merit": "世界功勋",
+        }
+        rewards = []
+        for key, amount in record.reward.items():
+            name = reward_names.get(key)
+            if key.startswith("item."):
+                name = content.label("item", key)
+            if name is not None and amount > 0:
+                rewards.append(f"{name} ×{amount}" if key.startswith("item.") else f"{name} +{amount}")
+        reward_summary = "、".join(rewards) if rewards else "历练尚未圆满，嘉奖待后续奉上"
+        lines = [
+            "## 道源行历",
+            "",
+            f"- **篇章**：{task_name}",
+            f"- **历数**：已历 {record.progress.get('completed', 0)}/3 次",
+            f"- **所得**：{reward_summary}",
+        ]
+        if record.discovery:
+            lines.append(f"- **见闻**：{record.discovery['label']}已收入图鉴")
         return CommandResult(
             True,
             "DAO_ORIGIN_TASK_RECORDED",
-            f"## 道源任务已核验\n\n- **任务**：{task_key}\n- **进度**：{record.progress.get('completed', 0)}/3\n- **本次奖励**：{record.reward}",
+            "\n".join(lines),
             context.request_id,
             operation_id,
             data=self._data(record),

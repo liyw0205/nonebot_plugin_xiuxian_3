@@ -206,6 +206,13 @@
       "status": "active"
     },
     {
+      "key": "codex.dao.service_settlement",
+      "name": "道统服务结算",
+      "desc": "三次亲自完成公共建设后，留下道统服务结算的见闻。",
+      "category": "service",
+      "status": "active"
+    },
+    {
       "key": "codex.story.dao_service_origin",
       "name": "道统服务缘起",
       "desc": "已确认的故事节点会收入图鉴，不会泄露未经历的选择。",

@@ -147,6 +147,26 @@ DAO_ORIGIN_WORLD_MERIT = {
 }
 
 
+def dao_origin_codex_entry_key(
+    task_key: str, content: ContentBundle | None = None
+) -> str | None:
+    """Resolve the optional service discovery declared by an origin task."""
+
+    if task_key != DAO_ORIGIN_BUILD:
+        return None
+    bundle = content or bundled_content()
+    task = bundle.get("quest", task_key, include_locked=False)
+    entry_key = task.get("codex_entry_key") if task is not None else None
+    if not isinstance(entry_key, str) or not entry_key.strip():
+        raise ContentError(f"dao-origin task {task_key} requires codex_entry_key")
+    entry = bundle.get("codex_entry", entry_key, include_locked=False)
+    if entry is None or entry.get("status") != "active" or entry.get("category") != "service":
+        raise ContentError(
+            f"dao-origin task {task_key} references an inactive service codex entry: {entry_key}"
+        )
+    return entry_key
+
+
 def realm_rank(realm_key: str) -> int:
     return {
         "mortal": 0,
@@ -185,6 +205,7 @@ __all__ = [
     "DAO_ORIGIN_TASKS",
     "DAO_ORIGIN_TEACH",
     "DAO_ORIGIN_WORLD_MERIT",
+    "dao_origin_codex_entry_key",
     "DAO_UNION_CHALLENGE",
     "DAO_UNION_FRAGMENT_REWARD",
     "DAO_UNION_MAINLINE",
