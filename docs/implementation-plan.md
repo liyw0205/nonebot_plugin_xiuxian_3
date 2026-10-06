@@ -39,7 +39,7 @@ v0.1 同时开放不依赖境界层数的常驻经营与特色起点：凡人起
 在 `current-status.md` 写出新的可复现缺口，并说明为什么不能用既有 application、repository 或
 `utils` 解决；禁止以重命名、顺手统一或历史条目靠后为理由重复重构。
 
-**本轮已闭合切片：装备 - 穿脱装备原 operation 的内容变更重放。** 玩家入口为 `穿戴装备` / `卸下装备`；复现证据是
+**历史闭合切片：装备 - 穿脱装备原 operation 的内容变更重放。** 玩家入口为 `穿戴装备` / `卸下装备`；复现证据是
 `_set_equipment_loadout_sync` 先用当前 `ContentBundle` 解析展示名，再查询 operation ledger。装备改名并移除旧名称后，
 QQ 官方与 OneBot V11 在 runtime 重建后重放相同原始命令都会返回 `INVALID_EQUIPMENT`，而非已提交结果。
 主线文件限定为 `xiuxian/advancement/repository.py`、`test/test_equipment.py`、本计划和当前状态；只按原始请求引用
@@ -60,7 +60,7 @@ runtime 重建后的历史原请求恢复、输入冲突、新旧名称的新请
 不并行编码，因为请求身份、账本和内容解析都位于同一装备仓储事务。本条闭合后装备域重新进入冷却；问道行卷仍是
 待重新排序的合同缺口，不预先指定为下一切片。
 
-**上一条已闭合切片：经济 - 跨界求购发布的原 operation 内容变更重放。** 玩家入口为 `发布求购`；复现证据是
+**历史闭合切片：经济 - 跨界求购发布的原 operation 内容变更重放。** 玩家入口为 `发布求购`；复现证据是
 `_create_purchase_order_once` 先用当前 `ContentBundle` 解析物品再查 operation ledger，物品改名后同一原始请求
 无法回放，且回复名称重新读取当前内容。主线文件限定为 `xiuxian/economy/purchase_order_repository.py`、
 `purchase_order_models.py`、`purchase_order_use_cases.py`、`test/test_purchase_order.py`、经济/内容合同、当前状态与本计划。
@@ -79,7 +79,7 @@ Web 写操作与跨服身份/资产能力仍锁定。审计未发现其他冷却
 领域冷却依据玩家动作、领域状态和事务边界，不依据 Python 子包或共用数据文件；世界移动与探索可共用地点记录，
 但只修复地点开放状态并验收抵达，只计入世界移动。若同一切片改动探索会话、遭遇或奖池，则两个领域均进入冷却。
 
-**上一轮已闭合切片：世界移动 - 祖灵湖地点开放状态与公开移动验收。** `world.rules` 定义了从万兽山抵达
+**历史闭合切片：世界移动 - 祖灵湖地点开放状态与公开移动验收。** `world.rules` 定义了从万兽山抵达
 祖灵湖的化神/妖界声望门槛，但 `data/地图/地点.json` 曾标为 `locked`；旧测试直接改库设置地点，遗漏公开移动。
 拥有者为世界移动领域；范围为地点 JSON、双适配器真实移动/恢复测试和状态文档。`include_locked=False` 现可读取地点；
 QQ 官方与 OneBot V11 均覆盖预览、启程、runtime 重建后的原 operation 重放、抵达及结算重放，最终地点与体力只变化一次。

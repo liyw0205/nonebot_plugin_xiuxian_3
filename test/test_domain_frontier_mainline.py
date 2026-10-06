@@ -44,10 +44,11 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> None:
             UPDATE players
             SET stage='cultivator', realm_key='soul_transformation', realm_layer=1,
                 domain_key='domain.fire', location_key='xuantian.domain_front', stamina=100,
+                max_hp=100000, initiative=1000, qualification_json=?,
                 faction_reputation_json='{"demon":300,"beast":300}'
             WHERE id=?
             """,
-            (player_id,),
+            (json.dumps({"body": 100000, "agility": 1000}), player_id),
         )
         connection.execute(
             """
