@@ -63,6 +63,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
     change_player_state,
     change_player_state_actual,
     change_player_values,
+    grant_player_honor_title,
     grant_player_state,
     grant_player_reward,
     spend_player_state,
@@ -955,6 +956,40 @@ def test_split_player_rewards_preserves_zero_and_explicit_cumulative_values() ->
     )
     assert parts.assets == {"item.herb.blood_grass": 0}
     assert parts.value_delta == {"cultivation": 4, "total_cultivation": 7}
+
+
+def test_grant_player_honor_title_is_unique_and_requires_a_stable_key() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.execute(
+        """
+        CREATE TABLE honor_titles (
+            player_id INTEGER NOT NULL,
+            title_key TEXT NOT NULL,
+            source_operation_id TEXT NOT NULL,
+            acquired_at TEXT NOT NULL,
+            UNIQUE(player_id, title_key),
+            UNIQUE(player_id, source_operation_id)
+        )
+        """
+    )
+    assert grant_player_honor_title(
+        connection,
+        1,
+        "title.wayfaring.pathfinder",
+        "claim-1",
+        "2026-10-06T00:00:00+00:00",
+    ) is True
+    assert grant_player_honor_title(
+        connection,
+        1,
+        "title.wayfaring.pathfinder",
+        "claim-2",
+        "2026-10-06T00:00:00+00:00",
+    ) is False
+    assert connection.execute("SELECT COUNT(*) FROM honor_titles").fetchone()[0] == 1
+    with pytest.raises(ValueError):
+        grant_player_honor_title(connection, 1, "not-a-title", "claim-3", "now")
+    connection.close()
 
 
 def test_player_integer_projection_is_shared_by_profile_and_combat_reads() -> None:

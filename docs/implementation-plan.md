@@ -39,6 +39,16 @@ v0.1 同时开放不依赖境界层数的常驻经营与特色起点：凡人起
 在 `current-status.md` 写出新的可复现缺口，并说明为什么不能用既有 application、repository 或
 `utils` 解决；禁止以重命名、顺手统一或历史条目靠后为理由重复重构。
 
+**已闭合切片：道历/机缘 - 问道行卷称号奖励结算。** `领取行卷 <等级> 付费` 在有效月道契和真实行卷来源均满足时，首次称号奖励进入 `grant_player_reward_actual`，但 `split_player_rewards` 不接受 `title.*`，因此会返回 `PERSISTENCE_ERROR` 并回滚。只读复现通过正式命令确认：签名月道契激活、四个业务日真实问安、领取第 1 级付费称号；数据库中资产、领取数组、claim 行和 operation 均未留下部分写入。它是近期冷却领域的开放结算正确性例外；共享资产工具不负责 honor title 持久化，故补了通用 `utils.player` 称号写入函数并在同事务复用，不做行卷规则搬迁。QQ 官方与 OneBot V11 聚焦组 78 项通过，含免费/付费来源、双适配器、原子故障回滚、同 operation 重试和 runtime 重建重放。
+
+文件所有权：主线独占 `xiuxian/utils/player.py`、`xiuxian/utils/__init__.py`、`xiuxian/routine/rules.py`、`xiuxian/routine/repository.py`、`xiuxian/routine/wayfaring_use_cases.py`、已有称号发放 SQL 调用点、月道契当前奖励引用到的 `item.cosmetic.dao_name_frame` 正式物品记录、`test/test_utils.py`、`test/test_wayfaring.py` 和相关合同/状态/计划文档。该物品记录只补齐当前真实命令路径缺失的名称与内容引用，不改变奖励或道契规则。验收覆盖 QQ 官方与 OneBot V11 真实命令、真实问安来源、签名月道契、免费/付费称号归属展示、operation 重放、runtime 重建、输入冲突及 operation 写入故障回滚和原 operation 重试。称号、奖励与行卷 claim/operation 必须原子提交。
+
+明确不触碰：行卷周期、等级、积分来源/上限及奖励表内容化；道契生命周期；已完成生产恢复与设施维护；正式 PvE/PvP 结算；切磋和训练傀儡只读观战。
+
+横向比较：领域前线规则虽有 Python 常量，但当前事件记录和现行内容合同尚未完整定义它们，旧 v0.4 文件只是历史快照；先补合同，不以当前可见常量直接实现。其他三界副本、悬赏矩阵、魔渊深层、竞技场高阶资源链仍缺开放合同；Web/跨服写操作继续锁定。未选“完整内容化问道行卷”，因为它是领域重入且静态搬迁不能解释本次实际领奖失败。
+
+协作：只读审阅委托 `open_path_audit` 实际复现命令链与事务回滚，`adapter_gap_audit` 检查双适配器及故障恢复验收边界；两者不修改工作树。称号写入、行卷领取和 operation 共享同一 repository 事务，无独立实现文件所有权，因此不并行编码；由主线统一实现并运行全套验收。闭合后没有预选下一条；下一轮须比较当前状态页列出的全部未闭合玩家路径和子包近期触及情况，不按文档顺序或单一缺陷类型续做。
+
 **历史闭合切片：装备 - 穿脱装备原 operation 的内容变更重放。** 玩家入口为 `穿戴装备` / `卸下装备`；复现证据是
 `_set_equipment_loadout_sync` 先用当前 `ContentBundle` 解析展示名，再查询 operation ledger。装备改名并移除旧名称后，
 QQ 官方与 OneBot V11 在 runtime 重建后重放相同原始命令都会返回 `INVALID_EQUIPMENT`，而非已提交结果。

@@ -174,6 +174,7 @@ from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import grant_player_assets, inventory_amount
 from ..utils.player import (
     change_player_state,
+    grant_player_honor_title,
     grant_player_state,
     player_integer,
     player_inventory,
@@ -1831,15 +1832,12 @@ class AdventuresRepositoryMixin:
                 title = honor_title(title_key)
                 if title.closed:
                     raise MainlineContentClosedError("mainline title is not open")
-                connection.execute(
-                    """
-                    INSERT OR IGNORE INTO honor_titles(
-                        player_id, title_key, source_operation_id, acquired_at
-                    ) VALUES (?, ?, ?, ?)
-                    """,
-                    (
-                        player["id"], title_key, operation_id, now_text,
-                    ),
+                grant_player_honor_title(
+                    connection,
+                    int(player["id"]),
+                    title_key,
+                    operation_id,
+                    now_text,
                 )
                 actual[key] = title_key
             elif key.startswith("item."):

@@ -91,7 +91,7 @@ SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
 class HonorTitleDefinition:
     key: str
     label: str
-    source_event: str
+    source_event: str | None
     closed: bool = False
 
 
@@ -193,6 +193,11 @@ HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
         "虚空登临者",
         "specials.void_spire.floor.90",
     ),
+    HonorTitleDefinition("title.wayfaring.pathfinder", "行路先行", None),
+    HonorTitleDefinition("title.wayfaring.trailblazer", "拓途行者", None),
+    HonorTitleDefinition("title.wayfaring.seeker", "寻道客", None),
+    HonorTitleDefinition("title.wayfaring.wayfarer", "万里行者", None),
+    HonorTitleDefinition("title.wayfaring.licensed", "道契行者", None),
 )
 
 

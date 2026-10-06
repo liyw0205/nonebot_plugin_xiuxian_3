@@ -15,6 +15,7 @@ from ..persistence.errors import (
     OperationConflictError,
 )
 from ..routine.rules import honor_title
+from ..utils.player import grant_player_honor_title
 from .season_models import FinalHeavenClaimRecord, FinalHeavenSeasonRecord, FinalHeavenStanding
 from .season_rules import (
     FINAL_HEAVEN_BOARDS,
@@ -192,10 +193,12 @@ class FinalHeavenSeasonRepositoryMixin:
                 title_key = str(ranking["title_key"])
                 honor_title(title_key)
                 source_operation_id = f"season.final_heaven:{season_id}:{board_key}:{player['id']}"
-                connection.execute(
-                    "INSERT OR IGNORE INTO honor_titles(player_id, title_key, source_operation_id, acquired_at) "
-                    "VALUES (?, ?, ?, ?)",
-                    (player["id"], title_key, source_operation_id, now_text),
+                grant_player_honor_title(
+                    connection,
+                    int(player["id"]),
+                    title_key,
+                    source_operation_id,
+                    now_text,
                 )
                 title_event_operation = f"{operation_id}:{board_key}:title"
                 connection.execute(
@@ -500,10 +503,12 @@ class FinalHeavenSeasonRepositoryMixin:
                     "title_key": title_key,
                 },
             )
-            connection.execute(
-                "INSERT OR IGNORE INTO honor_titles(player_id, title_key, source_operation_id, acquired_at) "
-                "VALUES (?, ?, ?, ?)",
-                (player_id, title_key, source_operation_id, now_text),
+            grant_player_honor_title(
+                connection,
+                player_id,
+                title_key,
+                source_operation_id,
+                now_text,
             )
             connection.execute(
                 "INSERT OR IGNORE INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) "

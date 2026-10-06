@@ -175,6 +175,7 @@ from ..rewards.rules import local_reputation_maximum, reward_pool_map
 from ..utils.player import (
     change_player_state,
     change_player_state_actual,
+    grant_player_honor_title,
     grant_player_reward,
     grant_player_reward_actual,
     grant_player_state,
@@ -1286,25 +1287,15 @@ class RoutineRepositoryMixin:
         now_text: str,
     ) -> None:
         for definition in HONOR_TITLES:
-            if definition.closed:
+            if definition.closed or definition.source_event is None:
                 continue
             source_operation_id = SQLitePlayerRepository._honor_source_operation(
                 connection, player_id, definition.source_event
             )
             if source_operation_id is None:
                 continue
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO honor_titles(
-                    player_id, title_key, source_operation_id, acquired_at
-                ) VALUES (?, ?, ?, ?)
-                """,
-                (
-                    player_id,
-                    definition.key,
-                    source_operation_id,
-                    now_text,
-                ),
+            grant_player_honor_title(
+                connection, player_id, definition.key, source_operation_id, now_text
             )
 
     @staticmethod
@@ -1496,18 +1487,14 @@ class RoutineRepositoryMixin:
                     )
                 )
             if title_key:
-                title_definition = honor_title(str(title_key))
-                connection.execute(
-                    """
-                    INSERT OR IGNORE INTO honor_titles(
-                        player_id, title_key, source_operation_id, acquired_at
-                    ) VALUES (?, ?, ?, ?)
-                    """,
-                    (
-                        row["id"], str(title_key), source_operation_id, now_text,
-                    ),
+                honor_title(str(title_key))
+                grant_player_honor_title(
+                    connection,
+                    int(row["id"]),
+                    str(title_key),
+                    source_operation_id,
+                    now_text,
                 )
-                del title_definition
                 actual_reward["title_key"] = str(title_key)
             connection.execute(
                 """
@@ -2367,7 +2354,9 @@ class RoutineRepositoryMixin:
                     "starts_on": str(active_contract["starts_on"]),
                     "ends_on": str(active_contract["ends_on"]),
                 }
-            actual_reward = self._apply_dao_reward(connection, player, reward, now_text)
+            actual_reward = self._apply_dao_reward(
+                connection, player, reward, now_text, source_operation_id=operation_id
+            )
             claimed.add(level)
             connection.execute(
                 f"UPDATE wayfaring_passes SET {claimed_key} = ?, updated_at = ? WHERE id = ?",
@@ -2580,25 +2569,58 @@ class RoutineRepositoryMixin:
         player: sqlite3.Row,
         reward: dict[str, int],
         now_text: str,
+        *,
+        source_operation_id: str | None = None,
     ) -> dict[str, int]:
-        local_reward = int(reward.get("local_reputation", 0))
+        title_rewards = {
+            key: amount for key, amount in reward.items() if key.startswith("title.")
+        }
+        numeric_reward = {
+            key: amount for key, amount in reward.items() if not key.startswith("title.")
+        }
+        title_definitions = []
+        for title_key, amount in title_rewards.items():
+            if amount != 1:
+                raise ValueError("honor title rewards must have quantity one")
+            definition = honor_title(title_key)
+            if definition.closed:
+                raise ValueError(f"honor title is closed: {title_key}")
+            title_definitions.append(definition)
+        if title_definitions and not source_operation_id:
+            raise ValueError("honor title reward requires its source operation")
+
+        local_reward = int(numeric_reward.get("local_reputation", 0))
         local_key = ROUTINE_LOCAL_REPUTATION_KEY if local_reward else None
         local_maximums = (
             {local_key: local_reputation_maximum(local_key, self.content)}
             if local_key
             else None
         )
-        return grant_player_reward_actual(
-            connection,
-            player,
-            reward,
-            now_text,
-            local_reputation_key=local_key,
-            maximums={"energy": player_integer(player, "energy_max")}
-            if "energy" in reward
-            else None,
-            local_reputation_maximums=local_maximums,
+        actual = (
+            grant_player_reward_actual(
+                connection,
+                player,
+                numeric_reward,
+                now_text,
+                local_reputation_key=local_key,
+                maximums={"energy": player_integer(player, "energy_max")}
+                if "energy" in numeric_reward
+                else None,
+                local_reputation_maximums=local_maximums,
+            )
+            if numeric_reward
+            else {}
         )
+        for definition in title_definitions:
+            granted = grant_player_honor_title(
+                connection,
+                int(player["id"]),
+                definition.key,
+                str(source_operation_id),
+                now_text,
+            )
+            actual[definition.key] = int(granted)
+        return actual
 
     @staticmethod
     def _dao_status_from_connection(

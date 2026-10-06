@@ -289,6 +289,38 @@ def split_player_rewards(rewards: Mapping[str, Any]) -> PlayerRewardParts:
     )
 
 
+def grant_player_honor_title(
+    connection: Any,
+    player_id: int,
+    title_key: str,
+    source_operation_id: str,
+    acquired_at: str,
+) -> bool:
+    """Persist one domain-validated honor title in the caller's transaction."""
+
+    if isinstance(player_id, bool) or not isinstance(player_id, int) or player_id < 1:
+        raise ValueError("honor title player id must be a positive integer")
+    if (
+        not isinstance(title_key, str)
+        or not title_key.startswith("title.")
+        or not title_key.removeprefix("title.")
+    ):
+        raise ValueError("honor title key must use the title namespace")
+    if not isinstance(source_operation_id, str) or not source_operation_id:
+        raise ValueError("honor title source operation is required")
+    if not isinstance(acquired_at, str) or not acquired_at:
+        raise ValueError("honor title acquisition time is required")
+    cursor = connection.execute(
+        """
+        INSERT OR IGNORE INTO honor_titles(
+            player_id, title_key, source_operation_id, acquired_at
+        ) VALUES (?, ?, ?, ?)
+        """,
+        (player_id, title_key, source_operation_id, acquired_at),
+    )
+    return cursor.rowcount == 1
+
+
 def grant_player_reward(
     connection: Any,
     row: Mapping[str, Any] | Any,

@@ -17,6 +17,7 @@ from ..repository import (
     WayfaringPaidTrackInactiveError,
 )
 from .models import WayfaringClaimRecord, WayfaringStatusRecord
+from .rules import honor_title
 from .wayfaring import WAYFARING_LEVELS, WAYFARING_POINTS_PER_LEVEL
 
 
@@ -55,17 +56,16 @@ class WayfaringApplication:
             "item.ore.ironstone": "铁石",
             "item.clue.recipe_basic": "配方线索",
             "item.token.spirit_tree_water": "灵木水分券",
-            "title.wayfaring.pathfinder": "行卷称号",
-            "title.wayfaring.trailblazer": "行卷称号",
-            "title.wayfaring.seeker": "行卷称号",
-            "title.wayfaring.wayfarer": "行卷称号",
-            "title.wayfaring.licensed": "行卷称号",
         }
-        return "、".join(
-            f"{labels.get(key, '奖励')} ×{value}"
-            for key, value in reward.items()
-            if value
-        ) or "无"
+        rendered: list[str] = []
+        for key, value in reward.items():
+            if not value:
+                continue
+            if key.startswith("title."):
+                rendered.append(f"称号「{honor_title(key).label}」")
+            else:
+                rendered.append(f"{labels.get(key, '奖励')} ×{value}")
+        return "、".join(rendered) or "无"
 
     @staticmethod
     def _status_message(record: WayfaringStatusRecord) -> str:

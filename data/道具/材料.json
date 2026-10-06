@@ -625,6 +625,20 @@
       "key": "item.food.cloud_tea"
     },
     {
+      "name": "道号雅饰",
+      "desc": "可悬于道号一侧，为行走修行界的名号添一分风采。",
+      "item_type": "cosmetic",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active",
+      "key": "item.cosmetic.dao_name_frame"
+    },
+    {
       "name": "雾隐洞天路线线索",
       "desc": "记录雾隐洞天通行路线的残页，可供寻找洞天入口。",
       "item_type": "clue",
