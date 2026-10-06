@@ -46,7 +46,7 @@ failure: {}
 operation_scope: character | party | world | season
 permissions: [player]
 observability: [request_id, operation_id, result]
-rollback: 原版本结算或关闭新建
+rollback: 按冻结快照结算或关闭新建
 ```
 
 资产变化必须在同一个 Unit of Work 中写入 operation ledger、资产流水和业务实体。
@@ -181,7 +181,7 @@ WebDAV/第三方账号同样不在当前切片中。
 
 境界切片的通用验收：只有当前 L10 能创建突破；所有材料/资源不足均零变化；
 成功、失败、保护项、保底和恢复均由同一 operation 结算；重复请求回放同一随机结果；
-关闭版本不创建新会话但允许旧会话按快照完成；历史结局不可重选。
+关闭内容不创建新会话但允许旧会话按快照完成；历史结局不可重选。
 
 ## 4. 六个内容快照的完整范围
 
@@ -223,7 +223,7 @@ WebDAV/第三方账号同样不在当前切片中。
 | 探索 | 近郊采集、短历练、灵泉采集、雾隐洞天、一个悬赏 | 精英悬赏、多人秘境、跨界秘境、领域前线、虚空和道源试炼；会话开始冻结地点/成本/池 |
 | 战斗 | 自动回合训练、单人/多人 PVE 规则、基础技能、回放合同；PvP 稳定键注册为 `locked` | 自动回合精英/多人副本、正式 PvP（双方或多方）、领域机制、虚空规则重写、宗门战、天劫与守门人；奖励按战斗/角色唯一 |
 
-战斗快照必须包含参与者、境界层数、装备、技能、地点、随机池、规则版本和回合
+战斗快照必须包含参与者、境界层数、装备、技能、地点、随机池、实际规则参数和回合
 结果。修仙 3 不是单人游戏：PVE 可单人或多人协作，PvP 为双方或多方玩家对战；两者都使用服务端自动回合引擎，
 运行中不提供手动攻击、防御、选技能或选目标指令。PvP 在角色、属性、装备、技能、
 队伍和持久化基础完成前保持 `locked`，不能通过首版按钮绕过状态检查。
@@ -257,7 +257,7 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 | 类型 | v0.1 | 后续完整路线 |
 |:--|:--|:--|
 | 任务/事件 | 新手四任务、每日轮次、灵泉事件、基础贡献奖励 | 心魔、阵营战争、领域事件、赛季事件、道统和飞升日；轮次/角色唯一领奖 |
-| 道历运营 | 问安、补录、灵木聚财、七日入道、基础行卷、道号/功业、受控密令 | 日/周/月道契正式凭证、机缘池扩展、赛季通行证；随机池和支付结果可回放 |
+| 道历运营 | 问安、补录、灵木聚财、七日入道、问道行卷、道号/功业、受控密令；行卷规则与逐级奖励由内容提供，开卷冻结完整快照，周期内可达满级，到期封卷，历史 operation 原样回放 | 日/周/月道契正式凭证、机缘池扩展、赛季通行证；随机池和支付结果可回放 |
 | 冒险 | 悬赏榜、雾隐秘境、玄天主线、斗法留影、元婴三界主线 | 跨界秘境、炼虚道源主线、五人试炼、终局道源；分享只读，不重复结算 |
 | 特色 | 挂机、派遣、图鉴、试炼塔、竞技场预览、多结局剧情框架 | 正式异步竞技、派遣扩展、终局图鉴和留界结局；竞技不转移普通资产 |
 | 灵兽灵骑 | 木鼠、竹鹿、灵具/鞍具、最多 3 兽 1 骑 | 血脉、契约、灵骑蜕变、跨界坐骑、道统进化；战斗使用开始快照 |
@@ -335,9 +335,9 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 #### 5.4.3 `instance.secret_realm.ancestral_hall`
 
-稳定内容记录：`content_version=content-0.4`、`rule_version=adventures-0.4.2`、运行时目标状态 `open`。当前实现状态以 `current-status.md` 为准。该秘境为单人线性秘境，唯一入口在 `beast.ancestral_lake`；角色须为化神 L1、妖界声望至少 3000、血脉稳定至少 5000 bp。数据库以整数保存血脉稳定（`50` 表示 5000 bp），准入事务必须重新读取并校验地点、境界、声望和稳定度；不要求选择领域或持有特定道途。运行开始冻结血脉稳定、角色战斗快照和版本。
+稳定内容键为 `instance.secret_realm.ancestral_hall`，运行时目标状态为 `open`。当前实现状态以 `current-status.md` 为准。该秘境为单人线性秘境，唯一入口在 `beast.ancestral_lake`；角色须为化神 L1、妖界声望至少 3000、血脉稳定至少 5000 bp。数据库以整数保存血脉稳定（`50` 表示 5000 bp），准入事务必须重新读取并校验地点、境界、声望和稳定度；不要求选择领域或持有特定道途。运行开始冻结血脉稳定、角色战斗快照和本次采用的实际内容、规则参数。
 
-固定五节点为 `ancestral_gate -> oath_stones -> bloodline_corridor -> ancestral_spirit -> founder_altar`。节点逐个按序选择，没有分支和随机池；第四节点创建一次 `enemy.ancestral_spirit` 单人自动战，使用 `combat-0.4.1`，不发普通战斗奖励。节点、战斗、故事结算均由服务端推进，客户端不能提交行动、目标、伤害或结果。
+固定五节点为 `ancestral_gate -> oath_stones -> bloodline_corridor -> ancestral_spirit -> founder_altar`。节点逐个按序选择，没有分支和随机池；第四节点创建一次 `enemy.ancestral_spirit` 单人自动战，使用开始时冻结的自动回合规则和敌人参数，不发普通战斗奖励。节点、战斗、故事结算均由服务端推进，客户端不能提交行动、目标、伤害或结果。
 
 `enemy.ancestral_spirit` 的 `bloodline_call` 每第 4 回合召唤一个血脉影。后续自动玩家回合优先清除血脉影；若该回合因超时而防御、影子未被清除，则回合末首领恢复其最大气血的 5%（不超过最大气血），随后影子消失。该机制不修改角色血脉稳定。它适用于 `enemy.ancestral_spirit` 的自动战斗快照，战斗行动须记录召唤、清除/超时与恢复结果。
 
@@ -355,7 +355,7 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 #### 5.4.5 `instance.legacy.demon_abyss_echo`
 
-这是使用深渊秘境既有首通线索的第二条遗府，内容版本为 `content-0.6`、规则版本为 `adventures-0.6.1`。角色须达到筑基 L1、位于 `demon.abyss_gate`、持有 `access.demon_abyss_gate`，并拥有绑定 `item.clue.demon_abyss_echo`。线索只作为非消耗准入依据；本遗府不改变线索原有来源或语义，也不将其扣除、转化或复制。
+这是使用深渊秘境既有首通线索的第二条遗府，以稳定键 `instance.legacy.demon_abyss_echo` 识别内容，实际路线与规则随运行冻结。角色须达到筑基 L1、位于 `demon.abyss_gate`、持有 `access.demon_abyss_gate`，并拥有绑定 `item.clue.demon_abyss_echo`。线索只作为非消耗准入依据；本遗府不改变线索原有来源或语义，也不将其扣除、转化或复制。
 
 遗府固定单人三节点 `echo_threshold -> sealed_resonance -> final_whisper`，无随机池、无体力/灵石/物品成本，60 分钟过期。路线按序推进；首通只写 `story.legacy.demon_abyss_echo`，不发资产，不修改污染、声望、权限、任务进度或终局状态。未成功完成可重试；首通后关闭新建。过期和明确系统中止均不写故事旗标且无资源退款。
 
@@ -371,13 +371,13 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 #### 5.4.7 `tower.three_realms` 高阶单人层
 
-三界塔 v0.3 的 1–20 层继续使用 `content-0.3` / `specials-0.3.0`；v0.4 新增 21–40 层，版本固定为 `content-0.4` / `specials-0.4.0`。升级不得改变旧层记录、旧随机结果或旧 operation 哈希。公开命令为 `三界塔`、`挑战三界塔 <1-40>`、`领取三界塔奖励`；双人命令为 `创建三界塔双人队伍`、`挑战三界塔双人 <1-40>`、`领取三界塔双人奖励`。双人挑战使用独立 `three_realms_tower_duo` 队伍、运行表和成员奖励表。
+三界塔历史方案 v0.3 定义 1–20 层，v0.4 新增 21–40 层；这些编号只作文档对照，各层实际采用的内容和规则在入场时冻结。内容调整不得改变旧层记录、旧随机结果或旧 operation 哈希。公开命令为 `三界塔`、`挑战三界塔 <1-40>`、`领取三界塔奖励`；双人命令为 `创建三界塔双人队伍`、`挑战三界塔双人 <1-40>`、`领取三界塔双人奖励`。双人挑战使用独立 `three_realms_tower_duo` 队伍、运行表和成员奖励表。
 
 #### 5.4.8 `tower.void_spire` 首个开放切片（历史）
 
 虚空塔设计总高 90 层，本切片只开放单人 1–30 层；31–60 层属于下一阶段，61–90 层在完整合同定义前保持关闭。命令为 `虚空塔`、`挑战虚空塔 <1-30>` 和 `领取虚空塔奖励`。进入条件为炼虚境一层，或 `player_reputations.local_json.local.void_supply >= 600`；每次扣 20 体力，每角色每 UTC 周最多 2 次，失败计次，战斗启动失败才退款并标记 `aborted`。前一层首通奖励领取后才解锁下一层，活动状态使用独立 `void_spire_runs` 和 `void_spire_reward_claims` 表，不能复用雾隐塔记录。
 
-1–15 层冻结 `route_key=storm`，16–30 层冻结 `route_key=echo`，15/30 层为路线首领。首通奖励为灵石 120、阵砂 3，路线首领额外给 `local.void_supply +30`；重复挑战只可能给阵砂 0–1，不发普通战斗奖励。战斗敌人键、路线、奖励、图鉴和 operation 均写入运行快照，版本从 `data/内容版本.json` 的 `nonebot_plugin_xiuxian_3.xiuxian.specials.void_spire_rules` 读取。图鉴键为 `codex.void.route_spire_storm`、`codex.void.route_spire_echo` 和 `codex.challenge.void_spire.floor_<N>`。
+1–15 层冻结 `route_key=storm`，16–30 层冻结 `route_key=echo`，15/30 层为路线首领。首通奖励为灵石 120、阵砂 3，路线首领额外给 `local.void_supply +30`；重复挑战只可能给阵砂 0–1，不发普通战斗奖励。战斗敌人键、路线、奖励、图鉴、实际规则参数和 operation 均写入运行快照；恢复与回放直接读取该快照，不另设内容版本文件。图鉴键为 `codex.void.route_spire_storm`、`codex.void.route_spire_echo` 和 `codex.challenge.void_spire.floor_<N>`。
 
 验收至少覆盖 QQ 官方与 OneBot V11：门槛替代路径、31 层拒绝、锁层、首通/练习、周限、失败与启动补偿、operation/reward 幂等、路线首领快照、图鉴记录及普通战斗奖励隔离。OneBot 输出必须移除 Markdown 语法、蓝字和按键；QQ 可继续使用这些能力。该切片完成后再进入 31–60 层合同，不得把 31–90 层标为已开放。
 
@@ -385,13 +385,13 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 31–60 层沿用单人虚空塔命令和逐层首通领奖解锁，不修改 1–30 层的历史记录、随机结果及 operation 哈希。31–45 层冻结碑铭路线 `route_key=inscription`，46–60 层冻结见证路线 `route_key=witness`，45/60 层为路线首领；61–90 层继续关闭。入场需合道 L1，或独立道统服务名望 `player_reputations.local_json['local.dao_service'] >= 700`；通用服务信誉 `service_reputation` 上限为 100，不能冒充道统服务名望。每次仍扣 20 体力，31–60 层合计每 UTC 周最多 1 次，与 1–30 层每周 2 次额度分开；失败计次，战斗启动故障退款并释放本段额度。
 
-31–60 层首通不发灵石、阵砂、道果、功勋或终局装备：领奖时发现本层 `codex.challenge.void_spire.floor_<N>` 和路线 `codex.void.route_spire_<route>`；45/60 层分别追加 `codex.story.void_spire.inscription` 和 `codex.story.void_spire.witness`。60 层首胜产生 `specials.void_spire.floor.60` 来源，授予只用于展示的 `title.void_spire.witness`；练习无奖励。入场冻结敌人、路线、空资产奖励和内容/规则版本；31–60 层快照版本单独登记在 `data/内容版本.json`，低层继续使用原模块版本。扩表迁移须保留既有领奖记录、活动中会话及外键；按重启、重放、并发、QQ 官方和 OneBot V11 逐项验收。`dispatch.dao_service` 道统服务派遣为正式名望来源：合道 L1 或通用服务信誉 80 可接取，8 小时、每天 2 次、6 体力/4 精力，成功独立名望 +8、信誉 +4、服务图鉴和故事线索；部分成功独立名望 +4，失败不发奖。名望上限 1000，达到 700 可替代高层境界准入；派遣自身不得产出终局资产。
+31–60 层首通不发灵石、阵砂、道果、功勋或终局装备：领奖时发现本层 `codex.challenge.void_spire.floor_<N>` 和路线 `codex.void.route_spire_<route>`；45/60 层分别追加 `codex.story.void_spire.inscription` 和 `codex.story.void_spire.witness`。60 层首胜产生 `specials.void_spire.floor.60` 来源，授予只用于展示的 `title.void_spire.witness`；练习无奖励。入场冻结敌人、路线、空资产奖励及实际内容、规则参数；各层运行按自己的冻结快照恢复，不按高低层另设模块版本。扩表迁移须保留既有领奖记录、活动中会话及外键；按重启、重放、并发、QQ 官方和 OneBot V11 逐项验收。`dispatch.dao_service` 道统服务派遣为正式名望来源：合道 L1 或通用服务信誉 80 可接取，8 小时、每天 2 次、6 体力/4 精力，成功独立名望 +8、信誉 +4、服务图鉴和故事线索；部分成功独立名望 +4，失败不发奖。名望上限 1000，达到 700 可替代高层境界准入；派遣自身不得产出终局资产。
 
 21–40 层的准入为化神 L1，或重建名望总值至少 500。重建名望由 `local.xuantian.domain_front`、`local.demon.abyss_market`、`local.beast.three_realms_trade_port` 三处名望合计；不能以旧三界主线许可绕过该门槛。每次挑战消耗 12 体力；每角色、每层、每 UTC 周最多 2 次，胜利、失败和逃跑都计次。战斗启动失败标记 `aborted`、全额退还体力且不计次。首通必须按层胜利并领取上一层奖励后才解锁下一层；已首通层可练习。
 
 每层首通奖励固定为灵石 60、阵砂 2，并在领取事务发现 `codex.challenge.three_realms.floor_N`。练习奖励由 run ID 的 BLAKE2b 摘要稳定决定为阵砂 0 或 1；不发灵石、修为、神魂晶、突破物、声望或普通战斗掉落。第 30 层额外发现 `codex.story.three_realms.reconstruction_<faction>`，第 40 层额外发现 `codex.story.three_realms.domain_<faction>`；故事图鉴使用战斗开始时冻结的三界阵营，不接受命令参数覆盖。第 40 层首通胜利事件授予展示称号 `title.three_realms_tower.domain_guardian`，来源为 `specials.three_realms_tower.floor.40`，称号只用于展示。
 
-阵营首领固定在 10/20/30/40 层。v0.4 稳定敌人键为 `enemy.three_realms_tower.<faction>.domain_vanguard`（21–29 层）、`enemy.three_realms_tower.<faction>.floor_30_boss`、`enemy.three_realms_tower.<faction>.domain_veteran`（31–39 层）和 `enemy.three_realms_tower.<faction>.floor_40_boss`；`<faction>` 仅为 `xuantian`、`demon`、`beast`。敌人、阵营/盟约、三界名望、污染、血脉稳定、奖励、内容/规则版本均进入塔局与战斗快照。双人塔要求两名已确认成员，分别扣体力、计周限和首通，普通队伍奖励保持为空；失败不发奖，启动故障双方全额退款，成员独立 operation 领奖。首通、失败、启动补偿、每层周限、待领奖互斥、双适配器路由、operation 重放及资产隔离由 QQ 官方和 OneBot V11 模拟适配器专项验收。
+阵营首领固定在 10/20/30/40 层。v0.4 稳定敌人键为 `enemy.three_realms_tower.<faction>.domain_vanguard`（21–29 层）、`enemy.three_realms_tower.<faction>.floor_30_boss`、`enemy.three_realms_tower.<faction>.domain_veteran`（31–39 层）和 `enemy.three_realms_tower.<faction>.floor_40_boss`；`<faction>` 仅为 `xuantian`、`demon`、`beast`。敌人、阵营/盟约、三界名望、污染、血脉稳定、奖励及实际规则参数均进入塔局与战斗快照。双人塔要求两名已确认成员，分别扣体力、计周限和首通，普通队伍奖励保持为空；失败不发奖，启动故障双方全额退款，成员独立 operation 领奖。首通、失败、启动补偿、每层周限、待领奖互斥、双适配器路由、operation 重放及资产隔离由 QQ 官方和 OneBot V11 模拟适配器专项验收。
 
 ### 5.5 适配器、Web 和内容发布
 
@@ -399,7 +399,7 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 |:--|:--|:--|
 | 适配器 | 统一 `CommandContext`；QQ 文本/Markdown；OneBot 文本/合并转发；事件去重 | 能力矩阵、按钮签名、队伍/媒体降级；SDK 对象不能进入 domain |
 | Web | 健康检查、只读诊断、备份和审计查询 | CSRF、权限、审批、任务、消息和发布操作；写路由必须幂等和审计 |
-| 内容 | `data/内容清单.json`、schema/引用校验、dry-run、原子激活/回滚 | 多版本并存、迁移、历史回放、赛季包和分阶段开关 |
+| 内容 | `data/内容清单.json`、schema/引用校验、dry-run、原子激活/回滚 | 在途业务快照保留、迁移、历史回放、赛季包和分阶段开关 |
 
 ## 6. 跨域依赖和稳定键闭合
 
@@ -422,7 +422,7 @@ identity/player
 - 每个 `skill.*`、`location.*`、`recipe.*`、`quest.*`、`reward.*` 引用可解析。
 - `placeholder`/`locked` 不能被首版的地点、配方、奖励或按钮作为可达前置。
 - 任何 operation 只有一个 application owner；文本、按钮、Web 不复制规则。
-- 关闭版本只拒绝新建；`running/processing/preparing` 按原快照完成、取消或恢复。
+- 关闭内容只拒绝新建；`running/processing/preparing` 按原快照完成、取消或恢复。
 
 ## 7. 开发切片交付模板
 
@@ -433,21 +433,21 @@ identity/player
 3. **规则**：前置、成本、产出、随机池、冷却/配额、失败/取消/过期。
 4. **应用**：输入/输出 DTO、Unit of Work、`operation_id` 幂等和不同输入冲突。
 5. **持久化**：迁移、索引、唯一约束、ledger、流水和备份恢复。
-6. **内容**：稳定键、版本、引用闭合、内容清单和关闭策略。
+6. **内容**：稳定键、实际规则与内容快照、引用闭合、内容清单和关闭策略。
 7. **测试**：领域公式、应用集成、适配器契约、并发、重复回放、故障回滚。
-8. **观测**：`request_id`、`operation_id`、actor、feature、版本、结果、耗时和错误。
+8. **观测**：`request_id`、`operation_id`、actor、feature、内容稳定键、结果、耗时和错误。
 9. **回滚**：停止新入口、处理旧会话、恢复快照、补偿边界和数据完整性查询。
 
 ## 8. 发布、关闭和迁移
 
 内容状态统一为 `draft -> validated -> previewed -> approved -> active`；失败进入
-`rejected`，旧版本保持 active。发布顺序为 schema 解析、稳定键/版本校验、引用图、
+`rejected`，已激活内容保持不变。发布顺序为 schema 解析、稳定键和字段校验、引用图、
 公式/权重、假角色 dry-run、备份、原子激活、健康检查和只读 smoke。
 
-升级只能新增稳定键、增加明确的状态或显式关闭内容，不能改写已结算 operation 的
-输入、随机结果、奖励和结局。关闭时停止新写入口，不删除玩家、物品、operation、
+内容调整以稳定键和明确的状态为准，新会话冻结调整后的实际内容和规则；不得改写已结算 operation 的
+输入、随机结果、奖励和结局，也不得覆盖在途会话的原快照。关闭时停止新写入口，不删除玩家、物品、operation、
 战斗回放或历史内容快照。迁移必须覆盖空库、当前库、重复执行、中途失败、备份恢复
-和只读兼容窗口。
+和关闭写入口后的只读核验。
 
 ## 9. 相关文件的职责
 

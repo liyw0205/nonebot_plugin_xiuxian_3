@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentError
 from ..repository import (
     OperationConflictError,
     PlayerNotFoundError,
@@ -17,8 +18,6 @@ from ..repository import (
     WayfaringPaidTrackInactiveError,
 )
 from .models import WayfaringClaimRecord, WayfaringStatusRecord
-from .rules import honor_title
-from .wayfaring import WAYFARING_LEVELS, WAYFARING_POINTS_PER_LEVEL
 
 
 class WayfaringApplication:
@@ -46,25 +45,15 @@ class WayfaringApplication:
         )
 
     @staticmethod
-    def _reward_text(reward: dict[str, int]) -> str:
-        labels = {
-            "local_reputation": "地方名望",
-            "item.herb.blood_grass": "止血草",
-            "item.herb.spirit_leaf": "灵叶",
-            "item.mat.wood": "木材",
-            "item.mat.array_sand": "阵砂",
-            "item.ore.ironstone": "铁石",
-            "item.clue.recipe_basic": "配方线索",
-            "item.token.spirit_tree_water": "灵木水分券",
-        }
+    def _reward_text(reward: dict[str, int], labels: dict[str, str]) -> str:
         rendered: list[str] = []
-        for key, value in reward.items():
+        for key, value in sorted(reward.items()):
             if not value:
                 continue
             if key.startswith("title."):
-                rendered.append(f"称号「{honor_title(key).label}」")
+                rendered.append(f"称号「{labels[key]}」")
             else:
-                rendered.append(f"{labels.get(key, '奖励')} ×{value}")
+                rendered.append(f"{labels[key]} ×{value}")
         return "、".join(rendered) or "无"
 
     @staticmethod
@@ -72,23 +61,23 @@ class WayfaringApplication:
         status = {
             "active": "进行中",
             "completed": "已完成",
-            "closed": "已关闭",
+            "closed": "已封卷",
         }.get(record.status, "未开始")
         return "\n".join(
             (
-                "## 问道行卷",
+                f"## {record.name}",
                 "",
                 f"**{WayfaringApplication._display_name(record.player)}**的行卷状态：**{status}**",
                 "",
                 f"- **周期**：{record.cycle_start} 至 {record.cycle_end}",
-                f"- **行卷点**：{record.total_points}/{WAYFARING_LEVELS[-1] * WAYFARING_POINTS_PER_LEVEL}",
-                f"- **当前等级**：{record.current_level}/{WAYFARING_LEVELS[-1]}",
-                f"- **今日点数**：{record.daily_points}/100",
-                f"- **本周点数**：{record.weekly_points}/500",
+                f"- **行卷点**：{record.total_points}/{record.max_level * record.points_per_level}",
+                f"- **当前等级**：{record.current_level}/{record.max_level}",
+                f"- **今日点数**：{record.daily_points}/{record.daily_point_cap}",
+                f"- **本周点数**：{record.weekly_points}/{record.weekly_point_cap}",
                 f"- **免费奖励**：已领取 {len(record.claimed_free)} 级",
                 f"- **付费奖励**：已领取 {len(record.claimed_paid)} 级",
                 "",
-                "> 发送 `领取行卷 <等级>` 领取免费线；已验证月道契后可领取 `领取行卷 <等级> 付费`。",
+                "> 发送 `领取行卷 <等级>` 领取嘉奖；持有月道契可用 `领取行卷 <等级> 付费` 领取道契嘉奖。",
             )
         )
 
@@ -101,6 +90,8 @@ class WayfaringApplication:
             )
         except WayfaringNotStartedError:
             return CommandResult(False, "WAYFARING_NOT_STARTED", "行卷尚未开启，请先发送 `开始行卷`。", context.request_id)
+        except ContentError:
+            return CommandResult(False, "CONTENT_UNAVAILABLE", "行卷暂不可展，此番未记行历，亦未发放嘉奖。", context.request_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
         except PlayerSuspendedError:
@@ -122,6 +113,10 @@ class WayfaringApplication:
                 "current_level": record.current_level,
                 "daily_points": record.daily_points,
                 "weekly_points": record.weekly_points,
+                "max_level": record.max_level,
+                "points_per_level": record.points_per_level,
+                "daily_point_cap": record.daily_point_cap,
+                "weekly_point_cap": record.weekly_point_cap,
                 "claimed_free": list(record.claimed_free),
                 "claimed_paid": list(record.claimed_paid),
             },
@@ -139,6 +134,8 @@ class WayfaringApplication:
             )
         except WayfaringAlreadyStartedError:
             return CommandResult(False, "WAYFARING_ALREADY_STARTED", "本周期行卷已经开启。", context.request_id, operation_id)
+        except ContentError:
+            return CommandResult(False, "CONTENT_UNAVAILABLE", "行卷暂不可展，此番未记行历，亦未发放嘉奖。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerSuspendedError:
@@ -154,11 +151,11 @@ class WayfaringApplication:
             "WAYFARING_STARTED",
             "\n".join(
                 (
-                    "## 行卷已开启",
+                    f"## {record.name}已开启",
                     "",
                     f"**{self._display_name(record.player)}**已踏上本周期问道路程。",
                     f"- **周期**：{record.cycle_start} 至 {record.cycle_end}",
-                    f"- **行卷点**：0/{WAYFARING_LEVELS[-1] * WAYFARING_POINTS_PER_LEVEL}",
+                    f"- **行卷点**：0/{record.max_level * record.points_per_level}",
                     "",
                     "> 发送 `问道行卷` 查看进度。",
                 )
@@ -196,15 +193,17 @@ class WayfaringApplication:
                 operation_id=operation_id,
             )
         except WayfaringLevelInvalidError:
-            return CommandResult(False, "INVALID_WAYFARING_LEVEL", "行卷等级必须是 1 至 30。", context.request_id, operation_id)
+            return CommandResult(False, "INVALID_WAYFARING_LEVEL", "这份行卷中没有所选篇次，请核对后再来。", context.request_id, operation_id)
+        except ContentError:
+            return CommandResult(False, "CONTENT_UNAVAILABLE", "行卷暂不可展，此番未记行历，亦未发放嘉奖。", context.request_id, operation_id)
         except WayfaringNotStartedError:
             return CommandResult(False, "WAYFARING_NOT_STARTED", "行卷尚未开启，请先发送 `开始行卷`。", context.request_id, operation_id)
         except WayfaringLevelLockedError:
-            return CommandResult(False, "WAYFARING_LEVEL_LOCKED", "该等级尚未解锁，先完成更多行卷任务。", context.request_id, operation_id)
+            return CommandResult(False, "WAYFARING_LEVEL_LOCKED", "此篇尚不可领赏：行历不足，或本期已经封卷。", context.request_id, operation_id)
         except WayfaringClaimAlreadyExistsError:
             return CommandResult(False, "WAYFARING_ALREADY_CLAIMED", "该等级的这条奖励已经领取过了。", context.request_id, operation_id)
         except WayfaringPaidTrackInactiveError:
-            return CommandResult(False, "WAYFARING_PAID_LOCKED", "付费线需要当前有效的 `dao_contract.monthly`。", context.request_id, operation_id)
+            return CommandResult(False, "WAYFARING_PAID_LOCKED", "需持有尚在有效期内的月道契，方可领取此项嘉奖。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerSuspendedError:
@@ -223,7 +222,7 @@ class WayfaringApplication:
                     "## 行卷奖励已领取",
                     "",
                     f"**{self._display_name(record.player)}**领取了第 **{record.level}** 级{'付费' if record.track == 'paid' else '免费'}奖励。",
-                    f"- **获得**：{self._reward_text(record.reward)}",
+                    f"- **获得**：{self._reward_text(record.reward, record.reward_labels)}",
                     f"- **行卷点**：{record.total_points}",
                 )
             ),

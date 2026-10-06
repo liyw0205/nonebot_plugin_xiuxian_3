@@ -161,17 +161,6 @@ from ..routine.models import (
     SevenDayStatusRecord,
     SpiritTreeRecord,
 )
-from ..routine.wayfaring import (
-    WAYFARING_DAILY_POINT_CAP,
-    WAYFARING_LEVELS,
-    WAYFARING_PASS_KEY,
-    WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_WEEKLY_POINT_CAP,
-    wayfaring_free_reward,
-    wayfaring_paid_reward,
-    wayfaring_source_points,
-    wayfaring_week_start,
-)
 from ..routine.billing import BillingReceiptError, verify_receipt
 from ..routine.rules import (
     CHECKIN_ACTIVITY,

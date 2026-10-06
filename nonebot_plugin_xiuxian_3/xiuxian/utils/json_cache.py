@@ -1,4 +1,4 @@
-"""Read-only JSON cache invalidated by file metadata changes."""
+"""Strict JSON decoding and a read-only cache invalidated by file changes."""
 
 from __future__ import annotations
 
@@ -20,6 +20,11 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             raise DuplicateJSONKeyError(f"duplicate JSON object key: {key}")
         result[key] = value
     return result
+
+
+def decode_json_strict(value: str) -> Any:
+    """Decode persisted JSON with the same duplicate-key checks as content files."""
+    return json.loads(value, object_pairs_hook=_unique_object)
 
 
 @lru_cache(maxsize=256)
@@ -55,4 +60,4 @@ def clear_json_cache() -> None:
     _load_json.cache_clear()
 
 
-__all__ = ["DuplicateJSONKeyError", "clear_json_cache", "read_json_cached"]
+__all__ = ["DuplicateJSONKeyError", "clear_json_cache", "decode_json_strict", "read_json_cached"]

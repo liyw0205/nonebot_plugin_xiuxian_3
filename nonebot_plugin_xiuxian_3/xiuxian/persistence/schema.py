@@ -1817,6 +1817,7 @@ CREATE TABLE IF NOT EXISTS wayfaring_passes (
     weekly_points INTEGER NOT NULL DEFAULT 0 CHECK (weekly_points >= 0),
     claimed_free_json TEXT NOT NULL DEFAULT '[]',
     claimed_paid_json TEXT NOT NULL DEFAULT '[]',
+    snapshot_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (player_id, pass_key, cycle_start)

@@ -19,6 +19,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
+from ..content import ContentError
 from ..config import XiuxianSettings
 from ..player.models import (
     CultivationRecord,
@@ -130,14 +131,10 @@ from ..routine.models import (
     SpiritTreeRecord,
 )
 from ..routine.wayfaring import (
-    WAYFARING_DAILY_POINT_CAP,
-    WAYFARING_LEVELS,
     WAYFARING_PASS_KEY,
-    WAYFARING_POINTS_PER_LEVEL,
-    WAYFARING_WEEKLY_POINT_CAP,
-    wayfaring_free_reward,
-    wayfaring_paid_reward,
-    wayfaring_source_points,
+    WayfaringDefinition,
+    parse_wayfaring_snapshot,
+    wayfaring_definition,
     wayfaring_week_start,
 )
 from ..routine.billing import BillingReceiptError, verify_receipt
@@ -170,6 +167,7 @@ from ..routine.rules import (
 )
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
+from ..utils.json_cache import decode_json_strict
 from ..utils.operations import operation_replay
 from ..rewards.rules import local_reputation_maximum, reward_pool_map
 from ..utils.player import (
@@ -2145,7 +2143,6 @@ class RoutineRepositoryMixin:
         )
         now = self._now()
         now_text = serialize_datetime(now)
-        cycle_start, cycle_end = now.date(), now.date() + timedelta(days=27)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
@@ -2156,7 +2153,7 @@ class RoutineRepositoryMixin:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._wayfaring_status_from_payload(
-                    json.loads(existing["result_json"]), replay=True
+                    decode_json_strict(existing["result_json"]), replay=True
                 )
             player = self._require_player(connection, platform, platform_user_id)
             current = connection.execute(
@@ -2166,22 +2163,23 @@ class RoutineRepositoryMixin:
             if current is not None and str(current["status"]) in {"active", "completed"}:
                 if date.fromisoformat(str(current["cycle_end"])) >= now.date():
                     raise WayfaringAlreadyStartedError("wayfaring pass is already active")
-                connection.execute(
-                    "UPDATE wayfaring_passes SET status = 'closed', updated_at = ? WHERE id = ?",
-                    (now_text, current["id"]),
-                )
+                self._sync_wayfaring_points(connection, player, current, now)
+            definition = wayfaring_definition(self.content)
+            cycle_start = now.date()
+            cycle_end = cycle_start + timedelta(days=definition.cycle_days - 1)
             connection.execute(
                 """
                 INSERT INTO wayfaring_passes(
                     player_id, pass_key, cycle_start, cycle_end, status,
                     total_points, daily_date, daily_points, week_start, weekly_points,
-                    claimed_free_json, claimed_paid_json,
+                    claimed_free_json, claimed_paid_json, snapshot_json,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'active', 0, ?, 0, ?, 0, '[]', '[]', ?, ?)
+                ) VALUES (?, ?, ?, ?, 'active', 0, ?, 0, ?, 0, '[]', '[]', ?, ?, ?)
                 """,
                 (
                     player["id"], WAYFARING_PASS_KEY, cycle_start.isoformat(), cycle_end.isoformat(),
                     cycle_start.isoformat(), wayfaring_week_start(cycle_start).isoformat(),
+                    json.dumps(definition.snapshot(), ensure_ascii=False, sort_keys=True),
                     now_text, now_text,
                 ),
             )
@@ -2223,16 +2221,6 @@ class RoutineRepositoryMixin:
             ).fetchone()
             if pass_row is None:
                 raise WayfaringNotStartedError("wayfaring pass has not started")
-            if str(pass_row["status"]) == "active" and now.date() > date.fromisoformat(str(pass_row["cycle_end"])):
-                connection.execute(
-                    "UPDATE wayfaring_passes SET status = 'closed', updated_at = ? WHERE id = ?",
-                    (serialize_datetime(now), pass_row["id"]),
-                )
-                pass_row = connection.execute(
-                    "SELECT * FROM wayfaring_passes WHERE id = ?", (pass_row["id"],)
-                ).fetchone()
-            if pass_row is None:
-                raise RuntimeError("wayfaring pass disappeared")
             self._sync_wayfaring_points(connection, player, pass_row, now)
             pass_row = connection.execute(
                 "SELECT * FROM wayfaring_passes WHERE id = ?", (pass_row["id"],)
@@ -2277,7 +2265,7 @@ class RoutineRepositoryMixin:
             level = int(level)
         except (TypeError, ValueError) as exc:
             raise WayfaringLevelInvalidError("invalid wayfaring level") from exc
-        if level not in WAYFARING_LEVELS or track not in {"free", "paid"}:
+        if level <= 0 or track not in {"free", "paid"}:
             raise WayfaringLevelInvalidError("invalid wayfaring level or track")
         operation_name = "pass.wayfaring.claim"
         request_hash = self._request_hash(
@@ -2302,7 +2290,7 @@ class RoutineRepositoryMixin:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._wayfaring_claim_from_payload(
-                    json.loads(existing["result_json"]), replay=True
+                    decode_json_strict(existing["result_json"]), replay=True
                 )
             player = self._require_player(connection, platform, platform_user_id)
             pass_row = connection.execute(
@@ -2311,23 +2299,18 @@ class RoutineRepositoryMixin:
             ).fetchone()
             if pass_row is None:
                 raise WayfaringNotStartedError("wayfaring pass has not started")
-            if str(pass_row["status"]) == "active" and now.date() > date.fromisoformat(str(pass_row["cycle_end"])):
-                connection.execute(
-                    "UPDATE wayfaring_passes SET status = 'closed', updated_at = ? WHERE id = ?",
-                    (now_text, pass_row["id"]),
-                )
-                pass_row = connection.execute("SELECT * FROM wayfaring_passes WHERE id = ?", (pass_row["id"],)).fetchone()
-            if pass_row is None:
-                raise WayfaringNotStartedError("wayfaring pass has not started")
+            definition = self._wayfaring_rule(pass_row)
+            if level > definition.max_level:
+                raise WayfaringLevelInvalidError("invalid wayfaring level")
             self._sync_wayfaring_points(connection, player, pass_row, now)
             pass_row = connection.execute("SELECT * FROM wayfaring_passes WHERE id = ?", (pass_row["id"],)).fetchone()
             if pass_row is None or str(pass_row["status"]) == "closed":
                 raise WayfaringLevelLockedError("wayfaring cycle is closed")
-            current_level = min(WAYFARING_LEVELS[-1], int(pass_row["total_points"]) // WAYFARING_POINTS_PER_LEVEL)
+            current_level = definition.level_for_points(int(pass_row["total_points"]))
             if level > current_level:
                 raise WayfaringLevelLockedError("wayfaring level is not unlocked")
             claimed_key = "claimed_free_json" if track == "free" else "claimed_paid_json"
-            claimed = {int(item) for item in self._json_array(pass_row[claimed_key])}
+            claimed = set(self._wayfaring_claimed(pass_row[claimed_key], definition.max_level))
             if level in claimed:
                 raise WayfaringClaimAlreadyExistsError("wayfaring reward already claimed")
             if track == "paid":
@@ -2343,9 +2326,7 @@ class RoutineRepositoryMixin:
                 ).fetchone()
                 if active_contract is None:
                     raise WayfaringPaidTrackInactiveError("monthly dao contract is required")
-                reward = wayfaring_paid_reward(level)
-            else:
-                reward = wayfaring_free_reward(level)
+            reward = definition.reward(level, track)
             entitlement_snapshot = None
             if track == "paid" and active_contract is not None:
                 entitlement_snapshot = {
@@ -2355,7 +2336,8 @@ class RoutineRepositoryMixin:
                     "ends_on": str(active_contract["ends_on"]),
                 }
             actual_reward = self._apply_dao_reward(
-                connection, player, reward, now_text, source_operation_id=operation_id
+                connection, player, reward, now_text, source_operation_id=operation_id,
+                frozen_wayfaring=definition,
             )
             claimed.add(level)
             connection.execute(
@@ -2382,6 +2364,7 @@ class RoutineRepositoryMixin:
                 "reward": actual_reward,
                 "total_points": int(pass_row["total_points"]),
                 "entitlement_snapshot": entitlement_snapshot,
+                "reward_labels": {key: definition.reward_labels[key] for key in actual_reward},
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -2407,10 +2390,8 @@ class RoutineRepositoryMixin:
         pass_row: sqlite3.Row,
         now: datetime,
     ) -> dict[str, Any]:
-        total = min(
-            WAYFARING_LEVELS[-1] * WAYFARING_POINTS_PER_LEVEL,
-            int(pass_row["total_points"]),
-        )
+        definition = SQLitePlayerRepository._wayfaring_rule(pass_row)
+        total = int(pass_row["total_points"])
         return {
             "player": SQLitePlayerRepository._player_payload(SQLitePlayerRepository._row_to_player(player)),
             "pass_key": str(pass_row["pass_key"]),
@@ -2418,11 +2399,16 @@ class RoutineRepositoryMixin:
             "cycle_start": str(pass_row["cycle_start"]),
             "cycle_end": str(pass_row["cycle_end"]),
             "total_points": total,
-            "current_level": min(WAYFARING_LEVELS[-1], total // WAYFARING_POINTS_PER_LEVEL),
+            "current_level": definition.level_for_points(total),
             "daily_points": int(pass_row["daily_points"]),
             "weekly_points": int(pass_row["weekly_points"]),
-            "claimed_free": [int(item) for item in SQLitePlayerRepository._json_array(pass_row["claimed_free_json"])],
-            "claimed_paid": [int(item) for item in SQLitePlayerRepository._json_array(pass_row["claimed_paid_json"])],
+            "claimed_free": SQLitePlayerRepository._wayfaring_claimed(pass_row["claimed_free_json"], definition.max_level),
+            "claimed_paid": SQLitePlayerRepository._wayfaring_claimed(pass_row["claimed_paid_json"], definition.max_level),
+            "name": definition.name,
+            "max_level": definition.max_level,
+            "points_per_level": definition.points_per_level,
+            "daily_point_cap": definition.daily_point_cap,
+            "weekly_point_cap": definition.weekly_point_cap,
         }
 
     @staticmethod
@@ -2435,12 +2421,17 @@ class RoutineRepositoryMixin:
             status=str(payload["status"]),
             cycle_start=str(payload["cycle_start"]),
             cycle_end=str(payload["cycle_end"]),
-            total_points=int(payload.get("total_points", 0)),
-            current_level=int(payload.get("current_level", 0)),
-            daily_points=int(payload.get("daily_points", 0)),
-            weekly_points=int(payload.get("weekly_points", 0)),
-            claimed_free=tuple(int(item) for item in payload.get("claimed_free", [])),
-            claimed_paid=tuple(int(item) for item in payload.get("claimed_paid", [])),
+            total_points=int(payload["total_points"]),
+            current_level=int(payload["current_level"]),
+            daily_points=int(payload["daily_points"]),
+            weekly_points=int(payload["weekly_points"]),
+            name=str(payload["name"]),
+            max_level=int(payload["max_level"]),
+            points_per_level=int(payload["points_per_level"]),
+            daily_point_cap=int(payload["daily_point_cap"]),
+            weekly_point_cap=int(payload["weekly_point_cap"]),
+            claimed_free=tuple(int(item) for item in payload["claimed_free"]),
+            claimed_paid=tuple(int(item) for item in payload["claimed_paid"]),
             already_completed=replay,
         )
 
@@ -2453,10 +2444,43 @@ class RoutineRepositoryMixin:
             pass_key=str(payload["pass_key"]),
             level=int(payload["level"]),
             track=str(payload["track"]),
-            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
-            total_points=int(payload.get("total_points", 0)),
+            reward={str(key): int(value) for key, value in dict(payload["reward"]).items()},
+            total_points=int(payload["total_points"]),
             already_completed=replay,
+            reward_labels=dict(payload["reward_labels"]),
         )
+
+    @staticmethod
+    def _wayfaring_rule(pass_row: sqlite3.Row) -> WayfaringDefinition:
+        try:
+            definition = parse_wayfaring_snapshot(decode_json_strict(pass_row["snapshot_json"]))
+            start = date.fromisoformat(str(pass_row["cycle_start"]))
+            end = date.fromisoformat(str(pass_row["cycle_end"]))
+        except (TypeError, ValueError) as exc:
+            raise ContentError("wayfaring cycle snapshot is invalid") from exc
+        if (
+            pass_row["pass_key"] != definition.key
+            or end != start + timedelta(days=definition.cycle_days - 1)
+            or not 0 <= int(pass_row["total_points"]) <= definition.total_points
+        ):
+            raise ContentError("wayfaring cycle differs from its snapshot")
+        SQLitePlayerRepository._wayfaring_claimed(pass_row["claimed_free_json"], definition.max_level)
+        SQLitePlayerRepository._wayfaring_claimed(pass_row["claimed_paid_json"], definition.max_level)
+        return definition
+
+    @staticmethod
+    def _wayfaring_claimed(value: str, max_level: int) -> list[int]:
+        try:
+            levels = json.loads(value)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ContentError("wayfaring claimed levels cannot be read") from exc
+        if (
+            not isinstance(levels, list)
+            or any(type(level) is not int or not 1 <= level <= max_level for level in levels)
+            or len(set(levels)) != len(levels)
+        ):
+            raise ContentError("wayfaring claimed levels are invalid")
+        return levels
 
     @staticmethod
     def _sync_wayfaring_points(
@@ -2465,20 +2489,12 @@ class RoutineRepositoryMixin:
         pass_row: sqlite3.Row,
         now: datetime,
     ) -> None:
-        if str(pass_row["status"]) != "active":
+        definition = SQLitePlayerRepository._wayfaring_rule(pass_row)
+        if str(pass_row["status"]) == "closed":
             return
         start = str(pass_row["cycle_start"])
-        end = str(pass_row["cycle_end"])
-        sources = {
-            "player.start_seeking": "player.start_seeking",
-            "routine.checkin.daily": "routine.checkin.daily",
-            "routine.spirit_tree.water": "routine.spirit_tree.water",
-            "routine.spirit_tree.harvest": "routine.spirit_tree.harvest",
-            "production.complete": "production.complete",
-            "bounty.claim": "bounty.claim",
-            "exploration.settle": "exploration.settle",
-            "routine.claim_dao_contract": "dao_contract.daily",
-        }
+        end = min(str(pass_row["cycle_end"]), now.date().isoformat())
+        sources = definition.sources
         placeholders = ",".join("?" for _ in sources)
         candidates = connection.execute(
             f"""
@@ -2505,24 +2521,27 @@ class RoutineRepositoryMixin:
             day_totals[str(item["business_date"])] = day_totals.get(str(item["business_date"]), 0) + int(item["points"])
             week_totals[str(item["week_start"])] = week_totals.get(str(item["week_start"]), 0) + int(item["points"])
         total = int(pass_row["total_points"])
+        if sum(day_totals.values()) != total:
+            raise ContentError("wayfaring point events differ from cycle total")
         for item in candidates:
+            if total >= definition.total_points:
+                break
             source_operation_id = str(item["operation_id"])
             if source_operation_id in existing:
                 continue
-            source_key = sources[str(item["operation_name"])]
-            try:
-                raw_points = wayfaring_source_points(source_key)
-            except ValueError:
-                continue
+            source = sources[str(item["operation_name"])]
+            source_key = source["key"]
+            raw_points = source["points"]
             try:
                 business_date = datetime.fromisoformat(str(item["created_at"])).date()
-            except ValueError:
-                business_date = now.date()
+            except ValueError as exc:
+                raise ContentError("wayfaring source date is invalid") from exc
             business_date_text = business_date.isoformat()
             week_text = wayfaring_week_start(business_date).isoformat()
             remaining = min(
-                WAYFARING_DAILY_POINT_CAP - day_totals.get(business_date_text, 0),
-                WAYFARING_WEEKLY_POINT_CAP - week_totals.get(week_text, 0),
+                definition.daily_point_cap - day_totals.get(business_date_text, 0),
+                definition.weekly_point_cap - week_totals.get(week_text, 0),
+                definition.total_points - total,
             )
             points = max(0, min(raw_points, remaining))
             connection.execute(
@@ -2541,15 +2560,12 @@ class RoutineRepositoryMixin:
             existing.add(source_operation_id)
             day_totals[business_date_text] = day_totals.get(business_date_text, 0) + points
             week_totals[week_text] = week_totals.get(week_text, 0) + points
-            total = min(
-                WAYFARING_LEVELS[-1] * WAYFARING_POINTS_PER_LEVEL,
-                total + points,
-            )
+            total += points
         today_text = now.date().isoformat()
         week_text = wayfaring_week_start(now.date()).isoformat()
-        status = str(pass_row["status"])
-        if total >= WAYFARING_LEVELS[-1] * WAYFARING_POINTS_PER_LEVEL:
-            status = "completed"
+        status = "completed" if total >= definition.total_points else "active"
+        if now.date() > date.fromisoformat(str(pass_row["cycle_end"])):
+            status = "closed"
         connection.execute(
             """
             UPDATE wayfaring_passes
@@ -2571,6 +2587,7 @@ class RoutineRepositoryMixin:
         now_text: str,
         *,
         source_operation_id: str | None = None,
+        frozen_wayfaring: WayfaringDefinition | None = None,
     ) -> dict[str, int]:
         title_rewards = {
             key: amount for key, amount in reward.items() if key.startswith("title.")
@@ -2590,9 +2607,12 @@ class RoutineRepositoryMixin:
             raise ValueError("honor title reward requires its source operation")
 
         local_reward = int(numeric_reward.get("local_reputation", 0))
-        local_key = ROUTINE_LOCAL_REPUTATION_KEY if local_reward else None
+        local_key = (
+            frozen_wayfaring.local_reputation_key if frozen_wayfaring else ROUTINE_LOCAL_REPUTATION_KEY
+        ) if local_reward else None
         local_maximums = (
-            {local_key: local_reputation_maximum(local_key, self.content)}
+            {local_key: frozen_wayfaring.local_reputation_maximum
+             if frozen_wayfaring else local_reputation_maximum(local_key, self.content)}
             if local_key
             else None
         )

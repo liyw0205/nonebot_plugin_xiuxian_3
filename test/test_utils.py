@@ -52,6 +52,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.json import json_list, json_object
 from nonebot_plugin_xiuxian_3.xiuxian.utils.json_cache import (
     DuplicateJSONKeyError,
     clear_json_cache,
+    decode_json_strict,
     read_json_cached,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.utils.player import (
@@ -123,6 +124,14 @@ def test_json_cache_invalidates_replaced_files_and_rejects_duplicate_keys(tmp_pa
     path.write_text('{"value": 1, "value": 2}', encoding="utf-8")
     with pytest.raises(DuplicateJSONKeyError, match="duplicate JSON object key"):
         read_json_cached(path)
+
+
+def test_strict_json_decoder_rejects_nested_duplicate_keys() -> None:
+    assert decode_json_strict('{"reward": {"item": 2}}') == {"reward": {"item": 2}}
+    with pytest.raises(DuplicateJSONKeyError, match="duplicate JSON object key: item"):
+        decode_json_strict('{"reward": {"item": 2, "item": 200}}')
+    with pytest.raises(ValueError):
+        decode_json_strict('{')
 
 
 def test_sqlite_connection_uses_shared_pragmas(tmp_path) -> None:

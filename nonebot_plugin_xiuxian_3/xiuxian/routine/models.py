@@ -202,6 +202,11 @@ class WayfaringStatusRecord:
     current_level: int
     daily_points: int
     weekly_points: int
+    name: str
+    max_level: int
+    points_per_level: int
+    daily_point_cap: int
+    weekly_point_cap: int
     claimed_free: tuple[int, ...] = ()
     claimed_paid: tuple[int, ...] = ()
     already_completed: bool = False
@@ -216,6 +221,7 @@ class WayfaringClaimRecord:
     reward: dict[str, int] = field(default_factory=dict)
     total_points: int = 0
     already_completed: bool = False
+    reward_labels: dict[str, str] = field(default_factory=dict)
 
 
 __all__ = [

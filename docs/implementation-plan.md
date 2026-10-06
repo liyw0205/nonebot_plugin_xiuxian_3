@@ -17,6 +17,34 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 
 ## 1. 范围分层
 
+### 已闭合切片：问道行卷满级可达与周期快照
+
+开工证据：28日、30级、每级80点需要2400点，而每日100、自然周500的共同上限使任意开启星期最多获得2000至2200点，28至30级无法领取。本轮不是重复称号修复或单纯搬迁配置。保持28日/30级/80点/每日100与所有既有奖励不变，将默认周上限改为能完成四周2400点目标的最低值600；禁止配置形成任意起始星期不可满级的周期。来源只登记现有实际投影的八种，不把未投影的接取悬赏或近郊专用键另算一次。
+
+当前规则先在领域合同闭合，再接入JSON：开卷冻结周期、点数门槛/配额、来源点数、两条奖励线、地方名望上限和展示名。当前内容关闭只禁止新开卷，已有周期继续按快照计分和领取；周期结束后只同步周期内真实来源并关闭，不允许新领奖，已有operation仍原样回放。周期已满级也必须遵守结束日期，不延长领奖；坏内容/快照原子拒绝，不兼容旧格式。
+
+文件所有权：`wayfaring_contract_candidate` 编写 `routine/wayfaring.py`、新行卷JSON及清单注册、规则专项；`source_contract_candidate` 编写新 `test/test_wayfaring_content.py`，交回主线后独立补 `test/test_wayfaring_sources.py`；主线负责 `routine/repository.py`、`routine/models.py`、`routine/wayfaring_use_cases.py`、周期schema和整合验收。规则代理随后同步内容合同、领域 README/model-workflow 与总表，主线更新状态/计划/数据盘点，文件交接后再修改，不并行编辑同一文件。奖励复用 `utils.player` 的资产/名望/称号事务，不改适配器，不改变正式PvP/PvE或切磋/训练傀儡只读边界。
+
+最终只读审阅发现普通 `json.loads` 会静默覆盖快照中的重复奖励键。主线在 `utils/json_cache.py` 复用内容加载器已有的重复键检查，提供持久化 JSON 严格解码；行卷快照和历史 operation 共同调用，并补工具/双重字段坏账本测试。没有复制资产或数值工具，也不全仓替换 JSON 调用。另八个仓储仅删除未使用的旧行卷导入：`advancement`、`adventures`、`exploration`、`player`、`production`、`progression/breakthrough`、`progression/cultivation_repository`、`world/travel_repository`；不是这些玩法的再次重构。
+
+候选比较：功法朝阳吐纳篇无来源玩法/成本/概率合同，小型灵兽行囊无配方键/材料/门槛合同，不能臆造来源；其他高阶副本/跨服/Web仍缺合同或保持锁定；道源刚闭合，不重入。最近十条玩法提交为 `cf72c83`、`4ab072f`、`da1a8df`、`dbcfb4a`、`70963ed`、`58b69b6`、`31616c6`、`bf91ccd`、`3e771a7`、`a1e3179`，均验收QQ/OneBot。utils三次，生产/经济各两次，其余子插件各一次；最近五条无重复。道历此前称号结算仍属冷却，本次仅以满级不可达的独立正确性缺口例外进入，不扩道契/灵木/七日/机缘。
+
+验收包含七种起始星期的满级上界、真实问安等来源、满级奖励、日周封顶、内容变化与关闭、周期结束、operation冲突/并发/重放、故障回滚、坏JSON和QQ/OneBot恢复。仅跑相关聚焦组，不重复启动整条新角色飞升长测。
+
+默认内容的双适配器来源测试使用寻仙10点、问安20点与四次真实近郊采集结算达到日上限；悬赏接取及探索重放不额外计分，未写入伪造来源事件。28日满级链为临时内容将问安改为100点的真实命令测试，用来验证配置消费、周期封顶、30级领奖和到期，不代表默认规则28日完整游玩验收。规则专项独立验算七种开启星期的满级可达性。签名月道契过期后拒绝新付费领取，但原领奖 operation 在重启后仍可回放。
+
+验收结果：行卷、道历、共享奖励、机缘、内容、无版本标识、仓储边界、只读观战和正式 PvP/PvE 聚焦回归172项通过；最后补齐月道契过期、重复JSON字段与默认来源后，行卷四份专项、`test_utils`、`test_content`、`test_runtime_versionless`、`test_repository_boundaries` 和文档专项共209项通过。源码与测试 `compileall`、47份JSON严格解析及 `git diff --check` 通过。周期schema直接加入必需的 `snapshot_json`，不补旧格式默认值；未清理或改写用户数据库。开发库旧行卷不能自动获得可信快照，应先备份，再由开发者明确选择新测试库，不伪造历史快照。
+
+最终复验命令：
+
+```bash
+$HOME/myenv/bin/python -m pytest -q --tb=short test/test_wayfaring_content.py test/test_wayfaring_rules.py test/test_wayfaring.py test/test_wayfaring_sources.py test/test_utils.py test/test_content.py test/test_runtime_versionless.py test/test_repository_boundaries.py test/test_documentation.py
+$HOME/myenv/bin/python -m compileall -q nonebot_plugin_xiuxian_3 test
+git diff --check
+```
+
+本条闭合后道历冷却，未预选下一条。功法朝阳吐纳篇、小型灵兽行囊的来源/配方合同仍不足；不能因为其他候选未定义而再次整理行卷、道契或灵木。整条新角色飞升长链此前中止，本轮未重跑，不计为通过。
+
 ### 首版核心玩法（MVP-1 / `content-0.1`）
 
 `new_user -> 寻仙问道 -> mortal -> 完成引导 -> seeker -> 选择六大道途/辅修 -> cultivator -> 感气基础循环`。
