@@ -18,6 +18,7 @@ class PurchaseOrderRecord:
     seller_dao_name: str | None
     seller_faction: str | None
     item_key: str
+    item_label: str
     quantity: int
     unit_price: int
     purchase_fee: int

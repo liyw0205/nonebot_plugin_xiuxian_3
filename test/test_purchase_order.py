@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -112,6 +113,110 @@ def test_cross_realm_purchase_order_settlement_and_replay_on_qq_and_onebot() -> 
                 assert json.loads(buyer_row[2]) == {"item.beast_blood": 2}
                 assert seller_row[1] == 200
                 assert json.loads(seller_row[2]) == {"item.beast_blood": 1}
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_purchase_order_create_replays_after_item_rename_on_qq_and_onebot() -> None:
+    async def run() -> None:
+        source_data = Path(__file__).resolve().parents[1] / "data"
+        clock = MutableClock(datetime(2026, 9, 25, 12, tzinfo=timezone.utc))
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as temp_dir:
+                data_dir = Path(temp_dir) / "data"
+                shutil.copytree(source_data, data_dir)
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                buyer = f"rename-buyer-{adapter}"
+                seller = f"rename-seller-{adapter}"
+                await _player(runtime, adapter, buyer)
+                await _player(runtime, adapter, seller)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET location_key='demon.abyss_market', faction_reputation_json=?, spirit_stones=1000 WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"demon": 200}), adapter, buyer),
+                    )
+                    connection.execute(
+                        "UPDATE players SET location_key='beast.ten_thousand_hills', faction_reputation_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (json.dumps({"beast": 200}), json.dumps({"item.beast_blood": 3}), adapter, seller),
+                    )
+
+                created = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, buyer, "create-before-rename", "rename-create-order"),
+                    "发布求购 兽血 2 100",
+                )
+                assert created.code == "PURCHASE_ORDER_CREATED"
+                order_id = created.data["order_id"]
+                assert created.data["item_label"] == "兽血"
+                await runtime.close()
+
+                item_path = data_dir / "道具" / "材料.json"
+                document = json.loads(item_path.read_text(encoding="utf-8"))
+                item = next(row for row in document["records"] if row["key"] == "item.beast_blood")
+                item["name"] = "新名兽血"
+                item_path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, buyer, "replay-after-rename", "rename-create-order"),
+                    "发布求购 兽血 2 100",
+                )
+                assert replay.code == "PURCHASE_ORDER_CREATED"
+                assert replay.data["idempotent_replay"] is True
+                assert replay.data["order_id"] == order_id
+                assert replay.data["item_label"] == "兽血"
+                assert "兽血 ×2" in replay.message
+
+                matched = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, seller, "match-after-rename", "rename-match-order"),
+                    f"匹配求购 {order_id}",
+                )
+                assert matched.code == "PURCHASE_ORDER_MATCHED"
+                assert matched.data["item_label"] == "兽血"
+                delivered = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, seller, "deliver-after-rename", "rename-deliver-order"),
+                    f"交付求购 {order_id}",
+                )
+                assert delivered.code == "PURCHASE_ORDER_SETTLED"
+                assert "兽血 ×2" in delivered.message
+
+                changed = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, buyer, "conflicting-replay", "rename-create-order"),
+                    "发布求购 兽血 3 100",
+                )
+                assert changed.code == "LEDGER_CONFLICT"
+                rejected = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, buyer, "new-old-name", "new-order-after-rename"),
+                    "发布求购 兽血 2 100",
+                )
+                assert rejected.code == "PURCHASE_ITEM_FORBIDDEN"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM purchase_orders WHERE buyer_player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                        (adapter, buyer),
+                    ).fetchone()[0] == 1
+                    buyer_assets = connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, buyer),
+                    ).fetchone()
+                    assert buyer_assets[0] == 784
+                    assert json.loads(buyer_assets[1]) == {"item.beast_blood": 2}
+                    seller_assets = connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, seller),
+                    ).fetchone()
+                    assert seller_assets[0] == 200
+                    assert json.loads(seller_assets[1]) == {"item.beast_blood": 1}
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM operations WHERE operation_id='rename-create-order'"
+                    ).fetchone()[0] == 1
                 await runtime.close()
 
     asyncio.run(run())

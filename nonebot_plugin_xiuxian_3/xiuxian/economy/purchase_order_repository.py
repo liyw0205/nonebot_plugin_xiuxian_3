@@ -135,23 +135,14 @@ class PurchaseOrderRepositoryMixin:
         operation_id: str,
         cross_realm: bool,
     ) -> PurchaseOrderRecord:
-        try:
-            item = resolve_purchase_item(item_key, self.content)
-            validate_purchase_order(int(quantity), int(unit_price))
-        except ValueError as exc:
-            if "item" in str(exc):
-                raise PurchaseItemForbiddenError(str(exc)) from exc
-            raise PurchaseOrderStateConflictError(str(exc)) from exc
-        total = int(quantity) * int(unit_price)
-        fee = purchase_fee(total)
-        escrow = total + fee
+        item_input = str(item_key or "").strip()
         operation_name = "economy.create_purchase_order"
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "item_key": item.key,
+                "item_input": item_input,
                 "quantity": int(quantity),
                 "unit_price": int(unit_price),
                 "cross_realm": bool(cross_realm),
@@ -164,6 +155,16 @@ class PurchaseOrderRepositoryMixin:
             existing = self._purchase_operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
                 return self._purchase_record_from_payload(existing, replay=True)
+            try:
+                item = resolve_purchase_item(item_input, self.content)
+                validate_purchase_order(int(quantity), int(unit_price))
+            except ValueError as exc:
+                if "item" in str(exc):
+                    raise PurchaseItemForbiddenError(str(exc)) from exc
+                raise PurchaseOrderStateConflictError(str(exc)) from exc
+            total = int(quantity) * int(unit_price)
+            fee = purchase_fee(total)
+            escrow = total + fee
             buyer = self._require_player(connection, platform, platform_user_id)
             if cross_realm:
                 self._check_cross_realm_permission(buyer)
@@ -184,6 +185,7 @@ class PurchaseOrderRepositoryMixin:
                 "buyer_location": str(buyer["location_key"]),
                 "alliance_key": alliance_key,
                 "item_key": item.key,
+                "item_label": item.label,
                 "quantity": int(quantity),
                 "unit_price": int(unit_price),
                 "purchase_fee_bp": 800,
@@ -558,6 +560,10 @@ class PurchaseOrderRepositoryMixin:
         if row is None:
             raise PurchaseOrderNotFoundError("purchase order does not exist")
         result = json.loads(str(row["result_json"] or "{}"))
+        snapshot = json.loads(str(row["snapshot_json"]))
+        item_label = snapshot.get("item_label")
+        if not isinstance(item_label, str) or not item_label:
+            raise PurchaseOrderStateConflictError("purchase order item label is missing")
         return {
             "order_id": str(row["order_id"]),
             "status": str(row["status"]),
@@ -570,6 +576,7 @@ class PurchaseOrderRepositoryMixin:
             "seller_dao_name": str(row["seller_dao_name"] or "无名") if row["seller_stable_id"] is not None else None,
             "seller_faction": str(row["seller_faction"]) if row["seller_faction"] else None,
             "item_key": str(row["item_key"]),
+            "item_label": item_label,
             "quantity": int(row["quantity"]),
             "unit_price": int(row["unit_price"]),
             "purchase_fee": int(row["purchase_fee"]),
@@ -599,6 +606,7 @@ class PurchaseOrderRepositoryMixin:
             seller_dao_name=payload.get("seller_dao_name"),
             seller_faction=payload.get("seller_faction"),
             item_key=str(payload["item_key"]),
+            item_label=str(payload["item_label"]),
             quantity=int(payload["quantity"]),
             unit_price=int(payload["unit_price"]),
             purchase_fee=int(payload["purchase_fee"]),

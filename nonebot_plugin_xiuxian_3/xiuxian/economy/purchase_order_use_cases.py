@@ -22,7 +22,6 @@ from ..persistence.errors import (
     RepositoryBusyError,
 )
 from .purchase_order_models import PurchaseOrderRecord
-from .purchase_order_rules import resolve_purchase_item
 
 
 class PurchaseOrderApplication:
@@ -35,12 +34,6 @@ class PurchaseOrderApplication:
             return context.operation_id
         key = context.message_id or context.request_id
         return f"{name}:{context.adapter}:{context.user_id}:{key}"
-
-    def _label(self, item_key: str) -> str:
-        try:
-            return resolve_purchase_item(item_key, self.repository.content).label
-        except ValueError:
-            return item_key
 
     def _data(self, record: PurchaseOrderRecord) -> dict[str, object]:
         return {
@@ -55,7 +48,7 @@ class PurchaseOrderApplication:
             "seller_dao_name": record.seller_dao_name,
             "seller_faction": record.seller_faction,
             "item_key": record.item_key,
-            "item_label": self._label(record.item_key),
+            "item_label": record.item_label,
             "quantity": record.quantity,
             "unit_price": record.unit_price,
             "purchase_fee": record.purchase_fee,
@@ -121,7 +114,7 @@ class PurchaseOrderApplication:
         return CommandResult(
             True,
             "PURCHASE_ORDER_CREATED",
-            f"## 求购单已发布\n\n{self._label(record.item_key)} ×{record.quantity}，单价 {record.unit_price} 灵石。\n\n- **求购号**：`{record.order_id}`\n- **锁定总额**：{record.escrow_amount} 灵石\n- **有效至**：{record.expires_at}",
+            f"## 求购单已发布\n\n{record.item_label} ×{record.quantity}，单价 {record.unit_price} 灵石。\n\n- **求购号**：`{record.order_id}`\n- **锁定总额**：{record.escrow_amount} 灵石\n- **有效至**：{record.expires_at}",
             context.request_id,
             operation_id,
             data=self._data(record),
@@ -140,7 +133,7 @@ class PurchaseOrderApplication:
         lines = ["## 跨界求购", ""]
         for record in records:
             matched = f"，卖方 {record.seller_dao_name}" if record.seller_dao_name else ""
-            lines.append(f"- `{record.order_id}` {self._label(record.item_key)} ×{record.quantity}，单价 {record.unit_price}{matched}")
+            lines.append(f"- `{record.order_id}` {record.item_label} ×{record.quantity}，单价 {record.unit_price}{matched}")
         return CommandResult(True, "PURCHASE_ORDER_LISTED", "\n".join(lines), context.request_id, data={"orders": data})
 
     async def match(self, context: CommandContext) -> CommandResult:
@@ -168,7 +161,7 @@ class PurchaseOrderApplication:
             return CommandResult(False, "PURCHASE_ORDER_EXPIRED", "求购单已过期，锁定灵石已返还。", context.request_id, operation_id, data=data)
         if record.transition_notice == "delivery_failed":
             return CommandResult(False, "PURCHASE_DELIVERY_FAILED", "卖方物品在交付前失效，订单已关闭并返还买方托管。", context.request_id, operation_id, data=data)
-        return CommandResult(True, "PURCHASE_ORDER_SETTLED", f"## 求购单已成交\n\n已交付 {self._label(record.item_key)} ×{record.quantity}，卖方获得 {record.total_price} 灵石。", context.request_id, operation_id, data=data)
+        return CommandResult(True, "PURCHASE_ORDER_SETTLED", f"## 求购单已成交\n\n已交付 {record.item_label} ×{record.quantity}，卖方获得 {record.total_price} 灵石。", context.request_id, operation_id, data=data)
 
     async def cancel(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
