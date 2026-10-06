@@ -149,6 +149,174 @@ def test_production_failure_refunds_inputs_and_expired_recovery() -> None:
     asyncio.run(run())
 
 
+def test_expired_production_recovery_skips_newer_processing_order_on_both_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            for adapter in ("qq.official", "onebot.v11"):
+                runtime = create_runtime(
+                    data_dir=f"{data_dir}/{adapter}",
+                    adapters=(adapter,),
+                )
+                user = f"production-recovery-order-{adapter}"
+                dispatch = runtime.adapters.dispatch
+                try:
+                    for index, command in enumerate(
+                        (
+                            "开始修仙",
+                            "寻仙问道",
+                            "完成引导 阅读",
+                            "前往近郊",
+                            "完成引导 采集",
+                            "完成引导 炼丹",
+                            "选择道途 辅修 炼丹",
+                        )
+                    ):
+                        result = await dispatch(
+                            adapter,
+                            _adapter_context(adapter, user, f"setup-{index}"),
+                            command,
+                        )
+                        assert result.ok, (command, result.code, result.message)
+
+                    first = await dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "start-a", "start-a"),
+                        "开始生产 疗伤丹",
+                    )
+                    assert first.code == "PRODUCTION_STARTED"
+                    _finish_order(runtime, first.data["order_id"], hours_ago=25)
+                    marked_expired = await dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "expire-a"),
+                        "领取生产",
+                    )
+                    assert marked_expired.code == "ORDER_EXPIRED"
+
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE players SET energy = energy_max, inventory_json = ? "
+                            "WHERE platform = ? AND platform_user_id = ?",
+                            (
+                                json.dumps(
+                                    {
+                                        "item.herb.blood_grass": 2,
+                                        "item.food.coarse_spirit_rice": 1,
+                                        "item.tool.basic_furnace": 1,
+                                    }
+                                ),
+                                adapter,
+                                user,
+                            ),
+                        )
+                    second = await dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "start-b", "start-b"),
+                        "开始生产 疗伤丹",
+                    )
+                    assert second.code == "PRODUCTION_STARTED"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        inventory_before_recovery = connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                        connection.execute(
+                            "CREATE TRIGGER fail_recovery_operation BEFORE INSERT ON operations "
+                            "WHEN NEW.operation_id = 'recover-a' "
+                            "BEGIN SELECT RAISE(ABORT, 'injected recovery operation failure'); END"
+                        )
+
+                    recovery_failed = await dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "recover-a-failed", "recover-a"),
+                        "恢复生产",
+                    )
+                    assert recovery_failed.code == "PERSISTENCE_ERROR"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        statuses = connection.execute(
+                            "SELECT order_id, status FROM production_orders WHERE player_id = "
+                            "(SELECT id FROM players WHERE platform = ? AND platform_user_id = ?) ORDER BY id",
+                            (adapter, user),
+                        ).fetchall()
+                        assert statuses == [
+                            (first.data["order_id"], "expired"),
+                            (second.data["order_id"], "processing"),
+                        ]
+                        assert connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
+                            (adapter, user),
+                        ).fetchone()[0] == inventory_before_recovery
+                        assert connection.execute(
+                            "SELECT 1 FROM operations WHERE operation_id = 'recover-a'"
+                        ).fetchone() is None
+                        connection.execute("DROP TRIGGER fail_recovery_operation")
+
+                    recovered_a = await dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "recover-a-retry", "recover-a"),
+                        "恢复生产",
+                    )
+                    assert recovered_a.code == "PRODUCTION_RECOVERED"
+                    assert recovered_a.data["order_id"] == first.data["order_id"]
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        assert connection.execute(
+                            "SELECT status FROM production_orders WHERE order_id = ?",
+                            (second.data["order_id"],),
+                        ).fetchone()[0] == "processing"
+                        inventory_after_a = connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                    too_early_for_b = await dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "recover-b-early", "recover-b-early"),
+                        "恢复生产",
+                    )
+                    assert too_early_for_b.code == "PRODUCTION_NOT_READY"
+
+                    await runtime.close()
+                    runtime = create_runtime(
+                        data_dir=f"{data_dir}/{adapter}",
+                        adapters=(adapter,),
+                    )
+                    replay_a = await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "recover-a-replay", "recover-a"),
+                        "恢复生产",
+                    )
+                    assert replay_a.data["idempotent_replay"] is True
+                    assert replay_a.data["order_id"] == first.data["order_id"]
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        assert connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform = ? AND platform_user_id = ?",
+                            (adapter, user),
+                        ).fetchone()[0] == inventory_after_a
+                        connection.execute(
+                            "UPDATE production_orders SET ends_at = ? WHERE order_id = ?",
+                            (
+                                (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat(),
+                                second.data["order_id"],
+                            ),
+                        )
+                    recovered_b = await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "recover-b", "recover-b"),
+                        "恢复生产",
+                    )
+                    assert recovered_b.code == "PRODUCTION_RECOVERED"
+                    assert recovered_b.data["order_id"] == second.data["order_id"]
+                    replay_b = await runtime.adapters.dispatch(
+                        adapter,
+                        _adapter_context(adapter, user, "recover-b-replay", "recover-b"),
+                        "恢复生产",
+                    )
+                    assert replay_b.data["idempotent_replay"] is True
+                    assert replay_b.data["order_id"] == second.data["order_id"]
+                finally:
+                    await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_modified_constitution_json_changes_frozen_production_quality(tmp_path: Path) -> None:
     content_dir = tmp_path / "content"
     shutil.copytree(Path(__file__).parents[1] / "data", content_dir)

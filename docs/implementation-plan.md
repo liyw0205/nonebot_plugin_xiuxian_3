@@ -887,3 +887,15 @@ Python 映射，`PARTY_BATTLE_REWARD` 仍是第二套奖励来源；战斗域 RE
 入口为 QQ 官方与 OneBot V11 的 `结算派遣` 命令。文件边界限于 `xiuxian/specials/dispatch_repository.py`、派遣专项测试、本计划、当前状态页及派遣领域说明；复用 `grant_player_reward_actual`，冻结的 assignment 内容快照不改。operation 结果、assignment 结算结果与玩家回复一致记录实得数值、声望和返还；图鉴发现仍按冻结内容同事务写入。`test/test_dispatch_content.py` 与 `test/test_dispatch.py` 共 14 项通过：两种适配器覆盖名望/信誉封顶、资源返还封顶、assignment/operation/回复一致、operation 幂等与 runtime 重建回放；QQ 官方还覆盖账本写入故障时声望与图鉴原子回滚及原 operation 修复重试。明确未触碰派遣接受/取消、风险与奖励配置、日限额、活动来源投影、功业/七日目标、正式 PvE/PvP 结算以及切磋/训练傀儡只读边界。编译、全量内容 JSON 解析和 `git diff --check` 均通过；未新增运行时版本标识或旧格式兼容分支。
 
 协作方式：本轮由主线独占仓储与测试修改，不并行编码；此前只读候选审查用于比较跨域候选。缺陷已由当前 repository、共享 helper 和现有合同定位到单一结算边界，另行拆分同一仓储没有收益。特色玩法进入冷却；下一条从全部未闭合玩家路径重新比较，不按文档或子插件目录顺序续做。
+
+### 已闭合切片：生产订单过期恢复不被新订单遮挡
+
+入口为 QQ 官方与 OneBot V11 的 `恢复生产`，底层沿用 `production.complete_production` / `recover_production` application 和 `_settle_production_once` 事务。当前 repository 在领取与恢复中都取玩家最新一笔 `processing`/`expired` 订单；恢复逻辑遇到这笔未满 24 小时即返回 `PRODUCTION_NOT_READY`，即使更早的一笔 `expired` 订单已可恢复。现有 `test_production_failure_refunds_inputs_and_expired_recovery` 仅覆盖单笔订单。领域合同已要求已过期订单按创建快照恢复、操作幂等及产出原子写入，但未定义积压多笔的先后；本条补充并实现：`expired` 记录与结束时间超过 24 小时的 `processing` 记录均为可恢复项，每次选择其中创建时间最早的一笔；尚未达到恢复时间的 `processing` 订单不参与选择，不能遮挡更早的可恢复项。若没有可恢复订单但仍有待处理订单，保留现有“尚未达到恢复时间”错误；没有待处理订单则保留“无待恢复订单”错误。
+
+横向候选：问道行卷仍有硬编码周期/积分/奖励及非双适配器来源测试缺口，但未发现结算错误，本轮不以内容迁移优先于已复现的资源恢复阻塞；其它三界副本、悬赏矩阵、魔渊深层和竞技场高阶链合同不完整，入口保持关闭；Web 与跨服写入继续锁定。**开工前**最近五条切片依次涉及特色玩法、经济、生产、装备和经济；生产只出现一次，未触发子插件两次冷却条件。特色玩法与经济刚闭合，均未自动续做。生产订单恢复虽处于此前登记的冷却暂缓项，但期间已有装备、经济和特色玩法切片，且存在真实双适配器复现，因此重新进入候选有独立依据。**本条闭合后**最近五条切片依次为生产、特色玩法、经济、生产和装备；生产现出现两次，进入冷却。选择顺序来自全域候选与轮转约束，不按文档行号或子插件目录顺序。
+
+文件边界限于 `xiuxian/production/repository.py`、生产用例合同、`test/test_production.py`、本计划和当前状态页。先加双适配器回归复现 A 已 expired、B processing 且未到恢复时间的阻塞；修复后验证恢复 A 不改变 B，再恢复 B、产出/退款只提交一次、同 operation 重放和 runtime 重建回放。写入故障须保持订单、玩家资产及 operation 原子回滚，原请求可重试。明确不触碰配方 JSON/规则、创建/取消流程、设施维护、生产委托、其他领域、正式 PvP/PvE，以及切磋/训练傀儡只读观战边界。
+
+验收已通过：`test/test_production.py`、`test/test_production_contract.py`、`test/test_utils.py`、`test/test_documentation.py` 共 82 项通过。QQ 官方与 OneBot V11 均覆盖 A/B 顺序、B 在 A 恢复后仍保持 `processing`、A 与 B 分别结算、operation 故障回滚与原 operation 重试、operation 幂等和 runtime 重建回放；A 重放不会重复变更背包。恢复查询、资产结算与 operation 仍共用原事务。`compileall`、46 份内容 JSON 解析和 `git diff --check` 均通过。本条不改配方内容、创建/取消、设施维护、生产委托、正式 PvE/PvP 或切磋/训练傀儡只读边界。无运行时版本标识或旧格式兼容分支。
+
+协作方式：由主线独占一个 repository 与对应测试，不并行编码；恢复选择和结算共用同一事务，拆分同一查询会造成重叠所有权。切片已闭合，生产进入冷却；下一轮重新比较全部未闭合玩家路径，不沿本子插件续做。

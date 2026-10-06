@@ -558,10 +558,28 @@ class ProductionRepositoryMixin:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._production_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
             row = self._require_player(connection, platform, platform_user_id)
-            order = connection.execute(
-                "SELECT * FROM production_orders WHERE player_id = ? AND status IN ('processing', 'expired') ORDER BY id DESC LIMIT 1",
-                (row["id"],),
-            ).fetchone()
+            if recovery:
+                recovery_cutoff = serialize_datetime(now - timedelta(hours=24))
+                order = connection.execute(
+                    "SELECT * FROM production_orders WHERE player_id = ? AND "
+                    "(status = 'expired' OR (status = 'processing' AND ends_at < ?)) "
+                    "ORDER BY created_at ASC, id ASC LIMIT 1",
+                    (row["id"], recovery_cutoff),
+                ).fetchone()
+                if order is None:
+                    pending = connection.execute(
+                        "SELECT 1 FROM production_orders WHERE player_id = ? "
+                        "AND status IN ('processing', 'expired') LIMIT 1",
+                        (row["id"],),
+                    ).fetchone()
+                    if pending is not None:
+                        raise ProductionNotReadyError("production is not ready for recovery")
+                    raise ProductionNotFoundError("no processing production order")
+            else:
+                order = connection.execute(
+                    "SELECT * FROM production_orders WHERE player_id = ? AND status IN ('processing', 'expired') ORDER BY id DESC LIMIT 1",
+                    (row["id"],),
+                ).fetchone()
             if order is None:
                 raise ProductionNotFoundError("no processing production order")
             ends_at = datetime.fromisoformat(str(order["ends_at"]))
