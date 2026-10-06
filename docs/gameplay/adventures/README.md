@@ -4,8 +4,8 @@
 
 当前开放草药补给、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境、`instance.secret_realm.heaven_echo` 天劫回音，以及 `instance.legacy.demon_reliquary` 和 `instance.legacy.demon_abyss_echo` 两条线索驱动遗府。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。遗府使用遗府专属仓储和稳定键隔离，现无已登记且规则闭合的后续副本待办。斗法记录分享和尚未定义合同的后续内容仍保持锁定；世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
-当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，以及 v0.3 的
-`bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
+当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，感气阶段的
+`bounty.spell_trial`、`bounty.body_trial`，以及 v0.3 的 `bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
 接取时冻结目标、奖励、展示信息、地方名望键与上限，以及背包/生产/战斗/派遣基线。领取与进度
 只读取该快照，资产、数值、阵营/地方名望和服务信誉交由共享角色状态事务处理；悬赏、图鉴与
 operation 同事务提交，结果只记录封顶后的实得奖励。坏快照或声望 JSON 不会被当作空对象继续结算，
@@ -19,6 +19,7 @@ operation 同事务提交，结果只记录封顶后的实得奖励。坏快照�
 operation ledger 幂等。
 
 可用命令：`悬赏榜`、`接取悬赏 草药补给`、`接取悬赏 生产订单`、`接取悬赏 云铁矿区悬赏`、
+`接取悬赏 淬体试炼`、
 `接取悬赏 魔界救援`、`接取悬赏 妖界栖地保护`、`领取悬赏`。魔界救援要求 `access.demon_abyss_gate`，以接取后新增的粗糙灵米计进度，
 领取时扣除三份并原子增加魔界声望与灵石；过期不扣货。QQ 官方与 OneBot V11 共用同一 application，
 妖界栖地保护要求有效 `permit.beast_trade`，只计接取后成功结算的 `dispatch.beast_relocation` 来源事件，

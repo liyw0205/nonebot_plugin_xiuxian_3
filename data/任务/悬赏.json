@@ -160,6 +160,27 @@
       "reward_labels": {}
     },
     {
+      "key": "bounty.body_trial",
+      "name": "淬体试炼",
+      "desc": "入近郊伏妖，淬炼肉身、磨砺护体之法。",
+      "quality": "uncommon",
+      "status": "open",
+      "aliases": ["体修悬赏"],
+      "required_realm": "qi_sensing",
+      "required_layer": 1,
+      "path_keys": ["body"],
+      "weight": 100,
+      "duration_seconds": 3600,
+      "daily_limit": 1,
+      "target_kind": "exploration_battle_wins",
+      "target_key": "enemy.wood_rat",
+      "target_amount": 2,
+      "reward_pool_key": "reward_pool.bounty.body_trial",
+      "reputation_key": "local.xuantian.new_town",
+      "consume_target": false,
+      "reward_labels": {}
+    },
+    {
       "key": "bounty.void_anchoring",
       "name": "虚空锚定悬赏",
       "desc": "向界壁巡守交付虚空晶，协助稳定炼虚境附近的航道。",
