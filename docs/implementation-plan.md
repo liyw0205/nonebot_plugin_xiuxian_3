@@ -17,6 +17,75 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 
 ## 1. 范围分层
 
+### 已闭合切片：限量拍卖的内容快照与结算恢复
+
+开工证据：QQ/OneBot真实发布云铁并竞价后，物品改名/关闭、重建runtime，原发布operation均被
+`MARKET_ITEM_FORBIDDEN`拦截；列表、竞价与成交则改用现行名称，关闭时显示内部物品键。退款和成交资产
+仍正确，不把展示/回放缺陷夸大为已发生丢款。已有拍品snapshot从未被读取，竞价规则也未冻结。
+
+本条覆盖发布、列表、竞价、超价退款、成交/无竞价流拍/超时退款和重启回放。现有20个在售槽、12小时、
+10分钟宽限、数量1至99、最低起价1和500bp加价原值登记为`auction.weekly`内容，不新增品质、税费或玩法。
+发布冻结物品键/名称与完整规则、期限；后续只读快照，当前物品或拍卖关闭仅拒绝新发布。周槽仍按同一UTC
+起拍周open/settling占用计数，终态释放，不改为累计周次数。固定指令/错误短句留代码。
+
+| 候选 | 证据、合同和复用 | 选择 |
+|:--|:--|:--|
+| 经济拍卖 | 双适配器改名/关闭重启复现；已有完整锁货/托管/退款合同，可复用公共JSON、operation和资产事务 | 选中；经济退出最近十条，完整闭合拍品生命周期而非只挪一次校验 |
+| 师徒毕业 | 两适配器公开邀请/接受和真实疗伤丹生产后，筑基/金丹均拒绝毕业，仅聚气L3通过；现有境界内容和师徒仓储可复用 | 明确待修，但social刚完成道侣，优先轮转经济；不混改两域 |
+| 未定义来源、分享、后续副本 | 朝阳功法、灵兽行囊、分享授权与未登记副本仍缺当前合同 | 不臆造来源、权限或奖励 |
+| 跨服/Web/支付 | 身份隔离、写权限与支付前置未完成 | 保持关闭 |
+
+最近十条玩法切片依次为：`628c494`社交(social)，`5388b03`属性/战斗(stats/combat/advancement/adventures/
+exploration/player/progression/specials)，`de527ce`灵田(livelihood/utils)，`0b1d92e`行卷(routine/persistence/
+utils，另八处仅删导入)，`cf72c83`道源(quests/progression)，`4ab072f`灵兽(companions)，`da1a8df`移动(world)，
+`dbcfb4a`行卷称号(routine/adventures/events/utils)，`70963ed`生产(production)，`58b69b6`派遣(specials)，
+均已验收QQ/OneBot。计入纯导入触及：utils/adventures/progression各三次，advancement/exploration/player/
+world/routine/production/specials各两次，其他各一次；最近五条重复为utils/progression及advancement/
+adventures/exploration/player，其中行卷的相邻域仅删导入。上述重复子插件冷却；economy最近一次
+`31616c6`为库存隔离，已不在十条窗口，仍不重做已闭合库存工具。
+
+文件所有权：主线独占`economy/auction_repository.py`、`auction_models.py`、`auction_use_cases.py`和
+状态/计划/内容合同/数据盘点；`wayfaring_contract_candidate`独占`auction_rules.py`、新`经济/拍卖.json`、
+内容清单、内容总表与经济域四份当前合同、新`test/test_auction_rules.py`；`gather_transaction_reuse`独占新
+`test/test_auction_snapshot.py`，负责内容改值/关闭、双适配器生命周期与展示回放；`source_contract_candidate`
+独占新`test/test_auction_recovery.py`，负责JSON、权限、并发、托管退款/结算故障和原请求重试。
+三路在实现开始时并行；只读终审不重叠编辑。共享工具直接复用，不新增兼容wrapper。
+
+验收：旧请求优先按原始选择器/身份/输入回放，坏内容仅阻止新建；坏快照/账本拒绝且无部分资产变化；
+拍品、物品锁、竞价托管与冻结数量一致，成交一次、超价和过期退款一次；真实适配器、重启与并发验收。
+不改变摆摊、求购、生产、师徒、PvP/PvE或只读观战。聚焦测试、compileall、全部JSON和diff检查后提交推送，
+不重启完整飞升长测。
+
+实现记录：新发布读取当前 `auction.weekly`，在原事务冻结拍品名称、卖方、数量、起价、UTC起拍周、
+全部规则和期限；查询、竞价和交割实际消费快照。移除拍卖私有operation读写，复用公共严格JSON和
+operation工具，资产仍由共享事务处理；被超价与过期退款共用领域退款函数，不另写灵石或背包SQL。
+当前内容关闭或移除不影响履约，不添加新税费、品质要求、运行时版本或旧格式分支。
+
+三路并行交付规则/内容、双适配器和恢复测试；两名代理另作独立只读终审。终审发现仅校验字段类型仍会
+接受与动作矛盾的历史状态或错配拍品号/金额，主线补齐按动作和原请求核验，恢复测试逐项注入坏结果并
+检查整库零写。期限改为aware datetime比较，验证等价带偏移时间在结束前、结束时、宽限前和宽限时的
+行为。内容变更专项通过真实创建/寻仙命令获得临时内容定义的灵石与云铁；恢复专项使用明确的资产夹具，
+不将二者表述为默认生产或完整角色成长验收。
+
+最终统一复验：规则120项、内容/双适配器4项、恢复/并发14项，连同原拍卖、跨交易库存、求购和委托
+10项，共148项通过；公共工具/内容、适配器、正式PvP/PvE、只读观战和工程门槛119项通过，合计267项
+不重复测试。代理先前分组结果不再累加；终审补充的动作/原请求错配结果均已纳入最终148项。
+
+```bash
+/root/myenv/bin/python -m pytest -q --tb=short test/test_auction_rules.py test/test_auction_snapshot.py test/test_auction_recovery.py test/test_auction.py test/test_inventory_lock_isolation.py test/test_cross_realm_trade.py test/test_economy_commission.py
+/root/myenv/bin/python -m pytest -q --tb=short test/test_utils.py test/test_content.py test/test_adapter_normalization.py test/test_combat.py test/test_arena.py test/test_spar_interactions.py test/test_documentation.py test/test_repository_boundaries.py test/test_runtime_versionless.py
+/root/myenv/bin/python -m compileall -q nonebot_plugin_xiuxian_3 test
+git diff --check
+```
+
+48份内容JSON另经严格重复键及非有限数值校验通过；源码和测试compileall、diff检查通过。未运行整仓
+全量或飞升长链，正式战斗与观战边界只计本次专项回归，不声称全成长流程验证。
+
+回滚时须成对回退代码与内容，并由开发者恢复变更前明确备份的数据库；不得自动清库或拼造旧拍品快照。
+本条不改schema，但缺少必需字段的旧开发拍品或旧operation会明确拒绝。未改用户数据库，验收均用临时库。
+经济本条闭合后冷却；已复现的师徒高境界毕业阻断留作下一候选，朝阳功法/灵具来源、分享授权、未定义
+副本与跨服/Web前置仍待独立合同，不沿拍卖继续扩玩法。
+
 ### 已闭合切片：道侣缘契快照与重启续行
 
 开工证据：QQ 官方与 OneBot V11 的公开邀请、接受已成功，关闭 `social.partner` 并重建 runtime 后，

@@ -13,6 +13,7 @@ class AuctionRecord:
     seller_platform_user_id: str
     seller_dao_name: str
     item_key: str
+    item_label: str
     quantity: int
     starting_bid: int
     current_bid: int

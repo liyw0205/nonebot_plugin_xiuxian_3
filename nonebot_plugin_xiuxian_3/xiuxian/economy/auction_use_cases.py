@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentError
 from ..repository import (
     AuctionBidTooLowError,
     AuctionItemLockedError,
@@ -21,7 +22,6 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .auction_models import AuctionRecord
-from .rules import resolve_market_item
 
 
 class AuctionApplication:
@@ -35,13 +35,8 @@ class AuctionApplication:
         key = context.message_id or context.request_id
         return f"{name}:{context.adapter}:{context.user_id}:{key}"
 
-    def _label(self, item_key: str) -> str:
-        try:
-            return resolve_market_item(item_key, self.repository.content).label
-        except ValueError:
-            return item_key
-
-    def _data(self, record: AuctionRecord) -> dict[str, object]:
+    @staticmethod
+    def _data(record: AuctionRecord) -> dict[str, object]:
         return {
             "auction_id": record.auction_id,
             "status": record.status,
@@ -49,7 +44,7 @@ class AuctionApplication:
             "seller_platform_user_id": record.seller_platform_user_id,
             "seller_dao_name": record.seller_dao_name,
             "item_key": record.item_key,
-            "item_label": self._label(record.item_key),
+            "item_label": record.item_label,
             "quantity": record.quantity,
             "starting_bid": record.starting_bid,
             "current_bid": record.current_bid,
@@ -63,19 +58,20 @@ class AuctionApplication:
     @classmethod
     def _error(cls, context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
         mapping = {
-            AuctionSlotFullError: ("AUCTION_SLOT_FULL", "本周拍卖槽位已满，未锁定物品。"),
-            AuctionBidTooLowError: ("AUCTION_BID_TOO_LOW", "出价不足，下一价至少比当前价高 5%。"),
+            AuctionSlotFullError: ("AUCTION_SLOT_FULL", "本周在售拍品已满，请待拍品落槌后再来。"),
+            AuctionBidTooLowError: ("AUCTION_BID_TOO_LOW", "这口价尚未达到加价要求。"),
             AuctionSelfBidError: ("AUCTION_SELF_BID", "不能竞价自己的拍卖。"),
             AuctionNotFoundError: ("AUCTION_NOT_FOUND", "没有找到这条拍卖。"),
-            AuctionStateConflictError: ("AUCTION_STATE_CONFLICT", "拍卖当前不允许执行这个操作。"),
-            AuctionItemLockedError: ("AUCTION_ITEM_LOCKED", "拍卖物品锁定已失效，未转移资产。"),
-            BalanceInsufficientError: ("BALANCE_INSUFFICIENT", "灵石不足，未锁定出价。"),
+            AuctionStateConflictError: ("AUCTION_STATE_CONFLICT", "这件拍品眼下尚不能如此处置。"),
+            AuctionItemLockedError: ("AUCTION_ITEM_LOCKED", "此物暂不可交割，请先核对行囊与未结交易。"),
+            BalanceInsufficientError: ("BALANCE_INSUFFICIENT", "行囊中的灵石不足以支付这口价。"),
             ItemBindingActiveError: ("ITEM_BINDING_ACTIVE", "物品仍在绑定期，不能拍卖。"),
             MarketItemForbiddenError: ("MARKET_ITEM_FORBIDDEN", "该物品不能进入拍卖。"),
             MarketPriceInvalidError: ("AUCTION_INPUT_INVALID", "数量或起拍价不合法。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能操作拍卖。"),
             OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
+            ContentError: ("CONTENT_ERROR", "坊市此时不收拍品，请稍后再来。"),
             RepositoryBusyError: ("PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。"),
         }
         for error_type, (code, message) in mapping.items():
@@ -99,7 +95,7 @@ class AuctionApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "AUCTION_CREATED", f"## 拍卖已发布\n\n- **拍卖号**：`{record.auction_id}`\n- **物品**：{self._label(record.item_key)} ×{record.quantity}\n- **起拍价**：{record.starting_bid} 灵石\n- **结束时间**：{record.ends_at}", context.request_id, operation_id, data=self._data(record))
+        return CommandResult(True, "AUCTION_CREATED", f"## 拍卖已发布\n\n- **拍卖号**：`{record.auction_id}`\n- **物品**：{record.item_label} ×{record.quantity}\n- **起拍价**：{record.starting_bid} 灵石\n- **结束时间**：{record.ends_at}", context.request_id, operation_id, data=self._data(record))
 
     async def list(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -113,7 +109,7 @@ class AuctionApplication:
             return CommandResult(True, "AUCTION_LIST_EMPTY", "当前没有进行中的拍卖。", context.request_id, data={"auctions": data})
         lines = ["## 本周拍卖", ""]
         for record in records:
-            lines.append(f"- `{record.auction_id}` {self._label(record.item_key)} ×{record.quantity}，当前 {record.current_bid or record.starting_bid} 灵石，结束于 {record.ends_at}")
+            lines.append(f"- `{record.auction_id}` {record.item_label} ×{record.quantity}，当前 {record.current_bid or record.starting_bid} 灵石，结束于 {record.ends_at}")
         return CommandResult(True, "AUCTION_LISTED", "\n".join(lines), context.request_id, data={"auctions": data})
 
     async def bid(self, context: CommandContext) -> CommandResult:
@@ -139,9 +135,9 @@ class AuctionApplication:
         except Exception as exc:
             return self._error(context, operation_id, exc)
         if record.status == "expired":
-            return CommandResult(False, "AUCTION_SETTLEMENT_EXPIRED", "拍卖结算窗口已过，已按流拍处理并释放锁定资产。", context.request_id, operation_id, data=self._data(record))
+            return CommandResult(False, "AUCTION_SETTLEMENT_EXPIRED", "已过交割时辰，此物流拍；竞价灵石已退还，物品仍归原主。", context.request_id, operation_id, data=self._data(record))
         if record.status == "unsold":
-            message = "拍卖流拍，物品锁定已释放。"
+            message = "无人应价，此物流拍，仍归原主。"
             code = "AUCTION_UNSOLD"
         else:
             message = f"拍卖已成交，成交价 {record.current_bid} 灵石。"

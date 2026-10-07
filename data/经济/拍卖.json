@@ -1,0 +1,19 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "auction",
+  "records": [
+    {
+      "key": "auction.weekly",
+      "name": "仙市拍卖",
+      "desc": "珍物入市，诸位道友依次出价，价高者得。",
+      "status": "active",
+      "slot_limit": 20,
+      "duration_seconds": 43200,
+      "settlement_grace_seconds": 600,
+      "min_quantity": 1,
+      "max_quantity": 99,
+      "min_starting_bid": 1,
+      "min_increment_bp": 500
+    }
+  ]
+}
