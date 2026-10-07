@@ -151,6 +151,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, player_currency
+from ..utils.json_cache import decode_json_strict
 from ..utils.player import (
     change_player_state,
     player_integer,
@@ -161,6 +162,218 @@ from ..utils.player import (
 
 
 class TravelRepositoryMixin:
+    _TRAVEL_SNAPSHOT_FIELDS = frozenset(
+        {
+            "source",
+            "destination",
+            "stamina_cost",
+            "currency_cost",
+            "pass_key",
+            "pass_quantity",
+            "required_dao_fruit_progress",
+            "daily_start_limit",
+            "required_endgame_status",
+            "required_intro_flag",
+            "consume_pass_on_arrival",
+            "required_faction",
+            "required_faction_reputation",
+            "requires_selected_domain",
+            "domain_key",
+            "faction_reputation",
+        }
+    )
+    _TRAVEL_START_FIELDS = frozenset(
+        {
+            "player",
+            "session_id",
+            "source",
+            "destination",
+            "status",
+            "starts_at",
+            "ends_at",
+            "stamina_cost",
+            "currency_cost",
+            "pass_key",
+            "pass_quantity",
+            "consume_pass_on_arrival",
+        }
+    )
+    _TRAVEL_SETTLEMENT_FIELDS = _TRAVEL_START_FIELDS | {"arrived", "pass_consumed"}
+
+    @staticmethod
+    def _travel_json_object(value: Any, field: str) -> dict[str, Any]:
+        """Decode persisted movement JSON without accepting duplicate keys or fallbacks."""
+
+        try:
+            decoded = decode_json_strict(str(value))
+        except (TypeError, ValueError) as exc:
+            raise OperationResultMalformedError(f"travel {field} is invalid JSON") from exc
+        if not isinstance(decoded, dict):
+            raise OperationResultMalformedError(f"travel {field} must be an object")
+        return decoded
+
+    @staticmethod
+    def _travel_integer(value: Any, field: str, *, minimum: int = 0) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise OperationResultMalformedError(f"travel {field} is invalid")
+        return value
+
+    @staticmethod
+    def _travel_optional_text(value: Any, field: str) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value:
+            raise OperationResultMalformedError(f"travel {field} is invalid")
+        return value
+
+    @staticmethod
+    def _travel_datetime(value: Any, field: str) -> datetime:
+        if not isinstance(value, str) or not value:
+            raise OperationResultMalformedError(f"travel {field} is invalid")
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise OperationResultMalformedError(f"travel {field} is invalid") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise OperationResultMalformedError(f"travel {field} must include timezone")
+        return parsed
+
+    @classmethod
+    def _validate_travel_snapshot(
+        cls, snapshot: dict[str, Any], session: sqlite3.Row, *, expected_pass_timing: bool | None = None
+    ) -> None:
+        expected_fields = cls._TRAVEL_SNAPSHOT_FIELDS
+        if str(session["destination"]) == "beast.ten_thousand_hills":
+            expected_fields = expected_fields | {"beast_hills_permission"}
+        if set(snapshot) != expected_fields:
+            raise OperationResultMalformedError("travel snapshot fields are invalid")
+        if snapshot["source"] != str(session["source_location"]):
+            raise OperationResultMalformedError("travel snapshot source differs from session")
+        if snapshot["destination"] != str(session["destination"]):
+            raise OperationResultMalformedError("travel snapshot destination differs from session")
+        for field in (
+            "stamina_cost",
+            "currency_cost",
+            "pass_quantity",
+            "required_dao_fruit_progress",
+            "daily_start_limit",
+            "required_faction_reputation",
+            "faction_reputation",
+        ):
+            cls._travel_integer(snapshot[field], field)
+        if int(snapshot["stamina_cost"]) != int(session["stamina_cost"]):
+            raise OperationResultMalformedError("travel snapshot stamina cost differs from session")
+        if int(snapshot["currency_cost"]) != int(session["currency_cost"]):
+            raise OperationResultMalformedError("travel snapshot currency cost differs from session")
+        snapshot_pass_key = cls._travel_optional_text(snapshot["pass_key"], "pass_key")
+        session_pass_key = str(session["pass_key"]) if session["pass_key"] is not None else None
+        if snapshot_pass_key != session_pass_key:
+            raise OperationResultMalformedError("travel snapshot pass differs from session")
+        if int(snapshot["pass_quantity"]) != int(session["pass_quantity"]):
+            raise OperationResultMalformedError("travel snapshot pass quantity differs from session")
+        if snapshot_pass_key is None and int(snapshot["pass_quantity"]) != 0:
+            raise OperationResultMalformedError("travel snapshot has quantity without a pass")
+        for field in ("required_endgame_status", "required_intro_flag", "required_faction", "domain_key"):
+            cls._travel_optional_text(snapshot[field], field)
+        if not isinstance(snapshot["consume_pass_on_arrival"], bool):
+            raise OperationResultMalformedError("travel snapshot pass timing is invalid")
+        if expected_pass_timing is not None and snapshot["consume_pass_on_arrival"] != expected_pass_timing:
+            raise OperationResultMalformedError("travel snapshot pass timing differs from start operation")
+        if not isinstance(snapshot["requires_selected_domain"], bool):
+            raise OperationResultMalformedError("travel snapshot domain gate is invalid")
+        permission = snapshot.get("beast_hills_permission")
+        if str(session["destination"]) == "beast.ten_thousand_hills":
+            if permission not in {"reputation", "intro_flag"}:
+                raise OperationResultMalformedError("travel snapshot permission is invalid")
+            required_reputation = int(snapshot["required_faction_reputation"])
+            reputation = int(snapshot["faction_reputation"])
+            if permission == "reputation" and reputation < required_reputation:
+                raise OperationResultMalformedError("travel snapshot permission is inconsistent")
+            if permission == "intro_flag" and reputation >= required_reputation:
+                raise OperationResultMalformedError("travel snapshot permission is inconsistent")
+        elif permission is not None:
+            raise OperationResultMalformedError("travel snapshot permission is invalid")
+        if snapshot["requires_selected_domain"] != (snapshot["domain_key"] is not None):
+            raise OperationResultMalformedError("travel snapshot domain state is inconsistent")
+
+    @classmethod
+    def _validate_travel_operation_payload(
+        cls, payload: dict[str, Any], *, settlement: bool, destination: str | None = None
+    ) -> None:
+        expected = cls._TRAVEL_SETTLEMENT_FIELDS if settlement else cls._TRAVEL_START_FIELDS
+        if set(payload) != expected:
+            raise OperationResultMalformedError("travel operation result fields are invalid")
+        if not isinstance(payload["player"], dict):
+            raise OperationResultMalformedError("travel operation player is invalid")
+        for field in ("session_id", "source", "destination", "status", "starts_at", "ends_at"):
+            if not isinstance(payload[field], str) or not payload[field]:
+                raise OperationResultMalformedError(f"travel operation {field} is invalid")
+        cls._travel_datetime(payload["starts_at"], "starts_at")
+        cls._travel_datetime(payload["ends_at"], "ends_at")
+        if destination is not None and payload["destination"] != destination:
+            raise OperationResultMalformedError("travel operation destination differs from request")
+        expected_status = "arrived" if settlement else "running"
+        if payload["status"] != expected_status:
+            raise OperationResultMalformedError("travel operation status is invalid")
+        for field in ("stamina_cost", "currency_cost", "pass_quantity"):
+            cls._travel_integer(payload[field], field)
+        cls._travel_optional_text(payload["pass_key"], "pass_key")
+        if not isinstance(payload["consume_pass_on_arrival"], bool):
+            raise OperationResultMalformedError("travel operation pass timing is invalid")
+        if settlement:
+            if payload["arrived"] is not True or not isinstance(payload["pass_consumed"], bool):
+                raise OperationResultMalformedError("travel operation settlement flags are invalid")
+
+    @classmethod
+    def _validate_travel_start_against_session(cls, payload: dict[str, Any], session: sqlite3.Row) -> None:
+        cls._validate_travel_operation_payload(payload, settlement=False, destination=str(session["destination"]))
+        if payload["session_id"] != str(session["session_id"]):
+            raise OperationResultMalformedError("travel operation session differs from session")
+        if payload["starts_at"] != str(session["starts_at"]):
+            raise OperationResultMalformedError("travel operation timing differs from session")
+        if payload["ends_at"] != str(session["ends_at"]):
+            raise OperationResultMalformedError("travel operation timing differs from session")
+        if payload["source"] != str(session["source_location"]):
+            raise OperationResultMalformedError("travel operation source differs from session")
+        if int(payload["stamina_cost"]) != int(session["stamina_cost"]):
+            raise OperationResultMalformedError("travel operation stamina cost differs from session")
+        if int(payload["currency_cost"]) != int(session["currency_cost"]):
+            raise OperationResultMalformedError("travel operation currency cost differs from session")
+        if payload["pass_key"] != (str(session["pass_key"]) if session["pass_key"] is not None else None):
+            raise OperationResultMalformedError("travel operation pass differs from session")
+        if int(payload["pass_quantity"]) != int(session["pass_quantity"]):
+            raise OperationResultMalformedError("travel operation pass quantity differs from session")
+
+    @classmethod
+    def _validate_travel_settlement_against_session(cls, payload: dict[str, Any], session: sqlite3.Row) -> None:
+        cls._validate_travel_operation_payload(payload, settlement=True, destination=str(session["destination"]))
+        if payload["session_id"] != str(session["session_id"]):
+            raise OperationResultMalformedError("travel settlement session differs from session")
+        if payload["starts_at"] != str(session["starts_at"]):
+            raise OperationResultMalformedError("travel settlement timing differs from session")
+        if payload["ends_at"] != str(session["ends_at"]):
+            raise OperationResultMalformedError("travel settlement timing differs from session")
+        if payload["source"] != str(session["source_location"]):
+            raise OperationResultMalformedError("travel settlement source differs from session")
+        if int(payload["stamina_cost"]) != int(session["stamina_cost"]):
+            raise OperationResultMalformedError("travel settlement stamina cost differs from session")
+        if int(payload["currency_cost"]) != int(session["currency_cost"]):
+            raise OperationResultMalformedError("travel settlement currency cost differs from session")
+        if payload["pass_key"] != (str(session["pass_key"]) if session["pass_key"] is not None else None):
+            raise OperationResultMalformedError("travel settlement pass differs from session")
+        if int(payload["pass_quantity"]) != int(session["pass_quantity"]):
+            raise OperationResultMalformedError("travel settlement pass quantity differs from session")
+        snapshot = cls._travel_json_object(session["snapshot_json"], "snapshot")
+        cls._validate_travel_snapshot(snapshot, session, expected_pass_timing=payload["consume_pass_on_arrival"])
+        result = cls._travel_json_object(session["result_json"], "session result")
+        if set(result) != {"arrived", "pass_consumed", "settled_at"}:
+            raise OperationResultMalformedError("travel settlement session result is invalid")
+        if result["arrived"] is not True or not isinstance(result["pass_consumed"], bool):
+            raise OperationResultMalformedError("travel settlement session flags are invalid")
+        cls._travel_datetime(result["settled_at"], "settled_at")
+        if payload["pass_consumed"] != result["pass_consumed"]:
+            raise OperationResultMalformedError("travel settlement pass result differs from session")
+
     async def preview_travel(
         self,
         *,
@@ -315,13 +528,25 @@ class TravelRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._travel_start_from_payload(json.loads(existing["result_json"]), replay=True)
+                payload = self._travel_json_object(existing["result_json"], "start operation result")
+                self._validate_travel_operation_payload(payload, settlement=False, destination=destination)
+                session = connection.execute(
+                    "SELECT * FROM travel_sessions WHERE operation_id = ?", (operation_id,)
+                ).fetchone()
+                if session is None or int(session["player_id"]) != int(existing["player_id"]):
+                    raise OperationResultMalformedError("travel start operation has no matching session")
+                self._validate_travel_start_against_session(payload, session)
+                snapshot = self._travel_json_object(session["snapshot_json"], "snapshot")
+                self._validate_travel_snapshot(
+                    snapshot, session, expected_pass_timing=payload["consume_pass_on_arrival"]
+                )
+                return self._travel_start_from_payload(payload, replay=True)
 
             row = self._require_player(connection, platform, platform_user_id, writable=False)
             if not destination_location_is_open(destination, self.content):
@@ -507,6 +732,7 @@ class TravelRepositoryMixin:
                 "starts_at": serialize_datetime(now), "ends_at": serialize_datetime(ends_at),
                 "stamina_cost": definition.stamina_cost, "currency_cost": definition.currency_cost,
                 "pass_key": pass_key, "pass_quantity": pass_quantity,
+                "consume_pass_on_arrival": definition.consume_pass_on_arrival,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -516,6 +742,7 @@ class TravelRepositoryMixin:
 
     @staticmethod
     def _travel_start_from_payload(payload: dict[str, Any], replay: bool = False) -> TravelStartRecord:
+        TravelRepositoryMixin._validate_travel_operation_payload(payload, settlement=False)
         return TravelStartRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             session_id=str(payload["session_id"]), source=str(payload["source"]),
@@ -552,12 +779,22 @@ class TravelRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)
             ).fetchone()
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._travel_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+                payload = self._travel_json_object(existing["result_json"], "settlement operation result")
+                self._validate_travel_operation_payload(payload, settlement=True)
+                session = connection.execute(
+                    "SELECT * FROM travel_sessions WHERE session_id = ?", (payload["session_id"],)
+                ).fetchone()
+                if session is None or int(session["player_id"]) != int(existing["player_id"]):
+                    raise OperationResultMalformedError("travel settlement operation has no matching session")
+                if session["status"] != "arrived":
+                    raise OperationResultMalformedError("travel settlement operation session is not arrived")
+                self._validate_travel_settlement_against_session(payload, session)
+                return self._travel_settlement_from_payload(payload, replay=True)
             row = self._require_player(connection, platform, platform_user_id, writable=False)
             session = connection.execute(
                 "SELECT * FROM travel_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1", (row["id"],)
@@ -567,10 +804,36 @@ class TravelRepositoryMixin:
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now < ends_at:
                 raise TravelNotReadyError("travel is not ready")
-            snapshot = self._json_object(session["snapshot_json"], {})
-            pass_key = str(snapshot.get("pass_key") or session["pass_key"] or "") or None
-            pass_quantity = int(snapshot.get("pass_quantity", session["pass_quantity"] or 0))
-            consume_pass_on_arrival = bool(snapshot.get("consume_pass_on_arrival", False))
+            snapshot = self._travel_json_object(session["snapshot_json"], "snapshot")
+            self._validate_travel_snapshot(snapshot, session)
+            session_result = self._travel_json_object(session["result_json"], "session result")
+            if session_result:
+                raise OperationResultMalformedError("running travel has a non-empty result")
+            start_operation = connection.execute(
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
+                (session["operation_id"],),
+            ).fetchone()
+            if start_operation is None or start_operation["operation_name"] != "world.start_travel":
+                raise OperationResultMalformedError("travel session has no valid start operation")
+            if int(start_operation["player_id"]) != int(session["player_id"]):
+                raise OperationResultMalformedError("travel start operation owner differs from session")
+            expected_start_hash = self._request_hash(
+                "world.start_travel",
+                {
+                    "platform": platform,
+                    "platform_user_id": platform_user_id,
+                    "destination": str(session["destination"]),
+                },
+            )
+            if start_operation["request_hash"] != expected_start_hash:
+                raise OperationResultMalformedError("travel start operation input differs from session")
+            start_payload = self._travel_json_object(start_operation["result_json"], "start operation result")
+            self._validate_travel_start_against_session(start_payload, session)
+            if snapshot["consume_pass_on_arrival"] != start_payload["consume_pass_on_arrival"]:
+                raise OperationResultMalformedError("travel snapshot pass timing differs from start operation")
+            pass_key = str(snapshot["pass_key"]) if snapshot["pass_key"] is not None else None
+            pass_quantity = int(snapshot["pass_quantity"])
+            consume_pass_on_arrival = bool(snapshot["consume_pass_on_arrival"])
             pass_consumed = False
             if consume_pass_on_arrival and pass_key and pass_quantity:
                 if inventory_amount(player_inventory(row), pass_key) < pass_quantity:
@@ -593,8 +856,10 @@ class TravelRepositoryMixin:
             payload = {
                 "player": self._player_payload(player), "session_id": session["session_id"],
                 "source": session["source_location"], "destination": session["destination"], "status": "arrived",
+                "starts_at": str(session["starts_at"]), "ends_at": str(session["ends_at"]),
                 "arrived": True, "stamina_cost": int(session["stamina_cost"]), "currency_cost": int(session["currency_cost"]),
                 "pass_key": session["pass_key"], "pass_quantity": int(session["pass_quantity"]),
+                "consume_pass_on_arrival": bool(snapshot["consume_pass_on_arrival"]),
                 "pass_consumed": pass_consumed,
             }
             connection.execute(
@@ -614,6 +879,7 @@ class TravelRepositoryMixin:
 
     @staticmethod
     def _travel_settlement_from_payload(payload: dict[str, Any], replay: bool = False) -> TravelSettlementRecord:
+        TravelRepositoryMixin._validate_travel_operation_payload(payload, settlement=True)
         return TravelSettlementRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             session_id=str(payload["session_id"]), source=str(payload["source"]),

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
 from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+from travel_fixtures import set_travel_end_at
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -848,9 +849,10 @@ def test_dao_origin_gate_travel_has_atomic_gates_and_daily_limit() -> None:
                         "SELECT snapshot_json FROM travel_sessions WHERE session_id = ?",
                         (started.data["session_id"],),
                     ).fetchone()[0]
-                    connection.execute(
-                        "UPDATE travel_sessions SET ends_at = ? WHERE session_id = ?",
-                        ((clock() - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    set_travel_end_at(
+                        connection,
+                        started.data["session_id"],
+                        (clock() - timedelta(seconds=1)).isoformat(),
                     )
                 assert row == (10, "{}", "void.archive_ruins")
                 snapshot = json.loads(snapshot_json)
@@ -988,9 +990,10 @@ def test_qq_and_onebot_reach_dao_origin_from_a_settled_archive_route() -> None:
                 )
                 assert gate.code == "TRAVEL_STARTED"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-                        ((clock() - timedelta(seconds=1)).isoformat(), gate.data["session_id"]),
+                    set_travel_end_at(
+                        connection,
+                        gate.data["session_id"],
+                        (clock() - timedelta(seconds=1)).isoformat(),
                     )
                 arrived = await runtime.dispatch(
                     _ctx(adapter, user, f"gate-settle-{adapter}"), "结算移动"

@@ -1455,3 +1455,21 @@ application 规则、不引入第二份白名单。事件 operation ID 在归一
 故障后原事件成功重试且第三次仍幂等、runtime 重建后的历史 operation 回放，以及 `compileall`、
 全量内容 JSON 严格解析和 `git diff --check`。适配器专项 `47` 项、事件/运输/拍卖恢复关联 `73` 项
 通过；本节已闭合，适配器入口按轮转规则进入冷却。道途名称/别名内容合同另行登记，不在本条重复改动。
+
+### 已闭合切片：普通移动快照严格恢复与通行物扣除一致性
+
+轮转审查在 QQ 官方与 OneBot V11 真实入口复现：移动开始已扣除通行物，篡改
+`travel_sessions.snapshot_json` 的 `consume_pass_on_arrival` 重复键后，`结算移动` 会再次扣除通行物。
+修复范围限定为普通移动 repository/application、专项测试、当前状态、内容合同和本计划。实现使用
+`utils.json_cache.decode_json_strict`，严格核验 JSON 对象、必需字段、类型、会话/起程 operation 归属及通行物扣除
+语义；坏快照在资产、位置、会话状态或 operation 写入前拒绝，启程即扣的通行物不会在抵达再次扣除，结算失败回滚后
+原 operation 可重试，历史成功结果在重启后只回放一次。不重新解释已冻结快照，不增加运行时版本标识或旧格式兼容分支。
+
+明确不改云舟试炼、地点内容、移动数值、生活域短途运输、正式 PvP/PvE 结算或切磋/训练傀儡只读观战边界。
+`/root/travel_integrity` 完成普通移动严格校验，`/root/travel_adapter_tests` 完成双适配器专项验证，主线完成最终
+文档、边界与回归验收。
+
+验收通过：普通移动专项 `test/test_world_travel_integrity.py` 34 项；世界/云舟/万兽山/适配器回归 38 项；魔界/虚空
+路径 15 项；文档/内容/无版本标识 14 项；内容 JSON 严格解析 9 项；`compileall` 和
+`git diff --check` 通过。验收覆盖 QQ 官方与 OneBot V11 的适用路径、重启恢复、operation 幂等/冲突、坏账本只读拒绝
+和事务故障重试；未宣称整仓全量测试通过，其他路线和未开放领域不计入本条。

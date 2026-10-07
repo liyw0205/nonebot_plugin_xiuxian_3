@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+from travel_fixtures import set_travel_end_at
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -381,9 +382,10 @@ def test_demon_war_front_travel_and_battle_are_server_authoritative_on_qq_and_on
                 )
                 assert started_travel.code == "TRAVEL_STARTED"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-                        ((datetime(2026, 9, 23, 19, 59, tzinfo=timezone.utc)).isoformat(), started_travel.data["session_id"]),
+                    set_travel_end_at(
+                        connection,
+                        started_travel.data["session_id"],
+                        (datetime(2026, 9, 23, 19, 59, tzinfo=timezone.utc)).isoformat(),
                     )
                 arrived = await runtime.adapters.dispatch(adapter, _context(adapter, user, "arrive"), "结算移动")
                 assert arrived.code == "TRAVEL_COMPLETED"

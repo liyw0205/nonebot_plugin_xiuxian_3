@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from travel_fixtures import set_travel_end_at
 
 
 def _context(adapter: str, user: str, request: str, operation: str = "") -> CommandContext:
@@ -38,9 +39,10 @@ async def _prepare_player(runtime, adapter: str, user: str, reputation: int) -> 
 
 def _expire(runtime, session_id: str) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
-        connection.execute(
-            "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), session_id),
+        set_travel_end_at(
+            connection,
+            session_id,
+            (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
         )
 
 

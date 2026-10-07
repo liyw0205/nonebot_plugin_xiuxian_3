@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_map
+from travel_fixtures import set_travel_end_at
 
 
 def _beast_reward(seed: str) -> dict[str, int]:
@@ -52,10 +53,14 @@ async def _prepare_player(runtime, adapter: str, user: str, *, reputation: int) 
 
 def _expire(runtime, table: str, key: str, value: str) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
-        connection.execute(
-            f"UPDATE {table} SET ends_at=? WHERE {key}=?",
-            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), value),
-        )
+        ends_at = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        if table == "travel_sessions":
+            set_travel_end_at(connection, value, ends_at)
+        else:
+            connection.execute(
+                f"UPDATE {table} SET ends_at=? WHERE {key}=?",
+                (ends_at, value),
+            )
 
 
 def test_beast_hills_gate_travel_and_blood_reward_are_idempotent_on_both_adapters() -> None:

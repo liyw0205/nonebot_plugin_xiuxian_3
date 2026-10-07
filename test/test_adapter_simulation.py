@@ -21,6 +21,7 @@ from nonebot_plugin_xiuxian_3.adapters.qq import is_qq_event, normalize_event as
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.stats.rules import build_stat_preview
 from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
+from travel_fixtures import set_travel_end_at
 
 
 class MutableClock:
@@ -188,9 +189,10 @@ def test_qq_and_onebot_normalized_events_reach_sky_terrace_flow() -> None:
                 started = await dispatch("travel", "前往 天劫台")
                 assert started.code == "TRAVEL_STARTED"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    set_travel_end_at(
+                        connection,
+                        started.data["session_id"],
+                        (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
                     )
                 arrived = await dispatch("travel-settle", "结算移动")
                 assert arrived.code == "TRAVEL_COMPLETED"

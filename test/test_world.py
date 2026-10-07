@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from travel_fixtures import set_travel_end_at
 
 
 def _context(user_id: str, request_id: str, *, operation_id: str = "") -> CommandContext:
@@ -58,9 +59,10 @@ def test_cave_travel_locks_costs_and_settles_idempotently() -> None:
                 assert row[0:2] == (25, 90)
                 assert json.loads(row[2]) == {}
                 assert row[3] == "xuantian.new_town"
-                connection.execute(
-                    "UPDATE travel_sessions SET ends_at = ? WHERE session_id = ?",
-                    ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                set_travel_end_at(
+                    connection,
+                    started.data["session_id"],
+                    (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
                 )
 
             settled = await runtime.dispatch(
@@ -112,10 +114,7 @@ def test_three_realms_trade_port_travel_is_reachable_from_beast_hills_on_both_ad
                 )
                 assert started.code == "TRAVEL_STARTED"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-                        ("2026-09-20T12:00:00+00:00", started.data["session_id"]),
-                    )
+                    set_travel_end_at(connection, started.data["session_id"], "2026-09-20T12:00:00+00:00")
                 settled = await runtime.adapters.dispatch(
                     adapter, context(f"settle-{adapter}", f"settle-{adapter}"), "结算移动"
                 )
@@ -237,9 +236,10 @@ def test_qq_and_onebot_sky_terrace_travel_and_trial_location_gate() -> None:
                 )
                 assert during_travel.code == "TRIBULATION_TRIAL_BUSY"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    set_travel_end_at(
+                        connection,
+                        started.data["session_id"],
+                        (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
                     )
                     player = connection.execute(
                         "SELECT inventory_json, location_key FROM players WHERE platform=? AND platform_user_id=?",
@@ -319,9 +319,10 @@ def test_ascension_path_is_reached_by_final_battle_without_a_second_certificate(
                     ).fetchone()
                     assert json.loads(row[0]) == {"item.ascension_certificate": 1}
                     assert row[1] == "tribulation.sky_terrace"
-                    connection.execute(
-                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
+                    set_travel_end_at(
+                        connection,
+                        started.data["session_id"],
+                        (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
                     )
                 settled = await runtime.dispatch(
                     context(f"settle-{adapter}", f"settle-{adapter}"), "结算移动"
@@ -352,9 +353,10 @@ def test_ascension_path_is_reached_by_final_battle_without_a_second_certificate(
                 )
                 assert left_started.code == "TRAVEL_STARTED"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), left_started.data["session_id"]),
+                    set_travel_end_at(
+                        connection,
+                        left_started.data["session_id"],
+                        (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
                     )
                 left_settled = await runtime.dispatch(
                     context(f"left-settle-{adapter}", f"left-settle-{adapter}"), "结算移动"

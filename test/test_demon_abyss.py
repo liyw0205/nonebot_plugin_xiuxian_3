@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 
 from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+from travel_fixtures import set_travel_end_at
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -81,9 +82,10 @@ def _expire(runtime, exploration_id: str) -> None:
 
 def _expire_travel(runtime, session_id: str) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
-        connection.execute(
-            "UPDATE travel_sessions SET ends_at=? WHERE session_id=?",
-            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), session_id),
+        set_travel_end_at(
+            connection,
+            session_id,
+            (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
         )
 
 
