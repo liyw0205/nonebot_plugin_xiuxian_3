@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_currency
+from ..utils.json_cache import decode_json_strict
 from ..utils.player import (
     change_player_state_actual,
     player_reputation_state,
@@ -89,8 +90,8 @@ class ServiceRepositoryMixin:
         ):
             raise OperationConflictError("operation input differs from its original request")
         try:
-            payload = json.loads(row["result_json"])
-        except (TypeError, json.JSONDecodeError) as exc:
+            payload = decode_json_strict(str(row["result_json"]))
+        except (TypeError, ValueError) as exc:
             raise ValueError("service publish operation snapshot is invalid") from exc
         if not isinstance(payload, dict):
             raise ValueError("service publish operation snapshot must be an object")
@@ -508,6 +509,7 @@ class ServiceRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
+                self._validate_settlement_replay(connection, existing, operation_id, order_id)
                 return self._settlement_from_payload(existing, replay=True)
             provider = self._require_player(connection, platform, platform_user_id)
             if order_id:
@@ -672,7 +674,7 @@ class ServiceRepositoryMixin:
         """Decode one service snapshot without silently accepting old shapes."""
 
         try:
-            snapshot = json.loads(value) if isinstance(value, str) else value
+            snapshot = decode_json_strict(value) if isinstance(value, str) else value
         except (TypeError, ValueError) as exc:
             raise ServiceOrderConflictError("service snapshot is invalid") from exc
         if not isinstance(snapshot, dict):
@@ -735,6 +737,7 @@ class ServiceRepositoryMixin:
                 if (
                     not isinstance(item_key, str)
                     or not item_key.startswith("item.")
+                    or item_key == "item."
                     or isinstance(amount, bool)
                     or not isinstance(amount, int)
                     or amount <= 0
@@ -904,6 +907,7 @@ class ServiceRepositoryMixin:
         )
 
     def _settlement_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> ServiceSettlementRecord:
+        self._validate_settlement_payload(payload)
         return ServiceSettlementRecord(
             player=self._row_to_player(payload["player"]),
             order_id=str(payload["order_id"]),
@@ -922,6 +926,149 @@ class ServiceRepositoryMixin:
         )
 
     @staticmethod
+    def _validate_settlement_payload(payload: dict[str, Any]) -> None:
+        required = {
+            "player",
+            "order_id",
+            "service_key",
+            "service_name",
+            "service_description",
+            "status",
+            "reward_stones",
+            "outputs",
+            "provider_payment",
+            "publisher_refund",
+            "platform_fee",
+            "provider_refunds",
+            "stamina_refund",
+            "settled_at",
+        }
+        if set(payload) != required or not isinstance(payload["player"], dict):
+            raise ValueError("service settlement operation result is incomplete")
+        for key in ("order_id", "service_key", "service_name", "service_description", "settled_at"):
+            if not isinstance(payload[key], str) or not payload[key].strip():
+                raise ValueError("service settlement operation text is invalid")
+        status = payload["status"]
+        if not isinstance(status, str) or status not in {"delivered", "failed", "expired"}:
+            raise ValueError("service settlement operation status is invalid")
+
+        def non_negative_int(key: str) -> int:
+            value = payload[key]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError("service settlement operation numeric data is invalid")
+            return value
+
+        reward = payload["reward_stones"]
+        if isinstance(reward, bool) or not isinstance(reward, int) or reward <= 0:
+            raise ValueError("service settlement operation reward is invalid")
+        provider_payment = non_negative_int("provider_payment")
+        publisher_refund = non_negative_int("publisher_refund")
+        platform_fee = non_negative_int("platform_fee")
+        non_negative_int("stamina_refund")
+        if provider_payment + publisher_refund + platform_fee != reward:
+            raise ValueError("service settlement operation payment is inconsistent")
+
+        def asset_map(key: str) -> dict[str, int]:
+            assets = payload[key]
+            if not isinstance(assets, dict):
+                raise ValueError("service settlement operation assets are invalid")
+            for item_key, amount in assets.items():
+                if (
+                    not isinstance(item_key, str)
+                    or not item_key.startswith("item.")
+                    or item_key == "item."
+                    or isinstance(amount, bool)
+                    or not isinstance(amount, int)
+                    or amount <= 0
+                ):
+                    raise ValueError("service settlement operation assets are invalid")
+            return assets
+
+        outputs = asset_map("outputs")
+        provider_refunds = asset_map("provider_refunds")
+        if status == "delivered":
+            if publisher_refund or provider_refunds or payload["stamina_refund"]:
+                raise ValueError("service settlement operation success result is inconsistent")
+        elif provider_payment or outputs:
+            raise ValueError("service settlement operation failure result is inconsistent")
+        try:
+            datetime.fromisoformat(payload["settled_at"])
+        except ValueError as exc:
+            raise ValueError("service settlement operation timestamp is invalid") from exc
+
+    def _validate_settlement_replay(
+        self,
+        connection: Any,
+        payload: dict[str, Any],
+        operation_id: str,
+        requested_order_id: str | None,
+    ) -> None:
+        order = connection.execute(
+            "SELECT * FROM livelihood_service_orders WHERE settle_operation_id = ?",
+            (operation_id,),
+        ).fetchone()
+        if order is None or (
+            requested_order_id is not None and str(order["order_id"]) != requested_order_id
+        ):
+            raise ValueError("service settlement operation order is invalid")
+        try:
+            snapshot = self._service_snapshot_object(order["snapshot_json"])
+            self._validate_snapshot_row(snapshot, order)
+            stored_result = decode_json_strict(str(order["result_json"]))
+        except (TypeError, ValueError, ServiceOrderConflictError) as exc:
+            raise ValueError("service settlement order result is invalid") from exc
+        if not isinstance(stored_result, dict):
+            raise ValueError("service settlement order result must be an object")
+
+        status = str(order["status"])
+        reward = int(order["reward_stones"])
+        if status == "delivered":
+            expected = {
+                "status": status,
+                "outputs": dict(snapshot["publisher_outputs"]),
+                "provider_payment": (reward * 9800) // 10000,
+                "publisher_refund": 0,
+                "provider_refunds": {},
+                "stamina_refund": 0,
+            }
+        elif status == "expired":
+            expected = {
+                "status": status,
+                "outputs": {},
+                "provider_payment": 0,
+                "publisher_refund": (reward * 8000) // 10000,
+                "provider_refunds": dict(snapshot["provider_inputs"]),
+                "stamina_refund": int(snapshot["provider_stamina"]),
+            }
+        elif status == "failed":
+            expected = {
+                "status": status,
+                "outputs": {},
+                "provider_payment": 0,
+                "publisher_refund": (reward * 8000) // 10000,
+                "provider_refunds": dict(snapshot["failure_provider_refund"]),
+                "stamina_refund": int(snapshot["failure_stamina_refund"]),
+            }
+        else:
+            raise ValueError("service settlement order status is invalid")
+        expected["platform_fee"] = reward - expected["provider_payment"] - expected["publisher_refund"]
+        expected["settled_at"] = str(order["settled_at"])
+        expected_result = {key: expected[key] for key in expected}
+        if stored_result != expected_result:
+            raise ValueError("service settlement order result does not match its snapshot")
+        for key, value in expected.items():
+            if payload.get(key) != value:
+                raise ValueError("service settlement operation result does not match its order")
+        if (
+            payload.get("order_id") != str(order["order_id"])
+            or payload.get("service_key") != str(order["service_key"])
+            or payload.get("service_name") != str(snapshot["service_name"])
+            or payload.get("service_description") != str(snapshot["service_description"])
+            or payload.get("reward_stones") != reward
+        ):
+            raise ValueError("service settlement operation identity is invalid")
+
+    @staticmethod
     def _operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
         existing = connection.execute(
             "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)
@@ -931,8 +1078,8 @@ class ServiceRepositoryMixin:
         if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
             raise OperationConflictError("operation input differs from its original request")
         try:
-            payload = json.loads(existing["result_json"])
-        except (TypeError, json.JSONDecodeError) as exc:
+            payload = decode_json_strict(str(existing["result_json"]))
+        except (TypeError, ValueError) as exc:
             raise ValueError("service operation result is invalid") from exc
         if not isinstance(payload, dict):
             raise ValueError("service operation result must be an object")

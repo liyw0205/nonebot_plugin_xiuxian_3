@@ -33,6 +33,12 @@ def _edit_service(data_dir: Path, change) -> None:
     path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _append_duplicate(raw: str, key: str, value: object) -> str:
+    text = raw.rstrip()
+    assert text.endswith("}")
+    return f'{text[:-1]},"{key}":{json.dumps(value, ensure_ascii=False)}}}'
+
+
 def _context(user: str, operation_id: str) -> CommandContext:
     return CommandContext(adapter="web", user_id=user, operation_id=operation_id)
 
@@ -281,8 +287,9 @@ def test_service_publish_replay_rejects_corrupt_operation_without_writing(
 
 
 @pytest.mark.parametrize("kind", ["onebot", "qq"])
+@pytest.mark.parametrize("corruption", ["malformed", "duplicate", "shape"])
 def test_service_settlement_rejects_corrupt_snapshot_and_recovers(
-    tmp_path: Path, kind: str,
+    tmp_path: Path, kind: str, corruption: str,
 ) -> None:
     pytest.importorskip("nonebot")
 
@@ -334,15 +341,29 @@ def test_service_settlement_rejects_corrupt_snapshot_and_recovers(
                 "SELECT snapshot_json FROM livelihood_service_orders WHERE order_id=?",
                 (order_id,),
             ).fetchone()[0]
+            if corruption == "malformed":
+                corrupted_snapshot = "{"
+            elif corruption == "duplicate":
+                corrupted_snapshot = _append_duplicate(
+                    snapshot, "publisher_outputs", {"item.herb.blood_grass": 999}
+                )
+            else:
+                snapshot_payload = json.loads(snapshot)
+                snapshot_payload["publisher_outputs"] = []
+                corrupted_snapshot = json.dumps(snapshot_payload, ensure_ascii=False, sort_keys=True)
             connection.execute(
-                "UPDATE livelihood_service_orders SET snapshot_json='{' WHERE order_id=?",
-                (order_id,),
+                "UPDATE livelihood_service_orders SET snapshot_json=? WHERE order_id=?",
+                (corrupted_snapshot, order_id),
             )
             before = connection.execute(
                 "SELECT p.spirit_stones, p.stamina, p.inventory_json, o.status "
                 "FROM players p JOIN livelihood_service_orders o ON o.provider_id=p.id "
                 "WHERE p.platform=? AND p.platform_user_id=? AND o.order_id=?",
                 (adapter, provider, order_id),
+            ).fetchone()
+            publisher_before = connection.execute(
+                "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, publisher),
             ).fetchone()
         failed = await send(f"结算服务 {order_id}", 8422, provider)
         assert failed.code == "SERVICE_ORDER_CONFLICT"
@@ -354,6 +375,10 @@ def test_service_settlement_rejects_corrupt_snapshot_and_recovers(
                 "WHERE p.platform=? AND p.platform_user_id=? AND o.order_id=?",
                 (adapter, provider, order_id),
             ).fetchone()
+            publisher_after = connection.execute(
+                "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, publisher),
+            ).fetchone()
             assert connection.execute(
                 "SELECT COUNT(*) FROM operations WHERE operation_id=?", (settle_operation_id,)
             ).fetchone()[0] == 0
@@ -362,8 +387,40 @@ def test_service_settlement_rejects_corrupt_snapshot_and_recovers(
                 (snapshot, order_id),
             )
         assert after == before
+        assert publisher_after == publisher_before
         settled = await send(f"结算服务 {order_id}", 8422, provider)
         assert settled.code == "SERVICE_SETTLED"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            raw_result = connection.execute(
+                "SELECT result_json FROM operations WHERE operation_id=?", (settle_operation_id,)
+            ).fetchone()[0]
+            if corruption == "malformed":
+                corrupted_result = "{"
+            elif corruption == "duplicate":
+                corrupted_result = _append_duplicate(raw_result, "outputs", {"item.herb.blood_grass": 999})
+            else:
+                result_payload = json.loads(raw_result)
+                result_payload["outputs"] = {}
+                corrupted_result = json.dumps(result_payload, ensure_ascii=False, sort_keys=True)
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id=?",
+                (corrupted_result, settle_operation_id),
+            )
+            replay_before = connection.execute(
+                "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, provider),
+            ).fetchone()
+        corrupt_replay = await send(f"结算服务 {order_id}", 8422, provider)
+        assert corrupt_replay.code == "PERSISTENCE_ERROR"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            assert connection.execute(
+                "SELECT spirit_stones, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, provider),
+            ).fetchone() == replay_before
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id=?",
+                (raw_result, settle_operation_id),
+            )
         replay = await send(f"结算服务 {order_id}", 8422, provider)
         assert replay.data["idempotent_replay"] is True
         await runtime.close()
