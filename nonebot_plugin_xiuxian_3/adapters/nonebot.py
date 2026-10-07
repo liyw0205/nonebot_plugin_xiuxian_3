@@ -60,311 +60,8 @@ def _rule_for(checker: Callable[[Any], bool]):
     return rule
 
 
-_COMMANDS = (
-    "开始修仙",
-    "寻仙问道",
-    "我的状态",
-    "我的修仙信息",
-    "修仙改名",
-    "改名",
-    "完成引导",
-    "前往近郊",
-    "前往灵泉谷",
-    "返回新手城",
-    "选择道途",
-    "开始修炼",
-    "结算修炼",
-    "恢复修炼",
-    "取消修炼",
-    "晋升境界",
-    "境界晋升",
-    "开始合道",
-    "记录合道主线",
-    "开始合道挑战",
-    "交付合道作品",
-    "领取合道许可",
-    "完成道源任务",
-    "开始渡劫",
-    "选择结局",
-    "终局选择",
-    "终局战预览",
-    "预览终局战",
-    "创建终局战",
-    "加入终局战",
-    "开始终局战",
-    "选择终局战",
-    "恢复终局战",
-    "取消终局战",
-    "终局战回放",
-    "开始天劫试炼",
-    "结算天劫试炼",
-    "恢复状态",
-    "突破预览",
-    "选择领域",
-    "确认领域",
-    "取消领域",
-    "恢复领域裂痕",
-    "开始终局配方",
-    "结算终局配方",
-    "开始突破",
-    "结算突破",
-    "恢复虚弱",
-    "恢复道基震荡",
-    "准备元婴",
-    "化解心魔",
-    "恢复神魂疲劳",
-    "生产预览",
-    "开始生产",
-    "领取生产",
-    "恢复生产",
-    "认领设施槽位",
-    "维护设施",
-    "移动预览",
-    "前往",
-    "前往雾隐洞天",
-    "结算移动",
-    "进入虚空航道",
-    "前往虚空航道",
-    "虚空航行",
-    "结算虚空航道",
-    "档案状态",
-    "虚空档案",
-    "档案任务",
-    "领取档案碎片",
-    "开始探索",
-    "结算探索",
-    "选择云舟风暴",
-    "取消探索",
-    "开始魔界战",
-    "试炼塔",
-    "试炼塔状态",
-    "挑战试炼塔",
-    "领取试炼塔奖励",
-    "虚空塔",
-    "虚空塔状态",
-    "挑战虚空塔",
-    "领取虚空塔奖励",
-    "悬赏榜",
-    "接取悬赏",
-    "领取悬赏",
-    "每日修行",
-    "领取日课嘉奖",
-    "主线道途",
-    "主线",
-    "主线状态",
-    "开始主线",
-    "领取主线奖励",
-    "领域前线主线",
-    "领域主线",
-    "开始领域前线主线",
-    "领取领域前线主线奖励",
-    "虚空档案主线",
-    "档案主线",
-    "开始虚空档案主线",
-    "领取虚空档案主线奖励",
-    "道源主线",
-    "开始道源主线",
-    "领取道源主线奖励",
-    "三界主线",
-    "开始三界主线",
-    "领取三界主线奖励",
-    "闭关预览",
-    "预览闭关",
-    "开始闭关",
-    "结算闭关",
-    "恢复闭关",
-    "租住居所",
-    "申请贸易许可",
-    "租房",
-    "我的居所",
-    "居所状态",
-    "体质预览",
-    "预览体质",
-    "选择体质",
-    "我的体质",
-    "体质状态",
-    "重塑体质",
-    "道脉预览",
-    "天赋预览",
-    "我的道脉",
-    "我的天赋",
-    "天赋状态",
-    "解锁天赋",
-    "学习天赋",
-    "神通预览",
-    "预览神通",
-    "我的神通",
-    "神通状态",
-    "参悟神通",
-    "升级神通",
-    "法器预览",
-    "预览法器",
-    "重铸预览",
-    "预览重铸",
-    "强化法器",
-    "重铸法器",
-    "我的装备",
-    "装备状态",
-    "穿戴法器",
-    "穿戴装备",
-    "卸下法器",
-    "卸下装备",
-    "灵兽状态",
-    "灵骑状态",
-    "我的灵兽",
-    "结缘灵兽",
-    "结缘灵骑",
-    "喂养灵兽",
-    "喂灵兽",
-    "休养灵兽",
-    "装备灵具",
-    "蜕变灵兽",
-    "灵兽蜕变",
-    "道历问安",
-    "每日问安",
-    "签到",
-    "补录道历",
-    "补签到",
-    "浇灌灵木",
-    "灵木浇灌",
-    "浇水",
-    "收获灵木",
-    "灵木收获",
-    "七日入道",
-    "七日目标",
-    "入道七日",
-    "领取七日目标",
-    "领取七日任务",
-    "领取七日入道",
-    "功业录",
-    "我的功业",
-    "我的称号",
-    "领取功业",
-    "领取成就",
-    "佩戴称号",
-    "装备称号",
-    "兑换密令",
-    "领取密令",
-    "使用密令",
-    "创建宗门",
-    "建立宗门",
-    "申请入宗",
-    "宗门申请",
-    "宗门申请列表",
-    "待审宗门申请",
-    "审批入宗",
-    "审批宗门申请",
-    "离开宗门",
-    "离宗",
-    "我的宗门",
-    "宗门信息",
-    "宗门战",
-    "报名宗门战",
-    "贡献宗门战",
-    "领取宗门战奖励",
-    "创建双人队伍",
-    "创建探索队伍",
-    "创建多人副本队伍",
-    "创建四人副本队伍",
-    "创建普通副本队伍",
-    "创建三界塔双人队伍",
-    "邀请入队",
-    "邀请队伍",
-    "接受入队",
-    "同意入队",
-    "拒绝入队",
-    "确认入队",
-    "队伍确认",
-    "退出队伍",
-    "离开队伍",
-    "我的队伍",
-    "队伍状态",
-    "挑战三界塔双人",
-    "领取三界塔双人奖励",
-    "邀请拜师",
-    "收徒邀请",
-    "师徒邀请",
-    "接受拜师",
-    "同意拜师",
-    "拜师接受",
-    "拒绝拜师",
-    "拜师拒绝",
-    "师徒毕业",
-    "办理毕业",
-    "徒弟毕业",
-    "邀请结为道侣",
-    "接受道侣邀请",
-    "拒绝道侣邀请",
-    "道侣关系",
-    "申请解除道侣",
-    "确认解除道侣",
-    "拒绝解除道侣",
-    "我的道契",
-    "道契状态",
-    "激活道契",
-    "领取道契",
-    "机缘寻宝",
-    "寻宝",
-    "机缘抽奖",
-    "问道行卷",
-    "行卷状态",
-    "开始行卷",
-    "领取行卷",
-    "发布摆摊",
-    "购买摆摊",
-    "取消摆摊",
-    "清理摆摊",
-    "摆摊列表",
-    "发布生产委托",
-    "生产委托列表",
-    "委托生产列表",
-    "接取生产委托",
-    "交付生产委托",
-    "确认生产委托",
-    "取消生产委托",
-    "清理生产委托",
-    "恢复生产委托",
-    "灵泉事件",
-    "领取灵泉事件奖励",
-    "妖界贸易事件",
-    "万兽贸易事件",
-    "贡献妖界贸易",
-    "领取妖界贸易奖励",
-    "界隙裂痕",
-    "界隙事件",
-    "贡献界隙裂痕",
-    "领取界隙裂痕奖励",
-    "远古洞天事件",
-    "远古洞天开门",
-    "贡献远古洞天",
-    "领取远古洞天奖励",
-    "切磋",
-    "领域前线",
-    "领域前线状态",
-    "加入领域前线",
-    "开始领域战",
-    "领域战",
-    "占点领域前线",
-    "领域前线占点",
-    "贡献领域前线",
-    "领取领域前线奖励",
-    "三界赛季",
-    "领取三界赛季奖励",
-    "虚空前线",
-    "虚空前线赛季",
-    "虚空前线状态",
-    "领取虚空前线周任务",
-    "领取虚空前线周奖励",
-    "领取虚空前线奖励",
-    "领取虚空前线赛季奖励",
-    "领域赛季",
-    "领取领域赛季奖励",
-    "兑换领域核心",
-)
-
-
-def _canonical_command(text: str) -> str | None:
-    """Return the registered command while preserving normalized arguments."""
+def _canonical_command(text: str, commands: tuple[str, ...]) -> str | None:
+    """Return a command known by the shared router, preserving its arguments."""
 
     normalized = text.strip()
     if not normalized:
@@ -391,43 +88,52 @@ def _canonical_command(text: str) -> str | None:
         for prefix in prefixes
         if prefix and normalized.startswith(prefix)
     )
+    command_names = {command.strip().lower() for command in commands if command.strip()}
     for candidate in candidates:
-        for command in _COMMANDS:
-            if candidate == command or candidate.startswith(f"{command} "):
-                return candidate
+        command = candidate.split(maxsplit=1)[0].lower()
+        if command in command_names:
+            return candidate
     return None
 
 
-def _matches_seek_command(text: str) -> bool:
-    """Backward-compatible matcher name for the shared command rule."""
+def _matches_seek_command(text: str, commands: tuple[str, ...]) -> bool:
+    """Return whether text starts with a command registered by the router."""
 
-    return _canonical_command(text) is not None
+    return _canonical_command(text, commands) is not None
 
 
-def _is_seek_command(event: Any) -> bool:
+def _is_seek_command(event: Any, commands: tuple[str, ...]) -> bool:
     if not (is_onebot_v11_event(event) or is_qq_event(event)):
         return False
     try:
-        return _matches_seek_command(normalize_event(event).text)
+        return _matches_seek_command(normalize_event(event).text, commands)
     except (TypeError, ValueError):
         return False
 
 
-def _handler_for(runtime: XiuxianRuntime, matcher: Any, normalizer: Callable[[Any], NormalizedMessage], dedup: EventDeduplicator):
+def _handler_for(
+    runtime: XiuxianRuntime,
+    matcher: Any,
+    normalizer: Callable[[Any], NormalizedMessage],
+    dedup: EventDeduplicator,
+    commands: tuple[str, ...],
+):
     async def handle(event: NoneBotEvent) -> None:
         normalized = normalizer(event)
-        key = (
-            f"{normalized.context.adapter}:{normalized.context.bot_id}:{normalized.event_id}"
-            if normalized.event_id
-            else ""
-        )
-        if not dedup.accept(key):
-            return
         # Route the normalized command so prefixes do not reach the shared router.
-        command = _canonical_command(normalized.text)
+        command = _canonical_command(normalized.text, commands)
         if command is None:
             return
-        result = await runtime.dispatch(normalized.context, command)
+        key = normalized.context.operation_id
+        if not dedup.accept(key):
+            return
+        try:
+            result = await runtime.dispatch(normalized.context, command)
+        except Exception:
+            dedup.release(key)
+            raise
+        if result.retryable:
+            dedup.release(key)
         try:
             from nonebot.matcher import current_bot, current_event
 
@@ -456,12 +162,13 @@ def install(runtime: XiuxianRuntime) -> tuple[Any, ...]:
         raise RuntimeError("NoneBot 2 is required for the NoneBot adapter") from exc
 
     dedup = EventDeduplicator()
+    commands = runtime.router.commands
     matchers: list[Any] = []
     matcher = on_message(
-        rule=_rule_for(_is_seek_command),
+        rule=_rule_for(lambda event: _is_seek_command(event, commands)),
         priority=10,
         block=True,
     )
-    matcher.handle()(_handler_for(runtime, matcher, normalize_event, dedup))
+    matcher.handle()(_handler_for(runtime, matcher, normalize_event, dedup, commands))
     matchers.append(matcher)
     return tuple(matchers)

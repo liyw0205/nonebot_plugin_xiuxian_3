@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from ..contracts import CommandContext
-from .events import NormalizedMessage, author_name, extract_plaintext, text_value, value
+from .events import (
+    NormalizedMessage,
+    author_name,
+    event_operation_id,
+    extract_plaintext,
+    text_value,
+    value,
+)
 
 
 ADAPTER_NAME = "onebot.v11"
@@ -38,6 +45,14 @@ def normalize_event(event: Any) -> NormalizedMessage:
     scene_id = f"group:{group_id}" if group_id else "private"
     message_id = text_value(event, "message_id", default="")
     event_id = text_value(event, "event_id", default="") or message_id
+    bot_id = text_value(event, "self_id", "bot_id", default="")
+    operation_id = event_operation_id(
+        adapter=ADAPTER_NAME,
+        bot_id=bot_id,
+        user_id=user_id,
+        scene_id=scene_id,
+        event_id=event_id,
+    )
     context = CommandContext(
         adapter=ADAPTER_NAME,
         user_id=user_id,
@@ -46,10 +61,10 @@ def normalize_event(event: Any) -> NormalizedMessage:
         message_id=message_id,
         scene=message_type if message_type in {"group", "private"} else "unknown",
         group_id=group_id,
-        bot_id=text_value(event, "self_id", "bot_id", default=""),
+        bot_id=bot_id,
         capabilities=("text", "reference"),
         can_write_assets=bool(user_id and message_id),
-        operation_id=event_id,
+        operation_id=operation_id,
     )
     return NormalizedMessage(
         context=context,

@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 from ..contracts import CommandContext
-from .events import NormalizedMessage, author_name, extract_plaintext, nested_value, text_value, value
+from .events import (
+    NormalizedMessage,
+    author_name,
+    event_operation_id,
+    extract_plaintext,
+    nested_value,
+    text_value,
+    value,
+)
 
 
 ADAPTER_NAME = "qq.official"
@@ -67,6 +75,14 @@ def normalize_event(event: Any) -> NormalizedMessage:
     )
     message_id = text_value(event, "id", "message_id", default="")
     event_id = text_value(event, "event_id", default="") or message_id
+    bot_id = text_value(event, "application_id", "self_id", "bot_id", default="")
+    operation_id = event_operation_id(
+        adapter=ADAPTER_NAME,
+        bot_id=bot_id,
+        user_id=user_id,
+        scene_id=scene_id,
+        event_id=event_id,
+    )
     context = CommandContext(
         adapter=ADAPTER_NAME,
         user_id=user_id,
@@ -75,10 +91,10 @@ def normalize_event(event: Any) -> NormalizedMessage:
         message_id=message_id,
         scene=scene,
         group_id=text_value(event, "group_openid", "group_id", "channel_id", default=""),
-        bot_id=text_value(event, "application_id", "self_id", "bot_id", default=""),
+        bot_id=bot_id,
         capabilities=("text", "reference", "markdown", "keyboard"),
         can_write_assets=bool(user_id and message_id and scene != "unknown"),
-        operation_id=event_id,
+        operation_id=operation_id,
     )
     reference_id = nested_value(
         event,

@@ -820,12 +820,12 @@ def test_qq_and_onebot_normalization_reaches_soul_transformation_preview() -> No
 def test_qq_and_onebot_normalization_reaches_party_state_machine() -> None:
     qq = normalize_qq_event(_qq_group_event("创建双人队伍", message_id="qq-party-create"))
     onebot = normalize_event(_onebot_group_event("创建探索队伍", message_id=3007))
-    assert _canonical_command(qq.text) == "创建双人队伍"
-    assert _canonical_command(onebot.text) == "创建探索队伍"
 
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
+            assert _canonical_command(qq.text, runtime.router.commands) == "创建双人队伍"
+            assert _canonical_command(onebot.text, runtime.router.commands) == "创建探索队伍"
             for normalized, adapter_user, operation in (
                 (qq, qq.context.user_id, "qq-party-adapter"),
                 (onebot, onebot.context.user_id, "onebot-party-adapter"),
@@ -861,8 +861,9 @@ def test_nonebot_tuple_command_start_is_flattened(monkeypatch) -> None:
         "get_driver",
         lambda: SimpleNamespace(config=SimpleNamespace(command_start=("/", "!"))),
     )
-    assert _canonical_command("!开始修仙 青云") == "开始修仙 青云"
-    assert _canonical_command("/我的状态") == "我的状态"
+    commands = ("开始修仙", "我的状态")
+    assert _canonical_command("!开始修仙 青云", commands) == "开始修仙 青云"
+    assert _canonical_command("/我的状态", commands) == "我的状态"
 
 
 def test_normalized_event_identity_is_deduplicated_before_dispatch() -> None:
@@ -870,8 +871,8 @@ def test_normalized_event_identity_is_deduplicated_before_dispatch() -> None:
     qq = normalize_qq_event(_qq_group_event("开始修仙", message_id="qq-44"))
     dedup = EventDeduplicator(ttl_seconds=60, max_entries=8)
 
-    onebot_key = f"{onebot.context.adapter}:{onebot.context.bot_id}:{onebot.event_id}"
-    qq_key = f"{qq.context.adapter}:{qq.context.bot_id}:{qq.event_id}"
+    onebot_key = onebot.context.operation_id
+    qq_key = qq.context.operation_id
     assert dedup.accept(onebot_key) is True
     assert dedup.accept(onebot_key) is False
     assert dedup.accept(qq_key) is True

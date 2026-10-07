@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,6 +23,27 @@ def value(source: Any, *names: str, default: Any = None) -> Any:
 def text_value(source: Any, *names: str, default: str = "") -> str:
     candidate = value(source, *names, default=None)
     return default if candidate is None else str(candidate)
+
+
+def event_operation_id(
+    *,
+    adapter: str,
+    bot_id: str,
+    user_id: str,
+    scene_id: str,
+    event_id: str,
+) -> str:
+    """Build a stable operation identity from one normalized platform event.
+
+    Platform message IDs are only unique within a platform/bot scope. Encoding
+    every identity component as JSON keeps separators in provider IDs
+    unambiguous while preserving the exact value for retries.
+    """
+
+    values = (adapter, bot_id, user_id, scene_id, event_id)
+    if not event_id:
+        return ""
+    return "event:" + json.dumps(values, ensure_ascii=False, separators=(",", ":"))
 
 
 def nested_value(source: Any, paths: tuple[tuple[str, ...], ...]) -> str:

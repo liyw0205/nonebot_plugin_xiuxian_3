@@ -43,6 +43,14 @@ class EventDeduplicator:
                 self._seen.pop(oldest, None)
             return True
 
+    def release(self, key: str) -> None:
+        """Forget an event after a dispatch failed before it was committed."""
+
+        if not key:
+            return
+        with self._lock:
+            self._seen.pop(key, None)
+
 
 class CommandRouter:
     """Lock-free read path after startup registration is complete."""
