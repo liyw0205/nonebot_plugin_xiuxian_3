@@ -66,13 +66,12 @@ class ContractProductionRepositoryMixin:
         player_id: int,
         order_id: str,
         operation_id: str,
-        recipe: Any,
+        binding_kind: str | None,
         outputs: dict[str, int],
         bound_until: str | None,
         snapshot: dict[str, Any],
         now_text: str,
     ) -> dict[str, str]:
-        binding_kind = getattr(recipe, "binding_kind", None)
         if not binding_kind or not bound_until:
             return {}
         bindings: dict[str, str] = {}
