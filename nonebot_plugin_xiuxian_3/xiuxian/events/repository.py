@@ -15,14 +15,16 @@ from ..persistence.errors import (
     EventRewardAlreadyClaimedError,
     EventRewardExpiredError,
     OperationConflictError,
+    OperationResultMalformedError,
 )
+from ..utils.operations import operation_replay, record_operation
 from .models import SpiritSpringEventRecord
 from .reward_settlement import grant_public_event_reward
 from .spirit_spring_rules import (
     SPIRIT_SPRING_EVENT_KEY,
     SpiritSpringDefinition,
     spirit_spring_definition,
-    spirit_spring_snapshot,
+    spirit_spring_result,
     spirit_spring_window,
 )
 
@@ -100,15 +102,21 @@ class EventsRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            player = self._require_player(connection, platform, platform_user_id)
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
+                "SELECT 1 FROM operations WHERE operation_id = ?", (operation_id,)
             ).fetchone()
             if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._event_record_from_payload(json.loads(existing["result_json"]), replay=True)
-            player = self._require_player(connection, platform, platform_user_id)
+                replay = operation_replay(
+                    connection,
+                    operation_id,
+                    operation_name,
+                    request_hash,
+                    player_id=int(player["id"]),
+                )
+                if replay is None:
+                    raise OperationConflictError("operation result is unavailable")
+                return self._event_record_from_payload(replay, replay=True)
             event = self._event_select_round(connection, round_id, now)
             if event is None:
                 raise EventNotActiveError("no spirit spring event is available")
@@ -122,7 +130,14 @@ class EventsRepositoryMixin:
                 (event["round_id"], player["id"]),
             ).fetchone()
             contribution = int(contribution_row["contribution"]) if contribution_row else 0
-            definition = spirit_spring_snapshot(str(event["result_json"]))
+            result, definition = spirit_spring_result(str(event["result_json"]))
+            total = int(
+                connection.execute(
+                    "SELECT COALESCE(SUM(contribution), 0) AS total FROM world_event_contributions WHERE round_id = ?",
+                    (event["round_id"],),
+                ).fetchone()["total"]
+            )
+            self._validate_event_snapshot(event, result, definition, total_contribution=total)
             if contribution < definition.minimum_contribution:
                 raise EventContributionInsufficientError("event contribution is insufficient")
             claimed = connection.execute(
@@ -132,7 +147,7 @@ class EventsRepositoryMixin:
             if claimed is not None:
                 raise EventRewardAlreadyClaimedError("event reward has already been claimed")
 
-            success = bool(self._json_object(event["result_json"], {}).get("success", False))
+            success = result["success"]
             reward_grant, reward_snapshot = self._event_reward_grant(event, success=success)
             reward = grant_public_event_reward(
                 connection,
@@ -173,24 +188,19 @@ class EventsRepositoryMixin:
                 reward,
                 reward_snapshot,
             )
-            connection.execute(
-                """
-                INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    operation_id,
-                    operation_name,
-                    player["id"],
-                    request_hash,
-                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                ),
+            record_operation(
+                connection,
+                operation_id,
+                operation_name,
+                int(player["id"]),
+                request_hash,
+                payload,
+                now_text,
             )
             return self._event_record_from_payload(payload)
 
     def _event_reward_grant(self, event: Any, *, success: bool):
-        definition = spirit_spring_snapshot(str(event["result_json"]))
+        _, definition = spirit_spring_result(str(event["result_json"]))
         grants = [definition.base_reward]
         completion = definition.completion_reward if success else None
         if completion is not None:
@@ -280,10 +290,11 @@ class EventsRepositoryMixin:
                 "SELECT COALESCE(SUM(contribution), 0) AS total FROM world_event_contributions WHERE round_id = ?",
                 (event["round_id"],),
             ).fetchone()
-            definition = spirit_spring_snapshot(str(event["result_json"]))
+            result, definition = spirit_spring_result(str(event["result_json"]))
+            self._validate_event_snapshot(event, result, definition)
             total = int(total_row["total"] if total_row else 0)
             success = total >= definition.target_quantity
-            result = self._json_object(event["result_json"], {})
+            result = dict(result)
             result.update({"success": success, "settled_at": serialize_datetime(now)})
             connection.execute(
                 """
@@ -309,8 +320,16 @@ class EventsRepositoryMixin:
             (event["round_id"], player["id"]),
         ).fetchone()
         contribution = int(contribution_row["contribution"]) if contribution_row else 0
-        result = self._json_object(event["result_json"], {})
-        definition = spirit_spring_snapshot(result)
+        result, definition = spirit_spring_result(str(event["result_json"]))
+        total = int(
+            connection.execute(
+                "SELECT COALESCE(SUM(contribution), 0) AS total FROM world_event_contributions WHERE round_id = ?",
+                (event["round_id"],),
+            ).fetchone()["total"]
+        )
+        self._validate_event_snapshot(event, result, definition, total_contribution=total)
+        if int(event["total_contribution"]) != total:
+            raise ValueError("spirit spring total contribution differs from ledger")
         return SpiritSpringEventRecord(
             player=self._row_to_player(player),
             round_id=str(event["round_id"]),
@@ -342,8 +361,8 @@ class EventsRepositoryMixin:
         reward: dict[str, int],
         reward_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        result = self._json_object(event["result_json"], {})
-        definition = spirit_spring_snapshot(result)
+        result, definition = spirit_spring_result(str(event["result_json"]))
+        self._validate_event_snapshot(event, result, definition)
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "round_id": str(event["round_id"]),
@@ -370,6 +389,8 @@ class EventsRepositoryMixin:
     def _event_record_from_payload(payload: dict[str, Any], replay: bool = False) -> SpiritSpringEventRecord:
         from ..persistence.sqlite_repository import SQLitePlayerRepository
 
+        EventsRepositoryMixin._validate_event_payload(payload)
+
         return SpiritSpringEventRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             round_id=str(payload["round_id"]),
@@ -392,5 +413,87 @@ class EventsRepositoryMixin:
             reward_snapshot=dict(payload.get("reward_snapshot", {})),
             already_completed=replay,
         )
+
+    @staticmethod
+    def _validate_event_payload(payload: dict[str, Any]) -> None:
+        expected = {
+            "player", "round_id", "event_key", "status", "starts_at", "ends_at", "claim_expires_at",
+            "target_quantity", "minimum_contribution", "contribution_cap", "source_item_key",
+            "source_item_name", "event_name", "event_description", "total_contribution",
+            "player_contribution", "success", "reward", "reward_snapshot",
+        }
+        if not isinstance(payload, dict) or set(payload) != expected:
+            raise OperationResultMalformedError("spirit spring operation result has invalid fields")
+        if not isinstance(payload["player"], dict):
+            raise OperationResultMalformedError("spirit spring operation player snapshot is invalid")
+        if payload["event_key"] != SPIRIT_SPRING_EVENT_KEY:
+            raise OperationResultMalformedError("spirit spring operation event key is invalid")
+        for field in (
+            "round_id", "status", "starts_at", "ends_at", "claim_expires_at", "source_item_key",
+            "source_item_name", "event_name", "event_description",
+        ):
+            if not isinstance(payload[field], str) or not payload[field].strip():
+                raise OperationResultMalformedError(f"spirit spring operation {field} is invalid")
+        for field in ("target_quantity", "minimum_contribution", "contribution_cap"):
+            if isinstance(payload[field], bool) or not isinstance(payload[field], int) or payload[field] <= 0:
+                raise OperationResultMalformedError(f"spirit spring operation {field} is invalid")
+        for field in ("total_contribution", "player_contribution"):
+            if isinstance(payload[field], bool) or not isinstance(payload[field], int) or payload[field] < 0:
+                raise OperationResultMalformedError(f"spirit spring operation {field} is invalid")
+        if not isinstance(payload["success"], bool):
+            raise OperationResultMalformedError("spirit spring operation success is invalid")
+        reward = payload["reward"]
+        if not isinstance(reward, dict) or any(
+            not isinstance(key, str) or not key or isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            for key, value in reward.items()
+        ):
+            raise OperationResultMalformedError("spirit spring operation reward is invalid")
+        reward_snapshot = payload["reward_snapshot"]
+        if not isinstance(reward_snapshot, dict) or set(reward_snapshot) != {"base", "completion", "final"}:
+            raise OperationResultMalformedError("spirit spring operation reward snapshot is invalid")
+        from ..rewards.rules import (
+            RewardContentError,
+            combine_reward_grants,
+            reward_grant_from_snapshot,
+            reward_totals,
+        )
+
+        try:
+            base = reward_grant_from_snapshot(reward_snapshot["base"], operation="event.claim_reward")
+            completion_value = reward_snapshot["completion"]
+            completion = (
+                reward_grant_from_snapshot(completion_value, operation="event.claim_reward")
+                if completion_value is not None else None
+            )
+            final = reward_grant_from_snapshot(reward_snapshot["final"], operation="event.claim_reward")
+            expected_final = combine_reward_grants(base, completion) if completion is not None else base
+        except (RewardContentError, TypeError, ValueError, KeyError) as exc:
+            raise OperationResultMalformedError("spirit spring operation reward snapshot is malformed") from exc
+        if final.snapshot() != expected_final.snapshot() or reward_totals(final) != reward:
+            raise OperationResultMalformedError("spirit spring operation reward does not match snapshot")
+        if payload["success"] is not (completion is not None):
+            raise OperationResultMalformedError("spirit spring operation completion reward is inconsistent")
+
+    @staticmethod
+    def _validate_event_snapshot(
+        event: Any,
+        result: dict[str, Any],
+        definition: SpiritSpringDefinition,
+        *,
+        total_contribution: int | None = None,
+    ) -> None:
+        if str(event["event_key"]) != SPIRIT_SPRING_EVENT_KEY:
+            raise ValueError("spirit spring event key is invalid")
+        if str(event["location_key"]) != definition.location_key:
+            raise ValueError("spirit spring location snapshot differs from round")
+        if int(event["target_quantity"]) != definition.target_quantity:
+            raise ValueError("spirit spring target snapshot differs from round")
+        if str(event["status"]) in {"settled", "failed"}:
+            if "settled_at" not in result:
+                raise ValueError("spirit spring settled result is missing settled time")
+            expected_total = int(event["total_contribution"]) if total_contribution is None else total_contribution
+            expected_success = expected_total >= definition.target_quantity
+            if result["success"] is not expected_success:
+                raise ValueError("spirit spring success does not match contribution total")
 
 __all__ = ["EventsRepositoryMixin"]

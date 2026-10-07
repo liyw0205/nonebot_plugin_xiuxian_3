@@ -12,6 +12,7 @@ from .spirit_spring_rules import (
     SPIRIT_SPRING_EVENT_KEY,
     SpiritSpringDefinition,
     spirit_spring_definition,
+    spirit_spring_result,
     spirit_spring_snapshot,
     spirit_spring_window,
 )
@@ -101,7 +102,8 @@ def record_spirit_spring_contribution(
             (event["round_id"],),
         ).fetchone()["total"]
     )
-    result_json = _json_object(event["result_json"])
+    result_json, _ = spirit_spring_result(str(event["result_json"]))
+    result_json = dict(result_json)
     if str(event["status"]) in {"settled", "failed"}:
         result_json["success"] = total >= definition.target_quantity
     connection.execute(
@@ -151,16 +153,6 @@ def _insert_round(
             serialize_datetime(starts_at),
         ),
     )
-
-
-def _json_object(value: Any) -> dict[str, Any]:
-    try:
-        parsed = json.loads(value) if isinstance(value, str) else value
-    except (TypeError, json.JSONDecodeError) as exc:
-        raise ContentError("spirit spring round result is invalid") from exc
-    if not isinstance(parsed, dict):
-        raise ContentError("spirit spring round result must be an object")
-    return dict(parsed)
 
 
 __all__ = ["record_spirit_spring_contribution"]

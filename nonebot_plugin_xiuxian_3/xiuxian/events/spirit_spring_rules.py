@@ -10,6 +10,7 @@ from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
 from ..rewards.rules import RewardGrant, reward_definition, reward_grant_from_snapshot
+from ..utils.json_cache import decode_json_strict
 
 SPIRIT_SPRING_EVENT_KEY = "event.spirit_spring"
 
@@ -66,7 +67,7 @@ def spirit_spring_definition(
             "name", "desc", "status", "location_key", "duration_seconds", "schedule",
             "requirements", "contribution", "global_goal", "claim", "key",
         }
-        if set(event) != expected:
+        if set(event) != expected or event.get("key") != SPIRIT_SPRING_EVENT_KEY:
             raise ContentError("spirit spring event fields are invalid")
         name = _string(event["name"], "event.spirit_spring.name")
         description = _string(event["desc"], "event.spirit_spring.desc")
@@ -102,6 +103,8 @@ def spirit_spring_definition(
             raise ContentError("event.spirit_spring.claim fields are invalid")
         minimum = _positive_int(claim["min_contribution"], "event.spirit_spring.claim.min_contribution")
         window = _positive_int(claim["window_seconds"], "event.spirit_spring.claim.window_seconds")
+        if minimum > contribution_cap:
+            raise ContentError("event.spirit_spring.claim.min_contribution exceeds contribution cap")
         base_reward = reward_definition(
             _string(claim["reward_key"], "event.spirit_spring.claim.reward_key"),
             bundle,
@@ -138,13 +141,43 @@ def spirit_spring_definition(
         raise ContentError(f"spirit spring event content is incomplete: {exc}") from exc
 
 
-def spirit_spring_snapshot(result_json: str | dict[str, Any]) -> SpiritSpringDefinition:
+def spirit_spring_result(
+    result_json: str | dict[str, Any],
+) -> tuple[dict[str, Any], SpiritSpringDefinition]:
+    """Decode and validate a persisted round result and its frozen definition."""
+
     try:
-        result = json.loads(result_json) if isinstance(result_json, str) else result_json
-    except (TypeError, json.JSONDecodeError) as exc:
+        result = decode_json_strict(result_json) if isinstance(result_json, str) else result_json
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
         raise ContentError("spirit spring round result is invalid") from exc
     if not isinstance(result, dict):
         raise ContentError("spirit spring round result must be an object")
+    allowed_fields = {"success", "configuration", "settled_at"}
+    if not set(result).issubset(allowed_fields):
+        raise ContentError("spirit spring round result has invalid fields")
+    if not isinstance(result.get("success"), bool):
+        raise ContentError("spirit spring round result success is invalid")
+    if "settled_at" in result:
+        settled_at = result["settled_at"]
+        if not isinstance(settled_at, str) or not settled_at.strip():
+            raise ContentError("spirit spring round result settled_at is invalid")
+        try:
+            settled_time = datetime.fromisoformat(settled_at)
+        except ValueError as exc:
+            raise ContentError("spirit spring round result settled_at is invalid") from exc
+        if settled_time.tzinfo is None or settled_time.utcoffset() is None:
+            raise ContentError("spirit spring round result settled_at must include timezone")
+    return dict(result), _spirit_spring_snapshot_from_result(result)
+
+
+def spirit_spring_snapshot(result_json: str | dict[str, Any]) -> SpiritSpringDefinition:
+    """Return the frozen definition stored in a persisted round result."""
+
+    _, definition = spirit_spring_result(result_json)
+    return definition
+
+
+def _spirit_spring_snapshot_from_result(result: dict[str, Any]) -> SpiritSpringDefinition:
     snapshot = result.get("configuration")
     if not isinstance(snapshot, dict):
         raise ContentError("spirit spring configuration snapshot is missing")
@@ -165,6 +198,17 @@ def spirit_spring_snapshot(result_json: str | dict[str, Any]) -> SpiritSpringDef
     target_item_key = _string(snapshot["target_item_key"], "spirit spring snapshot.target_item_key")
     if source_item_key != target_item_key:
         raise ContentError("spirit spring snapshot goal item differs from source item")
+    contribution_per_quantity = _positive_int(
+        snapshot["contribution_per_quantity"], "spirit spring snapshot.contribution_per_quantity"
+    )
+    contribution_cap = _positive_int(
+        snapshot["contribution_cap"], "spirit spring snapshot.contribution_cap"
+    )
+    minimum_contribution = _positive_int(
+        snapshot["minimum_contribution"], "spirit spring snapshot.minimum_contribution"
+    )
+    if minimum_contribution > contribution_cap:
+        raise ContentError("spirit spring snapshot minimum contribution exceeds contribution cap")
     return SpiritSpringDefinition(
         key=SPIRIT_SPRING_EVENT_KEY,
         name=_string(snapshot["name"], "spirit spring snapshot.name"),
@@ -175,11 +219,11 @@ def spirit_spring_snapshot(result_json: str | dict[str, Any]) -> SpiritSpringDef
         required_realm_layer=required_realm_layer,
         source_item_key=source_item_key,
         source_item_name=_string(snapshot["source_item_name"], "spirit spring snapshot.source_item_name"),
-        contribution_per_quantity=_positive_int(snapshot["contribution_per_quantity"], "spirit spring snapshot.contribution_per_quantity"),
-        contribution_cap=_positive_int(snapshot["contribution_cap"], "spirit spring snapshot.contribution_cap"),
+        contribution_per_quantity=contribution_per_quantity,
+        contribution_cap=contribution_cap,
         target_item_key=target_item_key,
         target_quantity=_positive_int(snapshot["target_quantity"], "spirit spring snapshot.target_quantity"),
-        minimum_contribution=_positive_int(snapshot["minimum_contribution"], "spirit spring snapshot.minimum_contribution"),
+        minimum_contribution=minimum_contribution,
         claim_window_seconds=_positive_int(snapshot["claim_window_seconds"], "spirit spring snapshot.claim_window_seconds"),
         base_reward=reward_grant_from_snapshot(snapshot["base_reward"], operation="event.claim_reward"),
         completion_reward=reward_grant_from_snapshot(snapshot["completion_reward"], operation="event.claim_reward"),
@@ -296,6 +340,7 @@ __all__ = [
     "SpiritSpringDefinition",
     "round_id_for",
     "spirit_spring_definition",
+    "spirit_spring_result",
     "spirit_spring_snapshot",
     "spirit_spring_window",
 ]
