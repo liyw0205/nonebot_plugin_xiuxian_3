@@ -15,6 +15,34 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 [当前开发状态](current-status.md)是剩余工作的唯一清单。未出现在
 [当前开发状态](current-status.md)“已开放”表中的内容，不得被命令、按钮或 Web 写入口当作可用玩法。
 
+## 已闭合切片：虚空塔领奖快照严格解析与资产安全
+
+开工证据：QQ 官方与 OneBot V11 的真实 `挑战虚空塔` / `领取虚空塔奖励` 路径均已复现：将
+`void_spire_runs.reward_json` 中的 `spirit_stones` 重复键改成更大的数值后，领奖按后一个值发放
+灵石。现有领奖事务在资产、图鉴、领奖记录和 operation 写入前没有严格 JSON 与奖励字段校验，
+因此损坏持久化记录会改变实际资产。
+
+范围只包含 `specials.void_spire` 的运行结果、奖励快照和领奖 operation：严格解码并校验重复键、
+截断 JSON、对象字段、非负整数奖励以及运行记录的楼层/路线/状态一致性；无效记录在玩家资产、
+图鉴、领奖记录和 operation 写入前拒绝，修复后原 operation 可重试或重放且只兑现一次。复用
+`utils.json_cache.decode_json_strict`、共享玩家奖励事务和 operation 账本。不改塔层数值、自动战斗、
+正式 PvE/PvP 结算、切磋/训练傀儡只读观战或其他试炼塔路径；不加入运行时版本标识、旧格式兼容分支
+或玩家开发文案。
+
+文件所有权：`candidate_rotation` 负责 `xiuxian/specials/void_spire_repository.py` 的严格解析实现
+及 `test/test_void_spire.py` 的新增损坏记录/双适配器验收；`contract_gap` 只读核对解析点和合同边界；
+主线负责文档、共享事务边界、最终聚焦测试、compileall、内容 JSON 严格解析和差异检查。适配器门禁
+漂移、operation ID 命名空间和道途内容名称虽已复现，均作为未选候选，不在本条混改。
+
+验收覆盖重复键、截断 JSON、负数/非整数奖励、损坏 operation 结果、资产与 operation 零写、事务
+故障回滚、修复原 operation 重试、重启幂等回放及 QQ 官方/OneBot V11 两条真实入口；正式战斗结算和
+只读观战回归保持通过后，虚空塔领奖切片进入冷却。
+
+最终验收：虚空塔严格完整性专项 19 项通过；试炼塔 12 项、战斗/观战 21 项、适配器 29 项、内容与
+无版本标识 12 项关联回归通过。源码和测试 `compileall`、48 份内容 JSON 严格解析及 `git diff --check`
+完成。未跑整仓全量测试或新角色飞升长链，不将局部验收称为完整成长链；不清理用户数据，不为旧快照
+补兼容字段。
+
 ## 已闭合切片：生产订单快照与结算 operation 严格回放
 
 开工证据：`开始生产 疗伤丹`、`领取生产` 和 `恢复生产` 由统一 application/repository 对 QQ 官方与 OneBot V11

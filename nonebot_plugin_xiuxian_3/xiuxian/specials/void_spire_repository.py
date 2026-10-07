@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..persistence.errors import (
-    OperationConflictError,
+    OperationResultMalformedError,
     PlayerNotFoundError,
     ResourceInsufficientError,
     TowerAlreadyClaimedError,
@@ -23,7 +23,15 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
-from ..utils.player import change_player_state, grant_player_reward, player_integer, player_local_reputation
+from ..utils.json_cache import decode_json_strict
+from ..utils.operations import operation_replay, record_operation
+from ..utils.player import (
+    change_player_state,
+    grant_player_reward,
+    player_integer,
+    player_local_reputation,
+    split_player_rewards,
+)
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .void_spire_models import VoidSpirePreviewRecord, VoidSpireRewardRecord, VoidSpireRunRecord
 from .void_spire_rules import (
@@ -134,21 +142,31 @@ class VoidSpireRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name,request_hash,result_json FROM operations WHERE operation_id=?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing["result_json"])
+            replay_player = self._require_player(
+                connection, platform, platform_user_id, writable=False
+            )
+            payload = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player_id=int(replay_player["id"]),
+            )
+            if payload is not None:
+                self._validate_void_spire_start_payload(payload)
                 run = connection.execute(
                     "SELECT * FROM void_spire_runs WHERE run_id=?", (payload["run_id"],)
                 ).fetchone()
                 if run is None:
                     raise TowerNotFoundError("void spire run no longer exists")
-                player = connection.execute("SELECT * FROM players WHERE id=?", (run["player_id"],)).fetchone()
-                return self._void_spire_run_from_row(run, player, replay=True)
+                if (
+                    int(run["player_id"]) != int(replay_player["id"])
+                    or str(run["tower_key"]) != payload["tower_key"]
+                    or int(run["floor_no"]) != payload["floor_no"]
+                    or str(run["route_key"]) != payload["route_key"]
+                ):
+                    raise OperationResultMalformedError("void spire start operation does not match its run")
+                return self._void_spire_run_from_row(run, replay_player, replay=True)
 
             player = self._require_player(connection, platform, platform_user_id)
             upper_floor = floor_no > LOWER_ROUTE_END
@@ -230,7 +248,12 @@ class VoidSpireRepositoryMixin:
                 operation_name,
                 int(player["id"]),
                 request_hash,
-                {"run_id": run_id, "tower_key": TOWER_KEY, "floor_no": floor_no},
+                {
+                    "run_id": run_id,
+                    "tower_key": TOWER_KEY,
+                    "floor_no": floor_no,
+                    "route_key": definition.route_key,
+                },
                 now_text,
             )
             return self._void_spire_run_from_row(run, updated)
@@ -314,14 +337,20 @@ class VoidSpireRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name,request_hash,result_json FROM operations WHERE operation_id=?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._void_spire_reward_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay_player = self._require_player(
+                connection, platform, platform_user_id, writable=False
+            )
+            payload = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player_id=int(replay_player["id"]),
+            )
+            if payload is not None:
+                return self._void_spire_reward_replay(
+                    connection, payload, operation_id, replay_player
+                )
             player = self._require_player(connection, platform, platform_user_id)
             run = connection.execute(
                 "SELECT * FROM void_spire_runs WHERE player_id=? AND status='reward_pending' ORDER BY id DESC LIMIT 1",
@@ -334,7 +363,7 @@ class VoidSpireRepositoryMixin:
                 if claimed is not None:
                     raise TowerAlreadyClaimedError("void spire reward was already claimed")
                 raise TowerRewardNotAvailableError("no void spire reward is pending")
-            reward = {str(key): int(value) for key, value in json.loads(run["reward_json"]).items()}
+            reward = self._decode_void_spire_reward(run["reward_json"])
             if reward:
                 grant_player_reward(
                     connection,
@@ -444,52 +473,183 @@ class VoidSpireRepositoryMixin:
         payload: dict[str, Any],
         now_text: str,
     ) -> None:
-        connection.execute(
-            "INSERT INTO operations(operation_id,operation_name,player_id,request_hash,result_json,created_at) VALUES (?,?,?,?,?,?)",
-            (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
+        record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
 
     def _void_spire_run_from_row(
         self, run: sqlite3.Row, player: sqlite3.Row, *, replay: bool = False
     ) -> VoidSpireRunRecord:
-        result = json.loads(run["result_json"])
+        floor_no = run["floor_no"]
+        if (
+            isinstance(floor_no, bool)
+            or not isinstance(floor_no, int)
+            or not 1 <= floor_no <= MAX_FLOOR
+            or str(run["tower_key"]) != TOWER_KEY
+            or not isinstance(run["route_key"], str)
+            or not str(run["route_key"]).strip()
+            or run["first_clear"] not in (0, 1)
+            or int(run["player_id"]) != int(player["id"])
+        ):
+            raise OperationResultMalformedError("void spire run identity is invalid")
+        status = str(run["status"])
+        if status not in {"battle_running", "reward_pending", "lost", "claimed", "aborted"}:
+            raise OperationResultMalformedError("void spire run status is invalid")
+        if run["battle_id"] is not None and (
+            not isinstance(run["battle_id"], str) or not str(run["battle_id"]).strip()
+        ):
+            raise OperationResultMalformedError("void spire battle reference is invalid")
+        result = self._decode_void_spire_object(run["result_json"], "result")
+        if any(
+            key in result and (not isinstance(result[key], str) or not result[key].strip())
+            for key in ("outcome", "reason")
+        ):
+            raise OperationResultMalformedError("void spire result snapshot is invalid")
+        outcome = result.get("outcome")
+        if status == "battle_running" and result:
+            raise OperationResultMalformedError("running void spire run has a result")
+        if status == "reward_pending" and outcome != "won":
+            raise OperationResultMalformedError("pending void spire reward has no victory result")
+        if status == "lost" and outcome != "lost":
+            raise OperationResultMalformedError("lost void spire run has an invalid result")
+        if status == "aborted" and result.get("reason") != "battle_start_failed":
+            raise OperationResultMalformedError("aborted void spire run has an invalid result")
+        if status == "claimed" and outcome not in (None, "won"):
+            raise OperationResultMalformedError("claimed void spire run has an invalid result")
+        reward = self._decode_void_spire_reward(run["reward_json"])
         return VoidSpireRunRecord(
             player=self._row_to_player(player),
             run_id=str(run["run_id"]),
             tower_key=str(run["tower_key"]),
-            floor_no=int(run["floor_no"]),
+            floor_no=floor_no,
             route_key=str(run["route_key"]),
-            status=str(run["status"]),
+            status=status,
             battle_id=str(run["battle_id"]) if run["battle_id"] else None,
             first_clear=bool(run["first_clear"]),
             outcome=str(result["outcome"]) if result.get("outcome") else None,
             reason=str(result["reason"]) if result.get("reason") else None,
-            reward={str(key): int(value) for key, value in json.loads(run["reward_json"]).items()} if str(run["status"]) == "reward_pending" else {},
+            reward=reward if str(run["status"]) == "reward_pending" else {},
             already_completed=replay,
         )
 
     def _void_spire_reward_from_payload(
         self, payload: dict[str, Any], *, replay: bool = False
     ) -> VoidSpireRewardRecord:
-        discoveries = payload.get("discoveries")
-        if discoveries is None and bool(payload["first_clear"]):
-            discoveries = [
-                f"codex.void.route_spire_{payload['route_key']}",
-                f"codex.challenge.void_spire.floor_{payload['floor_no']}",
-            ]
-            story = story_codex_for_floor(int(payload["floor_no"]), self.content)
-            if story:
-                discoveries.append(story)
+        expected = {"player", "run_id", "floor_no", "route_key", "first_clear", "reward", "discoveries"}
+        if set(payload) != expected or not isinstance(payload.get("player"), dict):
+            raise OperationResultMalformedError("void spire reward operation result has invalid fields")
+        if not isinstance(payload["run_id"], str) or not payload["run_id"].strip():
+            raise OperationResultMalformedError("void spire reward operation run is invalid")
+        if (
+            isinstance(payload["floor_no"], bool)
+            or not isinstance(payload["floor_no"], int)
+            or not 1 <= payload["floor_no"] <= MAX_FLOOR
+        ):
+            raise OperationResultMalformedError("void spire reward operation floor is invalid")
+        if not isinstance(payload["route_key"], str) or not payload["route_key"].strip():
+            raise OperationResultMalformedError("void spire reward operation route is invalid")
+        if not isinstance(payload["first_clear"], bool):
+            raise OperationResultMalformedError("void spire reward operation first-clear flag is invalid")
+        reward = self._validate_void_spire_reward(payload["reward"], "operation reward")
+        discoveries = payload["discoveries"]
+        if not isinstance(discoveries, list) or any(not isinstance(key, str) or not key for key in discoveries):
+            raise OperationResultMalformedError("void spire reward operation discoveries are invalid")
+        try:
+            player = self._row_to_player(payload["player"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError("void spire reward operation player snapshot is invalid") from exc
         return VoidSpireRewardRecord(
-            player=self._row_to_player(payload["player"]),
+            player=player,
             run_id=str(payload["run_id"]),
             floor_no=int(payload["floor_no"]),
             route_key=str(payload["route_key"]),
             first_clear=bool(payload["first_clear"]),
-            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
-            discoveries=tuple(str(key) for key in (discoveries or ())),
+            reward=reward,
+            discoveries=tuple(discoveries),
             already_completed=replay,
         )
+
+    @staticmethod
+    def _decode_void_spire_object(value: Any, label: str) -> dict[str, Any]:
+        try:
+            decoded = decode_json_strict(str(value))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError(f"void spire {label} snapshot is malformed") from exc
+        if not isinstance(decoded, dict):
+            raise OperationResultMalformedError(f"void spire {label} snapshot must be an object")
+        return decoded
+
+    @classmethod
+    def _validate_void_spire_reward(cls, value: Any, label: str) -> dict[str, int]:
+        if not isinstance(value, dict):
+            raise OperationResultMalformedError(f"void spire {label} is invalid")
+        try:
+            split_player_rewards(value)
+        except (TypeError, ValueError) as exc:
+            raise OperationResultMalformedError(f"void spire {label} is invalid") from exc
+        return {str(key): int(amount) for key, amount in value.items()}
+
+    @classmethod
+    def _decode_void_spire_reward(cls, value: Any) -> dict[str, int]:
+        payload = cls._decode_void_spire_object(value, "reward")
+        return cls._validate_void_spire_reward(payload, "reward snapshot")
+
+    @staticmethod
+    def _validate_void_spire_start_payload(payload: dict[str, Any]) -> None:
+        if set(payload) != {"run_id", "tower_key", "floor_no", "route_key"}:
+            raise OperationResultMalformedError("void spire start operation result has invalid fields")
+        if not isinstance(payload["run_id"], str) or not payload["run_id"].strip():
+            raise OperationResultMalformedError("void spire start operation run is invalid")
+        if payload["tower_key"] != TOWER_KEY:
+            raise OperationResultMalformedError("void spire start operation tower is invalid")
+        if not isinstance(payload["route_key"], str) or not payload["route_key"].strip():
+            raise OperationResultMalformedError("void spire start operation route is invalid")
+        if isinstance(payload["floor_no"], bool) or not isinstance(payload["floor_no"], int):
+            raise OperationResultMalformedError("void spire start operation floor is invalid")
+        if not 1 <= payload["floor_no"] <= MAX_FLOOR:
+            raise OperationResultMalformedError("void spire start operation floor is invalid")
+
+    def _void_spire_reward_replay(
+        self,
+        connection: sqlite3.Connection,
+        payload: dict[str, Any],
+        operation_id: str,
+        expected_player: sqlite3.Row,
+    ) -> VoidSpireRewardRecord:
+        record = self._void_spire_reward_from_payload(payload, replay=True)
+        player_id = int(expected_player["id"])
+        run = connection.execute(
+            "SELECT * FROM void_spire_runs WHERE run_id=?", (record.run_id,)
+        ).fetchone()
+        if run is None:
+            raise OperationResultMalformedError("void spire reward operation run is missing")
+        claim = connection.execute(
+            "SELECT * FROM void_spire_reward_claims WHERE run_id=? AND operation_id=?",
+            (record.run_id, operation_id),
+        ).fetchone()
+        if (
+            claim is None
+            or record.player.player_id != str(expected_player["player_id"])
+            or record.player.platform != str(expected_player["platform"])
+            or record.player.platform_user_id != str(expected_player["platform_user_id"])
+            or int(run["player_id"]) != player_id
+            or str(run["status"]) != "claimed"
+        ):
+            raise OperationResultMalformedError("void spire reward operation does not match its claim")
+        if (
+            int(run["floor_no"]) != record.floor_no
+            or str(run["tower_key"]) != TOWER_KEY
+            or str(run["route_key"]) != record.route_key
+            or bool(run["first_clear"]) != record.first_clear
+            or int(claim["player_id"]) != player_id
+            or int(claim["floor_no"]) != record.floor_no
+            or str(claim["route_key"]) != record.route_key
+            or bool(claim["first_clear"]) != record.first_clear
+        ):
+            raise OperationResultMalformedError("void spire reward operation fields do not match its claim")
+        stored_reward = self._decode_void_spire_reward(run["reward_json"])
+        claimed_reward = self._decode_void_spire_reward(claim["reward_json"])
+        if stored_reward != record.reward or claimed_reward != record.reward:
+            raise OperationResultMalformedError("void spire reward operation reward does not match its claim")
+        return record
 
 
 __all__ = ["VoidSpireRepositoryMixin"]

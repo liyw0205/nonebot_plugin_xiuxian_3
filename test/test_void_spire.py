@@ -132,6 +132,157 @@ def test_void_spire_first_slice_works_on_qq_and_onebot() -> None:
     asyncio.run(run())
 
 
+def test_void_spire_reward_snapshots_and_operation_replays_are_strict_on_both_adapters() -> None:
+    async def run() -> None:
+        malformed_rewards = (
+            '{"spirit_stones":120,"spirit_stones":9999}',
+            '{"spirit_stones":',
+            '[]',
+            '{"spirit_stones":-1}',
+            '{"spirit_stones":true}',
+            '{"spirit_stones":"120"}',
+        )
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            replay_cases: list[tuple[str, str, str]] = []
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"strict-reward-{adapter.replace('.', '-')}"
+                await _setup(runtime, adapter, user, user)
+                challenge = await _send(runtime, adapter, user, f"{user}-challenge", "挑战虚空塔 1")
+                assert challenge.code == "VOID_SPIRE_CHALLENGE_SETTLED"
+                claim_operation = f"{user}-claim"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id, run_id, valid_reward = connection.execute(
+                        "SELECT players.id, void_spire_runs.run_id, void_spire_runs.reward_json "
+                        "FROM players JOIN void_spire_runs ON players.id=void_spire_runs.player_id "
+                        "WHERE players.platform=? AND players.platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    before = connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE id=?", (player_id,)
+                    ).fetchone()
+
+                for index, malformed in enumerate(malformed_rewards):
+                    operation_id = f"{claim_operation}-{index}"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE void_spire_runs SET reward_json=? WHERE run_id=?", (malformed, run_id)
+                        )
+                    failed = await _send(runtime, adapter, user, operation_id, "领取虚空塔奖励")
+                    assert failed.code == "PERSISTENCE_ERROR"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        assert connection.execute(
+                            "SELECT spirit_stones, inventory_json FROM players WHERE id=?", (player_id,)
+                        ).fetchone() == before
+                        assert connection.execute(
+                            "SELECT status FROM void_spire_runs WHERE run_id=?", (run_id,)
+                        ).fetchone()[0] == "reward_pending"
+                        assert connection.execute(
+                            "SELECT COUNT(*) FROM void_spire_reward_claims WHERE run_id=?", (run_id,)
+                        ).fetchone()[0] == 0
+                        assert connection.execute(
+                            "SELECT COUNT(*) FROM operations WHERE operation_id=?", (operation_id,)
+                        ).fetchone()[0] == 0
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE void_spire_runs SET reward_json=? WHERE run_id=?", (valid_reward, run_id)
+                    )
+                settled = await _send(runtime, adapter, user, claim_operation, "领取虚空塔奖励")
+                assert settled.code == "VOID_SPIRE_REWARD_CLAIMED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    stored_start = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?",
+                        (f"{user}-challenge",),
+                    ).fetchone()[0]
+                    start_payload = json.loads(stored_start)
+                    start_payload["floor_no"] = 2
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (json.dumps(start_payload), f"{user}-challenge"),
+                    )
+                tampered_start = await _send(
+                    runtime, adapter, user, f"{user}-challenge", "挑战虚空塔 1"
+                )
+                assert tampered_start.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (stored_start, f"{user}-challenge"),
+                    )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE void_spire_runs SET reward_json=? WHERE run_id=?",
+                        ('{"spirit_stones":', run_id),
+                    )
+                corrupted_run_replay = await _send(
+                    runtime, adapter, user, f"{user}-challenge", "挑战虚空塔 1"
+                )
+                assert corrupted_run_replay.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE void_spire_runs SET reward_json=? WHERE run_id=?", (valid_reward, run_id)
+                    )
+                    stored_operation = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?", (claim_operation,)
+                    ).fetchone()[0]
+                    player_after_claim = connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE id=?", (player_id,)
+                    ).fetchone()
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM void_spire_reward_claims WHERE run_id=?", (run_id,)
+                    ).fetchone()[0] == 1
+                    valid_payload = json.loads(stored_operation)
+                    valid_payload["reward"]["spirit_stones"] = 9999
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (json.dumps(valid_payload), claim_operation),
+                    )
+                tampered_claim = await _send(runtime, adapter, user, claim_operation, "领取虚空塔奖励")
+                assert tampered_claim.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (stored_operation, claim_operation),
+                    )
+                    assert connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE id=?", (player_id,)
+                    ).fetchone() == player_after_claim
+                    corrupted_operation = stored_operation.replace(
+                        '"reward":', '"reward":{},"reward":', 1
+                    )
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (corrupted_operation, claim_operation),
+                    )
+                failed_replay = await _send(runtime, adapter, user, claim_operation, "领取虚空塔奖励")
+                assert failed_replay.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT spirit_stones, inventory_json FROM players WHERE id=?", (player_id,)
+                    ).fetchone() == player_after_claim
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM void_spire_reward_claims WHERE run_id=?", (run_id,)
+                    ).fetchone()[0] == 1
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (stored_operation, claim_operation),
+                    )
+                replay = await _send(runtime, adapter, user, claim_operation, "领取虚空塔奖励")
+                assert replay.code == "VOID_SPIRE_REWARD_CLAIMED"
+                assert replay.data["idempotent_replay"] is True
+                replay_cases.append((adapter, user, claim_operation))
+            await runtime.close()
+            restarted = create_runtime(data_dir=data_dir)
+            for adapter, user, operation_id in replay_cases:
+                replay = await _send(restarted, adapter, user, operation_id, "领取虚空塔奖励")
+                assert replay.code == "VOID_SPIRE_REWARD_CLAIMED"
+                assert replay.data["idempotent_replay"] is True
+            await restarted.close()
+
+    asyncio.run(run())
+
+
 def test_void_spire_rules_and_content_records_are_stable() -> None:
     assert MAX_FLOOR == 90
     assert floor_definition(15).boss is True
@@ -167,6 +318,57 @@ def test_void_spire_rules_and_content_records_are_stable() -> None:
         assert (definition.max_hp, definition.attack, definition.label) == (
             row["stats"]["hp"], row["stats"]["attack"], row["name"]
         )
+
+
+def test_void_spire_claim_failure_rolls_back_and_retries_same_operation(monkeypatch) -> None:
+    async def run() -> None:
+        from nonebot_plugin_xiuxian_3.xiuxian.specials import void_spire_repository
+
+        def fail_codex(*args, **kwargs):
+            raise RuntimeError("codex write failed")
+
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"claim-retry-{adapter.replace('.', '-')}"
+                await _setup(runtime, adapter, user, user)
+                challenge = await _send(runtime, adapter, user, f"{user}-challenge", "挑战虚空塔 1")
+                assert challenge.code == "VOID_SPIRE_CHALLENGE_SETTLED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id, before = connection.execute(
+                        "SELECT id, spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                monkeypatch.setattr(
+                    void_spire_repository,
+                    "record_codex_discovery",
+                    fail_codex,
+                )
+                failed = await _send(runtime, adapter, user, f"{user}-claim", "领取虚空塔奖励")
+                assert failed.code == "PERSISTENCE_ERROR"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT spirit_stones FROM players WHERE id=?", (player_id,)
+                    ).fetchone()[0] == before
+                    assert connection.execute(
+                        "SELECT status FROM void_spire_runs WHERE run_id=?", (challenge.data["run_id"],)
+                    ).fetchone()[0] == "reward_pending"
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM void_spire_reward_claims WHERE run_id=?", (challenge.data["run_id"],)
+                    ).fetchone()[0] == 0
+                monkeypatch.setattr(
+                    void_spire_repository,
+                    "record_codex_discovery",
+                    original_record_codex_discovery,
+                )
+                claimed = await _send(runtime, adapter, user, f"{user}-claim", "领取虚空塔奖励")
+                assert claimed.code == "VOID_SPIRE_REWARD_CLAIMED"
+            await runtime.close()
+
+    from nonebot_plugin_xiuxian_3.xiuxian.specials.void_spire_repository import record_codex_discovery
+
+    original_record_codex_discovery = record_codex_discovery
+    asyncio.run(run())
 
 
 def test_void_spire_reputation_boundary_and_previous_floor_lock() -> None:
