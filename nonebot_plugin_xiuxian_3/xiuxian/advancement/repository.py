@@ -183,6 +183,8 @@ from ..routine.rules import (
 )
 
 from ..persistence.errors import *  # noqa: F401,F403
+from ..utils.json_cache import decode_json_strict
+from ..utils.operations import operation_replay
 from ..utils.assets import (
     inventory_amount,
     inventory_json,
@@ -193,6 +195,30 @@ from ..utils.assets import (
 )
 from ..utils.equipment import equipment_instance_rows
 from ..utils.player import change_player_state, player_integer, player_inventory, spend_player_state
+
+
+def _validated_equipment_affixes(value: Any) -> dict[str, int]:
+    if not isinstance(value, dict):
+        raise OperationResultMalformedError("equipment affixes must be an object")
+    result: dict[str, int] = {}
+    for key, raw_value in value.items():
+        if (
+            not isinstance(key, str)
+            or isinstance(raw_value, bool)
+            or not isinstance(raw_value, int)
+            or raw_value <= 0
+        ):
+            raise OperationResultMalformedError("equipment affix value is invalid")
+        result[key] = raw_value
+    return result
+
+
+def _decode_equipment_affixes(value: Any) -> dict[str, int]:
+    try:
+        decoded = decode_json_strict(str(value))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise OperationResultMalformedError("equipment affixes JSON is malformed") from exc
+    return _validated_equipment_affixes(decoded)
 
 
 class AdvancementRepositoryMixin:
@@ -1220,7 +1246,7 @@ class AdvancementRepositoryMixin:
             durability_bp=int(payload.get("durability_bp", 10000)),
             temper_level=int(payload.get("temper_level", 0)),
             max_temper_level=int(payload["max_temper_level"]),
-            affixes={str(key): int(value) for key, value in dict(payload.get("affixes", {})).items()},
+            affixes=_validated_equipment_affixes(payload.get("affixes", {})),
             refinement_failure_streak=int(payload.get("refinement_failure_streak", 0)),
         )
 
@@ -1237,10 +1263,7 @@ class AdvancementRepositoryMixin:
             durability_bp=int(row["durability_bp"]),
             temper_level=int(row["temper_level"]),
             max_temper_level=int(row["max_temper_level"]),
-            affixes={
-                str(key): int(value)
-                for key, value in SQLitePlayerRepository._json_object(row["affixes_json"], {}).items()
-            },
+            affixes=_decode_equipment_affixes(row["affixes_json"]),
             refinement_failure_streak=int(row["refinement_failure_streak"]),
         )
 
@@ -1535,7 +1558,7 @@ class AdvancementRepositoryMixin:
                     "durability_bp": updated_equipment["durability_bp"],
                     "temper_level": updated_equipment["temper_level"],
                     "max_temper_level": updated_equipment["max_temper_level"],
-                    "affixes": self._json_object(updated_equipment["affixes_json"], {}),
+                    "affixes": _decode_equipment_affixes(updated_equipment["affixes_json"]),
                     "refinement_failure_streak": updated_equipment["refinement_failure_streak"],
                 },
                 "action": operation_name.removeprefix("item."),
@@ -1645,28 +1668,23 @@ class AdvancementRepositoryMixin:
         equipment_reference: str,
         operation_id: str,
     ) -> TemperingRecord:
-        definition = equipment_definition(equipment_reference, self.content)
         operation_name = "item.tempering"
+        normalized_reference = equipment_reference.strip()
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "equipment_reference": equipment_reference.strip(),
-                "item_key": definition.key,
+                "equipment_reference": normalized_reference,
             },
         )
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._tempering_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay_payload = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay_payload is not None:
+                return self._tempering_from_payload(replay_payload, replay=True)
+            definition = equipment_definition(normalized_reference, self.content)
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["stage"]) != "cultivator":
                 raise PlayerStageConflictError("equipment tempering requires entry into cultivation")
@@ -1696,10 +1714,11 @@ class AdvancementRepositoryMixin:
                 raise EquipmentTemperingMaxedError("equipment has reached maximum temper level")
             target_level = from_level + 1
             costs = temper_cost(target_level, definition)
-            equipment = self._resolve_equipment(connection, player, equipment_reference, now_text)
+            equipment = self._resolve_equipment(connection, player, normalized_reference, now_text)
             player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if player is None:
                 raise PlayerNotFoundError("player disappeared during equipment resolution")
+            _decode_equipment_affixes(equipment["affixes_json"])
             inventory = player_inventory(player)
             inventory, stones_after, material_key, material_spent, stones_spent = self._consume_equipment_costs(
                 player, inventory, costs
@@ -1772,7 +1791,7 @@ class AdvancementRepositoryMixin:
                     "durability_bp": updated_equipment["durability_bp"],
                     "temper_level": updated_equipment["temper_level"],
                     "max_temper_level": updated_equipment["max_temper_level"],
-                    "affixes": self._json_object(updated_equipment["affixes_json"], {}),
+                    "affixes": _decode_equipment_affixes(updated_equipment["affixes_json"]),
                     "refinement_failure_streak": updated_equipment["refinement_failure_streak"],
                 },
                 "from_level": from_level,
@@ -1833,28 +1852,23 @@ class AdvancementRepositoryMixin:
         equipment_reference: str,
         operation_id: str,
     ) -> RefinementRecord:
-        definition = equipment_definition(equipment_reference, self.content)
         operation_name = "item.refinement"
+        normalized_reference = equipment_reference.strip()
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "equipment_reference": equipment_reference.strip(),
-                "item_key": definition.key,
+                "equipment_reference": normalized_reference,
             },
         )
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._refinement_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay_payload = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay_payload is not None:
+                return self._refinement_from_payload(replay_payload, replay=True)
+            definition = equipment_definition(normalized_reference, self.content)
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["stage"]) != "cultivator":
                 raise PlayerStageConflictError("equipment refinement requires entry into cultivation")
@@ -1872,18 +1886,15 @@ class AdvancementRepositoryMixin:
             if not self._equipment_source_exists(connection, player, definition):
                 raise EquipmentNotOwnedError("equipment is not owned")
             costs = refinement_cost(definition)
-            equipment = self._resolve_equipment(connection, player, equipment_reference, now_text)
+            equipment = self._resolve_equipment(connection, player, normalized_reference, now_text)
             player = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
             if player is None:
                 raise PlayerNotFoundError("player disappeared during equipment resolution")
+            old_affixes = _decode_equipment_affixes(equipment["affixes_json"])
             inventory = player_inventory(player)
             inventory, stones_after, material_key, material_spent, stones_spent = self._consume_equipment_costs(
                 player, inventory, costs
             )
-            old_affixes = {
-                str(key): int(value)
-                for key, value in self._json_object(equipment["affixes_json"], {}).items()
-            }
             streak_before = int(equipment["refinement_failure_streak"])
             roll_bp = refinement_roll_bp(f"{operation_id}:{equipment['instance_id']}:{streak_before}")
             success_bp = refinement_success_bp(definition)
@@ -1962,7 +1973,7 @@ class AdvancementRepositoryMixin:
                     "durability_bp": updated_equipment["durability_bp"],
                     "temper_level": updated_equipment["temper_level"],
                     "max_temper_level": updated_equipment["max_temper_level"],
-                    "affixes": self._json_object(updated_equipment["affixes_json"], {}),
+                    "affixes": _decode_equipment_affixes(updated_equipment["affixes_json"]),
                     "refinement_failure_streak": updated_equipment["refinement_failure_streak"],
                 },
                 "old_affixes": old_affixes,

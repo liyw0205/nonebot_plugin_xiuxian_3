@@ -8,6 +8,8 @@ from collections import defaultdict
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
+import pytest
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
@@ -75,7 +77,7 @@ def _set_equipment_resources(
         )
 
 
-def _equipment_state(runtime, user_id: str) -> tuple[str, int, dict[str, int], int]:
+def _equipment_state(runtime, user_id: str, *, adapter: str = "web") -> tuple[str, int, dict[str, int], int]:
     with sqlite3.connect(runtime.settings.database_path) as connection:
         row = connection.execute(
             """
@@ -85,7 +87,7 @@ def _equipment_state(runtime, user_id: str) -> tuple[str, int, dict[str, int], i
               AND item_key = 'item.weapon.wood_sword' AND status = 'active'
             ORDER BY id LIMIT 1
             """,
-            ("web", user_id),
+            (adapter, user_id),
         ).fetchone()
         assert row is not None
         return row[0], int(row[1]), json.loads(row[2]), int(row[3])
@@ -701,6 +703,265 @@ def test_equipment_loadout_replays_after_content_name_changes_for_both_adapters(
         data_dir = Path(directory) / "data"
         shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
         asyncio.run(run(data_dir))
+
+
+def test_equipment_growth_replays_after_content_close_for_both_adapters() -> None:
+    async def run(data_dir: Path) -> None:
+        adapters = ("qq.official", "onebot.v11")
+        runtime = create_runtime(data_dir=data_dir, adapters=adapters)
+        operation_ids: dict[str, tuple[str, str]] = {}
+        for adapter in adapters:
+            user = f"growth-content-{adapter}"
+            await _enter_cultivator_with_adapter(runtime, adapter, user)
+            _set_equipment_resources(
+                runtime,
+                user,
+                adapter=adapter,
+                ironstone=100,
+                stones=10_000,
+                sword=1,
+            )
+            temper_operation = f"{adapter}:growth:temper"
+            refine_operation = f"{adapter}:growth:refine"
+            tempered = await runtime.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-growth-temper", adapter=adapter, operation_id=temper_operation),
+                "强化法器 木纹剑",
+            )
+            refined = await runtime.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-growth-refine", adapter=adapter, operation_id=refine_operation),
+                "重铸法器 木纹剑",
+            )
+            assert tempered.code == "EQUIPMENT_TEMPERED", tempered
+            assert refined.code == "EQUIPMENT_REFINED", refined
+            operation_ids[adapter] = (temper_operation, refine_operation)
+        await runtime.close()
+
+        equipment_path = data_dir / "装备" / "法器.json"
+        document = json.loads(equipment_path.read_text(encoding="utf-8"))
+        wood_sword = next(row for row in document["records"] if row["key"] == "item.weapon.wood_sword")
+        wood_sword["name"] = "青木灵剑"
+        wood_sword["aliases"] = []
+        wood_sword["status"] = "closed"
+        equipment_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        recovered = create_runtime(data_dir=data_dir, adapters=adapters)
+        for adapter in adapters:
+            user = f"growth-content-{adapter}"
+            temper_operation, refine_operation = operation_ids[adapter]
+            replay_temper = await recovered.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-growth-temper-replay", adapter=adapter, operation_id=temper_operation),
+                "强化法器 木纹剑",
+            )
+            replay_refine = await recovered.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-growth-refine-replay", adapter=adapter, operation_id=refine_operation),
+                "重铸法器 木纹剑",
+            )
+            assert replay_temper.code == "EQUIPMENT_TEMPERED", replay_temper
+            assert replay_temper.data["idempotent_replay"] is True
+            assert replay_refine.code == "EQUIPMENT_REFINED", replay_refine
+            assert replay_refine.data["idempotent_replay"] is True
+            changed_input = await recovered.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-growth-input-conflict", adapter=adapter, operation_id=refine_operation),
+                "重铸法器 青木灵剑",
+            )
+            assert changed_input.code == "OPERATION_CONFLICT", changed_input
+            stale_new = await recovered.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-growth-stale-new", adapter=adapter, operation_id=f"{adapter}:growth:new"),
+                "重铸法器 木纹剑",
+            )
+            assert stale_new.code == "INVALID_EQUIPMENT", stale_new
+        await recovered.close()
+
+    with TemporaryDirectory() as directory:
+        data_dir = Path(directory) / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        asyncio.run(run(data_dir))
+
+
+@pytest.mark.parametrize("adapter", ("qq.official", "onebot.v11"))
+def test_equipment_refinement_rejects_bad_affixes_and_recovers_atomically(tmp_path: Path, adapter: str) -> None:
+    async def run() -> None:
+        data_dir = tmp_path / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=(adapter,))
+        user = f"growth-json-{adapter}"
+        await _enter_cultivator_with_adapter(runtime, adapter, user)
+        _set_equipment_resources(runtime, user, adapter=adapter, ironstone=200, stones=20_000, sword=1)
+        tempered = await runtime.adapters.dispatch(
+            adapter,
+            _context(user, f"{adapter}-json-temper", adapter=adapter, operation_id=f"{adapter}:json:temper"),
+            "强化法器 木纹剑",
+        )
+        assert tempered.ok, tempered
+
+        def state() -> tuple[object, ...]:
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player = connection.execute(
+                    "SELECT inventory_json, spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
+                    (adapter, user),
+                ).fetchone()
+                equipment = connection.execute(
+                    "SELECT affixes_json, refinement_failure_streak FROM equipment_instances "
+                    "WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) "
+                    "AND item_key='item.weapon.wood_sword'",
+                    (adapter, user),
+                ).fetchone()
+                events = connection.execute(
+                    "SELECT COUNT(*) FROM equipment_refinement_events WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                    (adapter, user),
+                ).fetchone()[0]
+                operations = connection.execute(
+                    "SELECT COUNT(*) FROM operations WHERE operation_name='item.refinement' "
+                    "AND player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                    (adapter, user),
+                ).fetchone()[0]
+            return (*player, *equipment, events, operations)
+
+        bad_values = (
+            "{",
+            "[]",
+            '{"damage":true}',
+            '{"damage":"1"}',
+            '{"damage":1,"damage":2}',
+        )
+        for index, bad_value in enumerate(bad_values):
+            operation_id = f"{adapter}:json:refine:{index}"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE equipment_instances SET affixes_json='{}' WHERE item_key='item.weapon.wood_sword' "
+                    "AND player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                    (adapter, user),
+                )
+                connection.execute(
+                    "UPDATE equipment_instances SET affixes_json=? WHERE item_key='item.weapon.wood_sword' "
+                    "AND player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                    (bad_value, adapter, user),
+                )
+            before = state()
+            refused = await runtime.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-json-refuse-{index}", adapter=adapter, operation_id=operation_id),
+                "重铸法器 木纹剑",
+            )
+            assert refused.code == "PERSISTENCE_ERROR", refused
+            assert state() == before
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE equipment_instances SET affixes_json='{}' WHERE item_key='item.weapon.wood_sword' "
+                    "AND player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                    (adapter, user),
+                )
+            retried = await runtime.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-json-retry-{index}", adapter=adapter, operation_id=operation_id),
+                "重铸法器 木纹剑",
+            )
+            assert retried.code == "EQUIPMENT_REFINED", retried
+
+        operation_id = f"{adapter}:json:ledger"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE equipment_instances SET affixes_json='{}' WHERE item_key='item.weapon.wood_sword' "
+                "AND player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                (adapter, user),
+            )
+        settled = await runtime.adapters.dispatch(
+            adapter,
+            _context(user, f"{adapter}-json-ledger", adapter=adapter, operation_id=operation_id),
+            "重铸法器 木纹剑",
+        )
+        assert settled.code == "EQUIPMENT_REFINED", settled
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            original = connection.execute(
+                "SELECT result_json FROM operations WHERE operation_id=?", (operation_id,)
+            ).fetchone()[0]
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id=?",
+                (original[:-1] + ',"success":false}', operation_id),
+            )
+        before_replay = state()
+        malformed = await runtime.adapters.dispatch(
+            adapter,
+            _context(user, f"{adapter}-json-ledger-bad", adapter=adapter, operation_id=operation_id),
+            "重铸法器 木纹剑",
+        )
+        assert malformed.code == "PERSISTENCE_ERROR", malformed
+        assert state() == before_replay
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute("UPDATE operations SET result_json=? WHERE operation_id=?", (original, operation_id))
+        replay = await runtime.adapters.dispatch(
+            adapter,
+            _context(user, f"{adapter}-json-ledger-retry", adapter=adapter, operation_id=operation_id),
+            "重铸法器 木纹剑",
+        )
+        assert replay.code == "EQUIPMENT_REFINED", replay
+        assert replay.data["idempotent_replay"] is True
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ("qq.official", "onebot.v11"))
+def test_equipment_refinement_failure_rolls_back_and_concurrent_runtime_settles_once(tmp_path: Path, adapter: str) -> None:
+    async def run() -> None:
+        data_dir = tmp_path / "data"
+        shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+        first = create_runtime(data_dir=data_dir, adapters=(adapter,))
+        user = f"growth-concurrent-{adapter}"
+        await _enter_cultivator_with_adapter(first, adapter, user)
+        _set_equipment_resources(first, user, adapter=adapter, ironstone=100, stones=10_000, sword=1)
+        tempered = await first.adapters.dispatch(
+            adapter,
+            _context(user, f"{adapter}-concurrent-temper", adapter=adapter, operation_id=f"{adapter}:concurrent:temper"),
+            "强化法器 木纹剑",
+        )
+        assert tempered.ok, tempered
+        operation_id = f"{adapter}:concurrent:refine"
+        with sqlite3.connect(first.settings.database_path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_equipment_refinement AFTER INSERT ON equipment_refinement_events "
+                f"WHEN NEW.operation_id='{operation_id}' BEGIN SELECT RAISE(ABORT, 'refinement failure'); END"
+            )
+        before = _equipment_state(first, user, adapter=adapter)
+        failed = await first.adapters.dispatch(
+            adapter,
+            _context(user, f"{adapter}-concurrent-fail", adapter=adapter, operation_id=operation_id),
+            "重铸法器 木纹剑",
+        )
+        assert failed.code == "PERSISTENCE_ERROR", failed
+        assert _equipment_state(first, user, adapter=adapter) == before
+        with sqlite3.connect(first.settings.database_path) as connection:
+            connection.execute("DROP TRIGGER fail_equipment_refinement")
+
+        second = create_runtime(data_dir=data_dir, adapters=(adapter,))
+        results = await asyncio.gather(
+            first.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-concurrent-one", adapter=adapter, operation_id=operation_id),
+                "重铸法器 木纹剑",
+            ),
+            second.adapters.dispatch(
+                adapter,
+                _context(user, f"{adapter}-concurrent-two", adapter=adapter, operation_id=operation_id),
+                "重铸法器 木纹剑",
+            ),
+        )
+        assert all(result.code == "EQUIPMENT_REFINED" for result in results), results
+        assert sum(result.data["idempotent_replay"] for result in results) == 1
+        with sqlite3.connect(first.settings.database_path) as connection:
+            assert connection.execute(
+                "SELECT COUNT(*) FROM equipment_refinement_events WHERE operation_id=?", (operation_id,)
+            ).fetchone()[0] == 1
+        await first.close()
+        await second.close()
+
+    asyncio.run(run())
 
 
 async def _enter_cultivator_with_adapter(runtime, adapter: str, user_id: str) -> None:
