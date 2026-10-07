@@ -488,3 +488,176 @@ def test_commission_invalid_snapshot_rolls_back_and_retries_same_operation(
         await recovered.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_commission_rejects_duplicate_snapshot_keys_before_asset_settlement(
+    tmp_path: Path, adapter: str,
+) -> None:
+    async def run() -> None:
+        data_dir = _content(tmp_path)
+        runtime = create_runtime(data_dir=data_dir)
+        base = CommandContext(adapter=adapter, user_id="duplicate-commission-json")
+
+        async def send(operation: str, text: str):
+            return await runtime.adapters.dispatch(
+                adapter, replace(base, operation_id=operation), text
+            )
+
+        assert (await send("create", "开始修仙")).ok
+        assert (await send("seek", "寻仙问道")).ok
+        accepted = await send("accept", "接取委托 止血草供应")
+        assert accepted.ok
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            player_id, before_stones, before_inventory, snapshot = connection.execute(
+                "SELECT p.id, p.spirit_stones, p.inventory_json, c.snapshot_json "
+                "FROM players p JOIN town_commission_claims c ON c.player_id=p.id "
+                "WHERE p.platform=? AND p.platform_user_id=? ORDER BY c.id DESC LIMIT 1",
+                (adapter, base.user_id),
+            ).fetchone()
+            operation_result = connection.execute(
+                "SELECT result_json FROM operations WHERE operation_id='accept'"
+            ).fetchone()[0]
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id='accept'",
+                (operation_result[:-1] + ',"reward_stones":999}',),
+            )
+
+        refused_operation = await send("accept", "接取委托 止血草供应")
+        assert refused_operation.code == "PERSISTENCE_ERROR"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            assert connection.execute(
+                "SELECT spirit_stones, inventory_json FROM players WHERE id=?", (player_id,)
+            ).fetchone() == (before_stones, before_inventory)
+            connection.execute(
+                "UPDATE operations SET result_json=? WHERE operation_id='accept'",
+                (operation_result,),
+            )
+        replayed_accept = await send("accept", "接取委托 止血草供应")
+        assert replayed_accept.data["idempotent_replay"] is True
+
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE town_commission_claims SET snapshot_json=? WHERE claim_id=?",
+                (snapshot[:-1] + ',"reward_stones":999}', accepted.data["claim_id"]),
+            )
+            before_delivery = connection.execute(
+                "SELECT players.spirit_stones, players.inventory_json, town_commission_claims.status FROM players "
+                "JOIN town_commission_claims ON town_commission_claims.player_id=players.id "
+                "WHERE players.id=? AND town_commission_claims.claim_id=?",
+                (player_id, accepted.data["claim_id"]),
+            ).fetchone()
+
+        refused_delivery = await send("deliver-duplicate", "交付委托 止血草供应")
+        assert refused_delivery.code == "PERSISTENCE_ERROR"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            assert connection.execute(
+                "SELECT p.spirit_stones, p.inventory_json, c.status "
+                "FROM players p JOIN town_commission_claims c ON c.player_id=p.id "
+                "WHERE p.id=? AND c.claim_id=?",
+                (player_id, accepted.data["claim_id"]),
+            ).fetchone() == before_delivery
+            assert connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE operation_id='deliver-duplicate'"
+            ).fetchone()[0] == 0
+            connection.execute(
+                "UPDATE town_commission_claims SET snapshot_json=? WHERE claim_id=?",
+                (snapshot, accepted.data["claim_id"]),
+            )
+
+        delivered = await send("deliver-duplicate", "交付委托 止血草供应")
+        assert delivered.code == "COMMISSION_DELIVERED"
+        assert delivered.data["reward_stones"] == 18
+        await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("variant", [
+    "reward_string",
+    "reward_bool",
+    "reward_negative",
+    "input_string",
+    "input_bool",
+    "input_zero",
+    "missing_inputs",
+    "missing_reward",
+    "local_reputation_maximum_zero",
+    "unknown_field",
+])
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_commission_rejects_invalid_snapshot_fields_before_asset_settlement(
+    tmp_path: Path, variant: str, adapter: str,
+) -> None:
+    async def run() -> None:
+        data_dir = _content(tmp_path)
+        runtime = create_runtime(data_dir=data_dir)
+        base = CommandContext(adapter=adapter, user_id=f"invalid-commission-{variant}")
+
+        async def send(operation: str, text: str):
+            return await runtime.adapters.dispatch(
+                adapter, replace(base, operation_id=operation), text
+            )
+
+        assert (await send("create", "开始修仙")).ok
+        assert (await send("seek", "寻仙问道")).ok
+        accepted = await send("accept", "接取委托 止血草供应")
+        assert accepted.ok
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            player_id, before_stones, before_inventory, snapshot_json = connection.execute(
+                "SELECT p.id, p.spirit_stones, p.inventory_json, c.snapshot_json "
+                "FROM players p JOIN town_commission_claims c ON c.player_id=p.id "
+                "WHERE p.platform=? AND p.platform_user_id=? ORDER BY c.id DESC LIMIT 1",
+                (adapter, base.user_id),
+            ).fetchone()
+        snapshot = json.loads(snapshot_json)
+        if variant == "reward_string":
+            snapshot["reward_stones"] = "999"
+        elif variant == "reward_bool":
+            snapshot["reward_stones"] = True
+        elif variant == "reward_negative":
+            snapshot["reward_stones"] = -1
+        elif variant == "input_string":
+            snapshot["inputs"]["item.herb.blood_grass"] = "3"
+        elif variant == "input_bool":
+            snapshot["inputs"]["item.herb.blood_grass"] = True
+        elif variant == "input_zero":
+            snapshot["inputs"]["item.herb.blood_grass"] = 0
+        elif variant == "missing_inputs":
+            del snapshot["inputs"]
+        elif variant == "missing_reward":
+            del snapshot["reward_stones"]
+        elif variant == "local_reputation_maximum_zero":
+            snapshot["local_reputation_maximum"] = 0
+        else:
+            snapshot["unexpected"] = 1
+        operation = f"deliver-invalid-{variant}"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE town_commission_claims SET snapshot_json=? WHERE claim_id=?",
+                (json.dumps(snapshot, ensure_ascii=False, sort_keys=True), accepted.data["claim_id"]),
+            )
+
+        refused = await send(operation, "交付委托 止血草供应")
+        assert refused.code == "PERSISTENCE_ERROR"
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            assert connection.execute(
+                "SELECT p.spirit_stones, p.inventory_json, c.status "
+                "FROM players p JOIN town_commission_claims c ON c.player_id=p.id "
+                "WHERE p.id=? AND c.claim_id=?",
+                (player_id, accepted.data["claim_id"]),
+            ).fetchone() == (before_stones, before_inventory, "accepted")
+            assert connection.execute(
+                "SELECT COUNT(*) FROM operations WHERE operation_id=?", (operation,)
+            ).fetchone()[0] == 0
+            connection.execute(
+                "UPDATE town_commission_claims SET snapshot_json=? WHERE claim_id=?",
+                (snapshot_json, accepted.data["claim_id"]),
+            )
+
+        delivered = await send(operation, "交付委托 止血草供应")
+        assert delivered.code == "COMMISSION_DELIVERED"
+        assert delivered.data["reward_stones"] == 18
+        await runtime.close()
+
+    asyncio.run(run())

@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_assets_missing
+from ..utils.json_cache import decode_json_strict
 from ..utils.player import change_player_state_actual, player_integer, player_reputation_state
 from ..content import bundled_content
 from ..rewards.rules import local_reputation_maximum
@@ -560,6 +561,7 @@ class CommissionRepositoryMixin:
         snapshot["commission_references"] = [definition.key, definition.label, *definition.aliases]
         snapshot["accepted_at"] = now_text
         snapshot["expires_at"] = str(offer["expires_at"])
+        CommissionRepositoryMixin._validated_snapshot(snapshot, claim=True)
         return snapshot
 
     @staticmethod
@@ -586,12 +588,92 @@ class CommissionRepositoryMixin:
     @staticmethod
     def _snapshot_object(value: Any) -> dict[str, Any]:
         try:
-            decoded = json.loads(value) if isinstance(value, str) else value
-        except (TypeError, json.JSONDecodeError) as exc:
+            decoded = decode_json_strict(value) if isinstance(value, str) else value
+        except (TypeError, ValueError) as exc:
             raise ValueError("commission snapshot is invalid JSON") from exc
         if not isinstance(decoded, dict):
             raise ValueError("commission snapshot must be an object")
-        return dict(decoded)
+        snapshot = dict(decoded)
+        return CommissionRepositoryMixin._validated_snapshot(
+            snapshot,
+            claim={"accepted_at", "expires_at"}.issubset(snapshot),
+        )
+
+    @staticmethod
+    def _validated_snapshot(snapshot: dict[str, Any], *, claim: bool = False) -> dict[str, Any]:
+        """Validate a persisted commission snapshot before exposing or settling it."""
+
+        base_fields = {
+            "commission_key",
+            "commission_references",
+            "label",
+            "inputs",
+            "input_labels",
+            "reward_stones",
+            "local_reputation",
+            "local_reputation_key",
+            "local_reputation_maximum",
+            "service_reputation",
+        }
+        required = base_fields | ({"accepted_at", "expires_at"} if claim else set())
+        if set(snapshot) != required:
+            raise ValueError("commission snapshot fields are incomplete")
+        for key in ("commission_key", "label", "local_reputation_key"):
+            if not isinstance(snapshot[key], str) or not snapshot[key].strip():
+                raise ValueError("commission snapshot identity is invalid")
+        references = snapshot["commission_references"]
+        if (
+            not isinstance(references, list)
+            or not references
+            or any(not isinstance(value, str) or not value.strip() for value in references)
+            or snapshot["commission_key"] not in references
+            or snapshot["label"] not in references
+        ):
+            raise ValueError("commission snapshot references are invalid")
+        inputs = snapshot["inputs"]
+        if (
+            not isinstance(inputs, dict)
+            or not inputs
+            or any(
+                not isinstance(key, str)
+                or not key.startswith("item.")
+                or isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+                for key, value in inputs.items()
+            )
+        ):
+            raise ValueError("commission snapshot inputs are invalid")
+        input_labels = snapshot["input_labels"]
+        if (
+            not isinstance(input_labels, dict)
+            or set(input_labels) != set(inputs)
+            or any(
+                not isinstance(key, str)
+                or not isinstance(value, str)
+                or not value.strip()
+                for key, value in input_labels.items()
+            )
+        ):
+            raise ValueError("commission snapshot input labels are invalid")
+        for key, minimum in (
+            ("reward_stones", 0),
+            ("local_reputation", 0),
+            ("service_reputation", 0),
+            ("local_reputation_maximum", 1),
+        ):
+            value = snapshot[key]
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                raise ValueError("commission snapshot numeric value is invalid")
+        if not snapshot["local_reputation_key"].startswith("local."):
+            raise ValueError("commission snapshot reputation key is invalid")
+        if claim:
+            for key in ("accepted_at", "expires_at"):
+                try:
+                    datetime.fromisoformat(snapshot[key])
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("commission snapshot timestamp is invalid") from exc
+        return snapshot
 
     def _payload(
         self,
@@ -688,8 +770,8 @@ class CommissionRepositoryMixin:
         ):
             raise OperationConflictError("operation input differs from its original request")
         try:
-            payload = json.loads(row["result_json"])
-        except (TypeError, json.JSONDecodeError) as exc:
+            payload = decode_json_strict(str(row["result_json"]))
+        except (TypeError, ValueError) as exc:
             raise ValueError("commission operation snapshot is invalid") from exc
         if not isinstance(payload, dict):
             raise ValueError("commission operation snapshot must be an object")
@@ -882,8 +964,8 @@ class CommissionRepositoryMixin:
         if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
             raise OperationConflictError("operation input differs from its original request")
         try:
-            payload = json.loads(existing["result_json"])
-        except (TypeError, json.JSONDecodeError) as exc:
+            payload = decode_json_strict(str(existing["result_json"]))
+        except (TypeError, ValueError) as exc:
             raise ValueError("commission operation result is invalid") from exc
         if not isinstance(payload, dict):
             raise ValueError("commission operation result must be an object")
