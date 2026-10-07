@@ -27,12 +27,12 @@ from .sect_rules import (
 )
 from .party_rules import PARTY_CONFIRMATION_TTL_SECONDS, PARTY_MAX_MEMBERS, PARTY_TYPE_EXPLORATION_PAIR, PARTY_TYPE_STANDARD_PVE
 from .mentor_rules import (
-    MENTOR_APPRENTICE_LOCAL_REPUTATION,
-    MENTOR_CONTRIBUTION,
     MENTOR_INVITATION_TTL_SECONDS,
     MENTOR_MASTER_MIN_LAYER,
     MENTOR_MAX_APPRENTICES,
-    MENTOR_SERVICE_REPUTATION,
+    MentorGraduationDefinition,
+    mentor_graduation_definition,
+    mentor_graduation_from_snapshot,
 )
 
 __all__ = [
@@ -71,10 +71,10 @@ __all__ = [
     "SECT_WAR_MIN_LEVEL",
     "SECT_WAR_REGISTRATION_FEE",
     "SECT_WAR_SECT_REWARD",
-    "MENTOR_APPRENTICE_LOCAL_REPUTATION",
-    "MENTOR_CONTRIBUTION",
     "MENTOR_INVITATION_TTL_SECONDS",
     "MENTOR_MASTER_MIN_LAYER",
     "MENTOR_MAX_APPRENTICES",
-    "MENTOR_SERVICE_REPUTATION",
+    "MentorGraduationDefinition",
+    "mentor_graduation_definition",
+    "mentor_graduation_from_snapshot",
 ]

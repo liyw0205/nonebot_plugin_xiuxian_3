@@ -28,6 +28,7 @@ data/
   奖励/奖励.json
   道历/行卷.json
   经济/拍卖.json
+  社交/玩家互动.json
   生活/生活.json
   灵兽/灵兽.json
   装备/{法器,防具,饰品,成长,词条,工具}.json
@@ -185,6 +186,7 @@ data/
 | `奖励/奖励.json` | 首次寻仙、入道、战斗、探索、任务奖励池；金丹突破成功后的青石镇地方名望嘉奖 | 各域 v0.1 内容文件；突破嘉奖由 `reward.breakthrough.golden_core` 引用 |
 | `生活/生活.json` | 居所、作物、城镇委托、运输和服务 | `gameplay/livelihood/content-v0.1.md` |
 | `经济/拍卖.json` | `auction.weekly`限量拍卖的在售槽、时限、数量、起价和加价规则；发布时冻结，后续按快照竞价与交割 | `gameplay/economy/workflow.md`、`content-data-contract.md` |
+| `社交/玩家互动.json` | 只读切磋、道侣与`social.mentor_graduation`出师门槛/奖励；出师成功时冻结规则与实得，邀请准入/名额/期限尚未内容化 | `gameplay/social/player-interactions.md`、`content-data-contract.md` |
 | `灵兽/灵兽.json` | 灵兽、灵骑及其装备定义 | `gameplay/companions/content-v0.1.md` |
 
 `skill.*`、`enemy.*`、`recipe.*`、`quest.*` 和 `event.*` 是内容键；战斗、生产、

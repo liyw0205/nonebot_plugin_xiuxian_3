@@ -29,6 +29,13 @@
 毕业时间、毕业 operation 和师傅贡献快照；毕业奖励通过同一事务写入 `player_reputations`，
 不会修改修为、突破材料或突破概率。
 
+毕业 operation 另存本次 `social.mentor_graduation` 的九项业务规则：`key`、`required_realm`、
+`required_rank`、`required_layer`、`local_reputation_key`、`local_reputation_maximum`、
+`apprentice_local_reputation`、`master_contribution`、`service_reputation`。境界序位来自当前境界记录，
+名望上限来自对应开放地点，不另维护排名表或上限表。序位、层数与奖励为非负整数，上限为正整数；
+快照严格拒绝缺字段、额外字段、布尔值和字符串数值，不能由现行内容补齐。结算结果记录实际所得而非名义奖励。
+规则在毕业事务中冻结，不承诺邀请时冻结出师条件，也不为此修改关系表结构。
+
 `Party`：队伍类型、队长、成员序列、地点、准备状态、当前会话、掉线时间和分配规则；当前类型为
 `party.exploration_pair`（最多 2 人）、`party.arena_trio`（最多 3 人）、`party.standard_pve`（4–5 人普通副本）、
 `party.boundary_realm`、`party.demon_realm`、`party.beast_realm`（2–5 人跨界副本队伍）及 `party.secret_realm_boundary`

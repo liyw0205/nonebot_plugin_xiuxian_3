@@ -13,6 +13,18 @@
         }
     },
     {
+      "key": "social.mentor_graduation",
+      "name": "师门出师",
+      "desc": "徒弟修有所成，又经生产或经营历练，由师傅见证出师，师徒各获声望。",
+      "status": "active",
+      "required_realm": "qi_gathering",
+      "required_layer": 3,
+      "local_reputation_key": "local.xuantian.new_town",
+      "apprentice_local_reputation": 10,
+      "master_contribution": 20,
+      "service_reputation": 2
+    },
+    {
       "key": "social.partner",
       "name": "道侣关系",
       "desc": "双方结下道侣缘契，只记录关系，不共享修为、资产或战斗加成。",

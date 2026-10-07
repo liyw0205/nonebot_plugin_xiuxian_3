@@ -17,6 +17,79 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 
 ## 1. 范围分层
 
+### 已闭合切片：师徒出师资格与幂等结算
+
+开工证据：当前HEAD由QQ/OneBot真实邀请、接受及成功疗伤丹生产后，同一徒弟仅将境界由聚气L3提升到
+筑基L1或金丹L1，毕业即返回`MENTOR_GRADUATION_NOT_READY`；这是把最低境界误写为精确境界。
+另经真实毕业复现：重复JSON键、错误关系号、非毕业状态、缺毕业时间及错账本归属仍被回放为毕业成功。
+问题只影响资格与回复，未证明重复发奖；不得将其夸大为丢失或增发资产。
+
+范围为公开`师徒毕业`的资格、现行出师参数、双方实得、宗门贡献及历史恢复。新增
+`social.mentor_graduation`记录现有聚气L3下界、青石镇名望10、师傅贡献20及双方信誉2，不改变数值；
+新毕业在当前规则下核验并于成功operation冻结本次规则、地点上限与实际结果，已提交请求先回放。
+邀请和接受没有毕业参数承诺快照，本条不改变为邀请时冻结；邀请期限/人数/准入内容化、关系查询和解除
+另待独立切片，不借修正毕业重做其状态机。按现行合同，“完成生产”不擅自改成“仅成功生产”。
+
+| 候选 | 入口、复用与缺口 | 本轮选择 |
+|:--|:--|:--|
+| 师徒出师 | 双适配器公开关系与真实生产复现；沿用mentor_relations、统一应用及共享角色状态/operation工具 | 选中；社交前次道侣已闭合，当前为不同且可复现的毕业正确性缺口，不改道侣/宗门生命周期 |
+| 经济拍卖 | 上轮148项拍卖及相邻验收已闭合 | 冷却，不重复开发 |
+| 功法/灵具来源、分享、后续副本 | 仍无指定来源/配方、授权和副本合同 | 不臆造入口、概率或奖励 |
+| 跨服/Web/支付 | 身份隔离、写权限和审计前置未齐 | 保持锁定 |
+
+最近十条玩法切片：`11e839e`经济，`628c494`社交，`5388b03`属性/战斗及相关开局仓储，`de527ce`生活/utils，
+`0b1d92e`道历/persistence/utils（八相邻域仅删导入），`cf72c83`道源quests/progression，`4ab072f`灵兽，
+`da1a8df`世界移动，`dbcfb4a`道历/冒险/活动/utils，`70963ed`生产，均有QQ/OneBot验收。子插件计数：
+utils/adventures/progression各三次，advancement/exploration/player/world/routine/production各两次，
+其余各一次；最近五条重复为utils与属性提交/纯导入触及的advancement/adventures/exploration/player/
+production/progression。重复子插件继续冷却；social本窗口一次，本轮仅修已复现出师缺口。
+
+文件所有权：主线独占`social/mentor_repository.py`、`mentor_use_cases.py`、必要模型调整、旧
+`test/test_mentor.py`及状态/计划/内容合同/数据盘点；`wayfaring_contract_candidate`独占
+`mentor_rules.py`、必要的`social/__init__.py`导出、`data/社交/玩家互动.json`、新`test/test_mentor_rules.py`、内容总表和社交五份当前合同；
+`gather_transaction_reuse`独占新`test/test_mentor_graduation.py`，负责真实生产后的双适配器毕业、境界与
+内容变更；`source_contract_candidate`独占新`test/test_mentor_graduation_recovery.py`，负责坏账本/权限、
+并发、名望/贡献/operation故障与原请求恢复。三路从预审即并行，文件不交叉编辑，主线统一复验。
+
+验收要求：聚气L3及以上开放境界均可毕业，以下或非法境界/层数拒绝；入道和本人已完成生产/服务仍为
+必要条件；坏内容、JSON、归属和状态整笔拒绝；地方名望封顶实得、双方信誉和师傅贡献只结算一次。
+复用共享资产/数值/JSON/operation，不加版本分支，不改战斗或只读切磋/训练傀儡。聚焦测试、源码及测试
+compileall、全量内容JSON严格校验与diff检查后提交推送；不运行完整成长或飞升长链。
+
+实现记录：新出师读取现行规则与开放境界序位、合法层数，不再精确匹配聚气，也不把浮点层数截成整数。
+名望上限引用地点，双方名望/信誉经`change_player_state_actual`取得实得；师承、宗门贡献及来源事件与
+operation同事务提交，零贡献不写贡献事件。四个师徒动作移除私有账本实现，复用公共严格JSON与
+`operation_replay`、`record_operation`，不新增通用规则表或兼容包装。
+
+历史结果校验字段、严格整数、时区、动作状态、关系号、账本归属和双方稳定身份；毕业另校验冻结规则与
+奖励边界。原请求不重读现行毕业内容、不重算奖励；终局只写锁不阻止历史回放，新请求仍拒绝，封禁角色
+仍不可访问。玩家回复使用“出师”和中文师承状态，固定短句留代码，不把`active/graduated`显示给玩家。
+
+三路交付后，规则代理只读终审发现浮点层数截断及终局写锁阻挡历史回放，主线修复并补入双适配器测试；
+恢复代理补齐零奖励、名望/信誉封顶、坏账本、事务末段故障及跨runtime并发。适配器专项使用真实邀请、
+接受和疗伤丹生产，境界、封顶名望及师傅建宗资金是明确夹具，不伪造已完成来源，也不声称完整成长验收。
+
+最终验收：师徒规则128项、双适配器路径4项、恢复/并发12项及原师徒13项，共157项；公共社交、道源来源、
+工具、内容、适配器、正式PvP/PvE、只读观战和工程门槛156项，共313项不重复测试通过。师徒组合首次155项
+通过，新增零奖励两项因测试runtime没有独立内容包失败；改为显式bundled_content夹具后两项复验通过，
+并覆盖移除现行规则后的原请求回放，不重复启动已通过的长组。最终文档复验不重复累加测试数。
+
+```bash
+/root/myenv/bin/python -m pytest -q --tb=short test/test_mentor_rules.py test/test_mentor_graduation.py test/test_mentor_graduation_recovery.py test/test_mentor.py
+/root/myenv/bin/python -m pytest -q test/test_mentor_graduation_recovery.py -k zero_rewards
+/root/myenv/bin/python -m pytest -q --tb=short test/test_social.py test/test_social_recovery.py test/test_partner.py test/test_dao_origin_task_content.py test/test_utils.py test/test_content.py test/test_adapter_normalization.py test/test_combat.py test/test_arena.py test/test_spar_interactions.py test/test_documentation.py test/test_repository_boundaries.py test/test_runtime_versionless.py
+/root/myenv/bin/python -m pytest -q test/test_documentation.py
+/root/myenv/bin/python -m compileall -q nonebot_plugin_xiuxian_3 test
+git diff --check
+```
+
+48份内容JSON另经重复键与非有限数值严格校验通过；源码和测试compileall、diff检查通过。未跑整仓全量
+或飞升长链，公共战斗回归不等同于完整成长验收。本条闭合后社交冷却，当前没有另开切片。
+
+本条不改schema或用户数据库。旧开发毕业operation缺少必需规则快照会明确拒绝，不自动补字段或清库；
+回退须配对代码、内容与事前数据库备份。邀请准入/期限/名额内容化、师徒查询/解除仍留作独立缺口，
+不预选同域继续整理。朝阳功法/灵具来源、分享、后续副本、跨服/Web仍待合同或前置，不臆造玩法。
+
 ### 已闭合切片：限量拍卖的内容快照与结算恢复
 
 开工证据：QQ/OneBot真实发布云铁并竞价后，物品改名/关闭、重建runtime，原发布operation均被

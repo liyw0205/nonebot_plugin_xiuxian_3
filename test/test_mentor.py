@@ -14,7 +14,6 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.social.mentor_repository import MentorRepositoryMixin
 from nonebot_plugin_xiuxian_3.xiuxian.utils.player import player_integer
 
 
@@ -326,9 +325,8 @@ def test_mentor_graduation_uses_shared_reputation_transaction_and_recovers(adapt
                         ('{"local.xuantian.new_town": 995}', apprentice_id),
                     )
                 before_failure = _mentor_graduation_state(runtime, adapter, master, apprentice, relation_id, operation_id)
-                with patch.object(
-                    MentorRepositoryMixin,
-                    "_mentor_record_operation",
+                with patch(
+                    "nonebot_plugin_xiuxian_3.xiuxian.social.mentor_repository.record_operation",
                     side_effect=RuntimeError("injected failure after reputation writes"),
                 ):
                     failed = await runtime.adapters.dispatch(

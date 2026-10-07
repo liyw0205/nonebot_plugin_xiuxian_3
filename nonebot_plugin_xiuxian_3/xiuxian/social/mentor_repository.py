@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import json
+from dataclasses import fields
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..rewards.rules import local_reputation_maximum
-from ..utils.player import change_player_state, player_integer, player_reputation_state
+from ..utils.operations import operation_replay, record_operation
+from ..utils.player import change_player_state_actual, player_integer
 from ..persistence.errors import (
     MentorGraduationNotReadyError,
     MentorInvitationExpiredError,
@@ -19,20 +19,18 @@ from ..persistence.errors import (
     MentorRelationConflictError,
     MentorRequirementError,
     MentorStateConflictError,
-    OperationConflictError,
     PlayerNotFoundError,
     PlayerSuspendedError,
 )
 from .mentor_models import MentorRelationRecord
 from .mentor_rules import (
-    MENTOR_APPRENTICE_LOCAL_REPUTATION,
-    MENTOR_CONTRIBUTION,
     MENTOR_INVITATION_TTL_SECONDS,
     MENTOR_MAX_APPRENTICES,
-    MENTOR_SERVICE_REPUTATION,
     is_apprentice_eligible,
     is_graduation_ready,
     is_master_eligible,
+    mentor_graduation_definition,
+    mentor_graduation_from_snapshot,
 )
 
 
@@ -133,10 +131,16 @@ class MentorRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._mentor_operation(connection, operation_id, operation_name, request_hash)
+            master = self._require_player(connection, platform, platform_user_id, writable=False)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash, player_id=int(master["id"]))
             if existing is not None:
-                return self._mentor_record_from_payload(existing, replay=True)
-            master = self._require_player(connection, platform, platform_user_id)
+                return self._mentor_record_from_payload(
+                    connection, existing, operation_name=operation_name, replay=True,
+                    expected_fields={"master_player_id": master["player_id"],
+                                     "master_platform_user_id": platform_user_id,
+                                     "apprentice_platform_user_id": target_user_id},
+                )
+            self._require_player(connection, platform, platform_user_id)
             self._mentor_expire_due(connection, now_text)
             if not is_master_eligible(str(master["realm_key"]), player_integer(master, "realm_layer")):
                 raise MentorRequirementError("master does not meet foundation L4 requirement")
@@ -197,8 +201,8 @@ class MentorRepositoryMixin:
                 ),
             )
             payload = self._mentor_payload(connection, relation_id)
-            self._mentor_record_operation(connection, operation_id, operation_name, int(master["id"]), request_hash, payload, now_text)
-            return self._mentor_record_from_payload(payload)
+            record_operation(connection, operation_id, operation_name, int(master["id"]), request_hash, payload, now_text)
+            return self._mentor_record_from_payload(connection, payload, operation_name=operation_name)
 
     def _mentor_accept_once(
         self,
@@ -217,10 +221,15 @@ class MentorRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._mentor_operation(connection, operation_id, operation_name, request_hash)
+            apprentice = self._require_player(connection, platform, platform_user_id, writable=False)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash, player_id=int(apprentice["id"]))
             if existing is not None:
-                return self._mentor_record_from_payload(existing, replay=True)
-            apprentice = self._require_player(connection, platform, platform_user_id)
+                return self._mentor_record_from_payload(
+                    connection, existing, operation_name=operation_name, replay=True,
+                    expected_fields={"relation_id": relation_id, "apprentice_player_id": apprentice["player_id"],
+                                     "apprentice_platform_user_id": platform_user_id},
+                )
+            self._require_player(connection, platform, platform_user_id)
             self._mentor_expire_due(connection, now_text)
             relation = connection.execute(
                 "SELECT * FROM mentor_relations WHERE relation_id = ? AND apprentice_id = ?",
@@ -257,8 +266,8 @@ class MentorRepositoryMixin:
                 (now_text, now_text, relation["id"]),
             )
             payload = self._mentor_payload(connection, relation_id)
-            self._mentor_record_operation(connection, operation_id, operation_name, int(apprentice["id"]), request_hash, payload, now_text)
-            return self._mentor_record_from_payload(payload)
+            record_operation(connection, operation_id, operation_name, int(apprentice["id"]), request_hash, payload, now_text)
+            return self._mentor_record_from_payload(connection, payload, operation_name=operation_name)
 
     def _mentor_reject_once(
         self,
@@ -277,10 +286,15 @@ class MentorRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._mentor_operation(connection, operation_id, operation_name, request_hash)
+            apprentice = self._require_player(connection, platform, platform_user_id, writable=False)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash, player_id=int(apprentice["id"]))
             if existing is not None:
-                return self._mentor_record_from_payload(existing, replay=True)
-            apprentice = self._require_player(connection, platform, platform_user_id)
+                return self._mentor_record_from_payload(
+                    connection, existing, operation_name=operation_name, replay=True,
+                    expected_fields={"relation_id": relation_id, "apprentice_player_id": apprentice["player_id"],
+                                     "apprentice_platform_user_id": platform_user_id},
+                )
+            self._require_player(connection, platform, platform_user_id)
             self._mentor_expire_due(connection, now_text)
             relation = connection.execute(
                 "SELECT * FROM mentor_relations WHERE relation_id = ? AND apprentice_id = ?",
@@ -302,8 +316,8 @@ class MentorRepositoryMixin:
                 (now_text, now_text, relation["id"]),
             )
             payload = self._mentor_payload(connection, relation_id)
-            self._mentor_record_operation(connection, operation_id, operation_name, int(apprentice["id"]), request_hash, payload, now_text)
-            return self._mentor_record_from_payload(payload)
+            record_operation(connection, operation_id, operation_name, int(apprentice["id"]), request_hash, payload, now_text)
+            return self._mentor_record_from_payload(connection, payload, operation_name=operation_name)
 
     def _mentor_graduate_once(
         self,
@@ -321,10 +335,15 @@ class MentorRepositoryMixin:
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._mentor_operation(connection, operation_id, operation_name, request_hash)
+            master = self._require_player(connection, platform, platform_user_id, writable=False)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash, player_id=int(master["id"]))
             if existing is not None:
-                return self._mentor_record_from_payload(existing, replay=True)
-            master = self._require_player(connection, platform, platform_user_id)
+                return self._mentor_record_from_payload(
+                    connection, existing, operation_name=operation_name, replay=True,
+                    expected_fields={"relation_id": relation_id, "master_player_id": master["player_id"],
+                                     "master_platform_user_id": platform_user_id},
+                )
+            self._require_player(connection, platform, platform_user_id)
             relation = connection.execute(
                 "SELECT * FROM mentor_relations WHERE relation_id = ? AND master_id = ?",
                 (relation_id, master["id"]),
@@ -336,18 +355,15 @@ class MentorRepositoryMixin:
             apprentice = connection.execute("SELECT * FROM players WHERE id = ?", (relation["apprentice_id"],)).fetchone()
             if apprentice is None:
                 raise PlayerNotFoundError("apprentice does not exist")
+            definition = mentor_graduation_definition(self.content)
             if not is_graduation_ready(
-                str(apprentice["stage"]), str(apprentice["realm_key"]), player_integer(apprentice, "realm_layer")
+                str(apprentice["stage"]), str(apprentice["realm_key"]), apprentice["realm_layer"],
+                definition, self.content,
             ):
-                raise MentorGraduationNotReadyError("apprentice has not reached qi gathering L3 after entry")
+                raise MentorGraduationNotReadyError("apprentice has not reached the graduation realm after entry")
             if not self._mentor_has_completed_service(connection, int(apprentice["id"])):
                 raise MentorGraduationNotReadyError("apprentice has not completed production or livelihood service")
-            local_key = "local.xuantian.new_town"
-            apprentice_id = int(apprentice["id"])
-            master_id = int(master["id"])
-            local_maximum = local_reputation_maximum(local_key, self.content)
-            apprentice_reputation_before = player_reputation_state(connection, apprentice_id)
-            master_reputation_before = player_reputation_state(connection, master_id)
+            local_key = definition.local_reputation_key
             connection.execute(
                 """
                 UPDATE mentor_relations
@@ -355,24 +371,22 @@ class MentorRepositoryMixin:
                     master_contribution = master_contribution + ?, updated_at = ?
                 WHERE id = ? AND status = 'active'
                 """,
-                (now_text, operation_id, MENTOR_CONTRIBUTION, now_text, relation["id"]),
+                (now_text, operation_id, definition.master_contribution, now_text, relation["id"]),
             )
-            change_player_state(
+            apprentice_actual = change_player_state_actual(
                 connection,
                 apprentice,
                 updated_at=now_text,
-                local_reputation_delta={local_key: MENTOR_APPRENTICE_LOCAL_REPUTATION},
-                local_reputation_maximums={local_key: local_maximum},
-                service_reputation_delta=MENTOR_SERVICE_REPUTATION,
+                local_reputation_delta={local_key: definition.apprentice_local_reputation},
+                local_reputation_maximums={local_key: definition.local_reputation_maximum},
+                service_reputation_delta=definition.service_reputation,
             )
-            change_player_state(
+            master_actual = change_player_state_actual(
                 connection,
                 master,
                 updated_at=now_text,
-                service_reputation_delta=MENTOR_SERVICE_REPUTATION,
+                service_reputation_delta=definition.service_reputation,
             )
-            apprentice_reputation_after = player_reputation_state(connection, apprentice_id)
-            master_reputation_after = player_reputation_state(connection, master_id)
             # Sect contribution is the existing shared contribution ledger. The
             # relation row remains the source of truth when the mentor is not in a sect.
             sect_member = connection.execute(
@@ -385,29 +399,23 @@ class MentorRepositoryMixin:
                 SET contribution = contribution + ?, last_action_at = ?, updated_at = ?
                 WHERE player_id = ? AND status = 'active'
                 """,
-                (MENTOR_CONTRIBUTION, now_text, now_text, master["id"]),
+                (definition.master_contribution, now_text, now_text, master["id"]),
             )
-            if sect_member is not None:
+            if sect_member is not None and definition.master_contribution:
                 connection.execute(
-                    "INSERT OR IGNORE INTO sect_contribution_events(sect_id, player_id, source_operation_id, quantity, occurred_at) VALUES (?, ?, ?, ?, ?)",
-                    (sect_member["sect_id"], master["id"], operation_id, MENTOR_CONTRIBUTION, now_text),
+                    "INSERT INTO sect_contribution_events(sect_id, player_id, source_operation_id, quantity, occurred_at) VALUES (?, ?, ?, ?, ?)",
+                    (sect_member["sect_id"], master["id"], operation_id, definition.master_contribution, now_text),
                 )
             payload = self._mentor_payload(
                 connection,
                 relation_id,
-                apprentice_local_reputation=(
-                    apprentice_reputation_after.local.get(local_key, 0)
-                    - apprentice_reputation_before.local.get(local_key, 0)
-                ),
-                apprentice_service_reputation_gain=(
-                    apprentice_reputation_after.service - apprentice_reputation_before.service
-                ),
-                master_service_reputation_gain=(
-                    master_reputation_after.service - master_reputation_before.service
-                ),
+                apprentice_local_reputation=apprentice_actual[local_key],
+                apprentice_service_reputation_gain=apprentice_actual["service_reputation"],
+                master_service_reputation_gain=master_actual["service_reputation"],
             )
-            self._mentor_record_operation(connection, operation_id, operation_name, int(master["id"]), request_hash, payload, now_text)
-            return self._mentor_record_from_payload(payload)
+            payload["graduation_rules"] = definition.snapshot()
+            record_operation(connection, operation_id, operation_name, int(master["id"]), request_hash, payload, now_text)
+            return self._mentor_record_from_payload(connection, payload, operation_name=operation_name)
 
     @staticmethod
     def _mentor_has_completed_service(connection: Any, player_id: int) -> bool:
@@ -487,44 +495,73 @@ class MentorRepositoryMixin:
         }
 
     @staticmethod
-    def _mentor_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
-        existing = connection.execute(
-            "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-            (operation_id,),
-        ).fetchone()
-        if existing is None:
-            return None
-        if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-            raise OperationConflictError("operation input differs from its original request")
-        return json.loads(existing["result_json"])
-
-    @staticmethod
-    def _mentor_record_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
-        connection.execute(
-            "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
-
-    @staticmethod
-    def _mentor_record_from_payload(payload: dict[str, Any], *, replay: bool = False) -> MentorRelationRecord:
-        return MentorRelationRecord(
-            relation_id=str(payload["relation_id"]),
-            status=str(payload["status"]),
-            master_player_id=str(payload["master_player_id"]),
-            master_platform_user_id=str(payload["master_platform_user_id"]),
-            master_dao_name=str(payload["master_dao_name"]),
-            apprentice_player_id=str(payload["apprentice_player_id"]),
-            apprentice_platform_user_id=str(payload["apprentice_platform_user_id"]),
-            apprentice_dao_name=str(payload["apprentice_dao_name"]),
-            expires_at=str(payload["expires_at"]),
-            accepted_at=payload.get("accepted_at"),
-            graduated_at=payload.get("graduated_at"),
-            master_contribution=int(payload.get("master_contribution", 0)),
-            apprentice_local_reputation=int(payload["apprentice_local_reputation"]),
-            apprentice_service_reputation_gain=int(payload["apprentice_service_reputation_gain"]),
-            master_service_reputation_gain=int(payload["master_service_reputation_gain"]),
-            already_completed=replay,
-        )
+    def _mentor_record_from_payload(
+        connection: Any, payload: dict[str, Any], *, operation_name: str, replay: bool = False,
+        expected_fields: dict[str, Any] | None = None,
+    ) -> MentorRelationRecord:
+        record_fields = {field.name for field in fields(MentorRelationRecord)} - {"already_completed"}
+        graduating = operation_name == "social.graduate_apprentice"
+        expected = record_fields | ({"graduation_rules"} if graduating else set())
+        if set(payload) != expected:
+            raise ValueError("mentor result fields are incomplete or unsupported")
+        rewards = {"master_contribution", "apprentice_local_reputation",
+                   "apprentice_service_reputation_gain", "master_service_reputation_gain"}
+        for key in record_fields:
+            value = payload[key]
+            if key in rewards:
+                if type(value) is not int or value < 0:
+                    raise ValueError(f"mentor result {key} is invalid")
+            elif key in {"accepted_at", "graduated_at"} and value is None:
+                continue
+            elif not isinstance(value, str) or not value.strip():
+                raise ValueError(f"mentor result {key} is invalid")
+        expected_status = {
+            "social.invite_mentor": "invited", "social.accept_mentor": "active",
+            "social.reject_mentor": "rejected", "social.graduate_apprentice": "graduated",
+        }[operation_name]
+        if payload["status"] != expected_status:
+            raise ValueError("mentor result state differs from its operation")
+        if payload["master_player_id"] == payload["apprentice_player_id"]:
+            raise ValueError("mentor result participants must differ")
+        times = {
+            key: datetime.fromisoformat(payload[key]) if payload[key] is not None else None
+            for key in ("expires_at", "accepted_at", "graduated_at")
+        }
+        if any(value is not None and value.utcoffset() is None for value in times.values()):
+            raise ValueError("mentor result timestamps must have timezones")
+        accepted, graduated = times["accepted_at"], times["graduated_at"]
+        if (accepted is not None) != (expected_status in {"active", "graduated"}):
+            raise ValueError("mentor result acceptance time differs from its state")
+        if (graduated is not None) != graduating:
+            raise ValueError("mentor result graduation time differs from its state")
+        if accepted is not None and accepted >= times["expires_at"]:
+            raise ValueError("mentor result was accepted after its invitation expired")
+        if graduating:
+            if graduated < accepted:
+                raise ValueError("mentor result was graduated before acceptance")
+            definition = mentor_graduation_from_snapshot(payload["graduation_rules"])
+            if (
+                payload["master_contribution"] != definition.master_contribution
+                or payload["apprentice_local_reputation"] > min(definition.apprentice_local_reputation, definition.local_reputation_maximum)
+                or payload["apprentice_service_reputation_gain"] > definition.service_reputation
+                or payload["master_service_reputation_gain"] > definition.service_reputation
+            ):
+                raise ValueError("mentor result reward differs from its rules")
+        elif any(payload[key] for key in rewards):
+            raise ValueError("ungraduated mentor result cannot contain rewards")
+        if expected_fields is not None and any(payload[key] != value for key, value in expected_fields.items()):
+            raise ValueError("mentor result differs from its request")
+        if replay:
+            participants = connection.execute(
+                """SELECT mp.player_id AS master_player_id, mp.platform_user_id AS master_platform_user_id,
+                          ap.player_id AS apprentice_player_id, ap.platform_user_id AS apprentice_platform_user_id
+                   FROM mentor_relations r JOIN players mp ON mp.id=r.master_id
+                   JOIN players ap ON ap.id=r.apprentice_id WHERE r.relation_id=?""",
+                (payload["relation_id"],),
+            ).fetchone()
+            if participants is None or any(payload[key] != participants[key] for key in participants.keys()):
+                raise ValueError("mentor result participants differ from its relation")
+        return MentorRelationRecord(**{key: payload[key] for key in record_fields}, already_completed=replay)
 
 
 __all__ = ["MentorRepositoryMixin"]

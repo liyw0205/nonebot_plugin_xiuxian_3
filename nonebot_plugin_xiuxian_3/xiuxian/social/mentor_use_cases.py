@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentError
 from ..repository import (
     MentorGraduationNotReadyError,
     MentorInvitationExpiredError,
@@ -55,11 +56,12 @@ class MentorApplication:
 
     @staticmethod
     def _summary(record) -> str:
+        status = {"invited": "待应允", "active": "传道授业", "graduated": "已出师", "rejected": "已谢绝", "expired": "邀约已过期"}[record.status]
         return (
             f"- **关系号**：`{record.relation_id}`\n"
             f"- **师傅**：{record.master_dao_name}\n"
             f"- **徒弟**：{record.apprentice_dao_name}\n"
-            f"- **状态**：{record.status}\n"
+            f"- **师承**：{status}\n"
             f"- **邀请截止**：{record.expires_at}"
         )
 
@@ -178,11 +180,13 @@ class MentorApplication:
                 operation_id=operation_id,
             )
         except MentorPermissionDeniedError:
-            return CommandResult(False, "MENTOR_PERMISSION_DENIED", "只有师傅可以为这段关系办理毕业。", context.request_id, operation_id)
+            return CommandResult(False, "MENTOR_PERMISSION_DENIED", "须由师傅准许徒弟出师。", context.request_id, operation_id)
         except MentorGraduationNotReadyError:
-            return CommandResult(False, "MENTOR_GRADUATION_NOT_READY", "徒弟需完成入道、达到聚气 L3，并完成一次生产或常驻经营服务。", context.request_id, operation_id)
+            return CommandResult(False, "MENTOR_GRADUATION_NOT_READY", "徒弟的修行或历练尚未达到出师要求。", context.request_id, operation_id)
         except MentorStateConflictError:
-            return CommandResult(False, "MENTOR_STATE_CONFLICT", "这段师徒关系当前不能毕业。", context.request_id, operation_id)
+            return CommandResult(False, "MENTOR_STATE_CONFLICT", "这段师承眼下不能办理出师。", context.request_id, operation_id)
+        except ContentError:
+            return CommandResult(False, "CONTENT_ERROR", "出师名册暂未备妥，请稍后再来。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "没有找到师徒关系中的角色。", context.request_id, operation_id)
         except PlayerSuspendedError:
@@ -203,7 +207,7 @@ class MentorApplication:
         return CommandResult(
             True,
             "MENTOR_GRADUATED",
-            "## 徒弟已毕业\n\n" + self._summary(record) + "\n\n" + "\n".join(reward_lines),
+            "## 徒弟已出师\n\n" + self._summary(record) + "\n\n" + "\n".join(reward_lines),
             context.request_id,
             operation_id,
             data=self._data(record),
