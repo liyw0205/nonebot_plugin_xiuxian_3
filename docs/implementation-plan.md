@@ -59,12 +59,9 @@ utils/adventures/progression各三次，social/advancement/exploration/player/ro
 最近五条重复为social。routine因此默认冷却，本轮仅因上述已复现结算遗漏例外进入；不是为内容搬迁或重复
 重构行卷。其他未触及候选缺合同，装备恢复另有完整独立边界，不将多个问题一起修。
 
-文件所有权：主线独占`routine/repository.py`、状态/计划/内容合同；`source_contract_candidate`独占新
-`test/test_gacha_codex.py`，负责真实所得/查询、首见来源、内容变化和重启回放；`gather_transaction_reuse`
-独占新`test/test_gacha_codex_recovery.py`，负责JSON、事务故障、冲突及跨runtime并发；
-`wayfaring_contract_candidate`独占道历README/model-workflow和`specials/codex.md`，同步当前合同并只读
-审查主线改动。三名代理从候选核验起并行；装备审计中一次服务并发中断已恢复，不视作已完成的审阅。
-测试文件各自夹具沿用已有测试助手，不交叉编辑，主线统一跑一份聚焦组；不重启飞升长测。
+后续切片可合理使用子代理并行核验候选、适配器入口、事务恢复和文档合同；每个代理应有明确文件边界，
+统一由主线复跑聚焦测试、编译和差异检查后再合并。代理只提供证据和可审阅改动，不改变切片边界，
+不以未完成的长链测试或未闭合的来源合同替代真实验收。
 
 ### 已闭合切片：师徒出师资格与幂等结算
 
