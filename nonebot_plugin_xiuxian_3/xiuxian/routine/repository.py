@@ -170,6 +170,7 @@ from ..utils.assets import inventory_amount, player_currency
 from ..utils.json_cache import decode_json_strict
 from ..utils.operations import operation_replay
 from ..rewards.rules import local_reputation_maximum, reward_pool_map
+from ..specials.codex_projection import record_material_discoveries
 from ..utils.player import (
     change_player_state,
     change_player_state_actual,
@@ -1908,6 +1909,15 @@ class RoutineRepositoryMixin:
                 )
                 for key, quantity in requested_reward.items()
             }
+            record_material_discoveries(
+                connection,
+                player_id=int(row["id"]),
+                operation_id=operation_id,
+                occurred_at=now_text,
+                reward=reward,
+                snapshot={"source": operation_name, "pool_key": definition.key},
+                content=self.content,
+            )
             total_draws = (int(pool["total_draws"]) if pool is not None else 0) + draw_count
             connection.execute(
                 """
