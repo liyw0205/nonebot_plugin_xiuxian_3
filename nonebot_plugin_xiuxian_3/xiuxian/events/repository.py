@@ -138,6 +138,8 @@ class EventsRepositoryMixin:
                 ).fetchone()["total"]
             )
             self._validate_event_snapshot(event, result, definition, total_contribution=total)
+            if int(event["total_contribution"]) != total:
+                raise ValueError("spirit spring total contribution differs from ledger")
             if contribution < definition.minimum_contribution:
                 raise EventContributionInsufficientError("event contribution is insufficient")
             claimed = connection.execute(

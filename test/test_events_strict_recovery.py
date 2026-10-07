@@ -73,7 +73,7 @@ def _player_state(runtime, adapter: str, user_id: str) -> tuple:
 
 
 @pytest.mark.parametrize("kind", ["qq", "onebot"])
-@pytest.mark.parametrize("corruption", ["duplicate", "malformed", "wrong_success"])
+@pytest.mark.parametrize("corruption", ["duplicate", "malformed", "wrong_success", "wrong_total"])
 def test_spirit_spring_round_snapshot_rejects_corruption_and_retries(
     tmp_path: Path, kind: str, corruption: str,
 ) -> None:
@@ -85,21 +85,30 @@ def test_spirit_spring_round_snapshot_rejects_corruption_and_retries(
             try:
                 round_id = await _seed_round(runtime, adapter, context, clock, f"{kind}-{corruption}")
                 with sqlite3.connect(runtime.settings.database_path) as connection:
-                    raw = connection.execute(
-                        "SELECT result_json FROM world_event_rounds WHERE round_id=?", (round_id,)
-                    ).fetchone()[0]
+                    raw, original_total = connection.execute(
+                        "SELECT result_json, total_contribution FROM world_event_rounds WHERE round_id=?",
+                        (round_id,),
+                    ).fetchone()
                     if corruption == "malformed":
                         bad = "{"
                     elif corruption == "duplicate":
                         bad = _append_duplicate(raw, "success", True)
-                    else:
+                    elif corruption == "wrong_success":
                         valid = json.loads(raw)
                         valid["success"] = True
                         bad = json.dumps(valid, ensure_ascii=False, sort_keys=True)
-                    connection.execute(
-                        "UPDATE world_event_rounds SET result_json=? WHERE round_id=?",
-                        (bad, round_id),
-                    )
+                    else:
+                        bad = raw
+                    if corruption == "wrong_total":
+                        connection.execute(
+                            "UPDATE world_event_rounds SET total_contribution=? WHERE round_id=?",
+                            (11, round_id),
+                        )
+                    else:
+                        connection.execute(
+                            "UPDATE world_event_rounds SET result_json=? WHERE round_id=?",
+                            (bad, round_id),
+                        )
                 before = _player_state(runtime, adapter, context.user_id)
                 refused = await runtime.adapters.dispatch(
                     adapter,
@@ -125,10 +134,16 @@ def test_spirit_spring_round_snapshot_rejects_corruption_and_retries(
                         "SELECT COUNT(*) FROM activity_events WHERE source_operation_id=?",
                         (f"{kind}-{corruption}-claim",),
                     ).fetchone()[0] == 0
-                    connection.execute(
-                        "UPDATE world_event_rounds SET result_json=? WHERE round_id=?",
-                        (raw, round_id),
-                    )
+                    if corruption == "wrong_total":
+                        connection.execute(
+                            "UPDATE world_event_rounds SET total_contribution=? WHERE round_id=?",
+                            (original_total, round_id),
+                        )
+                    else:
+                        connection.execute(
+                            "UPDATE world_event_rounds SET result_json=? WHERE round_id=?",
+                            (raw, round_id),
+                        )
                 claimed = await runtime.adapters.dispatch(
                     adapter,
                     replace(context, operation_id=f"{kind}-{corruption}-claim"),

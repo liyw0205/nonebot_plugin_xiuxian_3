@@ -229,6 +229,10 @@ def test_spirit_spring_event_failed_round_threshold_and_expiry_are_atomic() -> N
                     "UPDATE world_event_contributions SET contribution = 10 WHERE round_id = ? AND player_id = ?",
                     (status.data["round_id"], player_id),
                 )
+                connection.execute(
+                    "UPDATE world_event_rounds SET total_contribution = 10 WHERE round_id = ?",
+                    (status.data["round_id"],),
+                )
             claimed = await runtime.dispatch(
                 _context(user, "failed-claim"), f"领取灵泉事件奖励 {status.data['round_id']}"
             )
