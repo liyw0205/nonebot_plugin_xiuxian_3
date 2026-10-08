@@ -30,6 +30,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.utils.assets import (
     inventory_json,
     inventory_missing,
     reserved_inventory_quantity,
+    player_available_item_amount,
     inventory_spend,
     inventory_value,
     inventory_with_delta,
@@ -725,6 +726,9 @@ def test_reserved_inventory_quantity_sums_all_open_trade_locks() -> None:
     assert reserved_inventory_quantity(connection, 7, "item.herb") == 9
     assert reserved_inventory_quantity(connection, 8, "item.herb") == 10
     assert reserved_inventory_quantity(connection, 7, "item.unknown") == 0
+    player = {"id": 7, "spirit_stones": 0, "inventory_json": '{"item.herb":10}'}
+    assert player_available_item_amount(connection, player, "item.herb") == 1
+    assert player_available_item_amount(connection, player, "item.unknown") == 0
     connection.close()
 
 

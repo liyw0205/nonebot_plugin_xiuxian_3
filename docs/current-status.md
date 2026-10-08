@@ -187,6 +187,29 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 
 ### 4.0 当前切片选择账本
 
+**本轮已闭合：派遣成本不得侵占交易预留物。** QQ 官方与 OneBot V11 均可复现：角色持有 2 个木材，先以
+`发布摆摊 item.mat.wood 2 100` 预留，再预览并接受 `dispatch.workshop_help`（成本木材 2）。预览仍显示可接，接受后背包
+归零，但摆摊仍为 `listed` 且锁量为 2，买家购买因此失败。派遣成本合同完整，`specials` 最近十条只触及一次，符合
+正常轮转条件。现由 `utils.assets.player_available_item_amount` 读取总库存扣除所有交易预留后的可用量，结果最低为零。
+
+`_dispatch_preview` 的预览与接受前校验共用此读取；接受仍在同一 `BEGIN IMMEDIATE` 事务里复查并扣费。主线拥有
+`dispatch_repository.py`、`utils/assets.py`、`utils/__init__.py`、`test/test_utils.py` 和文档；`/root/shared_cost_gap`
+独占新增 `test/test_dispatch_reserved_inventory.py`，覆盖 QQ 官方与 OneBot V11、拒绝时资产/订单/锁/operation/assignment
+零写、解锁后原 operation 重试、部分未锁库存足够时保留交易锁，以及 runtime 重建幂等重放。专项与工具测试 77 项、派遣
+内容及交易锁回归 15 项、只读观战/正式战斗回归 8 项、文档测试 2 项通过；`compileall`、全部内容 JSON 严格解析和
+`git diff --check` 通过。不改成本/奖励内容、市场生命周期或其他派遣流程；切磋和训练傀儡保持只读观战，正式 PvP/PvE
+结算不变。
+
+最近十条代码切片为 `7de4df0` player、`e1b5459` player、`afabb94` events、`8775c7b` adventures、`d8a040b` progression、
+`f6dd8e6` world、`a6df3e1` adapters、`f733734` specials、`27f527c` production、`1b74cc3` livelihood；`2360b13` 仅为
+测试提交，不计切片。player 两次且最近五条重复，冷却；specials 一次，不在冷却。
+
+候选比较：师徒本人关系列表缺显示状态/字段和过期邀请投影合同，领域前线的当前快照合同也未闭合，先补合同；
+`item.manual.sunrise_breath` 缺来源合同、`beast.gear.sack_small` 缺配方合同；未开放副本和 Web/跨服写入口仍缺规则或
+权限/恢复前置。以上不臆造内容或入口。
+切磋/训练傀儡零写观战与正式 PvP/PvE 结算已有专项覆盖，不重做。生产恢复、市场库存、道途、活动、悬赏、修炼、
+移动、适配器、虚空塔与服务订单近期问题均已闭合，不重入。
+
 **已闭合切片：道途与辅修内容合同、入道解析和状态展示统一。** `选择道途` 的名称、别名、主动技能、
 入门物品和辅修子记录均由 `data/道途/道途.json` 当前内容驱动；`player/path_rules.py` 统一校验选择器、
 锁定记录、技能/物品引用和辅修奖励，入道回执与 `我的状态` 共用当前内容名称，玩家只保存稳定
@@ -206,21 +229,14 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 源码及新增测试 `compileall`、全量内容 JSON 严格解析和 `git diff --check` 通过。子代理各自只读审计或独占新增测试文件，
 实现与最终集成由主线完成；具体入口、模块、最近十条及候选排除依据见实施计划。
 
-轮转窗口按 `git log -10` 的十条已闭合代码切片计，同一提交可触及多个模块：`player`/道途、`events`/日课、
-`adventures`/悬赏、`progression`/修炼、`world`/普通行程、`adapters`/命令门禁、`specials`/虚空塔、
-`production`/生产账本、`livelihood`/服务订单、`events`/灵泉轮次。只有 `events` 子插件触及两次，默认冷却；
-最近五条子插件互不重复。`utils` 与 `economy` 本窗口均未触及，`production` 一次，不能沿用旧窗口的频次称其冷却；
-道途重入仅因公开操作的幂等恢复缺陷例外。社交过期投影未显示动作、资产或权限绕过；功法 `item.manual.sunrise_breath`
-缺取得来源合同，灵兽 `beast.gear.sack_small` 仍为 `pending_recipe_key`，未开放秘境及 Web/跨服写入口前置不全，均不臆造规则。
+最近十条实际代码切片为 `7de4df0` player、`e1b5459` player、`afabb94` events、`8775c7b` adventures、`d8a040b` progression、
+`f6dd8e6` world、`a6df3e1` adapters、`f733734` specials、`27f527c` production、`1b74cc3` livelihood。`2360b13` 仅加测试，
+不计代码切片。player 两次且最近五条重复；specials 一次。上次审查曾漏掉道途 operation 回放切片，并把已被新窗口挤出的
+`cc66276` 留在表中；本轮已按实际代码边界修正统计。
 
-**当前轮转结果：暂无下一条可开工代码切片。** 最近十条窗口和候选比较已在实施计划留档。社交过期状态只有 `expired`
-投影延迟，时间门槛仍拒绝过期动作，未发现资产/权限影响；功法 `item.manual.sunrise_breath` 缺玩家取得来源合同，灵兽
-`beast.gear.sack_small` 仍为 `pending_recipe_key`，未开放副本与 Web/跨服写入口前置不全。先补功法来源合同或等待新的
-双适配器事务/恢复证据，不臆造来源、奖池、入口或兼容分支。
-
-上一条代码切片复用了 `utils.assets`、`utils.player` 现有玩家资产/数值内核，没有增加同义包装；混合成本预检少数调用仍可
-考虑复用，但不是阻断其他玩法的缺陷。只读审查确认切磋/训练傀儡整库零写及正式 PvP/PvE 结算已有双适配器专项覆盖；
-其他候选的入口、合同缺口、复用和轮转依据均见实施计划。
+共享资产工具原已汇总摆摊、求购和拍卖锁。本条只为派遣成本预检接入可用物品读取，不扩展为所有领域的通用扣费重写。
+只读审查确认切磋/训练傀儡整库零写及正式 PvP/PvE 结算已有双适配器专项覆盖；其他候选的入口、合同缺口、复用和
+轮转依据均见实施计划。
 
 **本轮闭合：日课领奖快照与 operation 严格回放。** `每日修行` / `领取日课嘉奖` 已有完整公开路径，
 但只读审计在 QQ 官方与 OneBot V11 均复现 `daily_task_rounds.snapshot_json` 奖励对象的重复 JSON 键会把

@@ -27,7 +27,7 @@ from .dispatch_models import (
     DispatchPreviewRecord,
     DispatchSettlementRecord,
 )
-from ..utils.assets import inventory_amount
+from ..utils.assets import player_available_item_amount
 from ..rewards.rules import local_reputation_maximum
 from .dispatch_rules import (
     CANCEL_WINDOW_SECONDS,
@@ -43,7 +43,6 @@ from ..utils.player import (
     grant_player_reward_actual,
     grant_player_state,
     player_integer,
-    player_inventory,
     player_intro_flags,
     player_reputation_state,
     spend_player_state,
@@ -111,9 +110,10 @@ class DispatchRepositoryMixin:
             missing.append("体力不足")
         if player_integer(player, "energy") < costs.get("energy", 0):
             missing.append("精力不足")
-        inventory = player_inventory(player)
         for key, amount in costs.items():
-            if key.startswith("item.") and inventory_amount(inventory, key) < amount:
+            if key.startswith("item.") and player_available_item_amount(
+                connection, player, key
+            ) < amount:
                 content = self.content or bundled_content()
                 missing.append(f"{content.label('item', key)}不足")
         if self._has_active_long_action(connection, int(player["id"])):

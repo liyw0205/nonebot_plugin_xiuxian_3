@@ -16,6 +16,36 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 [当前开发状态](current-status.md)是剩余工作的唯一清单。未出现在
 [当前开发状态](current-status.md)“已开放”表中的内容，不得被命令、按钮或 Web 写入口当作可用玩法。
 
+## 已闭合切片：派遣成本不得侵占交易预留物
+
+QQ 官方与 OneBot V11 均可复现：角色持有 2 个木材，先用 `发布摆摊 item.mat.wood 2 100`
+将其全部预留，再预览并接受 `dispatch.workshop_help`（成本为木材 2）。预览仍显示可接，接受后背包
+归零，但摆摊仍为 `listed` 且锁量为 2，买家购买随后因实物不足失败。派遣合同已有完整成本，
+`specials` 最近十条切片只触及一次；这是资产正确性缺陷，不扩展派遣玩法。
+
+实现边界：新增 `utils.assets.player_available_item_amount`，以背包总量扣除三类交易锁，结果最低为零；
+`dispatch_repository.py::_dispatch_preview` 使用该共享读取，接受用例在同一 `BEGIN IMMEDIATE` 事务中复查预检后
+才能扣费和创建派遣。
+主线拥有 `xiuxian/specials/dispatch_repository.py`、`xiuxian/utils/assets.py`、`xiuxian/utils/__init__.py`、
+`test/test_utils.py` 及本计划/状态页。`/root/shared_cost_gap` 独占新增
+`test/test_dispatch_reserved_inventory.py`，覆盖 QQ 官方与 OneBot V11 的公开适配器路径、资产与订单锁
+不变、拒绝不落 operation/assignment、取消摊单后以原 operation 重试、可用余量恰好够成本时保留锁定库存、成功后
+重启重放不重复扣除；不编辑其他文件。`manual_source_contract`、`shared_cost_gap`、`unclosed_candidate_scan` 和
+`adapter_open_path_audit` 分别只读核对来源合同、共享成本复用、轮转候选及适配器边界；主线完成实现与整合。
+
+候选比较：师徒本人关系查询虽已列为缺口，但列表状态/字段及过期邀请投影仍缺合同；领域前线的当前快照合同也未闭合，
+先补合同。`sunrise_breath` 无来源合同、灵兽行囊无配方合同、后续秘境及 Web/跨服写入前置未齐，保持关闭；道途、活动、悬赏、修炼、移动、
+适配器、虚空塔、生产与服务订单近期切片已闭合，不重入。切磋和训练傀儡保持只读观战，正式 PvP/PvE 结算不变。
+最近十条代码切片为 `7de4df0`（player）、`e1b5459`（player）、`afabb94`（events）、`8775c7b`（adventures）、
+`d8a040b`（progression）、`f6dd8e6`（world）、`a6df3e1`（adapters）、`f733734`（specials）、
+`27f527c`（production）、`1b74cc3`（livelihood）；`2360b13` 仅为测试提交，不计切片。`player` 两次且最近五条
+重复，冷却；`specials` 一次，不在冷却。
+
+验收：新增专项在 QQ 官方与 OneBot V11 覆盖预览/接受拒绝、无资产/operation/assignment 写入、解锁后原 operation
+重试、可用余量扣费后锁定库存仍在及 runtime 重建重放；工具测试覆盖市场、求购和拍卖三类锁。专项与工具测试 77 项、
+派遣内容及交易锁回归 15 项、只读观战/正式战斗回归 8 项、文档测试 2 项通过；`compileall`、全部内容 JSON 严格解析和
+`git diff --check` 通过。不改成本/奖励内容、市场生命周期、其他派遣流程或正式 PvP/PvE；切磋和训练傀儡仍只读观战。
+
 ## 已闭合切片：道途与辅修内容合同、入道解析和状态展示统一
 
 本轮选择角色域 `player.enter_cultivation` 的内容消费缺口。现有 QQ 官方、OneBot V11 和共享 application/repository
@@ -65,6 +95,7 @@ operation 事务，不改奖励数值、道途效果、领域选择/切换、生
 
 | 提交 | 玩家领域/能力 | 子插件与仓储 | 适配器路径 |
 |:--|:--|:--|:--|
+| `7de4df0` | 道途选择词 operation 回放 | `player/cultivation_use_cases.py`、`progression/cultivation_repository.py` | QQ 官方、OneBot V11 |
 | `e1b5459` | 道途/辅修内容与入道选择 | `player/path_rules.py`、`player/cultivation_use_cases.py` | QQ 官方、OneBot V11 共用 application 测试 |
 | `afabb94` | 日课领奖恢复 | `events/daily_quest_repository.py` | QQ 官方、OneBot V11 |
 | `8775c7b` | 悬赏领奖恢复 | `adventures/repository.py` | QQ 官方、OneBot V11 |
@@ -74,22 +105,24 @@ operation 事务，不改奖励数值、道途效果、领域选择/切换、生
 | `f733734` | 虚空塔领奖恢复 | `specials/void_spire_repository.py` | QQ 官方、OneBot V11 |
 | `27f527c` | 生产快照恢复 | `production/contract_repository.py`、`production/repository.py` | QQ 官方、OneBot V11 |
 | `1b74cc3` | 服务订单结算恢复 | `livelihood/service_repository.py` | QQ 官方、OneBot V11 |
-| `cc66276` | 灵泉轮次总账 | `events/repository.py` | QQ 官方、OneBot V11 |
 
-十条窗口中 `events` 两次、其余各一次；最近五条无重复子插件。`utils`、`economy` 各零次，`production` 一次，不能按旧窗口
-误标为频次冷却。道途因公开 operation 恢复缺陷例外重入。其他候选比较如下：
+最近十条窗口中 `player` 两次、其余各一次；最近五条 `player` 重复。`specials` 一次，未触发子插件冷却。
+`2360b13` 是测试提交，不进入代码切片窗口。其他候选比较如下：
 
 | 候选 | 入口与缺口证据 | 合同、复用、轮转 | 处理 |
 |:--|:--|:--|:--|
-| 道途原选择词 operation 回放 | `CultivationApplication.enter_cultivation`；`test_path_content.py` 原只测改名后稳定键回放；新增 QQ/OneBot 原文重放测试复现修复 | 道途刚闭合，因真实幂等恢复错误例外；复用现有 operation、玩家资产和图鉴事务 | 已闭合；不改奖励或战斗 |
+| 派遣扣除交易预留库存 | QQ/OneBot 先上架 2 个木材，再接受消耗木材 2 的作坊派遣，交易锁仍在而背包归零 | 派遣成本合同完整；`specials` 十条仅一次；共享预留锁查询可复用 | 已闭合；预检按可用余额拒绝，并验证原 operation 可重试 |
+| 师徒本人关系列表 | 领域说明点名缺查询入口，现有 application/repository 无读取用例 | 社交未在近十条，但状态集合、字段及过期邀请投影需先补合同 | 暂缓；不据不完整合同臆造返回行为 |
+| 领域前线快照内容合同 | `开始领域战` 已有运行入口，但当前快照字段与内容闭合不足 | 活动规则合同不完整，不能借结算实现回填产品规则 | 暂缓；先补当前合同 |
+| 道途原选择词 operation 回放 | `CultivationApplication.enter_cultivation`；真实 QQ/OneBot 事件移除别名后无法重放 | `player` 域最近两条连续切片，属于真实幂等恢复缺陷例外 | 已闭合；不改奖励或战斗 |
 | 社交过期投影 | `partner_repository.py` 接受分支及 `sect_repository.py` 审批/撤回分支写 `expired` 后抛错回滚；`test_partner_expiry_and_pair_cooldown` 只验过期拒绝 | 时间门槛仍拒绝过期动作；未发现资产/权限阻断，社交生命周期已有切片 | 暂缓，不扩成社交重构 |
 | 功法来源 | `data/道具/功法.json` 中 `item.manual.sunrise_breath` 无取得来源 | 缺玩家来源、准入、成本、概率、奖励及绑定合同；消费规则已由 `manual_rules` 共用 | 先补领域合同，不编造奖池/入口 |
 | 灵兽小型行囊 | `data/灵兽/灵兽.json` 的 `beast.gear.sack_small` 为 `pending_recipe_key`；现有装备测试直接写背包 | 缺配方键、材料、成本和真实生产入口 | 保持不可取得，先补合同 |
 | 观战与正式 PvP/PvE | `test/test_spar_interactions.py`、`test/test_arena.py`、`test/test_party_combat.py` 覆盖只读观战及正式结算 | 两适配器均有专项覆盖；未发现可复现缺陷 | 不重复开发 |
 | 未开放副本、Web/跨服写入 | 状态页中对应入口仍为 `partial`/`locked` | 前置、规则或权限/审计/恢复合同未闭合 | 保持关闭 |
-| 共享工具整理 | `utils.assets`、`utils.player` 已集中玩家资产及数值读写 | 少数混合成本预检可复用既有 `player_requirements_missing`，但没有阻断其他领域的缺陷 | 不新增同义 wrapper；不单独切片 |
+| 共享工具整理 | `utils.assets` 已集中三类交易锁；派遣遗漏交易预留的具体缺口见当前唯一切片 | 不把单一调用方缺陷扩大为所有领域的扣费重构 | 不单独切片；仅接入派遣预检 |
 
-**下一轮：暂无可开工代码切片。** 先补齐功法来源合同，或等待新的双适配器事务/恢复证据，再重新比较候选；不为提交频率重入近期领域。
+派遣预留库存缺陷优先于上述合同缺口与低影响状态投影，因为它已由两个真实适配器复现并直接破坏已成交交易的资产约束。
 
 ## 已闭合切片：日课领奖快照与 operation 严格回放
 

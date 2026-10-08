@@ -591,6 +591,14 @@ def player_item_amount(row: Any, key: str) -> int:
     return player_asset_amount(row, key)
 
 
+def player_available_item_amount(connection: Any, row: Any, key: str) -> int:
+    """Read item inventory not reserved by an active player-to-player order."""
+
+    total = player_item_amount(row, key)
+    reserved = reserved_inventory_quantity(connection, player_database_id(row), key)
+    return max(0, total - reserved)
+
+
 def player_asset_amounts(row: Any, keys: tuple[str, ...] | list[str] | None = None) -> dict[str, int]:
     """Read selected asset balances without duplicating currency/item branches."""
 
