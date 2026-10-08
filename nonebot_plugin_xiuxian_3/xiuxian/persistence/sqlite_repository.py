@@ -67,6 +67,7 @@ from ..events.daily_quest_repository import DailyQuestRepositoryMixin
 from ..events.heart_demon_repository import HeartDemonEventRepositoryMixin
 from ..events.demon_repository import DemonInvasionRepositoryMixin
 from ..events.cross_realm_repository import CrossRealmEventRepositoryMixin
+from ..events.cross_realm_migration import ensure_cross_realm_event_schema
 from ..events.domain_front_repository import DomainFrontRepositoryMixin
 from ..events.domain_front_migration import ensure_domain_front_schema
 from ..events.void_archive_repository import VoidArchiveRepositoryMixin
@@ -311,6 +312,7 @@ class SQLitePlayerRepository(
             ensure_story_schema(connection)
             ensure_trade_permit_schema(connection)
             ensure_stats_schema(connection)
+            ensure_cross_realm_event_schema(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"

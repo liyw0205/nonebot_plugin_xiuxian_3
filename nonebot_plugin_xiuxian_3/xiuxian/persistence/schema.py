@@ -1642,6 +1642,7 @@ CREATE TABLE IF NOT EXISTS world_event_rounds (
     target_quantity INTEGER NOT NULL CHECK (target_quantity >= 0),
     total_contribution INTEGER NOT NULL DEFAULT 0 CHECK (total_contribution >= 0),
     result_json TEXT NOT NULL DEFAULT '{}',
+    configuration_hash TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

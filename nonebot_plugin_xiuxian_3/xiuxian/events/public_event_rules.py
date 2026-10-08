@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -103,11 +105,11 @@ def public_event_definition(
 
 
 def public_event_snapshot(event_key: str, result_json: str) -> PublicEventDefinition:
-    import json
-
     try:
-        result = json.loads(result_json)
-    except (TypeError, json.JSONDecodeError) as exc:
+        from ..utils.json_cache import decode_json_strict
+
+        result = decode_json_strict(result_json)
+    except (TypeError, ValueError) as exc:
         raise ContentError(f"public event result is invalid: {event_key}") from exc
     if not isinstance(result, dict):
         raise ContentError(f"public event result must be an object: {event_key}")
@@ -164,6 +166,56 @@ def public_event_snapshot(event_key: str, result_json: str) -> PublicEventDefini
         )
     except (KeyError, TypeError) as exc:
         raise ContentError(f"public event configuration snapshot is invalid: {event_key}") from exc
+
+
+def public_event_configuration_hash(snapshot: dict[str, Any]) -> str:
+    """Return the stable digest of a frozen public-event configuration."""
+
+    if not isinstance(snapshot, dict):
+        raise ContentError("public event configuration snapshot must be an object")
+    canonical = json.dumps(
+        snapshot,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def validate_public_event_round(
+    event: Any,
+    result_json: str,
+    *,
+    total_contribution: int | None = None,
+) -> tuple[dict[str, Any], PublicEventDefinition]:
+    """Validate a persisted round and return its frozen result and rules."""
+
+    event_key = str(event["event_key"])
+    try:
+        from ..utils.json_cache import decode_json_strict
+
+        result = decode_json_strict(result_json)
+    except (TypeError, ValueError) as exc:
+        raise ContentError(f"public event result is invalid: {event_key}") from exc
+    if not isinstance(result, dict):
+        raise ContentError(f"public event result must be an object: {event_key}")
+    definition = public_event_snapshot(event_key, result_json)
+    snapshot = result.get("configuration")
+    expected_hash = public_event_configuration_hash(snapshot)
+    if str(event["configuration_hash"] or "") != expected_hash:
+        raise ContentError(f"public event configuration digest differs from round: {event_key}")
+    if str(event["location_key"]) != definition.location_key:
+        raise ContentError(f"public event location differs from configuration: {event_key}")
+    if int(event["target_quantity"]) != definition.target_quantity:
+        raise ContentError(f"public event target differs from configuration: {event_key}")
+    success = result.get("success")
+    if not isinstance(success, bool):
+        raise ContentError(f"public event success is invalid: {event_key}")
+    if total_contribution is not None:
+        expected_success = total_contribution >= definition.target_quantity
+        if success is not expected_success:
+            raise ContentError(f"public event success differs from contribution total: {event_key}")
+    return result, definition
 
 
 def public_event_window(
@@ -370,8 +422,10 @@ def _bounded_int(value: Any, minimum: int, maximum: int, label: str) -> int:
 
 __all__ = [
     "PublicEventDefinition",
+    "public_event_configuration_hash",
     "public_event_definition",
     "public_event_is_open",
     "public_event_snapshot",
     "public_event_window",
+    "validate_public_event_round",
 ]

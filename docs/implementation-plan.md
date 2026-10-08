@@ -1857,3 +1857,9 @@ OneBot V11 共享 application/repository、正式 `pve.domain_front` 战斗结�
 不改变突破规则、奖励数值、心魔/炼虚后续流程、正式 PvE/PvP 结算或切磋/训练傀儡只读边界；未新增运行时版本标识、旧格式兼容分支或开发文案。
 QQ 官方与 OneBot V11 的专项 8 项、原突破测试 14 项、同域回归 57 项通过；覆盖损坏快照零写、operation 结果损坏只读拒绝、账本写入故障回滚、修复重试、runtime 重建和同 operation 幂等。
 源码与测试 `compileall`、全部内容 JSON 严格解析及 `git diff --check` 通过；未宣称整仓全量测试或新角色飞升长链通过。
+
+119. **已完成（跨界公共事件结算快照与 operation 互证）**：候选轮转在 `妖界贸易事件` 的 QQ 官方与 OneBot V11 真实路径复现 `world_event_rounds.result_json` 奖励数量可被篡改并实际发放的问题。事件域近期已有切片，本条以可直接改变物品/声望且有双适配器证据的正确性缺陷为例外；短途运输虽有宽松 JSON 缺口但处于近期冷却，其他活动候选没有更高影响的开放路径。
+
+文件所有权限定为 `events/public_event_rules.py`、`events/cross_realm_repository.py`、`events/cross_realm_migration.py`、`persistence/schema.py`、`persistence/sqlite_repository.py`、`test/test_cross_realm_event_snapshot_integrity.py` 及本计划/当前状态。每轮事件新增冻结配置摘要；`public_event_snapshot` 使用 `utils.json_cache.decode_json_strict`，`validate_public_event_round` 互证事件键、地点、目标、成功标记、配置结构、摘要和贡献总账。贡献、查询、结算和领奖在任何资产、贡献记录、领取记录或 operation 写入前拒绝坏 JSON、重复键、截断、错误类型及摘要/轮次字段不符；operation 回放严格解码并互证公开角色归属、领取轮次和奖励账本。配置摘要只绑定冻结内容，不是运行时版本标识；未发布项目不增加旧格式兼容分支，旧开发库需在正式发布前重建或按明确迁移处理。
+
+专项测试 22 项与既有跨界事件测试 7 项通过，覆盖 QQ 官方与 OneBot V11、损坏轮次快照/轮次列/operation 的零写、修复后同 operation 重试、重启恢复及幂等。主线负责运行时代码、持久化和最终验收；`/root/candidate_rotation` 只写独立专项测试并复现双适配器缺陷，`/root/companion_path_audit` 只读审查短途运输候选，未改同一仓储。正式 PvE/PvP 结算、切磋/训练傀儡只读观战和其他事件状态机不在范围内。

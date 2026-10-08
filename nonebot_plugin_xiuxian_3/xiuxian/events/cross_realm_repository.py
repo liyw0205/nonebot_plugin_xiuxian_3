@@ -9,8 +9,6 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..adventures.rules import meets_realm
-from ..utils.assets import spend_player_items
-from ..utils.player import player_integer
 from ..persistence.errors import (
     EventContributionInsufficientError,
     EventNotActiveError,
@@ -19,12 +17,16 @@ from ..persistence.errors import (
     EventSourceNotEligibleError,
     OperationConflictError,
 )
+from ..utils.assets import spend_player_items
+from ..utils.json_cache import decode_json_strict
+from ..utils.player import player_integer
 from .cross_realm_models import CrossRealmEventRecord
 from .public_event_rules import (
     PublicEventDefinition,
+    public_event_configuration_hash,
     public_event_definition,
-    public_event_snapshot,
     public_event_window,
+    validate_public_event_round,
 )
 from .reward_settlement import grant_public_event_reward
 
@@ -139,7 +141,7 @@ class CrossRealmEventRepositoryMixin:
             event = self._cross_event_refresh_round(connection, event, now)
             if str(event["status"]) not in {"open", "running"} or now >= datetime.fromisoformat(str(event["ends_at"])):
                 raise EventNotActiveError("cross-realm event is not open")
-            definition = public_event_snapshot(str(event["event_key"]), str(event["result_json"]))
+            result, definition = validate_public_event_round(event, str(event["result_json"]))
             if definition.required_realm_key is not None and not meets_realm(
                 str(player["realm_key"]),
                 player_integer(player, "realm_layer"),
@@ -207,7 +209,7 @@ class CrossRealmEventRepositoryMixin:
                     (event["round_id"],),
                 ).fetchone()["total"]
             )
-            result = self._json_object(event["result_json"], {})
+            result = dict(result)
             result.update({"success": total >= int(event["target_quantity"])})
             connection.execute(
                 "UPDATE world_event_rounds SET status='running', total_contribution=?, result_json=?, updated_at=? WHERE round_id=? AND status IN ('open','running')",
@@ -248,7 +250,19 @@ class CrossRealmEventRepositoryMixin:
                 (round_id, player["id"]),
             ).fetchone()
             contribution = int(contribution_row["contribution"]) if contribution_row else 0
-            definition = public_event_snapshot(str(event["event_key"]), str(event["result_json"]))
+            total = int(
+                connection.execute(
+                    "SELECT COALESCE(SUM(contribution), 0) AS total FROM world_event_contributions WHERE round_id=?",
+                    (round_id,),
+                ).fetchone()["total"]
+            )
+            _, definition = validate_public_event_round(
+                event,
+                str(event["result_json"]),
+                total_contribution=total,
+            )
+            if int(event["total_contribution"]) != total:
+                raise ValueError("public event total contribution differs from ledger")
             if contribution < definition.minimum_contribution:
                 raise EventContributionInsufficientError("cross-realm event contribution is insufficient")
             if connection.execute(
@@ -376,7 +390,7 @@ class CrossRealmEventRepositoryMixin:
         current_id, starts_at, ends_at, claim_expires_at = window
         now_text = serialize_datetime(now)
         connection.execute(
-            "INSERT OR IGNORE INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, ?, ?, ?)",
+            "INSERT OR IGNORE INTO world_event_rounds(round_id,event_key,location_key,status,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,configuration_hash,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, 0, ?, ?, ?, ?)",
             (
                 current_id,
                 event_key,
@@ -390,6 +404,7 @@ class CrossRealmEventRepositoryMixin:
                     ensure_ascii=False,
                     sort_keys=True,
                 ),
+                public_event_configuration_hash(definition.snapshot()),
                 now_text,
                 now_text,
             ),
@@ -404,7 +419,12 @@ class CrossRealmEventRepositoryMixin:
                     (event["round_id"],),
                 ).fetchone()["total"]
             )
-            result = self._json_object(event["result_json"], {})
+            result, _ = validate_public_event_round(
+                event,
+                str(event["result_json"]),
+                total_contribution=total,
+            )
+            result = dict(result)
             result.update({"success": total >= int(event["target_quantity"]), "settled_at": serialize_datetime(now)})
             connection.execute(
                 "UPDATE world_event_rounds SET status='settled', total_contribution=?, result_json=?, updated_at=? WHERE round_id=? AND status IN ('open','running')",
@@ -424,8 +444,19 @@ class CrossRealmEventRepositoryMixin:
 
     def _cross_event_payload(self, connection: Any, player_id: int, event: Any, contribution: int) -> dict[str, object]:
         player = connection.execute("SELECT * FROM players WHERE id=?", (player_id,)).fetchone()
-        result = self._json_object(event["result_json"], {})
-        definition = public_event_snapshot(str(event["event_key"]), str(event["result_json"]))
+        total = int(
+            connection.execute(
+                "SELECT COALESCE(SUM(contribution), 0) AS total FROM world_event_contributions WHERE round_id=?",
+                (event["round_id"],),
+            ).fetchone()["total"]
+        )
+        result, definition = validate_public_event_round(
+            event,
+            str(event["result_json"]),
+            total_contribution=total,
+        )
+        if int(event["total_contribution"]) != total:
+            raise ValueError("public event total contribution differs from ledger")
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "round_id": str(event["round_id"]),
@@ -463,12 +494,38 @@ class CrossRealmEventRepositoryMixin:
 
     @staticmethod
     def _cross_event_operation_replay(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, object] | None:
-        row = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
+        row = connection.execute(
+            "SELECT o.operation_name, o.request_hash, o.player_id, p.player_id AS public_player_id, o.result_json "
+            "FROM operations AS o LEFT JOIN players AS p ON p.id=o.player_id WHERE o.operation_id=?",
+            (operation_id,),
+        ).fetchone()
         if row is None:
             return None
         if row["operation_name"] != operation_name or row["request_hash"] != request_hash:
             raise OperationConflictError("event operation conflicts with its original input")
-        return json.loads(row["result_json"])
+        payload = decode_json_strict(str(row["result_json"]))
+        if not isinstance(payload, dict):
+            raise ValueError("event operation result must be an object")
+        player_payload = payload.get("player")
+        if (
+            row["public_player_id"] is None
+            or
+            not isinstance(player_payload, dict)
+            or player_payload.get("id") != str(row["public_player_id"])
+            or player_payload.get("player_id") != str(row["public_player_id"])
+        ):
+            raise ValueError("event operation player does not match its owner")
+        claim = connection.execute(
+            "SELECT round_id, player_id, reward_json FROM world_event_claims WHERE operation_id=?",
+            (operation_id,),
+        ).fetchone()
+        if claim is not None:
+            if int(claim["player_id"]) != int(row["player_id"]) or payload.get("round_id") != str(claim["round_id"]):
+                raise ValueError("event operation claim does not match its ledger")
+            stored_reward = decode_json_strict(str(claim["reward_json"]))
+            if not isinstance(stored_reward, dict) or payload.get("reward") != stored_reward:
+                raise ValueError("event operation reward does not match its ledger")
+        return payload
 
     @staticmethod
     def _cross_event_insert_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, object], now_text: str) -> None:
