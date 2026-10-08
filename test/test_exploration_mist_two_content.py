@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -59,7 +60,7 @@ async def _prepare_player(runtime, adapter: str, user: str, *, outcome: str = "w
             (
                 20_000 if strong else 1,
                 20_000 if strong else 1,
-                json.dumps({"body": 10_000, "agility": 10_000} if strong else {"body": 0, "agility": 0}),
+                json.dumps(BALANCED_QUALIFICATION),
                 adapter,
                 user,
             ),

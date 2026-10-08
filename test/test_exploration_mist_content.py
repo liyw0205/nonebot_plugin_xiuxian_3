@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -81,7 +82,7 @@ async def _prepare_player(
             (
                 max_hp,
                 initiative,
-                json.dumps(qualification or {"body": 2_000, "agility": 2_000}),
+                json.dumps(qualification or BALANCED_QUALIFICATION),
                 json.dumps({"item.cave_pass_basic": 1}),
                 adapter,
                 user,
@@ -348,11 +349,7 @@ def test_mist_grotto_real_encounters_settle_frozen_rewards_by_battle_result(
                     user,
                     max_hp=20_000 if outcome == "won" else 1,
                     initiative=20_000 if outcome == "won" else 1,
-                    qualification=(
-                        {"body": 10_000, "agility": 10_000}
-                        if outcome == "won"
-                        else {"body": 0, "agility": 0}
-                    ),
+                    qualification=BALANCED_QUALIFICATION,
                 )
                 start_operation = _operation_for_encounter(adapter, 2_500)
                 started = await _send(runtime, adapter, user, start_operation, "开始探索 雾隐洞天探索")

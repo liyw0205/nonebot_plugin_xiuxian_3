@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -58,7 +59,7 @@ async def _prepare_player(runtime, adapter: str, user: str) -> None:
             "energy=30, energy_max=30, soul_power=100, soul_power_max=100, max_hp=20000, "
             "initiative=20000, qualification_json=?, faction_reputation_json=? "
             "WHERE platform=? AND platform_user_id=?",
-            (json.dumps({"body": 10_000, "agility": 10_000}), "{}", adapter, user),
+            (json.dumps(BALANCED_QUALIFICATION), "{}", adapter, user),
         )
 
 

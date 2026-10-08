@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -65,8 +66,12 @@ async def _prepare(runtime, adapter: str) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, "
-            "location_key='xuantian.spirit_field', stamina=30, inventory_json='{}', intro_json=?",
-            (json.dumps({"flags": ["guide.gather_blood_grass"]}),),
+            "location_key='xuantian.spirit_field', stamina=30, qualification_json=?, "
+            "inventory_json='{}', intro_json=?",
+            (
+                json.dumps(BALANCED_QUALIFICATION),
+                json.dumps({"flags": ["guide.gather_blood_grass"]}),
+            ),
         )
 
 

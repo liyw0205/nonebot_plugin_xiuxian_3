@@ -9,6 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -99,8 +100,9 @@ def test_exploration_discovery_weights_freeze_for_both_adapters_and_replay_after
                             "realm_layer=1, path_key='beast', location_key='beast.ten_thousand_hills', "
                             "stamina=30, max_hp=999, initiative=99, qualification_json=? "
                             "WHERE platform=? AND platform_user_id=?",
-                            (json.dumps({"body": 2_000, "agility": 2_000}), adapter, user_id),
+                            (json.dumps(BALANCED_QUALIFICATION), adapter, user_id),
                         )
+                    equip_damage_weapon(runtime, adapter, user_id, damage=50_000)
 
                     bonus = 5_000 if has_companion else 0
                     operation_id = (

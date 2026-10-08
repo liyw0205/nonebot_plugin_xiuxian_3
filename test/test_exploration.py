@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
@@ -164,8 +165,9 @@ def test_trial_exploration_uses_content_pool_and_freezes_result_across_restart()
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
                         "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, "
-                        "location_key='xuantian.outskirts', stamina=30 WHERE platform=? AND platform_user_id=?",
-                        (adapter, user),
+                        "location_key='xuantian.outskirts', stamina=30, qualification_json=? "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (json.dumps(BALANCED_QUALIFICATION), adapter, user),
                     )
                 operation = next(
                     f"{adapter}-trial-{index}"
@@ -257,8 +259,9 @@ def test_trial_exploration_snapshot_wins_over_content_change_after_restart() -> 
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
                     "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, "
-                    "location_key='xuantian.outskirts', stamina=30 WHERE platform='qq.official' AND platform_user_id=?",
-                    (user,),
+                    "location_key='xuantian.outskirts', stamina=30, qualification_json=? "
+                    "WHERE platform='qq.official' AND platform_user_id=?",
+                    (json.dumps(BALANCED_QUALIFICATION), user),
                 )
             operation = next(
                 f"trial-freeze-{index}"

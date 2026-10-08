@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import cloud_boat_storm_roll_bp
@@ -18,6 +19,7 @@ def _context(adapter: str, user: str, request_id: str, operation_id: str = "") -
 
 
 def _set_player(runtime, adapter: str, user: str, **values: object) -> None:
+    values.setdefault("qualification_json", json.dumps(BALANCED_QUALIFICATION))
     assignments = ", ".join(f"{key} = ?" for key in values)
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(

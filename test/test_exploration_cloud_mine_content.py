@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -74,7 +75,7 @@ async def _prepare_player(runtime, adapter: str, user: str, *, outcome: str = "w
     assert created.code == "PLAYER_CREATED"
     max_hp = 20_000 if outcome == "won" else 1
     initiative = 20_000 if outcome == "won" else 1
-    qualification = {"body": 10_000, "agility": 10_000} if outcome == "won" else {"body": 0, "agility": 0}
+    qualification = BALANCED_QUALIFICATION
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key='foundation', realm_layer=1, "

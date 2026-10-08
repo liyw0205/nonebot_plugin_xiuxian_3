@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -53,9 +54,10 @@ async def _prepare_player(runtime, adapter: str, user: str) -> None:
         connection.execute(
             "UPDATE players SET stage='cultivator', realm_key='golden_core', realm_layer=10, "
             "location_key='demon.abyss_gate', stamina=100, stamina_max=100, "
-            "energy=100, energy_max=100, intro_json=? "
+            "energy=100, energy_max=100, qualification_json=?, intro_json=? "
             "WHERE platform=? AND platform_user_id=?",
             (
+                json.dumps(BALANCED_QUALIFICATION),
                 json.dumps({"flags": ["access.demon_abyss_gate"]}),
                 adapter,
                 user,
