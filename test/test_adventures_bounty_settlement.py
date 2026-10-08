@@ -113,6 +113,84 @@ def _player_state(runtime, adapter: str, user: str) -> tuple[int, str, str, str 
     return row[0], row[1], row[2], row[3]
 
 
+def _configure_claim_integrity_reward(data_dir: Path, *, consume_target: bool) -> None:
+    reward_path = data_dir / "奖励" / "奖励.json"
+    rewards = _json(reward_path)
+    pool = next(
+        row for row in rewards["records"]
+        if row["key"] == "reward_pool.bounty.herb_supply"
+    )
+    pool["outcomes"] = [
+        {
+            "weight": 1,
+            "rewards": {
+                "spirit_stones": 31,
+                "local_reputation": 10,
+                "item.weapon.body.pulse_edge": 1,
+                "codex.story.beast_habitat": 1,
+            },
+        }
+    ]
+    _write_json(reward_path, rewards)
+
+    bounty_path = data_dir / "任务" / "悬赏.json"
+    bounties = _json(bounty_path)
+    herb = next(
+        row for row in bounties["records"] if row["key"] == "bounty.herb_supply"
+    )
+    herb["consume_target"] = consume_target
+    _write_json(bounty_path, bounties)
+
+
+def _duplicate_json_member(raw: str, parent_key: str, key: str, value: object) -> str:
+    parent_marker = f'"{parent_key}"'
+    parent_index = raw.index(parent_marker)
+    object_start = raw.index("{", parent_index + len(parent_marker))
+    object_end = raw.index("}", object_start)
+    duplicate = f", {json.dumps(key)}: {json.dumps(value)}"
+    return raw[:object_end] + duplicate + raw[object_end:]
+
+
+def _bounty_claim_integrity_state(
+    runtime, adapter: str, user: str, accept_operation_id: str, claim_operation_id: str
+) -> tuple[object, ...]:
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        player = connection.execute(
+            "SELECT id, spirit_stones, inventory_json FROM players "
+            "WHERE platform=? AND platform_user_id=?",
+            (adapter, user),
+        ).fetchone()
+        player_id = player[0]
+        reputation = connection.execute(
+            "SELECT local_json, service_reputation FROM player_reputations WHERE player_id=?",
+            (player_id,),
+        ).fetchone()
+        offer = connection.execute(
+            "SELECT status, result_json FROM bounty_offers WHERE operation_id=?",
+            (accept_operation_id,),
+        ).fetchone()
+        equipment_count = connection.execute(
+            "SELECT COUNT(*) FROM equipment_instances WHERE player_id=? AND item_key=?",
+            (player_id, "item.weapon.body.pulse_edge"),
+        ).fetchone()[0]
+        codex_count = connection.execute(
+            "SELECT COUNT(*) FROM codex_entries WHERE player_id=? AND entry_key=?",
+            (player_id, "codex.story.beast_habitat"),
+        ).fetchone()[0]
+        operation = connection.execute(
+            "SELECT player_id, request_hash, result_json FROM operations WHERE operation_id=?",
+            (claim_operation_id,),
+        ).fetchone()
+    return (
+        tuple(player),
+        tuple(reputation) if reputation is not None else None,
+        tuple(offer) if offer is not None else None,
+        equipment_count,
+        codex_count,
+        tuple(operation) if operation is not None else None,
+    )
+
+
 def test_bounty_claim_uses_frozen_definition_reward_and_reputation_cap_after_restart() -> None:
     async def run() -> None:
         with TemporaryDirectory() as temp:
@@ -334,6 +412,417 @@ def test_bounty_claim_json_errors_and_ledger_failure_leave_offer_retryable() -> 
                     assert json.loads(reputation_json)["local.xuantian.new_town"] == 1000
             finally:
                 await recovered.close()
+
+    asyncio.run(run())
+
+
+def test_bounty_claim_rejects_duplicate_reward_snapshot_before_all_writes_then_retries() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            _copy_content(data_dir)
+            _configure_claim_integrity_reward(data_dir, consume_target=True)
+            runtime = create_runtime(data_dir=data_dir, adapters=_ADAPTERS)
+            offer_operations: dict[str, str] = {}
+            claim_operations: dict[str, str] = {}
+            accepted_snapshots: dict[str, str] = {}
+            before_states: dict[str, tuple[object, ...]] = {}
+            try:
+                for adapter in _ADAPTERS:
+                    user = f"bounty-duplicate-snapshot-{adapter}"
+                    offer_operation = f"{adapter}:duplicate-snapshot-accept"
+                    claim_operation = f"{adapter}:duplicate-snapshot-claim"
+                    offer_operations[adapter] = offer_operation
+                    claim_operations[adapter] = claim_operation
+                    await _create_mortal(runtime, adapter, user)
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE players SET stage='cultivator', realm_key='qi_sensing', "
+                            "realm_layer=1, path_key='body' "
+                            "WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        )
+                    _set_local_reputation(
+                        runtime, adapter, user, '{"local.xuantian.new_town":995}'
+                    )
+                    accepted = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "accept", offer_operation),
+                        "接取悬赏 草药补给",
+                    )
+                    assert accepted.code == "BOUNTY_ACCEPTED"
+                    _add_herbs(runtime, adapter, user)
+
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        accepted_snapshots[adapter] = connection.execute(
+                            "SELECT snapshot_json FROM bounty_offers WHERE operation_id=?",
+                            (offer_operation,),
+                        ).fetchone()[0]
+                    corrupted_snapshot = _duplicate_json_member(
+                        accepted_snapshots[adapter], "reward", "spirit_stones", 999
+                    )
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE bounty_offers SET snapshot_json=? WHERE operation_id=?",
+                            (corrupted_snapshot, offer_operation),
+                        )
+                    before_states[adapter] = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+
+                    rejected = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "duplicate-snapshot", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert rejected.code == "PERSISTENCE_ERROR"
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == before_states[adapter]
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        assert connection.execute(
+                            "SELECT snapshot_json FROM bounty_offers WHERE operation_id=?",
+                            (offer_operation,),
+                        ).fetchone()[0] == corrupted_snapshot
+                await runtime.close()
+
+                recovered = create_runtime(data_dir=data_dir, adapters=_ADAPTERS)
+                try:
+                    for adapter in _ADAPTERS:
+                        user = f"bounty-duplicate-snapshot-{adapter}"
+                        offer_operation = offer_operations[adapter]
+                        claim_operation = claim_operations[adapter]
+                        with sqlite3.connect(recovered.settings.database_path) as connection:
+                            connection.execute(
+                                "UPDATE bounty_offers SET snapshot_json=? WHERE operation_id=?",
+                                (accepted_snapshots[adapter], offer_operation),
+                            )
+
+                        claimed = await recovered.adapters.dispatch(
+                            adapter,
+                            _context(adapter, user, "retry", claim_operation),
+                            "领取悬赏",
+                        )
+                        assert claimed.code == "BOUNTY_CLAIMED"
+                        assert claimed.data["rewards"] == {
+                            "spirit_stones": 31,
+                            "local_reputation": 5,
+                            "item.weapon.body.pulse_edge": 1,
+                            "codex.story.beast_habitat": 1,
+                        }
+                        state_after_claim = _bounty_claim_integrity_state(
+                            recovered, adapter, user, offer_operation, claim_operation
+                        )
+                        assert state_after_claim[2][0] == "claimed"
+                        assert state_after_claim[3:5] == (1, 1)
+                        assert state_after_claim[5] is not None
+                        assert json.loads(state_after_claim[1][0]) == {
+                            "local.xuantian.new_town": 1000
+                        }
+
+                        inventory_before = json.loads(before_states[adapter][0][2])
+                        inventory_after = json.loads(state_after_claim[0][2])
+                        inventory_before["item.herb.blood_grass"] -= 5
+                        if inventory_before["item.herb.blood_grass"] == 0:
+                            del inventory_before["item.herb.blood_grass"]
+                        assert inventory_after == inventory_before
+                        assert state_after_claim[0][1] == before_states[adapter][0][1] + 31
+
+                        replay = await recovered.adapters.dispatch(
+                            adapter,
+                            _context(adapter, user, "replay", claim_operation),
+                            "领取悬赏",
+                        )
+                        assert replay.code == "BOUNTY_CLAIMED", replay.message
+                        assert replay.data["idempotent_replay"] is True
+                        assert replay.data["rewards"] == claimed.data["rewards"]
+                        assert _bounty_claim_integrity_state(
+                            recovered, adapter, user, offer_operation, claim_operation
+                        ) == state_after_claim
+                finally:
+                    await recovered.close()
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_bounty_claim_replay_rejects_damaged_offer_and_operation_results_read_only() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            _copy_content(data_dir)
+            _configure_fixed_herb_reward(data_dir)
+            runtime = create_runtime(data_dir=data_dir, adapters=_ADAPTERS)
+            claim_operations: dict[str, str] = {}
+            canonical_states: dict[str, tuple[object, ...]] = {}
+            try:
+                for adapter in _ADAPTERS:
+                    user = f"bounty-claim-replay-integrity-{adapter}"
+                    offer_operation = f"{adapter}:claim-integrity-accept"
+                    claim_operation = f"{adapter}:claim-integrity-claim"
+                    claim_operations[adapter] = claim_operation
+                    await _create_mortal(runtime, adapter, user)
+                    accepted = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "accept", offer_operation),
+                        "接取悬赏 草药补给",
+                    )
+                    assert accepted.code == "BOUNTY_ACCEPTED"
+                    _add_herbs(runtime, adapter, user)
+                    claimed = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "claim", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert claimed.code == "BOUNTY_CLAIMED"
+                    canonical_states[adapter] = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+                    canonical_offer_result = canonical_states[adapter][2][1]
+                    canonical_operation_result = canonical_states[adapter][5][2]
+
+                    offer_payload = json.loads(canonical_offer_result)
+                    offer_payload["rewards"]["spirit_stones"] = 999
+                    damaged_offer_result = json.dumps(
+                        offer_payload, ensure_ascii=False, sort_keys=True
+                    )
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE bounty_offers SET result_json=? WHERE operation_id=?",
+                            (damaged_offer_result, offer_operation),
+                        )
+                    before_rejected_replay = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+                    offer_result_replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "bad-offer-result", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert offer_result_replay.code == "PERSISTENCE_ERROR"
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == before_rejected_replay
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE bounty_offers SET result_json=? WHERE operation_id=?",
+                            (canonical_offer_result, offer_operation),
+                        )
+
+                    excessive_offer_progress = json.loads(canonical_offer_result)
+                    excessive_offer_progress["progress"] = (
+                        excessive_offer_progress["target"] + 1
+                    )
+                    excessive_offer_result = json.dumps(
+                        excessive_offer_progress, ensure_ascii=False, sort_keys=True
+                    )
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE bounty_offers SET result_json=? WHERE operation_id=?",
+                            (excessive_offer_result, offer_operation),
+                        )
+                    before_rejected_replay = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+                    excessive_offer_replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "excessive-offer-progress", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert excessive_offer_replay.code == "PERSISTENCE_ERROR"
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == before_rejected_replay
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE bounty_offers SET result_json=? WHERE operation_id=?",
+                            (canonical_offer_result, offer_operation),
+                        )
+
+                    damaged_operation_result = _duplicate_json_member(
+                        canonical_operation_result, "rewards", "spirit_stones", 999
+                    )
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            (damaged_operation_result, claim_operation),
+                        )
+                    before_rejected_replay = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+                    duplicate_operation_replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "duplicate-operation-result", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert duplicate_operation_replay.code == "PERSISTENCE_ERROR"
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == before_rejected_replay
+
+                    excessive_operation_progress = json.loads(canonical_operation_result)
+                    excessive_operation_progress["progress"] = (
+                        excessive_operation_progress["target"] + 1
+                    )
+                    excessive_operation_result = json.dumps(
+                        excessive_operation_progress, ensure_ascii=False, sort_keys=True
+                    )
+                    excessive_offer_progress = json.loads(canonical_offer_result)
+                    excessive_offer_progress["progress"] = (
+                        excessive_offer_progress["target"] + 1
+                    )
+                    excessive_offer_result = json.dumps(
+                        excessive_offer_progress, ensure_ascii=False, sort_keys=True
+                    )
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            (excessive_operation_result, claim_operation),
+                        )
+                        connection.execute(
+                            "UPDATE bounty_offers SET result_json=? WHERE operation_id=?",
+                            (excessive_offer_result, offer_operation),
+                        )
+                    before_rejected_replay = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+                    excessive_progress_replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "excessive-progress-results", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert excessive_progress_replay.code == "PERSISTENCE_ERROR"
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == before_rejected_replay
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            (canonical_operation_result, claim_operation),
+                        )
+                        connection.execute(
+                            "UPDATE bounty_offers SET result_json=? WHERE operation_id=?",
+                            (canonical_offer_result, offer_operation),
+                        )
+
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            ("{malformed", claim_operation),
+                        )
+                    before_rejected_replay = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+                    malformed_operation_replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "malformed-operation-result", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert malformed_operation_replay.code == "PERSISTENCE_ERROR"
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == before_rejected_replay
+
+                    mismatched_identity = json.loads(canonical_operation_result)
+                    mismatched_identity["player"]["id"] = "foreign-player"
+                    mismatched_identity["player"]["player_id"] = "foreign-player"
+                    mismatched_identity["player"]["platform_user_id"] = "foreign-user"
+                    damaged_identity_result = json.dumps(
+                        mismatched_identity, ensure_ascii=False, sort_keys=True
+                    )
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            (damaged_identity_result, claim_operation),
+                        )
+                    before_rejected_replay = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+                    identity_mismatch_replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "identity-mismatch-result", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert identity_mismatch_replay.code == "PERSISTENCE_ERROR"
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == before_rejected_replay
+
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            (canonical_operation_result, claim_operation),
+                        )
+                    replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "repaired-replay", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert replay.code == "BOUNTY_CLAIMED"
+                    assert replay.data["idempotent_replay"] is True
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == canonical_states[adapter]
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_expired_bounty_claim_replays_without_reapplying_state_for_both_adapters() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            _copy_content(data_dir)
+            runtime = create_runtime(data_dir=data_dir, adapters=_ADAPTERS)
+            try:
+                for adapter in _ADAPTERS:
+                    user = f"bounty-expired-replay-{adapter}"
+                    offer_operation = f"{adapter}:expired-accept"
+                    claim_operation = f"{adapter}:expired-claim"
+                    await _create_mortal(runtime, adapter, user)
+                    accepted = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "accept", offer_operation),
+                        "接取悬赏 草药补给",
+                    )
+                    assert accepted.code == "BOUNTY_ACCEPTED"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE bounty_offers SET expires_at='2000-01-01T00:00:00+00:00' "
+                            "WHERE operation_id=?",
+                            (offer_operation,),
+                        )
+                    before = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+
+                    expired = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "expire", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert expired.code == "BOUNTY_EXPIRED"
+                    after_expiry = _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    )
+                    assert after_expiry[0] == before[0]
+                    assert after_expiry[3:5] == before[3:5]
+                    assert after_expiry[2][0] == "expired"
+                    assert after_expiry[5] is not None
+
+                    replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "expired-replay", claim_operation),
+                        "领取悬赏",
+                    )
+                    assert replay.code == "BOUNTY_EXPIRED"
+                    assert _bounty_claim_integrity_state(
+                        runtime, adapter, user, offer_operation, claim_operation
+                    ) == after_expiry
+            finally:
+                await runtime.close()
 
     asyncio.run(run())
 

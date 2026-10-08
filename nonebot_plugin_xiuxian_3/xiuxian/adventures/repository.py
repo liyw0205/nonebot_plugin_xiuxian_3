@@ -13,6 +13,8 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
+from ..utils.json_cache import decode_json_strict
+from ..utils.operations import operation_replay
 from ..config import XiuxianSettings
 from ..player.models import (
     CultivationRecord,
@@ -175,7 +177,7 @@ from ..rewards.rules import local_reputation_maximum
 
 def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
     try:
-        snapshot = json.loads(str(raw_value))
+        snapshot = decode_json_strict(str(raw_value))
     except (TypeError, ValueError) as exc:
         raise ValueError("bounty snapshot is invalid JSON") from exc
     if not isinstance(snapshot, dict):
@@ -265,7 +267,7 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         raise ValueError("bounty snapshot reward quantities must be positive integers")
     labels = snapshot["reward_labels"]
     if not isinstance(labels, dict) or any(
-        not isinstance(key, str) or not isinstance(value, str)
+        not isinstance(key, str) or not isinstance(value, str) or not value
         for key, value in labels.items()
     ):
         raise ValueError("bounty snapshot reward_labels must map strings to strings")
@@ -930,16 +932,34 @@ class AdventuresRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT player_id FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing["result_json"])
-                if payload.get("status") == "expired":
+                caller = connection.execute(
+                    "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                    (platform, platform_user_id),
+                ).fetchone()
+                if caller is None or int(caller["id"]) != int(existing["player_id"]):
+                    raise OperationConflictError("operation belongs to another player")
+                payload = operation_replay(
+                    connection,
+                    operation_id,
+                    operation_name,
+                    request_hash,
+                    player_id=int(caller["id"]),
+                )
+                assert payload is not None
+                record = self._bounty_claim_from_payload(
+                    payload,
+                    replay=True,
+                    expected_platform=platform,
+                    expected_platform_user_id=platform_user_id,
+                )
+                self._validate_bounty_claim_offer(connection, record, str(payload["offer_id"]))
+                if record.status == "expired":
                     raise BountyExpiredError("bounty has expired")
-                return self._bounty_claim_from_payload(payload, replay=True)
+                return record
             row = self._require_player(connection, platform, platform_user_id)
             offer = connection.execute(
                 "SELECT * FROM bounty_offers WHERE player_id = ? AND status IN ('accepted', 'completed') ORDER BY id DESC LIMIT 1",
@@ -958,6 +978,7 @@ class AdventuresRepositoryMixin:
             if now > datetime.fromisoformat(str(offer["expires_at"])):
                 expired_payload = {
                     "player": self._player_payload(self._row_to_player(row)),
+                    "offer_id": str(offer["offer_id"]),
                     "bounty_key": snapshot["bounty_key"],
                     "label": snapshot["label"],
                     "status": "expired",
@@ -1108,6 +1129,7 @@ class AdventuresRepositoryMixin:
             player = self._row_to_player(updated)
             payload = {
                 "player": self._player_payload(player),
+                "offer_id": str(offer["offer_id"]),
                 "bounty_key": snapshot["bounty_key"],
                 "label": snapshot["label"],
                 "status": "claimed",
@@ -1127,21 +1149,172 @@ class AdventuresRepositoryMixin:
                     now_text,
                 ),
             )
-            return self._bounty_claim_from_payload(payload)
+            return self._bounty_claim_from_payload(
+                payload,
+                expected_platform=platform,
+                expected_platform_user_id=platform_user_id,
+            )
 
     @staticmethod
-    def _bounty_claim_from_payload(payload: dict[str, Any], replay: bool = False) -> BountyClaimRecord:
+    def _bounty_claim_from_payload(
+        payload: dict[str, Any],
+        replay: bool = False,
+        *,
+        expected_platform: str,
+        expected_platform_user_id: str,
+    ) -> BountyClaimRecord:
+        fields = {
+            "player",
+            "offer_id",
+            "bounty_key",
+            "label",
+            "status",
+            "progress",
+            "target",
+            "rewards",
+            "reward_labels",
+        }
+        if not isinstance(payload, dict) or set(payload) != fields:
+            raise ValueError("bounty claim result fields are invalid")
+        player_payload = payload["player"]
+        if not isinstance(player_payload, dict):
+            raise ValueError("bounty claim result player is invalid")
+        player_id = player_payload.get("player_id")
+        if (
+            not isinstance(player_id, str)
+            or not player_id
+            or player_payload["id"] != player_id
+            or player_payload.get("platform") != expected_platform
+            or player_payload.get("platform_user_id") != expected_platform_user_id
+        ):
+            raise ValueError("bounty claim result identity is invalid")
+        for key in ("offer_id", "bounty_key", "label"):
+            if not isinstance(payload[key], str) or not payload[key]:
+                raise ValueError(f"bounty claim result {key} is invalid")
+        if not isinstance(payload["status"], str) or payload["status"] not in {"claimed", "expired"}:
+            raise ValueError("bounty claim result status is invalid")
+        for key in ("progress", "target"):
+            if (
+                isinstance(payload[key], bool)
+                or not isinstance(payload[key], int)
+                or payload[key] < 0
+                or (key == "target" and payload[key] <= 0)
+            ):
+                raise ValueError(f"bounty claim result {key} is invalid")
+        if payload["progress"] > payload["target"]:
+            raise ValueError("bounty claim result progress exceeds its target")
+        rewards = payload["rewards"]
+        if not isinstance(rewards, dict) or any(
+            not isinstance(key, str)
+            or not key
+            or isinstance(value, bool)
+            or not isinstance(value, int)
+            or value <= 0
+            for key, value in rewards.items()
+        ):
+            raise ValueError("bounty claim result rewards are invalid")
+        if payload["status"] == "expired" and rewards:
+            raise ValueError("expired bounty claim cannot contain rewards")
+        if payload["status"] == "claimed" and payload["progress"] != payload["target"]:
+            raise ValueError("claimed bounty result does not meet its target")
+        reward_labels = payload["reward_labels"]
+        if not isinstance(reward_labels, dict) or any(
+            not isinstance(key, str)
+            or not key
+            or not isinstance(value, str)
+            or not value
+            for key, value in reward_labels.items()
+        ):
+            raise ValueError("bounty claim result labels are invalid")
         return BountyClaimRecord(
-            player=SQLitePlayerRepository._row_to_player(payload["player"]),
-            bounty_key=str(payload["bounty_key"]),
-            label=str(payload["label"]),
-            status=str(payload["status"]),
-            progress=int(payload.get("progress", 0)),
-            target=int(payload["target"]),
-            rewards={str(key): int(value) for key, value in dict(payload.get("rewards", {})).items()},
-            reward_labels={str(key): str(value) for key, value in dict(payload["reward_labels"]).items()},
+            player=SQLitePlayerRepository._row_to_player(player_payload),
+            bounty_key=payload["bounty_key"],
+            label=payload["label"],
+            status=payload["status"],
+            progress=payload["progress"],
+            target=payload["target"],
+            rewards=dict(rewards),
+            reward_labels=dict(reward_labels),
             already_completed=replay,
         )
+
+    def _validate_bounty_claim_offer(
+        self,
+        connection: sqlite3.Connection,
+        record: BountyClaimRecord,
+        offer_id: str,
+    ) -> None:
+        offer = connection.execute(
+            "SELECT player_id, bounty_key, status, snapshot_json, result_json FROM bounty_offers WHERE offer_id = ?",
+            (offer_id,),
+        ).fetchone()
+        if (
+            offer is None
+            or str(offer["bounty_key"]) != record.bounty_key
+            or str(offer["status"]) != record.status
+        ):
+            raise ValueError("bounty claim result does not match its offer")
+        owner = connection.execute(
+            "SELECT player_id, platform, platform_user_id FROM players WHERE id = ?",
+            (offer["player_id"],),
+        ).fetchone()
+        if (
+            owner is None
+            or str(owner["player_id"]) != record.player.player_id
+            or str(owner["platform"]) != record.player.platform
+            or str(owner["platform_user_id"]) != record.player.platform_user_id
+        ):
+            raise ValueError("bounty claim result owner does not match its offer")
+        snapshot = _bounty_snapshot(offer["snapshot_json"])
+        if (
+            snapshot["bounty_key"] != record.bounty_key
+            or snapshot["label"] != record.label
+            or snapshot["target_amount"] != record.target
+            or snapshot["reward_labels"] != record.reward_labels
+            or any(
+                key not in snapshot["reward"] or amount > snapshot["reward"][key]
+                for key, amount in record.rewards.items()
+            )
+        ):
+            raise ValueError("bounty claim result does not match its frozen snapshot")
+        offer_result = decode_json_strict(str(offer["result_json"]))
+        if not isinstance(offer_result, dict):
+            raise ValueError("bounty offer result must be an object")
+        if record.status == "claimed":
+            if (
+                set(offer_result) != {"status", "progress", "target", "rewards"}
+                or not isinstance(offer_result["status"], str)
+                or offer_result["status"] != "claimed"
+                or isinstance(offer_result["progress"], bool)
+                or not isinstance(offer_result["progress"], int)
+                or offer_result["progress"] < 0
+                or offer_result["progress"] != record.progress
+                or isinstance(offer_result["target"], bool)
+                or not isinstance(offer_result["target"], int)
+                or offer_result["target"] <= 0
+                or offer_result["target"] != record.target
+                or not isinstance(offer_result["rewards"], dict)
+                or any(
+                    not isinstance(key, str)
+                    or not key
+                    or isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value <= 0
+                    for key, value in offer_result["rewards"].items()
+                )
+                or offer_result["rewards"] != record.rewards
+            ):
+                raise ValueError("bounty claim result does not match its offer result")
+        elif (
+            set(offer_result) != {"status", "progress"}
+            or not isinstance(offer_result["status"], str)
+            or offer_result["status"] != "expired"
+            or isinstance(offer_result["progress"], bool)
+            or not isinstance(offer_result["progress"], int)
+            or offer_result["progress"] < 0
+            or offer_result["progress"] != record.progress
+        ):
+            raise ValueError("expired bounty claim does not match its offer result")
     async def get_mainline_status(
         self,
         *,
