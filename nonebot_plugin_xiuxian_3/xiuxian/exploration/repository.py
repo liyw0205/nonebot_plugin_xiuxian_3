@@ -94,6 +94,7 @@ from ..exploration.rules import (
     has_cloud_mine_access,
     battle_roll_bp,
     exploration_definition,
+    exploration_enemy_key,
     exploration_reward_pool,
     meets_realm as exploration_meets_realm,
     settlement_failure_result,
@@ -177,6 +178,100 @@ from ..rewards.rules import RewardContentError
 
 
 class ExplorationRepositoryMixin:
+    @staticmethod
+    def _strict_exploration_object(value: Any, label: str) -> dict[str, Any]:
+        try:
+            payload = decode_json_strict(value)
+        except (TypeError, ValueError) as exc:
+            raise RewardContentError(f"{label} is malformed") from exc
+        if not isinstance(payload, dict):
+            raise RewardContentError(f"{label} must be an object")
+        return payload
+
+    @staticmethod
+    def _strict_exploration_reward(value: Any, label: str) -> dict[str, int]:
+        if not isinstance(value, dict):
+            raise RewardContentError(f"{label} must be an object")
+        reward: dict[str, int] = {}
+        for key, quantity in value.items():
+            if not isinstance(key, str) or not key or type(quantity) is not int or quantity <= 0:
+                raise RewardContentError(f"{label} contains an invalid reward")
+            reward[key] = quantity
+        return reward
+
+    @staticmethod
+    def _strict_snapshot_integer(
+        snapshot: dict[str, Any], key: str, *, maximum: int | None = None
+    ) -> int:
+        value = snapshot.get(key)
+        if type(value) is not int or value < 0 or (maximum is not None and value > maximum):
+            raise RewardContentError(f"exploration snapshot field {key} is invalid")
+        return value
+
+    @classmethod
+    def _pending_exploration_rewards(
+        cls, session: sqlite3.Row
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, int], dict[str, int]]:
+        snapshot = cls._strict_exploration_object(session["snapshot_json"], "exploration snapshot")
+        pending = cls._strict_exploration_object(session["result_json"], "pending exploration result")
+        frozen_result = cls._strict_exploration_reward(
+            snapshot.get("frozen_result"), "exploration frozen reward"
+        )
+        failure_result = cls._strict_exploration_reward(
+            snapshot.get("battle_failure_result", {}), "exploration frozen failure reward"
+        )
+        stamina_cost = cls._strict_snapshot_integer(snapshot, "stamina_cost")
+        cls._strict_snapshot_integer(snapshot, "energy_cost")
+        cls._strict_snapshot_integer(snapshot, "pollution_before", maximum=100)
+        cls._strict_snapshot_integer(snapshot, "pollution_after", maximum=100)
+        cls._strict_snapshot_integer(snapshot, "bloodline_stability_before", maximum=100)
+        cls._strict_snapshot_integer(snapshot, "bloodline_stability_after", maximum=100)
+        if (
+            snapshot.get("mode_key") != session["mode_key"]
+            or snapshot.get("location_key") != session["location_key"]
+            or snapshot.get("random_seed") != session["operation_id"]
+            or stamina_cost != int(session["stamina_cost"])
+            or pending.get("status") != "combat_pending"
+            or pending.get("battle_pending") is not True
+            or cls._strict_exploration_reward(
+                pending.get("result"), "pending exploration result reward"
+            )
+            != frozen_result
+            or cls._strict_exploration_reward(
+                pending.get("frozen_result"), "pending exploration reward"
+            )
+            != frozen_result
+            or cls._strict_exploration_reward(
+                pending.get("battle_failure_result", {}), "pending exploration failure reward"
+            )
+            != failure_result
+        ):
+            raise RewardContentError("exploration reward snapshot does not match its session")
+        return snapshot, pending, frozen_result, failure_result
+
+    def _require_exploration_operation(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        operation_id: str,
+        operation_name: str,
+        request_hash: str,
+        player_id: int,
+        label: str,
+    ) -> dict[str, Any]:
+        operation = connection.execute(
+            "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
+            (operation_id,),
+        ).fetchone()
+        if (
+            operation is None
+            or str(operation["operation_name"]) != operation_name
+            or int(operation["player_id"]) != player_id
+            or str(operation["request_hash"]) != request_hash
+        ):
+            raise RewardContentError(f"{label} operation does not match its record")
+        return self._strict_exploration_object(operation["result_json"], f"{label} operation result")
+
     async def start_exploration(
         self,
         *,
@@ -595,13 +690,24 @@ class ExplorationRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._exploration_settlement_from_payload(decode_json_strict(existing["result_json"]), replay=True)
+                identity = connection.execute(
+                    "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                    (platform, platform_user_id),
+                ).fetchone()
+                if identity is None:
+                    raise PlayerNotFoundError("player does not exist")
+                if int(existing["player_id"]) != int(identity["id"]):
+                    raise OperationConflictError("operation belongs to another player")
+                return self._exploration_settlement_from_payload(
+                    self._strict_exploration_object(existing["result_json"], "exploration operation result"),
+                    replay=True,
+                )
             row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM exploration_sessions WHERE exploration_id = ? AND player_id = ?",
@@ -610,18 +716,22 @@ class ExplorationRepositoryMixin:
             if session is None:
                 raise ExplorationNotFoundError("exploration does not exist")
             if str(session["status"]) != "combat_pending":
-                stored = self._json_object(session["result_json"], {})
+                stored = self._strict_exploration_object(session["result_json"], "exploration result")
+                snapshot = self._strict_exploration_object(session["snapshot_json"], "exploration snapshot")
+                settled_result = self._strict_exploration_reward(
+                    stored.get("result", {}), "exploration settled result"
+                )
                 payload = {
                     "player": self._player_payload(self._row_to_player(row)),
                     "exploration_id": exploration_id,
                     "mode_key": session["mode_key"],
                     "location_key": session["location_key"],
                     "status": session["status"],
-                    "result": self._json_object(stored.get("result"), {}),
+                    "result": settled_result,
                     "battle_pending": False,
                     "expired": str(session["status"]) == "expired",
                     "stamina_cost": int(session["stamina_cost"]),
-                    "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
+                    "energy_cost": int(snapshot.get("energy_cost", 0)),
                     "battle_id": stored.get("battle_id"),
                     "battle_outcome": stored.get("battle_outcome"),
                 }
@@ -631,25 +741,133 @@ class ExplorationRepositoryMixin:
                 )
                 return self._exploration_settlement_from_payload(payload, replay=True)
             battle = connection.execute(
-                "SELECT status, result_json FROM battle_sessions WHERE battle_id = ? AND player_id = ?",
+                "SELECT * FROM battle_sessions WHERE battle_id = ? AND player_id = ?",
                 (battle_id, row["id"]),
             ).fetchone()
             if battle is None or str(battle["status"]) != "settled":
                 raise ExplorationCombatPendingError("exploration battle is not settled")
-            battle_result = self._json_object(battle["result_json"], {})
-            battle_outcome = str(battle_result.get("outcome", ""))
-            frozen = self._json_object(session["result_json"], {})
-            frozen_payload = frozen.get("frozen_result")
-            if not isinstance(frozen_payload, dict):
-                raise RewardContentError("exploration combat reward snapshot is missing")
-            frozen_result = dict(frozen_payload)
-            failure_result = frozen.get("battle_failure_result", {})
-            if not isinstance(failure_result, dict):
-                raise RewardContentError("exploration battle failure reward snapshot is invalid")
-            result = frozen_result if battle_outcome == "won" else dict(failure_result)
+            snapshot, frozen, frozen_result, failure_result = self._pending_exploration_rewards(session)
+            if frozen.get("battle_id") != battle_id:
+                raise RewardContentError("exploration reward snapshot does not match its session")
+
+            start_payload = self._require_exploration_operation(
+                connection,
+                operation_id=str(session["operation_id"]),
+                operation_name="exploration.start",
+                request_hash=self._request_hash(
+                    "exploration.start",
+                    {
+                        "platform": platform,
+                        "platform_user_id": platform_user_id,
+                        "mode_key": str(session["mode_key"]),
+                    },
+                ),
+                player_id=int(row["id"]),
+                label="exploration start",
+            )
+            if (
+                start_payload.get("exploration_id") != exploration_id
+                or start_payload.get("mode_key") != session["mode_key"]
+                or start_payload.get("location_key") != session["location_key"]
+                or start_payload.get("random_seed") != snapshot.get("random_seed")
+                or start_payload.get("reward_pool_key") != snapshot.get("reward_pool_key")
+                or start_payload.get("stamina_cost") != snapshot.get("stamina_cost")
+                or start_payload.get("energy_cost") != snapshot.get("energy_cost")
+                or start_payload.get("pollution_before") != snapshot.get("pollution_before")
+                or start_payload.get("pollution_after") != snapshot.get("pollution_after")
+                or start_payload.get("bloodline_stability_before")
+                != snapshot.get("bloodline_stability_before")
+                or start_payload.get("bloodline_stability_after")
+                != snapshot.get("bloodline_stability_after")
+                or self._strict_exploration_reward(
+                    start_payload.get("frozen_result", {}), "exploration start reward"
+                )
+                != frozen_result
+            ):
+                raise RewardContentError("exploration start operation does not match its snapshot")
+
+            expected_enemy_key = exploration_enemy_key(str(session["mode_key"]))
+            expected_battle_start_id = f"exploration.battle:{exploration_id}"
+            expected_battle_resolve_id = f"battle.resolve:{battle_id}"
+            battle_snapshot = self._strict_exploration_object(
+                battle["snapshot_json"], "exploration battle snapshot"
+            )
+            battle_player = battle_snapshot.get("player")
+            battle_enemy = battle_snapshot.get("enemy")
+            if (
+                str(battle["battle_type"]) != "pve.exploration"
+                or str(battle["start_operation_id"]) != expected_battle_start_id
+                or str(battle["resolved_operation_id"]) != expected_battle_resolve_id
+                or str(battle["enemy_key"]) != expected_enemy_key
+                or str(battle["location_key"]) != session["location_key"]
+                or battle_snapshot.get("battle_type") != "pve.exploration"
+                or battle_snapshot.get("exploration_id") != exploration_id
+                or battle_snapshot.get("location_key") != session["location_key"]
+                or not isinstance(battle_player, dict)
+                or battle_player.get("player_id") != str(row["player_id"])
+                or not isinstance(battle_enemy, dict)
+                or battle_enemy.get("key") != expected_enemy_key
+                or str(battle["reward_status"]) != "none"
+            ):
+                raise RewardContentError("settled battle does not belong to this exploration")
+
+            battle_start_payload = self._require_exploration_operation(
+                connection,
+                operation_id=expected_battle_start_id,
+                operation_name="battle.start.pve.exploration",
+                request_hash=self._request_hash(
+                    "battle.start.pve.exploration",
+                    {
+                        "platform": platform,
+                        "platform_user_id": platform_user_id,
+                        "enemy_key": str(expected_enemy_key),
+                        "battle_type": "pve.exploration",
+                        "exploration_id": exploration_id,
+                    },
+                ),
+                player_id=int(row["id"]),
+                label="exploration battle start",
+            )
+            if (
+                battle_start_payload.get("battle_id") != battle_id
+                or battle_start_payload.get("enemy_key") != expected_enemy_key
+                or battle_start_payload.get("status") != "created"
+            ):
+                raise RewardContentError("exploration battle start operation does not match its battle")
+
+            battle_result = self._strict_exploration_object(
+                battle["result_json"], "exploration battle result"
+            )
+            battle_outcome = battle_result.get("outcome")
+            if not isinstance(battle_outcome, str) or battle_outcome not in {"won", "lost"}:
+                raise RewardContentError("exploration battle result has an invalid outcome")
+            resolve_payload = self._require_exploration_operation(
+                connection,
+                operation_id=expected_battle_resolve_id,
+                operation_name="battle.resolve",
+                request_hash=self._request_hash("battle.resolve", {"battle_id": battle_id}),
+                player_id=int(row["id"]),
+                label="exploration battle resolution",
+            )
+            battle_reward = self._strict_exploration_reward(
+                battle_result.get("reward", {}), "exploration battle reward"
+            )
+            if (
+                resolve_payload.get("battle_id") != battle_id
+                or resolve_payload.get("status") != "settled"
+                or resolve_payload.get("outcome") != battle_outcome
+                or resolve_payload.get("reward_status") != battle["reward_status"]
+                or battle_result.get("reward_status") != battle["reward_status"]
+                or self._strict_exploration_reward(
+                    resolve_payload.get("reward", {}), "exploration battle operation reward"
+                )
+                != battle_reward
+            ):
+                raise RewardContentError("exploration battle resolution does not match its ledger")
+
+            result = frozen_result if battle_outcome == "won" else failure_result
             soul_power_loss = 0
             soul_fatigue_until = row["soul_fatigue_until"]
-            snapshot = decode_json_strict(session["snapshot_json"])
             bloodline_stability_after = int(snapshot.get("bloodline_stability_after", player_integer(row, "bloodline_stability")))
             if str(session["mode_key"]) == "explore.demon_abyss" and battle_outcome != "won":
                 soul_power_loss = min(20, player_integer(row, "soul_power"))
@@ -675,9 +893,9 @@ class ExplorationRepositoryMixin:
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
                 "expired": False,
-                "pollution_before": int(self._json_object(session["snapshot_json"], {}).get("pollution_before", 0)),
-                "pollution_after": int(self._json_object(session["snapshot_json"], {}).get("pollution_after", 0)),
-                "bloodline_stability_before": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_before", 0)),
+                "pollution_before": int(snapshot.get("pollution_before", 0)),
+                "pollution_after": int(snapshot.get("pollution_after", 0)),
+                "bloodline_stability_before": int(snapshot.get("bloodline_stability_before", 0)),
                 "bloodline_stability_after": bloodline_stability_after,
                 "soul_power_loss": soul_power_loss,
                 "soul_fatigue_until": soul_fatigue_until,
@@ -707,13 +925,13 @@ class ExplorationRepositoryMixin:
                 "battle_pending": False,
                 "expired": False,
                 "stamina_cost": int(session["stamina_cost"]),
-                "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
+                "energy_cost": int(snapshot.get("energy_cost", 0)),
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
-                "pollution_before": int(self._json_object(session["snapshot_json"], {}).get("pollution_before", 0)),
-                "pollution_after": int(self._json_object(session["snapshot_json"], {}).get("pollution_after", 0)),
-                "bloodline_stability_before": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_before", 0)),
-                "bloodline_stability_after": int(self._json_object(session["snapshot_json"], {}).get("bloodline_stability_after", 0)),
+                "pollution_before": int(snapshot.get("pollution_before", 0)),
+                "pollution_after": int(snapshot.get("pollution_after", 0)),
+                "bloodline_stability_before": int(snapshot.get("bloodline_stability_before", 0)),
+                "bloodline_stability_after": int(snapshot.get("bloodline_stability_after", 0)),
                 "soul_power_loss": soul_power_loss,
                 "soul_fatigue_until": soul_fatigue_until,
                 "reward_pool_key": snapshot.get("reward_pool_key"),
@@ -763,13 +981,24 @@ class ExplorationRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._exploration_settlement_from_payload(decode_json_strict(existing["result_json"]), replay=True)
+                identity = connection.execute(
+                    "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                    (platform, platform_user_id),
+                ).fetchone()
+                if identity is None:
+                    raise PlayerNotFoundError("player does not exist")
+                if int(existing["player_id"]) != int(identity["id"]):
+                    raise OperationConflictError("operation belongs to another player")
+                return self._exploration_settlement_from_payload(
+                    self._strict_exploration_object(existing["result_json"], "exploration operation result"),
+                    replay=True,
+                )
             row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM exploration_sessions WHERE player_id = ? AND status IN ('created', 'running', 'combat_pending') ORDER BY id DESC LIMIT 1",
@@ -778,22 +1007,18 @@ class ExplorationRepositoryMixin:
             if session is None:
                 raise ExplorationNotFoundError("no active exploration")
             if session["status"] == "combat_pending":
-                stored_result = self._json_object(session["result_json"], {})
-                result = {
-                    str(key): int(value)
-                    for key, value in dict(stored_result.get("result", {})).items()
-                }
+                snapshot, stored_result, frozen_result, _ = self._pending_exploration_rewards(session)
                 payload = {
                     "player": self._player_payload(self._row_to_player(row)),
                     "exploration_id": session["exploration_id"],
                     "mode_key": session["mode_key"],
                     "location_key": session["location_key"],
                     "status": "combat_pending",
-                    "result": result,
+                    "result": frozen_result,
                     "battle_pending": True,
                     "expired": False,
                     "stamina_cost": int(session["stamina_cost"]),
-                    "energy_cost": int(self._json_object(session["snapshot_json"], {}).get("energy_cost", 0)),
+                    "energy_cost": int(snapshot["energy_cost"]),
                     "battle_id": stored_result.get("battle_id"),
                     "battle_outcome": stored_result.get("battle_outcome"),
                 }

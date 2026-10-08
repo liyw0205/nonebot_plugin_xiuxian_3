@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import pytest
+from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -53,9 +54,14 @@ def _prepare_mortal(runtime, adapter: str, user: str) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             "UPDATE players SET stage='mortal', realm_key='mortal', realm_layer=0, "
-            "location_key='xuantian.outskirts', stamina=30, inventory_json=? "
+            "location_key='xuantian.outskirts', stamina=30, inventory_json=?, qualification_json=? "
             "WHERE platform=? AND platform_user_id=?",
-            (json.dumps({}, ensure_ascii=False), adapter, user),
+            (
+                json.dumps({}, ensure_ascii=False),
+                json.dumps(BALANCED_QUALIFICATION),
+                adapter,
+                user,
+            ),
         )
 
 
@@ -368,12 +374,11 @@ def test_gather_outskirts_encounter_rewards_follow_battle_result_on_both_adapter
                         with sqlite3.connect(runtime.settings.database_path) as connection:
                             connection.execute(
                                 "UPDATE players SET stage='cultivator', realm_key='qi_sensing', realm_layer=2, "
-                                "max_hp=?, initiative=?, qualification_json=? "
+                                "max_hp=?, initiative=? "
                                 "WHERE platform=? AND platform_user_id=?",
                                 (
                                     999,
                                     99,
-                                    json.dumps({"body": 2_000, "agility": 2_000} if outcome == "won" else {}),
                                     adapter,
                                     user,
                                 ),
