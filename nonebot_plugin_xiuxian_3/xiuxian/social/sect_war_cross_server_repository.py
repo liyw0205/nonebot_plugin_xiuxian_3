@@ -27,7 +27,7 @@ from ..persistence.errors import (
     CrossServerRosterCapError,
     CrossServerSourceInvalidError,
     CrossServerWarNotActiveError,
-    OperationConflictError,
+    OperationResultMalformedError,
     SectNotFoundError,
     SectPermissionDeniedError,
     SectWarRequirementError,
@@ -59,7 +59,9 @@ from .sect_war_cross_server_rules import (
 )
 from ..utils.assets import grant_player_assets
 from ..utils.json import json_list, json_object
+from ..utils.json_cache import decode_json_strict
 from ..utils.player import change_player_state
+from ..utils.operations import operation_replay
 
 
 class SectWarCrossServerRepositoryMixin:
@@ -356,16 +358,32 @@ class SectWarCrossServerRepositoryMixin:
             replay = self._cross_operation(connection, operation_id, operation_name, request_hash)
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             window, row = self._cross_prepare_round(connection, requested_id, now)
+            member = connection.execute("SELECT sect_id FROM sect_cross_server_war_members WHERE round_id=? AND player_id=?", (window.round_id, player["id"])).fetchone()
             if replay is not None:
-                return self._reward_from_payload(replay, already_completed=True)
+                record = self._reward_from_payload(replay, already_completed=True)
+                if member is None or record.round_id != window.round_id or record.sect_id != str(member["sect_id"]):
+                    raise OperationResultMalformedError("cross-server claim operation result does not match round")
+                return record
             self._cross_settle_if_due(connection, window, row, now)
             member = connection.execute("SELECT * FROM sect_cross_server_war_members WHERE round_id=? AND player_id=?", (window.round_id, player["id"])).fetchone()
             if member is None:
                 raise CrossServerRewardNotAvailableError("player has no cross-server reward")
-            pending = connection.execute("SELECT reward_json FROM sect_cross_server_weekly_rewards WHERE reward_key=?", (f"season.void_frontier.{window.week_id}:{player['id']}",)).fetchone()
+            reward_key = f"season.void_frontier.{window.week_id}:{player['id']}"
+            pending = connection.execute(
+                "SELECT reward_key,round_id,player_id,reward_json FROM sect_cross_server_weekly_rewards WHERE reward_key=?",
+                (reward_key,),
+            ).fetchone()
             if pending is None:
                 raise CrossServerRewardNotAvailableError("cross-server reward is not available")
-            reward = json_object(pending["reward_json"])
+            if (
+                isinstance(pending["player_id"], bool)
+                or not isinstance(pending["player_id"], int)
+                or str(pending["reward_key"]) != reward_key
+                or str(pending["round_id"]) != window.round_id
+                or int(pending["player_id"]) != int(player["id"])
+            ):
+                raise OperationResultMalformedError("cross-server weekly reward ownership is invalid")
+            reward = self._cross_weekly_reward_snapshot(pending["reward_json"])
             if reward.get("status") == "claimed":
                 payload = {"round_id": window.round_id, "sect_id": str(member["sect_id"]), "reward": {"void_merit": CROSS_SERVER_MEMBER_MERIT}, "status": "claimed"}
                 self._cross_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -377,7 +395,14 @@ class SectWarCrossServerRepositoryMixin:
                 value_delta={"void_merit": CROSS_SERVER_MEMBER_MERIT},
             )
             reward["status"] = "claimed"
-            connection.execute("UPDATE sect_cross_server_weekly_rewards SET reward_json=? WHERE reward_key=?", (json.dumps(reward, sort_keys=True), f"season.void_frontier.{window.week_id}:{player['id']}"))
+            connection.execute(
+                "UPDATE sect_cross_server_weekly_rewards SET reward_json=?, operation_id=? WHERE reward_key=?",
+                (
+                    json.dumps(reward, sort_keys=True),
+                    operation_id,
+                    reward_key,
+                ),
+            )
             payload = {"round_id": window.round_id, "sect_id": str(member["sect_id"]), "reward": {"void_merit": CROSS_SERVER_MEMBER_MERIT}, "status": "claimed"}
             self._cross_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._reward_from_payload(payload)
@@ -392,23 +417,60 @@ class SectWarCrossServerRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             replay = self._cross_operation(connection, operation_id, operation_name, request_hash)
             actor = self._require_player(connection, platform, platform_user_id)
-            target = self._require_player(connection, target_platform, target_platform_user_id, writable=False)
-            window, row = self._cross_prepare_round(connection, requested_id, self._now())
             membership = connection.execute("SELECT role,sect_id FROM sect_members WHERE player_id=? AND status='active'", (actor["id"],)).fetchone()
             if membership is None or str(membership["role"]) not in {"leader", "vice_leader"}:
                 raise SectPermissionDeniedError("only sect leader or vice leader can allocate rewards")
             sect_id = str(membership["sect_id"])
+            target = self._require_player(connection, target_platform, target_platform_user_id, writable=False)
+            window, row = self._cross_prepare_round(connection, requested_id, self._now())
             box = connection.execute("SELECT * FROM sect_cross_server_reward_boxes WHERE round_id=? AND sect_id=?", (window.round_id, sect_id)).fetchone()
             member = connection.execute("SELECT 1 FROM sect_cross_server_war_members WHERE round_id=? AND sect_id=? AND player_id=?", (window.round_id, sect_id, target["id"])).fetchone()
-            if box is None or member is None:
+            if member is None:
                 raise CrossServerRewardAllocationError("reward box or target member is unavailable")
-            reward = json_object(box["reward_json"]); distributed = json_object(box["distributed_json"])
-            available = int(reward.get("item.void_crystal", 0)) - int(distributed.get("item.void_crystal", 0))
+            if replay is not None:
+                allocation = connection.execute(
+                    "SELECT a.player_id,a.item_key,a.quantity,b.round_id,b.sect_id "
+                    "FROM sect_cross_server_reward_allocations a "
+                    "JOIN sect_cross_server_reward_boxes b ON b.box_id=a.box_id "
+                    "WHERE a.operation_id=?",
+                    (operation_id,),
+                ).fetchone()
+                record = self._reward_from_payload(replay, already_completed=True)
+                if (
+                    allocation is None
+                    or record.round_id != window.round_id
+                    or record.sect_id != sect_id
+                    or record.reward != {"item.void_crystal": quantity}
+                    or record.status not in {"partial", "distributed"}
+                    or str(allocation["round_id"]) != window.round_id
+                    or str(allocation["sect_id"]) != sect_id
+                    or int(allocation["player_id"]) != int(target["id"])
+                    or str(allocation["item_key"]) != "item.void_crystal"
+                    or int(allocation["quantity"]) != quantity
+                ):
+                    raise OperationResultMalformedError("cross-server allocation operation result does not match request")
+                return record
+            if box is None:
+                raise CrossServerRewardAllocationError("reward box or target member is unavailable")
+            registration = connection.execute(
+                "SELECT rank FROM sect_cross_server_war_registrations WHERE round_id=? AND sect_id=?",
+                (window.round_id, sect_id),
+            ).fetchone()
+            if registration is None or isinstance(registration["rank"], bool) or not isinstance(registration["rank"], int) or int(registration["rank"]) < 1:
+                raise CrossServerRewardAllocationError("reward box ranking is invalid")
+            expected_total = top_reward_for_rank(int(registration["rank"]))
+            reward = self._cross_reward_box_snapshot(box["reward_json"], expected_total, "reward box snapshot")
+            distributed = self._cross_reward_box_snapshot(
+                box["distributed_json"], expected_total, "distributed reward snapshot", allow_empty=True
+            )
+            distributed_amount = int(distributed.get("item.void_crystal", 0))
+            available = expected_total - distributed_amount
+            expected_status = "pending" if distributed_amount == 0 else "distributed" if distributed_amount == expected_total else "partial"
+            if str(box["status"]) != expected_status:
+                raise OperationResultMalformedError("cross-server reward box status is inconsistent")
             if quantity > available:
                 raise CrossServerRewardAllocationError("reward box quantity is insufficient")
-            if replay is not None:
-                return self._reward_from_payload(replay, already_completed=True)
-            distributed["item.void_crystal"] = int(distributed.get("item.void_crystal", 0)) + quantity
+            distributed["item.void_crystal"] = distributed_amount + quantity
             grant_player_assets(
                 connection,
                 target,
@@ -416,7 +478,7 @@ class SectWarCrossServerRepositoryMixin:
                 now_text,
             )
             connection.execute("INSERT INTO sect_cross_server_reward_allocations(box_id,player_id,operation_id,item_key,quantity,allocated_at) VALUES (?, ?, ?, 'item.void_crystal', ?, ?)", (box["box_id"], target["id"], operation_id, quantity, now_text))
-            status = "distributed" if int(distributed.get("item.void_crystal", 0)) >= int(reward.get("item.void_crystal", 0)) else "partial"
+            status = "distributed" if int(distributed["item.void_crystal"]) >= expected_total else "partial"
             connection.execute("UPDATE sect_cross_server_reward_boxes SET distributed_json=?, status=?, updated_at=? WHERE box_id=?", (json.dumps(distributed, sort_keys=True), status, now_text, box["box_id"]))
             payload = {"round_id": window.round_id, "sect_id": sect_id, "reward": {"item.void_crystal": quantity}, "status": status}
             self._cross_insert_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
@@ -496,16 +558,30 @@ class SectWarCrossServerRepositoryMixin:
             connection.execute("UPDATE sect_cross_server_war_sessions SET status=?,turn_no=?,engine_hp=?,replay_json=?,result_json=?,updated_at=? WHERE session_id=?", (status, turn, hp, json.dumps(replay, sort_keys=True), json.dumps({"victory": hp <= 0}, sort_keys=True), now_text, session["session_id"]))
 
     def _cross_auto_grant(self, connection: Any, window: CrossServerRoundWindow, now: datetime) -> None:
-        rows = connection.execute("SELECT reward_key,player_id,reward_json FROM sect_cross_server_weekly_rewards WHERE round_id=?", (window.round_id,)).fetchall()
+        rows = connection.execute(
+            "SELECT reward_key,round_id,player_id,reward_json FROM sect_cross_server_weekly_rewards WHERE round_id=?",
+            (window.round_id,),
+        ).fetchall()
         for row in rows:
-            reward = json_object(row["reward_json"])
+            expected_key = f"season.void_frontier.{window.week_id}:{row['player_id']}"
+            member = connection.execute(
+                "SELECT 1 FROM sect_cross_server_war_members WHERE round_id=? AND player_id=?",
+                (window.round_id, row["player_id"]),
+            ).fetchone()
+            if (
+                str(row["reward_key"]) != expected_key
+                or str(row["round_id"]) != window.round_id
+                or member is None
+            ):
+                raise OperationResultMalformedError("cross-server weekly reward ownership is invalid")
+            reward = self._cross_weekly_reward_snapshot(row["reward_json"])
             if reward.get("status") == "claimed":
                 continue
             player = connection.execute(
                 "SELECT * FROM players WHERE id = ?", (row["player_id"],)
             ).fetchone()
             if player is None:
-                continue
+                raise OperationResultMalformedError("cross-server weekly reward player is missing")
             change_player_state(
                 connection,
                 player,
@@ -545,12 +621,7 @@ class SectWarCrossServerRepositoryMixin:
 
     @staticmethod
     def _cross_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
-        existing = connection.execute("SELECT operation_name,request_hash,result_json FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
-        if existing is None:
-            return None
-        if str(existing["operation_name"]) != operation_name or str(existing["request_hash"]) != request_hash:
-            raise OperationConflictError("operation input differs from its original request")
-        return json_object(existing["result_json"])
+        return operation_replay(connection, operation_id, operation_name, request_hash)
 
     @staticmethod
     def _cross_insert_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: Mapping[str, object], now_text: str) -> None:
@@ -566,7 +637,70 @@ class SectWarCrossServerRepositoryMixin:
 
     @staticmethod
     def _reward_from_payload(payload: Mapping[str, object], *, already_completed: bool = False) -> CrossServerRewardRecord:
-        return CrossServerRewardRecord(str(payload["round_id"]), str(payload["sect_id"]), {str(k): int(v) for k, v in dict(payload.get("reward", {})).items()}, str(payload["status"]), already_completed)
+        if set(payload) != {"round_id", "sect_id", "reward", "status"}:
+            raise OperationResultMalformedError("cross-server reward result fields are invalid")
+        round_id = payload.get("round_id")
+        sect_id = payload.get("sect_id")
+        status = payload.get("status")
+        reward = payload.get("reward")
+        if not isinstance(round_id, str) or not round_id.startswith("sect_war.cross:") or not isinstance(sect_id, str) or not sect_id or not isinstance(status, str) or not isinstance(reward, dict):
+            raise OperationResultMalformedError("cross-server reward result fields are invalid")
+        if set(reward) == {"void_merit"}:
+            if status != "claimed" or reward["void_merit"] != CROSS_SERVER_MEMBER_MERIT:
+                raise OperationResultMalformedError("cross-server weekly reward result is invalid")
+        elif set(reward) == {"item.void_crystal"}:
+            amount = reward["item.void_crystal"]
+            if status not in {"partial", "distributed"} or isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
+                raise OperationResultMalformedError("cross-server allocation result is invalid")
+        else:
+            raise OperationResultMalformedError("cross-server reward result is invalid")
+        return CrossServerRewardRecord(round_id, sect_id, {str(k): int(v) for k, v in reward.items()}, status, already_completed)
+
+    @staticmethod
+    def _cross_weekly_reward_snapshot(value: Any) -> dict[str, object]:
+        try:
+            decoded = decode_json_strict(str(value))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError("cross-server weekly reward snapshot is malformed") from exc
+        merit = decoded.get("void_merit") if isinstance(decoded, dict) else None
+        status = decoded.get("status") if isinstance(decoded, dict) else None
+        if (
+            not isinstance(decoded, dict)
+            or set(decoded) != {"void_merit", "status"}
+            or isinstance(merit, bool)
+            or not isinstance(merit, int)
+            or merit != CROSS_SERVER_MEMBER_MERIT
+            or not isinstance(status, str)
+            or status not in {"pending", "claimed"}
+        ):
+            raise OperationResultMalformedError("cross-server weekly reward snapshot is invalid")
+        return {"void_merit": CROSS_SERVER_MEMBER_MERIT, "status": status}
+
+    @staticmethod
+    def _cross_reward_box_snapshot(
+        value: Any,
+        expected_total: int,
+        label: str,
+        *,
+        allow_empty: bool = False,
+    ) -> dict[str, int]:
+        try:
+            decoded = decode_json_strict(str(value))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise CrossServerRewardAllocationError(f"{label} is invalid") from exc
+        if not isinstance(decoded, dict) or set(decoded) - {"item.void_crystal"}:
+            raise CrossServerRewardAllocationError(f"{label} is invalid")
+        if "item.void_crystal" not in decoded:
+            if not allow_empty:
+                raise CrossServerRewardAllocationError(f"{label} is invalid")
+            return {"item.void_crystal": 0}
+        else:
+            amount = decoded["item.void_crystal"]
+            if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0 or (amount == 0 and not allow_empty):
+                raise CrossServerRewardAllocationError(f"{label} is invalid")
+        if expected_total <= 0 or amount > expected_total or (not allow_empty and amount != expected_total):
+            raise CrossServerRewardAllocationError(f"{label} is inconsistent")
+        return {"item.void_crystal": int(amount)}
 
 
 __all__ = ["SectWarCrossServerRepositoryMixin"]

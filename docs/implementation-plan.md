@@ -16,7 +16,7 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 [当前开发状态](current-status.md)是剩余工作的唯一清单。未出现在
 [当前开发状态](current-status.md)“已开放”表中的内容，不得被命令、按钮或 Web 写入口当作可用玩法。
 
-## 当前唯一切片：虚空前线周任务箱严格结算
+## 已闭合切片：虚空前线周任务箱严格结算
 
 开工证据：QQ 官方与 OneBot V11 的 `领取虚空前线周任务` 都读取
 `void_frontier_weekly_rewards.reward_json`。原实现使用宽松 JSON 解码，重复 `void_merit` 键、字符串数值或缺字段会被静默接受，
@@ -35,6 +35,33 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 `beast.gear.sack_small` 仍缺配方、成本和生产入口；生产恢复遮挡问题已有双适配器专项；未开放副本、Web 写入和跨服身份/资产操作前置不足，
 均不选。最近十条代码切片以 `cef0af4` 为止触及 `events` 两次、`player`/`progression` 各两次，其他候选领域要么冷却要么合同不完整；本条仅因公开
 资产篡改证据例外重入 `events`，不扩大到其他周箱或赛季领奖。
+
+## 已闭合切片：跨服宗门战奖励箱严格恢复
+
+开工证据：`分配跨服宗门战奖励` 已有 QQ 官方与 OneBot V11 共用的公开命令入口，但公共奖励箱的
+`reward_json`、`distributed_json`、成员周奖励和 operation 结果仍使用宽松 JSON 解码。重复键、字符串或负数、
+缺字段及奖励与已分配数量不一致时，可能扩大可分配虚空晶，或把坏账本带入领取和过期自动发放。
+
+本轮只处理跨服宗门战公共奖励箱分配、成员周奖励领取/自动发放及对应 operation 回放。复用
+`utils.json_cache.decode_json_strict`、共享角色资产/数值事务和现有 `BEGIN IMMEDIATE`；严格互证冻结奖励总量、已分配数量、
+轮次/宗门/成员归属、状态与 operation 结果。坏记录在资产、奖励箱、分配记录和 operation 写入前整体拒绝；修复后原 operation 可重试，
+成功结果在重启后只回放一次。
+
+文件所有权：主线独占 `xiuxian/social/sect_war_cross_server_repository.py`、相关共享校验及本计划/状态页；
+`/root/adapter_gap_audit` 独占 `test/test_sect_war_cross_server_reward_box_integrity.py`，覆盖 QQ 官方与 OneBot V11 的真实分配/领取命令、重复键/坏类型/缺字段/
+超发快照零写、operation 插入故障回滚、修复后原 operation 重试、runtime 重建幂等回放和过期自动发放；`/root/adapter_audit/mentor_audit` 独占
+`test/test_sect_war_cross_server_json_contract.py`，覆盖奖励箱与 operation 结果结构；`/root/adapter_audit` 只读核对适配器边界和师徒列表候选。
+主线完成最终整合与验收。
+
+明确排除：不改报名、积分来源、战争机关、跨服匹配、身份合并、玩家间资产转移、其他社交关系查询、正式 PvP/PvE 结算，
+切磋与训练傀儡仍为只读观战，不产生邀请、状态、扣费、奖励或图鉴写入；不新增运行时版本标识、旧格式兼容分支或玩家可见开发文案。
+
+候选比较：师徒关系查询缺状态集合、展示字段和纯只读过期投影合同；`item.manual.sunrise_breath` 缺真实来源；
+`beast.gear.sack_small` 缺配方、成本和生产入口；未开放跨服匹配和 Web 写入缺权限、审计、隔离与恢复前置，均暂缓。
+
+验收：跨服宗门战基础流程 2 项、JSON 合同 3 项、双适配器奖励箱与恢复专项 20 项通过；社交回归 10 项、仓储边界/文档/运行时无版本标识回归 8 项通过，
+源码与新增测试 `compileall`、`git diff --check` 通过。手动领取写入周奖励行的 operation 引用，已成功分配的 operation 先按分配账本回放，不因后来损坏的奖励箱快照重复发放。
+不新增运行时版本标识、旧格式兼容分支或玩家可见开发文案。
 
 ## 已闭合切片：派遣成本不得侵占交易预留物
 
