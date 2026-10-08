@@ -634,6 +634,7 @@ class CultivationRepositoryMixin:
         platform_user_id: str,
         path_key: str,
         subprofession_key: str | None,
+        request_args: tuple[str, ...],
         operation_id: str,
     ) -> CultivationRecord:
         await self.initialize()
@@ -644,8 +645,106 @@ class CultivationRepositoryMixin:
                 platform_user_id,
                 path_key,
                 subprofession_key,
+                request_args,
                 operation_id,
             )
+
+    async def replay_cultivation_entry(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        path_key: str | None,
+        subprofession_key: str | None,
+        request_args: tuple[str, ...],
+        operation_id: str,
+    ) -> CultivationRecord | None:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._replay_cultivation_entry,
+                platform,
+                platform_user_id,
+                path_key,
+                subprofession_key,
+                request_args,
+                operation_id,
+            )
+
+    def _replay_cultivation_entry(
+        self,
+        platform: str,
+        platform_user_id: str,
+        path_key: str | None,
+        subprofession_key: str | None,
+        request_args: tuple[str, ...],
+        operation_id: str,
+    ) -> CultivationRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT o.operation_name, o.request_hash, o.result_json,
+                       p.platform, p.platform_user_id
+                FROM operations AS o
+                LEFT JOIN players AS p ON p.id = o.player_id
+                WHERE o.operation_id = ?
+                """,
+                (operation_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            if (
+                row["operation_name"] != "player.enter_cultivation"
+                or row["platform"] != platform
+                or row["platform_user_id"] != platform_user_id
+            ):
+                raise OperationConflictError("operation input differs from its original request")
+            payload, record = self._decode_cultivation_entry_result(row["result_json"])
+
+            matches_current_key = False
+            if path_key is not None:
+                request_hash = self._request_hash(
+                    "player.enter_cultivation",
+                    {
+                        "platform": platform,
+                        "platform_user_id": platform_user_id,
+                        "path_key": path_key,
+                        "subprofession_key": subprofession_key,
+                    },
+                )
+                matches_current_key = row["request_hash"] == request_hash
+            if not matches_current_key and payload["request_args"] != list(request_args):
+                raise OperationConflictError("operation input differs from its original request")
+            return record
+
+    def _decode_cultivation_entry_result(
+        self, result_json: str
+    ) -> tuple[dict[str, Any], CultivationRecord]:
+        try:
+            payload = decode_json_strict(result_json)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError("cultivation entry result is malformed") from exc
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("player"), dict)
+            or not isinstance(payload.get("changed"), bool)
+        ):
+            raise OperationResultMalformedError("cultivation entry result is incomplete")
+        request_args = payload.get("request_args")
+        if not isinstance(request_args, list) or any(
+            not isinstance(value, str) for value in request_args
+        ):
+            raise OperationResultMalformedError("cultivation entry selectors are malformed")
+        player = self._row_to_player(payload["player"])
+        if not player.path_key:
+            raise OperationResultMalformedError("cultivation entry result has no path")
+        return payload, CultivationRecord(
+            player=player,
+            path_key=player.path_key,
+            subprofession_key=player.subprofession_key,
+            changed=payload["changed"],
+            already_completed=True,
+        )
 
     def _enter_cultivation_sync(
         self,
@@ -653,6 +752,7 @@ class CultivationRepositoryMixin:
         platform_user_id: str,
         path_key: str,
         subprofession_key: str | None,
+        request_args: tuple[str, ...],
         operation_id: str,
     ) -> CultivationRecord:
         last_error: Exception | None = None
@@ -663,6 +763,7 @@ class CultivationRepositoryMixin:
                     platform_user_id,
                     path_key,
                     subprofession_key,
+                    request_args,
                     operation_id,
                 )
             except sqlite3.OperationalError as exc:
@@ -680,6 +781,7 @@ class CultivationRepositoryMixin:
         platform_user_id: str,
         path_key: str,
         subprofession_key: str | None,
+        request_args: tuple[str, ...],
         operation_id: str,
     ) -> CultivationRecord:
         from ..player.path_rules import reward_items
@@ -699,19 +801,17 @@ class CultivationRepositoryMixin:
                 (operation_id,),
             ).fetchone()
             if existing_operation is not None:
+                if existing_operation["operation_name"] != "player.enter_cultivation":
+                    raise OperationConflictError("operation input differs from its original request")
+                payload, replay = self._decode_cultivation_entry_result(
+                    existing_operation["result_json"]
+                )
                 if (
-                    existing_operation["operation_name"] != "player.enter_cultivation"
-                    or existing_operation["request_hash"] != request_hash
+                    existing_operation["request_hash"] != request_hash
+                    and payload["request_args"] != list(request_args)
                 ):
                     raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing_operation["result_json"])
-                return CultivationRecord(
-                    player=self._row_to_player(payload["player"]),
-                    path_key=path_key,
-                    subprofession_key=subprofession_key,
-                    changed=bool(payload.get("changed", False)),
-                    already_completed=True,
-                )
+                return replay
 
             row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "seeker":
@@ -747,7 +847,11 @@ class CultivationRepositoryMixin:
             if updated is None:
                 raise RuntimeError("cultivation entry returned no row")
             player = self._row_to_player(updated)
-            payload = {"player": self._player_payload(player), "changed": True}
+            payload = {
+                "player": self._player_payload(player),
+                "changed": True,
+                "request_args": list(request_args),
+            }
             connection.execute(
                 """
                 INSERT INTO operations(

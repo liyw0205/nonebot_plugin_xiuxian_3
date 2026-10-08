@@ -187,14 +187,40 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 
 ### 4.0 当前切片选择账本
 
-**当前唯一切片：道途与辅修内容合同、入道解析和状态展示统一。** 角色入道已有 QQ 官方、OneBot V11
-和共享 application/repository 路径，但 `player/path_rules.py`、入道回执和资料展示仍维护重复的道途/辅修名称与别名表，
-`data/道途/道途.json` 也没有辅修名称/别名的独立记录。范围只包含道途记录的名称/别名、辅修子记录及入道奖励引用校验，
-共享内容解析、`选择道途` 输入、入道回执和 `我的状态` 展示；玩家持久化仍保存稳定 `path_key`/`subprofession_key`，
-既有奖励、图鉴和 operation 事务不变。锁定或歧义内容、坏引用和错误选择必须在写入前拒绝；成功 operation 继续幂等回放，
-两种适配器共用同一 application。道途战斗效果、领域选择/切换、生产规则、正式 PvP/PvE 和切磋/训练傀儡只读边界不在本轮。
-`/root/next_slice_scan` 独占 `data/道途/道途.json` 与 `xiuxian/player/path_rules.py`；主线独占 application、测试和本轮文档。
-灵兽行囊仍缺来源/配方合同，魔渊深层及其他未开放副本合同不完整，跨服/Web 写入口继续关闭。
+**已闭合切片：道途与辅修内容合同、入道解析和状态展示统一。** `选择道途` 的名称、别名、主动技能、
+入门物品和辅修子记录均由 `data/道途/道途.json` 当前内容驱动；`player/path_rules.py` 统一校验选择器、
+锁定记录、技能/物品引用和辅修奖励，入道回执与 `我的状态` 共用当前内容名称，玩家只保存稳定
+`path_key`/`subprofession_key`。QQ 官方与 OneBot V11 共用同一 application/repository，覆盖成功、错误选择、
+歧义/锁定内容零写、operation 冲突、故障回滚重试、重启回放以及改名后的稳定键回放；旧文字输入不保留兼容分支。
+本轮没有改道途战斗效果、领域选择/切换、生产规则、正式 PvP/PvE 或切磋/训练傀儡只读边界。
+专项 `test/test_path_content.py` 8 项及关联聚焦回归 95 项通过；`compileall`、全量内容 JSON 严格解析和
+`git diff --check` 通过。对应内容合同和道途领域文档已同步，提交为 `e1b5459`。
+
+**已闭合切片：道途选择词移出内容后的 operation 回放。** QQ 官方与 OneBot V11 公开命令均复现：以「百艺 阵法」入道后
+移除别名，原选择词和原 `operation_id` 重试曾返回 `INVALID_PATH`。现有账本在内容错误返回前核对；结果冻结原始选择词，
+同一原请求或当前解析为相同稳定键的请求回放首次结果，其他输入冲突。新 operation 仍按当前内容校验，移除别名不会成为
+兼容入口。没有改入道奖励、道途规则、正式 PvP/PvE、切磋/训练傀儡只读边界或其他玩家资产路径。
+
+专项 `test/test_path_alias_replay.py`、`test/test_path_content.py` 与适配器聚焦测试共 13 项通过（另有 20 项未选），
+真实 QQ/OneBot 事件归一化与重启回放 `test/test_path_alias_real_events.py` 2 项通过；文档/无运行时版本标识测试 5 项通过。
+源码及新增测试 `compileall`、全量内容 JSON 严格解析和 `git diff --check` 通过。子代理各自只读审计或独占新增测试文件，
+实现与最终集成由主线完成；具体入口、模块、最近十条及候选排除依据见实施计划。
+
+轮转窗口按 `git log -10` 的十条已闭合代码切片计，同一提交可触及多个模块：`player`/道途、`events`/日课、
+`adventures`/悬赏、`progression`/修炼、`world`/普通行程、`adapters`/命令门禁、`specials`/虚空塔、
+`production`/生产账本、`livelihood`/服务订单、`events`/灵泉轮次。只有 `events` 子插件触及两次，默认冷却；
+最近五条子插件互不重复。`utils` 与 `economy` 本窗口均未触及，`production` 一次，不能沿用旧窗口的频次称其冷却；
+道途重入仅因公开操作的幂等恢复缺陷例外。社交过期投影未显示动作、资产或权限绕过；功法 `item.manual.sunrise_breath`
+缺取得来源合同，灵兽 `beast.gear.sack_small` 仍为 `pending_recipe_key`，未开放秘境及 Web/跨服写入口前置不全，均不臆造规则。
+
+**当前轮转结果：暂无下一条可开工代码切片。** 最近十条窗口和候选比较已在实施计划留档。社交过期状态只有 `expired`
+投影延迟，时间门槛仍拒绝过期动作，未发现资产/权限影响；功法 `item.manual.sunrise_breath` 缺玩家取得来源合同，灵兽
+`beast.gear.sack_small` 仍为 `pending_recipe_key`，未开放副本与 Web/跨服写入口前置不全。先补功法来源合同或等待新的
+双适配器事务/恢复证据，不臆造来源、奖池、入口或兼容分支。
+
+上一条代码切片复用了 `utils.assets`、`utils.player` 现有玩家资产/数值内核，没有增加同义包装；混合成本预检少数调用仍可
+考虑复用，但不是阻断其他玩法的缺陷。只读审查确认切磋/训练傀儡整库零写及正式 PvP/PvE 结算已有双适配器专项覆盖；
+其他候选的入口、合同缺口、复用和轮转依据均见实施计划。
 
 **本轮闭合：日课领奖快照与 operation 严格回放。** `每日修行` / `领取日课嘉奖` 已有完整公开路径，
 但只读审计在 QQ 官方与 OneBot V11 均复现 `daily_task_rounds.snapshot_json` 奖励对象的重复 JSON 键会把

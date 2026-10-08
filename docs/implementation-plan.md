@@ -16,7 +16,7 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 [当前开发状态](current-status.md)是剩余工作的唯一清单。未出现在
 [当前开发状态](current-status.md)“已开放”表中的内容，不得被命令、按钮或 Web 写入口当作可用玩法。
 
-## 当前唯一切片：道途与辅修内容合同、入道解析和状态展示统一
+## 已闭合切片：道途与辅修内容合同、入道解析和状态展示统一
 
 本轮选择角色域 `player.enter_cultivation` 的内容消费缺口。现有 QQ 官方、OneBot V11 和共享 application/repository
 路径已经能完成入道，但 `player/path_rules.py`、`player/cultivation_use_cases.py` 与 `player/use_cases.py` 分别维护
@@ -36,6 +36,60 @@ operation 事务，不改奖励数值、道途效果、领域选择/切换、生
 当前内容名称而持久化稳定 key；锁定、歧义、错误类型、缺字段、坏奖励引用、主道途误带辅修和辅修缺选项均零写；成功 operation
 同输入重放与重启只返回原结果，不重复灵石、背包、图鉴。内容关闭/改名后的历史 operation 语义由现有 operation-first 仓储保持，
 若应用层无法在旧输入下抵达账本则测试明确拒绝，不增加兼容分支。
+
+实现与验收：`data/道途/道途.json` 增加道途/辅修名称、别名和辅修入门奖励记录；`path_rules.py` 负责领域内容校验，
+`cultivation_use_cases.py` 与 `player/use_cases.py` 统一入道和状态展示。专项 `test/test_path_content.py` 8 项，
+关联聚焦回归 95 项通过；`compileall`、全量内容 JSON 严格解析与 `git diff --check` 通过。提交为 `e1b5459`，
+已推送 `origin/main`。道途战斗效果、领域切换和独立辅修入口仍不在本条。
+
+## 已闭合切片：道途选择词移出内容后的 operation 回放
+
+入口是 QQ 官方与 OneBot V11 共用的 `CultivationApplication.enter_cultivation`。以「选择道途 百艺 阵法」入道后移除别名，
+原选择词和 `operation_id` 重试曾在两种适配器都返回 `INVALID_PATH`，没有回到已提交结果。现有账本在内容错误返回前核对；
+结果冻结原始选择词，同一原请求或当前解析为相同稳定键的请求回放首次结果，其他输入冲突。没有历史 operation 的请求仍须
+符合当前内容，移除别名不会留下兼容入口。
+
+主线负责 `xiuxian/player/cultivation_use_cases.py`、`xiuxian/progression/cultivation_repository.py` 和内容/状态/实施文档。
+`/root/path_alias_replay_test` 独占 `test/test_path_alias_replay.py`；`/root/adapter_test_scan` 独占
+`test/test_path_alias_real_events.py`，后者复用 QQ 官方和 OneBot V11 原始群事件 fixture，验证消息归一化、同事件 operation ID、
+重启后移除别名及原事件重放。`/root/candidate_audit` 比较候选和轮转窗口，`/root/reuse_scan` 审查共享工具，
+`/root/docs_rotation_check` 核对文档事实，均只读且未改运行时代码。
+
+聚焦 `test/test_path_alias_replay.py`、`test/test_path_content.py` 和 adapter simulation 过滤集共 13 项通过（20 项未选）；
+真实事件专项 2 项、文档与无运行时版本标识测试 5 项通过。源码及新增测试 `compileall`、全部内容 JSON 严格解析、
+`git diff --check` 通过。未运行整仓全量测试或 NoneBot transport 启动集成。
+
+### 轮转与候选留档
+
+最近十条已闭合代码切片，不计纯文档提交；同一提交允许涉及多个子插件。适配器列记录该切片的入口/测试路径，不表示每条都改写适配器。
+
+| 提交 | 玩家领域/能力 | 子插件与仓储 | 适配器路径 |
+|:--|:--|:--|:--|
+| `e1b5459` | 道途/辅修内容与入道选择 | `player/path_rules.py`、`player/cultivation_use_cases.py` | QQ 官方、OneBot V11 共用 application 测试 |
+| `afabb94` | 日课领奖恢复 | `events/daily_quest_repository.py` | QQ 官方、OneBot V11 |
+| `8775c7b` | 悬赏领奖恢复 | `adventures/repository.py` | QQ 官方、OneBot V11 |
+| `d8a040b` | 修炼快照结算 | `progression/cultivation_repository.py` | QQ 官方、OneBot V11 领域入口 |
+| `f6dd8e6` | 普通世界行程恢复 | `world/travel_repository.py` | QQ 官方、OneBot V11 |
+| `a6df3e1` | 命令门禁与共享路由 | `adapters/base.py`、`adapters/events.py`、`adapters/nonebot.py`、`adapters/onebot.py`、`adapters/qq.py` | QQ 官方、OneBot V11 真实事件 |
+| `f733734` | 虚空塔领奖恢复 | `specials/void_spire_repository.py` | QQ 官方、OneBot V11 |
+| `27f527c` | 生产快照恢复 | `production/contract_repository.py`、`production/repository.py` | QQ 官方、OneBot V11 |
+| `1b74cc3` | 服务订单结算恢复 | `livelihood/service_repository.py` | QQ 官方、OneBot V11 |
+| `cc66276` | 灵泉轮次总账 | `events/repository.py` | QQ 官方、OneBot V11 |
+
+十条窗口中 `events` 两次、其余各一次；最近五条无重复子插件。`utils`、`economy` 各零次，`production` 一次，不能按旧窗口
+误标为频次冷却。道途因公开 operation 恢复缺陷例外重入。其他候选比较如下：
+
+| 候选 | 入口与缺口证据 | 合同、复用、轮转 | 处理 |
+|:--|:--|:--|:--|
+| 道途原选择词 operation 回放 | `CultivationApplication.enter_cultivation`；`test_path_content.py` 原只测改名后稳定键回放；新增 QQ/OneBot 原文重放测试复现修复 | 道途刚闭合，因真实幂等恢复错误例外；复用现有 operation、玩家资产和图鉴事务 | 已闭合；不改奖励或战斗 |
+| 社交过期投影 | `partner_repository.py` 接受分支及 `sect_repository.py` 审批/撤回分支写 `expired` 后抛错回滚；`test_partner_expiry_and_pair_cooldown` 只验过期拒绝 | 时间门槛仍拒绝过期动作；未发现资产/权限阻断，社交生命周期已有切片 | 暂缓，不扩成社交重构 |
+| 功法来源 | `data/道具/功法.json` 中 `item.manual.sunrise_breath` 无取得来源 | 缺玩家来源、准入、成本、概率、奖励及绑定合同；消费规则已由 `manual_rules` 共用 | 先补领域合同，不编造奖池/入口 |
+| 灵兽小型行囊 | `data/灵兽/灵兽.json` 的 `beast.gear.sack_small` 为 `pending_recipe_key`；现有装备测试直接写背包 | 缺配方键、材料、成本和真实生产入口 | 保持不可取得，先补合同 |
+| 观战与正式 PvP/PvE | `test/test_spar_interactions.py`、`test/test_arena.py`、`test/test_party_combat.py` 覆盖只读观战及正式结算 | 两适配器均有专项覆盖；未发现可复现缺陷 | 不重复开发 |
+| 未开放副本、Web/跨服写入 | 状态页中对应入口仍为 `partial`/`locked` | 前置、规则或权限/审计/恢复合同未闭合 | 保持关闭 |
+| 共享工具整理 | `utils.assets`、`utils.player` 已集中玩家资产及数值读写 | 少数混合成本预检可复用既有 `player_requirements_missing`，但没有阻断其他领域的缺陷 | 不新增同义 wrapper；不单独切片 |
+
+**下一轮：暂无可开工代码切片。** 先补齐功法来源合同，或等待新的双适配器事务/恢复证据，再重新比较候选；不为提交频率重入近期领域。
 
 ## 已闭合切片：日课领奖快照与 operation 严格回放
 

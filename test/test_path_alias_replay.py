@@ -121,6 +121,16 @@ def test_path_alias_entry_replays_after_alias_removal(
             assert replay.message == entered.message
             assert {**replay.data, "idempotent_replay": False} == entered.data
 
+            conflict = await _dispatch(
+                recovered,
+                adapter,
+                user,
+                "enter-conflict",
+                operation_id,
+                "选择道途 失传方向",
+            )
+            assert conflict.code == "OPERATION_CONFLICT"
+
             new_operation = await _dispatch(
                 recovered,
                 adapter,
@@ -164,7 +174,7 @@ def test_path_alias_entry_replays_after_alias_removal(
                         "AND first_seen_operation_id=?",
                         (player[0], operation_id),
                     ).fetchone()[0]
-                    == 3
+                    == 2
                 )
         finally:
             await recovered.close()

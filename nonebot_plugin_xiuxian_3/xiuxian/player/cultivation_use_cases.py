@@ -52,17 +52,27 @@ class CultivationApplication:
 
     async def enter_cultivation(self, context: CommandContext) -> CommandResult:
         path_key, subprofession_key, error = self._parse_args(context.command_args)
-        if error:
-            return CommandResult(False, "INVALID_PATH", error, context.request_id)
         operation_id = self._operation_id(context)
         try:
-            record = await self.repository.enter_cultivation(
+            record = await self.repository.replay_cultivation_entry(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                path_key=path_key,
-                subprofession_key=subprofession_key,
+                path_key=path_key if error is None else None,
+                subprofession_key=subprofession_key if error is None else None,
+                request_args=context.command_args,
                 operation_id=operation_id,
             )
+            if record is None:
+                if error:
+                    return CommandResult(False, "INVALID_PATH", error, context.request_id, operation_id)
+                record = await self.repository.enter_cultivation(
+                    platform=context.adapter,
+                    platform_user_id=context.user_id,
+                    path_key=path_key,
+                    subprofession_key=subprofession_key,
+                    request_args=context.command_args,
+                    operation_id=operation_id,
+                )
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerStageConflictError:
@@ -88,6 +98,8 @@ class CultivationApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
+        path_key = record.path_key
+        subprofession_key = record.subprofession_key
         player = record.player
         try:
             selected_path_name = path_name(path_key, self.content)
