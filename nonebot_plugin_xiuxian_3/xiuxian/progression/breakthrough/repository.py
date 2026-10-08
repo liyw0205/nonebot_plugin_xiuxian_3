@@ -87,6 +87,7 @@ from ...exploration.rules import (
 )
 from ...adventures.models import BountyAcceptRecord, BountyBoardRecord, BountyClaimRecord, BountyOfferView
 from ...utils.assets import inventory_amount, player_currency
+from ...utils.json_cache import decode_json_strict
 from ...utils.player import (
     change_player_state,
     grant_player_state,
@@ -163,6 +164,261 @@ from ...persistence.errors import *  # noqa: F401,F403
 
 
 class BreakthroughRepositoryMixin:
+    _BREAKTHROUGH_SNAPSHOT_KEYS = frozenset(
+        {
+            "target_realm",
+            "source_realm",
+            "realm_key",
+            "realm_layer",
+            "cultivation",
+            "total_cultivation",
+            "location_key",
+            "path_key",
+            "subprofession_key",
+            "qualification",
+            "random_pool",
+            "base_success_bp",
+            "required_foundation_quality",
+            "foundation_quality",
+            "foundation_quality_on_success",
+            "quality_bonus_bp",
+            "technique_bonus_bp",
+            "formation_bonus_bp",
+            "location_bonus_bp",
+            "support_bonus_bp",
+            "support_key",
+            "alternative_material",
+            "preparation_bp",
+            "success_bp",
+            "pity_before_bp",
+            "protection_requested",
+            "protection_key",
+            "materials",
+            "currency_cost",
+            "random_seed",
+            "cross_realm_risk_bp",
+            "heart_demon_bonus_bp",
+            "pollution",
+            "cross_realm_penalty_bp",
+            "soul_power_before",
+            "world_merit_before",
+            "soul_prepare_bp",
+            "reputation_prepare_bp",
+            "quest_prepare_bp",
+            "route_count",
+            "domain_power",
+            "domain_charge_before",
+            "void_power_before",
+            "space_resistance_bp",
+            "void_instability_until",
+            "success_reward",
+            "success_reward_local_reputation_maximums",
+            "starts_at",
+            "ends_at",
+            "snapshot_digest",
+        }
+    )
+
+    @staticmethod
+    def _breakthrough_object(value: Any, field: str) -> dict[str, Any]:
+        try:
+            decoded = decode_json_strict(value) if isinstance(value, str) else value
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"invalid {field} JSON") from exc
+        if not isinstance(decoded, dict) or not decoded:
+            raise ValueError(f"invalid {field} object")
+        return decoded
+
+    @staticmethod
+    def _breakthrough_digest(value: dict[str, Any], digest_field: str) -> str:
+        unsigned = dict(value)
+        unsigned.pop(digest_field, None)
+        encoded = json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _validate_breakthrough_snapshot_integrity(cls, snapshot: dict[str, Any]) -> None:
+        if set(snapshot) != cls._BREAKTHROUGH_SNAPSHOT_KEYS:
+            raise ValueError("breakthrough snapshot fields are incomplete")
+        digest = snapshot["snapshot_digest"]
+        if not isinstance(digest, str) or digest != cls._breakthrough_digest(snapshot, "snapshot_digest"):
+            raise ValueError("breakthrough snapshot digest is invalid")
+        if not isinstance(snapshot["target_realm"], str) or not isinstance(snapshot["source_realm"], str):
+            raise ValueError("breakthrough snapshot realms are invalid")
+        if not isinstance(snapshot["random_seed"], str) or not snapshot["random_seed"]:
+            raise ValueError("breakthrough snapshot seed is invalid")
+        if not isinstance(snapshot["protection_requested"], bool):
+            raise ValueError("breakthrough snapshot protection flag is invalid")
+        if snapshot["protection_key"] is not None and not isinstance(snapshot["protection_key"], str):
+            raise ValueError("breakthrough snapshot protection key is invalid")
+        if snapshot["support_key"] is not None and not isinstance(snapshot["support_key"], str):
+            raise ValueError("breakthrough snapshot support key is invalid")
+        if snapshot["alternative_material"] is not None and not isinstance(snapshot["alternative_material"], str):
+            raise ValueError("breakthrough snapshot alternative material is invalid")
+        if snapshot["foundation_quality_on_success"] is not None and (
+            isinstance(snapshot["foundation_quality_on_success"], bool)
+            or not isinstance(snapshot["foundation_quality_on_success"], int)
+        ):
+            raise ValueError("breakthrough snapshot foundation quality is invalid")
+        for field in (
+            "realm_layer",
+            "cultivation",
+            "total_cultivation",
+            "base_success_bp",
+            "required_foundation_quality",
+            "foundation_quality",
+            "quality_bonus_bp",
+            "technique_bonus_bp",
+            "formation_bonus_bp",
+            "location_bonus_bp",
+            "support_bonus_bp",
+            "preparation_bp",
+            "success_bp",
+            "pity_before_bp",
+            "currency_cost",
+            "cross_realm_risk_bp",
+            "heart_demon_bonus_bp",
+            "pollution",
+            "cross_realm_penalty_bp",
+            "soul_power_before",
+            "world_merit_before",
+            "soul_prepare_bp",
+            "reputation_prepare_bp",
+            "quest_prepare_bp",
+            "route_count",
+            "domain_power",
+            "domain_charge_before",
+            "void_power_before",
+            "space_resistance_bp",
+        ):
+            value = snapshot[field]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"breakthrough snapshot {field} is invalid")
+        if not isinstance(snapshot["qualification"], dict):
+            raise ValueError("breakthrough snapshot qualification is invalid")
+        materials = snapshot["materials"]
+        if not isinstance(materials, dict) or any(
+            not isinstance(key, str)
+            or isinstance(quantity, bool)
+            or not isinstance(quantity, int)
+            or quantity <= 0
+            for key, quantity in materials.items()
+        ):
+            raise ValueError("breakthrough snapshot materials are invalid")
+        if not isinstance(snapshot["success_reward_local_reputation_maximums"], dict):
+            raise ValueError("breakthrough snapshot reputation caps are invalid")
+        if snapshot["void_instability_until"] is not None and not isinstance(snapshot["void_instability_until"], str):
+            raise ValueError("breakthrough snapshot instability is invalid")
+        if not isinstance(snapshot["starts_at"], str) or not isinstance(snapshot["ends_at"], str):
+            raise ValueError("breakthrough snapshot timing is invalid")
+
+    @classmethod
+    def _validate_breakthrough_snapshot(
+        cls,
+        snapshot: dict[str, Any],
+        session: sqlite3.Row,
+        definition: Any,
+    ) -> None:
+        cls._validate_breakthrough_snapshot_integrity(snapshot)
+        if snapshot["target_realm"] != session["target_realm"]:
+            raise ValueError("breakthrough snapshot target does not match session")
+        if snapshot["random_seed"] != session["operation_id"]:
+            raise ValueError("breakthrough snapshot operation does not match session")
+        if snapshot["starts_at"] != session["starts_at"]:
+            raise ValueError("breakthrough snapshot timing does not match session")
+        try:
+            snapshot_end = datetime.fromisoformat(snapshot["ends_at"])
+            session_end = datetime.fromisoformat(str(session["ends_at"]))
+        except ValueError as exc:
+            raise ValueError("breakthrough snapshot timing is invalid") from exc
+        if session_end > snapshot_end:
+            raise ValueError("breakthrough session was extended beyond its frozen end")
+        if snapshot["source_realm"] != definition.source_realm or snapshot["target_realm"] != definition.target_realm:
+            raise ValueError("breakthrough snapshot realm does not match definition")
+        if snapshot["random_pool"] != definition.random_pool or snapshot["currency_cost"] != definition.currency_cost:
+            raise ValueError("breakthrough snapshot rule does not match definition")
+        if snapshot["base_success_bp"] != definition.base_success_bp:
+            raise ValueError("breakthrough snapshot base success does not match definition")
+        if not definition.minimum_success_bp <= snapshot["success_bp"] <= definition.maximum_success_bp:
+            raise ValueError("breakthrough snapshot success rate is out of range")
+        expected_materials = dict(definition.materials)
+        alternative = snapshot["alternative_material"]
+        if alternative is not None:
+            if snapshot["target_realm"] != "nascent_soul" or alternative not in {"item.demon_core", "item.beast_blood"}:
+                raise ValueError("breakthrough snapshot alternative material is invalid")
+            expected_materials[alternative] = 2
+        if snapshot["materials"] != expected_materials:
+            raise ValueError("breakthrough snapshot materials do not match definition")
+        expected_protection = definition.protection_key if snapshot["protection_requested"] else None
+        if snapshot["protection_key"] != expected_protection:
+            raise ValueError("breakthrough snapshot protection does not match definition")
+
+    @classmethod
+    def _validate_breakthrough_result(
+        cls,
+        result: dict[str, Any],
+        *,
+        session_id: str,
+        target_realm: str,
+        player_id: str | None = None,
+    ) -> None:
+        if not isinstance(result, dict) or not result:
+            raise ValueError("breakthrough result is invalid")
+        digest = result.get("result_digest")
+        digest_source = dict(result)
+        digest_source.pop("session_id", None)
+        digest_source.pop("target_realm", None)
+        digest_source.pop("player", None)
+        if not isinstance(digest, str) or digest != cls._breakthrough_digest(digest_source, "result_digest"):
+            raise ValueError("breakthrough result digest is invalid")
+        if result.get("session_id") != session_id or result.get("target_realm") != target_realm:
+            raise ValueError("breakthrough result identity is invalid")
+        if player_id is not None:
+            player_payload = result.get("player")
+            if (
+                not isinstance(player_payload, dict)
+                or player_payload.get("id") != player_id
+                or player_payload.get("player_id") != player_id
+            ):
+                raise ValueError("breakthrough result player is invalid")
+        for field in (
+            "roll_bp",
+            "success_bp",
+            "cultivation_before",
+            "cultivation_after",
+            "pity_before_bp",
+            "pity_after_bp",
+            "currency_spent",
+            "preparation_bp",
+            "reward_currency",
+            "reward_stamina",
+            "reward_world_merit",
+            "reward_local_reputation",
+            "foundation_quality",
+            "required_foundation_quality",
+            "soul_prepare_bp",
+            "reputation_prepare_bp",
+            "quest_prepare_bp",
+            "location_bonus_bp",
+            "support_bonus_bp",
+            "cross_realm_risk_bp",
+            "heart_demon_bonus_bp",
+        ):
+            value = result.get(field)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"breakthrough result {field} is invalid")
+        for field in ("success", "protection_consumed", "heart_demon_pending"):
+            if not isinstance(result.get(field), bool):
+                raise ValueError(f"breakthrough result {field} is invalid")
+        if result.get("status") not in {"succeeded", "failed"}:
+            raise ValueError("breakthrough result status is invalid")
+        if result.get("materials") is not None and not isinstance(result["materials"], dict):
+            raise ValueError("breakthrough result materials are invalid")
+        if result.get("reward_items") is not None and not isinstance(result["reward_items"], dict):
+            raise ValueError("breakthrough result rewards are invalid")
+        if result.get("weakness_until") is not None and not isinstance(result["weakness_until"], str):
+            raise ValueError("breakthrough result weakness is invalid")
+
     async def prepare_nascent_soul(
         self,
         *,
@@ -284,13 +540,33 @@ class BreakthroughRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, request_hash, player_id, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing["result_json"])
+                row = self._require_player(connection, platform, platform_user_id, writable=False)
+                if int(existing["player_id"]) != int(row["id"]):
+                    raise OperationConflictError("operation does not belong to this player")
+                payload = self._breakthrough_object(existing["result_json"], "breakthrough start operation")
+                snapshot = self._breakthrough_object(payload.get("snapshot"), "breakthrough start snapshot")
+                self._validate_breakthrough_snapshot_integrity(snapshot)
+                if (
+                    payload.get("session_id") is None
+                    or payload.get("target_realm") != snapshot["target_realm"]
+                    or payload.get("starts_at") != snapshot["starts_at"]
+                    or payload.get("ends_at") != snapshot["ends_at"]
+                    or payload.get("success_bp") != snapshot["success_bp"]
+                ):
+                    raise ValueError("breakthrough start operation does not match snapshot")
+                player_payload = payload.get("player")
+                if (
+                    not isinstance(player_payload, dict)
+                    or player_payload.get("id") != row["player_id"]
+                    or player_payload.get("player_id") != row["player_id"]
+                ):
+                    raise ValueError("breakthrough start operation player is invalid")
                 return BreakthroughSessionRecord(
                     player=self._row_to_player(payload["player"]),
                     session_id=str(payload["session_id"]),
@@ -592,7 +868,10 @@ class BreakthroughRepositoryMixin:
                 "void_instability_until": row["void_instability_until"],
                 "success_reward": success_reward,
                 "success_reward_local_reputation_maximums": success_reward_local_reputation_maximums,
+                "starts_at": starts_at,
+                "ends_at": ends_at,
             }
+            snapshot["snapshot_digest"] = self._breakthrough_digest(snapshot, "snapshot_digest")
             value_delta = {
                 "world_merit": -(
                     100 if is_nascent else 500 if is_soul_transformation or is_void_refining else 0
@@ -643,6 +922,7 @@ class BreakthroughRepositoryMixin:
                 "ends_at": ends_at,
                 "success_bp": final_success_bp,
                 "protection_key": snapshot["protection_key"],
+                "snapshot": snapshot,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -930,13 +1210,45 @@ class BreakthroughRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, request_hash, player_id, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._breakthrough_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+                row = self._require_player(connection, platform, platform_user_id, writable=False)
+                if int(existing["player_id"]) != int(row["id"]):
+                    raise OperationConflictError("operation does not belong to this player")
+                payload = self._breakthrough_object(existing["result_json"], "breakthrough settlement operation")
+                session_id = payload.get("session_id")
+                if not isinstance(session_id, str) or not session_id:
+                    raise ValueError("breakthrough settlement operation has no session")
+                session = connection.execute(
+                    "SELECT * FROM breakthrough_sessions WHERE session_id = ? AND player_id = ? LIMIT 1",
+                    (session_id, row["id"]),
+                ).fetchone()
+                if session is None or session["status"] not in {"succeeded", "failed"}:
+                    raise ValueError("breakthrough settlement operation has no terminal session")
+                stored_result = self._breakthrough_object(session["result_json"], "breakthrough settlement result")
+                stored_payload = {
+                    "session_id": str(session["session_id"]),
+                    "target_realm": str(session["target_realm"]),
+                    **stored_result,
+                }
+                self._validate_breakthrough_result(
+                    stored_payload,
+                    session_id=str(session["session_id"]),
+                    target_realm=str(session["target_realm"]),
+                )
+                self._validate_breakthrough_result(
+                    payload,
+                    session_id=str(session["session_id"]),
+                    target_realm=str(session["target_realm"]),
+                    player_id=str(row["player_id"]),
+                )
+                if {key: value for key, value in payload.items() if key != "player"} != stored_payload:
+                    raise ValueError("breakthrough settlement operation does not match session result")
+                return self._breakthrough_settlement_from_payload(payload, replay=True)
             row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM breakthrough_sessions WHERE player_id = ? AND status = 'preparing' ORDER BY id DESC LIMIT 1",
@@ -953,13 +1265,27 @@ class BreakthroughRepositoryMixin:
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now < ends_at:
                 raise BreakthroughNotReadyError("breakthrough is not ready")
-            snapshot = self._json_object(session["snapshot_json"], {})
+            snapshot = self._breakthrough_object(session["snapshot_json"], "breakthrough snapshot")
             from ...progression.breakthrough.rules import breakthrough_definition
 
             try:
-                definition = breakthrough_definition(str(snapshot.get("target_realm", session["target_realm"])))
+                definition = breakthrough_definition(str(snapshot["target_realm"]))
             except ValueError as exc:
                 raise BreakthroughRequirementError("historical breakthrough rule is unavailable") from exc
+            self._validate_breakthrough_snapshot(snapshot, session, definition)
+            start_operation = connection.execute(
+                "SELECT operation_name, player_id, result_json FROM operations WHERE operation_id = ?",
+                (session["operation_id"],),
+            ).fetchone()
+            if start_operation is None or start_operation["operation_name"] != definition.key:
+                raise ValueError("breakthrough start operation is missing")
+            if int(start_operation["player_id"]) != int(row["id"]):
+                raise ValueError("breakthrough start operation player is invalid")
+            start_payload = self._breakthrough_object(start_operation["result_json"], "breakthrough start operation")
+            start_snapshot = self._breakthrough_object(start_payload.get("snapshot"), "breakthrough start snapshot")
+            self._validate_breakthrough_snapshot_integrity(start_snapshot)
+            if start_snapshot != snapshot:
+                raise ValueError("breakthrough start snapshot does not match session")
             success_reward = None
             success_reward_local_reputation_maximums: dict[str, int] = {}
             if definition.reward_key is not None:
@@ -1177,6 +1503,17 @@ class BreakthroughRepositoryMixin:
                 "status": status,
                 "heart_demon_pending": heart_demon_pending,
             }
+            result["result_digest"] = self._breakthrough_digest(result, "result_digest")
+            result_payload = {
+                "session_id": str(session["session_id"]),
+                "target_realm": str(session["target_realm"]),
+                **result,
+            }
+            self._validate_breakthrough_result(
+                result_payload,
+                session_id=str(session["session_id"]),
+                target_realm=str(session["target_realm"]),
+            )
             connection.execute(
                 "UPDATE breakthrough_sessions SET status = ?, result_json = ?, updated_at = ? WHERE id = ?",
                 (status, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
@@ -1219,7 +1556,13 @@ class BreakthroughRepositoryMixin:
             if updated is None:
                 raise RuntimeError("breakthrough settlement returned no player")
             player = self._row_to_player(updated)
-            payload = {"player": self._player_payload(player), "session_id": session["session_id"], "target_realm": session["target_realm"], **result}
+            payload = {"player": self._player_payload(player), **result_payload}
+            self._validate_breakthrough_result(
+                payload,
+                session_id=str(session["session_id"]),
+                target_realm=str(session["target_realm"]),
+                player_id=str(row["player_id"]),
+            )
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (operation_id, operation_name, row["id"], request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),

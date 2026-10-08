@@ -1841,3 +1841,19 @@ OneBot V11 共享 application/repository、正式 `pve.domain_front` 战斗结�
 事务故障重试和坏快照零写；领域前线聚焦组 11 项、只读观战回归 5 项通过，源码与测试 `compileall`、全部内容 JSON 严格解析及
 `git diff --check` 完成。旧开发数据库中新增规则快照列可能为空对象、旧占点 CHECK 约束不会由 `IF NOT EXISTS` 更新；不加入兼容分支或历史回填，
 正式发布前重建开发库或执行明确迁移。整仓全量测试和新角色飞升长链不以局部结果代称。
+
+### 已闭合切片：突破结算严格快照与 operation 互证
+
+候选轮转发现公开入口 `开始突破 聚气` -> `结算突破` 存在可复现的资产与境界篡改：`progression/breakthrough/repository.py`
+以宽松 JSON 读取 `breakthrough_sessions.snapshot_json`，重复的 `success_bp` 键可把原本失败的 roll 改成成功；QQ 官方与 OneBot V11
+均已复现角色从当前境界 L10 直接晋升、扣除/发放灵石。现有突破测试只覆盖正常结果与普通幂等，没有坏快照、双适配器、重启和故障重试。
+
+本条处理了突破开始/结算及 `progression.settle_breakthrough` operation 的严格 JSON、会话列/玩家归属/冻结字段互证和原子恢复。重复键、截断、
+非对象、布尔或越界数值、错误奖励/随机种子、坏账本均在境界、修为、资源、会话终态和 operation 写入前拒绝；修复后沿原 operation
+重试，成功回放不重复结算。主线拥有状态/计划文档和最终整合；`/root/candidate_rotation` 独占
+`xiuxian/progression/breakthrough/repository.py` 与新增 `test/test_breakthrough_snapshot_integrity.py`，只修改该仓储和专项测试；
+其他代理仅做只读合同/适配器审查。复用 `utils.json_cache.decode_json_strict`、共享角色状态事务和既有 operation 协议。
+
+不改变突破规则、奖励数值、心魔/炼虚后续流程、正式 PvE/PvP 结算或切磋/训练傀儡只读边界；未新增运行时版本标识、旧格式兼容分支或开发文案。
+QQ 官方与 OneBot V11 的专项 8 项、原突破测试 14 项、同域回归 57 项通过；覆盖损坏快照零写、operation 结果损坏只读拒绝、账本写入故障回滚、修复重试、runtime 重建和同 operation 幂等。
+源码与测试 `compileall`、全部内容 JSON 严格解析及 `git diff --check` 通过；未宣称整仓全量测试或新角色飞升长链通过。
