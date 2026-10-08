@@ -337,7 +337,7 @@ class WorldApplication:
         except ResourceInsufficientError:
             return CommandResult(False, "CLOUD_FARE_INSUFFICIENT", "体力不足，未扣除灵石或凭证。", context.request_id, operation_id)
         except CloudBoatBusyError:
-            return CommandResult(False, "TRAVEL_BUSY", "已有移动、修炼、生产或云舟会话，请先完成后再试。", context.request_id, operation_id)
+            return CommandResult(False, "TRAVEL_BUSY", "已有移动、修炼、生产或云舟行程，请先完成后再试。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerSuspendedError:
@@ -351,7 +351,7 @@ class WorldApplication:
         return CommandResult(
             True,
             "CLOUD_BOAT_STARTED",
-            f"## {definition.label}已起航\n\n- **耗时**：{definition.duration_seconds // 60} 分钟\n- **体力**：-{record.stamina_cost}\n- **灵石**：-{record.currency_cost}\n- **凭证**：{pass_label} ×{record.pass_quantity if record.pass_key else 0}\n\n> 抵达后发送 `结算云舟`。航线与费用已冻结，重复请求不会重复扣费。",
+            f"## {definition.label}已起航\n\n- **耗时**：{definition.duration_seconds // 60} 分钟\n- **体力**：-{record.stamina_cost}\n- **灵石**：-{record.currency_cost}\n- **凭证**：{pass_label} ×{record.pass_quantity if record.pass_key else 0}\n\n> 抵达后发送 `结算云舟`。航路与费用已经定下，重复请求不会重复扣费。",
             context.request_id,
             operation_id,
             data={"session_id": record.session_id, "route_key": record.route_key, "destination": record.destination, "status": record.status, "ends_at": record.ends_at, "idempotent_replay": record.already_completed},
@@ -406,7 +406,7 @@ class WorldApplication:
         return CommandResult(
             True,
             "CLOUD_BOAT_RECOVERED",
-            "## 云舟已恢复抵达\n\n已按创建时冻结的航线和费用写入位置，不会再次扣除资源。",
+            "## 云舟已恢复抵达\n\n已按登舟时定下的航路和费用抵达，不会再次扣除资源。",
             context.request_id,
             operation_id,
             data={"session_id": record.session_id, "route_key": record.route_key, "destination": record.destination, "status": record.status, "arrived": record.arrived, "idempotent_replay": record.already_completed},
