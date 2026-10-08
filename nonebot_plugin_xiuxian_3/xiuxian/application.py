@@ -599,6 +599,7 @@ class XiuxianApplication:
         return await self._invoke(
             context,
             lambda: self.combat.start_training_battle(context),
+            require_write=False,
             write_message="当前事件不允许开始训练战。",
         )
 

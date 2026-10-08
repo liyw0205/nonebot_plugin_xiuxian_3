@@ -148,3 +148,47 @@ def test_training_dummy_is_read_only_and_has_no_reward_or_replay(adapter: str) -
             await runtime.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ("qq.official", "onebot.v11"))
+def test_spectators_accept_read_only_identity_on_both_adapters(adapter: str) -> None:
+    async def run() -> None:
+        player = _context(adapter, f"readonly-{adapter}", f"readonly-{adapter}-request")
+        opponent_adapter = "onebot.v11" if adapter == "qq.official" else "qq.official"
+        opponent = _context(opponent_adapter, f"opponent-{adapter}", f"opponent-{adapter}-request")
+        player_name = f"甲-{adapter}"
+        opponent_name = f"乙-{adapter}"
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            await _create(runtime, player, f"readonly-{adapter}-create")
+            await _create(runtime, opponent, f"opponent-{adapter}-create")
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                for context, dao_name in ((player, player_name), (opponent, opponent_name)):
+                    connection.execute(
+                        "UPDATE players SET stage='cultivator', realm_key='qi_sensing', "
+                        "realm_layer=1, dao_name=? WHERE platform=? AND platform_user_id=?",
+                        (dao_name, context.adapter, context.user_id),
+                    )
+                before_database = tuple(connection.iterdump())
+
+            read_only = replace(player, can_write_assets=False, operation_id="readonly-training")
+            training = await runtime.application.start_training_battle(read_only)
+            assert training.code == "TRAINING_SPECTATOR"
+            assert training.data["status"] == "spectator"
+            assert training.data["actions"]
+
+            spar_context = replace(
+                read_only,
+                operation_id="readonly-spar",
+                command_args=(opponent_name,),
+            )
+            spar = await runtime.application.spar_players(spar_context)
+            assert spar.code == "SPAR_SPECTATOR"
+            assert spar.data["persistent"] is False
+            assert spar.data["actions"]
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert tuple(connection.iterdump()) == before_database
+            await runtime.close()
+
+    asyncio.run(run())

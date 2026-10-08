@@ -1663,3 +1663,15 @@ application 规则、不引入第二份白名单。事件 operation ID 在归一
 路径 15 项；文档/内容/无版本标识 14 项；内容 JSON 严格解析 9 项；`compileall` 和
 `git diff --check` 通过。验收覆盖 QQ 官方与 OneBot V11 的适用路径、重启恢复、operation 幂等/冲突、坏账本只读拒绝
 和事务故障重试；未宣称整仓全量测试通过，其他路线和未开放领域不计入本条。
+
+### 已闭合切片：训练傀儡观战接受只读权限上下文
+
+这不是按文档顺序续做。训练傀儡已有只读观战合同和 repository 预览，但 application 门禁没有声明该用例无需资产写权限：`start_training_battle()` 调 `_invoke` 时沿用默认 `require_write=True`。QQ 官方和 OneBot V11 的只读上下文均可复现 `INVALID_CONTEXT`，相同上下文调用切磋则正确返回 `SPAR_SPECTATOR`。现已在 application 明确 `require_write=False`，让门禁与只读用例一致。
+
+最近十条实际代码切片（不计纯测试提交 `2360b13`）依次为：`4b7c013` specials/utils、`7de4df0` player/progression、`e1b5459` player、`afabb94` events、`8775c7b` adventures、`d8a040b` progression、`f6dd8e6` world、`a6df3e1` adapters、`f733734` specials、`27f527c` production。`specials` 与 `player` 各触及两次，按子插件冷却暂缓；战斗只读入口不属于近期切片。
+
+候选比较：领域前线的事件 JSON 引用了奖励包中不存在的稳定键，活动与赛季规则尚未形成完整内容快照，登记为后续合同切片；师徒本人关系查询缺少状态投影和过期邀请语义；功法来源与灵兽行囊配方缺少发放/配方合同；未开放副本、Web 和跨服写入口继续关闭。当前训练傀儡合同完整且有明确权限复现，影响两种适配器的只读上下文，优先用最小应用修复及双路径零写测试闭合。
+
+文件所有权：主线独占 `nonebot_plugin_xiuxian_3/xiuxian/application.py`、本计划和当前状态；`combat_boundary_audit` 独占 `test/test_spar_interactions.py`，新增 `can_write_assets=False` 下 QQ 官方/OneBot V11 训练傀儡观战、全库零写及切磋对照回归。未触碰训练傀儡/切磋 repository、邀请或战斗状态、费用、奖励、图鉴；正式 PvP/PvE 仍沿原结算。无版本标识、兼容分支或玩家可见开发文案。
+
+验收：`test/test_spar_interactions.py`、`test/test_arena.py`、`test/test_party_combat.py` 与构筑投影用例共 12 项通过。两适配器只读身份均返回训练观战结果，训练与切磋调用前后数据库 `iterdump()` 完全一致；正式 PvP/PvE 回归通过。
