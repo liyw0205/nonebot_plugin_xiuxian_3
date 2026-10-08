@@ -47,19 +47,11 @@ from ..progression.breakthrough.models import (
     WeaknessRecoveryRecord,
     DomainSelectionRecord,
 )
-from ..advancement.models import RetreatSessionRecord, RetreatSettlementRecord
 from ..advancement.constitution_models import ConstitutionRecord
 from ..advancement.talent_models import TalentNodeRecord, TalentProfileRecord
 from ..advancement.skill_models import SkillMasteryRecord, SkillProfileRecord
 from ..advancement.equipment_models import EquipmentRecord, RefinementRecord, TemperingRecord
-from ..advancement.rules import (
-    MAX_OFFLINE_SECONDS,
-    MAX_SETTLEMENT_SECONDS,
-    RETREAT_BASIC,
-    RETREAT_RESTFUL,
-    retreat_definition,
-    retreat_reward,
-)
+from ..advancement.rules import MAX_OFFLINE_SECONDS, MAX_SETTLEMENT_SECONDS
 from ..livelihood.models import ResidenceRecord
 from ..livelihood.rules import residence_definition
 from ..world.models import TravelPreview, TravelSettlementRecord, TravelStartRecord
@@ -210,7 +202,6 @@ _CULTIVATION_CANCEL_RESULT_FIELDS = {
     "stamina_refund",
     "energy_refund",
 }
-
 
 def _strict_progression_object(raw_value: Any, label: str) -> dict[str, Any]:
     try:
@@ -1950,33 +1941,6 @@ class CultivationRepositoryMixin:
             if active is not None:
                 return True
         return False
-
-    @staticmethod
-    def _retreat_start_from_payload(payload: dict[str, Any], *, replay: bool = False) -> RetreatSessionRecord:
-        return RetreatSessionRecord(
-            player=SQLitePlayerRepository._row_to_player(payload["player"]),
-            session_id=str(payload["session_id"]),
-            retreat_key=str(payload["retreat_key"]),
-            status=str(payload["status"]),
-            starts_at=str(payload["starts_at"]),
-            ends_at=str(payload["ends_at"]),
-            energy_cost=int(payload["energy_cost"]),
-            item_cost={str(key): int(value) for key, value in dict(payload.get("item_cost", {})).items()},
-            already_completed=replay,
-        )
-
-    @staticmethod
-    def _retreat_settlement_from_payload(payload: dict[str, Any], *, replay: bool = False) -> RetreatSettlementRecord:
-        return RetreatSettlementRecord(
-            player=SQLitePlayerRepository._row_to_player(payload["player"]),
-            session_id=str(payload["session_id"]),
-            retreat_key=str(payload["retreat_key"]),
-            status=str(payload["status"]),
-            result={str(key): int(value) for key, value in dict(payload.get("result", {})).items()},
-            cycles=int(payload.get("cycles", 1)),
-            expired=bool(payload.get("expired", False)),
-            already_completed=replay,
-        )
 
     async def advance_layer(
         self,

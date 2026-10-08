@@ -184,7 +184,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.json_cache import decode_json_strict
-from ..utils.operations import operation_replay
+from ..utils.operations import operation_replay, record_operation
 from ..utils.assets import (
     inventory_amount,
     inventory_json,
@@ -195,6 +195,49 @@ from ..utils.assets import (
 )
 from ..utils.equipment import equipment_instance_rows
 from ..utils.player import change_player_state, player_integer, player_inventory, spend_player_state
+
+
+_RETREAT_SNAPSHOT_FIELDS = frozenset(
+    {
+        "retreat_key",
+        "random_pool",
+        "random_seed",
+        "realm_key",
+        "realm_layer",
+        "path_key",
+        "subprofession_key",
+        "qualification",
+        "residence_key",
+        "energy_before",
+        "energy_cost",
+        "item_cost",
+        "reward",
+        "starts_at",
+        "ends_at",
+        "duration_seconds",
+    }
+)
+_RETREAT_START_FIELDS = frozenset(
+    {
+        "player",
+        "session_id",
+        "retreat_key",
+        "status",
+        "starts_at",
+        "ends_at",
+        "energy_cost",
+        "item_cost",
+    }
+)
+_RETREAT_SETTLEMENT_FIELDS = _RETREAT_START_FIELDS | {
+    "result",
+    "cycles",
+    "expired",
+    "settled_at",
+}
+_RETREAT_QUALIFICATION_FIELDS = frozenset(
+    {"body", "spirit", "insight", "root", "agility", "fortune"}
+)
 
 
 def _validated_equipment_affixes(value: Any) -> dict[str, int]:
@@ -222,6 +265,400 @@ def _decode_equipment_affixes(value: Any) -> dict[str, int]:
 
 
 class AdvancementRepositoryMixin:
+    @staticmethod
+    def _retreat_json_object(value: Any, field: str) -> dict[str, Any]:
+        try:
+            decoded = decode_json_strict(value) if isinstance(value, str) else value
+        except (TypeError, ValueError) as exc:
+            raise OperationResultMalformedError(f"retreat {field} is invalid JSON") from exc
+        if not isinstance(decoded, dict):
+            raise OperationResultMalformedError(f"retreat {field} must be an object")
+        return decoded
+
+    @staticmethod
+    def _retreat_text(value: Any, field: str, *, optional: bool = False) -> str | None:
+        if optional and value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise OperationResultMalformedError(f"retreat {field} is invalid")
+        return value
+
+    @staticmethod
+    def _retreat_integer(value: Any, field: str, *, minimum: int = 0) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise OperationResultMalformedError(f"retreat {field} is invalid")
+        return value
+
+    @staticmethod
+    def _retreat_datetime(value: Any, field: str) -> datetime:
+        text = AdvancementRepositoryMixin._retreat_text(value, field)
+        try:
+            parsed = datetime.fromisoformat(str(text))
+        except ValueError as exc:
+            raise OperationResultMalformedError(f"retreat {field} is invalid") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise OperationResultMalformedError(f"retreat {field} must include timezone")
+        return parsed
+
+    @classmethod
+    def _retreat_asset_map(cls, value: Any, field: str) -> dict[str, int]:
+        if not isinstance(value, dict):
+            raise OperationResultMalformedError(f"retreat {field} is invalid")
+        result: dict[str, int] = {}
+        for key, raw_quantity in value.items():
+            if not isinstance(key, str) or not key.startswith("item.") or not key.removeprefix("item."):
+                raise OperationResultMalformedError(f"retreat {field} key is invalid")
+            result[key] = cls._retreat_integer(raw_quantity, f"{field}.{key}", minimum=1)
+        return result
+
+    @classmethod
+    def _retreat_reward_map(cls, value: Any, field: str = "reward") -> dict[str, int]:
+        if not isinstance(value, dict) or not value:
+            raise OperationResultMalformedError(f"retreat {field} is invalid")
+        result: dict[str, int] = {}
+        for key, raw_amount in value.items():
+            if key not in {"cultivation", "energy"}:
+                raise OperationResultMalformedError(f"retreat {field} key is invalid")
+            result[key] = cls._retreat_integer(raw_amount, f"{field}.{key}", minimum=1)
+        return result
+
+    @classmethod
+    def _retreat_qualification(cls, value: Any, field: str) -> dict[str, int]:
+        qualification = cls._retreat_json_object(value, field)
+        if set(qualification) != _RETREAT_QUALIFICATION_FIELDS or any(
+            type(raw_value) is not int or raw_value < 0 for raw_value in qualification.values()
+        ):
+            raise OperationResultMalformedError(f"retreat {field} is invalid")
+        return {str(key): int(raw_value) for key, raw_value in qualification.items()}
+
+    @classmethod
+    def _validate_retreat_player_payload(cls, value: Any) -> None:
+        if not isinstance(value, dict):
+            raise OperationResultMalformedError("retreat operation player is invalid")
+        for field in (
+            "id",
+            "player_id",
+            "platform",
+            "platform_user_id",
+            "stage",
+            "status",
+            "realm_key",
+            "realm_layer",
+            "energy",
+            "energy_max",
+            "qualification_json",
+            "inventory_json",
+            "durability_json",
+            "intro_json",
+            "faction_reputation_json",
+            "created_at",
+            "updated_at",
+        ):
+            if field not in value:
+                raise OperationResultMalformedError("retreat operation player is incomplete")
+        if not isinstance(value["player_id"], str) or not value["player_id"]:
+            raise OperationResultMalformedError("retreat operation player id is invalid")
+        for field in ("platform", "platform_user_id", "stage", "status", "realm_key"):
+            cls._retreat_text(value[field], f"player.{field}")
+        cls._retreat_integer(value["realm_layer"], "player.realm_layer")
+        cls._retreat_integer(value["energy"], "player.energy")
+        cls._retreat_integer(value["energy_max"], "player.energy_max")
+        cls._retreat_datetime(value["created_at"], "player.created_at")
+        cls._retreat_datetime(value["updated_at"], "player.updated_at")
+        cls._retreat_qualification(value["qualification_json"], "player.qualification_json")
+        for field in ("inventory_json", "durability_json", "intro_json", "faction_reputation_json"):
+            cls._retreat_json_object(value[field], f"player.{field}")
+        cls._retreat_text(value["id"], "player.id")
+
+    @classmethod
+    def _validate_retreat_operation_payload(
+        cls,
+        payload: dict[str, Any],
+        *,
+        settlement: bool,
+        platform: str,
+        platform_user_id: str,
+    ) -> None:
+        expected = _RETREAT_SETTLEMENT_FIELDS if settlement else _RETREAT_START_FIELDS
+        if set(payload) != expected:
+            raise OperationResultMalformedError("retreat operation result fields are invalid")
+        cls._validate_retreat_player_payload(payload["player"])
+        player = payload["player"]
+        if player["platform"] != platform or player["platform_user_id"] != platform_user_id:
+            raise OperationResultMalformedError("retreat operation player differs from request")
+        if str(player["id"]) != str(player["player_id"]):
+            raise OperationResultMalformedError("retreat operation player id is inconsistent")
+        for field in ("session_id", "retreat_key", "status"):
+            cls._retreat_text(payload[field], f"operation.{field}")
+        starts_at = cls._retreat_datetime(payload["starts_at"], "operation.starts_at")
+        ends_at = cls._retreat_datetime(payload["ends_at"], "operation.ends_at")
+        if ends_at <= starts_at:
+            raise OperationResultMalformedError("retreat operation timing is invalid")
+        energy_cost = cls._retreat_integer(payload["energy_cost"], "operation.energy_cost")
+        cls._retreat_asset_map(payload["item_cost"], "operation.item_cost")
+        expected_status = "settled" if settlement else "running"
+        if payload["status"] != expected_status:
+            raise OperationResultMalformedError("retreat operation status is invalid")
+        if settlement:
+            cls._retreat_reward_map(payload["result"], "operation.result")
+            cycles = cls._retreat_integer(payload["cycles"], "operation.cycles", minimum=1)
+            if cycles > 4 or not isinstance(payload["expired"], bool):
+                raise OperationResultMalformedError("retreat operation settlement is invalid")
+            cls._retreat_datetime(payload["settled_at"], "operation.settled_at")
+
+    @classmethod
+    def _validate_retreat_snapshot(cls, snapshot: dict[str, Any], session: sqlite3.Row) -> dict[str, Any]:
+        if set(snapshot) != _RETREAT_SNAPSHOT_FIELDS:
+            raise OperationResultMalformedError("retreat snapshot fields are invalid")
+        retreat_key = cls._retreat_text(snapshot["retreat_key"], "snapshot.retreat_key")
+        if retreat_key != str(session["retreat_key"]):
+            raise OperationResultMalformedError("retreat snapshot key differs from session")
+        random_pool = snapshot["random_pool"]
+        if random_pool is not None:
+            cls._retreat_text(random_pool, "snapshot.random_pool")
+        random_seed = cls._retreat_text(snapshot["random_seed"], "snapshot.random_seed")
+        cls._retreat_text(snapshot["realm_key"], "snapshot.realm_key")
+        cls._retreat_integer(snapshot["realm_layer"], "snapshot.realm_layer")
+        cls._retreat_text(snapshot["path_key"], "snapshot.path_key", optional=True)
+        cls._retreat_text(snapshot["subprofession_key"], "snapshot.subprofession_key", optional=True)
+        qualification = cls._retreat_qualification(snapshot["qualification"], "snapshot.qualification")
+        residence_key = cls._retreat_text(snapshot["residence_key"], "snapshot.residence_key", optional=True)
+        if retreat_key == RETREAT_RESTFUL and residence_key is None:
+            raise OperationResultMalformedError("restful retreat snapshot has no residence")
+        cls._retreat_integer(snapshot["energy_before"], "snapshot.energy_before")
+        energy_cost = cls._retreat_integer(snapshot["energy_cost"], "snapshot.energy_cost")
+        if energy_cost != int(session["energy_cost"]):
+            raise OperationResultMalformedError("retreat snapshot energy cost differs from session")
+        item_cost = cls._retreat_asset_map(snapshot["item_cost"], "snapshot.item_cost")
+        session_cost = cls._retreat_json_object(session["item_cost_json"], "session item cost")
+        if item_cost != cls._retreat_asset_map(session_cost, "session item cost"):
+            raise OperationResultMalformedError("retreat snapshot item cost differs from session")
+        reward = cls._retreat_reward_map(snapshot["reward"])
+        expected_reward_key = (
+            "cultivation"
+            if retreat_key == RETREAT_BASIC
+            else "energy"
+            if retreat_key == RETREAT_RESTFUL
+            else None
+        )
+        if expected_reward_key is not None and set(reward) != {expected_reward_key}:
+            raise OperationResultMalformedError("retreat snapshot reward is invalid")
+        starts_at = cls._retreat_datetime(snapshot["starts_at"], "snapshot.starts_at")
+        ends_at = cls._retreat_datetime(snapshot["ends_at"], "snapshot.ends_at")
+        if starts_at.isoformat() != str(session["starts_at"]) or ends_at.isoformat() != str(session["ends_at"]):
+            raise OperationResultMalformedError("retreat snapshot timing differs from session")
+        duration = cls._retreat_integer(snapshot["duration_seconds"], "snapshot.duration_seconds", minimum=1)
+        if int((ends_at - starts_at).total_seconds()) != duration:
+            raise OperationResultMalformedError("retreat snapshot duration is invalid")
+        snapshot["retreat_key"] = str(retreat_key)
+        snapshot["random_pool"] = random_pool
+        snapshot["random_seed"] = random_seed
+        snapshot["qualification"] = qualification
+        snapshot["item_cost"] = item_cost
+        snapshot["reward"] = reward
+        return snapshot
+
+    def _retreat_session_snapshot(
+        self,
+        connection: sqlite3.Connection,
+        session: sqlite3.Row,
+        player: sqlite3.Row,
+        platform: str,
+        platform_user_id: str,
+    ) -> dict[str, Any]:
+        if int(session["player_id"]) != int(player["id"]):
+            raise OperationResultMalformedError("retreat session player differs from request")
+        snapshot = self._retreat_json_object(session["snapshot_json"], "session snapshot")
+        snapshot = self._validate_retreat_snapshot(snapshot, session)
+        start_operation = connection.execute(
+            "SELECT operation_name, player_id, request_hash, result_json "
+            "FROM operations WHERE operation_id = ?",
+            (str(session["operation_id"]),),
+        ).fetchone()
+        if start_operation is None or int(start_operation["player_id"]) != int(player["id"]):
+            raise OperationResultMalformedError("retreat start operation is missing or foreign")
+        owner = connection.execute(
+            "SELECT player_id, platform, platform_user_id FROM players WHERE id = ?",
+            (start_operation["player_id"],),
+        ).fetchone()
+        if owner is None:
+            raise OperationResultMalformedError("retreat start operation owner is missing")
+        start_payload = self._retreat_json_object(start_operation["result_json"], "start operation result")
+        self._validate_retreat_operation_payload(
+            start_payload,
+            settlement=False,
+            platform=platform,
+            platform_user_id=platform_user_id,
+        )
+        start_player = start_payload["player"]
+        start_qualification = self._retreat_qualification(
+            start_player["qualification_json"], "start operation player.qualification_json"
+        )
+        if (
+            start_player["realm_key"] != snapshot["realm_key"]
+            or start_player["realm_layer"] != snapshot["realm_layer"]
+            or start_player.get("path_key") != snapshot["path_key"]
+            or start_player.get("subprofession_key") != snapshot["subprofession_key"]
+            or start_qualification != snapshot["qualification"]
+            or start_player["energy"] != snapshot["energy_before"] - snapshot["energy_cost"]
+        ):
+            raise OperationResultMalformedError("retreat start operation differs from snapshot")
+        if (
+            start_payload["player"]["player_id"] != owner["player_id"]
+            or owner["platform"] != platform
+            or owner["platform_user_id"] != platform_user_id
+        ):
+            raise OperationResultMalformedError("retreat start operation player differs from owner")
+        if start_operation["operation_name"] != "progression.start_retreat":
+            raise OperationResultMalformedError("retreat start operation name is invalid")
+        expected_hash = self._request_hash(
+            "progression.start_retreat",
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "retreat_key": str(session["retreat_key"]),
+            },
+        )
+        if start_operation["request_hash"] != expected_hash:
+            raise OperationResultMalformedError("retreat start operation input is invalid")
+        if (
+            start_payload["session_id"] != str(session["session_id"])
+            or start_payload["retreat_key"] != str(session["retreat_key"])
+            or start_payload["starts_at"] != str(session["starts_at"])
+            or start_payload["ends_at"] != str(session["ends_at"])
+            or start_payload["energy_cost"] != int(session["energy_cost"])
+            or start_payload["item_cost"] != snapshot["item_cost"]
+        ):
+            raise OperationResultMalformedError("retreat start operation differs from session")
+        if snapshot["residence_key"] is not None:
+            residence = connection.execute(
+                "SELECT 1 FROM residences "
+                "WHERE player_id = ? AND residence_key = ? "
+                "AND starts_at <= ? AND ends_at > ? LIMIT 1",
+                (
+                    player["id"],
+                    snapshot["residence_key"],
+                    str(session["starts_at"]),
+                    str(session["starts_at"]),
+                ),
+            ).fetchone()
+            if residence is None:
+                raise OperationResultMalformedError("retreat snapshot residence differs from history")
+        return snapshot
+
+    def _validate_retreat_start_replay(
+        self,
+        connection: sqlite3.Connection,
+        payload: dict[str, Any],
+        operation_id: str,
+        player_id: int,
+        platform: str,
+        platform_user_id: str,
+    ) -> None:
+        player = connection.execute(
+            "SELECT * FROM players WHERE id = ? AND platform = ? AND platform_user_id = ?",
+            (player_id, platform, platform_user_id),
+        ).fetchone()
+        session = connection.execute(
+            "SELECT * FROM retreat_sessions WHERE session_id = ? AND operation_id = ? AND player_id = ?",
+            (payload["session_id"], operation_id, player_id),
+        ).fetchone()
+        if player is None or session is None or session["status"] not in {"running", "expired", "settled"}:
+            raise OperationResultMalformedError("retreat start operation does not match its session")
+        self._retreat_session_snapshot(connection, session, player, platform, platform_user_id)
+
+    def _validate_retreat_settlement_replay(
+        self,
+        connection: sqlite3.Connection,
+        payload: dict[str, Any],
+        operation_name: str,
+        player_id: int,
+        platform: str,
+        platform_user_id: str,
+    ) -> None:
+        player = connection.execute(
+            "SELECT * FROM players WHERE id = ? AND platform = ? AND platform_user_id = ?",
+            (player_id, platform, platform_user_id),
+        ).fetchone()
+        session = connection.execute(
+            "SELECT * FROM retreat_sessions WHERE session_id = ? AND player_id = ?",
+            (payload["session_id"], player_id),
+        ).fetchone()
+        if player is None or session is None or session["status"] != "settled":
+            raise OperationResultMalformedError("retreat settlement operation does not match its session")
+        if payload["player"]["player_id"] != player["player_id"]:
+            raise OperationResultMalformedError("retreat settlement operation player differs from owner")
+        snapshot = self._retreat_session_snapshot(connection, session, player, platform, platform_user_id)
+        stored = self._retreat_json_object(session["result_json"], "settled retreat result")
+        if set(stored) != {"result", "cycles", "expired", "settled_at"}:
+            raise OperationResultMalformedError("settled retreat result fields are invalid")
+        stored_result = self._retreat_reward_map(stored["result"], "settled retreat result.result")
+        stored_cycles = self._retreat_integer(stored["cycles"], "settled retreat result.cycles", minimum=1)
+        if stored_cycles > 4 or not isinstance(stored["expired"], bool):
+            raise OperationResultMalformedError("settled retreat result values are invalid")
+        stored_settled_at = self._retreat_datetime(stored["settled_at"], "settled retreat result.settled_at")
+        if (
+            stored_result != payload["result"]
+            or stored_cycles != payload["cycles"]
+            or stored["expired"] != payload["expired"]
+            or stored_settled_at.isoformat() != payload["settled_at"]
+            or payload["retreat_key"] != snapshot["retreat_key"]
+            or payload["starts_at"] != session["starts_at"]
+            or payload["ends_at"] != session["ends_at"]
+            or payload["energy_cost"] != session["energy_cost"]
+            or payload["item_cost"] != snapshot["item_cost"]
+            or payload["expired"] != (operation_name == "progression.recover_retreat")
+        ):
+            raise OperationResultMalformedError("retreat settlement operation differs from its session")
+        expected_result = {
+            key: int(value) * int(payload["cycles"])
+            for key, value in snapshot["reward"].items()
+        }
+        if stored_result != expected_result or payload["result"] != expected_result:
+            raise OperationResultMalformedError("retreat settlement result differs from its snapshot")
+
+    @staticmethod
+    def _retreat_start_from_payload(payload: dict[str, Any], *, replay: bool = False) -> RetreatSessionRecord:
+        if payload["status"] != "running":
+            raise OperationResultMalformedError("retreat start status is invalid")
+        starts_at = AdvancementRepositoryMixin._retreat_datetime(payload["starts_at"], "operation.starts_at")
+        ends_at = AdvancementRepositoryMixin._retreat_datetime(payload["ends_at"], "operation.ends_at")
+        if ends_at <= starts_at:
+            raise OperationResultMalformedError("retreat operation timing is invalid")
+        return RetreatSessionRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            session_id=payload["session_id"],
+            retreat_key=payload["retreat_key"],
+            status=payload["status"],
+            starts_at=payload["starts_at"],
+            ends_at=payload["ends_at"],
+            energy_cost=payload["energy_cost"],
+            item_cost=dict(payload["item_cost"]),
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _retreat_settlement_from_payload(payload: dict[str, Any], *, replay: bool = False) -> RetreatSettlementRecord:
+        return RetreatSettlementRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            session_id=payload["session_id"],
+            retreat_key=payload["retreat_key"],
+            status=payload["status"],
+            result=dict(payload["result"]),
+            cycles=payload["cycles"],
+            expired=payload["expired"],
+            already_completed=replay,
+        )
+
+    @classmethod
+    def _retreat_expired_result(cls, value: Any) -> None:
+        result = cls._retreat_json_object(value, "expired result")
+        if set(result) != {"expired_at", "recovery_pending"}:
+            raise OperationResultMalformedError("retreat expired result is invalid")
+        cls._retreat_datetime(result["expired_at"], "expired_at")
+        if result["recovery_pending"] is not True:
+            raise OperationResultMalformedError("retreat expired result is invalid")
+
     async def start_retreat(
         self,
         *,
@@ -285,13 +722,46 @@ class AdvancementRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._retreat_start_from_payload(json.loads(existing["result_json"]), replay=True)
+                owner = connection.execute(
+                    "SELECT player_id, platform, platform_user_id FROM players WHERE id = ?",
+                    (existing["player_id"],),
+                ).fetchone()
+                if (
+                    owner is None
+                    or owner["platform"] != platform
+                    or owner["platform_user_id"] != platform_user_id
+                ):
+                    raise OperationResultMalformedError("retreat operation owner is invalid")
+                payload = operation_replay(
+                    connection,
+                    operation_id,
+                    operation_name,
+                    request_hash,
+                    player_id=int(existing["player_id"]),
+                )
+                if payload is None:
+                    raise OperationResultMalformedError("retreat start operation is missing")
+                self._validate_retreat_operation_payload(
+                    payload,
+                    settlement=False,
+                    platform=platform,
+                    platform_user_id=platform_user_id,
+                )
+                self._validate_retreat_start_replay(
+                    connection,
+                    payload,
+                    operation_id,
+                    int(existing["player_id"]),
+                    platform,
+                    platform_user_id,
+                )
+                return self._retreat_start_from_payload(payload, replay=True)
 
             row = self._require_player(connection, platform, platform_user_id)
             if definition.key == RETREAT_BASIC:
@@ -342,6 +812,9 @@ class AdvancementRepositoryMixin:
             if player_integer(row, "energy") < definition.energy_cost:
                 raise ResourceInsufficientError("energy is insufficient")
             seed = f"{definition.random_pool or definition.key}:{operation_id}"
+            starts_at = now_text
+            ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
+            frozen_reward = retreat_reward(definition.key, seed)
             snapshot = {
                 "retreat_key": definition.key,
                 "random_pool": definition.random_pool,
@@ -350,14 +823,17 @@ class AdvancementRepositoryMixin:
                 "realm_layer": player_integer(row, "realm_layer"),
                 "path_key": row["path_key"],
                 "subprofession_key": row["subprofession_key"],
-                "qualification": self._json_object(row["qualification_json"], {}),
+                "qualification": self._retreat_json_object(row["qualification_json"], "player qualification"),
                 "residence_key": active_residence["residence_key"] if active_residence is not None else None,
                 "energy_before": player_integer(row, "energy"),
+                "energy_cost": definition.energy_cost,
                 "item_cost": item_cost,
+                "reward": frozen_reward,
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "duration_seconds": definition.duration_seconds,
             }
             session_id = uuid4().hex
-            starts_at = now_text
-            ends_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
             spend_player_state(
                 connection,
                 row,
@@ -400,16 +876,12 @@ class AdvancementRepositoryMixin:
                 "energy_cost": definition.energy_cost,
                 "item_cost": item_cost,
             }
-            connection.execute(
-                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    operation_id,
-                    operation_name,
-                    row["id"],
-                    request_hash,
-                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
-                    starts_at,
-                ),
+            record_operation(connection, operation_id, operation_name, row["id"], request_hash, payload, starts_at)
+            self._validate_retreat_operation_payload(
+                payload,
+                settlement=False,
+                platform=platform,
+                platform_user_id=platform_user_id,
             )
             return self._retreat_start_from_payload(payload)
 
@@ -465,13 +937,46 @@ class AdvancementRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._retreat_settlement_from_payload(json.loads(existing["result_json"]), replay=True)
+                owner = connection.execute(
+                    "SELECT player_id, platform, platform_user_id FROM players WHERE id = ?",
+                    (existing["player_id"],),
+                ).fetchone()
+                if (
+                    owner is None
+                    or owner["platform"] != platform
+                    or owner["platform_user_id"] != platform_user_id
+                ):
+                    raise OperationResultMalformedError("retreat operation owner is invalid")
+                payload = operation_replay(
+                    connection,
+                    operation_id,
+                    operation_name,
+                    request_hash,
+                    player_id=int(existing["player_id"]),
+                )
+                if payload is None:
+                    raise OperationResultMalformedError("retreat settlement operation is missing")
+                self._validate_retreat_operation_payload(
+                    payload,
+                    settlement=True,
+                    platform=platform,
+                    platform_user_id=platform_user_id,
+                )
+                self._validate_retreat_settlement_replay(
+                    connection,
+                    payload,
+                    operation_name,
+                    int(existing["player_id"]),
+                    platform,
+                    platform_user_id,
+                )
+                return self._retreat_settlement_from_payload(payload, replay=True)
             row = self._require_player(connection, platform, platform_user_id)
             session = connection.execute(
                 "SELECT * FROM retreat_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
@@ -485,6 +990,9 @@ class AdvancementRepositoryMixin:
                 if latest is not None and str(latest["status"]) == "settled":
                     raise RetreatAlreadySettledError("retreat already settled")
                 raise RetreatNotFoundError("no active retreat")
+            snapshot = self._retreat_session_snapshot(connection, session, row, platform, platform_user_id)
+            if session["status"] == "expired":
+                self._retreat_expired_result(session["result_json"])
             if session["status"] == "expired" and not recover:
                 raise RetreatExpiredError("retreat requires recovery")
             starts_at = datetime.fromisoformat(str(session["starts_at"]))
@@ -502,12 +1010,11 @@ class AdvancementRepositoryMixin:
                 )
                 connection.commit()
                 raise RetreatExpiredError("retreat settlement window expired")
-            snapshot = self._json_object(session["snapshot_json"], {})
-            definition = retreat_definition(str(snapshot.get("retreat_key", session["retreat_key"])))
-            elapsed = max(definition.duration_seconds, int((now - starts_at).total_seconds()))
+            duration_seconds = int(snapshot["duration_seconds"])
+            elapsed = max(duration_seconds, int((now - starts_at).total_seconds()))
             capped = min(MAX_SETTLEMENT_SECONDS, elapsed)
-            cycles = max(1, min(4, capped // definition.duration_seconds))
-            result = retreat_reward(definition.key, str(snapshot.get("random_seed", operation_id)))
+            cycles = max(1, min(4, capped // duration_seconds))
+            result = dict(snapshot["reward"])
             result = {key: int(value) * cycles for key, value in result.items()}
             cultivation_gain = int(result.get("cultivation", 0))
             energy_gain = int(result.get("energy", 0))
@@ -533,23 +1040,24 @@ class AdvancementRepositoryMixin:
             payload = {
                 "player": self._player_payload(self._row_to_player(updated)),
                 "session_id": session["session_id"],
-                "retreat_key": definition.key,
+                "retreat_key": str(snapshot["retreat_key"]),
                 "status": "settled",
+                "starts_at": str(session["starts_at"]),
+                "ends_at": str(session["ends_at"]),
+                "energy_cost": int(session["energy_cost"]),
+                "item_cost": dict(snapshot["item_cost"]),
                 "result": result,
                 "cycles": cycles,
                 "expired": bool(recover),
+                "settled_at": now_text,
             }
-            connection.execute(
-                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    operation_id,
-                    operation_name,
-                    row["id"],
-                    request_hash,
-                    json.dumps(payload, ensure_ascii=False, sort_keys=True),
-                    now_text,
-                ),
+            self._validate_retreat_operation_payload(
+                payload,
+                settlement=True,
+                platform=platform,
+                platform_user_id=platform_user_id,
             )
+            record_operation(connection, operation_id, operation_name, row["id"], request_hash, payload, now_text)
             return self._retreat_settlement_from_payload(payload)
 
     @staticmethod

@@ -41,12 +41,11 @@ async def _enter_cultivator(runtime, user_id: str) -> None:
 
 
 def _finish_retreat(runtime, session_id: str, *, clock: MutableClock, hours_ago: int = 0) -> None:
-    now = clock.value - timedelta(hours=hours_ago, seconds=1)
     with sqlite3.connect(runtime.settings.database_path) as connection:
-        connection.execute(
-            "UPDATE retreat_sessions SET ends_at = ? WHERE session_id = ?",
-            (now.isoformat(), session_id),
-        )
+        ends_at = connection.execute(
+            "SELECT ends_at FROM retreat_sessions WHERE session_id = ?", (session_id,)
+        ).fetchone()[0]
+    clock.value = datetime.fromisoformat(ends_at) + timedelta(seconds=1, hours=-hours_ago)
 
 
 def _set_player(runtime, user_id: str, *, spirit_stones: int | None = None, energy: int | None = None) -> None:
