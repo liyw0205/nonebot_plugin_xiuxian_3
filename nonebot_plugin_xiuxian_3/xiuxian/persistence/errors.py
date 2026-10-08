@@ -1304,6 +1304,15 @@ class DomainEventRoundNotActiveError(RuntimeError):
     """The selected domain-front round no longer accepts actions."""
 
 
+class DomainEventPointMinutesError(RuntimeError):
+    """The requested occupation duration is outside the frozen round bounds."""
+
+    def __init__(self, minimum: int, maximum: int) -> None:
+        self.minimum = minimum
+        self.maximum = maximum
+        super().__init__("domain-front occupation duration is outside round bounds")
+
+
 class DomainEventSourceInvalidError(RuntimeError):
     """A domain-front contribution source is absent or not owned by the actor."""
 

@@ -24,6 +24,7 @@ class DomainFrontRecord:
     success: bool | None
     reward: dict[str, int] = field(default_factory=dict)
     already_completed: bool = False
+    last_contribution_quantity: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +52,7 @@ class DomainFrontSeasonRecord:
 class DomainFrontClaimRecord:
     round_id: str
     reward: dict[str, int]
+    reward_name: str
     already_completed: bool = False
 
 
@@ -59,6 +61,7 @@ class DomainFrontSeasonClaimRecord:
     season_id: str
     reward: dict[str, int]
     rank: int
+    reward_name: str
     already_completed: bool = False
     expired: bool = False
 

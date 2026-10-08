@@ -15,8 +15,9 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..content import bundled_content
+from ..utils.json_cache import decode_json_strict
 from ..utils.assets import change_player_assets
-from ..utils.player import change_player_state, grant_player_state, player_integer
+from ..utils.player import change_player_state, grant_player_reward_actual, player_integer
 from ..specials.codex_projection import record_codex_discovery
 from ..persistence.errors import (
     DomainCrackActiveError,
@@ -25,6 +26,7 @@ from ..persistence.errors import (
     DomainCoreRedeemRequirementError,
     DomainEventAlreadyJoinedError,
     DomainEventParticipantCapError,
+    DomainEventPointMinutesError,
     DomainEventRequirementError,
     DomainEventRewardAlreadyClaimedError,
     DomainEventRewardNotEligibleError,
@@ -46,24 +48,19 @@ from .domain_front_models import (
     DomainFrontSeasonStanding,
 )
 from .domain_front_rules import (
-    ACTION_VALUES,
-    BATTLE_CONTRIBUTION,
-    CLAIM_DAYS,
-    EVENT_KEY,
-    EVENT_TARGET,
-    JOIN_STAMINA_COST,
-    LOCATION_KEY,
-    PARTICIPANT_CAP,
-    PERSONAL_THRESHOLD,
-    POINT_CONTRIBUTION_PER_MINUTE,
     anonymous_label,
     claim_expiry,
+    domain_front_definition,
+    domain_front_definition_from_snapshot,
+    domain_war_season_definition,
+    domain_war_season_definition_from_snapshot,
     meets_domain_front_realm,
-    reward_for_rank,
     round_window,
     season_window,
     season_window_for_id,
+    ACTION_VALUES,
 )
+from ..rewards.rules import reward_totals
 
 
 class DomainFrontRepositoryMixin:
@@ -164,7 +161,8 @@ class DomainFrontRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             event = self._domain_refresh_round(connection, self._domain_select_round(connection, None, now), now)
             self._domain_require_open(event, now)
-            sect, membership = self._domain_requirements(connection, player, now)
+            rules = self._domain_round_rules(event)
+            sect, membership = self._domain_requirements(connection, player, now, rules)
             existing = connection.execute(
                 "SELECT 1 FROM domain_front_participants WHERE round_id=? AND player_id=? AND status='active'",
                 (event["round_id"], player["id"]),
@@ -177,9 +175,9 @@ class DomainFrontRepositoryMixin:
                     (event["round_id"], sect["sect_id"]),
                 ).fetchone()["count"]
             )
-            if member_count >= PARTICIPANT_CAP:
+            if member_count >= rules.participant_cap:
                 raise DomainEventParticipantCapError("sect participant cap reached")
-            if player_integer(player, "stamina") < JOIN_STAMINA_COST:
+            if player_integer(player, "stamina") < rules.join_stamina_cost:
                 raise ResourceInsufficientError("domain-front stamina is insufficient")
             snapshot = {
                 "realm_key": str(player["realm_key"]),
@@ -191,13 +189,13 @@ class DomainFrontRepositoryMixin:
             }
             connection.execute(
                 "INSERT INTO domain_front_participants(round_id,player_id,sect_id,domain_key,stamina_cost,contribution,status,snapshot_json,joined_at) VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?)",
-                (event["round_id"], player["id"], sect["sect_id"], player["domain_key"], JOIN_STAMINA_COST, json.dumps(snapshot, sort_keys=True), now_text),
+                (event["round_id"], player["id"], sect["sect_id"], player["domain_key"], rules.join_stamina_cost, json.dumps(snapshot, sort_keys=True), now_text),
             )
             change_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                value_delta={"stamina": -JOIN_STAMINA_COST},
+                value_delta={"stamina": -rules.join_stamina_cost},
             )
             payload = self._domain_payload(connection, int(player["id"]), event)
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -249,15 +247,20 @@ class DomainFrontRepositoryMixin:
                 raise DomainEventSourceInvalidError("formal domain-front battle identity is invalid")
             if str(battle["status"]) != "settled":
                 raise DomainEventRoundNotActiveError("domain-front battle has not settled")
-            result = self._json_object(battle["result_json"], {})
+            try:
+                result = self._domain_strict_object(battle["result_json"])
+            except ValueError as exc:
+                raise DomainEventSourceInvalidError("formal domain-front battle result is invalid") from exc
             outcome = str(result.get("outcome", ""))
             if outcome not in {"won", "lost"}:
                 raise DomainEventSourceInvalidError("formal domain-front battle has no final outcome")
+            event = connection.execute("SELECT * FROM domain_front_rounds WHERE round_id=?", (battle["round_id"],)).fetchone()
+            rules = self._domain_round_rules(event)
             payload = {
                 "battle_id": str(battle["battle_id"]),
                 "round_id": str(battle["round_id"]),
                 "outcome": outcome,
-                "contribution": BATTLE_CONTRIBUTION if outcome == "won" else 0,
+                "contribution": rules.battle_contribution if outcome == "won" else 0,
                 "source_operation_id": operation_id,
                 "idempotent_replay": False,
             }
@@ -267,8 +270,6 @@ class DomainFrontRepositoryMixin:
     def _create_domain_front_point_once(self, platform: str, platform_user_id: str, minutes: int, operation_id: str) -> dict[str, object]:
         operation_name = "event.domain_front.point"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id, "minutes": minutes})
-        if minutes < 1 or minutes > 30:
-            raise ValueError("minutes must be between 1 and 30")
         now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
@@ -279,13 +280,16 @@ class DomainFrontRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             event = self._domain_refresh_round(connection, self._domain_select_round(connection, None, now), now)
             self._domain_require_open(event, now)
+            rules = self._domain_round_rules(event)
+            if minutes < rules.point_minutes_min or minutes > rules.point_minutes_max:
+                raise DomainEventPointMinutesError(rules.point_minutes_min, rules.point_minutes_max)
             self._domain_require_participant(connection, int(player["id"]), str(event["round_id"]))
             point_id = f"domain-front-point:{uuid4().hex}"
             connection.execute(
                 "INSERT INTO domain_front_point_operations(point_id,round_id,player_id,operation_id,minutes,status,created_at) VALUES (?, ?, ?, ?, ?, 'settled', ?)",
                 (point_id, event["round_id"], player["id"], operation_id, minutes, now_text),
             )
-            payload = {"point_id": point_id, "round_id": str(event["round_id"]), "minutes": minutes, "contribution": minutes * POINT_CONTRIBUTION_PER_MINUTE, "source_operation_id": operation_id}
+            payload = {"point_id": point_id, "round_id": str(event["round_id"]), "minutes": minutes, "contribution": minutes * rules.point_contribution_per_minute, "source_operation_id": operation_id}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return payload
 
@@ -305,8 +309,9 @@ class DomainFrontRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             event = self._domain_refresh_round(connection, self._domain_select_round(connection, None, now), now)
             self._domain_require_open(event, now)
+            rules = self._domain_round_rules(event)
             participant = self._domain_require_participant(connection, int(player["id"]), str(event["round_id"]))
-            source = self._domain_find_source(connection, int(player["id"]), str(event["round_id"]), action, source_operation_id)
+            source = self._domain_find_source(connection, int(player["id"]), str(event["round_id"]), action, source_operation_id, rules)
             source_id = str(source["source_operation_id"])
             if connection.execute("SELECT 1 FROM domain_front_contributions WHERE round_id=? AND player_id=? AND source_operation_id=?", (event["round_id"], player["id"], source_id)).fetchone() is not None:
                 raise DomainEventSourceInvalidError("domain-front source already contributed")
@@ -333,7 +338,7 @@ class DomainFrontRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             replay = self._domain_operation_replay(connection, operation_id, operation_name, request_hash)
             if replay is not None:
-                return DomainFrontClaimRecord(str(replay["round_id"]), {str(k): int(v) for k, v in dict(replay["reward"]).items()}, True)
+                return DomainFrontClaimRecord(str(replay["round_id"]), {str(k): int(v) for k, v in dict(replay["reward"]).items()}, str(replay["reward_name"]), True)
             player = self._require_player(connection, platform, platform_user_id)
             event = self._domain_refresh_round(connection, self._domain_select_round(connection, round_id, now), now)
             if event is None or str(event["status"]) != "settled":
@@ -341,41 +346,38 @@ class DomainFrontRepositoryMixin:
             if now >= datetime.fromisoformat(str(event["claim_expires_at"])):
                 raise DomainEventRoundNotActiveError("domain-front claim window closed")
             participant = connection.execute("SELECT contribution, domain_key FROM domain_front_participants WHERE round_id=? AND player_id=?", (round_id, player["id"])).fetchone()
-            if participant is None or int(participant["contribution"]) < PERSONAL_THRESHOLD:
+            rules = self._domain_round_rules(event)
+            if participant is None or int(participant["contribution"]) < rules.personal_claim_threshold:
                 raise DomainEventRewardNotEligibleError("domain-front personal contribution is insufficient")
             if connection.execute("SELECT 1 FROM domain_front_claims WHERE round_id=? AND player_id=?", (round_id, player["id"])).fetchone() is not None:
                 raise DomainEventRewardAlreadyClaimedError("domain-front reward already claimed")
-            reward = {"item.domain_core_fragment": 5, "world_merit": 100}
-            grant_player_state(
+            reward_grant = rules.reward
+            reward = grant_player_reward_actual(
                 connection,
                 player,
-                {"item.domain_core_fragment": reward["item.domain_core_fragment"]},
+                reward_totals(reward_grant),
                 now_text,
-                value_delta={"world_merit": reward["world_merit"]},
+                local_reputation_maximums=dict(rules.reward_local_reputation_maximums) or None,
             )
+            reward = {key: amount for key, amount in reward.items() if amount}
             connection.execute("INSERT INTO domain_front_claims(round_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (round_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
-            content = self.content or bundled_content()
-            event_definition = content.require("event", EVENT_KEY)
-            codex_entry_key = event_definition.get("codex_entry_key")
-            if not isinstance(codex_entry_key, str):
-                raise ValueError(f"event {EVENT_KEY} has no configured codex entry")
             record_codex_discovery(
                 connection,
                 player_id=int(player["id"]),
-                entry_key=codex_entry_key,
+                entry_key=rules.codex_entry_key,
                 operation_id=operation_id,
                 occurred_at=now_text,
                 snapshot={
                     "round_id": round_id,
                     "domain_key": participant["domain_key"],
                     "contribution": int(participant["contribution"]),
-                    "result": self._json_object(event["result_json"], {}),
+                    "result": self._domain_strict_object(event["result_json"]),
                 },
-                content=content,
+                content=self.content or bundled_content(),
             )
-            payload = {"round_id": round_id, "reward": reward}
+            payload = {"round_id": round_id, "reward": reward, "reward_name": rules.reward_name}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
-            return DomainFrontClaimRecord(round_id, reward)
+            return DomainFrontClaimRecord(round_id, reward, rules.reward_name)
 
     def _get_domain_war_season_once(self, platform: str, platform_user_id: str, season_id: str | None) -> DomainFrontSeasonRecord:
         now = self._now()
@@ -383,10 +385,13 @@ class DomainFrontRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             if season_id is None:
-                season_id, starts_at, ends_at = season_window(now)
+                rules = domain_war_season_definition(self.content)
+                season_id, starts_at, ends_at = season_window(now, rules)
             else:
-                season_id, starts_at, ends_at = season_window_for_id(season_id)
-            season = self._domain_get_or_create_season(connection, season_id, starts_at, ends_at, now)
+                existing = connection.execute("SELECT * FROM domain_war_seasons WHERE season_id=?", (season_id,)).fetchone()
+                rules = self._domain_season_rules(existing) if existing is not None else domain_war_season_definition(self.content)
+                season_id, starts_at, ends_at = season_window_for_id(season_id, rules)
+            season = self._domain_get_or_create_season(connection, season_id, starts_at, ends_at, now, rules)
             if str(season["status"]) == "collecting" and now >= ends_at:
                 self._domain_freeze_season(connection, season, now)
                 season = connection.execute("SELECT * FROM domain_war_seasons WHERE season_id=?", (season_id,)).fetchone()
@@ -401,10 +406,12 @@ class DomainFrontRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             replay = self._domain_operation_replay(connection, operation_id, operation_name, request_hash)
             if replay is not None:
-                return DomainFrontSeasonClaimRecord(str(replay["season_id"]), {str(k): int(v) for k, v in dict(replay["reward"]).items()}, int(replay["rank"]), True, bool(replay.get("expired", False)))
+                return DomainFrontSeasonClaimRecord(str(replay["season_id"]), {str(k): int(v) for k, v in dict(replay["reward"]).items()}, int(replay["rank"]), str(replay["reward_name"]), True, bool(replay.get("expired", False)))
             player = self._require_player(connection, platform, platform_user_id)
-            canonical_id, starts_at, ends_at = season_window_for_id(season_id)
-            season = self._domain_get_or_create_season(connection, canonical_id, starts_at, ends_at, now)
+            existing = connection.execute("SELECT * FROM domain_war_seasons WHERE season_id=?", (season_id,)).fetchone()
+            current_rules = self._domain_season_rules(existing) if existing is not None else domain_war_season_definition(self.content)
+            canonical_id, starts_at, ends_at = season_window_for_id(season_id, current_rules)
+            season = self._domain_get_or_create_season(connection, canonical_id, starts_at, ends_at, now, current_rules)
             if str(season["status"]) == "collecting" and now >= ends_at:
                 self._domain_freeze_season(connection, season, now)
                 season = connection.execute("SELECT * FROM domain_war_seasons WHERE season_id=?", (canonical_id,)).fetchone()
@@ -413,26 +420,30 @@ class DomainFrontRepositoryMixin:
             if now >= datetime.fromisoformat(str(season["claim_expires_at"])):
                 raise DomainSeasonRewardExpiredError("domain-war claim window closed")
             standing = connection.execute("SELECT * FROM domain_war_rankings WHERE season_id=? AND player_id=?", (canonical_id, player["id"])).fetchone()
-            if standing is None or not self._json_object(standing["reward_json"], {}):
+            standing_reward = self._domain_strict_object(standing["reward_json"]) if standing is not None else {}
+            if standing is None or not standing_reward:
                 raise DomainSeasonRewardNotEligibleError("player has no domain-war ranking reward")
             if connection.execute("SELECT 1 FROM domain_war_claims WHERE season_id=? AND player_id=?", (canonical_id, player["id"])).fetchone() is not None:
                 raise DomainSeasonRewardAlreadyClaimedError("domain-war reward already claimed")
-            reward = {str(k): int(v) for k, v in self._json_object(standing["reward_json"], {}).items()}
-            grant_player_state(
+            season_rules = self._domain_season_rules(season)
+            reward = season_rules.reward_for_rank(int(standing["rank"]))
+            if reward != {str(k): int(v) for k, v in standing_reward.items()}:
+                raise DomainSeasonRankingNotFinalizedError("domain-war ranking reward does not match frozen rules")
+            _, _, _, reward_grant, reward_name, _, reward_caps = next(
+                row for row in season_rules.rank_rewards if row[0] <= int(standing["rank"]) <= row[1]
+            )
+            reward = grant_player_reward_actual(
                 connection,
                 player,
-                {
-                    key: value
-                    for key, value in reward.items()
-                    if key == "spirit_stones" or key.startswith("item.")
-                },
+                reward_totals(reward_grant),
                 now_text,
-                value_delta={"world_merit": reward.get("world_merit", 0)},
+                local_reputation_maximums=dict(reward_caps) or None,
             )
+            reward = {key: amount for key, amount in reward.items() if amount}
             connection.execute("INSERT INTO domain_war_claims(season_id,player_id,operation_id,reward_json,claimed_at) VALUES (?, ?, ?, ?, ?)", (canonical_id, player["id"], operation_id, json.dumps(reward, sort_keys=True), now_text))
-            payload = {"season_id": canonical_id, "rank": int(standing["rank"]), "reward": reward}
+            payload = {"season_id": canonical_id, "rank": int(standing["rank"]), "reward": reward, "reward_name": reward_name}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
-            return DomainFrontSeasonClaimRecord(canonical_id, reward, int(standing["rank"]))
+            return DomainFrontSeasonClaimRecord(canonical_id, reward, int(standing["rank"]), reward_name)
 
     def _redeem_domain_core_once(self, platform: str, platform_user_id: str, season_id: str, operation_id: str) -> DomainCoreRedeemRecord:
         operation_name = "event.redeem.domain_core"
@@ -443,10 +454,12 @@ class DomainFrontRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             replay = self._domain_operation_replay(connection, operation_id, operation_name, request_hash)
             if replay is not None:
-                return DomainCoreRedeemRecord(str(replay["season_id"]), "item.domain_core", 1, True)
+                return DomainCoreRedeemRecord(str(replay["season_id"]), str(replay["item_key"]), int(replay["quantity"]), True)
             player = self._require_player(connection, platform, platform_user_id)
-            canonical_id, starts_at, ends_at = season_window_for_id(season_id)
-            season = self._domain_get_or_create_season(connection, canonical_id, starts_at, ends_at, now)
+            existing = connection.execute("SELECT * FROM domain_war_seasons WHERE season_id=?", (season_id,)).fetchone()
+            current_rules = self._domain_season_rules(existing) if existing is not None else domain_war_season_definition(self.content)
+            canonical_id, starts_at, ends_at = season_window_for_id(season_id, current_rules)
+            season = self._domain_get_or_create_season(connection, canonical_id, starts_at, ends_at, now, current_rules)
             if str(season["status"]) == "collecting" and now >= ends_at:
                 self._domain_freeze_season(connection, season, now)
                 season = connection.execute("SELECT * FROM domain_war_seasons WHERE season_id=?", (canonical_id,)).fetchone()
@@ -458,35 +471,38 @@ class DomainFrontRepositoryMixin:
                 change_player_assets(
                     connection,
                     player,
-                    {"item.domain_core_fragment": -20, "item.domain_core": 1},
+                    {current_rules.fragment_item_key: -current_rules.fragment_quantity, current_rules.reward_item_key: current_rules.reward_quantity},
                     now_text,
                 )
             except ValueError as exc:
                 raise DomainCoreFragmentInsufficientError("domain core fragments are insufficient") from exc
             connection.execute("INSERT INTO domain_core_redemptions(season_id,player_id,operation_id,redeemed_at) VALUES (?, ?, ?, ?)", (canonical_id, player["id"], operation_id, now_text))
-            payload = {"season_id": canonical_id, "item_key": "item.domain_core", "quantity": 1}
+            payload = {"season_id": canonical_id, "item_key": current_rules.reward_item_key, "quantity": current_rules.reward_quantity}
             self._domain_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
-            return DomainCoreRedeemRecord(canonical_id, "item.domain_core", 1)
+            return DomainCoreRedeemRecord(canonical_id, current_rules.reward_item_key, current_rules.reward_quantity)
 
     def _domain_select_round(self, connection: Any, round_id: str | None, now: datetime) -> Any:
         if round_id:
             return connection.execute("SELECT * FROM domain_front_rounds WHERE round_id=?", (round_id,)).fetchone()
-        rid, activity_id, activity_start, activity_end, starts_at, ends_at = round_window(now)
+        definition = domain_front_definition(self.content)
+        rid, activity_id, activity_start, activity_end, starts_at, ends_at = round_window(now, definition)
         now_text = serialize_datetime(now)
         connection.execute(
-            "INSERT OR IGNORE INTO domain_front_rounds(round_id,activity_id,location_key,status,activity_starts_at,activity_ends_at,starts_at,ends_at,claim_expires_at,target_quantity,total_contribution,result_json,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
-            (rid, activity_id, LOCATION_KEY, serialize_datetime(activity_start), serialize_datetime(activity_end), serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(ends_at + timedelta(days=CLAIM_DAYS)), EVENT_TARGET, json.dumps({"success": False}, sort_keys=True), now_text, now_text),
+            "INSERT OR IGNORE INTO domain_front_rounds(round_id,activity_id,location_key,status,activity_starts_at,activity_ends_at,starts_at,ends_at,claim_expires_at,target_quantity,rules_snapshot_json,total_contribution,result_json,created_at,updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+            (rid, activity_id, definition.location_key, serialize_datetime(activity_start), serialize_datetime(activity_end), serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(ends_at + timedelta(days=definition.claim_days)), definition.target_quantity, json.dumps(definition.snapshot(), ensure_ascii=False, sort_keys=True), json.dumps({"success": False}, sort_keys=True), now_text, now_text),
         )
         return connection.execute("SELECT * FROM domain_front_rounds WHERE round_id=?", (rid,)).fetchone()
 
     def _domain_refresh_round(self, connection: Any, event: Any, now: datetime) -> Any:
         if event is None:
             raise DomainEventRoundNotActiveError("domain-front round does not exist")
+        self._domain_round_rules(event)
         if str(event["status"]) in {"open", "running"} and now >= datetime.fromisoformat(str(event["ends_at"])):
             total = int(connection.execute("SELECT COALESCE(SUM(quantity),0) AS total FROM domain_front_contributions WHERE round_id=?", (event["round_id"],)).fetchone()["total"])
             winner = connection.execute("SELECT domain_key, SUM(quantity) AS score FROM domain_front_contributions WHERE round_id=? GROUP BY domain_key ORDER BY score DESC, domain_key ASC LIMIT 1", (event["round_id"],)).fetchone()
-            result = self._json_object(event["result_json"], {})
-            result.update({"success": total >= int(event["target_quantity"]), "winner_domain": winner["domain_key"] if winner else None, "settled_at": serialize_datetime(now)})
+            result = self._domain_strict_object(event["result_json"])
+            rules = self._domain_round_rules(event)
+            result.update({"success": total >= rules.target_quantity, "winner_domain": winner["domain_key"] if winner else None, "settled_at": serialize_datetime(now)})
             connection.execute("UPDATE domain_front_rounds SET status='settled', total_contribution=?, result_json=?, updated_at=? WHERE round_id=? AND status IN ('open','running')", (total, json.dumps(result, sort_keys=True), serialize_datetime(now), event["round_id"]))
             event = connection.execute("SELECT * FROM domain_front_rounds WHERE round_id=?", (event["round_id"],)).fetchone()
         return event
@@ -495,20 +511,33 @@ class DomainFrontRepositoryMixin:
         if event is None or str(event["status"]) not in {"open", "running"} or now >= datetime.fromisoformat(str(event["ends_at"])):
             raise DomainEventRoundNotActiveError("domain-front round is not active")
 
-    def _domain_requirements(self, connection: Any, player: Any, now: datetime) -> tuple[Any, Any]:
-        if not meets_domain_front_realm(str(player["realm_key"]), player_integer(player, "realm_layer")) or not player["domain_key"]:
+    @staticmethod
+    def _domain_round_rules(event: Any) -> Any:
+        if event is None:
+            raise DomainEventRoundNotActiveError("domain-front round does not exist")
+        try:
+            snapshot = decode_json_strict(str(event["rules_snapshot_json"]))
+        except Exception as exc:
+            raise DomainEventRoundNotActiveError("domain-front round rules are invalid") from exc
+        try:
+            return domain_front_definition_from_snapshot(snapshot)
+        except Exception as exc:
+            raise DomainEventRoundNotActiveError("domain-front round rules are invalid") from exc
+
+    def _domain_requirements(self, connection: Any, player: Any, now: datetime, rules: Any) -> tuple[Any, Any]:
+        if not meets_domain_front_realm(str(player["realm_key"]), player_integer(player, "realm_layer"), rules.required_realm_rank, rules.required_realm_layer, self.content) or not player["domain_key"]:
             raise DomainEventRequirementError("domain-front requires a selected soul-transformation domain")
         crack = player["domain_crack_until"]
         if crack and now < datetime.fromisoformat(str(crack)):
             raise DomainCrackActiveError("domain crack is active")
-        if str(player["location_key"]) != LOCATION_KEY:
+        if str(player["location_key"]) != rules.location_key:
             raise DomainEventRequirementError("player is not at the domain front")
         membership = connection.execute("SELECT * FROM sect_members WHERE player_id=? AND status='active'", (player["id"],)).fetchone()
         if membership is None:
             raise DomainEventRequirementError("domain-front requires an active sect")
         sect = connection.execute("SELECT * FROM sects WHERE sect_id=? AND status='active'", (membership["sect_id"],)).fetchone()
-        if sect is None or int(sect["level"]) < 4:
-            raise DomainEventRequirementError("domain-front requires sect level 4")
+        if sect is None or int(sect["level"]) < rules.sect_level_min:
+            raise DomainEventRequirementError("domain-front requires the configured sect level")
         return sect, membership
 
     @staticmethod
@@ -518,7 +547,7 @@ class DomainFrontRepositoryMixin:
             raise DomainEventRequirementError("player has not joined this domain-front round")
         return row
 
-    def _domain_find_source(self, connection: Any, player_id: int, round_id: str, action: str, source_operation_id: str | None) -> dict[str, object]:
+    def _domain_find_source(self, connection: Any, player_id: int, round_id: str, action: str, source_operation_id: str | None, rules: Any) -> dict[str, object]:
         if action == "battle":
             query = """
                 SELECT links.event_operation_id AS operation_id
@@ -539,7 +568,7 @@ class DomainFrontRepositoryMixin:
             query += " ORDER BY links.created_at DESC LIMIT 1"
             row = connection.execute(query, tuple(params)).fetchone()
             if row is not None:
-                return {"source_operation_id": str(row["operation_id"]), "quantity": BATTLE_CONTRIBUTION}
+                return {"source_operation_id": str(row["operation_id"]), "quantity": rules.battle_contribution}
         if action == "point":
             query = "SELECT operation_id, minutes FROM domain_front_point_operations WHERE round_id=? AND player_id=? AND status='settled'"
             params = [round_id, player_id]
@@ -552,12 +581,12 @@ class DomainFrontRepositoryMixin:
             query += " ORDER BY created_at DESC LIMIT 1"
             row = connection.execute(query, tuple(params)).fetchone()
             if row is not None:
-                return {"source_operation_id": str(row["operation_id"]), "quantity": int(row["minutes"]) * POINT_CONTRIBUTION_PER_MINUTE}
+                return {"source_operation_id": str(row["operation_id"]), "quantity": int(row["minutes"]) * rules.point_contribution_per_minute}
         raise DomainEventSourceInvalidError("no eligible settled domain-front source operation")
 
     def _domain_payload(self, connection: Any, player_id: int, event: Any) -> dict[str, object]:
         participant = connection.execute("SELECT * FROM domain_front_participants WHERE round_id=? AND player_id=?", (event["round_id"], player_id)).fetchone()
-        result = self._json_object(event["result_json"], {})
+        result = self._domain_strict_object(event["result_json"])
         return {"round_id": str(event["round_id"]), "activity_id": str(event["activity_id"]), "status": str(event["status"]), "activity_starts_at": str(event["activity_starts_at"]), "activity_ends_at": str(event["activity_ends_at"]), "starts_at": str(event["starts_at"]), "ends_at": str(event["ends_at"]), "claim_expires_at": str(event["claim_expires_at"]), "total_contribution": int(event["total_contribution"]), "player_contribution": int(participant["contribution"]) if participant else 0, "participant": participant is not None and participant["status"] == "active", "sect_id": str(participant["sect_id"]) if participant else None, "domain_key": str(participant["domain_key"]) if participant else None, "winner_domain": result.get("winner_domain"), "success": result.get("success")}
 
     def _domain_record(self, connection: Any, player_id: int, event: Any) -> DomainFrontRecord:
@@ -565,47 +594,70 @@ class DomainFrontRepositoryMixin:
 
     @staticmethod
     def _domain_record_from_payload(payload: dict[str, object], replay: bool = False) -> DomainFrontRecord:
-        return DomainFrontRecord(str(payload["round_id"]), str(payload["activity_id"]), str(payload["status"]), str(payload["activity_starts_at"]), str(payload["activity_ends_at"]), str(payload["starts_at"]), str(payload["ends_at"]), str(payload["claim_expires_at"]), int(payload["total_contribution"]), int(payload["player_contribution"]), bool(payload["participant"]), payload.get("sect_id") and str(payload["sect_id"]), payload.get("domain_key") and str(payload["domain_key"]), payload.get("winner_domain") and str(payload["winner_domain"]), payload.get("success") if payload.get("success") is None else bool(payload["success"]), {str(k): int(v) for k, v in dict(payload.get("reward", {})).items()}, replay or bool(payload.get("idempotent_replay", False)))
+        return DomainFrontRecord(str(payload["round_id"]), str(payload["activity_id"]), str(payload["status"]), str(payload["activity_starts_at"]), str(payload["activity_ends_at"]), str(payload["starts_at"]), str(payload["ends_at"]), str(payload["claim_expires_at"]), int(payload["total_contribution"]), int(payload["player_contribution"]), bool(payload["participant"]), payload.get("sect_id") and str(payload["sect_id"]), payload.get("domain_key") and str(payload["domain_key"]), payload.get("winner_domain") and str(payload["winner_domain"]), payload.get("success") if payload.get("success") is None else bool(payload["success"]), {str(k): int(v) for k, v in dict(payload.get("reward", {})).items()}, replay or bool(payload.get("idempotent_replay", False)), int(payload["quantity"]) if payload.get("quantity") is not None else None)
 
-    def _domain_get_or_create_season(self, connection: Any, season_id: str, starts_at: datetime, ends_at: datetime, now: datetime) -> Any:
+    def _domain_get_or_create_season(self, connection: Any, season_id: str, starts_at: datetime, ends_at: datetime, now: datetime, rules: Any) -> Any:
         now_text = serialize_datetime(now)
-        connection.execute("INSERT OR IGNORE INTO domain_war_seasons(season_id,starts_at,ends_at,claim_expires_at,status,frozen_at,snapshot_json,created_at,updated_at) VALUES (?, ?, ?, ?, 'collecting', NULL, '{}', ?, ?)", (season_id, serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(claim_expiry(ends_at)), now_text, now_text))
+        connection.execute("INSERT OR IGNORE INTO domain_war_seasons(season_id,starts_at,ends_at,claim_expires_at,status,frozen_at,rules_snapshot_json,snapshot_json,created_at,updated_at) VALUES (?, ?, ?, ?, 'collecting', NULL, ?, '{}', ?, ?)", (season_id, serialize_datetime(starts_at), serialize_datetime(ends_at), serialize_datetime(claim_expiry(ends_at, rules)), json.dumps(rules.snapshot(), ensure_ascii=False, sort_keys=True), now_text, now_text))
         return connection.execute("SELECT * FROM domain_war_seasons WHERE season_id=?", (season_id,)).fetchone()
 
     def _domain_freeze_season(self, connection: Any, season: Any, now: datetime) -> None:
         if str(season["status"]) == "frozen":
             return
+        rules = self._domain_season_rules(season)
         scores: dict[int, dict[str, object]] = {}
         rows = connection.execute("SELECT player_id, occurred_at, quantity FROM domain_front_contributions c JOIN domain_front_rounds r ON r.round_id=c.round_id WHERE r.starts_at>=? AND r.starts_at<? AND quantity>0", (season["starts_at"], season["ends_at"])).fetchall()
         for row in rows:
             entry = scores.setdefault(int(row["player_id"]), {"score": 0, "achieved_at": str(row["occurred_at"])})
-            entry["score"] = int(entry["score"]) + int(row["quantity"])
+            entry["score"] = int(entry["score"]) + int(row["quantity"]) * rules.domain_multiplier
             entry["achieved_at"] = min(str(entry["achieved_at"]), str(row["occurred_at"]))
         sect_rows = connection.execute("SELECT player_id, occurred_at, quantity FROM sect_contribution_events WHERE occurred_at>=? AND occurred_at<? AND quantity>0", (season["starts_at"], season["ends_at"])).fetchall()
         for row in sect_rows:
             entry = scores.setdefault(int(row["player_id"]), {"score": 0, "achieved_at": str(row["occurred_at"])})
-            entry["score"] = int(entry["score"]) + int(row["quantity"]) * 2
+            entry["score"] = int(entry["score"]) + int(row["quantity"]) * rules.sect_multiplier
             entry["achieved_at"] = min(str(entry["achieved_at"]), str(row["occurred_at"]))
-        production_rows = connection.execute("SELECT player_id, updated_at FROM production_orders WHERE status='completed' AND updated_at>=? AND updated_at<? AND (recipe_key LIKE 'recipe.domain.%' OR json_extract(snapshot_json,'$.realm_key')='soul_transformation')", (season["starts_at"], season["ends_at"])).fetchall()
+        production_rows = connection.execute(
+            "SELECT player_id, updated_at FROM production_orders "
+            "WHERE status='completed' AND updated_at>=? AND updated_at<? "
+            "AND (substr(recipe_key, 1, ?) = ? OR json_extract(snapshot_json,'$.realm_key') = ?)",
+            (
+                season["starts_at"],
+                season["ends_at"],
+                len(rules.production_recipe_key_prefix),
+                rules.production_recipe_key_prefix,
+                rules.production_snapshot_realm_key,
+            ),
+        ).fetchall()
         for row in production_rows:
             entry = scores.setdefault(int(row["player_id"]), {"score": 0, "achieved_at": str(row["updated_at"])})
-            entry["score"] = int(entry["score"]) + 5
+            entry["score"] = int(entry["score"]) + rules.production_multiplier
             entry["achieved_at"] = min(str(entry["achieved_at"]), str(row["updated_at"]))
-        rows = sorted(({"player_id": player_id, **value} for player_id, value in scores.items() if int(value["score"]) > 0), key=lambda row: (-int(row["score"]), str(row["achieved_at"]), int(row["player_id"])))
+        rows = [{"player_id": player_id, **value} for player_id, value in scores.items() if int(value["score"]) > 0]
+        rows.sort(key=lambda row: int(row["player_id"]), reverse=rules.identity_tiebreak == "player_id_desc")
+        rows.sort(key=lambda row: str(row["achieved_at"]), reverse=rules.achieved_at_order == "desc")
+        rows.sort(key=lambda row: int(row["score"]), reverse=rules.score_order == "desc")
         snapshot = []
-        for rank, row in enumerate(rows[:50], 1):
-            reward = reward_for_rank(rank)
+        for rank, row in enumerate(rows[: rules.rank_limit], 1):
+            reward = rules.reward_for_rank(rank)
             label = anonymous_label(str(season["season_id"]), int(row["player_id"]))
             connection.execute("INSERT OR IGNORE INTO domain_war_rankings(season_id,player_id,rank,score,achieved_at,anonymous_label,reward_json) VALUES (?, ?, ?, ?, ?, ?, ?)", (season["season_id"], row["player_id"], rank, row["score"], row["achieved_at"], label, json.dumps(reward, sort_keys=True)))
             snapshot.append({"rank": rank, "anonymous_label": label, "score": int(row["score"]), "achieved_at": str(row["achieved_at"]), "reward": reward})
-        connection.execute("UPDATE domain_war_seasons SET status='frozen', frozen_at=?, snapshot_json=?, updated_at=? WHERE season_id=? AND status='collecting'", (serialize_datetime(now), json.dumps(snapshot, sort_keys=True), serialize_datetime(now), season["season_id"]))
+        connection.execute("UPDATE domain_war_seasons SET status='frozen', frozen_at=?, snapshot_json=?, updated_at=? WHERE season_id=? AND status='collecting'", (serialize_datetime(now), json.dumps({"rules": rules.snapshot(), "standings": snapshot}, ensure_ascii=False, sort_keys=True), serialize_datetime(now), season["season_id"]))
 
     def _domain_season_record(self, connection: Any, player_id: int, season: Any) -> DomainFrontSeasonRecord:
         rows = connection.execute("SELECT * FROM domain_war_rankings WHERE season_id=? ORDER BY rank", (season["season_id"],)).fetchall()
-        standings = tuple(DomainFrontSeasonStanding(int(row["rank"]), str(row["anonymous_label"]), int(row["score"]), str(row["achieved_at"]), self._json_object(row["reward_json"], {})) for row in rows)
+        standings = tuple(DomainFrontSeasonStanding(int(row["rank"]), str(row["anonymous_label"]), int(row["score"]), str(row["achieved_at"]), self._domain_strict_object(row["reward_json"])) for row in rows)
         own_row = connection.execute("SELECT * FROM domain_war_rankings WHERE season_id=? AND player_id=?", (season["season_id"], player_id)).fetchone()
-        own = DomainFrontSeasonStanding(int(own_row["rank"]), str(own_row["anonymous_label"]), int(own_row["score"]), str(own_row["achieved_at"]), self._json_object(own_row["reward_json"], {})) if own_row else None
+        own = DomainFrontSeasonStanding(int(own_row["rank"]), str(own_row["anonymous_label"]), int(own_row["score"]), str(own_row["achieved_at"]), self._domain_strict_object(own_row["reward_json"])) if own_row else None
         return DomainFrontSeasonRecord(str(season["season_id"]), str(season["status"]), str(season["starts_at"]), str(season["ends_at"]), str(season["claim_expires_at"]), season["frozen_at"] and str(season["frozen_at"]), standings, own)
+
+    @staticmethod
+    def _domain_season_rules(season: Any) -> Any:
+        try:
+            snapshot = decode_json_strict(str(season["rules_snapshot_json"]))
+            return domain_war_season_definition_from_snapshot(snapshot)
+        except Exception as exc:
+            raise DomainSeasonRankingNotFinalizedError("domain-war season rules are invalid") from exc
 
     def _domain_operation_replay(self, connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, object] | None:
         row = connection.execute("SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
@@ -613,7 +665,14 @@ class DomainFrontRepositoryMixin:
             return None
         if str(row["operation_name"]) != operation_name or str(row["request_hash"]) != request_hash:
             raise OperationConflictError("operation id was reused with different input")
-        return self._json_object(row["result_json"], {})
+        return self._domain_strict_object(row["result_json"])
+
+    @staticmethod
+    def _domain_strict_object(value: Any) -> dict[str, object]:
+        decoded = decode_json_strict(str(value))
+        if not isinstance(decoded, dict):
+            raise ValueError("domain-front JSON payload must be an object")
+        return {str(key): item for key, item in decoded.items()}
 
     def _domain_insert_operation(self, connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, object], now_text: str) -> None:
         connection.execute("INSERT INTO operations(operation_id,operation_name,player_id,request_hash,result_json,created_at) VALUES (?, ?, ?, ?, ?, ?)", (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text))

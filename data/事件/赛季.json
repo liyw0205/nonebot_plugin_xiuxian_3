@@ -1,0 +1,35 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "season",
+  "records": [
+    {
+      "key": "season.domain_war",
+      "name": "领域战赛季",
+      "desc": "各方修士以领域战功、宗门建设与化神配方成品争夺领域战榜。",
+      "status": "active",
+      "anchor": "2025-01-01T00:00:00+00:00",
+      "duration_days": 21,
+      "claim_days": 7,
+      "rank_limit": 50,
+      "score_sources": {
+        "domain_contribution": {"multiplier": 1},
+        "sect_contribution": {"multiplier": 2},
+        "soul_transformation_production": {"multiplier": 5, "recipe_key_prefix": "recipe.domain.", "snapshot_realm_key": "soul_transformation"}
+      },
+      "ranking": {"score_order": "desc", "achieved_at_order": "asc", "identity_tiebreak": "player_id_asc"},
+      "rank_rewards": [
+        {"min_rank": 1, "max_rank": 1, "reward_key": "reward.season.domain_war.rank_1"},
+        {"min_rank": 2, "max_rank": 2, "reward_key": "reward.season.domain_war.rank_2"},
+        {"min_rank": 3, "max_rank": 3, "reward_key": "reward.season.domain_war.rank_3"},
+        {"min_rank": 4, "max_rank": 10, "reward_key": "reward.season.domain_war.rank_4_10"},
+        {"min_rank": 11, "max_rank": 50, "reward_key": "reward.season.domain_war.rank_11_50"}
+      ],
+      "redemption": {
+        "fragment_item_key": "item.domain_core_fragment",
+        "fragment_quantity": 20,
+        "reward_item_key": "item.domain_core",
+        "reward_quantity": 1
+      }
+    }
+  ]
+}

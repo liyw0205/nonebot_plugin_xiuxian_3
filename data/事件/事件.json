@@ -238,6 +238,25 @@
       "status": "active",
       "location_key": "xuantian.domain_front",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "schedule": {
+        "activity_hours": 4,
+        "anchor_hour": 0,
+        "round_minutes": 30,
+        "claim_days": 1
+      },
+      "participation": {
+        "participant_cap": 20,
+        "join_stamina_cost": 20,
+        "sect_level_min": 4
+      },
+      "contribution": {
+        "battle": 100,
+        "point_per_minute": 10,
+        "point_minutes_min": 1,
+        "point_minutes_max": 30
+      },
+      "global_goal": 1000,
+      "personal_claim_threshold": 100,
       "reward_key": "reward.event.domain_front",
       "codex_entry_key": "codex.domain.frontline",
       "key": "event.domain_front"

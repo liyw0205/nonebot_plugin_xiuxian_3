@@ -19,6 +19,7 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
             ends_at TEXT NOT NULL,
             claim_expires_at TEXT NOT NULL,
             target_quantity INTEGER NOT NULL CHECK (target_quantity >= 0),
+            rules_snapshot_json TEXT NOT NULL DEFAULT '{}',
             total_contribution INTEGER NOT NULL DEFAULT 0 CHECK (total_contribution >= 0),
             result_json TEXT NOT NULL DEFAULT '{}',
             created_at TEXT NOT NULL,
@@ -71,7 +72,7 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
             round_id TEXT NOT NULL REFERENCES domain_front_rounds(round_id),
             player_id INTEGER NOT NULL REFERENCES players(id),
             operation_id TEXT NOT NULL UNIQUE,
-            minutes INTEGER NOT NULL CHECK (minutes BETWEEN 1 AND 30),
+            minutes INTEGER NOT NULL CHECK (minutes > 0),
             status TEXT NOT NULL CHECK (status IN ('settled', 'failed')),
             created_at TEXT NOT NULL
         );
@@ -91,6 +92,7 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
             claim_expires_at TEXT NOT NULL,
             status TEXT NOT NULL CHECK (status IN ('collecting', 'frozen')),
             frozen_at TEXT,
+            rules_snapshot_json TEXT NOT NULL DEFAULT '{}',
             snapshot_json TEXT NOT NULL DEFAULT '{}',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -128,6 +130,12 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
         );
         """
     )
+    round_columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(domain_front_rounds)")}
+    if "rules_snapshot_json" not in round_columns:
+        connection.execute("ALTER TABLE domain_front_rounds ADD COLUMN rules_snapshot_json TEXT NOT NULL DEFAULT '{}'")
+    season_columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(domain_war_seasons)")}
+    if "rules_snapshot_json" not in season_columns:
+        connection.execute("ALTER TABLE domain_war_seasons ADD COLUMN rules_snapshot_json TEXT NOT NULL DEFAULT '{}'")
 
 
 __all__ = ["ensure_domain_front_schema"]

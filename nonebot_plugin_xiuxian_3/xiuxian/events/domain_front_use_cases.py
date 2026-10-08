@@ -14,6 +14,7 @@ from ..persistence.errors import (
     DomainCoreRedeemRequirementError,
     DomainEventAlreadyJoinedError,
     DomainEventParticipantCapError,
+    DomainEventPointMinutesError,
     DomainEventRequirementError,
     DomainEventRewardAlreadyClaimedError,
     DomainEventRewardNotEligibleError,
@@ -52,12 +53,13 @@ class DomainFrontApplication:
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
         mapping: dict[type[Exception], tuple[str, str]] = {
             DomainCrackActiveError: ("DOMAIN_CRACK_ACTIVE", "领域裂痕尚未恢复，暂时不能参加领域前线。"),
-            DomainEventRequirementError: ("DOMAIN_EVENT_REQUIREMENT_MISSING", "需要化神、已选领域、宗门等级 4，并位于领域前线。"),
-            DomainEventParticipantCapError: ("EVENT_PARTICIPANT_CAP", "本轮宗门参战人数已达到 20 人上限。"),
+            DomainEventRequirementError: ("DOMAIN_EVENT_REQUIREMENT_MISSING", "尚未满足参加领域前线的条件。"),
+            DomainEventParticipantCapError: ("EVENT_PARTICIPANT_CAP", "本轮宗门参战人数已满。"),
+            DomainEventPointMinutesError: ("INVALID_DOMAIN_EVENT_COMMAND", "守点时长不符合本轮规矩。"),
             DomainEventAlreadyJoinedError: ("EVENT_ALREADY_JOINED", "你已经加入本轮领域前线。"),
             DomainEventRoundNotActiveError: ("EVENT_NOT_ACTIVE", "当前领域前线轮次不接受这个操作。"),
             DomainEventSourceInvalidError: ("EVENT_CONTRIBUTION_SOURCE_INVALID", "本轮没有找到可记入的对应功绩。"),
-            DomainEventRewardNotEligibleError: ("EVENT_CONTRIBUTION_INSUFFICIENT", "个人领域前线贡献尚未达到 100。"),
+            DomainEventRewardNotEligibleError: ("EVENT_CONTRIBUTION_INSUFFICIENT", "个人领域前线贡献尚未达到领奖门槛。"),
             DomainEventRewardAlreadyClaimedError: ("EVENT_REWARD_ALREADY_CLAIMED", "本轮领域前线奖励已经领取。"),
             BattleRequirementError: ("DOMAIN_BATTLE_REQUIREMENT_MISSING", "眼下还不能开启这场领域斗法。"),
             BattleBusyError: ("BATTLE_PLAYER_OCCUPIED", "你正处于另一场斗法或行程中，暂不能开始领域战。"),
@@ -69,8 +71,8 @@ class DomainFrontApplication:
             DomainSeasonRewardExpiredError: ("DOMAIN_SEASON_REWARD_EXPIRED", "领域战赛季领奖窗口已经结束。"),
             DomainCoreRedeemRequirementError: ("DOMAIN_CORE_REDEEM_NOT_AVAILABLE", "领域核心只能在已结束且已冻结的领域赛季中兑换。"),
             DomainCoreRedeemAlreadyUsedError: ("DOMAIN_CORE_REDEEM_ALREADY_USED", "本赛季已经兑换过领域核心。"),
-            DomainCoreFragmentInsufficientError: ("DOMAIN_CORE_FRAGMENT_INSUFFICIENT", "兑换领域核心需要 20 个领域核心碎片。"),
-            ResourceInsufficientError: ("STAMINA_INSUFFICIENT", "加入领域前线需要 20 点体力。"),
+            DomainCoreFragmentInsufficientError: ("DOMAIN_CORE_FRAGMENT_INSUFFICIENT", "兑换领域核心所需碎片不足。"),
+            ResourceInsufficientError: ("STAMINA_INSUFFICIENT", "加入领域前线所需体力不足。"),
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂时不能执行领域前线操作。"),
             OperationConflictError: ("OPERATION_CONFLICT", "此事已有安排，请重新起意。"),
@@ -98,6 +100,7 @@ class DomainFrontApplication:
             "winner_domain": record.winner_domain,
             "success": record.success,
             "reward": dict(record.reward),
+            "quantity": record.last_contribution_quantity,
             "idempotent_replay": record.already_completed,
         }
 
@@ -129,7 +132,7 @@ class DomainFrontApplication:
             record = await self.repository.join_domain_front(platform=context.adapter, platform_user_id=context.user_id, operation_id=operation_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "DOMAIN_EVENT_JOINED", "你已加入本轮领域前线，消耗体力 20。", context.request_id, operation_id, data=self._record_data(record))
+        return CommandResult(True, "DOMAIN_EVENT_JOINED", "你已加入本轮领域前线。", context.request_id, operation_id, data=self._record_data(record))
 
     async def start_domain_front_battle(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -171,12 +174,12 @@ class DomainFrontApplication:
         try:
             minutes = int(context.command_args[0]) if context.command_args else 1
         except ValueError:
-            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "占点时间须为 1 至 30 分钟。", context.request_id)
-        if not 1 <= minutes <= 30:
-            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "占点时间须为 1 至 30 分钟。", context.request_id)
+            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", "请填写守点时长。", context.request_id)
         operation_id = self._operation_id(context, "point")
         try:
             payload = await self.repository.create_domain_front_point(platform=context.adapter, platform_user_id=context.user_id, minutes=minutes, operation_id=operation_id)
+        except DomainEventPointMinutesError as exc:
+            return CommandResult(False, "INVALID_DOMAIN_EVENT_COMMAND", f"守点时长须为 {exc.minimum} 至 {exc.maximum} 分钟。", context.request_id, operation_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
         return CommandResult(True, "DOMAIN_POINT_SETTLED", f"已守住领域前线 {minutes} 分钟，可将此番功绩记入本轮。", context.request_id, operation_id, data={**payload, "idempotent_replay": bool(payload.get("idempotent_replay", False))})
@@ -191,7 +194,8 @@ class DomainFrontApplication:
             record = await self.repository.record_domain_front_contribution(platform=context.adapter, platform_user_id=context.user_id, action_key=action, source_operation_id=source, operation_id=operation_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "DOMAIN_EVENT_CONTRIBUTION_RECORDED", f"此番功绩已记入领域前线，本轮个人贡献 {record.player_contribution}。", context.request_id, operation_id, data=self._record_data(record))
+        data = self._record_data(record)
+        return CommandResult(True, "DOMAIN_EVENT_CONTRIBUTION_RECORDED", f"此番功绩已记入领域前线，本轮个人贡献 {record.player_contribution}。", context.request_id, operation_id, data=data)
 
     async def claim_domain_front_reward(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
@@ -201,7 +205,7 @@ class DomainFrontApplication:
             record = await self.repository.claim_domain_front_reward(platform=context.adapter, platform_user_id=context.user_id, round_id=context.command_args[0], operation_id=operation_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "DOMAIN_EVENT_REWARD_CLAIMED", "领域前线奖励已发放：领域核心碎片 +5，世界功勋 +100。", context.request_id, operation_id, data={"round_id": record.round_id, "reward": dict(record.reward), "idempotent_replay": record.already_completed})
+        return CommandResult(True, "DOMAIN_EVENT_REWARD_CLAIMED", f"已领取「{record.reward_name}」。", context.request_id, operation_id, data={"round_id": record.round_id, "reward": dict(record.reward), "reward_name": record.reward_name, "idempotent_replay": record.already_completed})
 
     @staticmethod
     def _season_data(record: DomainFrontSeasonRecord) -> dict[str, object]:
@@ -234,7 +238,7 @@ class DomainFrontApplication:
             return CommandResult(False, "INVALID_DOMAIN_SEASON_COMMAND", "赛季编号无效。", context.request_id, operation_id)
         except Exception as exc:
             return self._error(context, operation_id, exc)
-        return CommandResult(True, "DOMAIN_SEASON_REWARD_CLAIMED", f"领域战赛季第 {record.rank} 名奖励已发放。", context.request_id, operation_id, data={"season_id": record.season_id, "rank": record.rank, "reward": dict(record.reward), "idempotent_replay": record.already_completed})
+        return CommandResult(True, "DOMAIN_SEASON_REWARD_CLAIMED", f"已领取「{record.reward_name}」。", context.request_id, operation_id, data={"season_id": record.season_id, "rank": record.rank, "reward": dict(record.reward), "reward_name": record.reward_name, "idempotent_replay": record.already_completed})
 
     async def redeem_domain_core(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
@@ -254,7 +258,7 @@ class DomainFrontApplication:
         return CommandResult(
             True,
             "DOMAIN_CORE_REDEEMED",
-            "已消耗 20 个领域核心碎片，兑换领域核心 +1。",
+            "领域核心兑换已完成。",
             context.request_id,
             operation_id,
             data={

@@ -3,6 +3,7 @@
   "status": "active",
   "files": [
     "事件/事件.json",
+    "事件/赛季.json",
     "任务/任务.json",
     "任务/悬赏.json",
     "剧情/主线.json",

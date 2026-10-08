@@ -2,6 +2,58 @@
   "kind": "reward",
   "records": [
     {
+      "name": "领域前线个人嘉奖",
+      "desc": "为领域前线稳住战局后所得的领域核心碎片与世界功勋。",
+      "operation": "event.domain_front.claim",
+      "entries": [
+        {"kind": "item", "item_key": "item.domain_core_fragment", "quantity": 5},
+        {"kind": "resource", "resource_key": "world_merit", "quantity": 100}
+      ],
+      "once_per_event_round": true,
+      "key": "reward.event.domain_front",
+      "status": "active"
+    },
+    {
+      "name": "领域战赛季第一名",
+      "desc": "领域战赛季榜首的领域核心碎片。",
+      "operation": "event.domain_war.claim",
+      "entries": [{"kind": "item", "item_key": "item.domain_core_fragment", "quantity": 20}],
+      "key": "reward.season.domain_war.rank_1",
+      "status": "active"
+    },
+    {
+      "name": "领域战赛季第二名",
+      "desc": "领域战赛季第二名的领域核心碎片。",
+      "operation": "event.domain_war.claim",
+      "entries": [{"kind": "item", "item_key": "item.domain_core_fragment", "quantity": 15}],
+      "key": "reward.season.domain_war.rank_2",
+      "status": "active"
+    },
+    {
+      "name": "领域战赛季第三名",
+      "desc": "领域战赛季第三名的领域核心碎片。",
+      "operation": "event.domain_war.claim",
+      "entries": [{"kind": "item", "item_key": "item.domain_core_fragment", "quantity": 10}],
+      "key": "reward.season.domain_war.rank_3",
+      "status": "active"
+    },
+    {
+      "name": "领域战赛季前十奖励",
+      "desc": "领域战赛季前十名的领域核心碎片。",
+      "operation": "event.domain_war.claim",
+      "entries": [{"kind": "item", "item_key": "item.domain_core_fragment", "quantity": 5}],
+      "key": "reward.season.domain_war.rank_4_10",
+      "status": "active"
+    },
+    {
+      "name": "领域战赛季前五十奖励",
+      "desc": "领域战赛季前五十名的世界功勋。",
+      "operation": "event.domain_war.claim",
+      "entries": [{"kind": "resource", "resource_key": "world_merit", "quantity": 100}],
+      "key": "reward.season.domain_war.rank_11_50",
+      "status": "active"
+    },
+    {
       "name": "魔界引路所得",
       "desc": "确认魔界风险后取得的引路声望。",
       "operation": "world.accept_demon_intro",
