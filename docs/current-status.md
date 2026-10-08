@@ -811,6 +811,14 @@ QQ 官方与 OneBot V11、内容关闭后的重启回放、坏账本和资源原
 
 验收由双适配器只读上下文测试确认训练傀儡返回观战结果且全库不变，并与正式竞技场 PvP、队伍 PvE 结算回归同组验证；文件所有权和协作记录见实施计划。
 
+### 4.5 已闭合切片：灵兽成长不能消耗已预留物品
+
+喂养与蜕变现通过 `utils.assets.player_available_assets_missing` 检查扣除市集、求购、拍卖预留后的物品余额，并仍在原 `BEGIN IMMEDIATE` 事务中扣除资产、写入灵兽状态和 operation。QQ 官方与 OneBot V11 均覆盖：预留不足时全库状态不变、订单与锁保留、operation 不落库；解除预留后原 operation 可成功，重复及重启后只回放一次。相关资产锁查询和灵兽规则没有改动。
+
+灵兽预留物专项、灵兽既有测试及市场/求购/拍卖/工具聚焦组共 231 项通过；更新工具断言后，工具、专项与文档测试组 82 项通过；正式 PvP/PvE 与切磋/训练傀儡只读观战回归 10 项通过。源码与测试 `compileall`、全部 `data/**/*.json` 严格解析及 `git diff --check` 通过。小型灵兽行囊仍缺配方合同，灵具绑定不属于本条；师徒关系列表和功法来源也仍先补合同，不据此新增运行时入口。
+
+闭合后的横向复核没有找到可立即实现的完整合同候选。下一轮优先补领域前线活动合同：当前事件记录缺完整奖励定义，轮次、赛季、成本、贡献和奖励门槛仍由规则常量提供；先明确可变内容及冻结范围，再评估运行时接入。世界移动路线暂无线上的可复现错误，师徒列表/功法来源/灵兽行囊缺规则合同。计入本条后的最近十条切片为：本条 `companions/utils`、`b3a0ead` combat/application、`4b7c013` specials/utils、`7de4df0` player/progression、`e1b5459` player、`afabb94` events、`8775c7b` adventures、`d8a040b` progression、`f6dd8e6` world、`a6df3e1` adapters；`utils`、`player`、`progression` 各触及两次并进入子插件冷却，灵兽亦因本条闭合进入冷却。
+
 ## 5. 开发顺序
 
 开发按可独立验收的垂直切片推进，不按 `content-v0.1`、`content-v0.2` 逐个版本搬运：

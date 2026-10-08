@@ -599,6 +599,25 @@ def player_available_item_amount(connection: Any, row: Any, key: str) -> int:
     return max(0, total - reserved)
 
 
+def player_available_assets_missing(
+    connection: Any, row: Any, requirements: Mapping[str, Any]
+) -> dict[str, int]:
+    """Return asset shortfalls after subtracting inventory reserved by trade orders."""
+
+    missing = player_assets_missing(row, requirements)
+    _, item_requirements = _asset_delta_parts(requirements, currency_key="spirit_stones")
+    for raw_key, raw_required in item_requirements.items():
+        key = str(raw_key)
+        required = inventory_amount({key: raw_required}, key)
+        available = player_available_item_amount(connection, row, key)
+        shortfall = required - available
+        if shortfall > 0:
+            missing[key] = shortfall
+        else:
+            missing.pop(key, None)
+    return missing
+
+
 def player_asset_amounts(row: Any, keys: tuple[str, ...] | list[str] | None = None) -> dict[str, int]:
     """Read selected asset balances without duplicating currency/item branches."""
 

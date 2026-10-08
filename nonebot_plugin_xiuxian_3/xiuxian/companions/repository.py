@@ -23,7 +23,12 @@ from ..persistence.errors import (
     PlayerSuspendedError,
     ResourceInsufficientError,
 )
-from ..utils.assets import AssetDeltaError, spend_player_assets, spend_player_items
+from ..utils.assets import (
+    AssetDeltaError,
+    player_available_assets_missing,
+    spend_player_assets,
+    spend_player_items,
+)
 from ..utils.player import player_field
 from .models import CompanionMutationRecord, CompanionSnapshot, CompanionStatusRecord, CompanionView
 from .rules import (
@@ -242,6 +247,8 @@ class CompanionRepositoryMixin:
                 raise CompanionInjuredError("companion is resting")
             spent = {definition.feed_item_key: 1}
             try:
+                if player_available_assets_missing(connection, player, spent):
+                    raise AssetDeltaError("feed item is unavailable")
                 spend_player_items(connection, player, spent, now_text)
             except ValueError as exc:
                 raise ResourceInsufficientError("feed item is insufficient") from exc
@@ -391,6 +398,8 @@ class CompanionRepositoryMixin:
             if int(instance["affinity"]) < evolution.required_affinity:
                 raise CompanionRequirementError("companion affinity is insufficient")
             try:
+                if player_available_assets_missing(connection, player, evolution.costs):
+                    raise AssetDeltaError("evolution assets are unavailable")
                 spend_player_assets(connection, player, evolution.costs, now_text)
             except AssetDeltaError as exc:
                 raise ResourceInsufficientError("evolution materials are insufficient") from exc

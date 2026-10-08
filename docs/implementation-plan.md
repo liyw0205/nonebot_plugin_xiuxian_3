@@ -1675,3 +1675,15 @@ application 规则、不引入第二份白名单。事件 operation ID 在归一
 文件所有权：主线独占 `nonebot_plugin_xiuxian_3/xiuxian/application.py`、本计划和当前状态；`combat_boundary_audit` 独占 `test/test_spar_interactions.py`，新增 `can_write_assets=False` 下 QQ 官方/OneBot V11 训练傀儡观战、全库零写及切磋对照回归。未触碰训练傀儡/切磋 repository、邀请或战斗状态、费用、奖励、图鉴；正式 PvP/PvE 仍沿原结算。无版本标识、兼容分支或玩家可见开发文案。
 
 验收：`test/test_spar_interactions.py`、`test/test_arena.py`、`test/test_party_combat.py` 与构筑投影用例共 12 项通过。两适配器只读身份均返回训练观战结果，训练与切磋调用前后数据库 `iterdump()` 完全一致；正式 PvP/PvE 回归通过。
+
+### 已闭合切片：灵兽消耗不能使用已预留物品
+
+这不是按目录顺序继续开发。只读审查通过 QQ 官方与 OneBot V11 公开命令复现：卖家持有 1 份粗糙灵米，发布摆摊后库存被 `market_item_locks` 预留；喂养木鼠仍返回成功并扣空背包，订单保持 `listed`，锁定标的却已不存在。入口是 `companions.repository._feed_companion_sync`，扣除、灵兽经验/等级和 `companion.feed` operation 同属一个 `BEGIN IMMEDIATE` 事务。进一步复核发现 `_evolve_companion_sync` 也会从总背包扣蜕变材料，其中 `item.ancient_fruit` 可正常交易并可能被预留。两处都应按可用余额扣除，而不是总背包数量。
+
+最近十条代码切片（不计纯测试提交）依次为：`b3a0ead` combat/application、`4b7c013` specials/utils、`7de4df0` player/progression、`e1b5459` player、`afabb94` events、`8775c7b` adventures、`d8a040b` progression、`f6dd8e6` world、`a6df3e1` adapters、`f733734` specials。`specials`、`player`、`progression` 各触及两次，均按子插件冷却暂缓；`companions` 未在窗口触及。领域前线缺完整活动/赛季内容快照，师徒本人关系查询缺少过期邀请投影合同，功法来源和小型灵兽行囊缺来源/配方合同，均暂缓或保持关闭。当前问题会让已预留物品被灵兽用例再次消耗；共享资产工具可提供按市集、求购、拍卖锁扣除后的统一可用量查询，故优先修复这条开放资产路径。
+
+文件所有权：主线独占 `nonebot_plugin_xiuxian_3/xiuxian/companions/repository.py`、`xiuxian/utils/assets.py`、`xiuxian/utils/__init__.py`、`docs/gameplay/companions/model-workflow.md`、本计划与当前状态；`untouched_open_audit` 独占新文件 `test/test_companion_reserved_inventory.py`，覆盖 QQ 官方/OneBot V11 下喂养与蜕变预留物拒绝、零写、订单存续、释放后同 operation 重试与重放。`contract_close_audit` 只读复核共享锁查询、事务顺序及其他灵兽消耗边界。实现复用共享可用资产查询，不改变市场/求购/拍卖状态机、灵兽数值、战斗快照或奖励。训练傀儡与切磋仍只读观战，不新增邀请、状态变化、费用、奖励或图鉴写入；正式 PvP/PvE 照常结算。无运行时版本标识、旧格式兼容分支或玩家可见开发文案。
+
+实现结果：`utils.assets.player_available_assets_missing` 统一保留货币原有校验，并按三类交易锁计算物品可用量；喂养和蜕变在各自原事务内先检查可用量再扣除，预留不足时保持资产、灵兽状态、operation、订单和锁不变。新增工具断言覆盖混合灵石/物品需求及三类预留；灵兽专项覆盖双适配器、失败零写、释放后同 operation 成功/重放和 runtime 重建恢复。专项与灵兽、市场、求购、拍卖及工具聚焦组 231 项通过；更新后的工具/灵兽专项/文档组 82 项通过；正式 PvP/PvE 与切磋/训练傀儡只读观战回归 10 项通过；源码与测试 `compileall`、全量内容 JSON 严格解析、`git diff --check` 均通过。
+
+协作结果：`untouched_open_audit` 独占新增专项测试文件；`contract_close_audit` 只读核对合同、事务顺序和文档状态，确认无需重复补充子代理或选片通用规则；闭合后由 `untouched_open_audit` 只读横向盘点剩余候选，没有改动工作树。主线负责共享工具、灵兽仓储、文档同步和最终验收。候选复核未找到可直接开工的完整合同路径，下一轮优先补领域前线活动合同：当前事件缺完整奖励定义，轮次、赛季、成本、贡献和奖励门槛仍是规则常量；须先明确可变内容、冻结范围与奖励引用，再登记运行时切片。世界移动路线没有可复现的运行时错误；师徒关系列表、功法来源、小型灵兽行囊配方合同不全。`utils`、`player`、`progression` 按最近十条的触及次数冷却，灵兽本域也因本条闭合进入冷却；未开放副本和 Web/跨服写入口继续关闭。
