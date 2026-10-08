@@ -226,7 +226,7 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 
 本条仅处理正式探索遭遇的奖励结算与恢复：坏 JSON、重复键、错误奖励结构、快照/结果副本不一致或未结算/错误归属战斗都须在资产、角色数值、会话、图鉴及 operation 写入前整体拒绝；修复后原 operation 可重试，重启回放不重复发放。代码复用现有严格 JSON、奖励事务和 operation ledger。
 
-主线拥有 `xiuxian/exploration/repository.py` 与本状态页/实施计划；`/root/adventure_path_audit` 独占新 `test/test_exploration_integrity.py`，覆盖 QQ 官方与 OneBot V11、零写、修复重试、故障回滚和重启回放，专项 12 项通过；`/root/exploration_transaction_review` 只读审查事务与恢复不变量，未发现确定问题。主线聚焦回归（完整性、遭遇战、采集）24 项通过，完整探索专项回归 118 项通过；之前暴露的 43 个失败均由既有测试夹具未写入完整六项资质或依赖非法高资质造成，已统一迁移为合法六项资质并用测试武器保留胜负语义。文档测试、`compileall`、内容 JSON 解析和 `git diff --check` 通过。正式 PvP/PvE 保持正常结算，切磋和训练傀儡仍是只读观战，不产生邀请、状态变化、成本、奖励或图鉴写入。云舟恢复候选因不直接影响资产发放而暂缓；下一轮先补师徒关系查询合同，领域前线活动合同继续只读审查；最近十条中 `events` 三次、`player` 两次，按冷却暂缓；`exploration` 本条闭合，`combat` 与 `adventures` 各一次。损坏数据拒绝和修复重试已由专项测试复现。
+主线拥有 `xiuxian/exploration/repository.py` 与本状态页/实施计划；`/root/adventure_path_audit` 独占新 `test/test_exploration_integrity.py`，覆盖 QQ 官方与 OneBot V11、零写、修复重试、故障回滚和重启回放，专项 12 项通过；`/root/exploration_transaction_review` 只读审查事务与恢复不变量，未发现确定问题。主线聚焦回归（完整性、遭遇战、采集）24 项通过，完整探索专项回归 118 项通过；之前暴露的 43 个失败均由既有测试夹具未写入完整六项资质或依赖非法高资质造成，已统一迁移为合法六项资质并用测试武器保留胜负语义。文档测试、`compileall`、内容 JSON 解析和 `git diff --check` 通过。正式 PvP/PvE 保持正常结算，切磋和训练傀儡仍是只读观战，不产生邀请、状态变化、成本、奖励或图鉴写入。云舟结算/恢复冻结快照互证已闭合：旧云舟路径 8 项、完整性专项 5 项、世界/引导回归 20 项通过；师徒关系查询与领域前线活动合同继续只读审查，不直接创建新入口；最近十条中 `events` 三次、`player` 两次，按冷却暂缓；`exploration` 本条闭合，`combat` 与 `adventures` 各一次。损坏数据拒绝和修复重试已由专项测试复现。
 
 ### 4.0 历史切片选择账本：派遣成本
 

@@ -35,12 +35,15 @@ def _prepare_player(runtime, adapter: str, user: str, *, realm: str, location: s
         )
 
 
-def _expire_boat(runtime, session_id: str) -> None:
+def _expire_boat(runtime, session_id: str, *, age: timedelta = timedelta(seconds=1)) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
-        connection.execute(
-            "UPDATE cloud_boat_sessions SET ends_at=? WHERE session_id=?",
-            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), session_id),
+        ends_at = datetime.fromisoformat(
+            connection.execute(
+                "SELECT ends_at FROM cloud_boat_sessions WHERE session_id=?", (session_id,)
+            ).fetchone()[0]
         )
+    advance = age + timedelta(seconds=1)
+    runtime.repository._clock = lambda ends_at=ends_at, advance=advance: ends_at + advance
 
 
 def test_cloud_boat_route_is_idempotent_and_qq_onebot_compatible() -> None:
@@ -65,6 +68,12 @@ def test_cloud_boat_route_is_idempotent_and_qq_onebot_compatible() -> None:
                     "登上云舟 洞天二层",
                 )
                 assert started.code == "CLOUD_BOAT_STARTED"
+                conflict = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, f"board-conflict-{adapter}", f"board-{adapter}"),
+                    "登上云舟 魔界引导",
+                )
+                assert conflict.code == "OPERATION_CONFLICT"
                 replay = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, f"board-replay-{adapter}", f"board-{adapter}"),
@@ -195,11 +204,7 @@ def test_cloud_boat_recovery_uses_frozen_route_after_24_hours() -> None:
                     "登上云舟 魔界引导",
                 )
                 assert started.code == "CLOUD_BOAT_STARTED"
-                with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE cloud_boat_sessions SET ends_at=? WHERE session_id=?",
-                        ((datetime.now(timezone.utc) - timedelta(hours=25)).isoformat(), started.data["session_id"]),
-                    )
+                _expire_boat(runtime, started.data["session_id"], age=timedelta(hours=25))
                 recovered = await runtime.dispatch(
                     _context(adapter, user, f"recover-{adapter}", f"recover-{adapter}"), "恢复云舟"
                 )
@@ -295,11 +300,7 @@ def test_cloud_boat_recovery_rejects_malformed_operation_after_restart() -> None
                     _context(adapter, user, "board", "board"), "登上云舟 魔界引导"
                 )
                 assert started.code == "CLOUD_BOAT_STARTED"
-                with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE cloud_boat_sessions SET ends_at=? WHERE session_id=?",
-                        ((datetime.now(timezone.utc) - timedelta(hours=25)).isoformat(), started.data["session_id"]),
-                    )
+                _expire_boat(runtime, started.data["session_id"], age=timedelta(hours=25))
                 recovered = await runtime.dispatch(
                     _context(adapter, user, "recover", "recover"), "恢复云舟"
                 )

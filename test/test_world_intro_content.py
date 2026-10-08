@@ -4,6 +4,7 @@ import asyncio
 import json
 import sqlite3
 import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -38,10 +39,13 @@ async def _arrive_demon(runtime, adapter: str, user: str) -> None:
     started = await runtime.dispatch(_context(adapter, user, f"board-{user}", f"board-{user}"), "登上云舟 魔界引导")
     assert started.code == "CLOUD_BOAT_STARTED"
     with sqlite3.connect(runtime.settings.database_path) as connection:
-        connection.execute(
-            "UPDATE cloud_boat_sessions SET ends_at='2000-01-01T00:00:00+00:00' WHERE session_id=?",
-            (started.data["session_id"],),
+        ends_at = datetime.fromisoformat(
+            connection.execute(
+                "SELECT ends_at FROM cloud_boat_sessions WHERE session_id=?",
+                (started.data["session_id"],),
+            ).fetchone()[0]
         )
+    runtime.repository._clock = lambda ends_at=ends_at: ends_at + timedelta(seconds=1)
     settled = await runtime.dispatch(_context(adapter, user, f"settle-{user}", f"settle-{user}"), "结算云舟")
     assert settled.code == "CLOUD_BOAT_ARRIVED"
 

@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..utils.assets import player_currency
+from ..utils.json_cache import decode_json_strict
 from ..utils.operations import operation_replay, record_operation
 from ..utils.player import (
     change_player_state,
@@ -86,6 +87,8 @@ class CloudRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             replay = operation_replay(connection, operation_id, operation_name, request_hash)
             if replay is not None:
+                player = self._require_player(connection, platform, platform_user_id, writable=False)
+                self._validate_cloud_start_replay(connection, replay, operation_id, int(player["id"]))
                 return self._cloud_start_from_payload(replay, replay=True)
 
             player = self._require_player(connection, platform, platform_user_id)
@@ -160,6 +163,11 @@ class CloudRepositoryMixin:
                     now_text,
                 ),
             )
+            created = connection.execute(
+                "SELECT * FROM cloud_boat_sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
+            if created is None:
+                raise ValueError("cloud session was not persisted")
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
             payload = {
                 "player": self._player_payload(self._row_to_player(updated)),
@@ -176,6 +184,7 @@ class CloudRepositoryMixin:
                 "pass_quantity": definition.pass_quantity,
             }
             record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
+            self._validate_cloud_session(connection, created, player_id)
             return self._cloud_start_from_payload(payload)
 
     async def settle_cloud_boat(
@@ -184,7 +193,7 @@ class CloudRepositoryMixin:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._settle_cloud_boat_once, platform, platform_user_id, operation_id
+                self._settle_cloud_boat_once, platform, platform_user_id, operation_id, False
             )
 
     async def recover_cloud_boat(
@@ -195,15 +204,15 @@ class CloudRepositoryMixin:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._recover_cloud_boat_once, platform, platform_user_id, operation_id
+                self._settle_cloud_boat_once, platform, platform_user_id, operation_id, True
             )
 
     def _settle_cloud_boat_once(
-        self, platform: str, platform_user_id: str, operation_id: str
+        self, platform: str, platform_user_id: str, operation_id: str, recover: bool
     ) -> CloudBoatSettlementRecord:
         from ..repository import CloudBoatNotFoundError, CloudBoatNotReadyError
 
-        operation_name = "world.settle_cloud_boat"
+        operation_name = "world.recover_cloud_boat" if recover else "world.settle_cloud_boat"
         request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
         now = self._now()
         now_text = serialize_datetime(now)
@@ -211,6 +220,10 @@ class CloudRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             replay = operation_replay(connection, operation_id, operation_name, request_hash)
             if replay is not None:
+                player = self._require_player(connection, platform, platform_user_id, writable=False)
+                self._validate_cloud_settlement_replay(
+                    connection, replay, operation_name, int(player["id"])
+                )
                 return self._cloud_settlement_from_payload(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             session = connection.execute(
@@ -219,15 +232,26 @@ class CloudRepositoryMixin:
             ).fetchone()
             if session is None:
                 raise CloudBoatNotFoundError("no running cloud boat")
-            if now < datetime.fromisoformat(str(session["ends_at"])):
-                raise CloudBoatNotReadyError("cloud boat is not ready")
+            self._validate_cloud_session(connection, session, int(player["id"]))
+            ready_at = datetime.fromisoformat(str(session["ends_at"]))
+            if recover:
+                ready_at += timedelta(hours=24)
+            if now < ready_at:
+                raise CloudBoatNotReadyError(
+                    "cloud boat recovery window has not opened" if recover else "cloud boat is not ready"
+                )
             change_player_state(
                 connection,
                 player,
                 updated_at=now_text,
                 player_values={"location_key": session["destination"]},
             )
-            result = {"arrived": True, "settled_at": now_text, "destination": session["destination"]}
+            result = {
+                "arrived": True,
+                "settled_at": now_text,
+                "destination": session["destination"],
+                **({"recovered": True} if recover else {}),
+            }
             connection.execute(
                 "UPDATE cloud_boat_sessions SET status = 'arrived', result_json = ?, updated_at = ? WHERE id = ? AND status = 'running'",
                 (json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
@@ -249,52 +273,188 @@ class CloudRepositoryMixin:
             record_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._cloud_settlement_from_payload(payload)
 
-    def _recover_cloud_boat_once(
-        self, platform: str, platform_user_id: str, operation_id: str
-    ) -> CloudBoatSettlementRecord:
-        from ..repository import CloudBoatNotFoundError, CloudBoatNotReadyError
+    @staticmethod
+    def _strict_cloud_object(value: Any, label: str) -> dict[str, Any]:
+        try:
+            decoded = decode_json_strict(str(value))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError(f"{label} is malformed") from exc
+        if not isinstance(decoded, dict):
+            raise ValueError(f"{label} must be an object")
+        return decoded
 
-        operation_name = "world.recover_cloud_boat"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
-        now = self._now()
-        now_text = serialize_datetime(now)
-        with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            replay = operation_replay(connection, operation_id, operation_name, request_hash)
-            if replay is not None:
-                return self._cloud_settlement_from_payload(replay, replay=True)
-            player = self._require_player(connection, platform, platform_user_id, writable=False)
-            session = connection.execute(
-                "SELECT * FROM cloud_boat_sessions WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
-                (player["id"],),
-            ).fetchone()
-            if session is None:
-                raise CloudBoatNotFoundError("no running cloud boat")
-            recovery_deadline = datetime.fromisoformat(str(session["ends_at"])) + timedelta(hours=24)
-            if now < recovery_deadline:
-                raise CloudBoatNotReadyError("cloud boat recovery window has not opened")
-            change_player_state(
-                connection,
-                player,
-                updated_at=now_text,
-                player_values={"location_key": session["destination"]},
-            )
-            result = {"arrived": True, "recovered": True, "settled_at": now_text, "destination": session["destination"]}
-            connection.execute(
-                "UPDATE cloud_boat_sessions SET status = 'arrived', result_json = ?, updated_at = ? WHERE id = ? AND status = 'running'",
-                (json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
-            )
-            updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
-            payload = {
-                "player": self._player_payload(self._row_to_player(updated)),
-                "session_id": session["session_id"], "route_key": session["route_key"],
-                "source": session["source_location"], "destination": session["destination"],
-                "status": "arrived", "arrived": True,
-                "stamina_cost": int(session["stamina_cost"]), "currency_cost": int(session["currency_cost"]),
-                "pass_key": session["pass_key"], "pass_quantity": int(session["pass_quantity"]),
-            }
-            record_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
-            return self._cloud_settlement_from_payload(payload)
+    @classmethod
+    def _validate_cloud_session(cls, connection: Any, session: Any, player_id: int) -> dict[str, Any]:
+        if int(session["player_id"]) != int(player_id):
+            raise ValueError("cloud session owner does not match player")
+        snapshot = cls._strict_cloud_object(session["snapshot_json"], "cloud session snapshot")
+        required = {
+            "route_key", "source", "destination", "stamina_cost", "currency_cost",
+            "pass_key", "pass_quantity", "required_realm", "required_layer", "required_quest",
+        }
+        if set(snapshot) != required:
+            raise ValueError("cloud session snapshot fields are invalid")
+        for key in ("route_key", "source", "destination", "required_realm"):
+            if not isinstance(snapshot[key], str) or not snapshot[key].strip():
+                raise ValueError(f"cloud session snapshot {key} is invalid")
+        for key in ("stamina_cost", "currency_cost", "pass_quantity", "required_layer"):
+            value = snapshot[key]
+            minimum = 1 if key in {"stamina_cost", "currency_cost", "required_layer"} else 0
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                raise ValueError(f"cloud session snapshot {key} is invalid")
+        if snapshot["pass_key"] is not None and (
+            not isinstance(snapshot["pass_key"], str) or not snapshot["pass_key"].strip()
+        ):
+            raise ValueError("cloud session snapshot pass_key is invalid")
+        if snapshot["required_quest"] is not None and (
+            not isinstance(snapshot["required_quest"], str) or not snapshot["required_quest"].strip()
+        ):
+            raise ValueError("cloud session snapshot required_quest is invalid")
+        expected = {
+            "route_key": str(session["route_key"]),
+            "source": str(session["source_location"]),
+            "destination": str(session["destination"]),
+            "stamina_cost": int(session["stamina_cost"]),
+            "currency_cost": int(session["currency_cost"]),
+            "pass_key": session["pass_key"],
+            "pass_quantity": int(session["pass_quantity"]),
+        }
+        if any(snapshot[key] != value for key, value in expected.items()):
+            raise ValueError("cloud session snapshot does not match persisted route")
+        try:
+            starts_at = datetime.fromisoformat(str(session["starts_at"]))
+            ends_at = datetime.fromisoformat(str(session["ends_at"]))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("cloud session timestamps are invalid") from exc
+        if starts_at.tzinfo is None or ends_at.tzinfo is None:
+            raise ValueError("cloud session timestamps are invalid")
+        board = connection.execute(
+            "SELECT operation_name, player_id, result_json FROM operations WHERE operation_id = ?",
+            (str(session["operation_id"]),),
+        ).fetchone()
+        if board is None or str(board["operation_name"]) != "world.board_cloud_boat" or int(board["player_id"]) != int(player_id):
+            raise ValueError("cloud session start operation does not match player")
+        payload = cls._strict_cloud_object(board["result_json"], "cloud session start operation")
+        cls._validate_cloud_payload_scalars(payload, "running", require_times=True)
+        for key in (
+            "player", "session_id", "route_key", "source", "destination", "status", "starts_at", "ends_at",
+            "stamina_cost", "currency_cost", "pass_key", "pass_quantity",
+        ):
+            if key not in payload:
+                raise ValueError("cloud session start operation fields are invalid")
+        if not cls._cloud_player_payload_matches(connection, payload["player"], int(player_id)):
+            raise ValueError("cloud session start operation player is invalid")
+        if payload["session_id"] != str(session["session_id"]):
+            raise ValueError("cloud session start operation session does not match")
+        if payload["route_key"] != expected["route_key"] or payload["source"] != expected["source"] or payload["destination"] != expected["destination"]:
+            raise ValueError("cloud session start operation route does not match")
+        if any(
+            payload[key] != expected[key]
+            for key in ("stamina_cost", "currency_cost", "pass_key", "pass_quantity")
+        ):
+            raise ValueError("cloud session start operation costs do not match")
+        if (
+            payload["status"] != "running"
+            or payload["starts_at"] != str(session["starts_at"])
+            or payload["ends_at"] != str(session["ends_at"])
+        ):
+            raise ValueError("cloud session start operation timing is invalid")
+        return snapshot
+
+    @staticmethod
+    def _cloud_player_payload_matches(connection: Any, payload: Any, player_id: int) -> bool:
+        if not isinstance(payload, dict):
+            return False
+        row = connection.execute("SELECT player_id FROM players WHERE id = ?", (int(player_id),)).fetchone()
+        if row is None:
+            return False
+        stable_id = str(row["player_id"])
+        return payload.get("id") == stable_id and payload.get("player_id") == stable_id
+
+    @classmethod
+    def _validate_cloud_start_replay(
+        cls, connection: Any, payload: dict[str, Any], operation_id: str, player_id: int
+    ) -> None:
+        cls._validate_cloud_payload_scalars(payload, "running", require_times=True)
+        if not cls._cloud_player_payload_matches(connection, payload["player"], int(player_id)):
+            raise ValueError("cloud start operation player is invalid")
+        session = connection.execute(
+            "SELECT * FROM cloud_boat_sessions WHERE session_id = ? AND player_id = ?",
+            (payload["session_id"], int(player_id)),
+        ).fetchone()
+        if session is None or str(session["operation_id"]) != str(operation_id) or str(session["status"]) not in {"running", "arrived"}:
+            raise ValueError("cloud start operation session is invalid")
+        cls._validate_cloud_session(connection, session, int(player_id))
+        expected = {
+            "route_key": str(session["route_key"]),
+            "source": str(session["source_location"]),
+            "destination": str(session["destination"]),
+            "stamina_cost": int(session["stamina_cost"]),
+            "currency_cost": int(session["currency_cost"]),
+            "pass_key": session["pass_key"],
+            "pass_quantity": int(session["pass_quantity"]),
+            "starts_at": str(session["starts_at"]),
+            "ends_at": str(session["ends_at"]),
+        }
+        if any(payload.get(key) != value for key, value in expected.items()):
+            raise ValueError("cloud start operation does not match session")
+
+    @classmethod
+    def _validate_cloud_settlement_replay(
+        cls, connection: Any, payload: dict[str, Any], operation_name: str, player_id: int
+    ) -> None:
+        cls._validate_cloud_payload_scalars(payload, "arrived")
+        for key in ("player", "session_id", "route_key", "source", "destination", "status", "arrived"):
+            if key not in payload:
+                raise ValueError("cloud settlement operation fields are invalid")
+        if (
+            not cls._cloud_player_payload_matches(connection, payload["player"], int(player_id))
+            or payload["status"] != "arrived"
+            or payload["arrived"] is not True
+        ):
+            raise ValueError("cloud settlement operation result is invalid")
+        session = connection.execute(
+            "SELECT * FROM cloud_boat_sessions WHERE session_id = ? AND player_id = ?",
+            (str(payload["session_id"]), int(player_id)),
+        ).fetchone()
+        if session is None or str(session["status"]) != "arrived":
+            raise ValueError("cloud settlement operation session is invalid")
+        cls._validate_cloud_session(connection, session, int(player_id))
+        result = cls._strict_cloud_object(session["result_json"], "cloud settlement result")
+        expected_result_keys = {"arrived", "settled_at", "destination"}
+        if operation_name == "world.recover_cloud_boat":
+            expected_result_keys.add("recovered")
+        if set(result) != expected_result_keys:
+            raise ValueError("cloud settlement result fields are invalid")
+        settled_at = result.get("settled_at")
+        if (
+            result.get("arrived") is not True
+            or result.get("destination") != str(session["destination"])
+            or not isinstance(settled_at, str)
+        ):
+            raise ValueError("cloud settlement result does not match session")
+        try:
+            settled_at_value = datetime.fromisoformat(settled_at)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("cloud settlement result timestamp is invalid") from exc
+        if settled_at_value.tzinfo is None:
+            raise ValueError("cloud settlement result timestamp is invalid")
+        if operation_name == "world.recover_cloud_boat" and result.get("recovered") is not True:
+            raise ValueError("cloud recovery result is invalid")
+        if operation_name == "world.settle_cloud_boat" and result.get("recovered") is not None:
+            raise ValueError("cloud settlement result is invalid")
+        expected = {
+            "route_key": str(session["route_key"]),
+            "source": str(session["source_location"]),
+            "destination": str(session["destination"]),
+            "status": "arrived",
+            "stamina_cost": int(session["stamina_cost"]),
+            "currency_cost": int(session["currency_cost"]),
+            "pass_key": session["pass_key"],
+            "pass_quantity": int(session["pass_quantity"]),
+        }
+        if any(payload.get(key) != value for key, value in expected.items()):
+            raise ValueError("cloud settlement operation route does not match session")
 
     async def accept_demon_intro(
         self, *, platform: str, platform_user_id: str, operation_id: str
@@ -730,6 +890,7 @@ class CloudRepositoryMixin:
     def _cloud_start_from_payload(payload: dict[str, Any], *, replay: bool = False) -> CloudBoatStartRecord:
         from ..repository import SQLitePlayerRepository
 
+        CloudRepositoryMixin._validate_cloud_payload_scalars(payload, "running", require_times=True)
         return CloudBoatStartRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             session_id=str(payload["session_id"]), route_key=str(payload["route_key"]),
@@ -744,6 +905,9 @@ class CloudRepositoryMixin:
     def _cloud_settlement_from_payload(payload: dict[str, Any], *, replay: bool = False) -> CloudBoatSettlementRecord:
         from ..repository import SQLitePlayerRepository
 
+        CloudRepositoryMixin._validate_cloud_payload_scalars(payload, "arrived")
+        if payload.get("arrived") is not True:
+            raise ValueError("cloud settlement payload must be arrived")
         return CloudBoatSettlementRecord(
             player=SQLitePlayerRepository._row_to_player(payload["player"]),
             session_id=str(payload["session_id"]), route_key=str(payload["route_key"]),
@@ -752,6 +916,54 @@ class CloudRepositoryMixin:
             currency_cost=int(payload.get("currency_cost", 0)), pass_key=payload.get("pass_key"),
             pass_quantity=int(payload.get("pass_quantity", 0)), already_completed=replay,
         )
+
+    @staticmethod
+    def _validate_cloud_payload_scalars(
+        payload: dict[str, Any], status: str, *, require_times: bool = False
+    ) -> None:
+        required = (
+            "player", "session_id", "route_key", "source", "destination", "status",
+            "stamina_cost", "currency_cost", "pass_key", "pass_quantity",
+        )
+        expected_keys = set(required)
+        if require_times:
+            expected_keys.update(("starts_at", "ends_at"))
+        if status == "arrived":
+            expected_keys.add("arrived")
+        if set(payload) != expected_keys:
+            raise ValueError("cloud payload fields are invalid")
+        if (
+            not isinstance(payload["player"], dict)
+            or not isinstance(payload["player"].get("id"), str)
+            or not isinstance(payload["player"].get("player_id"), str)
+            or payload["player"].get("id") != payload["player"].get("player_id")
+        ):
+            raise ValueError("cloud payload player is invalid")
+        for key in ("session_id", "route_key", "source", "destination"):
+            if not isinstance(payload[key], str) or not payload[key].strip():
+                raise ValueError(f"cloud payload {key} is invalid")
+        if payload["status"] != status:
+            raise ValueError("cloud payload status is invalid")
+        for key in ("stamina_cost", "currency_cost"):
+            if isinstance(payload[key], bool) or not isinstance(payload[key], int) or payload[key] <= 0:
+                raise ValueError(f"cloud payload {key} is invalid")
+        if payload["pass_key"] is not None and (
+            not isinstance(payload["pass_key"], str) or not payload["pass_key"].strip()
+        ):
+            raise ValueError("cloud payload pass_key is invalid")
+        if isinstance(payload["pass_quantity"], bool) or not isinstance(payload["pass_quantity"], int) or payload["pass_quantity"] < 0:
+            raise ValueError("cloud payload pass_quantity is invalid")
+        if require_times:
+            for key in ("starts_at", "ends_at"):
+                if not isinstance(payload.get(key), str) or not payload[key].strip():
+                    raise ValueError(f"cloud payload {key} is invalid")
+            try:
+                starts_at = datetime.fromisoformat(payload["starts_at"])
+                ends_at = datetime.fromisoformat(payload["ends_at"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("cloud payload timestamps are invalid") from exc
+            if starts_at.tzinfo is None or ends_at.tzinfo is None or ends_at <= starts_at:
+                raise ValueError("cloud payload timestamps are invalid")
 
     @staticmethod
     def _demon_intro_from_payload(payload: dict[str, Any], *, replay: bool = False) -> DemonIntroRecord:
