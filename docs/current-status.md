@@ -187,6 +187,15 @@ v0.3 三界贸易许可、派遣与妖界栖地悬赏已接入：`申请贸易�
 
 ### 4.0 当前切片选择账本
 
+**当前唯一切片：道途与辅修内容合同、入道解析和状态展示统一。** 角色入道已有 QQ 官方、OneBot V11
+和共享 application/repository 路径，但 `player/path_rules.py`、入道回执和资料展示仍维护重复的道途/辅修名称与别名表，
+`data/道途/道途.json` 也没有辅修名称/别名的独立记录。范围只包含道途记录的名称/别名、辅修子记录及入道奖励引用校验，
+共享内容解析、`选择道途` 输入、入道回执和 `我的状态` 展示；玩家持久化仍保存稳定 `path_key`/`subprofession_key`，
+既有奖励、图鉴和 operation 事务不变。锁定或歧义内容、坏引用和错误选择必须在写入前拒绝；成功 operation 继续幂等回放，
+两种适配器共用同一 application。道途战斗效果、领域选择/切换、生产规则、正式 PvP/PvE 和切磋/训练傀儡只读边界不在本轮。
+`/root/next_slice_scan` 独占 `data/道途/道途.json` 与 `xiuxian/player/path_rules.py`；主线独占 application、测试和本轮文档。
+灵兽行囊仍缺来源/配方合同，魔渊深层及其他未开放副本合同不完整，跨服/Web 写入口继续关闭。
+
 **本轮闭合：日课领奖快照与 operation 严格回放。** `每日修行` / `领取日课嘉奖` 已有完整公开路径，
 但只读审计在 QQ 官方与 OneBot V11 均复现 `daily_task_rounds.snapshot_json` 奖励对象的重复 JSON 键会把
 冻结灵石从 50 篡改为 999 并真实入账。本轮严格校验日课轮次、任务快照、来源 operation/正式战斗结果及领奖 operation

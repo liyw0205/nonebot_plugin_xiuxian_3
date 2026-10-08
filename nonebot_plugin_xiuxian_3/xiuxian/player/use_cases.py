@@ -16,7 +16,7 @@ from ..repository import (
 )
 from .intro_use_cases import IntroApplication
 from .cultivation_use_cases import CultivationApplication
-from .path_rules import PATH_LABELS, SUBPROFESSION_LABELS
+from .path_rules import path_name, subprofession_name
 from .rules import (
     LOCATION_LABELS,
     QUALIFICATION_KEYS,
@@ -39,7 +39,7 @@ class PlayerApplication:
         self.repository = repository
         self.content = content
         self.intro = IntroApplication(repository)
-        self.cultivation = CultivationApplication(repository)
+        self.cultivation = CultivationApplication(repository, content)
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -92,13 +92,18 @@ class PlayerApplication:
                 pass
         return text
 
-    @staticmethod
-    def _path_text(path_key: str | None, subprofession_key: str | None) -> str:
+    def _path_text(self, path_key: str | None, subprofession_key: str | None) -> str:
         if not path_key:
             return "未选择"
-        name = PATH_LABELS.get(path_key, "修行道途")
+        try:
+            name = path_name(path_key, self.content)
+        except ContentError:
+            return "未知道途"
         if subprofession_key:
-            name += f"·{SUBPROFESSION_LABELS.get(subprofession_key, '辅修')}"
+            try:
+                name += f"·{subprofession_name(subprofession_key, path_key, self.content)}"
+            except ContentError:
+                name += "·辅修"
         return name
 
     @staticmethod

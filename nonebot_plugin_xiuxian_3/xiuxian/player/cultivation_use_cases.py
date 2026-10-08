@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentBundle, ContentError
 from ..repository import (
     OperationConflictError,
     PathAlreadySelectedError,
@@ -14,10 +15,12 @@ from ..repository import (
     SubprofessionRequiredError,
 )
 from .path_rules import (
-    PATH_LABELS,
-    SUBPROFESSION_LABELS,
+    path_name,
+    path_records,
     resolve_path,
     resolve_subprofession,
+    subprofession_name,
+    subprofession_records,
 )
 from .rules import STAGE_LABELS
 
@@ -25,8 +28,9 @@ from .rules import STAGE_LABELS
 class CultivationApplication:
     """Selects the first path and settles its fixed entry reward."""
 
-    def __init__(self, repository: SQLitePlayerRepository):
+    def __init__(self, repository: SQLitePlayerRepository, content: ContentBundle | None = None):
         self.repository = repository
+        self.content = content
 
     @staticmethod
     def _operation_id(context: CommandContext) -> str:
@@ -66,7 +70,15 @@ class CultivationApplication:
         except PathAlreadySelectedError:
             return CommandResult(False, "PATH_ALREADY_SELECTED", "你已经选择过首要道途，不能重复选择。", context.request_id, operation_id)
         except SubprofessionRequiredError:
-            return CommandResult(False, "SUBPROFESSION_REQUIRED", "辅修必须同时选择炼丹、炼器或布阵。", context.request_id, operation_id)
+            try:
+                choices = "、".join(
+                    record["name"]
+                    for record in subprofession_records("support", self.content)
+                )
+                message = f"辅修必须同时选择{choices}。"
+            except ContentError:
+                message = "辅修典籍暂不可阅，请稍后再试。"
+            return CommandResult(False, "SUBPROFESSION_REQUIRED", message, context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能入道。", context.request_id, operation_id)
         except OperationConflictError:
@@ -77,16 +89,29 @@ class CultivationApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
         player = record.player
-        path_name = PATH_LABELS[path_key]
-        subprofession_name = SUBPROFESSION_LABELS.get(subprofession_key or "")
+        try:
+            selected_path_name = path_name(path_key, self.content)
+            selected_subprofession_name = (
+                subprofession_name(subprofession_key, path_key, self.content)
+                if subprofession_key
+                else None
+            )
+        except ContentError:
+            return CommandResult(
+                False,
+                "INVALID_PATH",
+                "道途典籍暂不可阅，请稍后再试。",
+                context.request_id,
+                operation_id,
+            )
         reward_hint = "基础功法与对应试用技能"
         if path_key == "support":
-            reward_hint += f"，以及{SUBPROFESSION_LABELS[subprofession_key or '']}工具"
+            reward_hint += f"，以及{selected_subprofession_name}工具"
         message = (
             "## 入道完成\n\n"
-            f"**{self._display_name(player)}**已选择 **{path_name}**，正式踏入修行之路。\n\n"
-            f"- **道途**：{path_name}\n"
-            + (f"- **主辅修**：{subprofession_name}\n" if subprofession_name else "")
+            f"**{self._display_name(player)}**已选择 **{selected_path_name}**，正式踏入修行之路。\n\n"
+            f"- **道途**：{selected_path_name}\n"
+            + (f"- **主辅修**：{selected_subprofession_name}\n" if selected_subprofession_name else "")
             + f"- **境界**：感气一层\n"
             f"- **灵石**：{player.spirit_stones}\n"
             f"- **入道所得**：{reward_hint}\n\n"
@@ -112,20 +137,36 @@ class CultivationApplication:
             },
         )
 
-    @staticmethod
-    def _parse_args(args: tuple[str, ...]) -> tuple[str, str | None, str | None]:
+    def _parse_args(self, args: tuple[str, ...]) -> tuple[str, str | None, str | None]:
         if not args or len(args) > 2:
             return "", None, "请使用 `选择道途 体修`，辅修还需追加 `炼丹`、`炼器` 或 `布阵`。"
-        path_key = resolve_path(args[0])
+        try:
+            path_key = resolve_path(args[0], self.content)
+        except ContentError:
+            return "", None, "道途典籍暂不可阅，请稍后再试。"
         if path_key is None:
-            return "", None, "未知道途，可选：体修、法修、器修、魔修、妖修、辅修。"
+            try:
+                choices = "、".join(record["name"] for record in path_records(self.content))
+            except ContentError:
+                return "", None, "道途典籍暂不可阅，请稍后再试。"
+            return "", None, f"未知道途，可选：{choices}。"
         subprofession_key = None
         if len(args) == 2:
-            subprofession_key = resolve_subprofession(args[1])
-            if subprofession_key is None:
-                return "", None, "主辅修只能选择炼丹、炼器或布阵。"
             if path_key != "support":
                 return "", None, "只有辅修需要同时选择生产方向。"
+            try:
+                subprofession_key = resolve_subprofession(args[1], path_key, self.content)
+            except ContentError:
+                return "", None, "辅修典籍暂不可阅，请稍后再试。"
+            if subprofession_key is None:
+                try:
+                    choices = "、".join(
+                        record["name"]
+                        for record in subprofession_records(path_key, self.content)
+                    )
+                except ContentError:
+                    return "", None, "辅修典籍暂不可阅，请稍后再试。"
+                return "", None, f"主辅修只能选择{choices}。"
         elif path_key == "support":
             return path_key, None, None
         return path_key, subprofession_key, None

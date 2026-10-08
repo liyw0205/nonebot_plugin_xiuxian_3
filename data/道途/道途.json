@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "体修",
+      "aliases": [],
       "talent_tree_label": "体修道脉",
       "desc": "以锤炼筋骨为根本，在近身搏杀中磨砺不屈战意。",
       "passive": {
@@ -28,6 +29,7 @@
     },
     {
       "name": "法修",
+      "aliases": [],
       "talent_tree_label": "法修道脉",
       "desc": "以灵力驾驭术法，讲求心神专注与出手时机。",
       "passive": {
@@ -52,6 +54,7 @@
     },
     {
       "name": "器修",
+      "aliases": [],
       "talent_tree_label": "器修道脉",
       "desc": "借机关与法器开拓战法，善于以器物弥补攻守间隙。",
       "passive": {
@@ -79,6 +82,7 @@
     },
     {
       "name": "魔修",
+      "aliases": [],
       "talent_tree_label": "魔修道脉",
       "desc": "行于险途，以意志驾驭魔息，在绝境中换取更强力量。",
       "passive": {
@@ -103,6 +107,7 @@
     },
     {
       "name": "妖修",
+      "aliases": [],
       "talent_tree_label": "妖修道脉",
       "desc": "感应万灵血脉与山野气息，善于寻迹、察险并顺势而行。",
       "passive": {
@@ -127,6 +132,7 @@
     },
     {
       "name": "辅修",
+      "aliases": [],
       "talent_tree_label": "辅修道脉",
       "desc": "专研炼制与布阵等技艺，以扎实手艺支撑漫长修行。",
       "passive": {
@@ -139,11 +145,26 @@
       },
       "active_skill": "skill.support.quick_assessment",
       "entry_item_rewards": [{"item_key": "item.manual.basic_qi", "quantity": 1}],
-      "subprofession_item_rewards": {
-        "alchemy": [{"item_key": "item.tool.basic_furnace", "quantity": 1}],
-        "artifice": [{"item_key": "item.tool.basic_hammer", "quantity": 1}],
-        "formation": [{"item_key": "item.mat.array_sand", "quantity": 3}]
-      },
+      "subprofessions": [
+        {
+          "key": "alchemy",
+          "name": "炼丹",
+          "aliases": [],
+          "entry_item_rewards": [{"item_key": "item.tool.basic_furnace", "quantity": 1}]
+        },
+        {
+          "key": "artifice",
+          "name": "炼器",
+          "aliases": [],
+          "entry_item_rewards": [{"item_key": "item.tool.basic_hammer", "quantity": 1}]
+        },
+        {
+          "key": "formation",
+          "name": "布阵",
+          "aliases": [],
+          "entry_item_rewards": [{"item_key": "item.mat.array_sand", "quantity": 3}]
+        }
+      ],
       "state": {
         "key": "daily_energy_extra_cost",
         "per_use": 2
