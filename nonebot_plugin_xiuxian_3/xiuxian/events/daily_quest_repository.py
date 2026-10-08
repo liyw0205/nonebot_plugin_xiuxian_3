@@ -15,7 +15,6 @@ from ..persistence.errors import (
     DailyTaskRewardExpiredError,
     DailyTasksIncompleteError,
     DailyTasksUnavailableError,
-    OperationConflictError,
 )
 from ..rewards.rules import (
     RewardContentError,
@@ -24,6 +23,8 @@ from ..rewards.rules import (
     reward_totals,
     reward_value_delta,
 )
+from ..utils.json_cache import decode_json_strict
+from ..utils.operations import operation_replay
 from ..utils.player import grant_player_state, player_integer, player_reputation_state
 from .daily_quest_models import DailyQuestRecord, DailyTaskView
 from .daily_quest_rules import (
@@ -101,17 +102,40 @@ class DailyQuestRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
+            replay = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+            )
+            if replay is not None:
+                player = connection.execute(
+                    "SELECT p.* FROM operations o JOIN players p ON p.id = o.player_id "
+                    "WHERE o.operation_id = ?",
+                    (operation_id,),
+                ).fetchone()
+                if player is None:
+                    raise DailyTasksUnavailableError("daily task operation owner is invalid")
+                if (
+                    str(player["platform"]) != platform
+                    or str(player["platform_user_id"]) != platform_user_id
+                ):
+                    raise DailyTasksUnavailableError("daily task operation owner is invalid")
+                claim = connection.execute(
+                    "SELECT c.reward_json, r.* FROM daily_task_claims c "
+                    "JOIN daily_task_rounds r ON r.id = c.round_id "
+                    "WHERE c.operation_id = ? AND c.player_id = ?",
+                    (operation_id, player["id"]),
+                ).fetchone()
+                if claim is None:
+                    raise DailyTasksUnavailableError("daily task claim record is missing")
+                self._validate_claim_replay(connection, claim, replay)
                 return self._daily_task_record_from_payload(
-                    json.loads(existing["result_json"]), replay=True
+                    replay,
+                    replay=True,
+                    expected_player=player,
+                    expected_round_id=str(claim["round_key"]),
                 )
-
             player = self._require_player(connection, platform, platform_user_id)
             self._expire_daily_task_rounds(connection, int(player["id"]), now_text)
             candidates = connection.execute(
@@ -258,7 +282,11 @@ class DailyQuestRepositoryMixin:
                     now_text,
                 ),
             )
-            return self._daily_task_record_from_payload(payload)
+            return self._daily_task_record_from_payload(
+                payload,
+                expected_player=updated_player,
+                expected_round_id=str(claimed_round["round_key"]),
+            )
 
     def _materialize_daily_task_round(
         self,
@@ -380,12 +408,7 @@ class DailyQuestRepositoryMixin:
         ).fetchall()
         now_text = serialize_datetime(now)
         for operation in operations:
-            try:
-                result = json.loads(str(operation["result_json"]))
-            except (TypeError, ValueError) as exc:
-                raise DailyTasksUnavailableError("daily source result is invalid") from exc
-            if not isinstance(result, dict):
-                raise DailyTasksUnavailableError("daily source result is invalid")
+            result = self._strict_object(operation["result_json"], "daily source result")
             for task, source in sources[str(operation["operation_name"])]:
                 if not source_matches(source, str(operation["operation_name"]), result):
                     continue
@@ -446,11 +469,10 @@ class DailyQuestRepositoryMixin:
             return False
         if str(battle["battle_type"]) not in allowed_types or str(battle["status"]) != "settled":
             return False
-        try:
-            result = json.loads(str(battle["result_json"]))
-        except (TypeError, ValueError) as exc:
-            raise DailyTasksUnavailableError("daily battle result is invalid") from exc
-        return isinstance(result, dict) and result.get("outcome") == "won"
+        result = DailyQuestRepositoryMixin._strict_object(
+            battle["result_json"], "daily battle result"
+        )
+        return result.get("outcome") == "won"
 
     @staticmethod
     def _daily_source_snapshot(value: Any) -> DailyTaskSource:
@@ -487,7 +509,18 @@ class DailyQuestRepositoryMixin:
             "SELECT reward_json FROM daily_task_claims WHERE round_id = ?",
             (round_row["id"],),
         ).fetchone()
-        reward = json.loads(str(claim["reward_json"])) if claim is not None else {}
+        reward = (
+            self._strict_object(claim["reward_json"], "daily claim reward")
+            if claim is not None
+            else {}
+        )
+        if any(
+            not isinstance(key, str)
+            or isinstance(value, bool)
+            or not isinstance(value, int)
+            for key, value in reward.items()
+        ):
+            raise DailyTasksUnavailableError("daily claim reward is invalid")
         snapshot = self._daily_round_snapshot(round_row)
         return DailyQuestRecord(
             player=self._row_to_player(player),
@@ -553,37 +586,158 @@ class DailyQuestRepositoryMixin:
         payload: dict[str, Any],
         *,
         replay: bool = False,
+        expected_player: Any | None = None,
+        expected_round_id: str | None = None,
     ) -> DailyQuestRecord:
-        if not isinstance(payload, dict) or not isinstance(payload.get("player"), dict):
+        fields = {
+            "player",
+            "round_id",
+            "business_date",
+            "starts_at",
+            "ends_at",
+            "claim_expires_at",
+            "status",
+            "completed_count",
+            "completion_threshold",
+            "tasks",
+            "reward",
+            "snapshot",
+        }
+        if not isinstance(payload, dict) or set(payload) != fields or not isinstance(payload.get("player"), dict):
             raise DailyTasksUnavailableError("daily task operation result is invalid")
+        player_payload = payload["player"]
+        if expected_player is not None:
+            if (
+                player_payload.get("id") != expected_player["player_id"]
+                or player_payload.get("platform") != expected_player["platform"]
+                or player_payload.get("platform_user_id") != expected_player["platform_user_id"]
+            ):
+                raise DailyTasksUnavailableError("daily task operation player is invalid")
+        if expected_round_id is not None and payload.get("round_id") != expected_round_id:
+            raise DailyTasksUnavailableError("daily task operation round is invalid")
         tasks = payload.get("tasks")
         if not isinstance(tasks, list):
             raise DailyTasksUnavailableError("daily task operation tasks are invalid")
-        return DailyQuestRecord(
-            player=self._row_to_player(payload["player"]),
-            round_id=str(payload["round_id"]),
-            business_date=str(payload["business_date"]),
-            starts_at=str(payload["starts_at"]),
-            ends_at=str(payload["ends_at"]),
-            claim_expires_at=str(payload["claim_expires_at"]),
-            status=str(payload["status"]),
-            completed_count=int(payload["completed_count"]),
-            completion_threshold=int(payload["completion_threshold"]),
-            tasks=tuple(
+        normalized_tasks: list[DailyTaskView] = []
+        for task in tasks:
+            if not isinstance(task, dict) or set(task) != {
+                "task_key", "name", "description", "progress", "target", "status"
+            }:
+                raise DailyTasksUnavailableError("daily task operation task is invalid")
+            progress = task["progress"]
+            target = task["target"]
+            if (
+                not isinstance(task["task_key"], str)
+                or not isinstance(task["name"], str)
+                or not isinstance(task["description"], str)
+                or isinstance(progress, bool)
+                or not isinstance(progress, int)
+                or isinstance(target, bool)
+                or not isinstance(target, int)
+                or target <= 0
+                or progress < 0
+                or progress > target
+                or task["status"] not in {"active", "completed"}
+            ):
+                raise DailyTasksUnavailableError("daily task operation task is invalid")
+            normalized_tasks.append(
                 DailyTaskView(
-                    task_key=str(task["task_key"]),
-                    name=str(task["name"]),
-                    description=str(task["description"]),
-                    progress=int(task["progress"]),
-                    target=int(task["target"]),
-                    status=str(task["status"]),
+                    task_key=task["task_key"],
+                    name=task["name"],
+                    description=task["description"],
+                    progress=progress,
+                    target=target,
+                    status=task["status"],
                 )
-                for task in tasks
-            ),
-            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
-            snapshot=dict(payload.get("snapshot", {})),
+            )
+        reward = payload.get("reward")
+        if not isinstance(reward, dict) or any(
+            not isinstance(key, str)
+            or isinstance(value, bool)
+            or not isinstance(value, int)
+            for key, value in reward.items()
+        ):
+            raise DailyTasksUnavailableError("daily task operation reward is invalid")
+        snapshot = payload.get("snapshot")
+        if not isinstance(snapshot, dict):
+            raise DailyTasksUnavailableError("daily task operation snapshot is invalid")
+        completed_count = payload["completed_count"]
+        completion_threshold = payload["completion_threshold"]
+        if (
+            isinstance(completed_count, bool)
+            or not isinstance(completed_count, int)
+            or completed_count < 0
+            or isinstance(completion_threshold, bool)
+            or not isinstance(completion_threshold, int)
+            or completion_threshold <= 0
+            or completed_count > len(normalized_tasks)
+            or completed_count != sum(task.status == "completed" for task in normalized_tasks)
+        ):
+            raise DailyTasksUnavailableError("daily task operation progress is invalid")
+        status = payload["status"]
+        if status != "claimed":
+            raise DailyTasksUnavailableError("daily task operation status is invalid")
+        self._validate_record_snapshot(snapshot)
+        return DailyQuestRecord(
+            player=self._row_to_player(player_payload),
+            round_id=self._required_text(payload["round_id"], "round_id"),
+            business_date=self._required_text(payload["business_date"], "business_date"),
+            starts_at=self._required_text(payload["starts_at"], "starts_at"),
+            ends_at=self._required_text(payload["ends_at"], "ends_at"),
+            claim_expires_at=self._required_text(payload["claim_expires_at"], "claim_expires_at"),
+            status=status,
+            completed_count=completed_count,
+            completion_threshold=completion_threshold,
+            tasks=tuple(normalized_tasks),
+            reward=dict(reward),
+            snapshot=snapshot,
             already_completed=replay,
         )
+
+    def _validate_claim_replay(
+        self,
+        connection: Any,
+        claim: Any,
+        payload: dict[str, Any],
+    ) -> None:
+        if str(claim["status"]) != "claimed":
+            raise DailyTasksUnavailableError("daily task round is not claimed")
+        for field in ("business_date", "starts_at", "ends_at", "claim_expires_at"):
+            if payload.get(field) != str(claim[field]):
+                raise DailyTasksUnavailableError(
+                    f"daily task operation {field} does not match round"
+                )
+        reward = self._strict_object(claim["reward_json"], "daily claim reward")
+        if payload.get("reward") != reward:
+            raise DailyTasksUnavailableError("daily task operation reward does not match claim")
+        round_snapshot = self._daily_round_snapshot(claim)
+        expected_snapshot = {
+            "timezone": round_snapshot["timezone"],
+            "reward": round_snapshot["reward"],
+            "local_reputation_maximums": round_snapshot["local_reputation_maximums"],
+        }
+        if payload.get("snapshot") != expected_snapshot:
+            raise DailyTasksUnavailableError("daily task operation snapshot does not match round")
+        tasks = self._daily_task_views(connection, int(claim["id"]))
+        expected_tasks = [
+            {
+                "task_key": task.task_key,
+                "name": task.name,
+                "description": task.description,
+                "progress": task.progress,
+                "target": task.target,
+                "status": task.status,
+            }
+            for task in tasks
+        ]
+        if payload.get("tasks") != expected_tasks:
+            raise DailyTasksUnavailableError("daily task operation tasks do not match round")
+        if (
+            payload.get("status") != "claimed"
+            or payload.get("completed_count") != self._daily_completed_count(connection, int(claim["id"]))
+            or payload.get("completion_threshold") != round_snapshot["completion_threshold"]
+        ):
+            raise DailyTasksUnavailableError("daily task operation progress does not match round")
 
     def _daily_task_views(self, connection: Any, round_id: int) -> tuple[DailyTaskView, ...]:
         rows = connection.execute(
@@ -606,29 +760,56 @@ class DailyQuestRepositoryMixin:
 
     @staticmethod
     def _daily_task_snapshot(task: Any) -> dict[str, Any]:
-        try:
-            snapshot = json.loads(str(task["snapshot_json"]))
-        except (TypeError, ValueError) as exc:
-            raise DailyTasksUnavailableError("daily task snapshot is invalid") from exc
-        if not isinstance(snapshot, dict) or not isinstance(snapshot.get("sources"), list):
+        snapshot = DailyQuestRepositoryMixin._strict_object(
+            task["snapshot_json"], "daily task snapshot"
+        )
+        if set(snapshot) != {"task_key", "name", "description", "group", "target", "sources"}:
+            raise DailyTasksUnavailableError("daily task snapshot is invalid")
+        if (
+            any(
+                not isinstance(snapshot.get(key), str) or not snapshot[key].strip()
+                for key in ("task_key", "name", "description", "group")
+            )
+            or isinstance(snapshot.get("target"), bool)
+            or not isinstance(snapshot.get("target"), int)
+            or snapshot["target"] <= 0
+            or not isinstance(snapshot.get("sources"), list)
+            or not snapshot["sources"]
+        ):
             raise DailyTasksUnavailableError("daily task snapshot is invalid")
         return snapshot
 
     @staticmethod
     def _daily_round_snapshot(round_row: Any) -> dict[str, Any]:
-        try:
-            snapshot = json.loads(str(round_row["snapshot_json"]))
-        except (TypeError, ValueError) as exc:
-            raise DailyTasksUnavailableError("daily round snapshot is invalid") from exc
+        snapshot = DailyQuestRepositoryMixin._strict_object(
+            round_row["snapshot_json"], "daily round snapshot"
+        )
         if (
-            not isinstance(snapshot, dict)
+            set(snapshot)
+            != {
+                "timezone",
+                "selection_seed",
+                "completion_threshold",
+                "reward",
+                "local_reputation_maximums",
+            }
             or not isinstance(snapshot.get("timezone"), str)
+            or snapshot["timezone"] != "UTC"
+            or not isinstance(snapshot.get("selection_seed"), str)
+            or not snapshot["selection_seed"]
             or isinstance(snapshot.get("completion_threshold"), bool)
             or not isinstance(snapshot.get("completion_threshold"), int)
+            or snapshot["completion_threshold"] <= 0
             or not isinstance(snapshot.get("reward"), dict)
             or not isinstance(snapshot.get("local_reputation_maximums"), dict)
         ):
             raise DailyTasksUnavailableError("daily round snapshot is invalid")
+        try:
+            reward_grant_from_snapshot(
+                snapshot["reward"], operation="event.claim_daily_tasks"
+            )
+        except RewardContentError as exc:
+            raise DailyTasksUnavailableError("daily round reward snapshot is invalid") from exc
         reward_local = snapshot["reward"].get("local_reputation")
         maximums = snapshot["local_reputation_maximums"]
         if (
@@ -646,6 +827,45 @@ class DailyQuestRepositoryMixin:
         ):
             raise DailyTasksUnavailableError("daily round reputation snapshot is invalid")
         return snapshot
+
+    @staticmethod
+    def _validate_record_snapshot(snapshot: dict[str, Any]) -> None:
+        if set(snapshot) != {"timezone", "reward", "local_reputation_maximums"}:
+            raise DailyTasksUnavailableError("daily task operation snapshot is invalid")
+        if snapshot.get("timezone") != "UTC" or not isinstance(snapshot.get("reward"), dict):
+            raise DailyTasksUnavailableError("daily task operation snapshot is invalid")
+        try:
+            reward_grant_from_snapshot(
+                snapshot["reward"], operation="event.claim_daily_tasks"
+            )
+        except RewardContentError as exc:
+            raise DailyTasksUnavailableError("daily task operation reward snapshot is invalid") from exc
+        maximums = snapshot.get("local_reputation_maximums")
+        if not isinstance(maximums, dict) or any(
+            not isinstance(key, str)
+            or not key.startswith("local.")
+            or isinstance(value, bool)
+            or not isinstance(value, int)
+            or value <= 0
+            for key, value in maximums.items()
+        ):
+            raise DailyTasksUnavailableError("daily task operation reputation snapshot is invalid")
+
+    @staticmethod
+    def _strict_object(value: Any, label: str) -> dict[str, Any]:
+        try:
+            decoded = decode_json_strict(str(value))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise DailyTasksUnavailableError(f"{label} is invalid") from exc
+        if not isinstance(decoded, dict):
+            raise DailyTasksUnavailableError(f"{label} is invalid")
+        return decoded
+
+    @staticmethod
+    def _required_text(value: Any, field: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise DailyTasksUnavailableError(f"daily task operation {field} is invalid")
+        return value
 
     @staticmethod
     def _daily_task_event_count(connection: Any, task_id: int) -> int:

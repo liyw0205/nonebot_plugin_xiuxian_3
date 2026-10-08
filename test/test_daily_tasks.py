@@ -174,6 +174,23 @@ def _replace_local_reputation_maximum(data_dir: Path, maximum: int | None) -> No
     path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+async def _prepare_completed_daily_round(runtime, adapter: str, user: str) -> None:
+    created = await runtime.adapters.dispatch(
+        adapter, _context(adapter, user, "create-completed"), "开始修仙"
+    )
+    assert created.code == "PLAYER_CREATED"
+    status = await runtime.adapters.dispatch(
+        adapter, _context(adapter, user, "status-completed"), "每日修行"
+    )
+    assert status.code == "DAILY_TASK_STATUS"
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        connection.execute(
+            "UPDATE daily_tasks SET progress=target, status='completed' "
+            "WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+            (adapter, user),
+        )
+
+
 @pytest.mark.parametrize("adapter", ADAPTERS)
 def test_daily_tasks_project_owned_settlements_and_claim_atomically(adapter: str) -> None:
     async def run() -> None:
@@ -309,11 +326,7 @@ def test_daily_tasks_project_owned_settlements_and_claim_atomically(adapter: str
                     "开始修炼",
                 )
                 assert cultivation.code == "CULTIVATION_STARTED"
-                with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE cultivation_sessions SET ends_at=? WHERE session_id=?",
-                        ((clock.current - timedelta(seconds=1)).isoformat(), cultivation.data["session_id"]),
-                    )
+                clock.advance(minutes=11)
                 settled_cultivation = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "cultivation-settle", f"daily-cultivation-settle-{adapter}"),
@@ -560,5 +573,350 @@ def test_daily_task_round_rotates_at_utc_day_and_expires(adapter: str) -> None:
                 assert rows == [("2026-01-15", "expired"), ("2026-01-17", "open")]
             finally:
                 await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ADAPTERS)
+def test_daily_task_round_snapshot_duplicate_key_rejects_without_writes_and_recovers(
+    adapter: str,
+) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(ROOT / "data", data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+            user = f"daily-round-corrupt-{adapter}"
+            operation_id = f"daily-round-corrupt-claim-{adapter}"
+            try:
+                await _prepare_completed_daily_round(runtime, adapter, user)
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_snapshot = connection.execute(
+                        "SELECT snapshot_json FROM daily_task_rounds "
+                        "WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    duplicate_snapshot = original_snapshot.replace(
+                        '"spirit_stones": 50',
+                        '"spirit_stones": 50, "spirit_stones": 999',
+                        1,
+                    )
+                    assert duplicate_snapshot != original_snapshot
+                    connection.execute(
+                        "UPDATE daily_task_rounds SET snapshot_json=? "
+                        "WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                        (duplicate_snapshot, adapter, user),
+                    )
+                before = _daily_state(runtime, adapter, user)
+                rejected = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "round-corrupt-claim", operation_id),
+                    "领取日课嘉奖",
+                )
+                assert rejected.code == "DAILY_TASKS_UNAVAILABLE"
+                assert _daily_state(runtime, adapter, user) == before
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE daily_task_rounds SET snapshot_json=? "
+                        "WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                        (original_snapshot, adapter, user),
+                    )
+                claimed = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "round-corrupt-retry", operation_id),
+                    "领取日课嘉奖",
+                )
+                assert claimed.code == "DAILY_TASK_REWARD_CLAIMED"
+                after_claim = _daily_state(runtime, adapter, user)
+                replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "round-corrupt-replay", operation_id),
+                    "领取日课嘉奖",
+                )
+                assert replay.code == "DAILY_TASK_REWARD_CLAIMED"
+                assert replay.data["idempotent_replay"] is True
+                assert _daily_state(runtime, adapter, user) == after_claim
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ADAPTERS)
+@pytest.mark.parametrize("corrupt_result", ("not-json", '{"player": {}, "player": {}}'))
+def test_daily_task_claim_operation_corruption_rejects_without_writes_and_recovers(
+    adapter: str,
+    corrupt_result: str,
+) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(ROOT / "data", data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+            user = f"daily-operation-corrupt-{adapter}-{len(corrupt_result)}"
+            operation_id = f"daily-operation-corrupt-claim-{adapter}-{len(corrupt_result)}"
+            try:
+                await _prepare_completed_daily_round(runtime, adapter, user)
+                first = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "operation-corrupt-initial", operation_id),
+                    "领取日课嘉奖",
+                )
+                assert first.code == "DAILY_TASK_REWARD_CLAIMED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_result = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?",
+                        (operation_id,),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (corrupt_result, operation_id),
+                    )
+                await runtime.close()
+
+                recovered = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+                try:
+                    before = _daily_state(recovered, adapter, user)
+                    rejected = await recovered.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "operation-corrupt-replay", operation_id),
+                        "领取日课嘉奖",
+                    )
+                    assert rejected.code == "PERSISTENCE_ERROR"
+                    assert _daily_state(recovered, adapter, user) == before
+
+                    with sqlite3.connect(recovered.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            (original_result, operation_id),
+                        )
+                    before_replay = _daily_state(recovered, adapter, user)
+                    replay = await recovered.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "operation-corrupt-repaired", operation_id),
+                        "领取日课嘉奖",
+                    )
+                    assert replay.code == "DAILY_TASK_REWARD_CLAIMED"
+                    assert replay.data["idempotent_replay"] is True
+                    assert _daily_state(recovered, adapter, user) == before_replay
+                finally:
+                    await recovered.close()
+            finally:
+                if not runtime._closed:
+                    await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ADAPTERS)
+def test_daily_task_rejects_malformed_source_result_without_projection(adapter: str) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(ROOT / "data", data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+            user = f"daily-source-corrupt-{adapter}"
+            try:
+                seed = _seed_for_tasks(runtime.content, {"task.daily.checkin"})
+                with patch(
+                    "nonebot_plugin_xiuxian_3.xiuxian.events.daily_quest_repository.secrets.token_hex",
+                    return_value=seed,
+                ):
+                    initial = await runtime.adapters.dispatch(
+                        adapter, _context(adapter, user, "source-create"), "开始修仙"
+                    )
+                    assert initial.code == "PLAYER_CREATED"
+                    status = await runtime.adapters.dispatch(
+                        adapter, _context(adapter, user, "source-status"), "每日修行"
+                    )
+                assert status.code == "DAILY_TASK_STATUS"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        (
+                            f"daily-source-corrupt-{adapter}",
+                            "routine.checkin.daily",
+                            player_id,
+                            "fixture",
+                            '{"makeup": false, "makeup": true, "target_date": "2026-01-15", "consecutive_days": 1}',
+                            clock.current.isoformat(),
+                        ),
+                    )
+                before = _daily_state(runtime, adapter, user)
+                rejected = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "source-corrupt-retry"), "每日修行"
+                )
+                assert rejected.code == "DAILY_TASKS_UNAVAILABLE"
+                assert _daily_state(runtime, adapter, user) == before
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (
+                            json.dumps(
+                                {
+                                    "makeup": False,
+                                    "target_date": "2026-01-15",
+                                    "consecutive_days": 1,
+                                },
+                                sort_keys=True,
+                            ),
+                            f"daily-source-corrupt-{adapter}",
+                        ),
+                    )
+                repaired = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "source-repaired"), "每日修行"
+                )
+                assert repaired.code == "DAILY_TASK_STATUS"
+                assert next(
+                    task for task in repaired.data["tasks"] if task["task_key"] == "task.daily.checkin"
+                )["progress"] == 1
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ADAPTERS)
+def test_daily_task_claim_replay_rejects_nonterminal_round_and_recovers(adapter: str) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(ROOT / "data", data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+            user = f"daily-round-state-replay-{adapter}"
+            operation_id = f"daily-round-state-claim-{adapter}"
+            try:
+                await _prepare_completed_daily_round(runtime, adapter, user)
+                claimed = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "round-state-claim", operation_id),
+                    "领取日课嘉奖",
+                )
+                assert claimed.code == "DAILY_TASK_REWARD_CLAIMED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE daily_task_rounds SET status='open' "
+                        "WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                        (adapter, user),
+                    )
+                await runtime.close()
+
+                recovered = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+                try:
+                    before = _daily_state(recovered, adapter, user)
+                    rejected = await recovered.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "round-state-replay", operation_id),
+                        "领取日课嘉奖",
+                    )
+                    assert rejected.code == "DAILY_TASKS_UNAVAILABLE"
+                    assert _daily_state(recovered, adapter, user) == before
+
+                    with sqlite3.connect(recovered.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE daily_task_rounds SET status='claimed' "
+                            "WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
+                            (adapter, user),
+                        )
+                    before_replay = _daily_state(recovered, adapter, user)
+                    replay = await recovered.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "round-state-repaired", operation_id),
+                        "领取日课嘉奖",
+                    )
+                    assert replay.code == "DAILY_TASK_REWARD_CLAIMED"
+                    assert replay.data["idempotent_replay"] is True
+                    assert _daily_state(recovered, adapter, user) == before_replay
+                finally:
+                    await recovered.close()
+            finally:
+                if not runtime._closed:
+                    await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ADAPTERS)
+@pytest.mark.parametrize(
+    ("field", "tampered_value"),
+    (
+        ("business_date", "2026-01-14"),
+        ("ends_at", "2026-01-17T00:00:00+00:00"),
+    ),
+)
+def test_daily_task_claim_replay_rejects_tampered_round_metadata_and_recovers(
+    adapter: str,
+    field: str,
+    tampered_value: str,
+) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as temp:
+            data_dir = Path(temp) / "data"
+            shutil.copytree(ROOT / "data", data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+            user = f"daily-metadata-replay-{adapter}-{field}"
+            operation_id = f"daily-metadata-claim-{adapter}-{field}"
+            try:
+                await _prepare_completed_daily_round(runtime, adapter, user)
+                claimed = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "metadata-claim", operation_id),
+                    "领取日课嘉奖",
+                )
+                assert claimed.code == "DAILY_TASK_REWARD_CLAIMED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_result = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?",
+                        (operation_id,),
+                    ).fetchone()[0]
+                    payload = json.loads(original_result)
+                    payload[field] = tampered_value
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (json.dumps(payload, sort_keys=True), operation_id),
+                    )
+                await runtime.close()
+
+                recovered = create_runtime(data_dir=data_dir, adapters=(adapter,), clock=clock)
+                try:
+                    before = _daily_state(recovered, adapter, user)
+                    rejected = await recovered.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "metadata-replay", operation_id),
+                        "领取日课嘉奖",
+                    )
+                    assert rejected.code == "DAILY_TASKS_UNAVAILABLE"
+                    assert _daily_state(recovered, adapter, user) == before
+
+                    with sqlite3.connect(recovered.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            (original_result, operation_id),
+                        )
+                    before_replay = _daily_state(recovered, adapter, user)
+                    replay = await recovered.adapters.dispatch(
+                        adapter,
+                        _context(adapter, user, "metadata-repaired", operation_id),
+                        "领取日课嘉奖",
+                    )
+                    assert replay.code == "DAILY_TASK_REWARD_CLAIMED"
+                    assert replay.data["idempotent_replay"] is True
+                    assert _daily_state(recovered, adapter, user) == before_replay
+                finally:
+                    await recovered.close()
+            finally:
+                if not runtime._closed:
+                    await runtime.close()
 
     asyncio.run(run())

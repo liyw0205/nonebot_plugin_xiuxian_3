@@ -16,6 +16,29 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 [当前开发状态](current-status.md)是剩余工作的唯一清单。未出现在
 [当前开发状态](current-status.md)“已开放”表中的内容，不得被命令、按钮或 Web 写入口当作可用玩法。
 
+## 已闭合切片：日课领奖快照与 operation 严格回放
+
+本轮选择 `每日修行` / `领取日课嘉奖` 的日课轮次领奖恢复。只读审计已在 QQ 官方与 OneBot V11
+公开 dispatch 路径复现：`daily_task_rounds.snapshot_json` 的奖励对象使用宽松 JSON 解码，重复
+`spirit_stones` 键可以把冻结奖励从 50 改成 999 并实际入账。该路径已有完整轮次、来源投影、领奖、
+operation 和回滚合同，且问题影响玩家资产，符合冷却期内的正确性例外；只补来源持久化 JSON 完整性校验，不改变日课来源投影规则。
+
+文件职责：`/root/adapter_gap_scan` 实现 `xiuxian/events/daily_quest_repository.py` 的严格校验；
+`/root/path_contract_impl` 补充 `test/test_daily_tasks.py` 的双适配器损坏快照、operation、终态及元数据恢复用例，并只读复核
+operation 回放；`/root/next_slice_scan` 只读比较下一轮候选。主线负责本计划、当前状态、共享边界审阅和最终验收。
+实现只复用 `utils.json_cache.decode_json_strict`、operation 回放和共享角色奖励事务，严格校验轮次/任务/
+领奖 operation 结果的 JSON、字段、玩家归属和终态；来源 operation 与正式战斗结果也严格解码，不改变来源匹配规则。
+坏记录在资产、轮次、任务、图鉴和 operation 写入前拒绝，
+修复后原 operation 可重试，成功结果重启只回放一次。不得改任务选择、目标、奖励数值、来源规则、正式 PvP/PvE
+结算或切磋/训练傀儡只读边界，不添加运行时版本标识、旧格式兼容分支或玩家可见开发文案。
+
+日课专项 20 项、日课/文档/版本标识/奖励/通用工具关联测试 320 项通过；源码与测试 `compileall`、内容 JSON
+解析及 `git diff --check` 完成。未运行整仓全量测试或 NoneBot 消息级 transport 集成测试。
+
+候选比较：下一轮可重新评估道途名称/别名内容合同；只读盘点发现 `player/path_rules.py` 与 `player/use_cases.py`
+仍硬编码首要/辅修道途名称，而 `data/道途/道途.json` 缺少别名合同，尚需补辅修来源结构和双适配器快照验收；不在本轮顺带实现。
+灵兽灵具缺少真实配方来源合同，魔渊深层和其他三界多人副本缺完整探索/战斗/失败/奖励合同，均继续关闭；Web/跨服写入口前置未齐。
+
 ## 已闭合切片：悬赏领奖快照与 operation 严格回放
 
 入口为 `悬赏榜`、`接取悬赏`、`领取悬赏`；拥有者为 `xiuxian/adventures` 领域仓储。QQ 官方与 OneBot V11
