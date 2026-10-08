@@ -147,10 +147,486 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import grant_player_assets
+from ..utils.json_cache import decode_json_strict
 from ..utils.player import change_player_state, player_integer, player_inventory
 
 
+_CULTIVATION_SNAPSHOT_FIELDS = {
+    "realm_key",
+    "realm_layer",
+    "qualification",
+    "location_key",
+    "mode_key",
+    "mode_label",
+    "requested_mode_key",
+    "requested_mode_reference",
+    "duration_seconds",
+    "stamina_cost",
+    "energy_cost",
+    "state_bp",
+    "state_bonus_bp",
+    "pending_state_bonus_bp",
+    "base_cultivation",
+    "environment_bp",
+    "manual_cultivation_gain_bp",
+    "soul_power_gain",
+    "soul_power_max",
+    "start_player_fingerprint",
+}
+_CULTIVATION_QUALIFICATION_FIELDS = {
+    "body",
+    "spirit",
+    "insight",
+    "root",
+    "agility",
+    "fortune",
+}
+_CULTIVATION_START_RESULT_FIELDS = {
+    "player",
+    "session_id",
+    "mode_key",
+    "mode_label",
+    "duration_seconds",
+    "status",
+    "starts_at",
+    "ends_at",
+    "stamina_cost",
+    "energy_cost",
+    "state_bp",
+    "state_bonus_bp",
+    "snapshot_fingerprint",
+}
+_CULTIVATION_SETTLEMENT_RESULT_FIELDS = {
+    "player",
+    "session_id",
+    "cultivation_gain",
+    "soul_power_gain",
+    "mode_key",
+    "mode_label",
+}
+_CULTIVATION_CANCEL_RESULT_FIELDS = {
+    "player",
+    "session_id",
+    "stamina_refund",
+    "energy_refund",
+}
+
+
+def _strict_progression_object(raw_value: Any, label: str) -> dict[str, Any]:
+    try:
+        value = decode_json_strict(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} is invalid JSON") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be an object")
+    return value
+
+
+def _require_progression_integer(value: Any, label: str, *, minimum: int = 0) -> int:
+    if type(value) is not int or value < minimum:
+        raise ValueError(f"{label} must be an integer of at least {minimum}")
+    return value
+
+
 class CultivationRepositoryMixin:
+    @staticmethod
+    def _validate_cultivation_snapshot_fields(
+        snapshot: dict[str, Any], *, allow_unbound_start: bool = False
+    ) -> None:
+        expected_fields = _CULTIVATION_SNAPSHOT_FIELDS
+        if allow_unbound_start:
+            expected_fields = expected_fields - {"start_player_fingerprint"}
+        if set(snapshot) != expected_fields:
+            raise ValueError("cultivation snapshot fields are invalid")
+        for key in (
+            "realm_key",
+            "location_key",
+            "mode_key",
+            "mode_label",
+            "requested_mode_key",
+        ):
+            if not isinstance(snapshot[key], str) or not snapshot[key]:
+                raise ValueError(f"cultivation snapshot {key} is invalid")
+        if not isinstance(snapshot["requested_mode_reference"], str):
+            raise ValueError("cultivation snapshot requested mode reference is invalid")
+        if not allow_unbound_start and (
+            not isinstance(snapshot["start_player_fingerprint"], str)
+            or len(snapshot["start_player_fingerprint"]) != 64
+        ):
+            raise ValueError("cultivation start player fingerprint is invalid")
+        _require_progression_integer(snapshot["realm_layer"], "cultivation realm layer", minimum=1)
+        qualification = snapshot["qualification"]
+        if (
+            not isinstance(qualification, dict)
+            or set(qualification) != _CULTIVATION_QUALIFICATION_FIELDS
+            or any(type(value) is not int or value < 0 for value in qualification.values())
+        ):
+            raise ValueError("cultivation snapshot qualification is invalid")
+        for key in (
+            "duration_seconds",
+            "stamina_cost",
+            "state_bp",
+            "base_cultivation",
+            "environment_bp",
+        ):
+            _require_progression_integer(snapshot[key], f"cultivation snapshot {key}", minimum=1)
+        for key in (
+            "energy_cost",
+            "state_bonus_bp",
+            "pending_state_bonus_bp",
+            "manual_cultivation_gain_bp",
+            "soul_power_gain",
+            "soul_power_max",
+        ):
+            _require_progression_integer(snapshot[key], f"cultivation snapshot {key}")
+        if (
+            snapshot["state_bonus_bp"] != snapshot["pending_state_bonus_bp"]
+            or snapshot["soul_power_gain"] > snapshot["soul_power_max"]
+        ):
+            raise ValueError("cultivation snapshot values are inconsistent")
+
+    def _cultivation_result_player(
+        self, payload: dict[str, Any], platform: str, platform_user_id: str
+    ) -> PlayerView:
+        player = payload.get("player")
+        if (
+            not isinstance(player, dict)
+            or player.get("platform") != platform
+            or player.get("platform_user_id") != platform_user_id
+            or not isinstance(player.get("id"), str)
+            or not player.get("id")
+            or player.get("id") != player.get("player_id")
+        ):
+            raise ValueError("cultivation operation player does not match its request")
+        for key in (
+            "qualification_json",
+            "inventory_json",
+            "durability_json",
+            "intro_json",
+            "faction_reputation_json",
+        ):
+            if key in player:
+                _strict_progression_object(player[key], f"cultivation operation player {key}")
+        return self._row_to_player(player)
+
+    def _cultivation_operation_result(
+        self,
+        connection: sqlite3.Connection,
+        operation: sqlite3.Row,
+        platform: str,
+        platform_user_id: str,
+        expected_name: str,
+        expected_fields: set[str],
+    ) -> tuple[dict[str, Any], PlayerView]:
+        if operation["operation_name"] != expected_name:
+            raise ValueError("cultivation operation name is invalid")
+        payload = _strict_progression_object(operation["result_json"], "cultivation operation result")
+        if set(payload) != expected_fields:
+            raise ValueError("cultivation operation result fields are invalid")
+        player = self._cultivation_result_player(payload, platform, platform_user_id)
+        owner = connection.execute(
+            "SELECT player_id, platform, platform_user_id FROM players WHERE id = ?",
+            (operation["player_id"],),
+        ).fetchone()
+        if (
+            owner is None
+            or owner["player_id"] != player.player_id
+            or owner["platform"] != platform
+            or owner["platform_user_id"] != platform_user_id
+        ):
+            raise ValueError("cultivation operation player id is invalid")
+        return payload, player
+
+    @staticmethod
+    def _cultivation_session_result(
+        raw_value: Any, status: str
+    ) -> tuple[dict[str, Any], bool]:
+        result = _strict_progression_object(raw_value, "cultivation session result")
+        if status == "running":
+            if result:
+                raise ValueError("running cultivation result must be empty")
+            return result, False
+        if status == "settled":
+            if set(result) != {
+                "cultivation_gain",
+                "soul_power_gain",
+                "terminal_operation_id",
+                "operation_result_fingerprint",
+            }:
+                raise ValueError("settled cultivation result fields are invalid")
+            _require_progression_integer(result["cultivation_gain"], "cultivation gain")
+            _require_progression_integer(result["soul_power_gain"], "soul power gain")
+            if not isinstance(result["terminal_operation_id"], str) or not result["terminal_operation_id"]:
+                raise ValueError("settled cultivation operation id is invalid")
+            if not isinstance(result["operation_result_fingerprint"], str) or len(result["operation_result_fingerprint"]) != 64:
+                raise ValueError("settled cultivation result fingerprint is invalid")
+            return result, True
+        if status == "cancelled":
+            if set(result) != {
+                "stamina_refund",
+                "energy_refund",
+                "terminal_operation_id",
+                "operation_result_fingerprint",
+            }:
+                raise ValueError("cancelled cultivation result fields are invalid")
+            _require_progression_integer(result["stamina_refund"], "stamina refund")
+            _require_progression_integer(result["energy_refund"], "energy refund")
+            if not isinstance(result["terminal_operation_id"], str) or not result["terminal_operation_id"]:
+                raise ValueError("cancelled cultivation operation id is invalid")
+            if not isinstance(result["operation_result_fingerprint"], str) or len(result["operation_result_fingerprint"]) != 64:
+                raise ValueError("cancelled cultivation result fingerprint is invalid")
+            return result, True
+        if status != "expired":
+            raise ValueError("cultivation session state is invalid")
+        if set(result) == {"expired_at", "recovery_pending"}:
+            if result["recovery_pending"] is not True or not isinstance(result["expired_at"], str):
+                raise ValueError("expired cultivation result is invalid")
+            try:
+                expired_at = datetime.fromisoformat(result["expired_at"])
+            except ValueError as exc:
+                raise ValueError("expired cultivation result time is invalid") from exc
+            if expired_at.tzinfo is None:
+                raise ValueError("expired cultivation result time must include a timezone")
+            return result, False
+        if set(result) == {
+            "cultivation_gain",
+            "soul_power_gain",
+            "recovered_after_expiry",
+            "terminal_operation_id",
+            "operation_result_fingerprint",
+        }:
+            _require_progression_integer(result["cultivation_gain"], "cultivation gain")
+            _require_progression_integer(result["soul_power_gain"], "soul power gain")
+            if result["recovered_after_expiry"] is not True:
+                raise ValueError("recovered cultivation result is invalid")
+            if not isinstance(result["terminal_operation_id"], str) or not result["terminal_operation_id"]:
+                raise ValueError("recovered cultivation operation id is invalid")
+            if not isinstance(result["operation_result_fingerprint"], str) or len(result["operation_result_fingerprint"]) != 64:
+                raise ValueError("recovered cultivation result fingerprint is invalid")
+            return result, True
+        raise ValueError("expired cultivation result fields are invalid")
+
+    def _cultivation_terminal_operation(
+        self,
+        connection: sqlite3.Connection,
+        session: sqlite3.Row,
+        snapshot: dict[str, Any],
+        result: dict[str, Any],
+        status: str,
+        platform: str,
+        platform_user_id: str,
+    ) -> None:
+        if status == "settled":
+            operation_name = "progression.settle_cultivation"
+            fingerprint_name = "progression.settle_cultivation.result"
+            expected_fields = _CULTIVATION_SETTLEMENT_RESULT_FIELDS
+        elif status == "cancelled":
+            operation_name = "progression.cancel_cultivation"
+            fingerprint_name = "progression.cancel_cultivation.result"
+            expected_fields = _CULTIVATION_CANCEL_RESULT_FIELDS
+        elif status == "expired" and result.get("recovered_after_expiry") is True:
+            operation_name = "progression.recover_cultivation"
+            fingerprint_name = "progression.recover_cultivation.result"
+            expected_fields = _CULTIVATION_SETTLEMENT_RESULT_FIELDS
+        else:
+            return
+        operation_id = result.get("terminal_operation_id")
+        if not isinstance(operation_id, str) or not operation_id:
+            raise ValueError("cultivation terminal operation id is invalid")
+        operation = connection.execute(
+            "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
+            (operation_id,),
+        ).fetchone()
+        if (
+            operation is None
+            or operation["player_id"] != session["player_id"]
+            or operation["request_hash"]
+            != self._request_hash(
+                operation_name,
+                {"platform": platform, "platform_user_id": platform_user_id},
+            )
+        ):
+            raise ValueError("cultivation terminal operation does not match its session")
+        payload, _ = self._cultivation_operation_result(
+            connection,
+            operation,
+            platform,
+            platform_user_id,
+            operation_name,
+            expected_fields,
+        )
+        if payload.get("session_id") != str(session["session_id"]):
+            raise ValueError("cultivation terminal operation session is invalid")
+        if status == "cancelled":
+            _require_progression_integer(payload["stamina_refund"], "stamina refund")
+            _require_progression_integer(payload["energy_refund"], "energy refund")
+            if (
+                payload["stamina_refund"] != result["stamina_refund"]
+                or payload["energy_refund"] != result["energy_refund"]
+                or payload["stamina_refund"] != snapshot["stamina_cost"]
+                or payload["energy_refund"] != snapshot["energy_cost"]
+            ):
+                raise ValueError("cultivation cancellation result does not match its operation")
+        else:
+            _require_progression_integer(payload["cultivation_gain"], "cultivation gain")
+            _require_progression_integer(payload["soul_power_gain"], "soul power gain")
+            if (
+                payload["cultivation_gain"] != result["cultivation_gain"]
+                or payload["soul_power_gain"] != result["soul_power_gain"]
+                or payload["mode_key"] != snapshot["mode_key"]
+                or payload["mode_label"] != snapshot["mode_label"]
+            ):
+                raise ValueError("cultivation settlement result does not match its operation")
+        if result["operation_result_fingerprint"] != self._request_hash(fingerprint_name, payload):
+            raise ValueError("cultivation terminal result fingerprint is invalid")
+
+    def _cultivation_expiry_operation(
+        self,
+        connection: sqlite3.Connection,
+        session: sqlite3.Row,
+        platform: str,
+        platform_user_id: str,
+    ) -> None:
+        operation_id = f"progression.expire_cultivation:{session['session_id']}"
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "session_id": str(session["session_id"]),
+        }
+        operation = connection.execute(
+            "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
+            (operation_id,),
+        ).fetchone()
+        if (
+            operation is None
+            or operation["operation_name"] != "progression.expire_cultivation"
+            or operation["player_id"] != session["player_id"]
+            or operation["request_hash"]
+            != self._request_hash("progression.expire_cultivation", request_payload)
+        ):
+            raise ValueError("cultivation expiry operation does not match its session")
+        result = _strict_progression_object(operation["result_json"], "cultivation expiry operation")
+        if result != {"session_id": str(session["session_id"]), "status": "expired"}:
+            raise ValueError("cultivation expiry operation result is invalid")
+
+    def _record_cultivation_expiry(
+        self,
+        connection: sqlite3.Connection,
+        session: sqlite3.Row,
+        platform: str,
+        platform_user_id: str,
+        created_at: str,
+    ) -> None:
+        request_payload = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "session_id": str(session["session_id"]),
+        }
+        connection.execute(
+            "INSERT OR IGNORE INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                f"progression.expire_cultivation:{session['session_id']}",
+                "progression.expire_cultivation",
+                session["player_id"],
+                self._request_hash("progression.expire_cultivation", request_payload),
+                json.dumps(
+                    {"session_id": session["session_id"], "status": "expired"},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+                created_at,
+            ),
+        )
+        self._cultivation_expiry_operation(connection, session, platform, platform_user_id)
+
+    def _cultivation_snapshot(
+        self, connection: sqlite3.Connection, session: sqlite3.Row
+    ) -> dict[str, Any]:
+        snapshot = _strict_progression_object(session["snapshot_json"], "cultivation snapshot")
+        self._validate_cultivation_snapshot_fields(snapshot)
+
+        operation = connection.execute(
+            "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
+            (session["operation_id"],),
+        ).fetchone()
+        if (
+            operation is None
+            or operation["operation_name"] != "progression.start_cultivation"
+            or operation["player_id"] != session["player_id"]
+        ):
+            raise ValueError("cultivation start operation does not match its session")
+        start = _strict_progression_object(operation["result_json"], "cultivation start operation")
+        if set(start) != _CULTIVATION_START_RESULT_FIELDS:
+            raise ValueError("cultivation start operation fields are invalid")
+        for key in ("session_id", "mode_key", "mode_label", "status", "starts_at", "ends_at", "snapshot_fingerprint"):
+            if not isinstance(start[key], str) or not start[key]:
+                raise ValueError(f"cultivation start operation {key} is invalid")
+        if start["status"] != "running" or len(start["snapshot_fingerprint"]) != 64:
+            raise ValueError("cultivation start operation state is invalid")
+        for key in ("duration_seconds", "stamina_cost", "energy_cost", "state_bp", "state_bonus_bp"):
+            _require_progression_integer(start[key], f"cultivation start operation {key}")
+        start_player = start["player"]
+        if not isinstance(start_player, dict):
+            raise ValueError("cultivation start operation player is invalid")
+        owner = connection.execute(
+            "SELECT id, player_id, platform, platform_user_id FROM players WHERE id = ?",
+            (session["player_id"],),
+        ).fetchone()
+        start_view = self._cultivation_result_player(
+            start, str(owner["platform"]) if owner is not None else "", str(owner["platform_user_id"]) if owner is not None else ""
+        ) if owner is not None else None
+        if (
+            owner is None
+            or start_view is None
+            or start_view.player_id != owner["player_id"]
+            or owner["id"] != session["player_id"]
+            or operation["request_hash"]
+            != self._request_hash(
+                "progression.start_cultivation",
+                {
+                    "platform": owner["platform"],
+                    "platform_user_id": owner["platform_user_id"],
+                    "mode_key": snapshot["requested_mode_key"],
+                    "mode_reference": snapshot["requested_mode_reference"],
+                },
+            )
+            or snapshot["realm_key"] != start_player.get("realm_key")
+            or snapshot["realm_layer"] != start_player.get("realm_layer")
+            or snapshot["location_key"] != start_player.get("location_key")
+            or snapshot["qualification"]
+            != _strict_progression_object(start_player.get("qualification_json"), "cultivation start qualification")
+            or snapshot["start_player_fingerprint"]
+            != self._request_hash("progression.cultivation.start_player", start_player)
+        ):
+            raise ValueError("cultivation start operation does not match its snapshot")
+        try:
+            starts_at = datetime.fromisoformat(str(session["starts_at"]))
+            ends_at = datetime.fromisoformat(str(session["ends_at"]))
+        except ValueError as exc:
+            raise ValueError("cultivation session time is invalid") from exc
+        if (
+            starts_at.tzinfo is None
+            or ends_at.tzinfo is None
+            or ends_at - starts_at != timedelta(seconds=snapshot["duration_seconds"])
+            or str(session["session_id"]) != start["session_id"]
+            or str(session["mode_key"]) != snapshot["mode_key"]
+            or str(session["mode_key"]) != start["mode_key"]
+            or str(session["starts_at"]) != start["starts_at"]
+            or str(session["ends_at"]) != start["ends_at"]
+            or type(session["stamina_cost"]) is not int
+            or session["stamina_cost"] != snapshot["stamina_cost"]
+            or start["mode_label"] != snapshot["mode_label"]
+            or start["duration_seconds"] != snapshot["duration_seconds"]
+            or start["stamina_cost"] != snapshot["stamina_cost"]
+            or start["energy_cost"] != snapshot["energy_cost"]
+            or start["state_bp"] != snapshot["state_bp"]
+            or start["state_bonus_bp"] != snapshot["state_bonus_bp"]
+            or start["snapshot_fingerprint"]
+            != self._request_hash("progression.cultivation.snapshot", snapshot)
+        ):
+            raise ValueError("cultivation session and frozen snapshot do not match")
+        return snapshot
+
     async def enter_cultivation(
         self,
         *,
@@ -376,7 +852,7 @@ class CultivationRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing_operation is not None:
@@ -385,7 +861,45 @@ class CultivationRepositoryMixin:
                     or existing_operation["request_hash"] != request_hash
                 ):
                     raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing_operation["result_json"])
+                payload, _ = self._cultivation_operation_result(
+                    connection,
+                    existing_operation,
+                    platform,
+                    platform_user_id,
+                    "progression.start_cultivation",
+                    _CULTIVATION_START_RESULT_FIELDS,
+                )
+                _require_progression_integer(payload["duration_seconds"], "cultivation duration", minimum=1)
+                _require_progression_integer(payload["stamina_cost"], "cultivation stamina cost", minimum=1)
+                _require_progression_integer(payload["energy_cost"], "cultivation energy cost")
+                _require_progression_integer(payload["state_bp"], "cultivation state")
+                _require_progression_integer(payload["state_bonus_bp"], "cultivation state bonus")
+                if payload["status"] != "running":
+                    raise ValueError("cultivation start operation status is invalid")
+                session = connection.execute(
+                    "SELECT * FROM cultivation_sessions WHERE operation_id = ?",
+                    (operation_id,),
+                ).fetchone()
+                if session is None or str(session["session_id"]) != payload["session_id"]:
+                    raise ValueError("cultivation start operation has no matching session")
+                session_result, terminal = self._cultivation_session_result(
+                    session["result_json"], str(session["status"])
+                )
+                snapshot = self._cultivation_snapshot(connection, session)
+                if terminal:
+                    self._cultivation_terminal_operation(
+                        connection,
+                        session,
+                        snapshot,
+                        session_result,
+                        str(session["status"]),
+                        platform,
+                        platform_user_id,
+                    )
+                if session["status"] == "expired":
+                    self._cultivation_expiry_operation(
+                        connection, session, platform, platform_user_id
+                    )
                 return CultivationSessionRecord(
                     player=self._row_to_player(payload["player"]),
                     session_id=str(payload["session_id"]),
@@ -463,14 +977,20 @@ class CultivationRepositoryMixin:
                 if production is not None:
                     raise CultivationBusyError("seclusion requires no active production")
             pending = connection.execute(
-                "SELECT status, result_json FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
+                "SELECT * FROM cultivation_sessions WHERE player_id = ? AND status IN ('running', 'expired') ORDER BY id DESC LIMIT 1",
                 (row["id"],),
             ).fetchone()
-            if pending is not None and pending["status"] == "running":
-                raise CultivationBusyError("player already has a running cultivation")
             if pending is not None:
-                pending_result = self._json_object(pending["result_json"], {})
-                if "cultivation_gain" not in pending_result:
+                self._cultivation_snapshot(connection, pending)
+                _, recovered = self._cultivation_session_result(
+                    pending["result_json"], str(pending["status"])
+                )
+                if pending["status"] == "running":
+                    raise CultivationBusyError("player already has a running cultivation")
+                self._cultivation_expiry_operation(
+                    connection, pending, platform, platform_user_id
+                )
+                if not recovered:
                     raise CultivationRecoveryRequiredError("expired cultivation requires recovery")
             if mode.daily_limit is not None:
                 day_start = serialize_datetime(now.replace(hour=0, minute=0, second=0, microsecond=0))
@@ -516,10 +1036,14 @@ class CultivationRepositoryMixin:
             snapshot = {
                 "realm_key": row["realm_key"],
                 "realm_layer": player_integer(row, "realm_layer"),
-                "qualification": self._json_object(row["qualification_json"], {}),
+                "qualification": _strict_progression_object(
+                    row["qualification_json"], "cultivation player qualification"
+                ),
                 "location_key": row["location_key"],
                 "mode_key": mode.key,
                 "mode_label": mode.label,
+                "requested_mode_key": mode_key,
+                "requested_mode_reference": mode_reference if mode_reference is not None else "",
                 "duration_seconds": mode.duration_seconds,
                 "stamina_cost": mode.stamina_cost,
                 "energy_cost": mode.energy_cost,
@@ -532,6 +1056,7 @@ class CultivationRepositoryMixin:
                 "soul_power_gain": mode.soul_power_gain,
                 "soul_power_max": mode.soul_power_max,
             }
+            self._validate_cultivation_snapshot_fields(snapshot, allow_unbound_start=True)
             change_player_state(
                 connection,
                 row,
@@ -549,6 +1074,29 @@ class CultivationRepositoryMixin:
                     "item_effects_json": json.dumps(item_effects, ensure_ascii=False, sort_keys=True),
                 },
             )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
+            if updated is None:
+                raise RuntimeError("cultivation start returned no player")
+            player = self._row_to_player(updated)
+            player_payload = self._player_payload(player)
+            snapshot["start_player_fingerprint"] = self._request_hash(
+                "progression.cultivation.start_player", player_payload
+            )
+            payload = {
+                "player": player_payload,
+                "session_id": session_id,
+                "mode_key": mode.key,
+                "mode_label": mode.label,
+                "duration_seconds": mode.duration_seconds,
+                "status": "running",
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "stamina_cost": mode.stamina_cost,
+                "energy_cost": mode.energy_cost,
+                "state_bp": state_bp,
+                "state_bonus_bp": state_bonus_bp,
+                "snapshot_fingerprint": self._request_hash("progression.cultivation.snapshot", snapshot),
+            }
             connection.execute(
                 """
                 INSERT INTO cultivation_sessions(
@@ -569,24 +1117,6 @@ class CultivationRepositoryMixin:
                     starts_at,
                 ),
             )
-            updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
-            if updated is None:
-                raise RuntimeError("cultivation start returned no player")
-            player = self._row_to_player(updated)
-            payload = {
-                "player": self._player_payload(player),
-                "session_id": session_id,
-                "mode_key": mode.key,
-                "mode_label": mode.label,
-                "duration_seconds": mode.duration_seconds,
-                "status": "running",
-                "starts_at": starts_at,
-                "ends_at": ends_at,
-                "stamina_cost": mode.stamina_cost,
-                "energy_cost": mode.energy_cost,
-                "state_bp": state_bp,
-                "state_bonus_bp": state_bonus_bp,
-            }
             connection.execute(
                 """
                 INSERT INTO operations(
@@ -657,7 +1187,7 @@ class CultivationRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing_operation is not None:
@@ -666,9 +1196,39 @@ class CultivationRepositoryMixin:
                     or existing_operation["request_hash"] != request_hash
                 ):
                     raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing_operation["result_json"])
+                payload, player = self._cultivation_operation_result(
+                    connection,
+                    existing_operation,
+                    platform,
+                    platform_user_id,
+                    "progression.settle_cultivation",
+                    _CULTIVATION_SETTLEMENT_RESULT_FIELDS,
+                )
+                _require_progression_integer(payload["cultivation_gain"], "cultivation gain")
+                _require_progression_integer(payload["soul_power_gain"], "soul power gain")
+                if not isinstance(payload["session_id"], str) or not payload["session_id"]:
+                    raise ValueError("cultivation settlement session id is invalid")
+                session = connection.execute(
+                    "SELECT * FROM cultivation_sessions WHERE session_id = ? AND player_id = ?",
+                    (payload["session_id"], existing_operation["player_id"]),
+                ).fetchone()
+                if session is None or session["status"] != "settled":
+                    raise ValueError("cultivation settlement operation has no settled session")
+                snapshot = self._cultivation_snapshot(connection, session)
+                result, recovered = self._cultivation_session_result(session["result_json"], "settled")
+                if (
+                    not recovered
+                    or result["terminal_operation_id"] != operation_id
+                    or payload["cultivation_gain"] != result["cultivation_gain"]
+                    or payload["soul_power_gain"] != result["soul_power_gain"]
+                    or payload["mode_key"] != snapshot["mode_key"]
+                    or payload["mode_label"] != snapshot["mode_label"]
+                    or result["operation_result_fingerprint"]
+                    != self._request_hash("progression.settle_cultivation.result", payload)
+                ):
+                    raise ValueError("cultivation settlement operation does not match its session")
                 return CultivationSettlementRecord(
-                    player=self._row_to_player(payload["player"]),
+                    player=player,
                     session_id=str(payload["session_id"]),
                     cultivation_gain=int(payload["cultivation_gain"]),
                     mode_key=str(payload["mode_key"]),
@@ -684,17 +1244,17 @@ class CultivationRepositoryMixin:
             ).fetchone()
             if session is None:
                 raise CultivationNotFoundError("no running cultivation")
+            snapshot = self._cultivation_snapshot(connection, session)
+            _, recovered = self._cultivation_session_result(
+                session["result_json"], str(session["status"])
+            )
             if session["status"] == "expired":
+                self._cultivation_expiry_operation(connection, session, platform, platform_user_id)
                 raise CultivationExpiredError("cultivation requires recovery")
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now < ends_at:
                 raise CultivationNotReadyError("cultivation is not ready")
             if now > ends_at + timedelta(seconds=CULTIVATION_SETTLEMENT_GRACE_SECONDS):
-                expiry_payload = {
-                    "platform": platform,
-                    "platform_user_id": platform_user_id,
-                    "session_id": str(session["session_id"]),
-                }
                 connection.execute(
                     "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
                     (
@@ -703,25 +1263,17 @@ class CultivationRepositoryMixin:
                         session["id"],
                     ),
                 )
-                connection.execute(
-                    "INSERT OR IGNORE INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        f"progression.expire_cultivation:{session['session_id']}",
-                        "progression.expire_cultivation",
-                        row["id"],
-                        self._request_hash("progression.expire_cultivation", expiry_payload),
-                        json.dumps(
-                            {"session_id": session["session_id"], "status": "expired"},
-                            ensure_ascii=False,
-                            sort_keys=True,
-                        ),
-                        now_text,
-                    ),
+                expired_session = connection.execute(
+                    "SELECT * FROM cultivation_sessions WHERE id = ?", (session["id"],)
+                ).fetchone()
+                if expired_session is None:
+                    raise RuntimeError("expired cultivation session was not saved")
+                self._record_cultivation_expiry(
+                    connection, expired_session, platform, platform_user_id, now_text
                 )
                 connection.commit()
                 raise CultivationExpiredError("cultivation settlement window expired")
-            snapshot = self._json_object(session["snapshot_json"], {})
-            qualification = self._json_object(snapshot["qualification"], {})
+            qualification = snapshot["qualification"]
             gain = cultivation_gain(
                 int(snapshot["base_cultivation"]),
                 qualification,
@@ -741,14 +1293,6 @@ class CultivationRepositoryMixin:
                 },
                 maximums={"soul_power": max(player_integer(row, "soul_power_max"), int(snapshot["soul_power_max"]))},
             )
-            settlement_result = {
-                "cultivation_gain": gain,
-                "soul_power_gain": soul_power_gain,
-            }
-            connection.execute(
-                "UPDATE cultivation_sessions SET status = 'settled', result_json = ?, updated_at = ? WHERE id = ?",
-                (json.dumps(settlement_result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
-            )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
                 raise RuntimeError("cultivation settlement returned no player")
@@ -761,6 +1305,18 @@ class CultivationRepositoryMixin:
                 "mode_key": str(snapshot["mode_key"]),
                 "mode_label": str(snapshot["mode_label"]),
             }
+            settlement_result = {
+                "cultivation_gain": gain,
+                "soul_power_gain": soul_power_gain,
+                "terminal_operation_id": operation_id,
+                "operation_result_fingerprint": self._request_hash(
+                    "progression.settle_cultivation.result", payload
+                ),
+            }
+            connection.execute(
+                "UPDATE cultivation_sessions SET status = 'settled', result_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(settlement_result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (
@@ -833,7 +1389,7 @@ class CultivationRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing_operation is not None:
@@ -842,9 +1398,41 @@ class CultivationRepositoryMixin:
                     or existing_operation["request_hash"] != request_hash
                 ):
                     raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing_operation["result_json"])
+                payload, player = self._cultivation_operation_result(
+                    connection,
+                    existing_operation,
+                    platform,
+                    platform_user_id,
+                    "progression.recover_cultivation",
+                    _CULTIVATION_SETTLEMENT_RESULT_FIELDS,
+                )
+                _require_progression_integer(payload["cultivation_gain"], "cultivation gain")
+                _require_progression_integer(payload["soul_power_gain"], "soul power gain")
+                if not isinstance(payload["session_id"], str) or not payload["session_id"]:
+                    raise ValueError("cultivation recovery session id is invalid")
+                session = connection.execute(
+                    "SELECT * FROM cultivation_sessions WHERE session_id = ? AND player_id = ?",
+                    (payload["session_id"], existing_operation["player_id"]),
+                ).fetchone()
+                if session is None or session["status"] != "expired":
+                    raise ValueError("cultivation recovery operation has no expired session")
+                snapshot = self._cultivation_snapshot(connection, session)
+                result, recovered = self._cultivation_session_result(session["result_json"], "expired")
+                if (
+                    not recovered
+                    or result.get("recovered_after_expiry") is not True
+                    or result["terminal_operation_id"] != operation_id
+                    or payload["cultivation_gain"] != result["cultivation_gain"]
+                    or payload["soul_power_gain"] != result["soul_power_gain"]
+                    or payload["mode_key"] != snapshot["mode_key"]
+                    or payload["mode_label"] != snapshot["mode_label"]
+                    or result["operation_result_fingerprint"]
+                    != self._request_hash("progression.recover_cultivation.result", payload)
+                ):
+                    raise ValueError("cultivation recovery operation does not match its session")
+                self._cultivation_expiry_operation(connection, session, platform, platform_user_id)
                 return CultivationRecoveryRecord(
-                    player=self._row_to_player(payload["player"]),
+                    player=player,
                     session_id=str(payload["session_id"]),
                     cultivation_gain=int(payload["cultivation_gain"]),
                     mode_key=str(payload["mode_key"]),
@@ -860,16 +1448,24 @@ class CultivationRepositoryMixin:
             ).fetchone()
             if session is None:
                 raise CultivationNotFoundError("no expired cultivation")
-            session_result = self._json_object(session["result_json"], {})
-            if "cultivation_gain" in session_result:
+            snapshot = self._cultivation_snapshot(connection, session)
+            session_result, recovered = self._cultivation_session_result(
+                session["result_json"], str(session["status"])
+            )
+            if recovered:
                 raise CultivationAlreadyRecoveredError("cultivation was already recovered")
+            if session["status"] == "expired":
+                self._cultivation_expiry_operation(connection, session, platform, platform_user_id)
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now < ends_at:
                 raise CultivationNotReadyError("cultivation is not ready")
             if now <= ends_at + timedelta(seconds=CULTIVATION_SETTLEMENT_GRACE_SECONDS):
                 raise CultivationNotReadyError("cultivation is still within the normal settlement window")
-            snapshot = self._json_object(session["snapshot_json"], {})
-            qualification = self._json_object(snapshot["qualification"], {})
+            if session["status"] == "running":
+                self._record_cultivation_expiry(
+                    connection, session, platform, platform_user_id, now_text
+                )
+            qualification = snapshot["qualification"]
             gain = cultivation_gain(
                 int(snapshot["base_cultivation"]),
                 qualification,
@@ -889,22 +1485,6 @@ class CultivationRepositoryMixin:
                 },
                 maximums={"soul_power": max(player_integer(row, "soul_power_max"), int(snapshot["soul_power_max"]))},
             )
-            connection.execute(
-                "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    json.dumps(
-                        {
-                            "cultivation_gain": gain,
-                            "soul_power_gain": soul_power_gain,
-                            "recovered_after_expiry": True,
-                        },
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    ),
-                    now_text,
-                    session["id"],
-                ),
-            )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
                 raise RuntimeError("cultivation recovery returned no player")
@@ -917,6 +1497,19 @@ class CultivationRepositoryMixin:
                 "mode_key": str(snapshot["mode_key"]),
                 "mode_label": str(snapshot["mode_label"]),
             }
+            recovery_result = {
+                "cultivation_gain": gain,
+                "soul_power_gain": soul_power_gain,
+                "recovered_after_expiry": True,
+                "terminal_operation_id": operation_id,
+                "operation_result_fingerprint": self._request_hash(
+                    "progression.recover_cultivation.result", payload
+                ),
+            }
+            connection.execute(
+                "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(recovery_result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (
@@ -977,7 +1570,7 @@ class CultivationRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_operation = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
+                "SELECT operation_name, player_id, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
             ).fetchone()
             if existing_operation is not None:
@@ -986,9 +1579,38 @@ class CultivationRepositoryMixin:
                     or existing_operation["request_hash"] != request_hash
                 ):
                     raise OperationConflictError("operation input differs from its original request")
-                payload = json.loads(existing_operation["result_json"])
+                payload, player = self._cultivation_operation_result(
+                    connection,
+                    existing_operation,
+                    platform,
+                    platform_user_id,
+                    "progression.cancel_cultivation",
+                    _CULTIVATION_CANCEL_RESULT_FIELDS,
+                )
+                _require_progression_integer(payload["stamina_refund"], "stamina refund")
+                _require_progression_integer(payload["energy_refund"], "energy refund")
+                if not isinstance(payload["session_id"], str) or not payload["session_id"]:
+                    raise ValueError("cultivation cancellation session id is invalid")
+                session = connection.execute(
+                    "SELECT * FROM cultivation_sessions WHERE session_id = ? AND player_id = ?",
+                    (payload["session_id"], existing_operation["player_id"]),
+                ).fetchone()
+                if session is None or session["status"] != "cancelled":
+                    raise ValueError("cultivation cancellation operation has no cancelled session")
+                snapshot = self._cultivation_snapshot(connection, session)
+                result, _ = self._cultivation_session_result(session["result_json"], "cancelled")
+                if (
+                    result["terminal_operation_id"] != operation_id
+                    or payload["stamina_refund"] != result["stamina_refund"]
+                    or payload["energy_refund"] != result["energy_refund"]
+                    or payload["stamina_refund"] != snapshot["stamina_cost"]
+                    or payload["energy_refund"] != snapshot["energy_cost"]
+                    or result["operation_result_fingerprint"]
+                    != self._request_hash("progression.cancel_cultivation.result", payload)
+                ):
+                    raise ValueError("cultivation cancellation operation does not match its session")
                 return CultivationCancelRecord(
-                    player=self._row_to_player(payload["player"]),
+                    player=player,
                     session_id=str(payload["session_id"]),
                     stamina_refund=int(payload["stamina_refund"]),
                     energy_refund=int(payload["energy_refund"]),
@@ -1001,14 +1623,11 @@ class CultivationRepositoryMixin:
             ).fetchone()
             if session is None:
                 raise CultivationNotFoundError("no running cultivation")
+            snapshot = self._cultivation_snapshot(connection, session)
+            self._cultivation_session_result(session["result_json"], str(session["status"]))
             ends_at = datetime.fromisoformat(str(session["ends_at"]))
             if now >= ends_at:
                 if now > ends_at + timedelta(seconds=CULTIVATION_SETTLEMENT_GRACE_SECONDS):
-                    expiry_payload = {
-                        "platform": platform,
-                        "platform_user_id": platform_user_id,
-                        "session_id": str(session["session_id"]),
-                    }
                     connection.execute(
                         "UPDATE cultivation_sessions SET status = 'expired', result_json = ?, updated_at = ? WHERE id = ?",
                         (
@@ -1021,26 +1640,18 @@ class CultivationRepositoryMixin:
                             session["id"],
                         ),
                     )
-                    connection.execute(
-                        "INSERT OR IGNORE INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                        (
-                            f"progression.expire_cultivation:{session['session_id']}",
-                            "progression.expire_cultivation",
-                            row["id"],
-                            self._request_hash("progression.expire_cultivation", expiry_payload),
-                            json.dumps(
-                                {"session_id": session["session_id"], "status": "expired"},
-                                ensure_ascii=False,
-                                sort_keys=True,
-                            ),
-                            serialize_datetime(now),
-                        ),
+                    expired_session = connection.execute(
+                        "SELECT * FROM cultivation_sessions WHERE id = ?", (session["id"],)
+                    ).fetchone()
+                    if expired_session is None:
+                        raise RuntimeError("expired cultivation session was not saved")
+                    self._record_cultivation_expiry(
+                        connection, expired_session, platform, platform_user_id, now_text
                     )
                     connection.commit()
                     raise CultivationExpiredError("cultivation cancellation window expired")
                 raise CultivationAlreadyReadyError("cultivation must be settled")
-            snapshot = self._json_object(session["snapshot_json"], {})
-            refund = int(session["stamina_cost"])
+            refund = int(snapshot["stamina_cost"])
             energy_refund = int(snapshot["energy_cost"])
             change_player_state(
                 connection,
@@ -1048,18 +1659,6 @@ class CultivationRepositoryMixin:
                 updated_at=now_text,
                 value_delta={"stamina": refund, "energy": energy_refund},
                 maximums={"stamina": row["stamina_max"], "energy": row["energy_max"]},
-            )
-            connection.execute(
-                "UPDATE cultivation_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    json.dumps(
-                        {"stamina_refund": refund, "energy_refund": energy_refund},
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    ),
-                    now_text,
-                    session["id"],
-                ),
             )
             updated = connection.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone()
             if updated is None:
@@ -1071,6 +1670,18 @@ class CultivationRepositoryMixin:
                 "stamina_refund": refund,
                 "energy_refund": energy_refund,
             }
+            cancellation_result = {
+                "stamina_refund": refund,
+                "energy_refund": energy_refund,
+                "terminal_operation_id": operation_id,
+                "operation_result_fingerprint": self._request_hash(
+                    "progression.cancel_cultivation.result", payload
+                ),
+            }
+            connection.execute(
+                "UPDATE cultivation_sessions SET status = 'cancelled', result_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(cancellation_result, ensure_ascii=False, sort_keys=True), now_text, session["id"]),
+            )
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (

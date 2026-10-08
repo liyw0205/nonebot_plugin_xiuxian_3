@@ -26,14 +26,17 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 
 ## 错误码与验收
 
-`CULTIVATION_BUSY`、`CULTIVATION_NOT_READY`、`CULTIVATION_NOT_FOUND`、`RESOURCE_INSUFFICIENT`、`REALM_CULTIVATION_INSUFFICIENT`、`REALM_LAYER_INVALID`、`BREAKTHROUGH_REQUIREMENT_MISSING`、`BREAKTHROUGH_BUSY`、`PROGRESSION_LOCKED`、`RULE_VERSION_UNAVAILABLE`。
+`CULTIVATION_BUSY`、`CULTIVATION_NOT_READY`、`CULTIVATION_NOT_FOUND`、`RESOURCE_INSUFFICIENT`、`REALM_CULTIVATION_INSUFFICIENT`、`REALM_LAYER_INVALID`、`BREAKTHROUGH_REQUIREMENT_MISSING`、`BREAKTHROUGH_BUSY`、`PROGRESSION_LOCKED`。
 
 同境晋层只允许 `current_layer + 1`，L10 后拒绝继续晋层；跨境突破只接受 L10
 混元。修为不足不扣材料；突破重试返回同一结果；失败不同时多扣修为和材料；规则更新
 不改变历史记录。
 
 当前已实现的命令映射为 `开始修炼`、`开始修炼 灵泉`、`结算修炼`、`恢复修炼`、
-`取消修炼`、`晋升境界` 和 `恢复状态`。调息会话固定消耗 2 点体力、持续 10 分钟、
+`取消修炼`、`晋升境界` 和 `恢复状态`。开始修炼冻结方式、玩家归属、成本、时长、修为与神魂收益等完整字段；
+正常结算、过期恢复和取消均严格校验快照，并与会话列及开始 operation 交叉核对。快照损坏、字段缺失、重复键、类型/范围错误
+或语义不一致时，在修为、神魂、退款、会话结果或 operation 写入前拒绝；修复记录后可用原 operation 重试，已提交结果重放不重复结算。
+调息会话固定消耗 2 点体力、持续 10 分钟、
 基础修为 40；灵泉会话要求感气二层、完成教学采集并位于灵泉谷，固定消耗 3 点体力、
 持续 15 分钟、基础修为 70，使用 11500 bp 环境倍率且每日最多 4 次。悟性、环境和状态倍率
 均按整数公式计算；结算读取开始时的资质快照，重复 operation 只回放原结果。正式生产使用独立的
@@ -76,5 +79,5 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 雾隐洞天移动命令映射为 `移动预览 雾隐洞天`、`前往 雾隐洞天`（或
 `前往雾隐洞天`）和 `结算移动`。入口要求聚气 L4 以上、来源地点有效且持有
 `item.cave_pass_basic`；开始时消耗 5 点体力、10 灵石和 1 张凭证，创建 2 分钟会话。
-移动与修炼、生产、突破互斥；凭证、成本、来源和内容版本写入快照，重复 operation 不会
+移动与修炼、生产、突破互斥；凭证、成本、来源和生效规则写入快照，重复 operation 不会
 重复扣费或改写位置。

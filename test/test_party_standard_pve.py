@@ -29,7 +29,20 @@ async def _create_standard_player(runtime, adapter: str, user: str) -> None:
             "location_key='xuantian.outskirts', stamina=100, stamina_max=100, "
             "max_hp=999, initiative=99, qualification_json=? "
             "WHERE platform=? AND platform_user_id=?",
-            (json.dumps({"body": 2_000, "agility": 2_000}), adapter, user),
+            (
+                json.dumps(
+                    {
+                        "body": 15,
+                        "spirit": 10,
+                        "insight": 10,
+                        "root": 10,
+                        "agility": 8,
+                        "fortune": 7,
+                    }
+                ),
+                adapter,
+                user,
+            ),
         )
 
 

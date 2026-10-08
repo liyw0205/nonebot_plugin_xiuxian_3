@@ -44,18 +44,15 @@ async def _enter_cultivator(runtime, user_id: str) -> None:
     assert result.code == "CULTIVATION_ENTERED"
 
 
-def _finish_session(runtime, user_id: str) -> None:
-    with sqlite3.connect(runtime.settings.database_path) as connection:
-        connection.execute(
-            "UPDATE cultivation_sessions SET ends_at = ? WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
-            ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), user_id),
-        )
+def _finish_session(clock: MutableClock) -> None:
+    clock.advance(minutes=31)
 
 
 def test_cultivation_session_settlement_and_layer_advance() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
             user = "progression-user"
             await _enter_cultivator(runtime, user)
 
@@ -67,7 +64,7 @@ def test_cultivation_session_settlement_and_layer_advance() -> None:
             not_ready = await runtime.dispatch(_context(user, "settle-early"), "结算修炼")
             assert not_ready.code == "CULTIVATION_NOT_READY"
 
-            _finish_session(runtime, user)
+            _finish_session(clock)
             settled = await runtime.dispatch(
                 _context(user, "settle", operation_id="settle-1"),
                 "结算修炼",
@@ -85,7 +82,7 @@ def test_cultivation_session_settlement_and_layer_advance() -> None:
             # session is needed before the explicit layer operation.
             started_again = await runtime.dispatch(_context(user, "start-2"), "开始修炼")
             assert started_again.code == "CULTIVATION_STARTED"
-            _finish_session(runtime, user)
+            _finish_session(clock)
             second = await runtime.dispatch(_context(user, "settle-2"), "结算修炼")
             assert second.code == "CULTIVATION_SETTLED"
             advanced = await runtime.dispatch(_context(user, "advance"), "晋升境界")
@@ -188,17 +185,13 @@ def test_cultivation_cancel_and_resource_recovery_are_idempotent() -> None:
 def test_expired_cultivation_requires_recovery_and_replays_once() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
             user = "expired-user"
             await _enter_cultivator(runtime, user)
             started = await runtime.dispatch(_context(user, "start"), "开始修炼")
             assert started.code == "CULTIVATION_STARTED"
-            old = datetime.now(timezone.utc) - timedelta(hours=25)
-            with sqlite3.connect(runtime.settings.database_path) as connection:
-                connection.execute(
-                    "UPDATE cultivation_sessions SET ends_at = ? WHERE session_id = ?",
-                    ((old - timedelta(minutes=1)).isoformat(), started.data["session_id"]),
-                )
+            clock.advance(days=1, hours=1, minutes=11)
 
             expired = await runtime.dispatch(_context(user, "settle"), "结算修炼")
             assert expired.code == "CULTIVATION_EXPIRED"
@@ -528,7 +521,8 @@ def test_foundation_late_milestone_requires_total_cultivation_threshold() -> Non
 def test_spirit_spring_requires_access_and_enforces_daily_quota() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
             user = "spirit-spring-user"
             await _enter_cultivator(runtime, user)
             with sqlite3.connect(runtime.settings.database_path) as connection:
@@ -552,11 +546,7 @@ def test_spirit_spring_requires_access_and_enforces_daily_quota() -> None:
                 assert started.code == "CULTIVATION_STARTED"
                 assert started.data["mode_key"] == "cultivate.spirit_spring"
                 assert started.data["stamina_cost"] == 3
-                with sqlite3.connect(runtime.settings.database_path) as connection:
-                    connection.execute(
-                        "UPDATE cultivation_sessions SET ends_at = ? WHERE session_id = ?",
-                        ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), started.data["session_id"]),
-                    )
+                clock.advance(minutes=16)
                 settled = await runtime.dispatch(_context(user, f"spring-settle-{index}"), "结算修炼")
                 assert settled.code == "CULTIVATION_SETTLED"
                 assert settled.data["mode_key"] == "cultivate.spirit_spring"
@@ -575,7 +565,8 @@ def test_spirit_spring_requires_access_and_enforces_daily_quota() -> None:
 def test_seclusion_requires_qi_gathering_locks_resources_and_replays_once() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
             user = "seclusion-user"
             await _enter_cultivator(runtime, user)
 
@@ -620,7 +611,7 @@ def test_seclusion_requires_qi_gathering_locks_resources_and_replays_once() -> N
                     "SELECT COUNT(*) FROM cultivation_sessions WHERE player_id = ?", (player_id,)
                 ).fetchone()[0] == 1
 
-            _finish_session(runtime, user)
+            _finish_session(clock)
             settled = await runtime.dispatch(_context(user, "seclusion-settle"), "结算修炼")
             assert settled.code == "CULTIVATION_SETTLED"
             assert settled.data["mode_key"] == "cultivate.seclusion"

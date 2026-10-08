@@ -141,7 +141,14 @@ def test_demon_mainline_requires_server_evidence_and_unlocks_both_adapters() -> 
                     battle_snapshot = json.loads(snapshot_text)
                     qualification = json.loads(qualification_text)
                     assert enemy_key == "enemy.demon_ruins_scout"
-                    assert battle_snapshot["player"]["stats"]["max_hp"] == 600
+                    player_stats = battle_snapshot["player"]["stats"]
+                    stat_snapshot = battle_snapshot["player"]["stat_snapshot"]
+                    permanent_source = next(
+                        source for source in stat_snapshot["source_refs"]
+                        if source["key"] == "permanent"
+                    )
+                    assert player_stats == stat_snapshot["combat_stats"]
+                    assert permanent_source["value"]["max_hp"] == 600
                     assert battle_snapshot["player"]["stats"]["attack"] == 10 + qualification["body"] // 2
                     assert battle_snapshot["player"]["cross_realm_penalty_bp"] == 1000
 
