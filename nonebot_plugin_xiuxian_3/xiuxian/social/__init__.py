@@ -2,7 +2,7 @@
 
 from .sect_models import SectApplicationRecord, SectRecord
 from .party_models import PartyInvitationRecord, PartyMemberRecord, PartyRecord
-from .mentor_models import MentorRelationRecord
+from .mentor_models import MentorRelationRecord, MentorRelationView
 from .partner_models import PartnerRelationRecord
 from .sect_war_models import SectWarClaimRecord, SectWarRecord, SectWarStanding
 from .sect_war_federation_models import SectWarFederationResultRecord, SectWarFederationSnapshotRecord
@@ -50,6 +50,7 @@ __all__ = [
     "PartyMemberRecord",
     "PartyRecord",
     "MentorRelationRecord",
+    "MentorRelationView",
     "PartnerRelationRecord",
     "SectWarClaimRecord",
     "SectWarRecord",

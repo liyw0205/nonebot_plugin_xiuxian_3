@@ -1236,6 +1236,9 @@ class XiuxianApplication:
     async def graduate_apprentice(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.mentor.graduate_apprentice(context), write_message="当前事件不允许办理师徒毕业。")
 
+    async def get_mentor_relations(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.mentor.get_mentor_relations(context), require_write=False)
+
     async def invite_partner(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.partner.invite_partner(context), write_message="当前事件不允许发出结缘之请。")
 

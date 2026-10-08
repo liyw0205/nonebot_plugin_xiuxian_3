@@ -3,7 +3,7 @@
 ## 用例
 
 `create_sect`、`apply_sect`、`withdraw_sect_application`、`review_member`、`contribute_sect`、`change_role`、`leave_sect`、
-`invite_mentor`、`accept_mentor`、`reject_mentor`、`graduate_apprentice`、
+`invite_mentor`、`accept_mentor`、`reject_mentor`、`get_mentor_relations`、`graduate_apprentice`、
 `invite_partner`、`accept_partner`、`reject_partner`、`get_partner`、`request_partner_dissolution`、`confirm_partner_dissolution`、`reject_partner_dissolution`、
 `create_party`、`create_boundary_rift_party`、`invite_party`、`accept_party`、`reject_party`、`confirm_party`、`leave_party`、
 `get_party`、`start_party_battle`、`settle_party_battle`、`replay_party_battle`、`start_service_order`、`deliver_service`、
@@ -48,6 +48,11 @@
 结算地方名望、贡献和双方服务信誉，不直接发放修为或突破资源。`social.mentor_graduation` 是新毕业门槛与
 奖励的唯一来源，名望键所指地点提供本次上限；出师关系、双方状态变化、宗门贡献和 operation 在同一事务
 提交，结算记录与回复显示封顶后的实际增量。原 operation 先按身份和关系回放，不重读已关闭或改值的内容。
+
+`get_mentor_relations` 对应 `师徒关系`、`我的师徒`、`师门关系`，无参数且只读。它返回本人作为师傅或徒弟的全部关系，
+按创建时间倒序、关系号倒序排列；每项只公开关系号、本人身份、双方道号、状态、邀请/截止/接受/拒绝/出师时间和师傅贡献，
+不返回平台用户号或数据库编号。查询时若 `invited` 已到截止时间，只在结果中显示 `expired`，不修改关系表，也不写 operation。
+无关系返回空列表；坏状态、身份或时间字段直接返回可重试的持久化错误。
 
 出师验收包含聚气下界与筑基/金丹等更高境界、缺少服务证据、非师傅权限、重复请求与不同关系冲突、当前
 内容改值/关闭、坏 JSON/字段只读拒绝、写入失败回滚与重启后原请求恢复。QQ 官方和 OneBot V11 均走同一

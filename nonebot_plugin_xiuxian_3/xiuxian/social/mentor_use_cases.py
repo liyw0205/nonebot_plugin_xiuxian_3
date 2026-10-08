@@ -23,6 +23,15 @@ from ..repository import (
 class MentorApplication:
     """Translate mentor relationship transitions into adapter-neutral commands."""
 
+    _STATUS_NAMES = {
+        "invited": "待应允",
+        "active": "传道授业",
+        "graduated": "已出师",
+        "rejected": "已谢绝",
+        "expired": "邀约已过期",
+    }
+    _ROLE_NAMES = {"master": "师傅", "apprentice": "徒弟"}
+
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
 
@@ -56,7 +65,7 @@ class MentorApplication:
 
     @staticmethod
     def _summary(record) -> str:
-        status = {"invited": "待应允", "active": "传道授业", "graduated": "已出师", "rejected": "已谢绝", "expired": "邀约已过期"}[record.status]
+        status = MentorApplication._STATUS_NAMES[record.status]
         return (
             f"- **关系号**：`{record.relation_id}`\n"
             f"- **师傅**：{record.master_dao_name}\n"
@@ -64,6 +73,23 @@ class MentorApplication:
             f"- **师承**：{status}\n"
             f"- **邀请截止**：{record.expires_at}"
         )
+
+    @staticmethod
+    def _relation_view_data(record) -> dict[str, object]:
+        return {
+            "relation_id": record.relation_id,
+            "role": record.role,
+            "counterpart_dao_name": record.counterpart_dao_name,
+            "master_dao_name": record.master_dao_name,
+            "apprentice_dao_name": record.apprentice_dao_name,
+            "status": record.status,
+            "invited_at": record.invited_at,
+            "expires_at": record.expires_at,
+            "accepted_at": record.accepted_at,
+            "rejected_at": record.rejected_at,
+            "graduated_at": record.graduated_at,
+            "master_contribution": record.master_contribution,
+        }
 
     @staticmethod
     def _persistence_error(context: CommandContext, operation_id: str | None = None) -> CommandResult:
@@ -167,6 +193,52 @@ class MentorApplication:
         except Exception:
             return self._persistence_error(context, operation_id)
         return CommandResult(True, "MENTOR_REJECTED", "## 已拒绝拜师邀请\n\n" + self._summary(record), context.request_id, operation_id, data=self._data(record))
+
+    async def get_mentor_relations(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_MENTOR_COMMAND", "请直接发送 `师徒关系` 查看当前师承。", context.request_id)
+        try:
+            records = await self.repository.get_mentor_relations(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时无法查看师徒关系。", context.request_id)
+        except RepositoryBusyError:
+            return self._persistence_error(context)
+        except Exception:
+            return self._persistence_error(context)
+        data = {
+            "status": "none" if not records else "ok",
+            "count": len(records),
+            "relations": [self._relation_view_data(record) for record in records],
+        }
+        if not records:
+            return CommandResult(True, "MENTOR_NONE", "## 师徒关系\n\n暂未结下师徒缘分。", context.request_id, data=data)
+        lines = ["## 师徒关系"]
+        for record in records:
+            lines.extend(
+                (
+                    "",
+                    f"- **关系号**：`{record.relation_id}`",
+                    f"- **身份**：{MentorApplication._ROLE_NAMES[record.role]}",
+                    f"- **对方**：{record.counterpart_dao_name}",
+                    f"- **师承**：{MentorApplication._STATUS_NAMES[record.status]}",
+                    f"- **邀请时间**：{record.invited_at}",
+                    f"- **邀请截止**：{record.expires_at}",
+                )
+            )
+            if record.accepted_at:
+                lines.append(f"- **应允时间**：{record.accepted_at}")
+            if record.rejected_at:
+                lines.append(f"- **谢绝时间**：{record.rejected_at}")
+            if record.graduated_at:
+                lines.append(f"- **出师时间**：{record.graduated_at}")
+            if record.master_contribution:
+                lines.append(f"- **师傅贡献**：{record.master_contribution}")
+        return CommandResult(True, "MENTOR_RELATIONS", "\n".join(lines), context.request_id, data=data)
 
     async def graduate_apprentice(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:

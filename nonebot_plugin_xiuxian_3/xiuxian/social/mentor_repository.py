@@ -22,7 +22,7 @@ from ..persistence.errors import (
     PlayerNotFoundError,
     PlayerSuspendedError,
 )
-from .mentor_models import MentorRelationRecord
+from .mentor_models import MentorRelationRecord, MentorRelationView
 from .mentor_rules import (
     MENTOR_INVITATION_TTL_SECONDS,
     MENTOR_MAX_APPRENTICES,
@@ -108,6 +108,130 @@ class MentorRepositoryMixin:
                 relation_id,
                 operation_id,
             )
+
+    async def get_mentor_relations(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+    ) -> list[MentorRelationView]:
+        """Return the caller's mentor relationships without changing state."""
+
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._mentor_list_once,
+                platform,
+                platform_user_id,
+            )
+
+    def _mentor_list_once(self, platform: str, platform_user_id: str) -> list[MentorRelationView]:
+        now = self._now()
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            rows = connection.execute(
+                """
+                SELECT r.relation_id, r.status, r.invited_at, r.expires_at, r.accepted_at,
+                       r.rejected_at, r.graduated_at, r.master_contribution, r.created_at,
+                       r.master_id, r.apprentice_id,
+                       mp.dao_name AS master_dao_name, ap.dao_name AS apprentice_dao_name
+                FROM mentor_relations r
+                JOIN players mp ON mp.id = r.master_id
+                JOIN players ap ON ap.id = r.apprentice_id
+                WHERE r.master_id = ? OR r.apprentice_id = ?
+                ORDER BY r.created_at DESC, r.relation_id DESC
+                """,
+                (player["id"], player["id"]),
+            ).fetchall()
+            return [self._mentor_view_from_row(row, int(player["id"]), now) for row in rows]
+
+    @staticmethod
+    def _mentor_view_from_row(row: Any, player_id: int, now: datetime) -> MentorRelationView:
+        allowed_statuses = {"invited", "active", "graduated", "rejected", "expired"}
+        status = row["status"]
+        if not isinstance(status, str) or status not in allowed_statuses:
+            raise ValueError("mentor relationship status is invalid")
+        relation_id = row["relation_id"]
+        if not isinstance(relation_id, str) or not relation_id.strip():
+            raise ValueError("mentor relationship id is invalid")
+        if type(row["master_contribution"]) is not int or row["master_contribution"] < 0:
+            raise ValueError("mentor relationship contribution is invalid")
+
+        def parse_time(key: str, *, required: bool) -> tuple[str | None, datetime | None]:
+            value = row[key]
+            if value is None and not required:
+                return None, None
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"mentor relationship {key} is invalid")
+            parsed = datetime.fromisoformat(value)
+            if parsed.utcoffset() is None:
+                raise ValueError(f"mentor relationship {key} lacks timezone")
+            return value, parsed
+
+        invited_at, invited_time = parse_time("invited_at", required=True)
+        expires_at, expires_time = parse_time("expires_at", required=True)
+        accepted_at, accepted_time = parse_time("accepted_at", required=False)
+        rejected_at, rejected_time = parse_time("rejected_at", required=False)
+        graduated_at, graduated_time = parse_time("graduated_at", required=False)
+        _, created_time = parse_time("created_at", required=True)
+        if invited_time is None or expires_time is None or created_time is None:
+            raise ValueError("mentor relationship timestamps are incomplete")
+        if invited_time > expires_time or created_time > invited_time:
+            raise ValueError("mentor relationship timestamps are out of order")
+        if accepted_time is not None and accepted_time >= expires_time:
+            raise ValueError("mentor relationship was accepted after expiry")
+        if accepted_time is not None and accepted_time < invited_time:
+            raise ValueError("mentor relationship acceptance precedes invitation")
+        if graduated_time is not None and (accepted_time is None or graduated_time < accepted_time):
+            raise ValueError("mentor relationship graduation is out of order")
+        if status == "invited" and any(value is not None for value in (accepted_time, rejected_time, graduated_time)):
+            raise ValueError("pending mentor relationship has terminal timestamps")
+        if status == "active" and (accepted_time is None or rejected_time is not None or graduated_time is not None):
+            raise ValueError("active mentor relationship timestamps are invalid")
+        if status == "rejected" and (rejected_time is None or accepted_time is not None or graduated_time is not None):
+            raise ValueError("rejected mentor relationship timestamps are invalid")
+        if status == "expired" and any(value is not None for value in (accepted_time, rejected_time, graduated_time)):
+            raise ValueError("expired mentor relationship timestamps are invalid")
+        if status == "graduated" and (accepted_time is None or graduated_time is None or rejected_time is not None):
+            raise ValueError("graduated mentor relationship timestamps are invalid")
+        projected_status = "expired" if status == "invited" and now >= expires_time else status
+        master_id = row["master_id"]
+        apprentice_id = row["apprentice_id"]
+        if type(master_id) is not int or type(apprentice_id) is not int or master_id == apprentice_id:
+            raise ValueError("mentor relationship participants are invalid")
+        if player_id == master_id:
+            role = "master"
+            counterpart = row["apprentice_dao_name"]
+        elif player_id == apprentice_id:
+            role = "apprentice"
+            counterpart = row["master_dao_name"]
+        else:
+            raise ValueError("mentor relationship does not belong to player")
+        master_dao_name = row["master_dao_name"]
+        apprentice_dao_name = row["apprentice_dao_name"]
+        if (
+            not isinstance(counterpart, str)
+            or not counterpart.strip()
+            or not isinstance(master_dao_name, str)
+            or not master_dao_name.strip()
+            or not isinstance(apprentice_dao_name, str)
+            or not apprentice_dao_name.strip()
+        ):
+            raise ValueError("mentor relationship counterpart is invalid")
+        return MentorRelationView(
+            relation_id=relation_id,
+            role=role,
+            counterpart_dao_name=counterpart.strip(),
+            master_dao_name=master_dao_name.strip(),
+            apprentice_dao_name=apprentice_dao_name.strip(),
+            status=projected_status,
+            invited_at=invited_at,
+            expires_at=expires_at,
+            accepted_at=accepted_at,
+            rejected_at=rejected_at,
+            graduated_at=graduated_at,
+            master_contribution=row["master_contribution"],
+        )
 
     def _mentor_invite_once(
         self,

@@ -330,6 +330,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("接受拜师", application.accept_mentor, aliases=("同意拜师", "拜师接受"))
     router.register("拒绝拜师", application.reject_mentor, aliases=("拜师拒绝",))
     router.register("师徒毕业", application.graduate_apprentice, aliases=("办理毕业", "徒弟毕业"))
+    router.register("师徒关系", application.get_mentor_relations, aliases=("我的师徒", "师门关系"))
     router.register("邀请结为道侣", application.invite_partner)
     router.register("接受道侣邀请", application.accept_partner)
     router.register("拒绝道侣邀请", application.reject_partner)
