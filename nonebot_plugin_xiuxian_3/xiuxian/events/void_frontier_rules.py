@@ -10,6 +10,7 @@ SEASON_KEY = "season.void_frontier"
 SEASON_DAYS = 28
 CLAIM_DAYS = 7
 WEEKLY_CAP = 5
+WEEKLY_REWARD = {"void_merit": 20, "alliance_points": 10}
 RANKED_PLACES = 100
 SEASON_ANCHOR = datetime(2025, 1, 1, tzinfo=timezone.utc)
 
@@ -75,6 +76,7 @@ __all__ = [
     "SEASON_DAYS",
     "SEASON_KEY",
     "WEEKLY_CAP",
+    "WEEKLY_REWARD",
     "anonymous_label",
     "claim_expiry",
     "reward_for_rank",

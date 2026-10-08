@@ -16,6 +16,26 @@ Web 写操作和外部支付继续锁定，直至身份、权限、审计与恢�
 [当前开发状态](current-status.md)是剩余工作的唯一清单。未出现在
 [当前开发状态](current-status.md)“已开放”表中的内容，不得被命令、按钮或 Web 写入口当作可用玩法。
 
+## 当前唯一切片：虚空前线周任务箱严格结算
+
+开工证据：QQ 官方与 OneBot V11 的 `领取虚空前线周任务` 都读取
+`void_frontier_weekly_rewards.reward_json`。原实现使用宽松 JSON 解码，重复 `void_merit` 键、字符串数值或缺字段会被静默接受，
+可把冻结的 20 点虚空功勋改成 999 并写入玩家状态；该缺陷直接破坏资产完整性，属于 `events` 最近十条触及两次后的正确性例外。
+
+范围只限周任务箱的领取、赛季结束后的待领取转换，以及对应 `event.void_frontier.weekly.claim` operation 回放：复用
+`utils.json_cache.decode_json_strict`、`utils.player.grant_player_state` 和现有 `BEGIN IMMEDIATE` 事务；周箱奖励必须精确匹配当前规则的
+20 点虚空功勋与 10 点联盟积分，重复键、坏类型、缺字段、坏 operation 结果均在玩家数值、箱状态和 operation 写入前拒绝。修复后沿
+原 operation 重试，成功重放不重复结算。赛季榜、正式 PvE/PvP 结算、切磋/训练傀儡只读观战、跨服匹配与身份/资产转移不在本条。
+
+文件所有权：主线独占 `xiuxian/events/void_frontier_repository.py`、`void_frontier_rules.py` 及本计划/状态页；
+`/root/adapter_gap_audit` 独占 `test/test_void_frontier.py` 的新增专项，覆盖 QQ 官方与 OneBot V11、坏快照零写、账本故障回滚、
+重启后损坏 operation 拒绝及修复重放；`/root/adapter_audit` 只读核对仓储事务边界和候选冷却，未修改工作树。主线统一合并并负责最终验收。
+
+候选比较：师徒关系列表没有查询入口且状态/过期投影合同不全；`item.manual.sunrise_breath` 没有真实来源合同；
+`beast.gear.sack_small` 仍缺配方、成本和生产入口；生产恢复遮挡问题已有双适配器专项；未开放副本、Web 写入和跨服身份/资产操作前置不足，
+均不选。最近十条代码切片以 `cef0af4` 为止触及 `events` 两次、`player`/`progression` 各两次，其他候选领域要么冷却要么合同不完整；本条仅因公开
+资产篡改证据例外重入 `events`，不扩大到其他周箱或赛季领奖。
+
 ## 已闭合切片：派遣成本不得侵占交易预留物
 
 QQ 官方与 OneBot V11 均可复现：角色持有 2 个木材，先用 `发布摆摊 item.mat.wood 2 100`

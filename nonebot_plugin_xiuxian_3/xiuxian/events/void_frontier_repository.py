@@ -16,8 +16,10 @@ from typing import Any, Mapping
 from ...contracts import serialize_datetime
 from ..utils.player import change_player_state, grant_player_state
 from ..utils.json import json_object
+from ..utils.json_cache import decode_json_strict
 from ..persistence.errors import (
     OperationConflictError,
+    OperationResultMalformedError,
     PlayerNotFoundError,
     VoidFrontierRewardAlreadyClaimedError,
     VoidFrontierRewardExpiredError,
@@ -37,6 +39,7 @@ from .void_frontier_rules import (
     SCORE_VALUES,
     SEASON_KEY,
     WEEKLY_CAP,
+    WEEKLY_REWARD,
     anonymous_label,
     claim_expiry,
     reward_for_rank,
@@ -150,15 +153,15 @@ class VoidFrontierRepositoryMixin:
             ).fetchone()
             if pending is None:
                 raise VoidFrontierWeeklyNotAvailableError("no pending void-frontier weekly reward")
-            reward = json_object(pending["reward_json"], {"void_merit": 20, "alliance_points": 10})
+            reward = self._vf_weekly_reward_snapshot(pending["reward_json"])
             grant_player_state(
                 connection,
                 player,
                 rewards=None,
                 updated_at=now_text,
                 value_delta={
-                    "void_merit": int(reward.get("void_merit", 20)),
-                    "alliance_points": int(reward.get("alliance_points", 10)),
+                    "void_merit": reward["void_merit"],
+                    "alliance_points": reward["alliance_points"],
                 },
             )
             connection.execute(
@@ -345,7 +348,7 @@ class VoidFrontierRepositoryMixin:
             return
         connection.execute(
             "INSERT OR IGNORE INTO void_frontier_weekly_rewards(season_id,week_id,player_id,source_key,source_operation_id,reward_json,status,created_at) VALUES (?,?,?,?,?,?, 'pending', ?)",
-            (season_id, current_week, player_id, source_key, source_operation_id, json.dumps({"void_merit": 20, "alliance_points": 10}, sort_keys=True), serialize_datetime(now)),
+            (season_id, current_week, player_id, source_key, source_operation_id, json.dumps(WEEKLY_REWARD, sort_keys=True), serialize_datetime(now)),
         )
 
     def _vf_freeze(self, connection: Any, season: Any, now: datetime) -> None:
@@ -385,8 +388,8 @@ class VoidFrontierRepositoryMixin:
         for season in seasons:
             rows = connection.execute("SELECT id,player_id,reward_json FROM void_frontier_weekly_rewards WHERE season_id=? AND status='pending'", (season["season_id"],)).fetchall()
             for row in rows:
-                reward = json_object(row["reward_json"], {})
-                merit = int(reward.get("void_merit", 20))
+                reward = self._vf_weekly_reward_snapshot(row["reward_json"])
+                merit = reward["void_merit"]
                 player = connection.execute("SELECT * FROM players WHERE id=?", (row["player_id"],)).fetchone()
                 if player is None:
                     continue
@@ -438,7 +441,23 @@ class VoidFrontierRepositoryMixin:
             return None
         if str(existing["operation_name"]) != operation_name or str(existing["request_hash"]) != request_hash:
             raise OperationConflictError("operation input differs from its original request")
-        return json_object(existing["result_json"], {})
+        try:
+            result = decode_json_strict(str(existing["result_json"]))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError("void-frontier operation result is invalid") from exc
+        if not isinstance(result, dict):
+            raise OperationResultMalformedError("void-frontier operation result must be an object")
+        return {str(key): value for key, value in result.items()}
+
+    @staticmethod
+    def _vf_weekly_reward_snapshot(value: Any) -> dict[str, int]:
+        try:
+            decoded = decode_json_strict(str(value))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError("void-frontier weekly reward snapshot is invalid") from exc
+        if decoded != WEEKLY_REWARD or any(isinstance(item, bool) or not isinstance(item, int) for item in decoded.values()):
+            raise OperationResultMalformedError("void-frontier weekly reward snapshot is invalid")
+        return {str(key): int(item) for key, item in decoded.items()}
 
     @staticmethod
     def _vf_insert_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: Mapping[str, object], now_text: str) -> None:
@@ -446,11 +465,50 @@ class VoidFrontierRepositoryMixin:
 
     @staticmethod
     def _vf_weekly_from_payload(payload: Mapping[str, object], *, already_completed: bool = False) -> VoidFrontierWeeklyRecord:
-        return VoidFrontierWeeklyRecord(str(payload["week_id"]), str(payload["season_id"]), {str(k): int(v) for k, v in dict(payload.get("reward", {})).items() if isinstance(v, (int, float))}, str(payload.get("status", "claimed")), str(payload.get("source_key", "")), already_completed)
+        try:
+            week = payload["week_id"]
+            season = payload["season_id"]
+            reward = payload["reward"]
+            status = payload["status"]
+            source_key = payload["source_key"]
+        except (KeyError, TypeError) as exc:
+            raise OperationResultMalformedError("void-frontier weekly result is invalid") from exc
+        if (
+            not isinstance(week, str)
+            or not isinstance(season, str)
+            or not isinstance(status, str)
+            or status != "claimed"
+            or not isinstance(source_key, str)
+            or not isinstance(reward, dict)
+            or reward != WEEKLY_REWARD
+            or any(isinstance(item, bool) or not isinstance(item, int) for item in reward.values())
+        ):
+            raise OperationResultMalformedError("void-frontier weekly result is invalid")
+        return VoidFrontierWeeklyRecord(week, season, dict(reward), status, source_key, already_completed)
 
     @staticmethod
     def _vf_claim_from_payload(payload: Mapping[str, object], *, already_completed: bool = False) -> VoidFrontierClaimRecord:
-        return VoidFrontierClaimRecord(str(payload["season_id"]), {str(k): int(v) for k, v in dict(payload.get("rewards", {})).items()}, int(payload["rank"]), str(payload.get("claimed_at", "")), already_completed)
+        try:
+            season_id = payload["season_id"]
+            rewards = payload["rewards"]
+            rank = payload["rank"]
+            claimed_at = payload["claimed_at"]
+        except (KeyError, TypeError) as exc:
+            raise OperationResultMalformedError("void-frontier season result is invalid") from exc
+        if (
+            not isinstance(season_id, str)
+            or not isinstance(rewards, dict)
+            or isinstance(rank, bool)
+            or not isinstance(rank, int)
+            or rank < 1
+            or rank > RANKED_PLACES
+            or not isinstance(claimed_at, str)
+            or not claimed_at
+            or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in rewards.values())
+            or rewards != reward_for_rank(rank)
+        ):
+            raise OperationResultMalformedError("void-frontier season result is invalid")
+        return VoidFrontierClaimRecord(season_id, dict(rewards), rank, claimed_at, already_completed)
 
 
 __all__ = ["VoidFrontierRepositoryMixin"]

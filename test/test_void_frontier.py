@@ -6,6 +6,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -26,6 +28,309 @@ def _context(adapter: str, user_id: str, request_id: str, operation_id: str = ""
         operation_id=operation_id,
         can_write_assets=True,
     )
+
+
+async def _seed_weekly_box(runtime, clock: MutableClock, adapter: str, user_id: str) -> tuple[int, str]:
+    created = await runtime.adapters.dispatch(
+        adapter,
+        _context(adapter, user_id, f"create-{adapter}-{user_id}"),
+        "开始修仙",
+    )
+    assert created.code == "PLAYER_CREATED"
+    now_text = clock.value.isoformat()
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        player_id = int(
+            connection.execute(
+                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user_id),
+            ).fetchone()[0]
+        )
+        connection.execute(
+            "INSERT INTO void_route_sessions(session_id,player_id,operation_id,route_key,status,starts_at,ends_at,anchor_cost,stamina_cost,snapshot_json,result_json,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                f"weekly-route-{adapter}-{user_id}",
+                player_id,
+                f"weekly-route-op-{adapter}-{user_id}",
+                "void.first_route",
+                "settled",
+                now_text,
+                now_text,
+                1,
+                1,
+                "{}",
+                "{}",
+                now_text,
+                now_text,
+            ),
+        )
+    season = await runtime.adapters.dispatch(
+        adapter,
+        _context(adapter, user_id, f"season-{adapter}-{user_id}"),
+        "虚空前线",
+    )
+    assert season.code == "VOID_FRONTIER_SEASON_RANKING"
+    return player_id, str(season.data["season_id"])
+
+
+def _weekly_row(runtime, player_id: int) -> tuple[object, ...]:
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        row = connection.execute(
+            "SELECT status,claim_operation_id,reward_json FROM void_frontier_weekly_rewards WHERE player_id=?",
+            (player_id,),
+        ).fetchone()
+    assert row is not None
+    return tuple(row)
+
+
+def _player_rewards(runtime, player_id: int) -> tuple[int, int]:
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        row = connection.execute(
+            "SELECT void_merit,alliance_points FROM players WHERE id=?",
+            (player_id,),
+        ).fetchone()
+    assert row is not None
+    return int(row[0]), int(row[1])
+
+
+@pytest.mark.parametrize(
+    "corrupt_reward",
+    (
+        '{"void_merit":20,"void_merit":999,"alliance_points":10}',
+        '{"void_merit":"20","alliance_points":10}',
+        '{"void_merit":20}',
+    ),
+)
+def test_void_frontier_weekly_corrupt_snapshot_is_read_only_and_retryable(
+    corrupt_reward: str,
+) -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, 12, tzinfo=timezone.utc))
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                try:
+                    player_id, _ = await _seed_weekly_box(runtime, clock, adapter, f"corrupt-{adapter}")
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE void_frontier_weekly_rewards SET reward_json=? WHERE player_id=?",
+                            (corrupt_reward, player_id),
+                        )
+                    before_rewards = _player_rewards(runtime, player_id)
+                    before_row = _weekly_row(runtime, player_id)
+                    operation_id = f"void-frontier-corrupt-{adapter}"
+                    rejected = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"corrupt-{adapter}", "corrupt", operation_id),
+                        "领取虚空前线周任务",
+                    )
+                    assert rejected.code == "PERSISTENCE_ERROR"
+                    assert _player_rewards(runtime, player_id) == before_rewards
+                    assert _weekly_row(runtime, player_id) == before_row[:1] + (None, corrupt_reward)
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        assert connection.execute(
+                            "SELECT COUNT(*) FROM operations WHERE operation_id=?",
+                            (operation_id,),
+                        ).fetchone()[0] == 0
+
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE void_frontier_weekly_rewards SET reward_json=? WHERE player_id=?",
+                            ('{"alliance_points":10,"void_merit":20}', player_id),
+                        )
+                    retried = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"corrupt-{adapter}", "retry", operation_id),
+                        "领取虚空前线周任务",
+                    )
+                    assert retried.code == "VOID_FRONTIER_WEEKLY_CLAIMED"
+                    assert retried.data["reward"] == {"void_merit": 20, "alliance_points": 10}
+                    assert _player_rewards(runtime, player_id) == (20, 10)
+                finally:
+                    await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_frontier_weekly_operation_failure_rolls_back_and_retries_on_both_adapters() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, 12, tzinfo=timezone.utc))
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                try:
+                    player_id, _ = await _seed_weekly_box(runtime, clock, adapter, f"ledger-{adapter}")
+                    operation_id = f"void-frontier-ledger-{adapter}"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "CREATE TRIGGER reject_void_frontier_operation BEFORE INSERT ON operations "
+                            "BEGIN SELECT RAISE(ABORT, 'injected operation failure'); END",
+                        )
+                    failed = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"ledger-{adapter}", "failed", operation_id),
+                        "领取虚空前线周任务",
+                    )
+                    assert failed.code == "PERSISTENCE_ERROR"
+                    assert _player_rewards(runtime, player_id) == (0, 0)
+                    assert _weekly_row(runtime, player_id)[0:2] == ("pending", None)
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        assert connection.execute(
+                            "SELECT COUNT(*) FROM operations WHERE operation_id=?",
+                            (operation_id,),
+                        ).fetchone()[0] == 0
+                        connection.execute("DROP TRIGGER reject_void_frontier_operation")
+
+                    retried = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"ledger-{adapter}", "retry", operation_id),
+                        "领取虚空前线周任务",
+                    )
+                    assert retried.code == "VOID_FRONTIER_WEEKLY_CLAIMED"
+                    assert _player_rewards(runtime, player_id) == (20, 10)
+                finally:
+                    await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_void_frontier_weekly_operation_replay_rejects_corruption_then_recovers_after_restart() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, 12, tzinfo=timezone.utc))
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                player_id, _ = await _seed_weekly_box(runtime, clock, adapter, f"replay-{adapter}")
+                operation_id = f"void-frontier-replay-{adapter}"
+                first = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, f"replay-{adapter}", "claim", operation_id),
+                    "领取虚空前线周任务",
+                )
+                assert first.code == "VOID_FRONTIER_WEEKLY_CLAIMED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original_result = connection.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?",
+                        (operation_id,),
+                    ).fetchone()
+                    assert original_result is not None
+                    original_result_json = str(original_result[0])
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        ('{"week_id":"2026-09-21"}', operation_id),
+                    )
+                await runtime.close()
+
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                try:
+                    rejected = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"replay-{adapter}", "corrupt-replay", operation_id),
+                        "领取虚空前线周任务",
+                    )
+                    assert rejected.code == "PERSISTENCE_ERROR"
+                    assert _player_rewards(runtime, player_id) == (20, 10)
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE operations SET result_json=? WHERE operation_id=?",
+                            (original_result_json, operation_id),
+                        )
+                finally:
+                    await runtime.close()
+
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                try:
+                    replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"replay-{adapter}", "replay", operation_id),
+                        "领取虚空前线周任务",
+                    )
+                    assert replay.code == "VOID_FRONTIER_WEEKLY_CLAIMED"
+                    assert replay.data["idempotent_replay"] is True
+                    assert _player_rewards(runtime, player_id) == (20, 10)
+                finally:
+                    await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "corrupt_reward",
+    (
+        '{"void_merit":20,"void_merit":999,"alliance_points":10}',
+        '{"void_merit":"20","alliance_points":10}',
+    ),
+)
+def test_void_frontier_expired_weekly_snapshot_recovery_is_atomic(corrupt_reward: str) -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            clock = MutableClock(datetime(2026, 9, 25, 12, tzinfo=timezone.utc))
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                try:
+                    player_id, season_id = await _seed_weekly_box(runtime, clock, adapter, f"expired-{adapter}")
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE void_frontier_weekly_rewards SET reward_json=? WHERE player_id=?",
+                            (corrupt_reward, player_id),
+                        )
+                        operation_count = int(connection.execute("SELECT COUNT(*) FROM operations").fetchone()[0])
+
+                    clock.value += timedelta(days=36)
+                    rejected = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"expired-{adapter}", "expired-corrupt"),
+                        f"虚空前线 {season_id}",
+                    )
+                    assert rejected.code == "PERSISTENCE_ERROR"
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        season_status, box_status, claim_operation_id, claimed_at, reward_json = connection.execute(
+                            "SELECT s.status,w.status,w.claim_operation_id,w.claimed_at,w.reward_json "
+                            "FROM void_frontier_seasons s JOIN void_frontier_weekly_rewards w ON w.season_id=s.season_id "
+                            "WHERE s.season_id=? AND w.player_id=?",
+                            (season_id, player_id),
+                        ).fetchone()
+                        assert season_status == "collecting"
+                        assert box_status == "pending"
+                        assert claim_operation_id is None
+                        assert claimed_at is None
+                        assert reward_json == corrupt_reward
+                        assert int(connection.execute("SELECT COUNT(*) FROM operations").fetchone()[0]) == operation_count
+                    assert _player_rewards(runtime, player_id) == (0, 0)
+
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        connection.execute(
+                            "UPDATE void_frontier_weekly_rewards SET reward_json=? WHERE player_id=?",
+                            ('{"alliance_points":10,"void_merit":20}', player_id),
+                        )
+                    recovered = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"expired-{adapter}", "expired-retry"),
+                        f"虚空前线 {season_id}",
+                    )
+                    assert recovered.code == "VOID_FRONTIER_SEASON_RANKING"
+                    assert _player_rewards(runtime, player_id) == (20, 0)
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        box_status, reward_json = connection.execute(
+                            "SELECT status,reward_json FROM void_frontier_weekly_rewards WHERE season_id=? AND player_id=?",
+                            (season_id, player_id),
+                        ).fetchone()
+                        converted_reward = json.loads(reward_json)
+                        assert box_status == "converted"
+                        assert converted_reward == {"bound": True, "void_merit": 20}
+                        assert int(connection.execute("SELECT COUNT(*) FROM operations").fetchone()[0]) == operation_count
+
+                    replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _context(adapter, f"expired-{adapter}", "expired-replay"),
+                        f"虚空前线 {season_id}",
+                    )
+                    assert replay.code == "VOID_FRONTIER_SEASON_RANKING"
+                    assert _player_rewards(runtime, player_id) == (20, 0)
+                finally:
+                    await runtime.close()
+
+    asyncio.run(run())
 
 
 def test_void_frontier_freeze_weekly_box_and_claim_across_adapters() -> None:
