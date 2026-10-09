@@ -5,6 +5,8 @@ import json
 import sqlite3
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -21,7 +23,7 @@ async def _player(
     location: str,
     intro_flags: list[str],
     faction: dict[str, int],
-    body: int = 2_000,
+    damage: int = 0,
 ) -> None:
     created = await runtime.adapters.dispatch(adapter, _ctx(adapter, user, f"create:{adapter}:{user}"), "开始修仙")
     assert created.code == "PLAYER_CREATED"
@@ -33,7 +35,7 @@ async def _player(
             "WHERE platform=? AND platform_user_id=?",
             (
                 location,
-                json.dumps({"body": body, "agility": body}),
+                json.dumps(BALANCED_QUALIFICATION),
                 json.dumps({"flags": intro_flags}),
                 json.dumps(faction),
                 adapter,
@@ -73,7 +75,12 @@ def test_demon_and_beast_party_dungeons_use_mixed_adapters_and_frozen_rewards() 
             for identity in (demon_leader, demon_member):
                 await _player(runtime, *identity, location="demon.fallen_ruins", intro_flags=["access.demon.fallen_ruins"], faction={"demon": 200})
             for identity in (beast_leader, beast_member):
-                await _player(runtime, *identity, location="beast.ten_thousand_hills", intro_flags=[], faction={"beast": 200}, body=600)
+                await _player(runtime, *identity, location="beast.ten_thousand_hills", intro_flags=[], faction={"beast": 200})
+
+            for identity in (demon_leader, demon_member):
+                equip_damage_weapon(runtime, *identity, damage=500)
+            for identity in (beast_leader, beast_member):
+                equip_damage_weapon(runtime, *identity, damage=500)
 
             demon_party = await _form_party(runtime, "创建魔渊队伍", demon_leader, demon_member)
             demon_start = await runtime.repository.start_party_battle(
@@ -157,7 +164,6 @@ def test_demon_party_failure_releases_locks_and_applies_fatigue_once() -> None:
                     location="demon.fallen_ruins",
                     intro_flags=["access.demon.fallen_ruins"],
                     faction={"demon": 200},
-                    body=1,
                 )
             party_id = await _form_party(runtime, "创建魔渊队伍", leader, member)
             started = await runtime.repository.start_party_battle(

@@ -18,6 +18,19 @@ from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
 )
 
 
+class MutableClock:
+    """Rewrite the runtime clock instead of session rows, so frozen snapshots stay valid."""
+
+    def __init__(self, value: datetime) -> None:
+        self.value = value
+
+    def __call__(self) -> datetime:
+        return self.value
+
+    def advance(self, **kwargs: int) -> None:
+        self.value += timedelta(**kwargs)
+
+
 def _context(adapter: str, user: str, request: str, operation: str = "") -> CommandContext:
     return CommandContext(
         adapter=adapter,
@@ -85,7 +98,8 @@ def test_ancestral_lake_is_open_and_reachable_on_qq_and_onebot() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
                 runtime_dir = Path(data_dir) / adapter
-                runtime = create_runtime(data_dir=runtime_dir)
+                clock = MutableClock(datetime(2026, 9, 23, 10, 0, tzinfo=timezone.utc))
+                runtime = create_runtime(data_dir=runtime_dir, clock=clock)
                 user = f"ancestral-lake-travel-{adapter}"
                 await _prepare_soul_player(runtime, adapter, user, "beast.ten_thousand_hills")
                 with sqlite3.connect(runtime.settings.database_path) as connection:
@@ -109,12 +123,12 @@ def test_ancestral_lake_is_open_and_reachable_on_qq_and_onebot() -> None:
                 assert started.code == "TRAVEL_STARTED"
 
                 await runtime.close()
-                runtime = create_runtime(data_dir=runtime_dir)
+                runtime = create_runtime(data_dir=runtime_dir, clock=clock)
                 replay = await runtime.adapters.dispatch(
                     adapter, context("start-replay", "lake-travel-start"), "前往 祖灵湖"
                 )
                 assert replay.data["idempotent_replay"] is True
-                _expire(runtime, "travel_sessions", "session_id", started.data["session_id"])
+                clock.advance(hours=1)
 
                 arrived = await runtime.adapters.dispatch(
                     adapter, context("settle", "lake-travel-settle"), "结算移动"
@@ -122,7 +136,7 @@ def test_ancestral_lake_is_open_and_reachable_on_qq_and_onebot() -> None:
                 assert arrived.code == "TRAVEL_COMPLETED"
 
                 await runtime.close()
-                runtime = create_runtime(data_dir=runtime_dir)
+                runtime = create_runtime(data_dir=runtime_dir, clock=clock)
                 settled_replay = await runtime.adapters.dispatch(
                     adapter, context("settle-replay", "lake-travel-settle"), "结算移动"
                 )
@@ -143,7 +157,8 @@ def test_soul_refinement_grows_nascent_cultivation_and_soul_once_per_day() -> No
     async def run() -> None:
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as data_dir:
-                runtime = create_runtime(data_dir=Path(data_dir) / adapter)
+                clock = MutableClock(datetime(2026, 9, 23, 10, 0, tzinfo=timezone.utc))
+                runtime = create_runtime(data_dir=Path(data_dir) / adapter, clock=clock)
                 user = f"nascent-refinement-{adapter}"
                 await _prepare_nascent_player(runtime, adapter, user)
 
@@ -153,7 +168,7 @@ def test_soul_refinement_grows_nascent_cultivation_and_soul_once_per_day() -> No
                     "开始修炼 神魂淬炼",
                 )
                 assert started.code == "CULTIVATION_STARTED"
-                _expire(runtime, "cultivation_sessions", "session_id", started.data["session_id"])
+                clock.advance(minutes=31)
                 settled = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "refine-settle", "refine-settle"),
@@ -175,7 +190,7 @@ def test_soul_refinement_grows_nascent_cultivation_and_soul_once_per_day() -> No
                     "开始修炼 神魂淬炼",
                 )
                 assert second.code == "CULTIVATION_STARTED"
-                _expire(runtime, "cultivation_sessions", "session_id", second.data["session_id"])
+                clock.advance(minutes=31)
                 second_settled = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "refine-second-settle", "refine-second-settle"),

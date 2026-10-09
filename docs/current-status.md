@@ -1024,6 +1024,28 @@ tool_durability_after == tool_cost_bp` 逐项对齐配方与 `TOOL_MAX_DURABILIT
 4 项与经济/生产同组回归不受影响；未宣称整仓全量测试通过。剩余 13 项整仓失败在 `367ef2a` 干净工作树同样失败，早于本轮全部
 严格 JSON 切片，属另一条待办。
 
+### 已闭合切片：陈旧夹具不再冒充运行时代码缺陷
+
+整仓剩余的 13 项失败在 `367ef2a` 的干净工作树同样失败，早于本轮全部严格 JSON 切片，逐项复现后归为三类夹具陈旧，
+没有一项来自运行时代码：`stats/rules.py::_qualification` 自 `189329f` 起要求六项资质齐全、单项 5-15、总和 60，
+而 `test_beast_intro.py` 的无灵石角色只被 SQL 改写境界、完全没写资质，`test_adventures_bounty_body_trial.py` 与
+`test_cross_realm_party.py` 仍写入两键的 `{"body": 2000, "agility": 2000}`，于是 `开始探索` 直接落到 `PERSISTENCE_ERROR`，
+魔渊首领战的原始异常就是 `六项资质尚未完整生成`；`test_domain_sources.py` 用 `UPDATE cultivation_sessions SET ends_at=?`
+和同样的 `travel_sessions` 改写来快进，而 `_cultivation_snapshot` 与 `_travel_snapshot` 会拿冻结快照互证 `ends_at`，
+改写后立刻 `cultivation session and frozen snapshot do not match`；`test_livelihood_service.py` 按适配器写死结算
+operation 标识 `"8422"` / `"service-snapshot-8422"`，实际标识由适配器派生，导致修复后的成功结算查不到账本行。
+
+全部按测试侧修正，未碰任何运行时代码、错误码或玩法数值：资质统一复用 `test/combat_fixtures.py` 的
+`BALANCED_QUALIFICATION`，队伍首领战的强度改用同文件的 `equip_damage_weapon` 表达，伤害取 500 使魔渊首领在第 3 回合
+的污染与万兽首领在第 4 回合的召唤都发生后仍在 20 回合上限内取胜，掉队角色保持不带武器；`test_domain_sources.py`
+新增 `MutableClock` 并以时钟推进替换两处 `ends_at` 改写，让被冻结的快照始终是真相；
+`test_livelihood_service.py` 改从结果对象的 `operation_id` 取标识，并同时断言失败尝试与修复后成功结算共用同一标识。
+
+上述 7 份文件同组 67 项全部通过（此前 13 项失败），其中 `test_livelihood_service.py` 20 项、`test_domain_sources.py` 3 项、
+`test_cross_realm_party.py` 3 项、`test_beast_intro.py` 2 项、`test_adventures_bounty_body_trial.py` 1 项；`git diff --check`
+通过；未宣称整仓全量测试通过。顺带记录一条待办观察：尚未 `寻仙问道` 的角色发送 `开始探索` 现在会得到 `PERSISTENCE_ERROR`，
+语义上更接近资质未生成的准入拒绝，本轮只修夹具，没有改动这条错误码。
+
 ## 5. 开发顺序
 
 开发按可独立验收的垂直切片推进，不按 `content-v0.1`、`content-v0.2` 逐个版本搬运：

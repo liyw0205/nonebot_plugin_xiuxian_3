@@ -367,7 +367,10 @@ def test_service_settlement_rejects_corrupt_snapshot_and_recovers(
             ).fetchone()
         failed = await send(f"结算服务 {order_id}", 8422, provider)
         assert failed.code == "SERVICE_ORDER_CONFLICT"
-        settle_operation_id = "8422" if kind == "onebot" else "service-snapshot-8422"
+        # Both adapters derive their own operation identity, so the ledger row is tracked
+        # through the result instead of a hand-written id per adapter.
+        settle_operation_id = str(failed.operation_id)
+        assert settle_operation_id
         with sqlite3.connect(runtime.settings.database_path) as connection:
             after = connection.execute(
                 "SELECT p.spirit_stones, p.stamina, p.inventory_json, o.status "
@@ -390,6 +393,7 @@ def test_service_settlement_rejects_corrupt_snapshot_and_recovers(
         assert publisher_after == publisher_before
         settled = await send(f"结算服务 {order_id}", 8422, provider)
         assert settled.code == "SERVICE_SETTLED"
+        assert str(settled.operation_id) == settle_operation_id
         with sqlite3.connect(runtime.settings.database_path) as connection:
             raw_result = connection.execute(
                 "SELECT result_json FROM operations WHERE operation_id=?", (settle_operation_id,)

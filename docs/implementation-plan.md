@@ -1881,3 +1881,8 @@ QQ 官方与 OneBot V11 的专项 8 项、原突破测试 14 项、同域回归 
 新增 `test/conftest.py` 单点收窄：内容复制默认忽略 `*.sqlite3`、`*.sqlite`、`*.db`、`*.log`、SQLite journal/WAL/SHM、`__pycache__` 与 `.pytest_cache`，显式 `ignore` 原样透传，并保留 `shutil.copytree` 按位置参数递归子目录的行为。文件所有权仅为新增 `test/conftest.py` 与本计划/当前状态；不改断言、玩法数值、持久化合同，不新增运行时版本标识，运行时代码不使用 `shutil` 复制，产品行为不变。
 
 上述 2 份文件 38 项与另外 10 份内容复制型测试 77 项通过，另确认 `data/` 内容全为 JSON、无测试依赖被复制的运行库；未宣称整仓全量测试通过。剩余 13 项整仓失败在 `367ef2a` 干净工作树同样失败，早于本轮严格 JSON 切片，留作下一条：其中 7 项是夹具用 SQL 直接改写境界却不做 `寻仙问道`，导致六项资质为空而探索入口返回 `PERSISTENCE_ERROR`，6 项是 `test_livelihood_service.py` 对服务订单结算 operation 标识的期望与实际不一致。
+124. **已完成（陈旧测试夹具修复）**：`367ef2a` 干净工作树同样失败的 13 项整仓失败逐项复现，全部是夹具陈旧而非运行时缺陷：`_qualification` 自 `189329f` 起要求六项资质、单项 5-15、总和 60，而三处夹具只写两键大数值或不写资质；两处夹具用 SQL 改写 `cultivation_sessions.ends_at` / `travel_sessions.ends_at` 快进，被冻结快照互证直接拒绝；`test_livelihood_service.py` 写死的适配器 operation 标识与实际派生值不符。
+
+文件所有权仅为 `test/test_beast_intro.py`、`test/test_adventures_bounty_body_trial.py`、`test/test_cross_realm_party.py`、`test/test_domain_sources.py`、`test/test_livelihood_service.py` 与本计划/当前状态。资质统一复用 `test/combat_fixtures.py::BALANCED_QUALIFICATION`，首领战强度改为 `equip_damage_weapon` 且取伤害 500 以覆盖第 3 回合污染与第 4 回合召唤后再取胜，`test_domain_sources.py` 用 `MutableClock` 推进时钟替换 `ends_at` 改写，服务结算改从结果 `operation_id` 取标识。不改运行时代码、错误码、玩法数值或持久化合同，不新增运行时版本标识。
+
+7 份文件同组 67 项全部通过（此前同一批次 13 项失败），`git diff --check` 通过；未宣称整仓全量测试通过。另记待办：未 `寻仙问道` 的角色 `开始探索` 目前返回 `PERSISTENCE_ERROR`，应有更明确的资质准入错误码，本轮未动。

@@ -9,6 +9,8 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from combat_fixtures import BALANCED_QUALIFICATION
+
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
 
 
@@ -29,10 +31,10 @@ def _prepare_foundation_outskirts(runtime, adapter: str, user: str) -> None:
             UPDATE players
             SET stage='cultivator', realm_key='foundation', realm_layer=1,
                 location_key='xuantian.outskirts', stamina=60, stamina_max=60,
-                intro_json='{}'
+                intro_json='{}', qualification_json=?
             WHERE platform=? AND platform_user_id=?
             """,
-            (adapter, user),
+            (json.dumps(BALANCED_QUALIFICATION), adapter, user),
         )
 
 
