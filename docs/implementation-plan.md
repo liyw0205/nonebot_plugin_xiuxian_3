@@ -1876,3 +1876,8 @@ QQ 官方与 OneBot V11 的专项 8 项、原突破测试 14 项、同域回归 
 文件所有权限定为 `economy/repository.py`、`test/test_economy_commission_integrity.py` 及本计划/当前状态。快照校验按是否已接取分档锁定键集合并与委托列、配方材料、能量、工具耐久和质量骰互证；结果校验按状态锁定键集合，从冻结快照重算品质、成功标记、产物与失败返还，要求交付零支付、结算 `producer_payment + platform_fee == reward_stones`、失败 `publisher_refund + platform_fee == reward_stones`、取消与过期整笔退还托管。发布、接取、交付与恢复、确认、取消、过期与列表读取统一 `decode_json_strict`，operation 回放复用 `utils/operations.py` 并与当前行投影互证，生产者 `durability_json` 同样严格解码。互证只绑定已冻结数值，不是运行时版本标识，也没有按当前内容重算历史委托的兼容分支。
 
 专项 4 项（发布方与生产方在两个适配器间对调）与经济/生产/市集/库存锁同组 125 项通过，覆盖重复键放大、字符串产物、交付前快照篡改、`operations` 结果伪造与重复键、重启回放、零写断言与修复后同 operation 重试；源码与测试 `compileall` 及 `git diff --check` 通过；未宣称整仓全量测试通过。上一轮整仓失败项已定性：13 项在 `367ef2a` 干净工作树同样失败，其余 4 项由 `test/*.py` 复制 `data/` 时带入本机在跑的 `data/xiuxian3.sqlite3` 造成，属测试隔离缺陷。市集 `_market_operation` 的宽松 JSON 与这 4 项隔离缺陷留作下一条。
+123. **已完成（测试沙箱不再带入本机运行库）**：`test/*.py` 约 150 处 `shutil.copytree` 把仓库 `data/` 复制进临时沙箱并直接作为 `data_dir`，而 `data/xiuxian3.sqlite3` 是 git 忽略、由本机在跑的机器人写入的运行库，导致 `test_dao_origin_task_content.py`、`test_livelihood_field_selection.py` 的 4 项断言读到他人 players/codex_entries/operations；同一两条文件在 `367ef2a` 干净工作树全部通过，证明差异只来自被复制的运行库。
+
+新增 `test/conftest.py` 单点收窄：内容复制默认忽略 `*.sqlite3`、`*.sqlite`、`*.db`、`*.log`、SQLite journal/WAL/SHM、`__pycache__` 与 `.pytest_cache`，显式 `ignore` 原样透传，并保留 `shutil.copytree` 按位置参数递归子目录的行为。文件所有权仅为新增 `test/conftest.py` 与本计划/当前状态；不改断言、玩法数值、持久化合同，不新增运行时版本标识，运行时代码不使用 `shutil` 复制，产品行为不变。
+
+上述 2 份文件 38 项与另外 10 份内容复制型测试 77 项通过，另确认 `data/` 内容全为 JSON、无测试依赖被复制的运行库；未宣称整仓全量测试通过。剩余 13 项整仓失败在 `367ef2a` 干净工作树同样失败，早于本轮严格 JSON 切片，留作下一条：其中 7 项是夹具用 SQL 直接改写境界却不做 `寻仙问道`，导致六项资质为空而探索入口返回 `PERSISTENCE_ERROR`，6 项是 `test_livelihood_service.py` 对服务订单结算 operation 标识的期望与实际不一致。

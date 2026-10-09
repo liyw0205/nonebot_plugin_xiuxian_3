@@ -1005,6 +1005,25 @@ tool_durability_after == tool_cost_bp` 逐项对齐配方与 `TOOL_MAX_DURABILIT
 `367ef2a` social、`d156b44` 与 `3839546` world、`3081900` 与 `cf301e7` exploration；`progression`、`world`、`exploration`、`social`
 已触及两次以上，`economy`、特色玩法与适配器入口随本条闭合进入冷却，下一轮重新横向比较未闭合玩家路径，不沿经济域继续开发。
 
+### 已闭合切片：测试内容副本不再带入本机运行库
+
+开工证据：`test/*.py` 里约 150 处 `shutil.copytree` 把仓库 `data/` 复制进临时沙箱，再把同一目录当作 `data_dir` 交给
+`create_runtime`，而 `data/xiuxian3.sqlite3` 是被 git 忽略、由本机在跑的机器人持续写入的运行库。`test_dao_origin_task_content.py`
+与 `test_livelihood_field_selection.py` 的 4 项在本机失败：`codex_entries` 断言多出带昨日真实时间戳的 `player.start_seeking:qq.official:smoke:1`
+等他人行，地块整备的能量也没有按预期扣除；同样两条文件在 `367ef2a` 的干净工作树全部通过。唯一差异就是沙箱里是否带着这台机器的
+`xiuxian3.sqlite3`，与任何运行时代码改动无关。
+
+新增 `test/conftest.py` 单点收窄内容复制：默认忽略 `*.sqlite3`、`*.sqlite`、`*.db`、`*.log`、SQLite 的 journal/WAL/SHM、
+`__pycache__` 与 `.pytest_cache`；调用方显式传入 `ignore` 时原样透传，`shutil.copytree` 自身按位置参数递归进入子目录，
+所以嵌套调用不被改写。仓库 `data/` 内容全部是 JSON，运行时代码不使用 `shutil` 做复制，产品侧行为不变；顺带让每个测试沙箱
+少复制一份 3.5 MB 的运行库。不修改任何断言、玩法数值或持久化合同，也不新增运行时版本标识。
+
+`test/test_dao_origin_task_content.py` 与 `test/test_livelihood_field_selection.py` 合计 38 项（含上述 4 项）通过；
+`test_content`、`test_codex`、`test_items`、`test_talent`、`test_constitution`、`test_tower_content`、`test_mainline_content`、
+`test_dao_echoes`、`test_partner`、`test_events` 同组 77 项通过，确认内容复制仍完整。`test/test_economy_commission_integrity.py`
+4 项与经济/生产同组回归不受影响；未宣称整仓全量测试通过。剩余 13 项整仓失败在 `367ef2a` 干净工作树同样失败，早于本轮全部
+严格 JSON 切片，属另一条待办。
+
 ## 5. 开发顺序
 
 开发按可独立验收的垂直切片推进，不按 `content-v0.1`、`content-v0.2` 逐个版本搬运：
