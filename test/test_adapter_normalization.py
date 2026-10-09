@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
+import sys
+import types
 from dataclasses import replace
 from tempfile import TemporaryDirectory
 
@@ -240,6 +243,126 @@ def test_nonebot_handler_releases_event_after_dispatch_exception() -> None:
             await handler(event)
         await handler(event)
         assert runtime.calls == 2
+
+    asyncio.run(run())
+
+
+def test_nonebot_handler_releases_event_after_delivery_exception(monkeypatch) -> None:
+    event = FakeOneBotEvent(content="我的状态", message_id="delivery-event")
+
+    class Matcher:
+        async def finish(self, *args: object) -> None:
+            return None
+
+    class Runtime:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def dispatch(self, context, text):
+            self.calls += 1
+            return CommandResult(
+                True,
+                "PROFILE_READ",
+                "状态已阅。",
+                context.request_id,
+                context.operation_id,
+            )
+
+    class Bot:
+        pass
+
+    current_bot = contextvars.ContextVar("current_bot")
+    current_event = contextvars.ContextVar("current_event")
+    matcher_module = types.ModuleType("nonebot.matcher")
+    matcher_module.current_bot = current_bot
+    matcher_module.current_event = current_event
+    monkeypatch.setitem(sys.modules, "nonebot.matcher", matcher_module)
+    current_bot.set(Bot())
+    current_event.set(event)
+
+    deliveries = 0
+
+    async def send(*args, **kwargs):
+        nonlocal deliveries
+        deliveries += 1
+        if deliveries == 1:
+            raise RuntimeError("temporary delivery failure")
+
+    monkeypatch.setattr("nonebot_plugin_xiuxian_3.adapters.nonebot.send_markdown_message", send)
+
+    async def run() -> None:
+        runtime = Runtime()
+        handler = _handler_for(
+            runtime,
+            Matcher(),
+            normalize_nonebot_event,
+            EventDeduplicator(),
+            ("我的状态",),
+        )
+        with pytest.raises(RuntimeError, match="temporary delivery failure"):
+            await handler(event)
+        await handler(event)
+        assert runtime.calls == 2
+        assert deliveries == 2
+
+    asyncio.run(run())
+
+
+def test_nonebot_handler_keeps_event_deduplicated_after_finish_control_exception(monkeypatch) -> None:
+    event = FakeOneBotEvent(content="我的状态", message_id="finish-event")
+
+    class Matcher:
+        async def finish(self, *args: object) -> None:
+            raise RuntimeError("matcher finished")
+
+    class Runtime:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def dispatch(self, context, text):
+            self.calls += 1
+            return CommandResult(
+                True,
+                "PROFILE_READ",
+                "状态已阅。",
+                context.request_id,
+                context.operation_id,
+            )
+
+    class Bot:
+        pass
+
+    current_bot = contextvars.ContextVar("current_bot")
+    current_event = contextvars.ContextVar("current_event")
+    matcher_module = types.ModuleType("nonebot.matcher")
+    matcher_module.current_bot = current_bot
+    matcher_module.current_event = current_event
+    monkeypatch.setitem(sys.modules, "nonebot.matcher", matcher_module)
+    current_bot.set(Bot())
+    current_event.set(event)
+
+    deliveries = 0
+
+    async def send(*args, **kwargs):
+        nonlocal deliveries
+        deliveries += 1
+
+    monkeypatch.setattr("nonebot_plugin_xiuxian_3.adapters.nonebot.send_markdown_message", send)
+
+    async def run() -> None:
+        runtime = Runtime()
+        handler = _handler_for(
+            runtime,
+            Matcher(),
+            normalize_nonebot_event,
+            EventDeduplicator(),
+            ("我的状态",),
+        )
+        with pytest.raises(RuntimeError, match="matcher finished"):
+            await handler(event)
+        await handler(event)
+        assert runtime.calls == 1
+        assert deliveries == 1
 
     asyncio.run(run())
 

@@ -1869,3 +1869,5 @@ QQ 官方与 OneBot V11 的专项 8 项、原突破测试 14 项、同域回归 
 文件所有权限定为 `specials/tower_repository.py`、`specials/tower_rules.py`、`specials/tower_migration.py`、`test/test_tower_snapshot_integrity.py`、`test/test_tower_snapshot_migration.py`、`test/test_tower.py` 断言及本计划/当前状态。塔局新增覆盖冻结奖励与地方名望上限的 `reward_digest`，由 `tower_rules.reward_snapshot_digest` 单点生成，迁移按已存快照回填历史行且拒绝回填含重复键或坏类型的快照；运行投影、领奖与 operation 回放统一 `decode_json_strict` 并互证塔局列、玩家归属、楼层、首通标记、战斗结果、领奖记录与账本结果。摘要只绑定冻结数值，不是运行时版本标识，也没有按当前内容重算历史奖励的兼容分支。
 
 专项 1 项与升级/迁移专项 3 项、试炼塔与适配器同组 49 项、严格 JSON 与 operation 家族加竞技回归 179 项、图鉴/虚空塔/内容/工具/文档/无版本标识 121 项通过，覆盖双适配器坏快照零写、故障后同 operation 重试、runtime 重建幂等回放与坏历史行修复重放；源码与测试 `compileall`、全量内容 JSON 严格解析及 `git diff --check` 通过；未宣称整仓全量测试或新角色飞升长链通过。主线独占上述运行时代码、两份塔专项测试与文档；三个子代理因上游模型渠道不可用未产出任何文件，未发生并行改同一仓储的情况。
+
+121. **已完成（适配器投递失败释放事件去重）**：`adapters/nonebot.py` 原先只在 dispatch 异常或可重试结果时释放事件去重标记，`send_markdown_message` 自身抛错时标记保留且异常交回 NoneBot，导致 QQ 官方与 OneBot V11 的传输重试被去重吞掉：玩家收不到回复而角色状态已变。现改为发送异常先释放该事件标记再抛出，`matcher.finish()` 控制流异常不释放，成功回复后的重复事件仍被抑制。`test/test_adapter_normalization.py` 新增 2 项覆盖两种分支，该文件 13 项与真实适配器模拟 23 项同组通过；不改命令派生、operation 命名、内容合同或玩法状态机，也不新增适配器专有文案。

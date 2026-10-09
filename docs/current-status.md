@@ -962,6 +962,17 @@ operation 可重试，成功结果在 runtime 重建后只回放一次。摘要�
 工具、`gpt-6-*` 无可用渠道）未交付任何文件，迁移与升级专项由主线自行完成。虚空塔、生产、服务订单和云舟实现未改，
 切磋与训练傀儡仍为只读观战，正式 PvE/PvP 结算未改写。
 
+### 已闭合切片：适配器投递失败释放事件去重标记
+
+`adapters/nonebot.py` 在 `runtime.dispatch` 成功后调用 `send_markdown_message`。旧实现只在 dispatch 异常或可重试结果时释放
+去重标记，发送本身抛错时标记保留并把异常交回 NoneBot；QQ 官方与 OneBot V11 的传输重试会在同一条 operation 上被去重吞掉，
+玩家没有收到任何回复而角色状态已经改变。现在发送异常先释放该事件标记再抛出，`matcher.finish()` 的控制流异常仍在释放范围之外，
+成功回复后的重复事件仍被抑制。`test/test_adapter_normalization.py` 新增 2 项分别覆盖投递失败后可重试与 `finish` 控制流异常
+不释放；该文件 13 项与真实适配器模拟 23 项同组通过。计入本条后的最近十条切片为本条与雾隐塔 `specials/utils/adapters`、
+`68137ad` events、`2aa98d9` progression、`53ccffc` progression、`367ef2a` social、`d156b44` 与 `3839546` world、
+`3081900` 与 `cf301e7` exploration、`ef5e1f8` 与 `d0ce25e` social；`progression`、`world`、`exploration`、`social` 已触及两次以上，
+特色玩法域与适配器入口也随本条闭合进入冷却，下一轮重新横向比较未闭合玩家路径，不沿塔或适配器继续开发。
+
 ## 5. 开发顺序
 
 开发按可独立验收的垂直切片推进，不按 `content-v0.1`、`content-v0.2` 逐个版本搬运：

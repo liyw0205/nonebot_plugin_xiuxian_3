@@ -142,12 +142,17 @@ def _handler_for(
         except (ImportError, LookupError):
             await matcher.finish(result.message)
         else:
-            await send_markdown_message(
-                bot,
-                current,
-                result.message,
-                capabilities=normalized.context.capabilities,
-            )
+            try:
+                await send_markdown_message(
+                    bot,
+                    current,
+                    result.message,
+                    capabilities=normalized.context.capabilities,
+                )
+            except Exception:
+                # A delivery failure leaves the event eligible for transport retry.
+                dedup.release(key)
+                raise
             await matcher.finish()
 
     return handle
