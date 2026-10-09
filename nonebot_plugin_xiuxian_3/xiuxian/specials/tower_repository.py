@@ -25,9 +25,11 @@ from .tower_rules import (
     practice_week_start,
     reward_local_reputation_maximums,
     reward_for,
+    reward_snapshot_digest,
 )
 from ..persistence.errors import (
     OperationConflictError,
+    OperationResultMalformedError,
     PlayerNotFoundError,
     ResourceInsufficientError,
     TowerBusyError,
@@ -39,7 +41,14 @@ from ..persistence.errors import (
     TowerRewardNotAvailableError,
     TowerStartFailedError,
 )
-from ..utils.player import change_player_state, grant_player_reward, player_integer
+from ..utils.json_cache import decode_json_strict
+from ..utils.operations import operation_replay
+from ..utils.player import (
+    change_player_state,
+    grant_player_reward,
+    player_integer,
+    split_player_rewards,
+)
 
 
 class TowerRepositoryMixin:
@@ -132,11 +141,19 @@ class TowerRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                old_payload = json.loads(existing["result_json"])
+                old_payload = self._decode_tower_object(existing["result_json"], "start operation")
+                self._validate_tower_start_payload(old_payload)
                 run = connection.execute("SELECT * FROM tower_runs WHERE run_id=?", (old_payload["run_id"],)).fetchone()
                 if run is None:
                     raise TowerNotFoundError("tower run no longer exists")
                 player = connection.execute("SELECT * FROM players WHERE id=?", (run["player_id"],)).fetchone()
+                if player is None or int(run["player_id"]) != int(player["id"]):
+                    raise OperationResultMalformedError("tower start operation player is missing")
+                if (
+                    str(run["tower_key"]) != TOWER_KEY
+                    or int(run["floor_no"]) != old_payload["floor_no"]
+                ):
+                    raise OperationResultMalformedError("tower start operation does not match its run")
                 return self._tower_run_from_rows(run, player, replay=True)
 
             try:
@@ -225,15 +242,16 @@ class TowerRepositoryMixin:
                     run_id, player_id, tower_key, floor_no, status, battle_id, first_clear,
                     enemy_key, stamina_cost,
                     starts_at, result_json, reward_json, reward_maximums_json,
-                    codex_entry_key, codex_category,
+                    reward_digest, codex_entry_key, codex_category,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'battle_running', NULL, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, 'battle_running', NULL, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id, player["id"], TOWER_KEY, floor_no, int(first_clear),
                     definition.enemy_key, definition.stamina_cost, now_text,
                     json.dumps(reward, ensure_ascii=False, sort_keys=True),
                     json.dumps(reward_maximums, ensure_ascii=False, sort_keys=True),
+                    self._tower_reward_digest(reward, reward_maximums),
                     codex_key,
                     codex_category,
                     now_text, now_text,
@@ -327,14 +345,18 @@ class TowerRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id=?",
-                (operation_id,),
-            ).fetchone()
-            if existing is not None:
-                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-                    raise OperationConflictError("operation input differs from its original request")
-                return self._tower_reward_from_payload(json.loads(existing["result_json"]), replay=True)
+            replay_player = self._require_player(connection, platform, platform_user_id, writable=False)
+            payload = operation_replay(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player_id=int(replay_player["id"]),
+            )
+            if payload is not None:
+                return self._tower_reward_replay(
+                    connection, payload, operation_id, replay_player
+                )
             player = self._require_player(connection, platform, platform_user_id)
             run = connection.execute(
                 "SELECT * FROM tower_runs WHERE player_id=? AND status='reward_pending' ORDER BY id DESC LIMIT 1",
@@ -342,35 +364,9 @@ class TowerRepositoryMixin:
             ).fetchone()
             if run is None:
                 raise TowerRewardNotAvailableError("no tower reward is pending")
-            try:
-                reward_payload = json.loads(run["reward_json"])
-                reward_maximums = json.loads(run["reward_maximums_json"])
-            except (TypeError, ValueError) as exc:
-                raise TowerRequirementError("tower reward snapshot is invalid") from exc
-            if not isinstance(reward_payload, dict) or any(
-                not isinstance(key, str)
-                or not key
-                or isinstance(value, bool)
-                or not isinstance(value, int)
-                or value <= 0
-                for key, value in reward_payload.items()
-            ):
-                raise TowerRequirementError("tower reward snapshot is invalid")
-            reward = {str(key): int(value) for key, value in reward_payload.items()}
-            if not isinstance(reward_maximums, dict) or any(
-                not isinstance(key, str)
-                or not key.startswith("local.")
-                or isinstance(value, bool)
-                or not isinstance(value, int)
-                or value <= 0
-                for key, value in reward_maximums.items()
-            ) or set(reward_maximums) != {
-                key for key in reward if key.startswith("local.")
-            }:
-                raise TowerRequirementError("tower reward reputation snapshot is invalid")
-            settlement_reward: dict[str, int] = {}
-            for key, value in reward.items():
-                settlement_reward[key] = value
+            self._validate_tower_run_identity(run, player)
+            reward, reward_maximums = self._decode_tower_reward_snapshot(run)
+            settlement_reward = reward
             if settlement_reward:
                 grant_player_reward(
                     connection,
@@ -463,32 +459,192 @@ class TowerRepositoryMixin:
         )
 
     def _tower_run_from_rows(self, run: sqlite3.Row, player: sqlite3.Row, *, replay: bool = False) -> TowerRunRecord:
-        result = json.loads(run["result_json"])
+        self._validate_tower_run_identity(run, player)
+        result = self._decode_tower_object(run["result_json"], "tower result")
+        status = str(run["status"])
+        outcome = result.get("outcome")
+        if status == "battle_running" and result:
+            raise OperationResultMalformedError("running tower run has a result")
+        if status == "reward_pending" and outcome != "won":
+            raise OperationResultMalformedError("pending tower reward has no victory result")
+        if status == "lost" and outcome != "lost":
+            raise OperationResultMalformedError("lost tower run has an invalid result")
+        if status == "aborted" and result.get("reason") != "battle_start_failed":
+            raise OperationResultMalformedError("aborted tower run has an invalid result")
+        if status == "claimed" and outcome not in (None, "won"):
+            raise OperationResultMalformedError("claimed tower run has an invalid result")
+        reward, _ = self._decode_tower_reward_snapshot(run)
         return TowerRunRecord(
             player=self._row_to_player(player),
             run_id=str(run["run_id"]),
             tower_key=str(run["tower_key"]),
             floor_no=int(run["floor_no"]),
-            status=str(run["status"]),
+            status=status,
             battle_id=str(run["battle_id"]) if run["battle_id"] else None,
             first_clear=bool(run["first_clear"]),
             enemy_key=str(run["enemy_key"]) if run["enemy_key"] else None,
             stamina_cost=int(run["stamina_cost"]),
             outcome=str(result["outcome"]) if result.get("outcome") else None,
             reason=str(result["reason"]) if result.get("reason") else None,
-            reward={str(key): int(value) for key, value in json.loads(run["reward_json"]).items()} if str(run["status"]) == "reward_pending" else {},
+            reward=reward if status == "reward_pending" else {},
             already_completed=replay,
         )
 
     def _tower_reward_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> TowerRewardRecord:
+        expected = {"player", "run_id", "floor_no", "first_clear", "reward"}
+        if set(payload) != expected or not isinstance(payload.get("player"), dict):
+            raise OperationResultMalformedError("tower reward operation result has invalid fields")
+        if not isinstance(payload["run_id"], str) or not payload["run_id"].strip():
+            raise OperationResultMalformedError("tower reward operation run is invalid")
+        if isinstance(payload["floor_no"], bool) or not isinstance(payload["floor_no"], int) or payload["floor_no"] < 1:
+            raise OperationResultMalformedError("tower reward operation floor is invalid")
+        if not isinstance(payload["first_clear"], bool):
+            raise OperationResultMalformedError("tower reward operation first-clear flag is invalid")
+        reward = self._validate_tower_reward(payload["reward"], "operation reward")
+        try:
+            player = self._row_to_player(payload["player"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError("tower reward operation player snapshot is invalid") from exc
         return TowerRewardRecord(
-            player=self._row_to_player(payload["player"]),
+            player=player,
             run_id=str(payload["run_id"]),
             floor_no=int(payload["floor_no"]),
             first_clear=bool(payload["first_clear"]),
-            reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            reward=reward,
             already_completed=replay,
         )
+
+    def _tower_reward_replay(
+        self,
+        connection: sqlite3.Connection,
+        payload: dict[str, Any],
+        operation_id: str,
+        expected_player: sqlite3.Row,
+    ) -> TowerRewardRecord:
+        record = self._tower_reward_from_payload(payload, replay=True)
+        player_id = int(expected_player["id"])
+        run = connection.execute(
+            "SELECT * FROM tower_runs WHERE run_id=?", (record.run_id,)
+        ).fetchone()
+        claim = connection.execute(
+            "SELECT * FROM tower_reward_claims WHERE run_id=? AND operation_id=?",
+            (record.run_id, operation_id),
+        ).fetchone()
+        if (
+            run is None
+            or claim is None
+            or record.player.player_id != str(expected_player["player_id"])
+            or record.player.platform != str(expected_player["platform"])
+            or record.player.platform_user_id != str(expected_player["platform_user_id"])
+            or int(run["player_id"]) != player_id
+            or str(run["status"]) != "claimed"
+        ):
+            raise OperationResultMalformedError("tower reward operation does not match its claim")
+        if (
+            str(run["tower_key"]) != TOWER_KEY
+            or int(run["floor_no"]) != record.floor_no
+            or bool(run["first_clear"]) != record.first_clear
+            or int(claim["player_id"]) != player_id
+            or int(claim["floor_no"]) != record.floor_no
+            or bool(claim["first_clear"]) != record.first_clear
+            or str(claim["operation_id"]) != operation_id
+        ):
+            raise OperationResultMalformedError("tower reward operation fields do not match its claim")
+        stored_reward, _ = self._decode_tower_reward_snapshot(run)
+        claimed_reward = self._decode_tower_reward(claim["reward_json"], "tower claim reward")
+        if stored_reward != record.reward or claimed_reward != record.reward:
+            raise OperationResultMalformedError("tower reward operation reward does not match its claim")
+        return record
+
+    @staticmethod
+    def _decode_tower_object(value: Any, label: str) -> dict[str, Any]:
+        try:
+            decoded = decode_json_strict(str(value))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError(f"{label} snapshot is malformed") from exc
+        if not isinstance(decoded, dict):
+            raise OperationResultMalformedError(f"{label} snapshot must be an object")
+        return decoded
+
+    @classmethod
+    def _validate_tower_reward(cls, value: Any, label: str) -> dict[str, int]:
+        if not isinstance(value, dict):
+            raise OperationResultMalformedError(f"{label} is invalid")
+        try:
+            split_player_rewards(value)
+        except (TypeError, ValueError) as exc:
+            raise OperationResultMalformedError(f"{label} is invalid") from exc
+        if any(amount <= 0 for amount in value.values()):
+            raise OperationResultMalformedError(f"{label} is invalid")
+        return {str(key): int(amount) for key, amount in value.items()}
+
+    @classmethod
+    def _decode_tower_reward(cls, value: Any, label: str) -> dict[str, int]:
+        return cls._validate_tower_reward(cls._decode_tower_object(value, label), label)
+
+    @classmethod
+    def _decode_tower_reward_maximums(
+        cls, value: Any, reward: dict[str, int]
+    ) -> dict[str, int]:
+        maximums = cls._decode_tower_object(value, "tower reputation")
+        if any(
+            not isinstance(key, str)
+            or not key.startswith("local.")
+            or isinstance(amount, bool)
+            or not isinstance(amount, int)
+            or amount <= 0
+            for key, amount in maximums.items()
+        ) or set(maximums) != {key for key in reward if key.startswith("local.")}:
+            raise OperationResultMalformedError("tower reputation snapshot is invalid")
+        return {str(key): int(amount) for key, amount in maximums.items()}
+
+    @classmethod
+    def _decode_tower_reward_snapshot(
+        cls, run: sqlite3.Row
+    ) -> tuple[dict[str, int], dict[str, int]]:
+        reward = cls._decode_tower_reward(run["reward_json"], "tower reward snapshot")
+        maximums = cls._decode_tower_reward_maximums(run["reward_maximums_json"], reward)
+        digest = run["reward_digest"]
+        if (
+            not isinstance(digest, str)
+            or not digest
+            or digest != cls._tower_reward_digest(reward, maximums)
+        ):
+            raise OperationResultMalformedError("tower reward snapshot integrity is invalid")
+        return reward, maximums
+
+    @staticmethod
+    def _tower_reward_digest(
+        reward: dict[str, int], reward_maximums: dict[str, int]
+    ) -> str:
+        return reward_snapshot_digest(reward, reward_maximums)
+
+    @staticmethod
+    def _validate_tower_start_payload(payload: dict[str, Any]) -> None:
+        if set(payload) != {"run_id", "tower_key", "floor_no"}:
+            raise OperationResultMalformedError("tower start operation result has invalid fields")
+        if not isinstance(payload["run_id"], str) or not payload["run_id"].strip():
+            raise OperationResultMalformedError("tower start operation run is invalid")
+        if payload["tower_key"] != TOWER_KEY:
+            raise OperationResultMalformedError("tower start operation tower is invalid")
+        if isinstance(payload["floor_no"], bool) or not isinstance(payload["floor_no"], int) or payload["floor_no"] < 1:
+            raise OperationResultMalformedError("tower start operation floor is invalid")
+
+    @staticmethod
+    def _validate_tower_run_identity(run: sqlite3.Row, player: sqlite3.Row) -> None:
+        if (
+            not isinstance(run["run_id"], str)
+            or not str(run["run_id"]).strip()
+            or str(run["tower_key"]) != TOWER_KEY
+            or isinstance(run["floor_no"], bool)
+            or not isinstance(run["floor_no"], int)
+            or run["floor_no"] < 1
+            or run["first_clear"] not in (0, 1)
+            or int(run["player_id"]) != int(player["id"])
+        ):
+            raise OperationResultMalformedError("tower run identity is invalid")
+        if str(run["status"]) not in {"battle_running", "reward_pending", "lost", "claimed", "aborted"}:
+            raise OperationResultMalformedError("tower run status is invalid")
 
 
 __all__ = ["TowerRepositoryMixin"]

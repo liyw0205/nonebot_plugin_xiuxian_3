@@ -181,6 +181,9 @@ def test_tower_schema_has_current_floor_range_and_no_release_metadata() -> None:
         connection.execute("INSERT INTO players(id) VALUES (1)")
         ensure_tower_schema(connection)
         ensure_tower_schema(connection)
+        assert "reward_digest" in {
+            str(row[1]) for row in connection.execute("PRAGMA table_info(tower_runs)").fetchall()
+        }
 
 
         connection.execute(

@@ -1863,3 +1863,9 @@ QQ 官方与 OneBot V11 的专项 8 项、原突破测试 14 项、同域回归 
 文件所有权限定为 `events/public_event_rules.py`、`events/cross_realm_repository.py`、`events/cross_realm_migration.py`、`persistence/schema.py`、`persistence/sqlite_repository.py`、`test/test_cross_realm_event_snapshot_integrity.py` 及本计划/当前状态。每轮事件新增冻结配置摘要；`public_event_snapshot` 使用 `utils.json_cache.decode_json_strict`，`validate_public_event_round` 互证事件键、地点、目标、成功标记、配置结构、摘要和贡献总账。贡献、查询、结算和领奖在任何资产、贡献记录、领取记录或 operation 写入前拒绝坏 JSON、重复键、截断、错误类型及摘要/轮次字段不符；operation 回放严格解码并互证公开角色归属、领取轮次和奖励账本。配置摘要只绑定冻结内容，不是运行时版本标识；未发布项目不增加旧格式兼容分支，旧开发库需在正式发布前重建或按明确迁移处理。
 
 专项测试 22 项与既有跨界事件测试 7 项通过，覆盖 QQ 官方与 OneBot V11、损坏轮次快照/轮次列/operation 的零写、修复后同 operation 重试、重启恢复及幂等。主线负责运行时代码、持久化和最终验收；`/root/candidate_rotation` 只写独立专项测试并复现双适配器缺陷，`/root/companion_path_audit` 只读审查短途运输候选，未改同一仓储。正式 PvE/PvP 结算、切磋/训练傀儡只读观战和其他事件状态机不在范围内。
+
+120. **已完成（雾隐试炼塔冻结奖励与领奖账本互证）**：QQ 官方与 OneBot V11 的真实 `挑战试炼塔` / `领取试炼塔奖励` 路径复现 `tower_runs.reward_json` 宽松解析下重复 `spirit_stones` 键把每层 10 灵石改成 9999 实际入账，且被改写的领奖 operation 结果会被当作历史回放。特色玩法域近期已闭合虚空塔，本条以可直接改变资产且有双适配器证据的正确性缺陷为例外，不重开塔层规则、额度、准入或自动回合引擎。
+
+文件所有权限定为 `specials/tower_repository.py`、`specials/tower_rules.py`、`specials/tower_migration.py`、`test/test_tower_snapshot_integrity.py`、`test/test_tower_snapshot_migration.py`、`test/test_tower.py` 断言及本计划/当前状态。塔局新增覆盖冻结奖励与地方名望上限的 `reward_digest`，由 `tower_rules.reward_snapshot_digest` 单点生成，迁移按已存快照回填历史行且拒绝回填含重复键或坏类型的快照；运行投影、领奖与 operation 回放统一 `decode_json_strict` 并互证塔局列、玩家归属、楼层、首通标记、战斗结果、领奖记录与账本结果。摘要只绑定冻结数值，不是运行时版本标识，也没有按当前内容重算历史奖励的兼容分支。
+
+专项 1 项与升级/迁移专项 3 项、试炼塔与适配器同组 49 项、严格 JSON 与 operation 家族加竞技回归 179 项、图鉴/虚空塔/内容/工具/文档/无版本标识 121 项通过，覆盖双适配器坏快照零写、故障后同 operation 重试、runtime 重建幂等回放与坏历史行修复重放；源码与测试 `compileall`、全量内容 JSON 严格解析及 `git diff --check` 通过；未宣称整仓全量测试或新角色飞升长链通过。主线独占上述运行时代码、两份塔专项测试与文档；三个子代理因上游模型渠道不可用未产出任何文件，未发生并行改同一仓储的情况。

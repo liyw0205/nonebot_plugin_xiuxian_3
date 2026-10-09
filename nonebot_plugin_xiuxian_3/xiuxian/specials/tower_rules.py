@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -306,6 +308,20 @@ def practice_week_start(value) -> str:
     return (value.date() - timedelta(days=value.weekday())).isoformat()
 
 
+def reward_snapshot_digest(
+    reward: dict[str, int], reward_maximums: dict[str, int]
+) -> str:
+    """Bind a run's frozen reward and reputation caps into one integrity hash."""
+
+    payload = json.dumps(
+        {"reward": reward, "reward_maximums": reward_maximums},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 __all__ = [
     "TOWER_KEY",
     "TowerFloorDefinition",
@@ -318,4 +334,5 @@ __all__ = [
     "practice_week_start",
     "reward_local_reputation_maximums",
     "reward_for",
+    "reward_snapshot_digest",
 ]

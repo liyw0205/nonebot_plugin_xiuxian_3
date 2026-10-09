@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 
+from ..utils.json_cache import decode_json_strict
+from .tower_rules import reward_snapshot_digest
+
 
 def ensure_tower_schema(connection: sqlite3.Connection) -> None:
     connection.executescript(
@@ -53,12 +56,43 @@ def ensure_tower_schema(connection: sqlite3.Connection) -> None:
         "enemy_key": "TEXT NOT NULL DEFAULT ''",
         "stamina_cost": "INTEGER NOT NULL DEFAULT 0 CHECK (stamina_cost >= 0)",
         "reward_maximums_json": "TEXT NOT NULL DEFAULT '{}'",
+        "reward_digest": "TEXT NOT NULL DEFAULT ''",
         "codex_entry_key": "TEXT NOT NULL DEFAULT ''",
         "codex_category": "TEXT NOT NULL DEFAULT ''",
     }
     for name, definition in additions.items():
         if name not in columns:
             connection.execute(f"ALTER TABLE tower_runs ADD COLUMN {name} {definition}")
+    _backfill_reward_digests(connection)
+
+
+def _backfill_reward_digests(connection: sqlite3.Connection) -> None:
+    """Bind rows written before the integrity column existed to their stored snapshot.
+
+    Unreadable legacy snapshots keep an empty digest so the reward path rejects them
+    instead of laundering tampered or truncated JSON into a fresh grant.
+    """
+
+    rows = connection.execute(
+        "SELECT id, reward_json, reward_maximums_json FROM tower_runs WHERE reward_digest=''"
+    ).fetchall()
+    for row_id, stored_reward, stored_maximums in rows:
+        try:
+            reward = decode_json_strict(str(stored_reward))
+            reward_maximums = decode_json_strict(str(stored_maximums))
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(reward, dict) or not isinstance(reward_maximums, dict):
+            continue
+        if any(
+            isinstance(amount, bool) or not isinstance(amount, int)
+            for amount in (*reward.values(), *reward_maximums.values())
+        ):
+            continue
+        connection.execute(
+            "UPDATE tower_runs SET reward_digest=? WHERE id=?",
+            (reward_snapshot_digest(reward, reward_maximums), row_id),
+        )
 
 
 __all__ = ["ensure_tower_schema"]
