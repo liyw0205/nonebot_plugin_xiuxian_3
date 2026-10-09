@@ -23,6 +23,7 @@ from ..persistence.errors import (
     MarketSelfTradeError,
     ItemBindingActiveError,
     OperationConflictError,
+    OperationResultMalformedError,
     PlayerNotFoundError,
     PlayerSuspendedError,
 )
@@ -36,6 +37,8 @@ from ..utils.assets import (
     spend_player_assets,
     player_currency,
 )
+from ..utils.json_cache import decode_json_strict
+from ..utils.operations import operation_replay, record_operation
 from ..utils.player import change_player_state, player_inventory, player_integer, spend_player_state
 from .models import MarketOrderRecord
 from .bindings import active_binding_totals
@@ -54,6 +57,58 @@ from .rules import (
     validate_market_listing,
     commission_failure_refund,
     commission_platform_fee,
+)
+
+
+# ``production.rules.random_quality_bp`` only ever lands on these three quality bands.
+COMMISSION_QUALITY_ROLL_BP = frozenset({0, 500, 1000})
+COMMISSION_HEAD_KEYS = frozenset(
+    {
+        "recipe_key",
+        "recipe_name",
+        "material_mode",
+        "publisher_inputs",
+        "producer_inputs",
+        "publisher_player_id",
+        "reward_stones",
+    }
+)
+COMMISSION_WORK_KEYS = frozenset(
+    {
+        "producer_player_id",
+        "energy_cost",
+        "tool_key",
+        "tool_durability_before",
+        "tool_durability_after",
+        "random_quality_bp",
+        "material_quality_bp",
+        "proficiency_bp",
+        "starts_at",
+        "ends_at",
+    }
+)
+COMMISSION_ACCOUNT_KEYS = frozenset({"status", "producer_payment", "publisher_refund", "platform_fee"})
+COMMISSION_OUTCOME_KEYS = COMMISSION_ACCOUNT_KEYS | frozenset(
+    {"quality_bp", "random_quality_bp", "success", "outputs", "refunds", "recovered"}
+)
+COMMISSION_OPEN_STATUSES = frozenset({"published", "accepted", "locked", "processing"})
+COMMISSION_OUTCOME_STATUSES = frozenset({"delivered", "failed", "settled"})
+COMMISSION_CLOSED_STATUSES = frozenset({"cancelled", "expired"})
+COMMISSION_TERMINAL_STATUSES = COMMISSION_OUTCOME_STATUSES | COMMISSION_CLOSED_STATUSES
+COMMISSION_PROJECTION_KEYS = (
+    "commission_id",
+    "status",
+    "publisher_player_id",
+    "producer_player_id",
+    "recipe_key",
+    "material_mode",
+    "reward_stones",
+    "outputs",
+    "refunds",
+    "producer_payment",
+    "publisher_refund",
+    "platform_fee",
+    "quality_bp",
 )
 
 
@@ -723,6 +778,198 @@ class EconomyRepositoryMixin:
 
             raise CommissionRequirementError("unsupported material mode") from exc
 
+    @staticmethod
+    def _commission_json_object(value: Any, field: str) -> dict[str, Any]:
+        """Decode one persisted commission JSON field without collapsing duplicate keys."""
+
+        text = "" if value is None else str(value)
+        try:
+            decoded = decode_json_strict(text or "{}")
+        except (TypeError, ValueError) as exc:
+            raise OperationResultMalformedError(f"commission {field} is invalid JSON") from exc
+        if not isinstance(decoded, dict):
+            raise OperationResultMalformedError(f"commission {field} must be an object")
+        return decoded
+
+    @staticmethod
+    def _commission_integer(
+        value: Any, field: str, *, minimum: int = 0, maximum: int | None = None
+    ) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise OperationResultMalformedError(f"commission {field} is invalid")
+        if maximum is not None and value > maximum:
+            raise OperationResultMalformedError(f"commission {field} is invalid")
+        return int(value)
+
+    @classmethod
+    def _commission_amounts(cls, value: Any, field: str) -> dict[str, int]:
+        if not isinstance(value, dict):
+            raise OperationResultMalformedError(f"commission {field} must be an object")
+        return {str(key): cls._commission_integer(amount, f"{field} amount") for key, amount in value.items()}
+
+    @classmethod
+    def _commission_durability(cls, player: Any) -> dict[str, int]:
+        durability = cls._commission_json_object(player["durability_json"], "tool durability")
+        return cls._commission_amounts(durability, "tool durability")
+
+    @classmethod
+    def _validate_commission_snapshot(cls, order: Any) -> dict[str, Any]:
+        """Return one order's frozen snapshot after cross-checking it against its columns."""
+
+        from ..production.rules import TOOL_MAX_DURABILITY_BP
+
+        snapshot = cls._commission_json_object(order["snapshot_json"], "frozen snapshot")
+        worked = order["producer_player_id"] is not None
+        expected = set(COMMISSION_HEAD_KEYS)
+        if worked:
+            expected.update(COMMISSION_WORK_KEYS)
+        if set(snapshot) != expected:
+            raise OperationResultMalformedError("commission frozen snapshot fields are invalid")
+        recipe = cls._commission_recipe(str(order["recipe_key"]))
+        mode = str(order["material_mode"])
+        if str(snapshot["recipe_key"]) != str(order["recipe_key"]):
+            raise OperationResultMalformedError("commission snapshot recipe differs from its order")
+        if str(snapshot["recipe_name"]) != str(recipe.name):
+            raise OperationResultMalformedError("commission snapshot recipe name differs from the recipe")
+        if str(snapshot["material_mode"]) != mode:
+            raise OperationResultMalformedError("commission snapshot material mode differs from its order")
+        if cls._commission_integer(snapshot["publisher_player_id"], "publisher player id") != int(
+            order["publisher_player_id"]
+        ):
+            raise OperationResultMalformedError("commission snapshot publisher differs from its order")
+        if cls._commission_integer(snapshot["reward_stones"], "reward stones") != int(order["reward_stones"]):
+            raise OperationResultMalformedError("commission snapshot reward differs from its order")
+        recipe_inputs = cls._commission_amounts(recipe.inputs, "recipe input")
+        expected_inputs = recipe_inputs if mode == "publisher_supplies" else {}
+        if cls._commission_amounts(snapshot["publisher_inputs"], "publisher input") != expected_inputs:
+            raise OperationResultMalformedError("commission snapshot publisher materials differ from the recipe")
+        expected_inputs = recipe_inputs if mode == "producer_supplies" else {}
+        if cls._commission_amounts(snapshot["producer_inputs"], "producer input") != expected_inputs:
+            raise OperationResultMalformedError("commission snapshot producer materials differ from the recipe")
+        if not worked:
+            return snapshot
+        if cls._commission_integer(snapshot["producer_player_id"], "producer player id") != int(
+            order["producer_player_id"]
+        ):
+            raise OperationResultMalformedError("commission snapshot producer differs from its order")
+        if cls._commission_integer(snapshot["energy_cost"], "energy cost") != int(recipe.energy_cost):
+            raise OperationResultMalformedError("commission snapshot energy cost differs from the recipe")
+        tool_key = snapshot["tool_key"]
+        if tool_key is not None and (not isinstance(tool_key, str) or not tool_key):
+            raise OperationResultMalformedError("commission snapshot tool is invalid")
+        if tool_key != recipe.tool_key:
+            raise OperationResultMalformedError("commission snapshot tool differs from the recipe")
+        before = snapshot["tool_durability_before"]
+        after = snapshot["tool_durability_after"]
+        if recipe.tool_key is None:
+            if before is not None or after is not None:
+                raise OperationResultMalformedError("commission snapshot tool durability is inconsistent")
+        else:
+            before_value = cls._commission_integer(before, "tool durability", maximum=TOOL_MAX_DURABILITY_BP)
+            after_value = cls._commission_integer(after, "tool durability")
+            if after_value > before_value or before_value - after_value != int(recipe.tool_cost_bp):
+                raise OperationResultMalformedError("commission snapshot tool durability is inconsistent")
+        if cls._commission_integer(snapshot["random_quality_bp"], "quality roll") not in COMMISSION_QUALITY_ROLL_BP:
+            raise OperationResultMalformedError("commission snapshot quality roll is invalid")
+        if cls._commission_integer(snapshot["material_quality_bp"], "material quality") != 10000:
+            raise OperationResultMalformedError("commission snapshot material quality is invalid")
+        if cls._commission_integer(snapshot["proficiency_bp"], "proficiency") != 0:
+            raise OperationResultMalformedError("commission snapshot proficiency is invalid")
+        if str(snapshot["starts_at"]) != str(order["starts_at"]) or str(snapshot["ends_at"]) != str(order["ends_at"]):
+            raise OperationResultMalformedError("commission snapshot schedule differs from its order")
+        return snapshot
+
+    @classmethod
+    def _validate_commission_result(cls, order: Any, snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Return one order's stored outcome after re-deriving it from the frozen snapshot."""
+
+        from ..production.rules import HIGH_QUALITY_THRESHOLD_BP, QUALITY_SUCCESS_THRESHOLD_BP, production_quality
+
+        result = cls._commission_json_object(order["result_json"], "settlement result")
+        status = str(order["status"])
+        reward = int(order["reward_stones"])
+        if status in COMMISSION_OPEN_STATUSES:
+            if result:
+                raise OperationResultMalformedError("commission result exists before delivery")
+            return {}
+        if status in COMMISSION_CLOSED_STATUSES:
+            if set(result) != COMMISSION_ACCOUNT_KEYS or str(result["status"]) != status:
+                raise OperationResultMalformedError(f"commission {status} result is invalid")
+            if cls._commission_integer(result["publisher_refund"], "publisher refund") != reward:
+                raise OperationResultMalformedError(f"commission {status} refund differs from the escrow")
+            payout = cls._commission_integer(result["producer_payment"], "producer payment")
+            payout += cls._commission_integer(result["platform_fee"], "platform fee")
+            if payout:
+                raise OperationResultMalformedError(f"commission {status} result pays out")
+            return result
+        if status not in COMMISSION_OUTCOME_STATUSES:
+            raise OperationResultMalformedError("commission status has no stored result")
+        if set(result) != COMMISSION_OUTCOME_KEYS or str(result["status"]) != status:
+            raise OperationResultMalformedError(f"commission {status} result is invalid")
+        recipe = cls._commission_recipe(str(order["recipe_key"]))
+        quality_roll = cls._commission_integer(snapshot["random_quality_bp"], "quality roll")
+        quality = production_quality(
+            material_quality_bp=cls._commission_integer(snapshot["material_quality_bp"], "material quality"),
+            proficiency_bp=cls._commission_integer(snapshot["proficiency_bp"], "proficiency"),
+            tool_durability_bp=cls._commission_integer(snapshot["tool_durability_before"] or 0, "tool durability"),
+            random_quality_bp_value=quality_roll,
+        )
+        success = result["success"]
+        if not isinstance(success, bool) or success != (quality >= QUALITY_SUCCESS_THRESHOLD_BP):
+            raise OperationResultMalformedError("commission delivery success flag is invalid")
+        if not isinstance(result["recovered"], bool):
+            raise OperationResultMalformedError("commission delivery recovery flag is invalid")
+        if cls._commission_integer(result["quality_bp"], "quality") != quality:
+            raise OperationResultMalformedError("commission delivery quality differs from its snapshot")
+        if cls._commission_integer(result["random_quality_bp"], "quality roll") != quality_roll:
+            raise OperationResultMalformedError("commission delivery roll differs from its snapshot")
+        expected_outputs: dict[str, int] = {}
+        if success:
+            expected_outputs = cls._commission_amounts(recipe.outputs, "recipe output")
+            if quality >= HIGH_QUALITY_THRESHOLD_BP:
+                for key, quantity in cls._commission_amounts(recipe.high_quality_bonus, "recipe bonus").items():
+                    expected_outputs[key] = expected_outputs.get(key, 0) + quantity
+        if cls._commission_amounts(result["outputs"], "delivery output") != expected_outputs:
+            raise OperationResultMalformedError("commission delivery outputs differ from the recipe")
+        expected_refunds: dict[str, int] = {}
+        if not success:
+            expected_refunds = {
+                key: quantity
+                for key, quantity in cls._commission_amounts(recipe.failure_refunds, "recipe refund").items()
+                if quantity > 0
+            }
+        if cls._commission_amounts(result["refunds"], "failure refund") != expected_refunds:
+            raise OperationResultMalformedError("commission failure refunds differ from the recipe")
+        payment = cls._commission_integer(result["producer_payment"], "producer payment")
+        refund = cls._commission_integer(result["publisher_refund"], "publisher refund")
+        fee = cls._commission_integer(result["platform_fee"], "platform fee")
+        if status == "settled":
+            expected_payment = reward - commission_platform_fee(reward)
+            if not success or refund != 0 or payment != expected_payment or fee != reward - expected_payment:
+                raise OperationResultMalformedError("commission settlement split is invalid")
+        elif status == "delivered":
+            if not success or (payment, refund, fee) != (0, 0, 0):
+                raise OperationResultMalformedError("commission delivery payout is invalid")
+        else:
+            expected_refund = commission_failure_refund(reward)
+            if success or payment != 0 or refund != expected_refund or fee != reward - expected_refund:
+                raise OperationResultMalformedError("commission failure payout is invalid")
+        return result
+
+    @staticmethod
+    def _commission_projection(payload: dict[str, Any]) -> dict[str, Any]:
+        return {key: payload.get(key) for key in COMMISSION_PROJECTION_KEYS}
+
+    def _commission_replayed(self, connection: Any, payload: dict[str, Any]) -> dict[str, Any]:
+        """Confirm a finished operation result still matches the stored commission."""
+
+        if str(payload.get("status", "")) not in COMMISSION_TERMINAL_STATUSES:
+            return payload
+        current = self._commission_payload(connection, str(payload.get("commission_id") or ""))
+        if self._commission_projection(current) != self._commission_projection(payload):
+            raise OperationResultMalformedError("commission operation result no longer matches its order")
+        return current
+
     def _commission_create_once(
         self,
         platform: str,
@@ -758,9 +1005,10 @@ class EconomyRepositoryMixin:
         expires_at = serialize_datetime(now + timedelta(seconds=COMMISSION_TTL_SECONDS))
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._commission_operation(connection, operation_id, operation_name, request_hash)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                return self._commission_record_from_payload(existing, replay=True)
+                payload = self._commission_replayed(connection, existing)
+                return self._commission_record_from_payload(payload, replay=True)
             publisher = self._require_player(connection, platform, platform_user_id)
             if player_currency(publisher) < reward:
                 raise CommissionEscrowConflictError("reward cannot be escrowed")
@@ -848,7 +1096,7 @@ class EconomyRepositoryMixin:
                     now_text,
                 )
             payload = self._commission_payload(connection, commission_id)
-            self._commission_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
@@ -892,9 +1140,10 @@ class EconomyRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._commission_operation(connection, operation_id, operation_name, request_hash)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                return self._commission_record_from_payload(existing, replay=True)
+                payload = self._commission_replayed(connection, existing)
+                return self._commission_record_from_payload(payload, replay=True)
             producer = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
                 "SELECT * FROM production_commission_orders WHERE commission_id = ?", (commission_id,)
@@ -926,7 +1175,7 @@ class EconomyRepositoryMixin:
             except Exception as exc:
                 raise CommissionRequirementError("producer does not satisfy recipe requirements") from exc
             inventory = player_inventory(producer)
-            durability = self._json_object(producer["durability_json"], {})
+            durability = self._commission_durability(producer)
             mode = str(order["material_mode"])
             producer_inputs = dict(recipe.inputs) if mode == "producer_supplies" else {}
             if producer_inputs:
@@ -965,7 +1214,7 @@ class EconomyRepositoryMixin:
                 )
             starts_at = now_text
             ends_at = serialize_datetime(now + timedelta(seconds=recipe.duration_seconds))
-            snapshot = self._json_object(order["snapshot_json"], {})
+            snapshot = self._validate_commission_snapshot(order)
             snapshot.update(
                 {
                     "producer_player_id": int(producer["id"]),
@@ -1051,7 +1300,7 @@ class EconomyRepositoryMixin:
                     now_text,
                 )
             payload = self._commission_payload(connection, commission_id)
-            self._commission_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
@@ -1082,9 +1331,10 @@ class EconomyRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._commission_operation(connection, operation_id, operation_name, request_hash)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                return self._commission_record_from_payload(existing, replay=True)
+                payload = self._commission_replayed(connection, existing)
+                return self._commission_record_from_payload(payload, replay=True)
             producer = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
                 "SELECT * FROM production_commission_orders WHERE commission_id = ?", (commission_id,)
@@ -1103,12 +1353,14 @@ class EconomyRepositoryMixin:
             if recovery and now <= ends_at + timedelta(seconds=COMMISSION_RECOVERY_GRACE_SECONDS):
                 raise CommissionDeliveryError("commission is not ready for recovery")
             recipe = recipe_definition(str(order["recipe_key"]))
-            snapshot = self._json_object(order["snapshot_json"], {})
+            snapshot = self._validate_commission_snapshot(order)
+            if self._validate_commission_result(order, snapshot):
+                raise OperationResultMalformedError("commission delivery started from a finished order")
             quality = production_quality(
-                material_quality_bp=int(snapshot.get("material_quality_bp", 10000)),
-                proficiency_bp=int(snapshot.get("proficiency_bp", 0)),
-                tool_durability_bp=int(snapshot.get("tool_durability_before", 0) or 0),
-                random_quality_bp_value=int(snapshot.get("random_quality_bp", 0)),
+                material_quality_bp=int(snapshot["material_quality_bp"]),
+                proficiency_bp=int(snapshot["proficiency_bp"]),
+                tool_durability_bp=int(snapshot["tool_durability_before"] or 0),
+                random_quality_bp_value=int(snapshot["random_quality_bp"]),
             )
             success = quality >= QUALITY_SUCCESS_THRESHOLD_BP
             outputs: dict[str, int] = {}
@@ -1155,7 +1407,7 @@ class EconomyRepositoryMixin:
                 (status, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, now_text, commission_id),
             )
             payload = self._commission_payload(connection, commission_id)
-            self._commission_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
@@ -1179,9 +1431,10 @@ class EconomyRepositoryMixin:
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._commission_operation(connection, operation_id, operation_name, request_hash)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                return self._commission_record_from_payload(existing, replay=True)
+                payload = self._commission_replayed(connection, existing)
+                return self._commission_record_from_payload(payload, replay=True)
             publisher = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
                 "SELECT * FROM production_commission_orders WHERE commission_id = ?", (commission_id,)
@@ -1192,8 +1445,9 @@ class EconomyRepositoryMixin:
                 raise CommissionDeliveryError("only the publisher can confirm delivery")
             if str(order["status"]) != "delivered":
                 raise CommissionDeliveryError("commission is not awaiting delivery confirmation")
-            result = self._json_object(order["result_json"], {})
-            outputs = self._json_object(result.get("outputs", {}), {})
+            snapshot = self._validate_commission_snapshot(order)
+            result = self._validate_commission_result(order, snapshot)
+            outputs = dict(result["outputs"])
             producer = connection.execute("SELECT * FROM players WHERE id = ?", (order["producer_player_id"],)).fetchone()
             if producer is None:
                 raise CommissionNotFoundError("producer does not exist")
@@ -1256,7 +1510,7 @@ class EconomyRepositoryMixin:
                 (now_text, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, commission_id),
             )
             payload = self._commission_payload(connection, commission_id)
-            self._commission_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
@@ -1280,9 +1534,10 @@ class EconomyRepositoryMixin:
         now_text = serialize_datetime(self._now())
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._commission_operation(connection, operation_id, operation_name, request_hash)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                return self._commission_record_from_payload(existing, replay=True)
+                payload = self._commission_replayed(connection, existing)
+                return self._commission_record_from_payload(payload, replay=True)
             actor = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
                 "SELECT * FROM production_commission_orders WHERE commission_id = ?", (commission_id,)
@@ -1290,6 +1545,8 @@ class EconomyRepositoryMixin:
             if order is None:
                 raise CommissionNotFoundError("commission does not exist")
             status = str(order["status"])
+            if self._validate_commission_result(order, self._validate_commission_snapshot(order)):
+                raise OperationResultMalformedError("commission closure started from a finished order")
             is_publisher = int(order["publisher_player_id"]) == int(actor["id"])
             is_producer = int(order["producer_player_id"] or 0) == int(actor["id"])
             if status == "published" and is_publisher:
@@ -1308,7 +1565,7 @@ class EconomyRepositoryMixin:
                 (json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, now_text, commission_id),
             )
             payload = self._commission_payload(connection, commission_id)
-            self._commission_record_operation(
+            record_operation(
                 connection,
                 operation_id,
                 operation_name,
@@ -1333,9 +1590,10 @@ class EconomyRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._commission_operation(connection, operation_id, operation_name, request_hash)
+            existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                return self._commission_record_from_payload(existing, replay=True)
+                payload = self._commission_replayed(connection, existing)
+                return self._commission_record_from_payload(payload, replay=True)
             actor = self._require_player(connection, platform, platform_user_id, writable=False)
             order = connection.execute(
                 "SELECT * FROM production_commission_orders WHERE commission_id = ?", (commission_id,)
@@ -1344,15 +1602,17 @@ class EconomyRepositoryMixin:
                 raise CommissionNotFoundError("commission does not exist")
             if str(order["status"]) == "expired":
                 payload = self._commission_payload(connection, commission_id)
-                self._commission_record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
+                record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
                 return self._commission_record_from_payload(payload)
             if str(order["status"]) != "published":
                 raise CommissionStateConflictError("only unpublished commissions expire here")
+            if self._validate_commission_result(order, self._validate_commission_snapshot(order)):
+                raise OperationResultMalformedError("commission expiry started from a finished order")
             if now < datetime.fromisoformat(str(order["expires_at"])):
                 raise CommissionExpiredError("commission has not expired")
             self._commission_expire_row(connection, order, operation_id, now_text)
             payload = self._commission_payload(connection, commission_id)
-            self._commission_record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
+            record_operation(connection, operation_id, operation_name, int(actor["id"]), request_hash, payload, now_text)
             return self._commission_record_from_payload(payload)
 
     @staticmethod
@@ -1419,7 +1679,7 @@ class EconomyRepositoryMixin:
                     commission_id, now_text,
                 )
             elif kind == "tool":
-                durability = self._json_object(player["durability_json"], {})
+                durability = self._commission_durability(player)
                 before = int(durability.get(key, 0))
                 durability[key] = before + quantity
                 change_player_assets(
@@ -1528,34 +1788,7 @@ class EconomyRepositoryMixin:
             (operation_id, player_id, asset_kind, asset_key, reason, direction, amount, before_value, after_value, source_id, created_at),
         )
 
-    @staticmethod
-    def _commission_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
-        existing = connection.execute(
-            "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)
-        ).fetchone()
-        if existing is None:
-            return None
-        if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-            raise OperationConflictError("operation input differs from its original request")
-        return json.loads(existing["result_json"])
-
-    @staticmethod
-    def _commission_record_operation(
-        connection: Any,
-        operation_id: str,
-        operation_name: str,
-        player_id: int,
-        request_hash: str,
-        payload: dict[str, Any],
-        now_text: str,
-    ) -> None:
-        connection.execute(
-            "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
-
-    @staticmethod
-    def _commission_payload(connection: Any, commission_id: str) -> dict[str, Any]:
+    def _commission_payload(self, connection: Any, commission_id: str) -> dict[str, Any]:
         from ..production.rules import recipe_definition
 
         row = connection.execute(
@@ -1574,7 +1807,7 @@ class EconomyRepositoryMixin:
             from ..persistence.errors import CommissionNotFoundError
 
             raise CommissionNotFoundError("commission does not exist")
-        result = json.loads(str(row["result_json"] or "{}"))
+        result = self._validate_commission_result(row, self._validate_commission_snapshot(row))
         recipe = recipe_definition(str(row["recipe_key"]))
         return {
             "commission_id": str(row["commission_id"]),
@@ -1592,12 +1825,12 @@ class EconomyRepositoryMixin:
             "starts_at": str(row["starts_at"]) if row["starts_at"] else None,
             "ends_at": str(row["ends_at"]) if row["ends_at"] else None,
             "expires_at": str(row["expires_at"]),
-            "outputs": {str(key): int(value) for key, value in result.get("outputs", {}).items()},
-            "refunds": {str(key): int(value) for key, value in result.get("refunds", {}).items()},
+            "outputs": dict(result.get("outputs", {})),
+            "refunds": dict(result.get("refunds", {})),
             "producer_payment": int(result.get("producer_payment", 0)),
             "publisher_refund": int(result.get("publisher_refund", 0)),
             "platform_fee": int(result.get("platform_fee", 0)),
-            "quality_bp": int(result["quality_bp"]) if result.get("quality_bp") is not None else None,
+            "quality_bp": result.get("quality_bp"),
         }
 
     @staticmethod

@@ -973,6 +973,38 @@ operation 可重试，成功结果在 runtime 重建后只回放一次。摘要�
 `3081900` 与 `cf301e7` exploration、`ef5e1f8` 与 `d0ce25e` social；`progression`、`world`、`exploration`、`social` 已触及两次以上，
 特色玩法域与适配器入口也随本条闭合进入冷却，下一轮重新横向比较未闭合玩家路径，不沿塔或适配器继续开发。
 
+### 已闭合切片：生产委托冻结快照与结算账本严格互证
+
+开工证据：QQ 官方与 OneBot V11 的真实 `发布生产委托 疗伤丹 50 生产者供料` → `接取生产委托` → `交付生产委托` → `确认生产委托` 路径复现，
+旧实现把 `production_commission_orders.snapshot_json`、`result_json` 和 `operations.result_json` 交给宽松的 `utils/json.py::json_object`
+与裸 `json.loads`：`result_json.outputs` 写成 `{"item.pill.healing_low":1,"item.pill.healing_low":999}` 时重复键折叠成 999，结算真的向
+委托方发放 999 枚低阶疗伤丹；`snapshot_json` 重复 `random_quality_bp` 能把注定失败的交付改写成成功；`producer_payment` 与
+`platform_fee` 之和偏离托管报酬、`operations` 结果被改写成一笔 9999 灵石报酬时也都照单执行。经济域此前只闭合过市集入口那一段，本条以可直接
+改变灵石与物品、且有双适配器复现的正确性缺陷进入，不改报酬区间、手续费比例、供料模式、交付时限或任何玩法面。
+
+`economy/repository.py` 统一改用 `utils/json_cache.decode_json_strict` 与 `utils/operations.py` 的 `operation_replay` / `record_operation`。
+`_validate_commission_snapshot` 按是否已有人接取分档冻结键集合，并与 `recipe_key`、`material_mode`、`reward_stones`、
+`publisher_player_id`、`producer_player_id`、`starts_at`、`ends_at` 列互证，配方材料、能量、工具与 `tool_durability_before -
+tool_durability_after == tool_cost_bp` 逐项对齐配方与 `TOOL_MAX_DURABILITY_BP`，质量骰只允许 `production.rules.random_quality_bp`
+的三个真实取值。`_validate_commission_result` 按状态锁定键集合，从冻结快照重算品质、成功标记、产物与失败返还，要求交付三项金额为零、
+结算满足 `producer_payment + platform_fee == reward_stones`、失败满足 `publisher_refund + platform_fee == reward_stones`、
+取消与过期整笔退还托管且不外派。发布、接取、交付与恢复、确认、取消、过期、列表读取全部经过这套校验，operation 回放再与当前行投影互证，
+生产者的 `durability_json` 也改为严格解码。重复键、截断、非对象、字符串或布尔数值、金额放大、快照与列不符时，在灵石、能量、背包、耐久、
+锁定表、账本与 operation 写入前整体拒绝；修复后沿原 operation 重试，终局结果在 runtime 重建后只回放一次。互证只绑定已冻结数值与配方定义，
+未新增运行时版本标识，也没有按当前内容重算历史委托的兼容分支。
+
+`test/test_economy_commission_integrity.py` 新增 4 项，让发布方与生产方在两个适配器之间对调，覆盖交付产物重复键放大、产物数值被写成字符串、
+交付前快照质量骰重复键与配方键篡改、`operations` 结果伪造报酬与重复 `outputs` 键（含 runtime 重建后的回放）以及托管拆分，并逐项断言玩家状态、
+账本与 operation 零写、修复后可重试。经济/生产/市集/库存锁同组 125 项通过（含本专项 4 项）；源码与测试 `compileall`、`git diff --check`
+和 ruff 未定义检查通过；未宣称整仓全量测试通过。本轮同时给上一轮遗留的整仓失败项定性：17 项中有 13 项在 `367ef2a` 的干净工作树同样失败，
+早于本轮四个严格 JSON 切片；其余 4 项来自 `test/*.py` 用 `shutil.copytree` 复制 `data/` 时把本机在跑的 `data/xiuxian3.sqlite3`
+带进测试沙箱，属测试隔离缺陷，与本条改动无关，留作下一条处理。主线独占 `xiuxian/economy/repository.py`、该新增测试与本状态页；
+市集 `_market_operation` 的宽松 JSON 仍待后续。
+
+计入本条后的最近十条切片为本条 `economy`、`65a12ca` specials/utils/adapters、`68137ad` events、`2aa98d9` 与 `53ccffc` progression、
+`367ef2a` social、`d156b44` 与 `3839546` world、`3081900` 与 `cf301e7` exploration；`progression`、`world`、`exploration`、`social`
+已触及两次以上，`economy`、特色玩法与适配器入口随本条闭合进入冷却，下一轮重新横向比较未闭合玩家路径，不沿经济域继续开发。
+
 ## 5. 开发顺序
 
 开发按可独立验收的垂直切片推进，不按 `content-v0.1`、`content-v0.2` 逐个版本搬运：
