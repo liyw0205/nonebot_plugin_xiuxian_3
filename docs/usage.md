@@ -1,6 +1,8 @@
 # 玩家使用指南
 
-命令前缀由宿主的 `COMMAND_START` 决定，本文故意不固定写斜杠。QQ 群聊通常还需要 @机器人；QQ 可点击蓝字，OneBot 会收到等价纯文本。
+本文及安装教程适用于 [work/m9-content-data 版本](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/tree/work/m9-content-data)。默认 `main` 的源码与该版本不同，请按下方命令选择对应分支。
+
+命令前缀由宿主的 `COMMAND_START` 决定，下面的示例省略前缀。QQ 群聊通常还需要 @机器人；QQ 可点击蓝字，OneBot 会收到等价纯文本。
 
 ## 第一步：启程
 
@@ -52,4 +54,4 @@
 
 ## 消息与数据
 
-QQ 的 Markdown、蓝字和按键受账号能力与平台权限控制；没有能力时会自动降级，不影响命令本身。玩家数据保存在宿主 SQLite，内容定义位于宿主 `data/`。普通宿主的运行日志和 PID 位于 `.xiuxian3/`；Docker 才额外挂载 `runtime/` 运行状态目录。
+QQ 的 Markdown、蓝字和按键受账号能力与平台权限控制；没有能力时会自动降级，不影响命令本身。玩家数据保存在宿主 SQLite，内容定义位于宿主 `data/`，正常宿主的运行日志和状态位于 `.xiuxian3/`；Docker 还挂载 `runtime/`。

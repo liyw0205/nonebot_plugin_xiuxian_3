@@ -1,5 +1,7 @@
 # 发布分发约定
 
+本文及安装教程适用于 [work/m9-content-data 版本](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/tree/work/m9-content-data)。默认 `main` 的源码与该版本不同，请按下方命令选择对应分支。
+
 GitHub Release 是发布后的普通用户入口；在没有可用 Release 资产时，当前可用入口是显式 checkout `work/m9-content-data` 的源码模式。两者都使用同一套宿主模板和数据保护规则。
 
 ## Tag 与资产

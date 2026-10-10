@@ -1,5 +1,7 @@
 # NoneBot 修仙 3
 
+本文及安装教程适用于 [work/m9-content-data 版本](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/tree/work/m9-content-data)。默认 `main` 的源码与该版本不同，请按下方命令选择对应分支。
+
 `nonebot_plugin_xiuxian_3` 是一个面向 NoneBot 2 的文字修仙游戏插件。玩家从凡人开始，选择道途，修炼突破，探索三界，完成悬赏与主线，并把获得的材料用于生产、经济、灵兽和装备成长。角色进度保存在 SQLite，玩法内容由 `data/` 下的 JSON 内容包提供。
 
 插件支持 OneBot V11 和 QQ 官方机器人。两个适配器共用同一套角色、任务和玩法服务；QQ 有 Markdown、蓝字和按键能力时使用增强消息，否则自动降级为可读文本。
@@ -28,7 +30,7 @@
 
 ## 安装
 
-当前最实用的入口是 checkout `work/m9-content-data` 后使用源码模式；该分支包含本文对应的安装脚本。安装器会创建 `$HOME/xiu3` 和 `$HOME/myenv`，检查 Python 3.11+、Git、curl、venv 与编译工具，安装 QQ、OneBot V11、FastAPI、HTTPX、websockets 和 AIOHTTP。
+当前安装方式是先获取 `work/m9-content-data` 后使用源码模式；该分支包含本文对应的安装脚本。安装器会创建 `$HOME/xiu3` 和 `$HOME/myenv`，检查 Python 3.11+、Git、curl、venv 与编译工具，安装 QQ、OneBot V11、FastAPI、HTTPX、websockets 和 AIOHTTP。
 
 ### Linux 一键安装（当前推荐）
 
@@ -108,16 +110,17 @@ bash scripts/onekey.sh install --source-mode source --mirror direct \
   --target /path/to/nonebot-host --source "$PWD" --venv /path/to/venv
 ```
 
-源码模式不会下载 Release；当前 `work/m9-content-data` checkout 更新时不要使用 `xiu3 update`，因为控制脚本默认拉取 `origin main`。请先备份并停止宿主，再执行：
+源码模式不会下载 Release；当前 `work/m9-content-data` checkout 更新时不要使用 `xiu3 update`，控制脚本默认拉取 `origin main`。请先停止宿主并备份，再执行：
 
 ```bash
 /path/to/nonebot-host/xiu3 stop
 cp -a /path/to/nonebot-host /path/to/nonebot-host.backup
 git -C /path/to/xiuxian3-src pull --ff-only origin work/m9-content-data
 bash /path/to/xiuxian3-src/scripts/install.sh update /path/to/nonebot-host --venv /path/to/venv
+/path/to/nonebot-host/xiu3 start
 ```
 
-安装器会拒绝覆盖有未提交改动的源码 checkout。Release 宿主才使用 `xiu3 update` 重新获取 Release 资产。
+源码更新前应保存本地修改，使用 `git pull --ff-only` 保留分支边界。Release 宿主才使用 `xiu3 update` 重新获取 Release 资产。
 
 ## 配置
 
@@ -133,7 +136,7 @@ COMMAND_START=["/"]
 SUPERUSERS=[]
 QQ_BOTS=[]
 # XIUXIAN3_DATA_DIR=./data
-# ONEBOT_V11_ACCESS_TOKEN=请替换为随机令牌
+# ONEBOT_V11_ACCESS_TOKEN=replace-with-your-random-token
 ```
 
 ### QQ 官方机器人
@@ -144,7 +147,7 @@ QQ_BOTS=[]
 QQ_BOTS='[{"id":"APP_ID","token":"APP_TOKEN","secret":"APP_SECRET","use_websocket":true,"intent":{"c2c_group_at_messages":true,"direct_message":true}}]'
 ```
 
-`xiu3 login`（Windows 为 `& .\xiu3.ps1 login`）是可选的 QQ 官方 bot 绑定辅助，实际调用 `q.qq.com` 的绑定页面和接口并更新 `.env`；它不是 OneBot/NapCat 的扫码登录，也不能替代手动维护 `QQ_BOTS` 凭据。真实 QQ 权限和客户端呈现由部署者在官方平台验收。
+`xiu3 login`（Windows 为 `& .\xiu3.ps1 login`）是可选的 QQ 官方 bot 绑定辅助，实际调用 QQ 的绑定页面和接口并更新 `.env`；它不是 OneBot/NapCat 的扫码登录，也不能替代手动维护 `QQ_BOTS` 凭据。Markdown 和自定义键盘需要对应的平台权限。
 
 ### OneBot V11
 
@@ -157,7 +160,7 @@ ws://服务器地址:8080/onebot/v11/ws
 NapCat/OneBot 与宿主两端使用同一个 `ONEBOT_V11_ACCESS_TOKEN`：
 
 ```dotenv
-ONEBOT_V11_ACCESS_TOKEN=请替换为随机令牌
+ONEBOT_V11_ACCESS_TOKEN=replace-with-your-random-token
 ```
 
 Docker Compose 中宿主地址为 `ws://xiuxian3:8080/onebot/v11/ws`。只使用 OneBot 时保持 `QQ_BOTS=[]`；不要把 OneBot 登录信息写进 `QQ_BOTS`。
@@ -205,15 +208,13 @@ tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
 - [玩家使用指南](docs/usage.md)
 - [安装与更新](docs/installation.md)
 - [发布与分发](docs/release-distribution.md)
-- [玩法文档索引](docs/index.md)
-- [基础系统](docs/foundation/README.md)
-- [核心玩法](docs/gameplay/README.md)
-- [适配器说明](docs/extensions/adapters/README.md)
-- [运行与安全](docs/operations.md)
+- [开发与架构文档](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/index.md)
+- [适配器说明](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/extensions/adapters/README.md)
+- [运行与安全](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/operations.md)
 - `data/`：JSON 内容定义；安装器只补宿主中缺失的内容文件
 - 正常宿主的 PID 和运行日志：`.xiuxian3/nb.pid`、`.xiuxian3/nb.log`
 - `runtime/`：Docker 额外挂载的运行状态目录
-- [QQ 能力配置](docs/operations.md#1-配置层级)：`XIUXIAN3_QQ_CAPABILITIES` 控制 Markdown/键盘与纯文本降级；未配置时沿用默认能力，配置存在但未列当前 AppID 时仅发送文本
+- [QQ 能力配置](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/operations.md#1-配置层级)：`XIUXIAN3_QQ_CAPABILITIES` 控制 Markdown/键盘与纯文本降级
 
 ## 许可证
 

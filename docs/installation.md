@@ -1,6 +1,8 @@
 # 安装、配置与更新
 
-本文只描述当前仓库脚本实际支持的部署方式。要求 Python 3.11+；宿主由 NoneBot 的 `nb run` 启动，插件不单独监听业务端口。
+本文及安装教程适用于 [work/m9-content-data 版本](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/tree/work/m9-content-data)。默认 `main` 的源码与该版本不同，请按下方命令选择对应分支。
+
+以下步骤使用上述分支中的安装脚本。要求 Python 3.11+；宿主由 NoneBot 的 `nb run` 启动，插件不单独监听业务端口。
 
 ## 一键安装
 
@@ -19,7 +21,7 @@ bash scripts/onekey.sh install --source-mode source --mirror direct
 
 ### Release（发布后使用）
 
-GitHub Release 发布 `project.tar.gz` 后，可通过同一分支的远程脚本安装。脚本优先尝试 Release 代理地址，失败后回退 GitHub 直连；当前 `latest` API 返回 404，因此当前部署不要复制此段。
+GitHub Release 发布 `project.tar.gz` 后，可通过同一分支的远程脚本安装。脚本优先尝试 Release 代理地址，失败后回退 GitHub 直连；当前 `latest` API 返回 404；当前请使用上方源码安装步骤。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/work/m9-content-data/scripts/onekey.sh \
@@ -93,16 +95,17 @@ cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
 ```
 
-当前分支的源码更新不要使用 `xiu3 update`：控制脚本默认跟踪 `origin main`。请先备份并停止宿主，再明确拉取当前分支并重新安装：
+当前分支的源码更新不要使用 `xiu3 update`：控制脚本默认跟踪 `origin main`。请先停止宿主并备份，再明确拉取当前分支并重新安装：
 
 ```bash
 /path/to/nonebot-host/xiu3 stop
 cp -a /path/to/nonebot-host /path/to/nonebot-host.backup
 git -C /path/to/xiuxian3-src pull --ff-only origin work/m9-content-data
 bash /path/to/xiuxian3-src/scripts/install.sh update /path/to/nonebot-host --venv /path/to/venv
+/path/to/nonebot-host/xiu3 start
 ```
 
-安装器要求 checkout 工作树干净；未提交修改不会被覆盖。Release 宿主才使用 `xiu3 update` 重新获取 Release 资产。
+更新前先保存本地源码修改；`git pull --ff-only` 不会强制覆盖分支。Release 宿主才使用 `xiu3 update` 重新获取 Release 资产。
 
 ## 已有宿主手动安装
 
@@ -114,7 +117,30 @@ bash scripts/install.sh install /path/to/nonebot-host --venv /path/to/venv
 
 该脚本会在指定 venv 中安装 `requirements.txt`、QQ/OneBot 适配器、FastAPI/HTTPX/websockets/AIOHTTP 和插件本身，并只复制宿主中缺失的 `bot.py`、`pyproject.toml`、`.env` 与 `data/*.json`。已有宿主的配置、代码和数据不会覆盖。宿主必须包含可由 `nb run` 加载的 `bot.py` 和 `pyproject.toml`。
 
-如果只想手动执行步骤，顺序必须保持：创建 Python 3.11+ venv → `pip install -r requirements.txt` → `nb adapter install QQ` 与 `OneBot V11` → `nb driver install FastAPI HTTPX websockets AIOHTTP` → `pip install --no-deps /path/to/nonebot_plugin_xiuxian_3`。不要把插件安装到正在运行的另一套 venv。
+### 不使用安装脚本
+
+已取得对应分支源码且安装了 Python 3.11+ 时，可在仓库根目录执行以下步骤。Linux/Termux 示例：
+
+```bash
+XIUXIAN3_SRC="$PWD"
+XIUXIAN3_HOST="$HOME/xiu3"
+XIUXIAN3_ENV="$HOME/myenv"
+python3 -m venv "$XIUXIAN3_ENV"
+"$XIUXIAN3_ENV/bin/python" -m pip install -r requirements.txt
+mkdir -p "$XIUXIAN3_HOST"
+cp -n examples/nonebot/bot.py examples/nonebot/pyproject.toml "$XIUXIAN3_HOST/"
+if [ ! -f "$XIUXIAN3_HOST/.env" ]; then cp examples/nonebot/.env.example "$XIUXIAN3_HOST/.env"; fi
+cp -Rn data "$XIUXIAN3_HOST/"
+"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" adapter install --no-restrict-version QQ
+"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" adapter install --no-restrict-version "OneBot V11"
+"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" driver install FastAPI
+"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" driver install HTTPX
+"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" driver install websockets
+"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" driver install AIOHTTP
+"$XIUXIAN3_ENV/bin/python" -m pip install --no-deps "$XIUXIAN3_SRC"
+```
+
+填写宿主 `.env` 后执行 `"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" run`。此方式不生成 `xiu3` 管理命令；已有宿主需要在其启动入口注册适配器并在 `pyproject.toml` 加载插件，不能覆盖原入口。
 
 ## 最小配置
 
@@ -143,10 +169,10 @@ QQ_BOTS='[{"id":"APP_ID","token":"APP_TOKEN","secret":"APP_SECRET","use_websocke
 OneBot 反向 WebSocket 两端使用同一个随机令牌：
 
 ```dotenv
-ONEBOT_V11_ACCESS_TOKEN=请替换为随机令牌
+ONEBOT_V11_ACCESS_TOKEN=replace-with-your-random-token
 ```
 
-`xiu3 login`（Windows 为 `& .\xiu3.ps1 login`）是可选的 QQ 官方 bot 绑定辅助，实际调用 `q.qq.com` 的绑定页面和接口并把结果安全写回 `.env`；它不是 OneBot/NapCat 扫码登录。真实官方账号权限和客户端显示仍需部署者验证。
+`xiu3 login`（Windows 为 `& .\xiu3.ps1 login`）是可选的 QQ 官方 bot 绑定辅助，实际调用 QQ 的绑定页面和接口并把结果安全写回 `.env`；它不是 OneBot/NapCat 扫码登录。Markdown 和自定义键盘需要对应的平台权限。
 
 ### OneBot V11
 
@@ -184,7 +210,7 @@ xiu3 update
 xiu3 start
 ```
 
-正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](operations.md#1-配置层级) 控制；未配置时沿用默认能力，配置存在但未列当前 AppID 时仅发送文本。
+正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/operations.md#1-配置层级) 控制，未配置时沿用默认富消息能力；配置存在但未列出当前 AppID 时使用纯文本。
 
 ## 排错
 
@@ -202,4 +228,4 @@ tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
 - OneBot 无消息：检查 NapCat 的反向 WebSocket URL、端口、防火墙和连接日志。
 - Release 下载失败：先重试，再使用 `--mirror direct`；需要源码时显式使用 `--source-mode source`。
 
-完整玩法入口和数据目录见 [文档索引](index.md)；发布资产规则见 [发布分发](release-distribution.md)。
+常用命令和玩法流程见 [玩家使用指南](usage.md)；发布资产规则见 [发布分发](release-distribution.md)。
