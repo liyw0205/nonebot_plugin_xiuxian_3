@@ -1,0 +1,80 @@
+name: Quality and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install quality dependencies
+        run: python -m pip install -r requirements.txt "pytest>=8,<10"
+      - name: Run focused quality tests
+        run: python -m pytest -q test/test_installation_docs.py
+      - name: Compile Python sources
+        run: python -m compileall -q nonebot_plugin_xiuxian_3 examples docker
+      - name: Check shell entrypoints
+        run: bash -n scripts/onekey.sh scripts/install.sh scripts/install_termux.sh scripts/control.sh
+
+  install-smoke:
+    runs-on: ubuntu-latest
+    env:
+      XIUXIAN3_SOURCE_MODE: source
+      PIP_INDEX_URL: https://pypi.org/simple
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install from checkout
+        run: bash scripts/onekey.sh install --target "$RUNNER_TEMP/xiu3" --source-mode source --mirror direct --index-url https://pypi.org/simple
+      - name: Verify isolated runtime and preserved files
+        run: |
+          test -x "$RUNNER_TEMP/xiu3/xiu3"
+          test -f "$RUNNER_TEMP/xiu3/.env"
+          test -f "$RUNNER_TEMP/xiu3/data/内容清单.json"
+          "$HOME/myenv/bin/python" -c 'import nonebot_plugin_xiuxian_3'
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [quality, install-smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate release tag
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+      - name: Build release asset
+        run: |
+          tar --exclude=.git --exclude=.github --exclude=project.tar.gz -czf project.tar.gz .
+          tar -tzf project.tar.gz | grep -Fx './pyproject.toml'
+          tar -tzf project.tar.gz | grep -Fx './scripts/onekey.sh'
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" project.tar.gz --verify-tag --generate-notes
