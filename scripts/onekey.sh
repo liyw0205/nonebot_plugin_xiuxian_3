@@ -6,21 +6,18 @@ REPOSITORY="https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
 RELEASE_ARCHIVE="https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
 RELEASE_MIRRORS=(
     "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
-    "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
     "https://ghfast.top/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
     "https://ghproxy.vip/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
     "https://gh-proxy.org/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
 )
 ACCELERATED_REPOSITORIES=(
     "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
-    "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
     "https://ghfast.top/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
     "https://ghproxy.vip/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
     "https://gh-proxy.org/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
 )
 ACCELERATED_PROBES=(
     "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
-    "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
     "https://ghfast.top/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
     "https://ghproxy.vip/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
     "https://gh-proxy.org/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"

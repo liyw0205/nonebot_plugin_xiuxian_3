@@ -18,7 +18,7 @@
 3. 直连也失败时停止并保留已有宿主、`.env`、SQLite、`data/` 和 `runtime/`；不会偷偷把 Release 安装切换成未标记的 `main` 源码。
 4. 源码开发必须显式传入 `--source-mode source`，更新要求 Git 工作树干净并 fast-forward。
 
-当前保留的加速域名均已对本仓库的 Git refs 入口做过轻量验证（HTTP 200、`application/x-git-upload-pack-advertisement`）：`gh-proxy.com`、`ghproxy.net`、`ghfast.top`、`ghproxy.vip`、`gh-proxy.org`。由于当前没有 Release，它们的资产 URL 都只能记录为“待首个 Release 验证”，不能写成已下载成功。
+当前保留的加速域名均已对本仓库的 Git refs 入口做过轻量验证（HTTP 200、`application/x-git-upload-pack-advertisement`）：`gh-proxy.com`、`ghfast.top`、`ghproxy.vip`、`gh-proxy.org`。由于当前没有 Release，它们的资产 URL 都只能记录为“待首个 Release 验证”，不能写成已下载成功。
 
 ## 数据保护
 

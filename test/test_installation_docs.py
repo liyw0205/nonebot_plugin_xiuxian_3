@@ -61,8 +61,8 @@ def test_user_install_guides_start_with_remote_bootstrap() -> None:
     assert "--mirror accelerated" in installation
     assert "$HOME/xiu3" in readme
     assert "$HOME/xiu3" in installation
-    assert "ghproxy.net" in readme
-    assert "ghproxy.net" in installation
+    assert "ghfast.top" in readme
+    assert "ghfast.top" in installation
 
 
 def test_adapters_and_drivers_are_installed_through_nb_cli() -> None:
@@ -111,12 +111,12 @@ def test_qq_login_helper_is_installed_and_documented() -> None:
 def test_accelerated_bootstraps_benchmark_a_proxy_group() -> None:
     shell_bootstrap = (ROOT / "scripts/onekey.sh").read_text(encoding="utf-8")
     windows_bootstrap = (ROOT / "scripts/onekey_windows.ps1").read_text(encoding="utf-8")
-    domains = ("gh-proxy.com", "ghproxy.net", "ghfast.top", "ghproxy.vip", "gh-proxy.org")
+    domains = ("gh-proxy.com", "ghfast.top", "ghproxy.vip", "gh-proxy.org")
     for domain in domains:
         assert domain in shell_bootstrap
         assert domain in windows_bootstrap
-    assert shell_bootstrap.count("https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs") == 5
-    assert windows_bootstrap.count(".git/info/refs?service=git-upload-pack") == 5
+    assert shell_bootstrap.count("https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs") == 4
+    assert windows_bootstrap.count(".git/info/refs?service=git-upload-pack") == 4
     assert "select_fastest_proxy" in shell_bootstrap
     assert "Get-FastestProxyRepository" in windows_bootstrap
     assert "time_starttransfer" in shell_bootstrap

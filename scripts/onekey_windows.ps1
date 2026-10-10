@@ -14,7 +14,6 @@ $Repository = "https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
 $ReleaseArchive = "https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
 $ReleaseMirrors = @(
     "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz",
-    "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz",
     "https://ghfast.top/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz",
     "https://ghproxy.vip/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz",
     "https://gh-proxy.org/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
@@ -24,11 +23,6 @@ $AcceleratedRepositories = @(
         Name = "gh-proxy.com"
         Repository = "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
         Probe = "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
-    },
-    [PSCustomObject]@{
-        Name = "ghproxy.net"
-        Repository = "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
-        Probe = "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
     },
     [PSCustomObject]@{
         Name = "ghfast.top"

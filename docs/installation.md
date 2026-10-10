@@ -27,7 +27,7 @@ bash scripts/onekey.sh install \
 
 `--mirror` 可选 `direct`、`accelerated` 或 `custom`；自定义模式用 `--mirror-url URL` 指定完整的 `project.tar.gz` 地址。`--source-mode release` 强制使用 Release，`auto` 在仓库内运行时使用当前源码，在远程引导时使用 Release。
 
-代理组包含 `gh-proxy.com`、`ghproxy.net`、`ghfast.top`、`ghproxy.vip` 和 `gh-proxy.org`；每个地址失败后都会继续尝试，最后回退 GitHub 直连。
+代理组包含 `gh-proxy.com`、`ghfast.top`、`ghproxy.vip` 和 `gh-proxy.org`；每个地址失败后都会继续尝试，最后回退 GitHub 直连。
 
 安装完成后：
 

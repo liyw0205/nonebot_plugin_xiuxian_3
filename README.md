@@ -41,7 +41,7 @@ curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/m
 curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh | bash -s -- install --mirror accelerated
 ```
 
-可用代理包括 `gh-proxy.com`、`ghproxy.net`、`ghfast.top`、`ghproxy.vip` 和 `gh-proxy.org`。安装选项、更新、卸载和故障处理见[安装文档](docs/installation.md)。
+可用代理包括 `gh-proxy.com`、`ghfast.top`、`ghproxy.vip` 和 `gh-proxy.org`。安装选项、更新、卸载和故障处理见[安装文档](docs/installation.md)。
 
 安装完成后编辑 `$HOME/xiu3/.env`，再运行：
 
