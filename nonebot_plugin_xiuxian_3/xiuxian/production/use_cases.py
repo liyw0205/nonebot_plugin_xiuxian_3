@@ -39,6 +39,7 @@ from ..repository import (
 )
 from .endgame_rules import resolve_endgame_recipe
 from .rules import UnknownRecipeError, item_label, resolve_recipe
+from ..utils.text import command_link
 
 
 class ProductionApplication:
@@ -83,17 +84,17 @@ class ProductionApplication:
                 operation_id=operation_id,
             )
         except UnknownRecipeError:
-            return CommandResult(False, "RECIPE_NOT_FOUND", "请指定可用配方，例如 `生产预览 疗伤丹`。", context.request_id)
+            return CommandResult(False, "RECIPE_NOT_FOUND", f"先用{command_link('生产预览', '生产预览')}填写配方名，例如疗伤丹；{command_link('生活篇', '修仙帮助 生活')}可查看制作流程。", context.request_id)
         except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+            return CommandResult(False, "PLAYER_NOT_FOUND", f"还没有角色，先{command_link('开始修仙', '开始修仙')}。", context.request_id)
         except CrossRealmAllianceMissingError:
             return CommandResult(False, "CROSS_REALM_ALLIANCE_MISSING", "缺少妖修道途或契约盟约，暂不能制作跨界契约。", context.request_id)
         except CrossRealmRecipeLockedError:
             return CommandResult(False, "CROSS_REALM_RECIPE_LOCKED", "跨界契约配方尚未在当前境界或地点开放。", context.request_id)
         except RecipeRequirementError:
-            return CommandResult(False, "RECIPE_REQUIREMENT_MISSING", "当前道途、境界或地点不满足这条配方。", context.request_id)
+            return CommandResult(False, "RECIPE_REQUIREMENT_MISSING", f"道途、境界或地点尚不满足这条配方，可看{command_link('我的状态', '我的状态')}核对准备。", context.request_id)
         except PlayerStageConflictError:
-            return CommandResult(False, "RECIPE_REQUIREMENT_MISSING", "完成入道后才能进行正式生产。", context.request_id)
+            return CommandResult(False, "RECIPE_REQUIREMENT_MISSING", f"完成入道后才能进行正式生产，{command_link('修炼篇', '修仙帮助 修炼')}可查看入道准备。", context.request_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能查看生产。", context.request_id)
         except RepositoryBusyError:
@@ -105,15 +106,15 @@ class ProductionApplication:
             True,
             "RECIPE_PREVIEW",
             (
-                f"## {record.recipe_name} · 生产预览\n\n"
+                f"**{record.recipe_name} · 生产预览**\n\n"
                 f"- **精力消耗**：{record.energy_cost}\n"
                 f"- **预计时长**：{record.duration_seconds} 秒\n"
                 f"- **今日次数**：{record.daily_used}/{record.daily_limit}\n"
                 f"- **灵石消耗**：{record.currency_cost}\n"
                 + tool_text
-                + "\n### 所需材料\n\n"
+                + "\n**所需材料**\n\n"
                 + "\n".join(f"- **{item_label(key, self.repository.content)}** ×{value}" for key, value in record.inputs.items())
-                + f"\n\n> 下一步：发送 `开始生产 {record.recipe_name}`，锁定材料并开始。"
+                + f"\n\n备妥后{command_link('开始生产 ' + record.recipe_name, '开始生产 ' + record.recipe_name)}，交付材料开始制作。"
             ),
             context.request_id,
             operation_id,

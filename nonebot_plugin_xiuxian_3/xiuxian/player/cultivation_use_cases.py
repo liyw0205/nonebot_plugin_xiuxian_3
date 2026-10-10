@@ -23,6 +23,7 @@ from .path_rules import (
     subprofession_records,
 )
 from .rules import STAGE_LABELS
+from ..utils.text import command_link
 
 
 class CultivationApplication:
@@ -74,9 +75,9 @@ class CultivationApplication:
                     operation_id=operation_id,
                 )
         except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+            return CommandResult(False, "PLAYER_NOT_FOUND", f"还没有角色，先{command_link('开始修仙', '开始修仙')}。", context.request_id, operation_id)
         except PlayerStageConflictError:
-            return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成三项凡人引导后，才能选择道途入道。", context.request_id, operation_id)
+            return CommandResult(False, "PLAYER_STAGE_CONFLICT", f"完成三项凡人引导后，才能选择道途入道；{command_link('我的状态', '我的状态')}可查看进度和下一步。", context.request_id, operation_id)
         except PathAlreadySelectedError:
             return CommandResult(False, "PATH_ALREADY_SELECTED", "你已经选择过首要道途，不能重复选择。", context.request_id, operation_id)
         except SubprofessionRequiredError:
@@ -127,7 +128,7 @@ class CultivationApplication:
             + f"- **境界**：感气一层\n"
             f"- **灵石**：{player.spirit_stones}\n"
             f"- **入道所得**：{reward_hint}\n\n"
-            "> 下一步：查看 `我的状态`，确认你的修行构筑。"
+            f"{command_link('我的状态', '我的状态')}可查看你的修行构筑。"
         )
         return CommandResult(
             True,

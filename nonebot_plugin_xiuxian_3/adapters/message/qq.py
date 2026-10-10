@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Iterable
 from urllib.parse import quote
 
+from ...contracts import CommandAction
 from .common import MessageSendResult, require_adapter, require_content, send_text_message, message_id_from_response
 from .markdown import qq_markdown_segment
 
@@ -46,7 +47,11 @@ def qq_command_link(label: str, command: str) -> str:
     )
 
 
-def qq_keyboard(rows: Iterable[Iterable[tuple[str, str]]]) -> Any:
+def qq_keyboard(
+    rows: Iterable[Iterable[tuple[str, str] | CommandAction]],
+    *,
+    command_prefix: str = "",
+) -> Any:
     """Construct a QQ inline keyboard without importing SDK types at module load."""
 
     try:
@@ -66,18 +71,23 @@ def qq_keyboard(rows: Iterable[Iterable[tuple[str, str]]]) -> Any:
     keyboard_rows = []
     for row in rows:
         buttons = []
-        for label, command in row:
+        for index, item in enumerate(row):
+            if isinstance(item, CommandAction):
+                label, command, enter = item.label, item.command, item.enter
+            else:
+                label, command = item
+                enter = False
             text = str(label or " ").replace("\r", " ").replace("\n", " ").strip() or " "
-            action_data = str(command or text).replace("\r", " ").replace("\n", " ").strip() or text
+            action_data = command_prefix + (str(command or text).replace("\r", " ").replace("\n", " ").strip() or text)
             buttons.append(
                 Button(
-                    id=f"xiuxian3:{quote(action_data, safe='')[:48]}",
+                    id=f"xiuxian3:{len(keyboard_rows)}:{index}",
                     render_data=RenderData(label=text, visited_label=text, style=1),
                     action=Action(
                         type=2,
                         permission=Permission(type=2),
                         data=action_data,
-                        enter=False,
+                        enter=enter,
                         reply=False,
                     ),
                 )

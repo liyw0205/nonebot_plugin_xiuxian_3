@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..content import ContentBundle
 from ..progression.rules import segment_for_layer
 from ..repository import (
@@ -30,6 +30,7 @@ from .rules import (
 from ..utils.player import player_profile_values, player_projection
 from ..stats.presentation import PROFILE_STATS, stat_lines
 from ..content import ContentError
+from ..utils.text import command_link
 
 
 class PlayerApplication:
@@ -160,22 +161,21 @@ class PlayerApplication:
         if record.created:
             code = "PLAYER_CREATED"
             message = (
-                "## 身份登记完成\n\n"
+                "**身份登记完成**\n\n"
                 f"**{self._display_name(player)}**，你的修仙身份已经建立。\n\n"
-                f"- **道号**：{self._display_name(player)}\n"
+                f"- **道号**：{self._display_name(player)} · {command_link('改名', '修仙改名')}\n"
                 "- **当前阶段**：新用户\n"
                 "- **灵石**：0\n\n"
-                "> 下一步：发送 `寻仙问道`，开始生成你的入道资质。\n"
-                "> 尚未取道号？之后可使用 `修仙改名 道号`，首次改名无需改名卡。"
+                "下一步可寻仙问道，了解自己的入道资质。首次取道号无需改名卡。"
             )
         else:
             code = "PLAYER_ALREADY_EXISTS"
             message = (
-                "## 角色已经存在\n\n"
+                "**角色已经存在**\n\n"
                 f"**{self._display_name(player)}**，你已经登记过修仙身份。\n\n"
-                f"- **道号**：{self._display_name(player)}\n"
+                f"- **道号**：{self._display_name(player)} · {command_link('改名', '修仙改名')}\n"
                 f"- **当前阶段**：{self._stage_text(player.stage)}\n\n"
-                "> 可发送 `我的状态` 查看详细资料。"
+                f"{command_link('我的状态', '我的状态')}可查看详细资料。"
             )
         return CommandResult(
             ok=True,
@@ -183,6 +183,7 @@ class PlayerApplication:
             message=message,
             request_id=context.request_id,
             operation_id=operation_id,
+            actions=(CommandAction("寻仙问道", "寻仙问道", enter=True),) if record.created else (),
             data={
                 **player_projection(
                     player,
@@ -204,7 +205,7 @@ class PlayerApplication:
                 operation_id=operation_id,
             )
         except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "尚未登记角色，请先发送“开始修仙”。", context.request_id, operation_id)
+            return CommandResult(False, "PLAYER_NOT_FOUND", f"尚未登记角色，先{command_link('开始修仙', '开始修仙')}，再来寻仙。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能写入。", context.request_id, operation_id)
         except OperationConflictError:
@@ -219,7 +220,7 @@ class PlayerApplication:
         player = record.player
         if record.created:
             message = (
-                "## 寻仙问道成功\n\n"
+                "**寻仙问道成功**\n\n"
                 f"**{self._display_name(player)}**，你已踏入凡人阶段。\n\n"
                 f"- **道号**：{self._display_name(player)}\n"
                 f"- **阶段**：{self._stage_text(player.stage)}\n"
@@ -227,9 +228,9 @@ class PlayerApplication:
                 f"- **体力**：{player.stamina}/{player.stamina_max}\n"
                 f"- **精力**：{player.energy}/{player.energy_max}\n"
                 "- **初始物资**：启程所需物资已收入囊中\n\n"
-                "### 六项资质\n\n"
+                "**六项资质**\n\n"
                 + self._qualification_text(player.qualification)
-                + "\n\n> 下一步：发送 `完成引导 阅读`，开始凡人引导。"
+                + "\n\n接下来先读世界说明，开启凡人引导。"
             )
             code = "SEEKING_STARTED"
         else:
@@ -239,7 +240,7 @@ class PlayerApplication:
                 f"- **道号**：{self._display_name(player)}\n"
                 f"- **当前阶段**：{self._stage_text(player.stage)}\n"
                 f"- **灵石**：{player.spirit_stones}\n\n"
-                "> 可发送 `我的状态` 查看完整资料。"
+                f"{command_link('我的状态', '我的状态')}可查看完整资料。"
             )
             code = "SEEKING_ALREADY_DONE"
         return CommandResult(
@@ -248,6 +249,7 @@ class PlayerApplication:
             message=message,
             request_id=context.request_id,
             operation_id=operation_id,
+            actions=(CommandAction("阅读世界说明", "完成引导 阅读", enter=True),) if record.created else (),
             data={
                 **player_projection(
                     player,
@@ -283,7 +285,7 @@ class PlayerApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         if player is None:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送“开始修仙”。", context.request_id)
+            return CommandResult(False, "PLAYER_NOT_FOUND", f"还没有角色，先{command_link('开始修仙', '开始修仙')}，写下你的道号。", context.request_id)
         values = player_profile_values(player)
         stats_summary = (
             "\n\n### 周身气象\n\n" + "\n".join(stat_lines(stats["derived_stats"], PROFILE_STATS))
@@ -320,12 +322,17 @@ class PlayerApplication:
             if values["realm_key"] in {"dao_union", "tribulation"} or values["endgame_status"] != "none"
             else ""
         )
+        next_step = ""
+        if player.stage == "new_user":
+            next_step = command_link("寻仙问道", "寻仙问道") + "，了解资质并领取启程物资。"
+        elif player.stage in {"mortal", "seeker"}:
+            next_step = self.intro._guide_hint(player)
         return CommandResult(
             ok=True,
             code="PROFILE_READ",
             message=(
-                "## 我的修仙信息\n\n"
-                f"- **道号**：{self._display_name(player)}\n"
+                "**我的修仙信息**\n\n"
+                f"- **道号**：{self._display_name(player)} · {command_link('改名', '修仙改名')}\n"
                 f"- **阶段**：{self._stage_text(values['stage'])}\n"
                 f"- **状态**：{self._status_text(values['status'])}\n"
                 f"- **位置**：{self._location_text(values['location_key'])}\n"
@@ -348,6 +355,7 @@ class PlayerApplication:
                 f"{self._qualification_text(values['qualification'])}"
                 f"{stats_summary}"
                 f"\n\n### 凡人引导\n\n- **进度**：{len(set(values['intro_flags']))}/3"
+                + ("\n\n" + next_step if next_step else "")
             ),
             request_id=context.request_id,
             data={**values, "stats": stats},
@@ -358,7 +366,7 @@ class PlayerApplication:
             return CommandResult(
                 False,
                 "INVALID_DAO_NAME",
-                "请使用 `修仙改名 道号`，道号长度不能超过 7 个字。",
+                f"用{command_link('修仙改名', '修仙改名')}填写新道号，长度不能超过 7 个字。",
                 context.request_id,
             )
         try:
@@ -379,7 +387,7 @@ class PlayerApplication:
                 operation_id=operation_id,
             )
         except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+            return CommandResult(False, "PLAYER_NOT_FOUND", f"还没有角色，先{command_link('开始修仙', '开始修仙')}，再来取道号。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能修改道号。", context.request_id, operation_id)
         except DaoNameTakenError:

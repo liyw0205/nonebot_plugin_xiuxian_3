@@ -149,13 +149,33 @@ def test_internal_command_link_becomes_qq_blue_text_and_keeps_plain_label(monkey
         plain_bot = FakeBot()
         plain_result = await send_markdown_message(plain_bot, "event", markdown)
         assert plain_result.sent_format == "text"
-        assert plain_bot.sent[0][1] == "接取"
+        assert plain_bot.sent[0][1] == "接取（接取悬赏 bounty.herb_supply）"
 
     asyncio.run(run())
 
 
 def test_markdown_to_text_preserves_code_content() -> None:
     assert markdown_to_text("```text\n灵石: 100\n```") == "灵石: 100"
+
+
+def test_onebot_shared_sender_keeps_commands_and_drops_qq_controls() -> None:
+    from nonebot_plugin_xiuxian_3.contracts import CommandAction
+    from nonebot_plugin_xiuxian_3.xiuxian.utils.text import command_link
+
+    class FakeOneBot(FakeBot):
+        __module__ = "nonebot.adapters.onebot.v11.bot"
+
+    async def run() -> None:
+        bot = FakeOneBot()
+        result = await send_markdown_message(
+            bot, "event", "道号：青云 · " + command_link("改名", "修仙改名"),
+            actions=(CommandAction("查看图鉴", "我的图鉴", enter=True),),
+            capabilities=("markdown", "keyboard"), command_prefix="/",
+        )
+        assert result.sent_format == "text" and result.degraded
+        assert bot.sent[0][1] == "道号：青云 · 改名（修仙改名）\n\n可发送：我的图鉴"
+
+    asyncio.run(run())
 
 
 def test_onebot_v11_specific_senders() -> None:

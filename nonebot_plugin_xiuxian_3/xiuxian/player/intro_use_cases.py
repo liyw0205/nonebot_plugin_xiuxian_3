@@ -29,6 +29,7 @@ from .intro_rules import (
     resolve_service,
 )
 from .rules import STAGE_LABELS
+from ..utils.text import command_link
 
 
 class IntroApplication:
@@ -67,8 +68,16 @@ class IntroApplication:
     def _guide_hint(player) -> str:
         pending = [key for key in GUIDE_LABELS if key not in set(player.intro_flags)]
         if not pending:
-            return "发送 `选择道途 体修`，选择你的首要修行方向。"
-        return "、".join(f"`完成引导 {GUIDE_COMMANDS[key]}`" for key in pending)
+            return f"用{command_link('选择道途', '选择道途')}填写自己的修行方向。"
+        key = pending[0]
+        if key == GUIDE_GATHER_BLOOD_GRASS and player.location_key != "xuantian.outskirts":
+            return f"先{command_link('前往近郊', '前往近郊')}，再完成教学采集。"
+        if key == GUIDE_CHOOSE_SERVICE:
+            return "选择一项生产教学：" + "、".join(
+                command_link(f"完成引导 {name}", f"完成引导 {name}") for name in SERVICE_LABELS.values()
+            ) + "。"
+        command = f"完成引导 {GUIDE_COMMANDS[key]}"
+        return command_link(command, command) + "，继续凡人引导。"
 
     async def complete_intro(self, context: CommandContext) -> CommandResult:
         guide_key, service_key, error = self._parse_guide(context.command_args)
@@ -84,13 +93,13 @@ class IntroApplication:
                 operation_id=operation_id,
             )
         except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+            return CommandResult(False, "PLAYER_NOT_FOUND", f"还没有角色，先{command_link('开始修仙', '开始修仙')}。", context.request_id, operation_id)
         except PlayerStageConflictError:
-            return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成引导需要先完成 `寻仙问道`，且当前阶段必须是凡人。", context.request_id, operation_id)
+            return CommandResult(False, "PLAYER_STAGE_CONFLICT", f"凡人引导在寻仙后、入道前进行；{command_link('我的状态', '我的状态')}可查看当前阶段与下一步。", context.request_id, operation_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色处于暂停状态，暂时不能完成引导。", context.request_id, operation_id)
         except LocationRequiredError:
-            return CommandResult(False, "LOCATION_REQUIRED", "教学采集需要先发送 `前往近郊`。", context.request_id, operation_id)
+            return CommandResult(False, "LOCATION_REQUIRED", f"教学采集在玄天近郊，先{command_link('前往近郊', '前往近郊')}。", context.request_id, operation_id)
         except ResourceInsufficientError as exc:
             resource = "体力" if "stamina" in str(exc) else "精力"
             return CommandResult(False, "RESOURCE_INSUFFICIENT", f"{resource}不足，暂时无法完成这项引导。", context.request_id, operation_id)
@@ -137,7 +146,7 @@ class IntroApplication:
         if record.stage_advanced:
             message = message.replace(
                 f"> 下一步：{self._guide_hint(player)}",
-                "> 三项引导已完成，你已成为求道者。下一步：发送 `选择道途 体修`。",
+                f"三项引导已完成，你已成为求道者。{self._guide_hint(player)}",
             )
         return CommandResult(
             True,

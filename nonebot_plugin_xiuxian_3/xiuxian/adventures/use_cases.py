@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Mapping
-from urllib.parse import quote
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
@@ -22,6 +21,7 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .rules import resolve_bounty
+from ..utils.text import command_link
 
 STATUS_LABELS = {
     "available": "可接取",
@@ -93,7 +93,7 @@ class AdventuresApplication:
 
     @staticmethod
     def _command_link(label: str, command: str) -> str:
-        return f"[{label}](command:{quote(command, safe='')})"
+        return command_link(label, command)
 
     def _bounty_args(self, args: tuple[str, ...]) -> tuple[bool, str | None]:
         if not args:
@@ -111,7 +111,7 @@ class AdventuresApplication:
                 platform_user_id=context.user_id,
             )
         except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+            return CommandResult(False, "PLAYER_NOT_FOUND", f"还没有角色，先{command_link('开始修仙', '开始修仙')}。", context.request_id)
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看悬赏榜。", context.request_id)
         except RepositoryBusyError:
@@ -127,7 +127,7 @@ class AdventuresApplication:
             deadline = self._deadline_text(offer.expires_at)
             expires = f"\n  - **截止**：{deadline}" if deadline else ""
             if offer.status == "available":
-                action = self._command_link("接取", f"接取悬赏 {offer.key}")
+                action = self._command_link("接取", f"接取悬赏 {offer.label}")
             elif offer.status == "completed":
                 action = self._command_link("领取", "领取悬赏")
             else:

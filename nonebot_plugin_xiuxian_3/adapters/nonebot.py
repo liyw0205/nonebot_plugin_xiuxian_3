@@ -119,6 +119,21 @@ def _canonical_command(text: str, commands: tuple[str, ...]) -> str | None:
     return None
 
 
+def _reply_command_prefix() -> str:
+    """Use an enabled prefix for interactive payloads, without displaying it."""
+
+    try:
+        from nonebot import get_driver
+
+        configured = get_driver().config.command_start
+    except (ImportError, AttributeError, ValueError):
+        return "/"
+    if isinstance(configured, str):
+        return configured
+    prefixes = sorted(prefix for prefix in (configured or ()) if isinstance(prefix, str))
+    return prefixes[0] if prefixes else ""
+
+
 def _matches_seek_command(text: str, commands: tuple[str, ...]) -> bool:
     """Return whether text starts with a command registered by the router."""
 
@@ -171,6 +186,8 @@ def _handler_for(
                     current,
                     result.message,
                     capabilities=normalized.context.capabilities,
+                    actions=result.actions,
+                    command_prefix=_reply_command_prefix(),
                 )
             except Exception:
                 # A delivery failure leaves the event eligible for transport retry.

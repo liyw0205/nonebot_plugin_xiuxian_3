@@ -38,6 +38,15 @@ class CommandContext:
 
 
 @dataclass(frozen=True, slots=True)
+class CommandAction:
+    """A player-facing command; send directly only when its input is complete."""
+
+    label: str
+    command: str
+    enter: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class CommandResult:
     ok: bool
     code: str
@@ -46,6 +55,7 @@ class CommandResult:
     operation_id: str | None = None
     data: dict[str, Any] = field(default_factory=dict)
     retryable: bool = False
+    actions: tuple[CommandAction, ...] = ()
 
 
 def validate_command_identity(
