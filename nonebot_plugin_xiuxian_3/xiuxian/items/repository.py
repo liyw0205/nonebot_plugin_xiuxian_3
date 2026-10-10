@@ -7,12 +7,14 @@ import json
 import sqlite3
 import time
 from datetime import timedelta
+from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..content import bundled_content
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import inventory_amount, reserved_inventory_quantity, spend_player_items
+from ..utils.json_cache import decode_json_strict
 from ..utils.player import change_player_state_actual, player_integer, player_inventory
 from .models import ItemUseRecord
 from .rules import (
@@ -75,7 +77,7 @@ class ItemRepositoryMixin:
         with self._connect() as connection:
             row = connection.execute(
                 """
-                SELECT o.operation_name, o.result_json, p.platform, p.platform_user_id
+                SELECT o.operation_name, o.result_json, o.player_id, p.platform, p.platform_user_id
                 FROM operations AS o
                 JOIN players AS p ON p.id = o.player_id
                 WHERE o.operation_id = ?
@@ -91,12 +93,14 @@ class ItemRepositoryMixin:
         ):
             raise OperationConflictError("operation input differs from its original request")
         try:
-            payload = json.loads(row["result_json"])
-        except (TypeError, json.JSONDecodeError) as exc:
-            raise ValueError("item operation snapshot is invalid") from exc
-        if not isinstance(payload, dict):
-            raise ValueError("item operation snapshot must be an object")
-        self._item_use_from_payload(payload)
+            payload = decode_json_strict(str(row["result_json"]))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise OperationResultMalformedError("item operation snapshot is invalid") from exc
+        self._validate_item_use_payload(
+            payload,
+            platform=platform,
+            platform_user_id=platform_user_id,
+        )
         if not self._item_request_matches(payload, request_args):
             raise OperationConflictError("operation input differs from its original request")
         return self._item_use_from_payload(payload, replay=True)
@@ -223,7 +227,16 @@ class ItemRepositoryMixin:
             if existing is not None:
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._item_use_from_payload(json.loads(existing["result_json"]), replay=True)
+                try:
+                    payload = decode_json_strict(str(existing["result_json"]))
+                except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                    raise OperationResultMalformedError("item operation snapshot is invalid") from exc
+                self._validate_item_use_payload(
+                    payload,
+                    platform=platform,
+                    platform_user_id=platform_user_id,
+                )
+                return self._item_use_from_payload(payload, replay=True)
 
             row = self._require_player(connection, platform, platform_user_id)
             inventory = player_inventory(row)
@@ -357,15 +370,45 @@ class ItemRepositoryMixin:
 
     @staticmethod
     def _item_use_from_payload(payload: dict[str, object], *, replay: bool = False) -> ItemUseRecord:
+        ItemRepositoryMixin._validate_item_use_payload(payload)
         if not isinstance(payload.get("player"), dict):
-            raise ValueError("item operation snapshot player is invalid")
+            raise OperationResultMalformedError("item operation snapshot player is invalid")
+        try:
+            player = SQLitePlayerRepository._row_to_player(payload["player"])
+        except (TypeError, ValueError, KeyError, OverflowError) as exc:
+            raise OperationResultMalformedError("item operation snapshot player is invalid") from exc
+        return ItemUseRecord(
+            player=player,
+            item_key=str(payload["item_key"]),
+            item_name=str(payload["item_name"]),
+            quantity=int(payload.get("quantity", 1)),
+            effect=payload["effect"],
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _validate_item_use_payload(
+        payload: Any,
+        *,
+        platform: str | None = None,
+        platform_user_id: str | None = None,
+    ) -> None:
+        if not isinstance(payload, dict):
+            raise OperationResultMalformedError("item operation snapshot must be an object")
+        player = payload.get("player")
+        if not isinstance(player, dict):
+            raise OperationResultMalformedError("item operation snapshot player is invalid")
+        if platform is not None and player.get("platform") != platform:
+            raise OperationResultMalformedError("item operation snapshot platform is invalid")
+        if platform_user_id is not None and player.get("platform_user_id") != platform_user_id:
+            raise OperationResultMalformedError("item operation snapshot player is invalid")
         if not isinstance(payload.get("item_key"), str) or not str(payload["item_key"]).strip():
-            raise ValueError("item operation snapshot key is invalid")
+            raise OperationResultMalformedError("item operation snapshot key is invalid")
         if not isinstance(payload.get("item_name"), str) or not str(payload["item_name"]).strip():
-            raise ValueError("item operation snapshot name is invalid")
+            raise OperationResultMalformedError("item operation snapshot name is invalid")
         quantity = payload.get("quantity")
-        if not isinstance(quantity, int) or isinstance(quantity, bool) or quantity <= 0:
-            raise ValueError("item operation snapshot quantity is invalid")
+        if type(quantity) is not int or quantity != 1:
+            raise OperationResultMalformedError("item operation snapshot quantity is invalid")
         request_args = payload.get("request_args")
         references = payload.get("item_references")
         if (
@@ -373,43 +416,54 @@ class ItemRepositoryMixin:
             or not request_args
             or any(not isinstance(value, str) for value in request_args)
             or not isinstance(references, list)
+            or not references
             or any(not isinstance(value, str) or not value for value in references)
+            or references[0] != payload["item_key"]
         ):
-            raise ValueError("item operation snapshot references are invalid")
+            raise OperationResultMalformedError("item operation snapshot references are invalid")
         effect = payload.get("effect")
         if not isinstance(effect, dict) or effect.get("type") not in {
             "restore_choice",
             "next_cultivation_state_bonus_bp",
             "exploration_risk_reduction_bp",
         }:
-            raise ValueError("item operation snapshot effect is invalid")
+            raise OperationResultMalformedError("item operation snapshot effect is invalid")
         effect_type = effect["type"]
         if effect_type == "restore_choice":
             if (
                 effect.get("resource") not in {"stamina", "energy"}
                 or not isinstance(effect.get("requested"), int)
                 or isinstance(effect.get("requested"), bool)
+                or effect.get("requested", 0) <= 0
                 or not isinstance(effect.get("restored"), int)
                 or isinstance(effect.get("restored"), bool)
+                or effect.get("restored", -1) < 0
+                or effect.get("restored", 0) > effect.get("requested", 0)
                 or not isinstance(effect.get("cooldown_until"), str)
             ):
-                raise ValueError("item operation snapshot recovery effect is invalid")
+                raise OperationResultMalformedError("item operation snapshot recovery effect is invalid")
+            labels = {"stamina": "体力", "energy": "精力"}
+            if len(request_args) != 2 or request_args[1] not in {effect["resource"], labels[effect["resource"]]}:
+                raise OperationResultMalformedError("item operation snapshot recovery request is invalid")
         elif effect_type == "next_cultivation_state_bonus_bp":
-            if not isinstance(effect.get("state_bp_bonus"), int) or isinstance(effect.get("state_bp_bonus"), bool):
-                raise ValueError("item operation snapshot cultivation effect is invalid")
+            if (
+                not isinstance(effect.get("state_bp_bonus"), int)
+                or isinstance(effect.get("state_bp_bonus"), bool)
+                or effect.get("state_bp_bonus", 0) <= 0
+                or effect.get("pending") is not True
+                or len(request_args) != 1
+            ):
+                raise OperationResultMalformedError("item operation snapshot cultivation effect is invalid")
         elif not all(
             isinstance(effect.get(key), str) and str(effect[key]).strip()
             for key in ("barrier_id", "location_key", "location_name", "expires_at")
         ) or not isinstance(effect.get("risk_reduction_bp"), int) or isinstance(effect.get("risk_reduction_bp"), bool):
-            raise ValueError("item operation snapshot barrier effect is invalid")
-        return ItemUseRecord(
-            player=SQLitePlayerRepository._row_to_player(payload["player"]),
-            item_key=str(payload["item_key"]),
-            item_name=str(payload["item_name"]),
-            quantity=int(payload.get("quantity", 1)),
-            effect=effect,
-            already_completed=replay,
-        )
+            raise OperationResultMalformedError("item operation snapshot barrier effect is invalid")
+        elif len(request_args) != 2 or request_args[1] not in {
+            effect["location_key"],
+            effect["location_name"],
+        }:
+            raise OperationResultMalformedError("item operation snapshot barrier request is invalid")
 
 
 __all__ = ["ItemRepositoryMixin"]

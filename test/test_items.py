@@ -308,6 +308,96 @@ def test_item_replay_rejects_corrupt_result_without_writing_again() -> None:
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("field,value", (("restored", 9999), ("quantity", True), ("quantity", 1.0)))
+def test_item_replay_rejects_forged_recovery_amount_without_writing(field: str, value: object) -> None:
+    async def run() -> None:
+        for adapter in ("qq.official", "onebot.v11"):
+            with TemporaryDirectory() as data_dir:
+                runtime = create_runtime(data_dir=Path(data_dir) / adapter)
+                user = f"item-forged-recovery-{adapter}"
+                await _player(
+                    runtime,
+                    adapter,
+                    user,
+                    realm="qi_gathering",
+                    location="xuantian.spirit_field",
+                    inventory={"item.food.coarse_spirit_rice": 1},
+                )
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stamina=10 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                operation_id = "forged-recovery-op"
+                used = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "forged-recovery-use", operation_id),
+                    "使用 粗糙灵米 体力",
+                )
+                assert used.code == "ITEM_USED"
+                assert used.data["effect"]["restored"] == 3
+
+                def state_snapshot() -> tuple[object, ...]:
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        return tuple(
+                            connection.execute(
+                                "SELECT stamina, energy, inventory_json FROM players "
+                                "WHERE platform=? AND platform_user_id=?",
+                                (adapter, user),
+                            ).fetchone()
+                        ) + tuple(
+                            connection.execute(
+                                "SELECT cooldown_until, operation_id FROM item_use_cooldowns "
+                                "JOIN players ON players.id=item_use_cooldowns.player_id "
+                                "WHERE players.platform=? AND players.platform_user_id=?",
+                                (adapter, user),
+                            ).fetchone()
+                        )
+
+                before_replay = state_snapshot()
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    original = str(
+                        connection.execute(
+                            "SELECT result_json FROM operations WHERE operation_id=?", (operation_id,)
+                        ).fetchone()[0]
+                    )
+                    payload = json.loads(original)
+                    if field == "quantity":
+                        payload[field] = value
+                    else:
+                        payload["effect"][field] = value
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (json.dumps(payload, ensure_ascii=False, sort_keys=True), operation_id),
+                    )
+
+                rejected = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "forged-recovery-replay", operation_id),
+                    "使用 粗糙灵米 体力",
+                )
+                assert rejected.code == "PERSISTENCE_ERROR"
+                assert state_snapshot() == before_replay
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE operations SET result_json=? WHERE operation_id=?",
+                        (original, operation_id),
+                    )
+                replayed = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "forged-recovery-repair", operation_id),
+                    "使用 item.food.coarse_spirit_rice 体力",
+                )
+                assert replayed.code == "ITEM_USED"
+                assert replayed.data["idempotent_replay"] is True
+                assert replayed.data["effect"]["restored"] == 3
+                assert state_snapshot() == before_replay
+                await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_item_operation_conflict_does_not_consume_a_second_item() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:

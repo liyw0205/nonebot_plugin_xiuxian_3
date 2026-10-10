@@ -6,6 +6,7 @@ import sqlite3
 from datetime import timedelta
 from tempfile import TemporaryDirectory
 
+from combat_fixtures import BALANCED_QUALIFICATION
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
@@ -266,7 +267,7 @@ def test_qq_and_onebot_reach_tribulation_l6_and_complete_three_realms_trial() ->
                         "qualification_json=?, inventory_json=? "
                         "WHERE platform=? AND platform_user_id=?",
                         (
-                            json.dumps({"body": 10, "agility": 15}),
+                            json.dumps({**BALANCED_QUALIFICATION, "body": 10, "agility": 15}),
                             json.dumps({"item.tribulation_token": 2}),
                             adapter,
                             user,

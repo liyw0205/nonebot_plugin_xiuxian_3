@@ -7,8 +7,11 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.economy.rules import COMMISSION_RECOVERY_GRACE_SECONDS
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 
 
@@ -345,5 +348,62 @@ def test_commission_escrow_and_platform_fee_stay_consistent() -> None:
             assert settled.code == "COMMISSION_SETTLED", (settled.code, settled.message)
             assert settled.data["producer_payment"] + settled.data["platform_fee"] == 50
             await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("recovery", (False, True))
+def test_commission_delivery_replays_after_settlement_and_restart(recovery: bool) -> None:
+    async def run() -> None:
+        for publisher_adapter, producer_adapter in (("qq.official", "onebot.v11"), ("onebot.v11", "qq.official")):
+            with TemporaryDirectory() as data_dir:
+                clock = MutableClock(datetime(2026, 9, 23, tzinfo=timezone.utc))
+                publisher = (publisher_adapter, "history-publisher")
+                producer = (producer_adapter, "history-producer")
+                runtime = await _boot(data_dir, clock, publisher, producer)
+                try:
+                    commission_id = await _publish_and_accept(runtime, publisher, producer, "history")
+                    clock.advance(seconds=31 + (COMMISSION_RECOVERY_GRACE_SECONDS if recovery else 0))
+                    verb = "恢复" if recovery else "交付"
+                    command = f"{verb}生产委托 {commission_id}"
+                    delivered = await _send(runtime, *producer, "history-deliver", command)
+                    assert delivered.ok, (delivered.code, delivered.message)
+                    assert delivered.data["status"] == "delivered"
+                    settled = await _send(runtime, *publisher, "history-settle", f"确认生产委托 {commission_id}")
+                    assert settled.code == "COMMISSION_SETTLED"
+                    await runtime.close()
+                    runtime = create_runtime(data_dir=data_dir, clock=clock)
+                    await runtime.repository.initialize()
+
+                    database = str(runtime.settings.database_path)
+                    stored = str(_row(database, "SELECT result_json FROM operations WHERE operation_id=?", "history-deliver")[0])
+                    for field, value in (
+                        ("producer_payment", 49),
+                        ("outputs", {"item.pill.healing_low": 999}),
+                        ("status", "settled"),
+                        ("status", "published"),
+                    ):
+                        forged = {**json.loads(stored), field: value}
+                        _update(database, "UPDATE operations SET result_json=? WHERE operation_id=?", json.dumps(forged), "history-deliver")
+                        with sqlite3.connect(database) as connection:
+                            before = tuple(connection.iterdump())
+                        rejected = await _send(runtime, *producer, "history-deliver", command)
+                        assert rejected.code == "PERSISTENCE_ERROR"
+                        with sqlite3.connect(database) as connection:
+                            assert tuple(connection.iterdump()) == before
+
+                    _update(database, "UPDATE operations SET result_json=? WHERE operation_id=?", stored, "history-deliver")
+                    with sqlite3.connect(database) as connection:
+                        before = tuple(connection.iterdump())
+                    replay = await _send(runtime, *producer, "history-deliver", command)
+                    assert replay.code == delivered.code, (replay.code, replay.message)
+                    assert replay.data["idempotent_replay"] is True
+                    assert {key: value for key, value in replay.data.items() if key != "idempotent_replay"} == {
+                        key: value for key, value in delivered.data.items() if key != "idempotent_replay"
+                    }
+                    with sqlite3.connect(database) as connection:
+                        assert tuple(connection.iterdump()) == before
+                finally:
+                    await runtime.close()
 
     asyncio.run(run())

@@ -666,14 +666,7 @@ class EconomyRepositoryMixin:
 
     @staticmethod
     def _market_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:
-        existing = connection.execute(
-            "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?", (operation_id,)
-        ).fetchone()
-        if existing is None:
-            return None
-        if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
-            raise OperationConflictError("operation input differs from its original request")
-        return json.loads(existing["result_json"])
+        return operation_replay(connection, operation_id, operation_name, request_hash)
 
     @staticmethod
     def _market_record_operation(connection: Any, operation_id: str, operation_name: str, player_id: int, request_hash: str, payload: dict[str, Any], now_text: str) -> None:
@@ -720,23 +713,102 @@ class EconomyRepositoryMixin:
 
     @staticmethod
     def _market_record_from_payload(payload: dict[str, Any], *, replay: bool = False) -> MarketOrderRecord:
+        expected_keys = {
+            "order_id",
+            "status",
+            "seller_player_id",
+            "seller_platform_user_id",
+            "seller_dao_name",
+            "buyer_player_id",
+            "buyer_platform_user_id",
+            "item_key",
+            "quantity",
+            "remaining_quantity",
+            "unit_price",
+            "listing_fee",
+            "trade_fee",
+            "total_price",
+            "expires_at",
+            "created_at",
+        }
+        if not isinstance(payload, dict) or set(payload) != expected_keys:
+            raise OperationResultMalformedError("market operation result has an invalid shape")
+
+        text_fields = (
+            "order_id",
+            "seller_player_id",
+            "seller_platform_user_id",
+            "seller_dao_name",
+            "item_key",
+            "expires_at",
+            "created_at",
+        )
+        if any(not isinstance(payload[field], str) or not payload[field] for field in text_fields):
+            raise OperationResultMalformedError("market operation result has invalid text fields")
+        if any(
+            payload[field] is not None and (not isinstance(payload[field], str) or not payload[field])
+            for field in ("buyer_player_id", "buyer_platform_user_id")
+        ):
+            raise OperationResultMalformedError("market operation result has invalid buyer fields")
+        if (payload["buyer_player_id"] is None) != (payload["buyer_platform_user_id"] is None):
+            raise OperationResultMalformedError("market operation result has incomplete buyer identity")
+
+        integer_fields = (
+            "quantity",
+            "remaining_quantity",
+            "unit_price",
+            "listing_fee",
+            "trade_fee",
+            "total_price",
+        )
+        if any(type(payload[field]) is not int or payload[field] < 0 for field in integer_fields):
+            raise OperationResultMalformedError("market operation result has invalid numeric fields")
+
+        quantity = payload["quantity"]
+        remaining_quantity = payload["remaining_quantity"]
+        unit_price = payload["unit_price"]
+        total_price = payload["total_price"]
+        status = payload["status"]
+        try:
+            validate_market_listing(quantity, unit_price)
+        except ValueError as exc:
+            raise OperationResultMalformedError("market operation result has invalid listing values") from exc
+        if (
+            remaining_quantity > quantity
+            or total_price != quantity * unit_price
+            or payload["listing_fee"] != listing_fee(quantity)
+            or payload["trade_fee"] != trade_fee(total_price)
+            or not isinstance(status, str)
+            or status not in {"listed", "settled", "cancelled", "expired"}
+            or (status == "settled") != (remaining_quantity == 0)
+        ):
+            raise OperationResultMalformedError("market operation result is inconsistent")
+
+        for field in ("expires_at", "created_at"):
+            try:
+                parsed = datetime.fromisoformat(payload[field])
+            except ValueError as exc:
+                raise OperationResultMalformedError("market operation result has invalid timestamps") from exc
+            if parsed.tzinfo is None or parsed.utcoffset() is None:
+                raise OperationResultMalformedError("market operation result timestamps require a timezone")
+
         return MarketOrderRecord(
-            order_id=str(payload["order_id"]),
-            status=str(payload["status"]),
-            seller_player_id=str(payload["seller_player_id"]),
-            seller_platform_user_id=str(payload["seller_platform_user_id"]),
-            seller_dao_name=str(payload["seller_dao_name"]),
+            order_id=payload["order_id"],
+            status=status,
+            seller_player_id=payload["seller_player_id"],
+            seller_platform_user_id=payload["seller_platform_user_id"],
+            seller_dao_name=payload["seller_dao_name"],
             buyer_player_id=payload.get("buyer_player_id"),
             buyer_platform_user_id=payload.get("buyer_platform_user_id"),
-            item_key=str(payload["item_key"]),
-            quantity=int(payload["quantity"]),
-            remaining_quantity=int(payload["remaining_quantity"]),
-            unit_price=int(payload["unit_price"]),
-            listing_fee=int(payload["listing_fee"]),
-            trade_fee=int(payload["trade_fee"]),
-            total_price=int(payload["total_price"]),
-            expires_at=str(payload["expires_at"]),
-            created_at=str(payload["created_at"]),
+            item_key=payload["item_key"],
+            quantity=quantity,
+            remaining_quantity=remaining_quantity,
+            unit_price=unit_price,
+            listing_fee=payload["listing_fee"],
+            trade_fee=payload["trade_fee"],
+            total_price=total_price,
+            expires_at=payload["expires_at"],
+            created_at=payload["created_at"],
             already_completed=replay,
         )
 
@@ -960,15 +1032,30 @@ class EconomyRepositoryMixin:
     def _commission_projection(payload: dict[str, Any]) -> dict[str, Any]:
         return {key: payload.get(key) for key in COMMISSION_PROJECTION_KEYS}
 
-    def _commission_replayed(self, connection: Any, payload: dict[str, Any]) -> dict[str, Any]:
+    def _commission_replayed(
+        self, connection: Any, payload: dict[str, Any], operation_name: str
+    ) -> dict[str, Any]:
         """Confirm a finished operation result still matches the stored commission."""
 
+        is_delivery = operation_name in {
+            "economy.deliver_production_commission", "economy.recover_production_commission"
+        }
+        if is_delivery and payload.get("status") not in ("delivered", "failed"):
+            raise OperationResultMalformedError("commission delivery operation status is invalid")
         if str(payload.get("status", "")) not in COMMISSION_TERMINAL_STATUSES:
             return payload
         current = self._commission_payload(connection, str(payload.get("commission_id") or ""))
-        if self._commission_projection(current) != self._commission_projection(payload):
+        expected = self._commission_projection(current)
+        if (
+            is_delivery
+            and payload.get("status") == "delivered"
+            and current["status"] == "settled"
+        ):
+            # Confirmation settles escrow after the original delivery receipt.
+            expected.update(status="delivered", producer_payment=0, publisher_refund=0, platform_fee=0)
+        if expected != self._commission_projection(payload):
             raise OperationResultMalformedError("commission operation result no longer matches its order")
-        return current
+        return payload
 
     def _commission_create_once(
         self,
@@ -1007,7 +1094,7 @@ class EconomyRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                payload = self._commission_replayed(connection, existing)
+                payload = self._commission_replayed(connection, existing, operation_name)
                 return self._commission_record_from_payload(payload, replay=True)
             publisher = self._require_player(connection, platform, platform_user_id)
             if player_currency(publisher) < reward:
@@ -1142,7 +1229,7 @@ class EconomyRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                payload = self._commission_replayed(connection, existing)
+                payload = self._commission_replayed(connection, existing, operation_name)
                 return self._commission_record_from_payload(payload, replay=True)
             producer = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
@@ -1333,7 +1420,7 @@ class EconomyRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                payload = self._commission_replayed(connection, existing)
+                payload = self._commission_replayed(connection, existing, operation_name)
                 return self._commission_record_from_payload(payload, replay=True)
             producer = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
@@ -1433,7 +1520,7 @@ class EconomyRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                payload = self._commission_replayed(connection, existing)
+                payload = self._commission_replayed(connection, existing, operation_name)
                 return self._commission_record_from_payload(payload, replay=True)
             publisher = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
@@ -1536,7 +1623,7 @@ class EconomyRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                payload = self._commission_replayed(connection, existing)
+                payload = self._commission_replayed(connection, existing, operation_name)
                 return self._commission_record_from_payload(payload, replay=True)
             actor = self._require_player(connection, platform, platform_user_id)
             order = connection.execute(
@@ -1592,7 +1679,7 @@ class EconomyRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                payload = self._commission_replayed(connection, existing)
+                payload = self._commission_replayed(connection, existing, operation_name)
                 return self._commission_record_from_payload(payload, replay=True)
             actor = self._require_player(connection, platform, platform_user_id, writable=False)
             order = connection.execute(

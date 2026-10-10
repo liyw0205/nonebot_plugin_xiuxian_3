@@ -1,7 +1,8 @@
 # 修仙 3 文档总索引
 
 本文档用于开发阶段按主题加载上下文。开始实现前先读[开发文档总入口](development-guide.md)，
-再按本索引进入总纲、状态页、实施计划和领域细节。`xiuxian3-design.md` 是总纲；每个域目录的
+再按本索引进入总纲、状态页、实施计划和领域细节。当前任务、进度、阻塞与验收证据只有
+[当前开发状态](current-status.md)第 4 节；本索引不复制任务队列。`xiuxian3-design.md` 是总纲；每个域目录的
 `README.md` 是域索引，`model.md`、`workflow.md`、`use-cases.md` 等文件是实现细节权威。
 顶层同名文档保留为兼容概览，不再承担规则或运行时状态裁决。
 
@@ -22,13 +23,13 @@
 |:--|:--|:--|
 | [修仙 3 总设计](xiuxian3-design.md) | 项目定位、新手流程、世界观、境界、道途、资源、总体循环和子文档裁决原则 | 主文档 |
 | [开发文档总入口](development-guide.md) | 阅读顺序、文档职责、切片交付清单、状态判定和提交前验证 | 开发入口 |
-| [实施计划](implementation-plan.md) | P0-P8 依赖、首版垂直切片、风险、验收与回滚 | 执行权威 |
+| [实施计划](implementation-plan.md) | 有限里程碑、依赖、交付与回滚 | 交付模板；队列见当前状态 |
 | [完整内容开发总表](content-development.md) | 全部境界、功能域、发布边界、首版范围、稳定键依赖和完整切片验收 | 内容开发唯一权威 |
 | [数据内容开发合同](content-data-contract.md) | JSON 为唯一配置来源、配置维度、随机快照及当前数据驱动缺口 | 数据实现合同 |
 | [通用功能开发合同](content-development-contract.md) | 事务、幂等、随机、异常和预发布数据库变更 | 工程行为合同 |
 | [内容方案整理说明](content-history.md) | 方案编号的用途、当前权威文档和待清理归档边界 | 文档整理说明 |
 | [当前开发状态](current-status.md) | 当前分支已开放、合同/锁定和下一步开发顺序 | 状态唯一入口 |
-| [完成状态](completion-status.md) | 已完成、未完成、关闭范围和验收入口 | 交付检查 |
+| [完成状态](completion-status.md) | 当前状态与交付入口链接 | 不维护第二份状态表 |
 | [消息与文案规范](messaging-copywriting.md) | 玩家可见文案边界、消息结构和适配器降级 | 文案与投递合同 |
 | [上游参考与复用边界](reference-sources.md) | 上游文档的通用玩法参考、适配器复用范围和禁止事项 | 已整理 |
 | [基础域目录](foundation/) | 角色、境界、道途、属性、资源、物品和构筑养成的分文件规格 | 细节权威 |
@@ -107,7 +108,7 @@ Python 常量、JSON 配置、数据库快照或玩家文案。
 
 开始实现一个功能：
 
-1. 先读 `current-status.md`，确认功能不是 `locked` 或 `contract`。
+1. 先读 `current-status.md` 唯一队列，确认任务依赖和验收边界；`locked/contract` 可补前置，开放前仍拒绝新建。
 2. 再读对应域目录的 `README.md`。
 3. 再读该域的 `model.md`、`workflow.md`、`use-cases.md`。
 4. 跨域资源读取 `foundation/items/`，跨域数值读取 `foundation/stats/`。
@@ -115,7 +116,7 @@ Python 常量、JSON 配置、数据库快照或玩家文案。
 6. 最后按 `testing.md` 补齐测试与回滚验证。
 
 开始首版新手闭环时，先读 `content-development.md` 的 MVP-1 范围，再读
-`implementation-plan.md` 的当前切片和角色域模型；它们共同冻结
+`implementation-plan.md` 的依赖与交付模板和角色域模型；它们共同冻结
 `new_user -> 寻仙问道 -> mortal -> seeker -> cultivator` 状态机、初始资源、引导与六大道途选择。
 不得以旧项目或历史快照推断本文未声明的规则。
 

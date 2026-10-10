@@ -23,6 +23,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import next_layer_thresh
 from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import recipe_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_TASKS
+from nonebot_plugin_xiuxian_3.xiuxian.social.sect_rules import SECT_DEFINITION
 from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
 
 
@@ -165,9 +166,10 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
     asyncio.run(run())
 
 
-def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
+def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
     async def run() -> None:
-        for adapter in ("qq.official", "onebot.v11"):
+        # Both names share one router; SDK events and delivery have separate contract tests.
+        for adapter in ("qq.official",):
             with TemporaryDirectory() as data_dir:
                 clock = MutableClock()
                 runtime = create_runtime(data_dir=data_dir, clock=clock)
@@ -1333,22 +1335,6 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         (adapter, user),
                     ).fetchone()
                 main_inventory = json.loads(main_row[2] or "{}")
-                # Domain cores are character-bound in the current item
-                # contract and cannot cross the market. Prepare the missing
-                # bound material in this long-chain fixture instead of
-                # weakening the market gate.
-                bound_materials = {"item.domain_core": work_materials["item.domain_core"]}
-                bound_changed = False
-                for item_key, amount in bound_materials.items():
-                    if int(main_inventory.get(item_key, 0)) < amount:
-                        main_inventory[item_key] = amount
-                        bound_changed = True
-                if bound_changed:
-                    with sqlite3.connect(runtime.settings.database_path) as connection:
-                        connection.execute(
-                            "UPDATE players SET inventory_json=? WHERE id=?",
-                            (json.dumps(main_inventory, ensure_ascii=False, sort_keys=True), main_row[0]),
-                        )
                 material_missing = {
                     item_key: max(0, amount - int(main_inventory.get(item_key, 0)))
                     for item_key, amount in work_materials.items()
@@ -1445,6 +1431,7 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         continue
                     tradeable_sale_keys.append(item_key)
                 sale_keys = tuple(tradeable_sale_keys)
+                supply_budget = 320_000 + SECT_DEFINITION.create_cost + 300
                 for sale_index, item_key in enumerate(sale_keys):
                     with sqlite3.connect(runtime.settings.database_path) as connection:
                         main_row = connection.execute(
@@ -1452,13 +1439,13 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                             (adapter, user),
                         ).fetchone()
                     balance = int(main_row[0])
-                    if balance >= 320_000:
+                    if balance >= supply_budget:
                         break
                     inventory = json.loads(main_row[1] or "{}")
                     available = int(inventory.get(item_key, 0))
                     if available <= 0:
                         continue
-                    quantity = min(99, available, max(1, (320_000 - balance + 94_999) // 95_000))
+                    quantity = min(99, available, max(1, (supply_budget - balance + 94_999) // 95_000))
                     listed = await _dispatch(
                         runtime,
                         adapter,
@@ -1479,7 +1466,39 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                         "SELECT spirit_stones FROM players WHERE platform=? AND platform_user_id=?",
                         (adapter, user),
                     ).fetchone()[0])
-                assert balance >= 320_000, balance
+                assert balance >= supply_budget, balance
+
+                # Bound cores come from the player's own season rewards and
+                # redemption, never a seeded inventory or market transfer.
+                sect = await _dispatch(runtime, adapter, user, 61900, "创建宗门 成长验收宗")
+                assert sect.code == "SECT_CREATED"
+                for core_index in range(3):
+                    season = await _dispatch(runtime, adapter, user, 61910 + core_index * 5, "领域赛季")
+                    donated = await _dispatch(
+                        runtime, adapter, user, 61911 + core_index * 5, "宗门捐献 灵石 100"
+                    )
+                    assert donated.code == "SECT_DONATED"
+                    clock.current = datetime.fromisoformat(str(season.data["ends_at"])) + timedelta(seconds=1)
+                    season_id = str(season.data["season_id"])
+                    frozen = await _dispatch(
+                        runtime, adapter, user, 61912 + core_index * 5, f"领域赛季 {season_id}"
+                    )
+                    assert frozen.data["status"] == "frozen"
+                    assert frozen.data["personal"]["rank"] == 1
+                    claimed = await _dispatch(
+                        runtime, adapter, user, 61913 + core_index * 5, f"领取领域赛季奖励 {season_id}"
+                    )
+                    assert claimed.code == "DOMAIN_SEASON_REWARD_CLAIMED"
+                    redeemed = await _dispatch(
+                        runtime, adapter, user, 61914 + core_index * 5, f"兑换领域核心 {season_id}"
+                    )
+                    assert redeemed.code == "DOMAIN_CORE_REDEEMED"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    inventory = json.loads(connection.execute(
+                        "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()[0])
+                assert inventory.get("item.domain_core", 0) >= 3
 
                 for material_index, (item_key, amount) in enumerate(work_materials.items()):
                     with sqlite3.connect(runtime.settings.database_path) as connection:
@@ -2302,6 +2321,34 @@ def test_qq_and_onebot_can_reach_dao_union_l10_from_new_player() -> None:
                     battle.message,
                 )
                 assert battle.data["outcome"] == "won"
+                # Fork the publicly earned state to verify both irreversible
+                # endings without replaying the complete growth chain.
+                with TemporaryDirectory() as remain_dir:
+                    remain_runtime = create_runtime(data_dir=remain_dir, clock=clock)
+                    try:
+                        await remain_runtime.repository.initialize()
+                        with sqlite3.connect(runtime.settings.database_path) as source:
+                            with sqlite3.connect(remain_runtime.settings.database_path) as destination:
+                                source.backup(destination)
+                        remained = await _dispatch(
+                            remain_runtime, adapter, user, 907723, "选择结局 留界"
+                        )
+                        assert remained.code == "ENDING_CHOSEN"
+                        assert remained.data["ending_key"] == "remain_in_world"
+                        assert remained.data["status"] == "remained_in_world"
+                        repeated = await _dispatch(
+                            remain_runtime, adapter, user, 907723, "选择结局 留界"
+                        )
+                        assert repeated.data["idempotent_replay"] is True
+                        with sqlite3.connect(remain_runtime.settings.database_path) as connection:
+                            assert connection.execute(
+                                "SELECT p.realm_key, p.realm_layer, p.endgame_status, e.ending_key "
+                                "FROM players p JOIN endgame_endings e ON e.player_id=p.id "
+                                "WHERE p.platform=? AND p.platform_user_id=?",
+                                (adapter, user),
+                            ).fetchone() == ("tribulation", 10, "remained_in_world", "remain_in_world")
+                    finally:
+                        await remain_runtime.close()
                 ending = await _dispatch(runtime, adapter, user, 907722, "选择结局 飞升")
                 assert ending.code == "ENDING_CHOSEN"
                 assert ending.data["ending_key"] == "ascend"
