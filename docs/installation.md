@@ -184,7 +184,7 @@ xiu3 update
 xiu3 start
 ```
 
-正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](operations.md#配置层级) 控制，未声明能力时自动降级为文本。
+正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](operations.md#1-配置层级) 控制；未配置时沿用默认能力，配置存在但未列当前 AppID 时仅发送文本。
 
 ## 排错
 

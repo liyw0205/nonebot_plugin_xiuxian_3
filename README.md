@@ -213,7 +213,7 @@ tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
 - `data/`：JSON 内容定义；安装器只补宿主中缺失的内容文件
 - 正常宿主的 PID 和运行日志：`.xiuxian3/nb.pid`、`.xiuxian3/nb.log`
 - `runtime/`：Docker 额外挂载的运行状态目录
-- [QQ 能力配置](docs/operations.md#配置层级)：`XIUXIAN3_QQ_CAPABILITIES` 控制 Markdown/键盘与纯文本降级
+- [QQ 能力配置](docs/operations.md#1-配置层级)：`XIUXIAN3_QQ_CAPABILITIES` 控制 Markdown/键盘与纯文本降级；未配置时沿用默认能力，配置存在但未列当前 AppID 时仅发送文本
 
 ## 许可证
 
