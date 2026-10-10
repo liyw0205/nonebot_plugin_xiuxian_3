@@ -36,20 +36,17 @@ B2/B3 真实平台/外部环境只阻断完整产品/正式发布，不能阻断
 
 `runtime.create_runtime` 为所有接入构造同一个 `CommandRouter`、`XiuxianApplication`
 与 `SQLitePlayerRepository`；`AdapterRegistry.dispatch` 校验适配器注册后直接调用同一 router。
-适配器不能绕过 application 直接写仓库。完整成长、生产、战斗及结算等共享业务长链只运行
-一份代表性路径，不因 QQ/OneBot 名称不同复制整条链；不能把传入两个平台字符串称为真实接入验收。
+适配器不能绕过 application 直接写仓库。需要验证共享业务成长链时，只通过 OneBot WebSocket
+执行一次，不因平台名称复制整条链；不能把模拟接入称为真实平台验收。
 
-两端仍分别验证有差异的短合同：SDK 事件解析、群/私聊与频道场景、用户/机器人身份、
-operation 与事件去重键、参数/权限映射、实际 handler 到 application 的接线、重试和错误映射；
-消息层覆盖 QQ interaction ACK、msg_seq、Markdown/键盘及纯文本降级、OneBot 消息段与路由。
-已有 `test_adapter_normalization.py`、`test_adapter_simulation.py` 与消息专项提供相应覆盖，
-按改动选明确节点。发现平台特有业务分支或身份/权限差异影响业务时，补该分支的针对性用例，
-不机械重跑另一个平台的完整成长。真实账号的连接与投递继续按 B2 单列。
+QQ 只验证平台短合同：消息格式、Markdown、蓝字、按钮、回调 ACK 与失败降级；不在 QQ
+重复执行共享业务长链。按改动选择 `test_adapter_normalization.py`、`test_adapter_simulation.py`
+及消息专项中的对应节点。没有真实 QQ 设备/账号时，官方客户端呈现、权限与真实投递均未验，
+须按 B2 单列。OneBot WS 共享链也不替代 QQ 的真实平台验收。
 
-代表性完整成长节点为
-`test/test_progression_sources.py::test_shared_commands_can_reach_tribulation_l10_from_new_player`。
-它保留 QQ 代表路径的全部成长、飞升和留界断言；两个终局复用同一公开成长状态。
-仅移除相同共享调用链的 OneBot 重复执行；两端入口的短合同仍保留。
+M5 历史证据须与此策略区分：旧测试树全量包含 QQ/OneBot 双平台成长迭代；最终测试树只做
+等价去重，保留当时的 QQ 代表路径，并完成受影响短测与 collect，没有在最终树重跑全量或完整成长。
+不得把该历史 QQ 路径改述为 OneBot WS 证据或真实 QQ 平台验收。
 
 ## 3. 可直接执行的命令
 
