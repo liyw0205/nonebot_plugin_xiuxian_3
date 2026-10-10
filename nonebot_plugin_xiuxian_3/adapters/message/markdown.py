@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from typing import Any, Collection
+from urllib.parse import unquote
 
 from .common import MessageSendResult, message_id_from_response, require_content
 
@@ -72,6 +73,18 @@ def qq_markdown_segment(markdown: str) -> Any | None:
     if not callable(builder):
         return None
     try:
-        return builder(markdown)
+        return builder(_qq_command_links(markdown))
     except (TypeError, ValueError):
         return None
+
+
+def _qq_command_links(markdown: str) -> str:
+    pattern = re.compile(r"\[([^\]\n]+)\]\(command:([^)]+)\)")
+    if not pattern.search(markdown):
+        return markdown
+    from .qq import qq_command_link
+
+    return pattern.sub(
+        lambda match: qq_command_link(match.group(1), unquote(match.group(2))),
+        markdown,
+    )

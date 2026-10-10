@@ -118,6 +118,7 @@ class AdapterRegistry:
 
 
 def register_core_commands(router: CommandRouter, application: XiuxianApplication) -> None:
+    router.register("修仙帮助", application.get_help, aliases=("帮助",))
     router.register("开始修仙", application.create_player)
     router.register("寻仙问道", application.start_seeking)
     router.register("我的状态", application.get_profile, aliases=("我的修仙信息",))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Mapping
+from urllib.parse import quote
 
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
@@ -90,6 +91,10 @@ class AdventuresApplication:
             return f"约 {seconds // 3600} 小时后"
         return f"约 {max(1, seconds // 60)} 分钟后"
 
+    @staticmethod
+    def _command_link(label: str, command: str) -> str:
+        return f"[{label}](command:{quote(command, safe='')})"
+
     def _bounty_args(self, args: tuple[str, ...]) -> tuple[bool, str | None]:
         if not args:
             return True, None
@@ -121,14 +126,22 @@ class AdventuresApplication:
             progress = f"{offer.progress}/{offer.target}" if offer.target else "无需进度"
             deadline = self._deadline_text(offer.expires_at)
             expires = f"\n  - **截止**：{deadline}" if deadline else ""
+            if offer.status == "available":
+                action = self._command_link("接取", f"接取悬赏 {offer.key}")
+            elif offer.status == "completed":
+                action = self._command_link("领取", "领取悬赏")
+            else:
+                action = ""
             lines.extend(
                 [
                     f"### {offer.label} · {status}",
                     f"- **目标**：{offer.description}（{progress}）",
                     f"- **奖励**：{self._reward_text(offer.reward, offer.reward_labels)}{expires}",
-                    "",
                 ]
             )
+            if action:
+                lines.append(f"- **操作**：{action}")
+            lines.append("")
             offer_data.append(
                 {
                     "bounty_key": offer.key,
@@ -141,7 +154,10 @@ class AdventuresApplication:
                     "expires_at": offer.expires_at,
                 }
             )
-        lines.append("> 各悬赏按榜上次数开放，同一时间只能承接一桩；榜示为可能之赏，实得于接取时抽定。")
+        lines.append(
+            "> “接取悬赏 悬赏名”可指定委托，“接取悬赏”随机选择；达标后于有效期内发送“领取悬赏”。"
+            "每条悬赏按 UTC 自然日计次，同时只能承接一桩。目标与实得奖励在接取时确定。"
+        )
         return CommandResult(
             True,
             "BOUNTY_BOARD",

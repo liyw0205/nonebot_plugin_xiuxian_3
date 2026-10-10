@@ -124,6 +124,36 @@ def test_markdown_uses_qq_segment_when_capability_is_declared() -> None:
     asyncio.run(run())
 
 
+def test_internal_command_link_becomes_qq_blue_text_and_keeps_plain_label(monkeypatch) -> None:
+    from nonebot_plugin_xiuxian_3.adapters.message import markdown as formatter
+
+    monkeypatch.setattr(formatter, "qq_markdown_segment", formatter._qq_command_links)
+
+    async def run() -> None:
+        class FakeQQBot(FakeBot):
+            __module__ = "nonebot.adapters.qq.bot"
+
+        class FakeQQEvent:
+            __module__ = "nonebot.adapters.qq.event"
+
+        markdown = "[接取](command:%E6%8E%A5%E5%8F%96%E6%82%AC%E8%B5%8F%20bounty.herb_supply)"
+        qq_bot = FakeQQBot()
+        qq_result = await send_markdown_message(
+            qq_bot, FakeQQEvent(), markdown, capabilities=("markdown",)
+        )
+        assert qq_result.sent_format == "markdown"
+        assert "mqqapi://aio/inlinecmd?command=%E6%8E%A5%E5%8F%96%E6%82%AC%E8%B5%8F%20bounty.herb_supply" in str(
+            qq_bot.sent[0][1]
+        )
+
+        plain_bot = FakeBot()
+        plain_result = await send_markdown_message(plain_bot, "event", markdown)
+        assert plain_result.sent_format == "text"
+        assert plain_bot.sent[0][1] == "接取"
+
+    asyncio.run(run())
+
+
 def test_markdown_to_text_preserves_code_content() -> None:
     assert markdown_to_text("```text\n灵石: 100\n```") == "灵石: 100"
 

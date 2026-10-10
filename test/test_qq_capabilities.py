@@ -104,3 +104,18 @@ def test_qq_capabilities_default_and_invalid_values(monkeypatch) -> None:
     monkeypatch.setenv("XIUXIAN3_QQ_CAPABILITIES", '{"app-id":["unknown"]}')
     with pytest.raises(ValueError, match="unknown capabilities"):
         XiuxianSettings.from_env()
+
+
+def test_qq_capability_map_enables_markdown_only_for_listed_app_ids(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "XIUXIAN3_QQ_CAPABILITIES",
+        '{"markdown-app":["markdown","keyboard"]}',
+    )
+    settings = XiuxianSettings.from_env()
+
+    assert settings.qq_capabilities_for("markdown-app") == (
+        "text",
+        "markdown",
+        "keyboard",
+    )
+    assert settings.qq_capabilities_for("unlisted-app") == ("text",)

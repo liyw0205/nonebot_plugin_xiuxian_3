@@ -989,6 +989,7 @@ def test_random_bounty_freezes_choice_evidence_and_previews_selected_reward() ->
                     board = await runtime.adapters.dispatch(
                         adapter, _context(adapter, user, "board"), "悬赏榜"
                     )
+                    assert "[接取](command:" in board.message
                     available = {
                         row["bounty_key"] for row in board.data["offers"]
                         if row["status"] == "available"
@@ -1030,6 +1031,34 @@ def test_random_bounty_freezes_choice_evidence_and_previews_selected_reward() ->
                 await runtime.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "condition",
+    (
+        {"type": "unknown", "value": "x"},
+        {"type": "inventory_item", "item_key": "", "quantity": 1},
+        {"type": "inventory_item", "item_key": "item.herb.blood_grass", "quantity": True},
+        {"type": "permit", "permit_key": "permit.cloud_mine", "unused": True},
+        {"type": [], "value": "x"},
+    ),
+    ids=("unknown", "empty-item-key", "invalid-quantity", "unused-field", "invalid-type"),
+)
+def test_bounty_content_rejects_invalid_access_any_contract(
+    tmp_path: Path, condition: dict[str, object]
+) -> None:
+    data_dir = tmp_path / "content"
+    _copy_content(data_dir)
+    path = data_dir / "任务" / "悬赏.json"
+    document = _json(path)
+    bounty = next(
+        row for row in document["records"] if row["key"] == "bounty.cloud_mine"
+    )
+    bounty["access_any"] = [condition]
+    _write_json(path, document)
+
+    with pytest.raises(ContentError):
+        bounty_definitions(ContentBundle.load(data_dir))
 
 
 @pytest.mark.parametrize(

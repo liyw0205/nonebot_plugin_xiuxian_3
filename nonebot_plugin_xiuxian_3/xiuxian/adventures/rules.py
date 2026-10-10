@@ -20,6 +20,12 @@ _TARGET_KINDS = frozenset(
         "dispatch_successes",
     }
 )
+_ACCESS_CONDITION_FIELDS = {
+    "subprofession": frozenset({"type", "value"}),
+    "intro_flag": frozenset({"type", "value"}),
+    "inventory_item": frozenset({"type", "item_key", "quantity"}),
+    "permit": frozenset({"type", "permit_key"}),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +96,7 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
             bundle.require("path", path_key)
         aliases = _string_tuple(row, "aliases", key)
         access_any = row.get("access_any", [])
-        if not isinstance(access_any, list) or any(not isinstance(item, dict) for item in access_any):
-            raise ContentError(f"bounty {key} access_any must be a list of objects")
+        _validate_access_conditions(key, access_any)
         reward_labels = row.get("reward_labels", {})
         if not isinstance(reward_labels, dict) or any(
             not isinstance(label_key, str) or not isinstance(label, str)
@@ -175,6 +180,55 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
             )
         )
     return tuple(definitions)
+
+
+def _validate_access_conditions(bounty_key: str, conditions: Any) -> None:
+    if not isinstance(conditions, list) or any(
+        not isinstance(condition, dict) for condition in conditions
+    ):
+        raise ContentError(f"bounty {bounty_key} access_any must be a list of objects")
+    for index, condition in enumerate(conditions):
+        condition_type = condition.get("type")
+        allowed = (
+            _ACCESS_CONDITION_FIELDS.get(condition_type)
+            if isinstance(condition_type, str)
+            else None
+        )
+        if allowed is None:
+            raise ContentError(
+                f"bounty {bounty_key} access_any[{index}] has an unsupported type"
+            )
+        if condition.keys() - allowed:
+            raise ContentError(
+                f"bounty {bounty_key} access_any[{index}] has unused fields"
+            )
+        if condition_type in {"subprofession", "intro_flag"}:
+            value = condition.get("value")
+            if not isinstance(value, str) or not value.strip():
+                raise ContentError(
+                    f"bounty {bounty_key} access_any[{index}] value must be non-empty"
+                )
+        elif condition_type == "inventory_item":
+            item_key = condition.get("item_key")
+            if not isinstance(item_key, str) or not item_key:
+                raise ContentError(
+                    f"bounty {bounty_key} access_any[{index}] item_key is required"
+                )
+            quantity = condition.get("quantity", 1)
+            if (
+                isinstance(quantity, bool)
+                or not isinstance(quantity, int)
+                or quantity <= 0
+            ):
+                raise ContentError(
+                    f"bounty {bounty_key} access_any[{index}] quantity must be positive"
+                )
+        elif condition_type == "permit":
+            permit_key = condition.get("permit_key")
+            if not isinstance(permit_key, str) or not permit_key.strip():
+                raise ContentError(
+                    f"bounty {bounty_key} access_any[{index}] permit_key is required"
+                )
 
 
 def _string_tuple(row: Mapping[str, Any], field: str, key: str) -> tuple[str, ...]:

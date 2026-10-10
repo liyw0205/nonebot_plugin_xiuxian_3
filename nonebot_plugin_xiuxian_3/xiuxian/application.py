@@ -71,6 +71,62 @@ from .specials.story_use_cases import StoryApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
 
+_HELP_OVERVIEW = (
+    "## 修仙指南\n\n"
+    "- **启程**：`修仙帮助 启程`\n"
+    "- **修炼**：`修仙帮助 修炼`\n"
+    "- **探索**：`修仙帮助 探索`\n"
+    "- **悬赏**：`修仙帮助 悬赏`\n"
+    "- **生活**：`修仙帮助 生活`\n"
+    "- **社交**：`修仙帮助 社交`"
+)
+_HELP_PAGES = {
+    "启程": (
+        "## 启程\n\n"
+        "- `开始修仙 道号`：创建角色\n"
+        "- `寻仙问道`：开启修行\n"
+        "- `我的状态`：查看道号、境界与所在地\n"
+        "- `修仙改名 新道号`：修改道号"
+    ),
+    "修炼": (
+        "## 修炼\n\n"
+        "- `选择道途 道途名`：入道\n"
+        "- `开始修炼`、`结算修炼`：修习功法\n"
+        "- `突破预览 境界`、`开始突破 境界`：查看并开始突破\n"
+        "- `晋升境界`：按当前修为逐层晋升"
+    ),
+    "探索": (
+        "## 探索\n\n"
+        "- `开始探索`、`结算探索`：进行近郊探索\n"
+        "- `秘境预览`、`进入秘境 秘境名`：查看并进入秘境\n"
+        "- `我的状态`：查看当前位置与境界"
+    ),
+    "悬赏": (
+        "## 悬赏\n\n"
+        "- `悬赏榜`：查看目标、准入、进度与奖励范围\n"
+        "- `接取悬赏`：按当前可接内容随机选择\n"
+        "- `接取悬赏 悬赏名`：指定一条悬赏\n"
+        "- `领取悬赏`：完成目标后结算\n\n"
+        "> 每条悬赏按 UTC 自然日分别计次；同一时间只能承接一桩。\n"
+        "> 接取时冻结本次目标、奖励与进度基线，需在有效期内完成并领取。"
+    ),
+    "生活": (
+        "## 生活\n\n"
+        "- `生产预览 配方名`、`开始生产 配方名`：查看并开始生产\n"
+        "- `领取生产`：结算已完成的订单\n"
+        "- `每日修行`：查看今日修行安排\n"
+        "- `我的灵田`、`灵田收获`：查看与收获灵田"
+    ),
+    "社交": (
+        "## 社交\n\n"
+        "- `我的宗门`、`创建宗门 名称`：查看或创建宗门\n"
+        "- `申请入宗 宗门号或宗门名`：提交入宗申请\n"
+        "- `审批入宗 申请号 同意|拒绝`：处理入宗申请\n"
+        "- `邀请结为道侣 道号`：发起道侣邀请\n"
+        "- `切磋 道号`：发起切磋"
+    ),
+}
+
 
 class XiuxianApplication:
     """Expose feature services to adapters without mixing feature rules."""
@@ -163,6 +219,25 @@ class XiuxianApplication:
         self.three_realms_tower_duo = ThreeRealmsTowerDuoApplication(repository)
         self.story = StoryApplication(repository)
         self.quests = QuestApplication(repository)
+
+    async def get_help(self, context: CommandContext) -> CommandResult:
+        if not context.command_args:
+            return CommandResult(True, "HELP_OVERVIEW", _HELP_OVERVIEW, context.request_id)
+        if len(context.command_args) == 1 and context.command_args[0] in _HELP_PAGES:
+            category = context.command_args[0]
+            return CommandResult(
+                True,
+                "HELP_CATEGORY",
+                _HELP_PAGES[category],
+                context.request_id,
+                data={"category": category},
+            )
+        return CommandResult(
+            False,
+            "HELP_CATEGORY_NOT_FOUND",
+            _HELP_OVERVIEW,
+            context.request_id,
+        )
 
     async def _invoke(
         self,
