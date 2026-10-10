@@ -2,6 +2,21 @@
   "kind": "item",
   "records": [
     {
+      "key": "item.permit.cloud_mine",
+      "name": "矿区采集许可",
+      "desc": "通过矿区登记取得的绑定凭证。携带时可验看准入，使用后消耗凭证并永久记录矿区授权。境界门槛仍须满足。",
+      "item_type": "credential",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "grant_intro_flags", "flags": ["permit.cloud_mine", "cloud_mine.permit", "commission.cloud_mine"]}],
+      "requirements": [],
+      "source_recipe_key": "recipe.permit.cloud_mine",
+      "status": "active"
+    },
+    {
       "name": "雾隐洞天一层凭证",
       "desc": "通往雾隐洞天一层的凭证，启程时交由守门人验看。",
       "item_type": "credential",

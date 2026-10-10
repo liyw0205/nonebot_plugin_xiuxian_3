@@ -52,6 +52,13 @@ class StatsRepositoryMixin:
             constitution_effect=constitution,
             manual_effects=manuals,
         )
+        for gear in self.companion_carry_snapshot(connection, player_id):
+            value = int(gear["carry_capacity"])
+            preview["derived_stats"]["carry_capacity"] += value
+            preview["source_refs"].append({
+                "key": "companion_gear", "value": gear, "multiplier_zone": "build",
+                "effect": {"carry_capacity": value},
+            })
         return {
             "player_id": player_id,
             **preview,

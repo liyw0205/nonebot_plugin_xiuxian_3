@@ -484,6 +484,8 @@ class EconomyRepositoryMixin:
             if inventory_amount(seller_inventory, order["item_key"]) < quantity:
                 raise MarketItemLockedError("seller inventory no longer contains locked item")
             capacity = int(buyer["carry_capacity"] or 0)
+            if capacity > 0:
+                capacity += self.companion_carry_capacity(connection, int(buyer["id"]))
             if capacity > 0 and sum(int(value) for value in buyer_inventory.values()) + quantity > capacity:
                 raise MarketBuyerCapacityInsufficientError("buyer inventory capacity is insufficient")
             total = quantity * int(order["unit_price"])

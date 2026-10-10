@@ -38,7 +38,7 @@ from ..repository import (
     ToolMissingError,
 )
 from .endgame_rules import resolve_endgame_recipe
-from .rules import item_label, resolve_recipe
+from .rules import UnknownRecipeError, item_label, resolve_recipe
 
 
 class ProductionApplication:
@@ -65,24 +65,25 @@ class ProductionApplication:
             .replace("~", "\\~")
         )
 
-    @staticmethod
-    def _recipe_args(args: tuple[str, ...]) -> str | None:
+    def _recipe_args(self, args: tuple[str, ...]) -> str | None:
         if len(args) != 1:
             return None
-        return resolve_recipe(args[0])
+        return resolve_recipe(args[0], self.repository.content)
 
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
-        recipe_key = self._recipe_args(context.command_args)
-        if recipe_key is None:
-            return CommandResult(False, "RECIPE_NOT_FOUND", "请指定配方，例如 `生产预览 疗伤丹`。", context.request_id)
         operation_id = self._operation_id(context, "production.preview")
         try:
+            recipe_key = self._recipe_args(context.command_args)
+            if recipe_key is None:
+                raise UnknownRecipeError("recipe selector is missing")
             record = await self.repository.preview_production(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 recipe_key=recipe_key,
                 operation_id=operation_id,
             )
+        except UnknownRecipeError:
+            return CommandResult(False, "RECIPE_NOT_FOUND", "请指定可用配方，例如 `生产预览 疗伤丹`。", context.request_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
         except CrossRealmAllianceMissingError:
@@ -130,17 +131,19 @@ class ProductionApplication:
         )
 
     async def start_production(self, context: CommandContext) -> CommandResult:
-        recipe_key = self._recipe_args(context.command_args)
-        if recipe_key is None:
-            return CommandResult(False, "RECIPE_NOT_FOUND", "请指定配方，例如 `开始生产 疗伤丹`。", context.request_id)
         operation_id = self._operation_id(context, "production.start")
         try:
+            recipe_key = self._recipe_args(context.command_args)
+            if recipe_key is None:
+                raise UnknownRecipeError("recipe selector is missing")
             record = await self.repository.start_production(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 recipe_key=recipe_key,
                 operation_id=operation_id,
             )
+        except UnknownRecipeError:
+            return CommandResult(False, "RECIPE_NOT_FOUND", "请指定可用配方，例如 `开始生产 疗伤丹`。", context.request_id, operation_id)
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerStageConflictError:

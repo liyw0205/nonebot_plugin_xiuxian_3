@@ -147,6 +147,18 @@
       "entry_item_rewards": [{"item_key": "item.manual.basic_qi", "quantity": 1}],
       "subprofessions": [
         {
+          "key": "mining",
+          "name": "采矿",
+          "aliases": ["矿工"],
+          "entry_item_rewards": [{"item_key": "item.tool.mining_pickaxe", "quantity": 1}]
+        },
+        {
+          "key": "cooking",
+          "name": "烹饪",
+          "aliases": ["灵厨"],
+          "entry_item_rewards": [{"item_key": "item.food.coarse_spirit_rice", "quantity": 2}]
+        },
+        {
           "key": "alchemy",
           "name": "炼丹",
           "aliases": [],

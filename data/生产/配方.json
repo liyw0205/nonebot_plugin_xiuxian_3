@@ -1,579 +1,1529 @@
 {
+  "schema": "xiuxian.content",
   "kind": "recipe",
   "records": [
     {
-      "name": "炼制低阶疗伤丹",
-      "desc": "以止血草与粗糙灵米炼成疗伤丹，为战斗备下应急药物。",
+      "key": "recipe.pill.focus_low",
+      "name": "焦点丹",
       "profession": "alchemy",
-      "requirements": [
-        {
-          "type": "profession_level",
-          "value": 1
-        },
-        {
-          "type": "realm_any",
-          "values": [
-            "qi_gathering",
-            "alchemy_teaching"
-          ]
-        }
-      ],
-      "inputs": [
-        {
-          "item_key": "item.herb.blood_grass",
-          "quantity": 2
-        },
-        {
-          "item_key": "item.food.coarse_spirit_rice",
-          "quantity": 1
-        }
-      ],
-      "tool": {
-        "item_key": "item.tool.basic_furnace",
-        "durability_cost_bp": 100
-      },
-      "energy_cost": 4,
-      "duration_seconds": 30,
-      "outputs": [
-        {
-          "item_key": "item.pill.healing_low",
-          "quantity": 1,
-          "quality_bonus_at_bp": 8000,
-          "bonus_quantity": 1
-        }
-      ],
-      "daily_limit": 8,
-      "failure": {
-        "input_refund_bp": 5000,
-        "produces_output": false
-      },
-      "key": "recipe.pill.healing_low",
-      "status": "active"
-    },
-    {
-      "name": "炼制焦点丹",
-      "desc": "汇合灵叶与止血草，炼成可助人凝神修炼的焦点丹。",
-      "profession": "alchemy",
-      "requirements": [
-        {
-          "type": "profession_level",
-          "value": 1
-        },
-        {
-          "type": "realm",
-          "realm_key": "qi_sensing",
-          "min_layer": 1
-        }
-      ],
-      "inputs": [
-        {
-          "item_key": "item.herb.spirit_leaf",
-          "quantity": 2
-        },
-        {
-          "item_key": "item.herb.blood_grass",
-          "quantity": 1
-        }
-      ],
-      "tool": {
-        "item_key": "item.tool.basic_furnace",
-        "durability_cost_bp": 100
+      "inputs": {
+        "item.herb.spirit_leaf": 2,
+        "item.herb.blood_grass": 1
       },
       "energy_cost": 5,
       "duration_seconds": 45,
-      "outputs": [
-        {
-          "item_key": "item.pill.focus_low",
-          "quantity": 1
-        }
-      ],
       "daily_limit": 6,
-      "failure": {
-        "input_refund_bp": 5000,
-        "produces_output": false
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 100,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.focus_low": 1
       },
-      "key": "recipe.pill.focus_low",
-      "status": "active"
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.spirit_leaf": 1,
+        "item.herb.blood_grass": 0
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": true,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "汇合灵叶与止血草，炼成可助人凝神修炼的焦点丹。",
+      "aliases": [
+        "焦点"
+      ]
     },
     {
-      "name": "炼制聚气护脉丹",
-      "desc": "以灵叶和止血草调和药力，炼成聚气突破时护持经脉的丹药。",
+      "key": "recipe.pill.qi_guard",
+      "name": "聚气护脉丹",
       "profession": "alchemy",
-      "requirements": [
-        {
-          "type": "profession_level",
-          "value": 1
-        },
-        {
-          "type": "realm",
-          "realm_key": "qi_sensing",
-          "min_layer": 1
-        }
-      ],
-      "inputs": [
-        {
-          "item_key": "item.herb.spirit_leaf",
-          "quantity": 2
-        },
-        {
-          "item_key": "item.herb.blood_grass",
-          "quantity": 2
-        }
-      ],
-      "tool": {
-        "item_key": "item.tool.basic_furnace",
-        "durability_cost_bp": 100
+      "inputs": {
+        "item.herb.spirit_leaf": 2,
+        "item.herb.blood_grass": 2
       },
       "energy_cost": 6,
       "duration_seconds": 60,
-      "outputs": [
-        {
-          "item_key": "item.pill.qi_guard",
-          "quantity": 1
-        }
-      ],
       "daily_limit": 3,
-      "failure": {
-        "input_refund_bp": 5000,
-        "produces_output": false
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 100,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.qi_guard": 1
       },
-      "key": "recipe.pill.qi_guard",
-      "status": "active"
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.spirit_leaf": 1,
+        "item.herb.blood_grass": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [],
+      "proficiency_bp": 2000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以灵叶和止血草调和药力，炼成聚气突破时护持经脉的丹药。",
+      "aliases": [
+        "聚气保护丹"
+      ]
     },
     {
-      "name": "炼制筑基丹",
-      "desc": "汇集灵叶、阵砂与铁石炼制筑基丹，助修士跨过筑基门槛。",
+      "key": "recipe.pill.healing_low",
+      "name": "低阶疗伤丹",
       "profession": "alchemy",
-      "requirements": [
-        {
-          "type": "profession_level",
-          "value": 2
-        },
-        {
-          "type": "realm",
-          "realm_key": "qi_gathering",
-          "min_layer": 1
-        }
-      ],
-      "inputs": [
-        {
-          "item_key": "item.herb.spirit_leaf",
-          "quantity": 3
-        },
-        {
-          "item_key": "item.mat.array_sand",
-          "quantity": 2
-        },
-        {
-          "item_key": "item.ore.ironstone",
-          "quantity": 2
-        }
-      ],
-      "tool": {
-        "item_key": "item.tool.basic_furnace",
-        "durability_cost_bp": 100
+      "inputs": {
+        "item.herb.blood_grass": 2,
+        "item.food.coarse_spirit_rice": 1
+      },
+      "energy_cost": 4,
+      "duration_seconds": 30,
+      "daily_limit": 8,
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 100,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.healing_low": 1
+      },
+      "high_quality_bonus": {
+        "item.pill.healing_low": 1
+      },
+      "failure_refunds": {
+        "item.herb.blood_grass": 1,
+        "item.food.coarse_spirit_rice": 0
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": true,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以止血草与粗糙灵米炼成疗伤丹，为战斗备下应急药物。",
+      "aliases": [
+        "疗伤丹",
+        "炼丹"
+      ]
+    },
+    {
+      "key": "recipe.pill.foundation_draft",
+      "name": "筑基丹",
+      "profession": "alchemy",
+      "inputs": {
+        "item.herb.spirit_leaf": 3,
+        "item.mat.array_sand": 2,
+        "item.ore.ironstone": 2
       },
       "energy_cost": 8,
       "duration_seconds": 120,
-      "outputs": [
-        {
-          "item_key": "item.pill.foundation_draft",
-          "quantity": 1
-        }
-      ],
       "daily_limit": 3,
-      "failure": {
-        "input_refund_bp": 5000,
-        "produces_output": false
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 100,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.foundation_draft": 1
       },
-      "key": "recipe.pill.foundation_draft",
-      "status": "active"
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.spirit_leaf": 1,
+        "item.mat.array_sand": 1,
+        "item.ore.ironstone": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_gathering",
+      "additional_realms": [],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "汇集灵叶、阵砂与铁石炼制筑基丹，助修士跨过筑基门槛。",
+      "aliases": []
     },
     {
-      "name": "炼制筑基护脉丹",
-      "desc": "将灵叶、阵砂与止血草炼成护脉丹，为筑基突破增添一重保障。",
+      "key": "recipe.pill.foundation_guard",
+      "name": "筑基护脉丹",
       "profession": "alchemy",
-      "requirements": [
-        {
-          "type": "profession_level",
-          "value": 2
-        },
-        {
-          "type": "realm",
-          "realm_key": "qi_gathering",
-          "min_layer": 1
-        }
-      ],
-      "inputs": [
-        {
-          "item_key": "item.herb.spirit_leaf",
-          "quantity": 2
-        },
-        {
-          "item_key": "item.mat.array_sand",
-          "quantity": 1
-        },
-        {
-          "item_key": "item.herb.blood_grass",
-          "quantity": 1
-        }
-      ],
-      "tool": {
-        "item_key": "item.tool.basic_furnace",
-        "durability_cost_bp": 100
+      "inputs": {
+        "item.herb.spirit_leaf": 2,
+        "item.mat.array_sand": 1,
+        "item.herb.blood_grass": 1
       },
       "energy_cost": 10,
       "duration_seconds": 180,
-      "outputs": [
-        {
-          "item_key": "item.pill.foundation_guard",
-          "quantity": 1
-        }
-      ],
       "daily_limit": 2,
-      "failure": {
-        "input_refund_bp": 5000,
-        "produces_output": false
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 100,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.foundation_guard": 1
       },
-      "key": "recipe.pill.foundation_guard",
-      "status": "active"
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.spirit_leaf": 1,
+        "item.mat.array_sand": 0,
+        "item.herb.blood_grass": 0
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_gathering",
+      "additional_realms": [],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "将灵叶、阵砂与止血草炼成护脉丹，为筑基突破增添一重保障。",
+      "aliases": [
+        "筑基保护丹"
+      ]
     },
     {
-      "name": "锻造木纹剑",
-      "desc": "以铁石与木材锻成轻便长剑，供初入器道的修士使用。",
+      "key": "recipe.weapon.wood_sword",
+      "name": "木纹剑",
       "profession": "artifice",
-      "requirements": [
-        {
-          "type": "profession_level",
-          "value": 1
-        },
-        {
-          "type": "realm",
-          "realm_key": "qi_gathering",
-          "min_layer": 1
-        }
-      ],
-      "inputs": [
-        {
-          "item_key": "item.ore.ironstone",
-          "quantity": 2
-        },
-        {
-          "item_key": "item.mat.wood",
-          "quantity": 2
-        }
-      ],
-      "tool": {
-        "item_key": "item.tool.basic_hammer",
-        "durability_cost_bp": 100
+      "inputs": {
+        "item.ore.ironstone": 2,
+        "item.mat.wood": 2
       },
       "energy_cost": 5,
       "duration_seconds": 60,
-      "outputs": [
-        {
-          "item_key": "item.weapon.wood_sword",
-          "quantity": 1
-        }
-      ],
       "daily_limit": 4,
-      "failure": {
-        "input_refund_bp": 5000,
-        "produces_output": false
+      "tool_key": "item.tool.basic_hammer",
+      "tool_cost_bp": 100,
+      "currency_cost": 0,
+      "outputs": {
+        "item.weapon.wood_sword": 1
       },
-      "key": "recipe.weapon.wood_sword",
-      "status": "active"
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.ore.ironstone": 1,
+        "item.mat.wood": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_gathering",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以铁石与木材锻成轻便长剑，供初入器道的修士使用。",
+      "aliases": [
+        "木剑",
+        "炼器"
+      ]
     },
     {
-      "name": "布置基础聚灵阵",
-      "desc": "以阵砂在灵泉谷布下聚灵阵，使周围灵气在一日内更加充盈。",
+      "key": "recipe.array.gathering_basic",
+      "name": "基础聚灵阵",
       "profession": "formation",
-      "requirements": [
-        {
-          "type": "profession_level",
-          "value": 1
-        },
-        {
-          "type": "realm",
-          "realm_key": "qi_gathering",
-          "min_layer": 1
-        },
-        {
-          "type": "location_any",
-          "values": [
-            "xuantian.spirit_field"
-          ]
-        }
-      ],
-      "inputs": [
-        {
-          "item_key": "item.mat.array_sand",
-          "quantity": 2
-        }
-      ],
-      "currency_cost": {
-        "currency_key": "currency.spirit_stone",
-        "amount": 20
+      "inputs": {
+        "item.mat.array_sand": 2
       },
       "energy_cost": 6,
       "duration_seconds": 90,
-      "outputs": [
-        {
-          "item_key": "item.array.gathering_basic",
-          "quantity": 1,
-          "effect_bp": 500,
-          "duration_seconds": 86400
-        }
-      ],
       "daily_limit": 3,
-      "failure": {
-        "input_refund": [
-          {
-            "item_key": "item.mat.array_sand",
-            "quantity": 1
-          }
-        ],
-        "currency_refund_bp": 0,
-        "produces_output": false
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 20,
+      "outputs": {
+        "item.array.gathering_basic": 1
       },
-      "key": "recipe.array.gathering_basic",
-      "status": "active"
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.mat.array_sand": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_gathering",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [
+        "xuantian.spirit_field",
+        "xuantian.array_hall"
+      ],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以阵砂在灵泉谷布下聚灵阵，使周围灵气在一日内更加充盈。",
+      "aliases": [
+        "聚灵阵",
+        "布阵"
+      ]
     },
     {
-      "name": "烹饪灵米饭",
-      "desc": "将粗糙灵米细心烹煮，做成能补充体力或精力的饭食。",
-      "profession": "cooking",
-      "requirements": [
-        {
-          "type": "teaching",
-          "key": "guide.choose_service"
-        }
-      ],
-      "inputs": [
-        {
-          "item_key": "item.food.coarse_spirit_rice",
-          "quantity": 2
-        }
-      ],
-      "energy_cost": 2,
-      "duration_seconds": 15,
-      "outputs": [
-        {
-          "item_key": "item.food.spirit_rice",
-          "quantity": 2
-        }
-      ],
-      "daily_limit": 10,
-      "failure": {
-        "input_refund": [
-          {
-            "item_key": "item.food.coarse_spirit_rice",
-            "quantity": 1
-          }
-        ],
-        "produces_output": false
-      },
-      "key": "recipe.food.spirit_rice",
-      "status": "active"
-    },
-    {
-      "name": "炼制金丹护脉丹",
-      "desc": "以灵叶、云铁与止血草炼成护脉丹，助金丹修士稳住突破根基。",
-      "profession": "alchemy",
-      "requirements": [
-        {"type": "profession_level", "value": 3},
-        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
-        {"type": "facility", "facility_kind": "alchemy"},
-        {"type": "location_any", "values": ["cave.mist_grotto_2"]}
-      ],
-      "inputs": [
-        {"item_key": "item.herb.spirit_leaf", "quantity": 3},
-        {"item_key": "item.material.cloud_iron", "quantity": 1},
-        {"item_key": "item.herb.blood_grass", "quantity": 2}
-      ],
-      "tool": {"item_key": "item.tool.basic_furnace", "durability_cost_bp": 250},
-      "energy_cost": 8,
-      "duration_seconds": 120,
-      "outputs": [{"item_key": "item.pill.golden_core_guard", "quantity": 1}],
-      "daily_limit": 4,
-      "failure": {
-        "input_refund": [
-          {"item_key": "item.herb.spirit_leaf", "quantity": 1},
-          {"item_key": "item.herb.blood_grass", "quantity": 1}
-        ],
-        "currency_refund_bp": 0,
-        "produces_output": false
-      },
-      "key": "recipe.pill.golden_core_guard",
-      "status": "active"
-    },
-    {
-      "name": "炼制凝核丹",
-      "desc": "以灵叶、云铁与阵砂凝炼成丹，供金丹修士冲击更高境界。",
-      "profession": "alchemy",
-      "requirements": [
-        {"type": "profession_level", "value": 4},
-        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
-        {"type": "facility", "facility_kind": "alchemy"}
-      ],
-      "inputs": [
-        {"item_key": "item.herb.spirit_leaf", "quantity": 5},
-        {"item_key": "item.material.cloud_iron", "quantity": 2},
-        {"item_key": "item.mat.array_sand", "quantity": 2}
-      ],
-      "tool": {"item_key": "item.tool.basic_furnace", "durability_cost_bp": 250},
-      "energy_cost": 10,
-      "duration_seconds": 180,
-      "outputs": [{"item_key": "item.pill.core_condense", "quantity": 1}],
-      "daily_limit": 2,
-      "failure": {
-        "input_refund": [
-          {"item_key": "item.herb.spirit_leaf", "quantity": 3},
-          {"item_key": "item.material.cloud_iron", "quantity": 1},
-          {"item_key": "item.mat.array_sand", "quantity": 1}
-        ],
-        "currency_refund_bp": 0,
-        "produces_output": false
-      },
-      "key": "recipe.pill.core_condense",
-      "status": "active"
-    },
-    {
-      "name": "锻造云纹剑",
-      "desc": "以云铁、阵砂和木材锻出云纹长剑，剑身轻韧，灵纹流转。",
-      "profession": "artifice",
-      "requirements": [
-        {"type": "profession_level", "value": 3},
-        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
-        {"type": "facility", "facility_kind": "artifice"},
-        {"type": "location_any", "values": ["cave.mist_grotto_2"]}
-      ],
-      "inputs": [
-        {"item_key": "item.material.cloud_iron", "quantity": 4},
-        {"item_key": "item.mat.array_sand", "quantity": 1},
-        {"item_key": "item.mat.wood", "quantity": 2}
-      ],
-      "tool": {"item_key": "item.tool.basic_hammer", "durability_cost_bp": 250},
-      "energy_cost": 10,
-      "duration_seconds": 180,
-      "outputs": [{"item_key": "item.weapon.cloud_sword", "quantity": 1}],
-      "daily_limit": 2,
-      "failure": {
-        "input_refund": [
-          {"item_key": "item.material.cloud_iron", "quantity": 2},
-          {"item_key": "item.mat.wood", "quantity": 1}
-        ],
-        "currency_refund_bp": 0,
-        "produces_output": false
-      },
-      "key": "recipe.weapon.cloud_sword",
-      "status": "active"
-    },
-    {
-      "name": "布置迷雾屏障阵",
-      "desc": "以阵砂和灵叶布下迷雾屏障，遮蔽洞天入口并维持半日。",
+      "key": "recipe.array.mist_barrier",
+      "name": "迷雾屏障阵",
       "profession": "formation",
-      "requirements": [
-        {"type": "profession_level", "value": 3},
-        {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
-        {"type": "facility", "facility_kind": "array"},
-        {"type": "location_any", "values": ["xuantian.array_hall", "cave.mist_grotto_2"]}
-      ],
-      "inputs": [
-        {"item_key": "item.mat.array_sand", "quantity": 5},
-        {"item_key": "item.herb.spirit_leaf", "quantity": 2}
-      ],
-      "currency_cost": {"currency_key": "currency.spirit_stone", "amount": 100},
+      "inputs": {
+        "item.mat.array_sand": 5,
+        "item.herb.spirit_leaf": 2
+      },
       "energy_cost": 12,
       "duration_seconds": 240,
-      "outputs": [{"item_key": "item.array.mist_barrier", "quantity": 1, "duration_seconds": 43200}],
       "daily_limit": 2,
-      "failure": {
-        "input_refund": [
-          {"item_key": "item.mat.array_sand", "quantity": 3},
-          {"item_key": "item.herb.spirit_leaf", "quantity": 1}
-        ],
-        "currency_refund_bp": 0,
-        "produces_output": false
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 100,
+      "outputs": {
+        "item.array.mist_barrier": 1
       },
-      "key": "recipe.array.mist_barrier",
-      "status": "active"
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.mat.array_sand": 3,
+        "item.herb.spirit_leaf": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "golden_core",
+      "additional_realms": [],
+      "proficiency_bp": 4000,
+      "required_location": [
+        "xuantian.array_hall",
+        "cave.mist_grotto_2"
+      ],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 6000,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": "array",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以阵砂和灵叶布下迷雾屏障，遮蔽洞天入口并维持半日。",
+      "aliases": [
+        "迷雾屏障"
+      ]
     },
     {
-      "name": "烹饪云灵茶",
-      "desc": "取灵叶与灵米熬煮成茶，清灵之气可助下一次修炼凝神聚气。",
-      "profession": "cooking",
-      "requirements": [
-        {"type": "profession_level", "value": 2},
-        {"type": "location_any", "values": ["xuantian.spirit_field"]}
-      ],
-      "inputs": [
-        {"item_key": "item.herb.spirit_leaf", "quantity": 2},
-        {"item_key": "item.food.coarse_spirit_rice", "quantity": 2}
-      ],
-      "energy_cost": 4,
-      "duration_seconds": 60,
-      "outputs": [{"item_key": "item.food.cloud_tea", "quantity": 3}],
-      "daily_limit": 6,
-      "failure": {
-        "input_refund": [
-          {"item_key": "item.herb.spirit_leaf", "quantity": 1},
-          {"item_key": "item.food.coarse_spirit_rice", "quantity": 1}
-        ],
-        "currency_refund_bp": 0,
-        "produces_output": false
-      },
-      "key": "recipe.food.cloud_tea",
-      "status": "active"
-    },
-    {
-      "name": "炼制魂元丹",
-      "desc": "以神魂晶与兽血炼成魂元丹，可涤荡魔染、安定心神。",
+      "key": "recipe.pill.golden_core_guard",
+      "name": "金丹护脉丹",
       "profession": "alchemy",
-      "requirements": [
-        {"type": "profession_level", "value": 5},
-        {"type": "realm", "realm_key": "nascent_soul", "min_layer": 1},
-        {"type": "facility", "facility_kind": "alchemy"},
-        {"type": "location_any", "values": ["cave.mist_grotto_2"]}
-      ],
-      "inputs": [
-        {"item_key": "item.soul_crystal", "quantity": 2},
-        {"item_key": "item.beast_blood", "quantity": 1}
-      ],
-      "energy_cost": 15,
-      "duration_seconds": 300,
-      "outputs": [{"item_key": "item.pill.soul_restore", "quantity": 1}],
-      "daily_limit": 3,
-      "failure": {
-        "input_refund": [{"item_key": "item.soul_crystal", "quantity": 1}],
-        "currency_refund_bp": 0,
-        "produces_output": false
+      "inputs": {
+        "item.herb.spirit_leaf": 3,
+        "item.material.cloud_iron": 1,
+        "item.herb.blood_grass": 2
       },
-      "key": "recipe.pill.soul_restore",
-      "status": "active"
+      "energy_cost": 8,
+      "duration_seconds": 120,
+      "daily_limit": 4,
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 250,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.golden_core_guard": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.spirit_leaf": 1,
+        "item.material.cloud_iron": 0,
+        "item.herb.blood_grass": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "golden_core",
+      "additional_realms": [],
+      "proficiency_bp": 4000,
+      "required_location": [
+        "cave.mist_grotto_2"
+      ],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 6000,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": "alchemy",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以灵叶、云铁与止血草炼成护脉丹，助金丹修士稳住突破根基。",
+      "aliases": [
+        "金丹保护丹"
+      ]
     },
     {
-      "name": "缔结妖兽契约",
-      "desc": "以兽血为引，与妖兽缔结短暂同行之约。",
-      "profession": null,
-      "requirements": [
-        {"type": "path_any", "values": ["beast", "demonic"]},
-        {"type": "realm", "realm_key": "nascent_soul", "min_layer": 1},
-        {"type": "location_any", "values": ["beast.ten_thousand_hills", "demon.abyss_market"]}
-      ],
-      "inputs": [{"item_key": "item.beast_blood", "quantity": 3}],
-      "currency_cost": {"currency_key": "currency.spirit_stone", "amount": 500},
+      "key": "recipe.pill.core_condense",
+      "name": "凝核丹",
+      "profession": "alchemy",
+      "inputs": {
+        "item.herb.spirit_leaf": 5,
+        "item.material.cloud_iron": 2,
+        "item.mat.array_sand": 2
+      },
       "energy_cost": 10,
       "duration_seconds": 180,
-      "outputs": [{"item_key": "item.contract.beast_pact", "quantity": 1, "binding_seconds": 86400}],
-      "daily_limit": 99,
-      "failure": {
-        "input_refund_bp": 6000,
-        "currency_refund_bp": 0,
-        "produces_output": false
+      "daily_limit": 2,
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 250,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.core_condense": 1
       },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.spirit_leaf": 3,
+        "item.material.cloud_iron": 1,
+        "item.mat.array_sand": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "foundation",
+      "additional_realms": [
+        "golden_core"
+      ],
+      "proficiency_bp": 5000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 6000,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": "alchemy",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以灵叶、云铁与阵砂凝炼成丹，供金丹修士冲击更高境界。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.pill.soul_condense",
+      "name": "凝魂丹",
+      "profession": "alchemy",
+      "inputs": {
+        "item.soul_crystal": 1,
+        "item.herb.spirit_leaf": 3,
+        "item.mat.array_sand": 2
+      },
+      "energy_cost": 12,
+      "duration_seconds": 300,
+      "daily_limit": 2,
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 250,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.soul_condense": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.spirit_leaf": 1,
+        "item.mat.array_sand": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "golden_core",
+      "additional_realms": [],
+      "proficiency_bp": 5000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 6000,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": "alchemy",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "将神魂晶与灵材炼成凝魂丹，备下凝练元婴的资粮。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.pill.soul_restore",
+      "name": "魂元丹",
+      "profession": "alchemy",
+      "inputs": {
+        "item.soul_crystal": 2,
+        "item.beast_blood": 1
+      },
+      "energy_cost": 15,
+      "duration_seconds": 300,
+      "daily_limit": 3,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.soul_restore": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.soul_crystal": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "nascent_soul",
+      "additional_realms": [],
+      "proficiency_bp": 5000,
+      "required_location": [
+        "cave.mist_grotto_2"
+      ],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 1,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": "alchemy",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以神魂晶与兽血炼成魂元丹，可涤荡魔染、安定心神。",
+      "aliases": [
+        "心魔丹"
+      ]
+    },
+    {
+      "key": "recipe.weapon.cloud_sword",
+      "name": "云纹剑",
+      "profession": "artifice",
+      "inputs": {
+        "item.material.cloud_iron": 4,
+        "item.mat.array_sand": 1,
+        "item.mat.wood": 2
+      },
+      "energy_cost": 10,
+      "duration_seconds": 180,
+      "daily_limit": 2,
+      "tool_key": "item.tool.basic_hammer",
+      "tool_cost_bp": 250,
+      "currency_cost": 0,
+      "outputs": {
+        "item.weapon.cloud_sword": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.material.cloud_iron": 2,
+        "item.mat.array_sand": 0,
+        "item.mat.wood": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "golden_core",
+      "additional_realms": [],
+      "proficiency_bp": 4000,
+      "required_location": [
+        "cave.mist_grotto_2"
+      ],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 6000,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": "artifice",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以云铁、阵砂和木材锻出云纹长剑，剑身轻韧，灵纹流转。",
+      "aliases": [
+        "云剑"
+      ]
+    },
+    {
+      "key": "recipe.food.cloud_tea",
+      "name": "云灵茶",
+      "profession": "cooking",
+      "inputs": {
+        "item.herb.spirit_leaf": 2,
+        "item.food.coarse_spirit_rice": 2
+      },
+      "energy_cost": 4,
+      "duration_seconds": 60,
+      "daily_limit": 6,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.food.cloud_tea": 3
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.spirit_leaf": 1,
+        "item.food.coarse_spirit_rice": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_gathering",
+      "additional_realms": [],
+      "proficiency_bp": 3000,
+      "required_location": [
+        "xuantian.spirit_field"
+      ],
+      "teaching_allowed": true,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "取灵叶与灵米熬煮成茶，清灵之气可助下一次修炼凝神聚气。",
+      "aliases": [
+        "云茶"
+      ]
+    },
+    {
       "key": "recipe.contract.beast_pact",
-      "status": "active"
+      "name": "妖兽契约",
+      "profession": null,
+      "inputs": {
+        "item.beast_blood": 3
+      },
+      "energy_cost": 10,
+      "duration_seconds": 180,
+      "daily_limit": 99,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 500,
+      "outputs": {
+        "item.contract.beast_pact": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {},
+      "min_realm_layer": 1,
+      "required_realm": "nascent_soul",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [
+        "beast.ten_thousand_hills",
+        "demon.abyss_market"
+      ],
+      "teaching_allowed": false,
+      "required_path": "beast",
+      "required_paths": [
+        "beast",
+        "demonic"
+      ],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": 6000,
+      "binding_kind": "contract",
+      "binding_duration_seconds": 86400,
+      "binding_slot_limit": 1,
+      "cross_realm_faction": "beast",
+      "status": "active",
+      "desc": "以兽血为引，与妖兽缔结短暂同行之约。",
+      "aliases": [
+        "beast_pact",
+        "兽契"
+      ]
+    },
+    {
+      "key": "recipe.void.crystal_refine",
+      "name": "虚空晶炼制",
+      "profession": null,
+      "inputs": {
+        "item.void_crystal": 3,
+        "item.void_anchor": 1
+      },
+      "energy_cost": 8,
+      "duration_seconds": 60,
+      "daily_limit": 4,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.void_power_crystal": 2
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.void_crystal": 2,
+        "item.void_anchor": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 1,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "将虚空晶与虚空锚炼成虚空能量晶，供炼虚境修行使用。",
+      "aliases": [
+        "虚晶炼制"
+      ]
+    },
+    {
+      "key": "recipe.fruit.soul_seed",
+      "name": "化神魂种",
+      "profession": null,
+      "inputs": {
+        "item.ancestral_blood": 2,
+        "item.spirit_water": 5
+      },
+      "energy_cost": 15,
+      "duration_seconds": 21600,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.soul_seed": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.ancestral_blood": 1,
+        "item.spirit_water": 2
+      },
+      "min_realm_layer": 1,
+      "required_realm": "soul_transformation",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [
+        "beast.ancestral_lake"
+      ],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 1,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "在祖灵湖培育化神魂种，供化神后期修行使用。",
+      "aliases": [
+        "魂种"
+      ]
+    },
+    {
+      "key": "recipe.masterwork.body",
+      "name": "体修大师作品",
+      "profession": null,
+      "inputs": {
+        "item.material.cloud_iron": 20,
+        "item.domain_core": 2
+      },
+      "energy_cost": 20,
+      "duration_seconds": 7200,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.body": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.material.cloud_iron": 10,
+        "item.domain_core": 1
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "body",
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作体修大师作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.masterwork.spell",
+      "name": "法修大师作品",
+      "profession": null,
+      "inputs": {
+        "item.void_crystal": 20,
+        "item.soul_crystal": 6
+      },
+      "energy_cost": 20,
+      "duration_seconds": 7200,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.spell": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.void_crystal": 10,
+        "item.soul_crystal": 3
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "spell",
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作法修大师作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.masterwork.device",
+      "name": "器修大师作品",
+      "profession": null,
+      "inputs": {
+        "item.material.cloud_iron": 15,
+        "item.void_crystal": 10,
+        "item.domain_core": 1
+      },
+      "energy_cost": 20,
+      "duration_seconds": 7200,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.device": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.material.cloud_iron": 8,
+        "item.void_crystal": 5,
+        "item.domain_core": 1
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "device",
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作器修大师作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.masterwork.demonic",
+      "name": "魔修大师作品",
+      "profession": null,
+      "inputs": {
+        "item.demon_core": 12,
+        "item.soul_crystal": 6
+      },
+      "energy_cost": 20,
+      "duration_seconds": 7200,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.demonic": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.demon_core": 6,
+        "item.soul_crystal": 3
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "demonic",
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作魔修大师作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.masterwork.beast",
+      "name": "妖修大师作品",
+      "profession": null,
+      "inputs": {
+        "item.beast_blood": 12,
+        "item.void_crystal": 8
+      },
+      "energy_cost": 20,
+      "duration_seconds": 7200,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.beast": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.beast_blood": 6,
+        "item.void_crystal": 4
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "beast",
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作妖修大师作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.masterwork.alchemy",
+      "name": "炼丹大师作品",
+      "profession": null,
+      "inputs": {
+        "item.herb.blood_grass": 20,
+        "item.soul_crystal": 3,
+        "item.domain_core": 1
+      },
+      "energy_cost": 15,
+      "duration_seconds": 5400,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.alchemy": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.blood_grass": 10,
+        "item.soul_crystal": 1
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "support",
+      "required_paths": [],
+      "required_subprofession": [
+        "alchemy",
+        "artifice",
+        "formation",
+        "mining",
+        "cooking"
+      ],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作炼丹大师作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.masterwork.artifice",
+      "name": "炼器大师作品",
+      "profession": null,
+      "inputs": {
+        "item.material.cloud_iron": 15,
+        "item.void_crystal": 5
+      },
+      "energy_cost": 15,
+      "duration_seconds": 5400,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.artifice": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.material.cloud_iron": 7,
+        "item.void_crystal": 2
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "support",
+      "required_paths": [],
+      "required_subprofession": [
+        "alchemy",
+        "artifice",
+        "formation",
+        "mining",
+        "cooking"
+      ],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作炼器大师作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.masterwork.formation",
+      "name": "布阵大师作品",
+      "profession": null,
+      "inputs": {
+        "item.domain_core": 2,
+        "item.void_crystal": 5
+      },
+      "energy_cost": 15,
+      "duration_seconds": 5400,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.formation": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.domain_core": 1,
+        "item.void_crystal": 2
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "support",
+      "required_paths": [],
+      "required_subprofession": [
+        "alchemy",
+        "artifice",
+        "formation",
+        "mining",
+        "cooking"
+      ],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作布阵大师作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.masterwork.support",
+      "name": "辅修三艺合成作品",
+      "profession": null,
+      "inputs": {
+        "item.masterwork.alchemy": 1,
+        "item.masterwork.artifice": 1,
+        "item.masterwork.formation": 1
+      },
+      "energy_cost": 5,
+      "duration_seconds": 1800,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.masterwork.support": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.masterwork.alchemy": 1,
+        "item.masterwork.artifice": 1,
+        "item.masterwork.formation": 1
+      },
+      "min_realm_layer": 10,
+      "required_realm": "void_refining",
+      "additional_realms": [],
+      "proficiency_bp": 0,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": "support",
+      "required_paths": [],
+      "required_subprofession": [
+        "alchemy",
+        "artifice",
+        "formation",
+        "mining",
+        "cooking"
+      ],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以对应道途的珍材制作辅修三艺合成作品，供合道资格核验。",
+      "aliases": []
+    },
+    {
+      "key": "recipe.permit.cloud_mine",
+      "name": "矿区登记",
+      "profession": null,
+      "inputs": {
+        "item.mat.wood": 1,
+        "item.ore.ironstone": 1
+      },
+      "energy_cost": 2,
+      "duration_seconds": 30,
+      "daily_limit": 1,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 20,
+      "outputs": {
+        "item.permit.cloud_mine": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.mat.wood": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [
+        "qi_gathering",
+        "foundation",
+        "golden_core",
+        "nascent_soul",
+        "soul_transformation",
+        "void_refining",
+        "dao_union",
+        "tribulation"
+      ],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "aliases": [],
+      "desc": "备齐登记木牌与铁钉，向矿务司缴费取得绑定的矿区采集许可。许可可随身验看，也可使用后永久登记。"
+    },
+    {
+      "key": "recipe.tool.mining_pickaxe",
+      "name": "基础矿镐",
+      "profession": null,
+      "inputs": {
+        "item.ore.ironstone": 2,
+        "item.mat.wood": 1
+      },
+      "energy_cost": 3,
+      "duration_seconds": 30,
+      "daily_limit": 3,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 10,
+      "outputs": {
+        "item.tool.mining_pickaxe": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.ore.ironstone": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [
+        "qi_gathering",
+        "foundation",
+        "golden_core",
+        "nascent_soul",
+        "soul_transformation",
+        "void_refining",
+        "dao_union",
+        "tribulation"
+      ],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "aliases": [],
+      "desc": "以近郊铁石和木材制作矿镐，可凭此参加云铁矿区采集。"
+    },
+    {
+      "key": "recipe.tool.mining_pickaxe_t2",
+      "name": "精制矿镐",
+      "profession": null,
+      "inputs": {
+        "item.tool.mining_pickaxe": 1,
+        "item.ore.ironstone": 2
+      },
+      "energy_cost": 4,
+      "duration_seconds": 60,
+      "daily_limit": 2,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 20,
+      "outputs": {
+        "item.tool.mining_pickaxe_t2": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.tool.mining_pickaxe": 1,
+        "item.ore.ironstone": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_gathering",
+      "additional_realms": [
+        "foundation",
+        "golden_core",
+        "nascent_soul",
+        "soul_transformation",
+        "void_refining",
+        "dao_union",
+        "tribulation"
+      ],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "aliases": [],
+      "desc": "以基础矿镐与铁石加固镐头；无需先进入矿区取得云铁，避免准入循环。"
+    },
+    {
+      "key": "recipe.companion.sack_small",
+      "name": "小型灵兽行囊",
+      "profession": null,
+      "inputs": {
+        "item.mat.wood": 2,
+        "item.food.coarse_spirit_rice": 1
+      },
+      "energy_cost": 3,
+      "duration_seconds": 45,
+      "daily_limit": 3,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 10,
+      "outputs": {
+        "beast.gear.sack_small": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.mat.wood": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [
+        "qi_gathering",
+        "foundation",
+        "golden_core",
+        "nascent_soul",
+        "soul_transformation",
+        "void_refining",
+        "dao_union",
+        "tribulation"
+      ],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "aliases": [
+        "灵兽行囊",
+        "行囊"
+      ],
+      "desc": "用薄木片作框、灵米浆胶合，制成便于灵兽携带的轻便行囊。"
+    },
+    {
+      "key": "recipe.companion.bamboo_saddle",
+      "name": "竹鹿鞍具",
+      "profession": null,
+      "inputs": {
+        "item.mat.wood": 3,
+        "item.ore.ironstone": 2
+      },
+      "energy_cost": 4,
+      "duration_seconds": 60,
+      "daily_limit": 2,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 20,
+      "outputs": {
+        "mount.tack.bamboo_saddle": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.mat.wood": 1,
+        "item.ore.ironstone": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [
+        "qi_gathering",
+        "foundation",
+        "golden_core",
+        "nascent_soul",
+        "soul_transformation",
+        "void_refining",
+        "dao_union",
+        "tribulation"
+      ],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "aliases": [
+        "竹鹿鞍",
+        "鞍具"
+      ],
+      "desc": "将木材与铁扣装配成稳固鞍具，供已有竹鹿的修士装备；不替代竹鹿结缘来源。"
+    },
+    {
+      "key": "recipe.food.spirit_rice",
+      "name": "灵米饭",
+      "profession": "cooking",
+      "inputs": {
+        "item.food.coarse_spirit_rice": 2
+      },
+      "energy_cost": 2,
+      "duration_seconds": 15,
+      "daily_limit": 10,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.food.spirit_rice": 2
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.food.coarse_spirit_rice": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [
+        "qi_gathering",
+        "foundation",
+        "golden_core",
+        "nascent_soul",
+        "soul_transformation",
+        "void_refining",
+        "dao_union",
+        "tribulation"
+      ],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 10001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "aliases": [
+        "烹饪灵米饭"
+      ],
+      "desc": "将粗糙灵米细心烹煮，做成能补充体力或精力的饭食。"
     }
-  ],
-  "schema": "xiuxian.content"
+  ]
 }

@@ -2,6 +2,36 @@
   "kind": "item",
   "records": [
     {
+      "key": "item.tool.mining_pickaxe",
+      "name": "基础矿镐",
+      "desc": "以近郊铁石和木材制成。随身携带即可验看矿区准入，不增加采集产量。",
+      "item_type": "tool",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "source_recipe_key": "recipe.tool.mining_pickaxe",
+      "status": "active"
+    },
+    {
+      "key": "item.tool.mining_pickaxe_t2",
+      "name": "精制矿镐",
+      "desc": "用基础矿镐加固制成的采矿工具，可作矿区准入凭据，不额外改变现有采集收益。",
+      "item_type": "tool",
+      "quality": "uncommon",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "source_recipe_key": "recipe.tool.mining_pickaxe_t2",
+      "status": "active"
+    },
+    {
       "name": "基础丹炉",
       "desc": "炼制丹药所用的入门炉具，能承受寻常火候。",
       "item_type": "tool",

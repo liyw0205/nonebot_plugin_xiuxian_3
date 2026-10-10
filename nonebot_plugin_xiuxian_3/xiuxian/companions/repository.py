@@ -213,6 +213,32 @@ class CompanionRepositoryMixin:
             companions=tuple(snapshots),
         )
 
+    def companion_carry_snapshot(self, connection: sqlite3.Connection, player_id: int) -> list[dict[str, object]]:
+        rows = connection.execute(
+            "SELECT g.gear_instance_id, g.gear_key, g.durability_bp "
+            "FROM companion_gear_instances g JOIN companion_instances c ON c.id=g.companion_instance_id "
+            "WHERE g.player_id=? AND g.status='equipped' AND g.durability_bp>0 "
+            "AND c.kind='beast' AND c.deployed=1 AND c.status IN ('active', 'available') ORDER BY g.id",
+            (player_id,),
+        ).fetchall()
+        result: list[dict[str, object]] = []
+        for row in rows:
+            definition = companion_definition(str(row["gear_key"]), self.content)
+            effect = definition.effect or {}
+            if effect.get("type") != "carry_capacity":
+                continue
+            value = effect.get("value")
+            if type(value) is not int or value < 0:
+                raise ValueError("companion carry effect is invalid")
+            result.append({
+                "instance_id": str(row["gear_instance_id"]), "gear_key": definition.key,
+                "durability_bp": int(row["durability_bp"]), "carry_capacity": value,
+            })
+        return result
+
+    def companion_carry_capacity(self, connection: sqlite3.Connection, player_id: int) -> int:
+        return sum(int(item["carry_capacity"]) for item in self.companion_carry_snapshot(connection, player_id))
+
     def _list_companions_sync(self, platform: str, platform_user_id: str) -> CompanionStatusRecord:
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)

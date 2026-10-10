@@ -7,7 +7,8 @@
       "kind": "beast",
       "source": [
         "xuantian.outskirts",
-        "story.mainline.xuantian"
+        "story.mainline.xuantian",
+        "story.mainline.xuantian:chapter.1.stage.1"
       ],
       "level_range": [
         1,
@@ -51,7 +52,8 @@
       "desc": "生于竹林的温驯灵鹿，熟悉山路，适合陪伴主人长途跋涉。",
       "kind": "mount",
       "source": [
-        "story.mainline.xuantian"
+        "story.mainline.xuantian",
+        "story.mainline.xuantian:chapter.1.stage.1"
       ],
       "level_range": [
         1,
@@ -73,10 +75,8 @@
       "name": "小型灵兽行囊",
       "desc": "可挂在灵兽身上的轻便行囊，能替主人携带少量行旅物资。",
       "kind": "beast_gear",
-      "source": [
-        "production"
-      ],
-      "source_status": "pending_recipe_key",
+      "source": ["recipe.companion.sack_small"],
+      "source_recipe_key": "recipe.companion.sack_small",
       "instance_mode": "unique",
       "durability_bp": 1000,
       "effect": {
@@ -90,10 +90,8 @@
       "name": "竹鹿鞍具",
       "desc": "为竹鹿量身制作的鞍具，让山路上的骑行更稳当省力。",
       "kind": "mount_tack",
-      "source": [
-        "story.mainline.xuantian",
-        "production"
-      ],
+      "source": ["recipe.companion.bamboo_saddle"],
+      "source_recipe_key": "recipe.companion.bamboo_saddle",
       "instance_mode": "unique",
       "durability_bp": 1000,
       "effect": {

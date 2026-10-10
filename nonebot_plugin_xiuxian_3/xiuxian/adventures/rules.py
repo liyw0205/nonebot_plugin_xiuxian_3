@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
+from ..player.path_rules import subprofession_records
 from ..rewards.rules import local_reputation_maximum, reward_pool_outcomes
 from ..specials.dispatch_rules import resolve_dispatch
 from ..utils.randomness import deterministic_weighted_choice
@@ -96,7 +97,7 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
             bundle.require("path", path_key)
         aliases = _string_tuple(row, "aliases", key)
         access_any = row.get("access_any", [])
-        _validate_access_conditions(key, access_any)
+        _validate_access_conditions(key, access_any, bundle)
         reward_labels = row.get("reward_labels", {})
         if not isinstance(reward_labels, dict) or any(
             not isinstance(label_key, str) or not isinstance(label, str)
@@ -182,7 +183,7 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
     return tuple(definitions)
 
 
-def _validate_access_conditions(bounty_key: str, conditions: Any) -> None:
+def _validate_access_conditions(bounty_key: str, conditions: Any, bundle: ContentBundle) -> None:
     if not isinstance(conditions, list) or any(
         not isinstance(condition, dict) for condition in conditions
     ):
@@ -208,12 +209,18 @@ def _validate_access_conditions(bounty_key: str, conditions: Any) -> None:
                 raise ContentError(
                     f"bounty {bounty_key} access_any[{index}] value must be non-empty"
                 )
+            if condition_type == "subprofession" and value not in {
+                row["key"] for row in subprofession_records(content=bundle)
+            }:
+                raise ContentError(f"bounty {bounty_key} access_any[{index}] references an unavailable subprofession")
         elif condition_type == "inventory_item":
             item_key = condition.get("item_key")
             if not isinstance(item_key, str) or not item_key:
                 raise ContentError(
                     f"bounty {bounty_key} access_any[{index}] item_key is required"
                 )
+            if not bundle.has("item", item_key, include_locked=False):
+                raise ContentError(f"bounty {bounty_key} access_any[{index}] references an unavailable item")
             quantity = condition.get("quantity", 1)
             if (
                 isinstance(quantity, bool)

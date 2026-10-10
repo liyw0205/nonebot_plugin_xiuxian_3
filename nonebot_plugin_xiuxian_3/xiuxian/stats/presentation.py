@@ -18,6 +18,7 @@ STAT_LABELS = {
 SOURCE_LABELS = {
     "realm": "境界", "qualification": "资质根基", "permanent": "历练所得",
     "path": "道途", "equipment": "随身法器", "manual": "所修功法", "constitution": "天生体质",
+    "companion_gear": "灵兽行囊",
 }
 PROFILE_STATS = ("max_hp", "max_mp", "attack", "carry_capacity", "initiative")
 

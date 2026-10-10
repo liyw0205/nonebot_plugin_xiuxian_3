@@ -258,6 +258,8 @@ class ItemRepositoryMixin:
                 if cooldown is not None and str(cooldown["cooldown_until"]) > now_text:
                     raise ItemCooldownError("item recovery is still cooling down")
                 maximum = player_integer(row, f"{choice}_max")
+                if choice == "void_power" and maximum <= 0:
+                    raise ItemNotUsableError("void power is not unlocked")
                 actual = change_player_state_actual(
                     connection,
                     row,
@@ -284,6 +286,19 @@ class ItemRepositoryMixin:
                     "restored": actual.get(choice, 0),
                     "cooldown_until": cooldown_until,
                 }
+            elif definition.effect_type == "grant_intro_flags":
+                intro = self._json_object(row["intro_json"], {})
+                flags = intro.get("flags", [])
+                if not isinstance(flags, list) or any(not isinstance(flag, str) for flag in flags):
+                    raise ValueError("player intro flags are invalid")
+                if set(definition.granted_flags).issubset(flags):
+                    raise ItemEffectAlreadyActiveError("permit is already registered")
+                intro["flags"] = sorted(set(flags) | set(definition.granted_flags))
+                spend_player_items(
+                    connection, row, {definition.key: 1}, now_text,
+                    player_values={"intro_json": json.dumps(intro, ensure_ascii=False, sort_keys=True)},
+                )
+                effect = {"type": definition.effect_type, "flags": list(definition.granted_flags)}
             elif definition.effect_type == "next_cultivation_state_bonus_bp":
                 effects = self._json_object(row["item_effects_json"], {})
                 if effects.get("pending") is not None:
@@ -426,12 +441,13 @@ class ItemRepositoryMixin:
             "restore_choice",
             "next_cultivation_state_bonus_bp",
             "exploration_risk_reduction_bp",
+            "grant_intro_flags",
         }:
             raise OperationResultMalformedError("item operation snapshot effect is invalid")
         effect_type = effect["type"]
         if effect_type == "restore_choice":
             if (
-                effect.get("resource") not in {"stamina", "energy"}
+                effect.get("resource") not in {"stamina", "energy", "void_power"}
                 or not isinstance(effect.get("requested"), int)
                 or isinstance(effect.get("requested"), bool)
                 or effect.get("requested", 0) <= 0
@@ -442,9 +458,23 @@ class ItemRepositoryMixin:
                 or not isinstance(effect.get("cooldown_until"), str)
             ):
                 raise OperationResultMalformedError("item operation snapshot recovery effect is invalid")
-            labels = {"stamina": "体力", "energy": "精力"}
+            labels = {"stamina": "体力", "energy": "精力", "void_power": "虚力"}
             if len(request_args) != 2 or request_args[1] not in {effect["resource"], labels[effect["resource"]]}:
                 raise OperationResultMalformedError("item operation snapshot recovery request is invalid")
+        elif effect_type == "grant_intro_flags":
+            flags = effect.get("flags")
+            if (
+                set(effect) != {"type", "flags"}
+                or not isinstance(flags, list)
+                or not flags
+                or any(not isinstance(flag, str) or not flag.strip() for flag in flags)
+                or len(set(flags)) != len(flags)
+                or len(request_args) != 1
+            ):
+                raise OperationResultMalformedError("item operation snapshot flags are invalid")
+            intro_flags = decode_json_strict(payload["player"]["intro_json"]).get("flags")
+            if not isinstance(intro_flags, list) or not set(flags).issubset(intro_flags):
+                raise OperationResultMalformedError("item operation flags disagree with its player")
         elif effect_type == "next_cultivation_state_bonus_bp":
             if (
                 not isinstance(effect.get("state_bp_bonus"), int)

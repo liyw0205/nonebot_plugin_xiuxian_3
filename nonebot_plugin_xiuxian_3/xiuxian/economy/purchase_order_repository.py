@@ -391,6 +391,8 @@ class PurchaseOrderRepositoryMixin:
                     self._record_purchase_operation(connection, operation_id, operation_name, int(seller_actor["id"]), request_hash, payload, now_text)
                     return self._purchase_record_from_payload(payload)
                 capacity = int(buyer["carry_capacity"] or 0)
+                if capacity > 0:
+                    capacity += self.companion_carry_capacity(connection, int(buyer["id"]))
                 if capacity > 0 and sum(int(value) for value in buyer_inventory.values()) + quantity > capacity:
                     raise PurchaseBuyerCapacityInsufficientError("buyer inventory capacity is insufficient")
                 seller_transition = apply_player_asset_transition(

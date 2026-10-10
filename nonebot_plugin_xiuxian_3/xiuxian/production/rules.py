@@ -1,518 +1,189 @@
-"""Pure rules for the personal production slice."""
+"""Content-backed personal production recipes and quality rules."""
 
 from __future__ import annotations
 
+from dataclasses import fields
 from hashlib import blake2b
+from typing import Any
 
-from ..content import ContentBundle, bundled_content
-from .endgame_work_rules import (
-    ENDGAME_WORK_RECIPES,
-    ITEM_LABELS as ENDGAME_WORK_ITEM_LABELS,
-    RECIPE_ALIASES as ENDGAME_WORK_RECIPE_ALIASES,
-)
+from ..content import ContentBundle, ContentError, bundled_content
+from ..player.path_rules import subprofession_records
 from .recipe_models import RecipeDefinition
 
 
 QUALITY_SUCCESS_THRESHOLD_BP = 4500
 HIGH_QUALITY_THRESHOLD_BP = 8000
 TOOL_MAX_DURABILITY_BP = 2000
-
-
-RECIPES: dict[str, RecipeDefinition] = {
-    "recipe.pill.focus_low": RecipeDefinition(
-        key="recipe.pill.focus_low",
-        name="焦点丹",
-        profession="alchemy",
-        inputs={"item.herb.spirit_leaf": 2, "item.herb.blood_grass": 1},
-        energy_cost=5,
-        duration_seconds=45,
-        daily_limit=6,
-        tool_key="item.tool.basic_furnace",
-        tool_cost_bp=100,
-        currency_cost=0,
-        outputs={"item.pill.focus_low": 1},
-        high_quality_bonus={},
-        failure_refunds={"item.herb.spirit_leaf": 1, "item.herb.blood_grass": 0},
-        min_realm_layer=1,
-        required_realm="qi_sensing",
-        teaching_allowed=True,
-    ),
-    "recipe.pill.qi_guard": RecipeDefinition(
-        key="recipe.pill.qi_guard",
-        name="聚气护脉丹",
-        profession="alchemy",
-        inputs={
-            "item.herb.spirit_leaf": 2,
-            "item.herb.blood_grass": 2,
-        },
-        energy_cost=6,
-        duration_seconds=60,
-        daily_limit=3,
-        tool_key="item.tool.basic_furnace",
-        tool_cost_bp=100,
-        currency_cost=0,
-        outputs={"item.pill.qi_guard": 1},
-        high_quality_bonus={},
-        failure_refunds={
-            "item.herb.spirit_leaf": 1,
-            "item.herb.blood_grass": 1,
-        },
-        min_realm_layer=1,
-        required_realm="qi_sensing",
-        proficiency_bp=2000,
-    ),
-    "recipe.pill.healing_low": RecipeDefinition(
-        key="recipe.pill.healing_low",
-        name="低阶疗伤丹",
-        profession="alchemy",
-        inputs={"item.herb.blood_grass": 2, "item.food.coarse_spirit_rice": 1},
-        energy_cost=4,
-        duration_seconds=30,
-        daily_limit=8,
-        tool_key="item.tool.basic_furnace",
-        tool_cost_bp=100,
-        currency_cost=0,
-        outputs={"item.pill.healing_low": 1},
-        high_quality_bonus={"item.pill.healing_low": 1},
-        failure_refunds={"item.herb.blood_grass": 1, "item.food.coarse_spirit_rice": 0},
-        min_realm_layer=1,
-        required_realm="qi_sensing",
-        teaching_allowed=True,
-    ),
-    "recipe.pill.foundation_draft": RecipeDefinition(
-        key="recipe.pill.foundation_draft",
-        name="筑基丹",
-        profession="alchemy",
-        inputs={
-            "item.herb.spirit_leaf": 3,
-            "item.mat.array_sand": 2,
-            "item.ore.ironstone": 2,
-        },
-        energy_cost=8,
-        duration_seconds=120,
-        daily_limit=3,
-        tool_key="item.tool.basic_furnace",
-        tool_cost_bp=100,
-        currency_cost=0,
-        outputs={"item.pill.foundation_draft": 1},
-        high_quality_bonus={},
-        failure_refunds={
-            "item.herb.spirit_leaf": 1,
-            "item.mat.array_sand": 1,
-            "item.ore.ironstone": 1,
-        },
-        min_realm_layer=1,
-        required_realm="qi_gathering",
-        proficiency_bp=3000,
-    ),
-    "recipe.pill.foundation_guard": RecipeDefinition(
-        key="recipe.pill.foundation_guard",
-        name="筑基护脉丹",
-        profession="alchemy",
-        inputs={
-            "item.herb.spirit_leaf": 2,
-            "item.mat.array_sand": 1,
-            "item.herb.blood_grass": 1,
-        },
-        energy_cost=10,
-        duration_seconds=180,
-        daily_limit=2,
-        tool_key="item.tool.basic_furnace",
-        tool_cost_bp=100,
-        currency_cost=0,
-        outputs={"item.pill.foundation_guard": 1},
-        high_quality_bonus={},
-        failure_refunds={
-            "item.herb.spirit_leaf": 1,
-            "item.mat.array_sand": 0,
-            "item.herb.blood_grass": 0,
-        },
-        min_realm_layer=1,
-        required_realm="qi_gathering",
-        proficiency_bp=3000,
-    ),
-    "recipe.weapon.wood_sword": RecipeDefinition(
-        key="recipe.weapon.wood_sword",
-        name="木纹剑",
-        profession="artifice",
-        inputs={"item.ore.ironstone": 2, "item.mat.wood": 2},
-        energy_cost=5,
-        duration_seconds=60,
-        daily_limit=4,
-        tool_key="item.tool.basic_hammer",
-        tool_cost_bp=100,
-        currency_cost=0,
-        outputs={"item.weapon.wood_sword": 1},
-        high_quality_bonus={},
-        failure_refunds={"item.ore.ironstone": 1, "item.mat.wood": 1},
-        min_realm_layer=1,
-        required_realm="qi_gathering",
-    ),
-    "recipe.array.gathering_basic": RecipeDefinition(
-        key="recipe.array.gathering_basic",
-        name="基础聚灵阵",
-        profession="formation",
-        inputs={"item.mat.array_sand": 2},
-        energy_cost=6,
-        duration_seconds=90,
-        daily_limit=3,
-        tool_key=None,
-        tool_cost_bp=0,
-        currency_cost=20,
-        outputs={"item.array.gathering_basic": 1},
-        high_quality_bonus={},
-        failure_refunds={"item.mat.array_sand": 1},
-        min_realm_layer=1,
-        required_realm="qi_gathering",
-        required_location=("xuantian.spirit_field", "xuantian.array_hall"),
-    ),
-    "recipe.array.mist_barrier": RecipeDefinition(
-        key="recipe.array.mist_barrier",
-        name="迷雾屏障阵",
-        profession="formation",
-        inputs={"item.mat.array_sand": 5, "item.herb.spirit_leaf": 2},
-        energy_cost=12,
-        duration_seconds=240,
-        daily_limit=2,
-        tool_key=None,
-        tool_cost_bp=0,
-        currency_cost=100,
-        outputs={"item.array.mist_barrier": 1},
-        high_quality_bonus={},
-        failure_refunds={"item.mat.array_sand": 3, "item.herb.spirit_leaf": 1},
-        min_realm_layer=1,
-        required_realm="golden_core",
-        proficiency_bp=4000,
-        required_location=("xuantian.array_hall", "cave.mist_grotto_2"),
-        success_threshold_bp=6000,
-        high_quality_threshold_bp=8000,
-        facility_kind="array",
-    ),
-    "recipe.pill.golden_core_guard": RecipeDefinition(
-        key="recipe.pill.golden_core_guard",
-        name="金丹护脉丹",
-        profession="alchemy",
-        inputs={
-            "item.herb.spirit_leaf": 3,
-            "item.material.cloud_iron": 1,
-            "item.herb.blood_grass": 2,
-        },
-        energy_cost=8,
-        duration_seconds=120,
-        daily_limit=4,
-        tool_key="item.tool.basic_furnace",
-        tool_cost_bp=250,
-        currency_cost=0,
-        outputs={"item.pill.golden_core_guard": 1},
-        high_quality_bonus={},
-        failure_refunds={
-            "item.herb.spirit_leaf": 1,
-            "item.material.cloud_iron": 0,
-            "item.herb.blood_grass": 1,
-        },
-        min_realm_layer=1,
-        required_realm="golden_core",
-        proficiency_bp=4000,
-        required_location=("cave.mist_grotto_2",),
-        success_threshold_bp=6000,
-        high_quality_threshold_bp=8000,
-        facility_kind="alchemy",
-    ),
-    "recipe.pill.core_condense": RecipeDefinition(
-        key="recipe.pill.core_condense",
-        name="凝核丹",
-        profession="alchemy",
-        inputs={
-            "item.herb.spirit_leaf": 5,
-            "item.material.cloud_iron": 2,
-            "item.mat.array_sand": 2,
-        },
-        energy_cost=10,
-        duration_seconds=180,
-        daily_limit=2,
-        tool_key="item.tool.basic_furnace",
-        tool_cost_bp=250,
-        currency_cost=0,
-        outputs={"item.pill.core_condense": 1},
-        high_quality_bonus={},
-        failure_refunds={
-            "item.herb.spirit_leaf": 3,
-            "item.material.cloud_iron": 1,
-            "item.mat.array_sand": 1,
-        },
-        min_realm_layer=1,
-        required_realm="foundation",
-        additional_realms=("golden_core",),
-        proficiency_bp=5000,
-        success_threshold_bp=6000,
-        high_quality_threshold_bp=8000,
-        facility_kind="alchemy",
-    ),
-    "recipe.pill.soul_condense": RecipeDefinition(
-        key="recipe.pill.soul_condense",
-        name="凝魂丹",
-        profession="alchemy",
-        inputs={"item.soul_crystal": 1, "item.herb.spirit_leaf": 3, "item.mat.array_sand": 2},
-        energy_cost=12,
-        duration_seconds=5 * 60,
-        daily_limit=2,
-        tool_key="item.tool.basic_furnace",
-        tool_cost_bp=250,
-        currency_cost=0,
-        outputs={"item.pill.soul_condense": 1},
-        high_quality_bonus={},
-        failure_refunds={"item.herb.spirit_leaf": 1, "item.mat.array_sand": 1},
-        min_realm_layer=1,
-        required_realm="golden_core",
-        proficiency_bp=5000,
-        success_threshold_bp=6000,
-        facility_kind="alchemy",
-    ),
-    "recipe.pill.soul_restore": RecipeDefinition(
-        key="recipe.pill.soul_restore",
-        name="魂元丹",
-        profession="alchemy",
-        inputs={"item.soul_crystal": 2, "item.beast_blood": 1},
-        energy_cost=15,
-        duration_seconds=5 * 60,
-        daily_limit=3,
-        tool_key=None,
-        tool_cost_bp=0,
-        currency_cost=0,
-        outputs={"item.pill.soul_restore": 1},
-        high_quality_bonus={},
-        failure_refunds={"item.soul_crystal": 1},
-        min_realm_layer=1,
-        required_realm="nascent_soul",
-        proficiency_bp=5000,
-        required_location=("cave.mist_grotto_2",),
-        facility_kind="alchemy",
-        success_threshold_bp=1,
-        high_quality_threshold_bp=10001,
-    ),
-    "recipe.weapon.cloud_sword": RecipeDefinition(
-        key="recipe.weapon.cloud_sword",
-        name="云纹剑",
-        profession="artifice",
-        inputs={
-            "item.material.cloud_iron": 4,
-            "item.mat.array_sand": 1,
-            "item.mat.wood": 2,
-        },
-        energy_cost=10,
-        duration_seconds=180,
-        daily_limit=2,
-        tool_key="item.tool.basic_hammer",
-        tool_cost_bp=250,
-        currency_cost=0,
-        outputs={"item.weapon.cloud_sword": 1},
-        high_quality_bonus={},
-        failure_refunds={
-            "item.material.cloud_iron": 2,
-            "item.mat.array_sand": 0,
-            "item.mat.wood": 1,
-        },
-        min_realm_layer=1,
-        required_realm="golden_core",
-        proficiency_bp=4000,
-        required_location=("cave.mist_grotto_2",),
-        success_threshold_bp=6000,
-        high_quality_threshold_bp=8000,
-        facility_kind="artifice",
-    ),
-    "recipe.food.cloud_tea": RecipeDefinition(
-        key="recipe.food.cloud_tea",
-        name="云灵茶",
-        profession="cooking",
-        inputs={"item.herb.spirit_leaf": 2, "item.food.coarse_spirit_rice": 2},
-        energy_cost=4,
-        duration_seconds=60,
-        daily_limit=6,
-        tool_key=None,
-        tool_cost_bp=0,
-        currency_cost=0,
-        outputs={"item.food.cloud_tea": 3},
-        high_quality_bonus={},
-        failure_refunds={"item.herb.spirit_leaf": 1, "item.food.coarse_spirit_rice": 1},
-        min_realm_layer=1,
-        required_realm="qi_gathering",
-        proficiency_bp=3000,
-        required_location=("xuantian.spirit_field",),
-        teaching_allowed=True,
-        success_threshold_bp=4500,
-        high_quality_threshold_bp=8000,
-    ),
-    "recipe.contract.beast_pact": RecipeDefinition(
-        key="recipe.contract.beast_pact",
-        name="妖兽契约",
-        profession=None,
-        inputs={"item.beast_blood": 3},
-        energy_cost=10,
-        duration_seconds=180,
-        daily_limit=99,
-        tool_key=None,
-        tool_cost_bp=0,
-        currency_cost=500,
-        outputs={"item.contract.beast_pact": 1},
-        high_quality_bonus={},
-        failure_refunds={},
-        min_realm_layer=1,
-        required_realm="nascent_soul",
-        required_path="beast",
-        required_paths=("beast", "demonic"),
-        required_location=("beast.ten_thousand_hills", "demon.abyss_market"),
-        success_threshold_bp=4500,
-        high_quality_threshold_bp=8000,
-        failure_refund_bp=6000,
-        binding_kind="contract",
-        binding_duration_seconds=24 * 60 * 60,
-        binding_slot_limit=1,
-        cross_realm_faction="beast",
-    ),
-    "recipe.void.crystal_refine": RecipeDefinition(
-        key="recipe.void.crystal_refine",
-        name="虚空晶炼制",
-        profession=None,
-        inputs={"item.void_crystal": 3, "item.void_anchor": 1},
-        energy_cost=8,
-        duration_seconds=60,
-        daily_limit=4,
-        tool_key=None,
-        tool_cost_bp=0,
-        currency_cost=0,
-        outputs={"item.void_power_crystal": 2},
-        high_quality_bonus={},
-        failure_refunds={"item.void_crystal": 2, "item.void_anchor": 1},
-        min_realm_layer=1,
-        required_realm="void_refining",
-        success_threshold_bp=1,
-        high_quality_threshold_bp=10001,
-    ),
-    "recipe.fruit.soul_seed": RecipeDefinition(
-        key="recipe.fruit.soul_seed",
-        name="化神魂种",
-        profession=None,
-        inputs={"item.ancestral_blood": 2, "item.spirit_water": 5},
-        energy_cost=15,
-        duration_seconds=6 * 60 * 60,
-        daily_limit=1,
-        tool_key=None,
-        tool_cost_bp=0,
-        currency_cost=0,
-        outputs={"item.soul_seed": 1},
-        high_quality_bonus={},
-        failure_refunds={"item.ancestral_blood": 1, "item.spirit_water": 2},
-        min_realm_layer=1,
-        required_realm="soul_transformation",
-        required_location=("beast.ancestral_lake",),
-        success_threshold_bp=1,
-        high_quality_threshold_bp=10001,
-    ),
+_RECIPE_FIELDS = frozenset(field.name for field in fields(RecipeDefinition))
+_LIST_REFERENCES = {
+    "additional_realms": "realm",
+    "required_location": "location",
+    "required_paths": "path",
 }
-RECIPES.update(ENDGAME_WORK_RECIPES)
+_SUBPROFESSION_LIST = "required_subprofession"
 
 
-RECIPE_ALIASES = {
-    **{key: key for key in RECIPES},
-    "疗伤丹": "recipe.pill.healing_low",
-    "低阶疗伤丹": "recipe.pill.healing_low",
-    "炼丹": "recipe.pill.healing_low",
-    "焦点丹": "recipe.pill.focus_low",
-    "焦点": "recipe.pill.focus_low",
-    "筑基丹": "recipe.pill.foundation_draft",
-    "聚气护脉丹": "recipe.pill.qi_guard",
-    "聚气保护丹": "recipe.pill.qi_guard",
-    "筑基护脉丹": "recipe.pill.foundation_guard",
-    "筑基保护丹": "recipe.pill.foundation_guard",
-    "木纹剑": "recipe.weapon.wood_sword",
-    "木剑": "recipe.weapon.wood_sword",
-    "炼器": "recipe.weapon.wood_sword",
-    "聚灵阵": "recipe.array.gathering_basic",
-    "基础聚灵阵": "recipe.array.gathering_basic",
-    "布阵": "recipe.array.gathering_basic",
-    "迷雾屏障阵": "recipe.array.mist_barrier",
-    "迷雾屏障": "recipe.array.mist_barrier",
-    "金丹护脉丹": "recipe.pill.golden_core_guard",
-    "金丹保护丹": "recipe.pill.golden_core_guard",
-    "凝核丹": "recipe.pill.core_condense",
-    "凝魂丹": "recipe.pill.soul_condense",
-    "魂元丹": "recipe.pill.soul_restore",
-    "心魔丹": "recipe.pill.soul_restore",
-    "云纹剑": "recipe.weapon.cloud_sword",
-    "云剑": "recipe.weapon.cloud_sword",
-    "云灵茶": "recipe.food.cloud_tea",
-    "云茶": "recipe.food.cloud_tea",
-    "recipe.contract.beast_pact": "recipe.contract.beast_pact",
-    "beast_pact": "recipe.contract.beast_pact",
-    "妖兽契约": "recipe.contract.beast_pact",
-    "兽契": "recipe.contract.beast_pact",
-    "虚空晶炼制": "recipe.void.crystal_refine",
-    "虚晶炼制": "recipe.void.crystal_refine",
-    "化神魂种": "recipe.fruit.soul_seed",
-    "魂种": "recipe.fruit.soul_seed",
-}
-RECIPE_ALIASES.update({key: key for key in ENDGAME_WORK_RECIPES})
-RECIPE_ALIASES.update(ENDGAME_WORK_RECIPE_ALIASES)
-
-ITEM_LABELS = {
-    "item.herb.blood_grass": "止血草",
-    "item.herb.spirit_leaf": "灵叶",
-    "item.food.coarse_spirit_rice": "粗糙灵米",
-    "item.ore.ironstone": "铁石",
-    "item.mat.wood": "木材",
-    "item.mat.array_sand": "阵砂",
-    "item.pill.healing_low": "低阶疗伤丹",
-    "item.pill.focus_low": "焦点丹",
-    "item.pill.foundation_draft": "筑基丹",
-    "item.pill.qi_guard": "聚气护脉丹",
-    "item.pill.foundation_guard": "筑基护脉丹",
-    "item.weapon.wood_sword": "木纹剑",
-    "item.array.gathering_basic": "基础聚灵阵",
-    "item.array.mist_barrier": "迷雾屏障阵",
-    "item.material.cloud_iron": "云铁",
-    "item.void_crystal": "虚空晶",
-    "item.void_anchor": "虚空锚",
-    "item.void_power_crystal": "虚空能量晶",
-    "item.pill.golden_core_guard": "金丹护脉丹",
-    "item.pill.core_condense": "凝核丹",
-    "item.pill.soul_condense": "凝魂丹",
-    "item.pill.soul_restore": "魂元丹",
-    "item.soul_crystal": "神魂晶",
-    "item.demon_core": "魔核",
-    "item.weapon.cloud_sword": "云纹剑",
-    "item.food.cloud_tea": "云灵茶",
-    "item.contract.beast_pact": "妖兽契约",
-    "item.ancestral_blood": "祖灵血",
-    "item.spirit_water": "灵泉水",
-    "item.soul_seed": "化神魂种",
-    "item.tool.basic_furnace": "基础丹炉",
-    "item.tool.basic_hammer": "基础炼器锤",
-}
-ITEM_LABELS.update(ENDGAME_WORK_ITEM_LABELS)
+class UnknownRecipeError(ValueError):
+    """The requested stable recipe ID is absent or closed for new orders."""
 
 
-def resolve_recipe(value: str) -> str | None:
-    return RECIPE_ALIASES.get(value.strip())
+def recipe_definitions(content: ContentBundle | None = None) -> dict[str, RecipeDefinition]:
+    bundle = content or bundled_content()
+    professions = {row["key"] for row in subprofession_records(content=bundle)}
+    result: dict[str, RecipeDefinition] = {}
+    for row in bundle.list("recipe", include_locked=False):
+        key = row["key"]
+        if set(row) != _RECIPE_FIELDS | {"desc", "status", "aliases"}:
+            raise ContentError(f"recipe {key} has missing or unused fields")
+        for field in ("key", "name", "desc"):
+            if not isinstance(row[field], str) or not row[field].strip():
+                raise ContentError(f"recipe {key} {field} must be non-empty")
+        _strings(row["aliases"], key, "aliases")
+        profession = row["profession"]
+        if profession is not None and (not isinstance(profession, str) or profession not in professions):
+            raise ContentError(f"recipe {key} profession is unavailable")
+        for field in ("energy_cost", "duration_seconds", "daily_limit", "min_realm_layer"):
+            _integer(row[field], key, field, minimum=1)
+        for field in ("currency_cost", "binding_duration_seconds", "binding_slot_limit"):
+            _integer(row[field], key, field)
+        for field in ("tool_cost_bp", "proficiency_bp"):
+            _integer(row[field], key, field, maximum=10000)
+        _integer(row["success_threshold_bp"], key, "success_threshold_bp", minimum=1, maximum=10000)
+        _integer(row["high_quality_threshold_bp"], key, "high_quality_threshold_bp", minimum=1, maximum=10001)
+        if row["high_quality_threshold_bp"] < row["success_threshold_bp"]:
+            raise ContentError(f"recipe {key} quality thresholds are reversed")
+        if type(row["teaching_allowed"]) is not bool:
+            raise ContentError(f"recipe {key} teaching_allowed must be boolean")
+        for field, kind in _LIST_REFERENCES.items():
+            for reference in _strings(row[field], key, field):
+                _reference(bundle, kind, reference, key, field)
+        for reference in _strings(row[_SUBPROFESSION_LIST], key, _SUBPROFESSION_LIST):
+            if reference not in professions:
+                raise ContentError(f"recipe {key} required_subprofession is unavailable")
+        _reference(bundle, "realm", row["required_realm"], key, "required_realm")
+        realms = [row["required_realm"], *row["additional_realms"]]
+        if any(row["min_realm_layer"] > bundle.require("realm", realm)["layer_max"] for realm in realms):
+            raise ContentError(f"recipe {key} min_realm_layer exceeds realm layers")
+        if row["required_path"] is not None:
+            _reference(bundle, "path", row["required_path"], key, "required_path")
+        if row["facility_kind"] not in (None, "alchemy", "artifice", "array"):
+            raise ContentError(f"recipe {key} facility_kind is unsupported")
+        if row["cross_realm_faction"] not in (None, "beast", "demon"):
+            raise ContentError(f"recipe {key} cross_realm_faction is unsupported")
+        if row["binding_kind"] not in (None, "contract"):
+            raise ContentError(f"recipe {key} binding_kind is unsupported")
+        if row["binding_kind"] is None:
+            if row["binding_duration_seconds"] or row["binding_slot_limit"]:
+                raise ContentError(f"recipe {key} has binding values without a binding")
+        elif not row["binding_duration_seconds"] or not row["binding_slot_limit"]:
+            raise ContentError(f"recipe {key} binding values must be positive")
+        if row["failure_refund_bp"] is not None:
+            _integer(row["failure_refund_bp"], key, "failure_refund_bp", maximum=10000)
+        for field in ("inputs", "outputs", "high_quality_bonus", "failure_refunds"):
+            _assets(bundle, row[field], key, field, allow_zero=field == "failure_refunds")
+        if not row["inputs"] or not row["outputs"]:
+            raise ContentError(f"recipe {key} inputs and outputs must not be empty")
+        if set(row["high_quality_bonus"]) - set(row["outputs"]):
+            raise ContentError(f"recipe {key} quality bonus is not an output")
+        if any(amount > row["inputs"].get(asset, -1) for asset, amount in row["failure_refunds"].items()):
+            raise ContentError(f"recipe {key} refund exceeds its inputs")
+        if row["tool_key"] is not None:
+            _reference(bundle, "item", row["tool_key"], key, "tool_key")
+            if bundle.require("item", row["tool_key"]).get("item_type") != "tool":
+                raise ContentError(f"recipe {key} tool_key is not a tool")
+        elif row["tool_cost_bp"]:
+            raise ContentError(f"recipe {key} has tool cost without a tool")
+        values = {field: row[field] for field in _RECIPE_FIELDS}
+        for field in (*_LIST_REFERENCES, _SUBPROFESSION_LIST):
+            values[field] = tuple(values[field])
+        result[key] = RecipeDefinition(**values)
+    _validate_sources(bundle)
+    _recipe_selectors(bundle, result)
+    return result
 
 
-def recipe_definition(recipe_key: str) -> RecipeDefinition:
+def _integer(value: Any, key: str, field: str, *, minimum: int = 0, maximum: int | None = None) -> None:
+    if type(value) is not int or value < minimum or (maximum is not None and value > maximum):
+        raise ContentError(f"recipe {key} {field} has an invalid integer")
+
+
+def _strings(value: Any, key: str, field: str) -> list[str]:
+    if (
+        not isinstance(value, list)
+        or any(not isinstance(item, str) or not item.strip() for item in value)
+        or len(set(value)) != len(value)
+    ):
+        raise ContentError(f"recipe {key} {field} must be unique non-empty strings")
+    return value
+
+
+def _reference(bundle: ContentBundle, kind: str, value: Any, key: str, field: str) -> None:
+    # Locations retain their existing domain permission gates, including the array hall.
+    if not isinstance(value, str) or not bundle.has(kind, value, include_locked=kind == "location"):
+        raise ContentError(f"recipe {key} {field} references unavailable {kind}: {value}")
+
+
+def _assets(bundle: ContentBundle, value: Any, key: str, field: str, *, allow_zero: bool) -> None:
+    if not isinstance(value, dict):
+        raise ContentError(f"recipe {key} {field} must be an object")
+    for asset, amount in value.items():
+        _integer(amount, key, field, minimum=0 if allow_zero else 1)
+        if bundle.has("item", asset, include_locked=False):
+            continue
+        companion = bundle.get("companion", asset, include_locked=False)
+        if companion is None or companion.get("kind") not in {"beast_gear", "mount_tack"}:
+            raise ContentError(f"recipe {key} {field} references unavailable asset: {asset}")
+
+
+def _validate_sources(bundle: ContentBundle) -> None:
+    for kind in ("item", "companion"):
+        for row in bundle.list(kind, include_locked=False):
+            source = row.get("source_recipe_key")
+            if source is None:
+                continue
+            if not isinstance(source, str) or not source:
+                raise ContentError(f"{kind} {row['key']} source_recipe_key is invalid")
+            recipe = bundle.get("recipe", source)
+            outputs = recipe.get("outputs") if recipe is not None else None
+            amount = outputs.get(row["key"]) if isinstance(outputs, dict) else None
+            if type(amount) is not int or amount <= 0:
+                raise ContentError(f"{kind} {row['key']} source_recipe_key does not produce it")
+
+
+def _recipe_selectors(bundle: ContentBundle, definitions: dict[str, RecipeDefinition]) -> dict[str, str]:
+    selectors: dict[str, str] = {}
+    for key, definition in definitions.items():
+        row = bundle.require("recipe", key)
+        for selector in (key, definition.name, *row["aliases"]):
+            if selector in selectors and selectors[selector] != key:
+                raise ContentError(f"ambiguous recipe selector: {selector}")
+            selectors[selector] = key
+    return selectors
+
+
+def resolve_recipe(value: str, content: ContentBundle | None = None) -> str | None:
+    normalized = value.strip()
+    # Stable IDs reach the repository so historical operations can replay before content lookup.
+    if normalized.startswith("recipe."):
+        return normalized
+    bundle = content or bundled_content()
+    return _recipe_selectors(bundle, recipe_definitions(bundle)).get(normalized)
+
+
+def recipe_definition(recipe_key: str, content: ContentBundle | None = None) -> RecipeDefinition:
     try:
-        return RECIPES[recipe_key]
+        return recipe_definitions(content)[recipe_key]
     except KeyError as exc:
-        raise ValueError(f"unsupported production recipe: {recipe_key}") from exc
+        raise UnknownRecipeError(f"unsupported production recipe: {recipe_key}") from exc
 
 
 def item_label(item_key: str, content: ContentBundle | None = None) -> str:
-    return (content or bundled_content()).label(
-        "item",
-        item_key,
-        fallback=ITEM_LABELS.get(item_key, "生产物资"),
-    )
+    bundle = content or bundled_content()
+    kind = "companion" if bundle.has("companion", item_key) else "item"
+    return bundle.label(kind, item_key)
 
 
 def random_quality_bp(operation_id: str) -> int:
-    """Derive the weighted quality roll from the stable operation identity."""
-
     value = blake2b(operation_id.encode("utf-8"), digest_size=1).digest()[0]
     if value < 128:
         return 0
@@ -538,13 +209,7 @@ def production_quality(
 
 
 __all__ = [
-    "HIGH_QUALITY_THRESHOLD_BP",
-    "QUALITY_SUCCESS_THRESHOLD_BP",
-    "TOOL_MAX_DURABILITY_BP",
-    "RecipeDefinition",
-    "production_quality",
-    "random_quality_bp",
-    "item_label",
-    "recipe_definition",
-    "resolve_recipe",
+    "HIGH_QUALITY_THRESHOLD_BP", "QUALITY_SUCCESS_THRESHOLD_BP", "TOOL_MAX_DURABILITY_BP",
+    "RecipeDefinition", "recipe_definitions", "production_quality", "random_quality_bp",
+    "item_label", "recipe_definition", "resolve_recipe",
 ]

@@ -14,6 +14,7 @@ _SUPPORTED_EFFECTS = frozenset(
         "next_cultivation_state_bonus_bp",
         "exploration_risk_reduction_bp",
         "restore_choice",
+        "grant_intro_flags",
     }
 )
 
@@ -30,6 +31,7 @@ class ItemDefinition:
     location_key: str | None = None
     resources: tuple[str, ...] = ()
     cooldown_seconds: int | None = None
+    granted_flags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,8 +106,22 @@ def _content_item_definitions(content: ContentBundle | None = None) -> dict[str,
         effect_type = configured_effect.get("type")
         if not isinstance(effect_type, str) or not effect_type.strip():
             raise ContentError(f"usable item {key} effect type must be a string")
-        value = configured_effect.get("amount" if effect_type == "restore_choice" else "value")
-        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        granted_flags: tuple[str, ...] = ()
+        if effect_type == "grant_intro_flags":
+            raw_flags = configured_effect.get("flags")
+            if (
+                set(configured_effect) != {"type", "flags"}
+                or not isinstance(raw_flags, list)
+                or not raw_flags
+                or any(not isinstance(flag, str) or not flag.strip() for flag in raw_flags)
+                or len(set(raw_flags)) != len(raw_flags)
+            ):
+                raise ContentError(f"usable item {key} grant_intro_flags is invalid")
+            granted_flags = tuple(raw_flags)
+            value = 0
+        else:
+            value = configured_effect.get("amount" if effect_type == "restore_choice" else "value")
+        if effect_type != "grant_intro_flags" and (not isinstance(value, int) or isinstance(value, bool) or value <= 0):
             raise ContentError(f"usable item {key} effect amount must be a positive integer")
         row = bundle.get("item", key, include_locked=False)
         if row is None:
@@ -122,7 +138,7 @@ def _content_item_definitions(content: ContentBundle | None = None) -> dict[str,
             if (
                 not isinstance(raw_resources, list)
                 or not raw_resources
-                or any(resource not in {"stamina", "energy"} for resource in raw_resources)
+                or any(resource not in {"stamina", "energy", "void_power"} for resource in raw_resources)
                 or len(set(raw_resources)) != len(raw_resources)
             ):
                 raise ContentError(f"usable item {key} restore_choice resources are invalid")
@@ -147,6 +163,7 @@ def _content_item_definitions(content: ContentBundle | None = None) -> dict[str,
             location_key=location_key,
             resources=resources,
             cooldown_seconds=cooldown_seconds,
+            granted_flags=granted_flags,
         )
     return result
 

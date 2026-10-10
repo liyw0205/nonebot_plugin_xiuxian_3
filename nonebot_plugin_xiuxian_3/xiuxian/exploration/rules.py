@@ -245,13 +245,7 @@ def exploration_reward_pool(mode_key: str) -> str | None:
 
 
 def has_cloud_mine_access(*, subprofession_key: str | None, inventory: dict[str, int], intro_flags: set[str]) -> bool:
-    """Return whether the player has the mining/commission gate.
-
-    ``mining`` is accepted as a forward-compatible sub-class key even though
-    the first path picker only exposes the three production sub-professions.
-    Existing commission and permit flows can grant one of the stable flags or
-    item keys without adding a second player column.
-    """
+    """Check the mining path, carried tools/permit or registered permit flags."""
 
     if str(subprofession_key or "") in {"mining", "mining.t2", "artifice.mining"}:
         return True

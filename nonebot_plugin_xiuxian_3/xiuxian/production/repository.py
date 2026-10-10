@@ -182,7 +182,7 @@ class ProductionRepositoryMixin:
     ) -> ProductionPreviewRecord:
         from ..production.rules import recipe_definition
 
-        recipe = recipe_definition(recipe_key)
+        recipe = recipe_definition(recipe_key, self.content)
         now = self._now()
         with self._connect() as connection:
             row = self._require_player(connection, platform, platform_user_id)
@@ -269,11 +269,10 @@ class ProductionRepositoryMixin:
     ) -> ProductionOrderRecord:
         from ..production.rules import TOOL_MAX_DURABILITY_BP, random_quality_bp, recipe_definition
 
-        recipe = recipe_definition(recipe_key)
         operation_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
-            "recipe_key": recipe.key,
+            "recipe_key": recipe_key,
         }
         request_hash = self._request_hash("production.start", operation_payload)
         now = self._now()
@@ -296,6 +295,7 @@ class ProductionRepositoryMixin:
                 )
                 return self._production_order_from_payload(existing, replay=True)
 
+            recipe = recipe_definition(recipe_key, self.content)
             row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "cultivator":
                 raise PlayerStageConflictError("player is not ready for production")

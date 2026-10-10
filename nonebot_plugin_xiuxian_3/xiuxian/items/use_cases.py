@@ -44,7 +44,7 @@ class ItemApplication:
 
     @staticmethod
     def _resource_key(value: str, resources: tuple[str, ...]) -> str | None:
-        labels = {"stamina": "体力", "energy": "精力"}
+        labels = {"stamina": "体力", "energy": "精力", "void_power": "虚力"}
         normalized = (value or "").strip()
         for resource in resources:
             if normalized in {resource, labels[resource]}:
@@ -53,17 +53,19 @@ class ItemApplication:
 
     @staticmethod
     def _resource_prompt(resources: tuple[str, ...]) -> str:
-        labels = {"stamina": "体力", "energy": "精力"}
+        labels = {"stamina": "体力", "energy": "精力", "void_power": "虚力"}
         return "、".join(labels[resource] for resource in resources)
 
     def _result(self, context: CommandContext, operation_id: str, record: ItemUseRecord) -> CommandResult:
         effect = record.effect
         if effect.get("type") == "restore_choice":
-            resource = "体力" if effect.get("resource") == "stamina" else "精力"
+            resource = {"stamina": "体力", "energy": "精力", "void_power": "虚力"}[effect["resource"]]
             message = (
                 f"## {record.item_name}已用\n\n"
-                f"灵食化作暖流，{resource}恢复 **{int(effect['restored'])}**。"
+                f"{resource}恢复 **{int(effect['restored'])}**。"
             )
+        elif effect.get("type") == "grant_intro_flags":
+            message = f"## {record.item_name}已登记\n\n矿区授权已记入仙缘簿，无需继续携带许可。境界与地点门槛仍须满足。"
         elif effect.get("type") == "next_cultivation_state_bonus_bp":
             message = (
                 f"## {record.item_name}已饮尽\n\n一缕清灵仍在经脉间流转，"
@@ -155,6 +157,8 @@ class ItemApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except ItemInsufficientError:
             return CommandResult(False, "ITEM_INSUFFICIENT", f"缺少{definition.name}，未扣除资源。", context.request_id, operation_id)
+        except ItemNotUsableError:
+            return CommandResult(False, "ITEM_NOT_USABLE", "尚未开启该资源，未消耗物品。", context.request_id, operation_id)
         except ItemReservedError:
             return CommandResult(False, "ITEM_RESERVED", f"{definition.name}已托付给交易，暂不能使用。", context.request_id, operation_id)
         except ItemLocationRequiredError:
@@ -165,7 +169,12 @@ class ItemApplication:
             )
             return CommandResult(False, "ITEM_LOCATION_REQUIRED", f"{definition.name}只能在{target}布置，并绑定该处灵机。", context.request_id, operation_id)
         except ItemEffectAlreadyActiveError:
-            return CommandResult(False, "ITEM_EFFECT_ALREADY_ACTIVE", f"{definition.name}已在此处生效，不能重复布置。", context.request_id, operation_id)
+            message = (
+                f"{definition.name}已登记，矿区授权无需重复办理。"
+                if definition.effect_type == "grant_intro_flags"
+                else f"{definition.name}已在此处生效，不能重复布置。"
+            )
+            return CommandResult(False, "ITEM_EFFECT_ALREADY_ACTIVE", message, context.request_id, operation_id)
         except ItemEffectAlreadyPendingError:
             return CommandResult(False, "ITEM_EFFECT_ALREADY_PENDING", f"已有一份{definition.name}药力在经脉中流转，不能重复饮用。", context.request_id, operation_id)
         except ItemCooldownError:

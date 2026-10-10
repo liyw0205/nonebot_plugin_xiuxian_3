@@ -8,13 +8,15 @@
 
 ## 当前目标
 
-M5 已完成并推送；当前 M6 只处理 current 第 4 节登记的两项有限交付：以已结算的首次
-近郊采集 operation 作为 `item.manual.sunrise_breath` 的一次性引路嘉奖来源；接通
-`XIUXIAN3_QQ_CAPABILITIES` 的按 AppID 声明，使实际 QQ handler 的 Markdown 能力与纯文本降级
-遵循配置。普通 QQ 回复使用 Markdown segment；蓝字是 Markdown inline command，键盘是单独
-keyboard segment；普通 handler 不会自动生成它们。不得宣称 QQ 真机呈现、权限或按钮回调已验。
-共享 router/application/repository 的业务长链只跑一份；本轮只跑首次采集对应短合同和本地
-QQ presenter/config 测试，不重复共享适配器测试或启动全量成长。
+M5、M6 首采集/QQ 能力配置及分类帮助/悬赏蓝字切片已完成并推送，基线为 `06bc711`。
+当前唯一任务为 current 第 4 节 M7：按既有功能做一次数据消费/公开来源盘点，冻结有限缺项后
+逐域补齐定义、引用、来源和消费者。用户已明确授权设计 xiu3 自身缺失的本地来源、配方和数值；
+保守复用现有规则，在 current 记录选择，不把普通配方转为等待用户逐项给数值。
+必须证明 loader → 公开取得 → application/repository → 玩法消费，保留快照、事务、幂等和恢复。
+未来刻意锁定效果、真实平台、支付和跨服单列；不部署、不改 xiu2，不删除必需功能或注入背包冒充来源。
+QQ 回复按 AppID 能力使用 Markdown 或纯文本；悬赏内部链接已转换为蓝字，普通 handler 尚未接入键盘。
+不得宣称 QQ 真机呈现、权限或按钮回调已验。
+共享业务使用 OneBot 代表链一次，QQ 仅受影响短合同；不重复完整成长/全量/仿真，不压测或并行长测。
 适配器来源以实际运行时为准：xiu3 通过外部 pip/NoneBot CLI 使用 QQ 与 OneBot，仓内没有
 SDK vendor；兄弟 `nonebot_plugin_xiuxian_2` 的 vendor 只可在明确授权后作为 patch source。
 固定 SHA、候选补丁、魔改冲突和短合同见 `docs/adapter-upstream-review.md`；未核实补丁不得合并。
@@ -22,9 +24,9 @@ SDK vendor；兄弟 `nonebot_plugin_xiuxian_2` 的 vendor 只可在明确授权�
 
 ## 工作边界
 
-使用 `/root/myenv/bin/python`；M6 不启动全量或完整成长长测。
+使用 `/root/myenv/bin/python`；M7 只跑内容校验及受影响公开流程短测，除非存在明确的新覆盖需求。
 真实失败先诊断并在有限当前范围最小修复；不得 skip/ignore、删除行为断言或降低阈值求通过。
-用户已授权该有限玩法及适配器配置修复、审查、提交和普通 push；不发版、不 force，不扩展到其他玩法。
+用户已授权有限数据补全、必要合同更新、审查、精确提交和普通 push main；不发版、不 force，不超出冻结清单。
 按明确文件清单 stage，不纳入用户数据、运行库、密钥、日志或缓存；保护既有改动。
 缓存清理只处理当前任务确认归属产物；保护 `/tmp/codex-daemon-*`、活跃 agent 目录、
 IPC、socket 和 lock，禁止通配符清空 `/tmp`。
