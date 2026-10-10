@@ -8,7 +8,7 @@
 |:--|:--|:--|:--|:--|
 | `quest.first_seeking` | 寻仙问道成功 | `quest.claim.first_seeking` | 灵石 100、`item.food.coarse_spirit_rice` 3 | 永不过期；每角色一次 |
 | `quest.first_cultivation` | `player.enter_cultivation` 成功 | `quest.claim.first_cultivation` | `item.manual.basic_qi` 1、灵石 200 | 永不过期；入道主奖励与任务奖励分开，不能互相代替 |
-| `quest.first_gather` | 任一 `explore.gather_outskirts` 成功结算 | `quest.claim.first_gather` | 止血草 2、修为 30 | 永不过期；战斗遭遇失败不计 |
+| `quest.first_gather` | 任一 `explore.gather_outskirts` 成功结算 | `quest.claim.first_gather` | 止血草 2、修为 30、`item.manual.sunrise_breath` 1 | 永不过期；每角色一次；战斗遭遇失败不计 |
 | `quest.first_craft` | 任一生产订单 `completed` | `quest.claim.first_craft` | 灵石 50、`faction_reputation.xuantian` 2 | 永不过期；失败订单不计 |
 
 任务完成与领取分离；领取按 `quest_key/player_id` 唯一。寻仙/入道的主 operation 已发基础资源，本表奖励是引导里程碑，必须各自保存来源与防重键。

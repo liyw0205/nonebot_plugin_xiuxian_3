@@ -17,6 +17,7 @@ from .events import (
 
 
 ADAPTER_NAME = "qq.official"
+DEFAULT_QQ_CAPABILITIES = ("text", "reference", "markdown", "keyboard")
 
 
 def is_qq_event(event: Any) -> bool:
@@ -57,7 +58,12 @@ def _scene(event: Any) -> tuple[str, str]:
     return "unknown", "unknown"
 
 
-def normalize_event(event: Any) -> NormalizedMessage:
+def normalize_event(
+    event: Any,
+    *,
+    bot_id: str = "",
+    capabilities: tuple[str, ...] = DEFAULT_QQ_CAPABILITIES,
+) -> NormalizedMessage:
     if not is_qq_event(event):
         raise ValueError(f"不是 QQ 官方消息事件: {type(event)!r}")
     scene, scene_id = _scene(event)
@@ -75,7 +81,9 @@ def normalize_event(event: Any) -> NormalizedMessage:
     )
     message_id = text_value(event, "id", "message_id", default="")
     event_id = text_value(event, "event_id", default="") or message_id
-    bot_id = text_value(event, "application_id", "self_id", "bot_id", default="")
+    bot_id = bot_id or text_value(
+        event, "application_id", "self_id", "bot_id", default=""
+    )
     operation_id = event_operation_id(
         adapter=ADAPTER_NAME,
         bot_id=bot_id,
@@ -92,7 +100,7 @@ def normalize_event(event: Any) -> NormalizedMessage:
         scene=scene,
         group_id=text_value(event, "group_openid", "group_id", "channel_id", default=""),
         bot_id=bot_id,
-        capabilities=("text", "reference", "markdown", "keyboard"),
+        capabilities=tuple(dict.fromkeys(("text", *capabilities))),
         can_write_assets=bool(user_id and message_id and scene != "unknown"),
         operation_id=operation_id,
     )

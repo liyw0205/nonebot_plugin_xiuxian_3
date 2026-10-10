@@ -274,7 +274,7 @@
     },
     {
       "name": "采集里程碑奖励",
-      "desc": "首次采集成功后的嘉奖，包含草药与修为积累。",
+      "desc": "首次采集成功后的嘉奖，包含草药、修为与吐纳法门。",
       "operation": "quest.claim_guidance_reward",
       "entries": [
         {
@@ -286,6 +286,11 @@
           "kind": "resource",
           "resource_key": "cultivation",
           "quantity": 30
+        },
+        {
+          "kind": "item",
+          "item_key": "item.manual.sunrise_breath",
+          "quantity": 1
         }
       ],
       "once_per_player": true,

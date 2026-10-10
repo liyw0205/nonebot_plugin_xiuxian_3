@@ -46,6 +46,7 @@ def markdown_to_text(markdown: str) -> str:
     text = markdown.replace("\r\n", "\n").replace("\r", "\n")
     text = re.sub(r"```[^\n]*\n?", "", text)
     text = text.replace("```", "")
+    text = re.sub(r"(?<!`)`([^`\n]+)`(?!`)", r"\1", text)
     text = re.sub(r"!\[([^]]*)\]\([^)]*\)", r"\1", text)
     text = re.sub(r"\[([^]]+)\]\([^)]*\)", r"\1", text)
     text = re.sub(r"^\s{0,3}#{1,6}\s+", "", text, flags=re.MULTILINE)
@@ -59,9 +60,7 @@ def _supports_markdown(bot: Any, event: Any, capabilities: Collection[str]) -> b
     modules = f"{type(bot).__module__} {type(event).__module__}".lower()
     if "nonebot.adapters.onebot" in modules:
         return False
-    if "markdown" in capabilities:
-        return True
-    return "nonebot.adapters.qq" in modules
+    return "markdown" in capabilities
 
 
 def qq_markdown_segment(markdown: str) -> Any | None:

@@ -24,6 +24,7 @@
 | `item.pill.foundation_draft` | 突破丹，9 | 绑定 | 筑基必需材料 | `recipe.pill.foundation_draft`（灵叶 3、阵砂 2、铁石 2）/筑基悬赏 |
 | `item.pill.foundation_guard` | 突破丹，9 | 绑定 | 筑基失败保护；成功不消耗 | `recipe.pill.foundation_guard`（灵叶 2、阵砂 1、止血草 1）/宗门兑换（每日建设、捐献贡献及公共原料补给） |
 | `item.manual.basic_qi` | 功法，唯一 | 绑定 | 感气修炼许可；学习后不消耗 | 入道奖励 |
+| `item.manual.sunrise_breath` | 功法，唯一 | 绑定 | 感气修炼许可；提高聚气突破、修炼效率与先手 | 首次成功近郊采集后的引路嘉奖，一次/角色 |
 | `item.tool.basic_furnace` | 工具，唯一 | 绑定，耐久 2000 bp | 炼丹；订单每次 -100 bp | 入道/生产任务 |
 | `item.tool.basic_hammer` | 工具，唯一 | 绑定，耐久 2000 bp | 炼器；订单每次 -100 bp | 入道/生产任务 |
 | `item.weapon.wood_sword` | 法器，唯一 | 可交易，耐久 10000 bp | 物理伤害 +5；耐久归零效果为 0 | 新手任务 |

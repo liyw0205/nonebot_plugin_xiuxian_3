@@ -8,25 +8,23 @@
 
 ## 当前目标
 
-2026-10-10 本轮唯一目标是 current 的 M5：取得业务基线一次全量 pytest，以及
-新角色公开命令成长至渡劫 L10、飞升/留界的完整本地验收；全量中的相同链可复用。
-用户明确授权本次等价测试去重复用 PID 2428825 的旧双平台全量：成长节点仅改名、
-删除重复 OneBot 迭代，229/229 行为断言、夹具、命令和结局不变；结构/collect 与
-适配器短合同补验即可，不重新运行全量或完整成长，不称最终测试树已重新全量。
-共享 router/application/repository 的业务长链以后只跑一份，两端差异保留短合同。
+M5 已完成并推送；当前 M6 只处理 current 第 4 节登记的两项有限交付：以已结算的首次
+近郊采集 operation 作为 `item.manual.sunrise_breath` 的一次性引路嘉奖来源；接通
+`XIUXIAN3_QQ_CAPABILITIES` 的按 AppID 声明，使实际 QQ handler 的 Markdown 能力与纯文本降级
+遵循配置。普通 QQ 回复使用 Markdown segment；蓝字是 Markdown inline command，键盘是单独
+keyboard segment；普通 handler 不会自动生成它们。不得宣称 QQ 真机呈现、权限或按钮回调已验。
+共享 router/application/repository 的业务长链只跑一份；本轮只跑首次采集对应短合同和本地
+QQ presenter/config 测试，不重复共享适配器测试或启动全量成长。
 适配器来源以实际运行时为准：xiu3 通过外部 pip/NoneBot CLI 使用 QQ 与 OneBot，仓内没有
-SDK vendor；兄弟 `nonebot_plugin_xiuxian_2` 的 vendor 只可在明确授权后作为 patch source，
-不能当作 xiu3 已加载源码。固定 SHA、候选补丁、魔改冲突和短合同见
-`docs/adapter-upstream-review.md`；未核实补丁不得合并或升级依赖。
-复用有效安装/启动/备份恢复证据，审查本轮全部相关 code/test/docs/AGENTS，
-提交并普通推送到 origin/main 成功后才可结束本轮 goal。B1–B3 规则/来源、真实平台与
-外部条件仍阻断完整产品/正式发布，不能阻断已实现公开能力的本地 M5 或代替未跑测试。
+SDK vendor；兄弟 `nonebot_plugin_xiuxian_2` 的 vendor 只可在明确授权后作为 patch source。
+固定 SHA、候选补丁、魔改冲突和短合同见 `docs/adapter-upstream-review.md`；未核实补丁不得合并。
+完成有限改动、聚焦验证、审查、普通提交并推送当前项目分支后结束；不部署、不向真实 QQ 发消息。
 
 ## 工作边界
 
-使用 `/root/myenv/bin/python`；本轮 M5 是必须执行的阶段验收，同一长测只有一个运行者。
+使用 `/root/myenv/bin/python`；M6 不启动全量或完整成长长测。
 真实失败先诊断并在有限当前范围最小修复；不得 skip/ignore、删除行为断言或降低阈值求通过。
-用户已授权必要修复、审查、提交和普通 push；不发版、不 force，不扩新玩法。
+用户已授权该有限玩法及适配器配置修复、审查、提交和普通 push；不发版、不 force，不扩展到其他玩法。
 按明确文件清单 stage，不纳入用户数据、运行库、密钥、日志或缓存；保护既有改动。
 缓存清理只处理当前任务确认归属产物；保护 `/tmp/codex-daemon-*`、活跃 agent 目录、
 IPC、socket 和 lock，禁止通配符清空 `/tmp`。

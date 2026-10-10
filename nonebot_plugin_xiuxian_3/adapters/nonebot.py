@@ -7,6 +7,7 @@ optional import so the core package remains usable in CLI/Web deployments.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 from ..contracts import CommandContext
@@ -51,6 +52,28 @@ def normalize_event(event: Any) -> NormalizedMessage:
     if is_qq_event(event):
         return normalize_qq_event(event)
     raise ValueError(f"不支持的 NoneBot 事件类型: {type(event)!r}")
+
+
+def _normalizer_for_runtime(runtime: XiuxianRuntime) -> Callable[[Any], NormalizedMessage]:
+    def normalize(event: Any) -> NormalizedMessage:
+        if not is_qq_event(event):
+            return normalize_event(event)
+        try:
+            from nonebot.matcher import current_bot
+
+            bot_id = str(getattr(current_bot.get(), "self_id", "") or "")
+        except (ImportError, LookupError):
+            bot_id = ""
+        normalized = normalize_qq_event(event, bot_id=bot_id)
+        capabilities = runtime.settings.qq_capabilities_for(normalized.context.bot_id)
+        if capabilities is None:
+            return normalized
+        return replace(
+            normalized,
+            context=replace(normalized.context, capabilities=capabilities),
+        )
+
+    return normalize
 
 
 def _rule_for(checker: Callable[[Any], bool]):
@@ -174,6 +197,14 @@ def install(runtime: XiuxianRuntime) -> tuple[Any, ...]:
         priority=10,
         block=True,
     )
-    matcher.handle()(_handler_for(runtime, matcher, normalize_event, dedup, commands))
+    matcher.handle()(
+        _handler_for(
+            runtime,
+            matcher,
+            _normalizer_for_runtime(runtime),
+            dedup,
+            commands,
+        )
+    )
     matchers.append(matcher)
     return tuple(matchers)

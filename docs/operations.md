@@ -17,7 +17,7 @@
 | `XIUXIAN3_ADMIN_IDS` | Web 管理员白名单，缺失时可回退 NoneBot superusers |
 | `XIUXIAN3_TIMEZONE` | 业务日/周边界 |
 | `XIUXIAN3_RATE_*` | 用户、群、全局限流边界 |
-| `XIUXIAN3_QQ_CAPABILITIES` | 按 AppID 声明 Markdown、键盘、媒体等能力 |
+| `XIUXIAN3_QQ_CAPABILITIES` | 可选 JSON 对象，按 AppID 声明能力，例如 `{"app-id":["markdown","keyboard"]}`；总是保留文本能力。未设置时保持现有 Markdown/键盘默认；配置存在但 AppID 未列出时只发送文本。为不支持 Markdown 的 AppID 配置空列表即可启用纯文本降级 |
 | `XIUXIAN3_REDEMPTION_CODES` | 外部注入的机缘密令 JSON；仅进程读取，数据库只存哈希 |
 | `XIUXIAN3_BILLING_PUBLIC_KEY` | 道契 billing 服务的 Ed25519 公钥；不配置则关闭道契激活 |
 

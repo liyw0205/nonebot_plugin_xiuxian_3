@@ -113,6 +113,13 @@ def test_guidance_quests_use_settled_sources_and_shared_claim_transaction(adapte
                 assert initial.code == "GUIDANCE_QUEST_STATUS"
                 assert all(item["status"] == "active" for item in initial.data["quests"])
 
+                gather_claim_blocked = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "claim-gather-before", "guidance-early-gather-claim"),
+                    "领取引路嘉奖 第一次采集",
+                )
+                assert gather_claim_blocked.code == "QUEST_REQUIREMENT_MISSING"
+
                 blocked = await runtime.adapters.dispatch(
                     adapter,
                     _context(adapter, user, "claim-before", "guidance-early-claim"),
@@ -221,6 +228,17 @@ def test_guidance_quests_use_settled_sources_and_shared_claim_transaction(adapte
                 assert gathering_claim.code == "GUIDANCE_REWARD_CLAIMED"
                 assert gathering_claim.data["reward"]["item.herb.blood_grass"] == 2
                 assert gathering_claim.data["reward"]["cultivation"] == 30
+                assert gathering_claim.data["reward"]["item.manual.sunrise_breath"] == 1
+                gather_claim_state = _table_state(runtime, adapter, user)
+                assert json.loads(gather_claim_state[0][1])["item.manual.sunrise_breath"] == 1
+                gathering_replay = await runtime.adapters.dispatch(
+                    adapter,
+                    _context(adapter, user, "claim-gather-replay", f"{adapter}-gather-claim"),
+                    "领取引路嘉奖 第一次采集",
+                )
+                assert gathering_replay.data["idempotent_replay"] is True
+                assert gathering_replay.data["reward"] == gathering_claim.data["reward"]
+                assert _table_state(runtime, adapter, user) == gather_claim_state
 
                 start_operation = next(
                     f"{adapter}-production-start-{index}"
