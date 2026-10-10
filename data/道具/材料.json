@@ -182,6 +182,7 @@
       ],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [{"mode_key": "explore.spring_gather", "reward_pool_key": "reward_pool.exploration.spring_gather"}],
       "key": "item.food.coarse_spirit_rice"
     },
     {
@@ -203,6 +204,7 @@
       ],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [{"mode_key": "explore.gather_outskirts", "reward_pool_key": "reward_pool.exploration.gather_outskirts"}],
       "key": "item.herb.blood_grass"
     },
     {
@@ -225,6 +227,10 @@
       ],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [
+        {"mode_key": "explore.spring_gather", "reward_pool_key": "reward_pool.exploration.spring_gather"},
+        {"mode_key": "explore.mist_grotto", "reward_pool_key": "reward_pool.exploration.mist_grotto"}
+      ],
       "key": "item.herb.spirit_leaf"
     },
     {
@@ -275,6 +281,10 @@
       ],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [
+        {"mode_key": "explore.gather_outskirts", "reward_pool_key": "reward_pool.exploration.gather_outskirts"},
+        {"mode_key": "explore.mist_grotto", "reward_pool_key": "reward_pool.exploration.mist_grotto"}
+      ],
       "key": "item.ore.ironstone"
     },
     {
@@ -297,6 +307,7 @@
       ],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [{"mode_key": "explore.gather_outskirts", "reward_pool_key": "reward_pool.exploration.gather_outskirts"}],
       "key": "item.mat.wood"
     },
     {
@@ -319,6 +330,10 @@
       ],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [
+        {"mode_key": "explore.spring_gather", "reward_pool_key": "reward_pool.exploration.spring_gather"},
+        {"mode_key": "explore.mist_grotto", "reward_pool_key": "reward_pool.exploration.mist_grotto"}
+      ],
       "key": "item.mat.array_sand"
     },
     {
@@ -472,6 +487,10 @@
       ],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [
+        {"mode_key": "explore.cloud_mine", "reward_pool_key": "reward_pool.exploration.cloud_mine"},
+        {"mode_key": "explore.mist_grotto_2", "reward_pool_key": "reward_pool.exploration.mist_grotto_2"}
+      ],
       "key": "item.material.cloud_iron"
     },
     {
@@ -500,6 +519,7 @@
       "effects": [{"type": "nascent_soul_material"}],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [{"mode_key": "explore.demon_threshold", "reward_pool_key": "reward_pool.exploration.demon_threshold"}],
       "key": "item.soul_crystal"
     },
     {
@@ -514,6 +534,10 @@
       "effects": [{"type": "nascent_soul_alternative_material"}],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [
+        {"mode_key": "explore.demon_threshold", "reward_pool_key": "reward_pool.exploration.demon_threshold"},
+        {"mode_key": "explore.demon_abyss", "reward_pool_key": "reward_pool.exploration.demon_abyss"}
+      ],
       "key": "item.demon_core"
     },
     {
@@ -528,6 +552,7 @@
       "effects": [{"type": "nascent_soul_alternative_material"}],
       "requirements": [],
       "status": "active",
+      "gathering_sources": [{"mode_key": "explore.beast_hunt", "reward_pool_key": "reward_pool.exploration.beast_hunt"}],
       "key": "item.beast_blood"
     },
     {
@@ -542,6 +567,7 @@
       "tradeable": true,
       "effects": [{"type": "crafting_material", "tags": ["alchemy"]}],
       "requirements": [],
+      "gathering_sources": [{"mode_key": "explore.spring_gather", "reward_pool_key": "reward_pool.exploration.spring_gather"}],
       "status": "active"
     },
     {
@@ -556,6 +582,7 @@
       "tradeable": true,
       "effects": [{"type": "crafting_material", "tags": ["soul_transformation"]}],
       "requirements": [],
+      "gathering_sources": [{"mode_key": "explore.ancestral_lake", "reward_pool_key": "reward_pool.exploration.ancestral_lake"}],
       "status": "active"
     },
     {

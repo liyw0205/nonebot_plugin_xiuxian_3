@@ -474,13 +474,13 @@
     },
     {
       "name": "灵泉采集奖励池",
-      "desc": "沿灵泉谷采得灵叶与清冽泉水，也有机会寻到阵砂。",
+      "desc": "沿灵泉谷采得灵叶、清冽泉水和田边灵米，也有机会寻到阵砂。",
       "pool_type": "weighted",
       "outcomes": [
-        {"weight": 3600, "rewards": {"item.herb.spirit_leaf": 1, "item.spirit_water": 1}},
-        {"weight": 2400, "rewards": {"item.herb.spirit_leaf": 1, "item.mat.array_sand": 1, "item.spirit_water": 1}},
-        {"weight": 2400, "rewards": {"item.herb.spirit_leaf": 2, "item.spirit_water": 1}},
-        {"weight": 1600, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 1, "item.spirit_water": 1}}
+        {"weight": 3600, "rewards": {"item.herb.spirit_leaf": 1, "item.spirit_water": 1, "item.food.coarse_spirit_rice": 1}},
+        {"weight": 2400, "rewards": {"item.herb.spirit_leaf": 1, "item.mat.array_sand": 1, "item.spirit_water": 1, "item.food.coarse_spirit_rice": 1}},
+        {"weight": 2400, "rewards": {"item.herb.spirit_leaf": 2, "item.spirit_water": 1, "item.food.coarse_spirit_rice": 1}},
+        {"weight": 1600, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 1, "item.spirit_water": 1, "item.food.coarse_spirit_rice": 1}}
       ],
       "key": "reward_pool.exploration.spring_gather",
       "status": "active"
