@@ -51,18 +51,19 @@ def test_nonebot_host_template_has_cli_managed_adapter_configuration() -> None:
     assert docker_host["tool"]["nonebot"]["plugins"]["@local"] == ["nonebot_plugin_xiuxian_3"]
 
 
-def test_user_install_guides_start_with_remote_bootstrap() -> None:
+def test_user_install_guides_start_with_supported_source_checkout() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     installation = (ROOT / "docs/installation.md").read_text(encoding="utf-8")
-    assert "scripts/onekey.sh | bash -s -- install" in readme
-    assert "scripts/onekey_windows.ps1' -OutFile" in readme
+    assert "git clone --branch " in readme
+    assert "bash scripts/onekey.sh install --source-mode source" in readme
+    assert "git clone --branch " in installation
+    assert "--source-mode source" in installation
     assert "requirements.txt" in installation
-    assert "清华" in installation
     assert "--mirror accelerated" in installation
     assert "$HOME/xiu3" in readme
     assert "$HOME/xiu3" in installation
-    assert "ghfast.top" in readme
-    assert "ghfast.top" in installation
+    assert "ghproxy.net" not in readme
+    assert "ghproxy.net" not in installation
 
 
 def test_adapters_and_drivers_are_installed_through_nb_cli() -> None:
