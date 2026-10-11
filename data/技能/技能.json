@@ -2632,6 +2632,139 @@
       },
       "status": "active",
       "acquisition_item_key": "item.manual.skill_legacy"
+    },
+    {
+      "key": "enemy_skill.cloud_armor",
+      "name": "云铁护甲",
+      "desc": "矿兽凝聚云铁砂形成护甲，以沉重一击逼退来者。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 12500},
+      "cost": {},
+      "cooldown_rounds": 1,
+      "status": "active"
+    },
+    {
+      "key": "enemy_skill.mist_exposed",
+      "name": "破雾突袭",
+      "desc": "雾隐强敌短暂散去护身雾气，借势发动迅疾攻击。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 14500},
+      "cost": {},
+      "cooldown_rounds": 1,
+      "hit_bonus_bp": 500,
+      "status": "active"
+    },
+    {
+      "key": "enemy_skill.boundary_sweep",
+      "name": "界隙横扫",
+      "desc": "界隙守望者以横扫封住退路。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 16000},
+      "cost": {},
+      "cooldown_rounds": 2,
+      "status": "active"
+    },
+    {
+      "key": "enemy_skill.boundary_impact",
+      "name": "界壁震击",
+      "desc": "界壁守卫将灵力撞入地脉，震伤闯入者。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 17500},
+      "cost": {},
+      "cooldown_rounds": 2,
+      "status": "active"
+    },
+    {
+      "key": "enemy_skill.domain_suppress",
+      "name": "领域压制",
+      "desc": "领域守卫压低战场灵压，令对手难以维持攻势。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 18000},
+      "cost": {},
+      "cooldown_rounds": 2,
+      "status": "active"
+    },
+    {
+      "key": "enemy_skill.time_fort_strike",
+      "name": "时垒重击",
+      "desc": "时序堡垒守卫以凝滞的重击撕开防线。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 22000},
+      "cost": {},
+      "cooldown_rounds": 3,
+      "status": "active"
+    },
+    {
+      "key": "enemy_skill.boundary_wall",
+      "name": "界壁封击",
+      "desc": "界壁试炼守卫以封印之力压制对手。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 15500},
+      "cost": {},
+      "cooldown_rounds": 2,
+      "status": "active"
+    },
+    {
+      "key": "enemy_skill.archive_rule_rewrite",
+      "name": "档案改律",
+      "desc": "档案守卫重写一段旧律，令攻击轨迹偏转。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 19000},
+      "cost": {},
+      "cooldown_rounds": 3,
+      "status": "active"
+    },
+    {
+      "key": "skill.beast.guardian_roar",
+      "name": "守山兽吼",
+      "desc": "守山兽以咆哮震慑来者，随后发起重击。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 20000},
+      "cost": {},
+      "cooldown_rounds": 2,
+      "status": "active"
+    },
+    {
+      "key": "skill.beast.ancestral_form",
+      "name": "祖灵显形",
+      "desc": "祖灵之影显化本相，以水势与血脉之力反复攻伐。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 18000},
+      "cost": {},
+      "cooldown_rounds": 3,
+      "status": "active"
+    },
+    {
+      "key": "skill.demonic.abyss_communion",
+      "name": "深渊共鸣",
+      "desc": "深渊异兽借魔息共鸣，令攻击变得沉重而阴冷。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 18500},
+      "cost": {},
+      "cooldown_rounds": 2,
+      "status": "active"
+    },
+    {
+      "key": "skill.demonic.war_front_strike",
+      "name": "魔界战锋",
+      "desc": "魔界战线守卫以战锋突进，维持前线压制。",
+      "owner_type": "enemy",
+      "target": "single_player",
+      "effect": {"type": "physical_damage_multiplier_bp", "value": 17000},
+      "cost": {},
+      "cooldown_rounds": 2,
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"
