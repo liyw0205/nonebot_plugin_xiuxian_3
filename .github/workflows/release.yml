@@ -71,10 +71,11 @@ jobs:
           [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
       - name: Build release asset
         run: |
-          tar --exclude=.git --exclude=.github --exclude=project.tar.gz -czf project.tar.gz .
-          tar -tzf project.tar.gz | grep -Fx './pyproject.toml'
-          tar -tzf project.tar.gz | grep -Fx './scripts/onekey.sh'
+          asset_path="$RUNNER_TEMP/project.tar.gz"
+          tar --exclude=.git --exclude=.github --exclude=project.tar.gz -czf "$asset_path" .
+          tar -tzf "$asset_path" | grep -Fx './pyproject.toml'
+          tar -tzf "$asset_path" | grep -Fx './scripts/onekey.sh'
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" project.tar.gz --verify-tag --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/project.tar.gz" --verify-tag --generate-notes

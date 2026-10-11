@@ -332,6 +332,20 @@ def test_release_update_downloads_archive_and_preserves_host_state(tmp_path: Pat
     assert (venv / "sentinel").read_text(encoding="utf-8") == "keep-venv\n"
 
 
+def test_release_asset_is_built_outside_checkout_root() -> None:
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    build_step = workflow.split("      - name: Build release asset\n", 1)[1].split(
+        "      - name: Publish GitHub Release\n", 1
+    )[0]
+    publish_step = workflow.split("      - name: Publish GitHub Release\n", 1)[1]
+
+    assert 'asset_path="$RUNNER_TEMP/project.tar.gz"' in build_step
+    assert ' -czf "$asset_path" .' in build_step
+    assert 'tar -tzf "$asset_path" | grep -Fx \'./pyproject.toml\'' in build_step
+    assert 'tar -tzf "$asset_path" | grep -Fx \'./scripts/onekey.sh\'' in build_step
+    assert '"$RUNNER_TEMP/project.tar.gz" --verify-tag' in publish_step
+
+
 def test_windows_update_paths_do_not_run_git_fetch_or_pull() -> None:
     windows_control = (ROOT / "scripts/control_windows.ps1").read_text(encoding="utf-8")
     update_branch = windows_control.split('    "update" {', 1)[1].split('    "uninstall" {', 1)[0]
