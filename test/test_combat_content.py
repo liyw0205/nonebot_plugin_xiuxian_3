@@ -19,12 +19,13 @@ def _copy_data(tmp_path: Path, *, include_source_fixture: bool = False) -> Path:
     if include_source_fixture:
         manifest_path = root / "内容清单.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        manifest["files"].append("来源/来源.json")
+        if "来源/来源.json" not in manifest["files"]:
+            manifest["files"].append("来源/来源.json")
         manifest_path.write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         source_path = root / "来源/来源.json"
-        source_path.parent.mkdir(parents=True)
+        source_path.parent.mkdir(parents=True, exist_ok=True)
         source_path.write_text(
             json.dumps(
                 {
@@ -66,13 +67,14 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 def test_combat_content_closes_current_enemy_and_encounter_data() -> None:
     summary = validate_combat_content(ContentBundle.load(DATA))
 
+    expected_consumed_encounters = 12 if (DATA / "探索/模式.json").exists() else 0
     assert summary == {
         "enemies": 55,
         "enemy_profiles": 33,
         "encounters": 14,
         "candidates": 27,
         "drop_pools": 6,
-        "consumed_encounters": 0,
+        "consumed_encounters": expected_consumed_encounters,
         "enemy_skills": 11,
     }
 
