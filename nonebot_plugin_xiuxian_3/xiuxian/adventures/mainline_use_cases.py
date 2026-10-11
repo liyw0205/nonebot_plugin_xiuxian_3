@@ -14,7 +14,11 @@ from ..repository import (
     RepositoryBusyError,
     SQLitePlayerRepository,
 )
-from .mainline import MAINLINE_STORY_KEY, resolve_mainline
+from .mainline import (
+    MAINLINE_STORY_KEY,
+    MainlineObjectivesIncompleteError,
+    resolve_mainline,
+)
 from ..routine.rules import honor_title
 from ..specials.codex_rules import label_for_entry
 
@@ -207,12 +211,16 @@ class AdventuresMainlineApplication:
                 f"**{self._display_name(record.player)}**，你已开始第 **{record.stage}** 关。\n\n"
                 f"- **章节**：第 {record.chapter} 章\n"
                 f"- **状态**：进行中\n"
-                f"- **剧情**：{record.description}\n\n"
-                f"> 此关试炼已由仙缘簿记下，发送 `{self.claim_command} {record.stage_key}` 收取所得。"
+                f"- **剧情**：{record.body or record.description}\n"
+                + ("\n" + "\n".join(
+                    f"- **行动**：`{item['command']} {item['argument']}` · {item['description']}"
+                    for item in record.actions
+                ) if record.actions else "")
+                + f"\n\n> 完成目标后发送 `{self.claim_command} {record.stage_key}` 领取所得。"
             ),
             context.request_id,
             operation_id,
-            data={"stage_key": record.stage_key, "chapter": record.chapter, "stage": record.stage, "first_clear": record.first_clear, "idempotent_replay": record.already_completed},
+            data={"stage_key": record.stage_key, "chapter": record.chapter, "stage": record.stage, "first_clear": record.first_clear, "actions": list(record.actions), "next_stage_key": record.next_stage_key, "idempotent_replay": record.already_completed},
         )
 
     async def claim_reward(self, context: CommandContext) -> CommandResult:
@@ -232,6 +240,15 @@ class AdventuresMainlineApplication:
             return CommandResult(False, "CONTENT_CLOSED", "这段天路尚未显现，暂不结算所得。", context.request_id, operation_id)
         except MainlineNotStartedError:
             return CommandResult(False, "MAINLINE_NOT_STARTED", "请先发送 `开始主线 序号`，再领取当前关卡奖励。", context.request_id, operation_id)
+        except MainlineObjectivesIncompleteError as exc:
+            missing = "、".join(exc.missing)
+            return CommandResult(
+                False,
+                "MAINLINE_OBJECTIVES_INCOMPLETE",
+                f"尚未完成：{missing}。{exc.retry_message}",
+                context.request_id,
+                operation_id,
+            )
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerSuspendedError:
@@ -250,11 +267,12 @@ class AdventuresMainlineApplication:
                 f"## {self.title}结算完成 · {record.label}\n\n"
                 f"**{self._display_name(record.player)}**完成了第 **{record.stage}** 关，获得 **{reward_kind}**。\n\n"
                 f"- **获得**：{self._reward_text(record.reward)}\n\n"
-                f"> 首通所得只取一次；若再入此关，请重新发送 `{self.start_command} 序号`。"
+                + (f"> 下一关：`{self.start_command} {record.next_stage_key}`。\n\n" if record.next_stage_key else "")
+                + f"> 首通所得只取一次；若再入此关，请重新发送 `{self.start_command} 序号`。"
             ),
             context.request_id,
             operation_id,
-            data={"stage_key": record.stage_key, "chapter": record.chapter, "stage": record.stage, "reward": record.reward, "first_clear": record.first_clear, "idempotent_replay": record.already_completed},
+            data={"stage_key": record.stage_key, "chapter": record.chapter, "stage": record.stage, "reward": record.reward, "first_clear": record.first_clear, "next_stage_key": record.next_stage_key, "idempotent_replay": record.already_completed},
         )
 
 

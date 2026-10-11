@@ -84,7 +84,23 @@
 移出当前内容后仍先核对 operation 并回放原结果，按当前内容可解析到相同稳定键的输入也可回放。历史选择词
 不会因此成为新 operation 的有效选择器。
 
-### 2.0.2 生产物资的采集来源
+### 2.0.2 主线剧情关卡
+
+玄天主线首两关 `chapter.1.stage.1` 与 `chapter.1.stage.2` 必须提供非空 `body`、非空 `objectives`、
+可执行提示 `actions`、`state_changes.activity_events`、同故事内的 `next_stage_key` 和 `retry`。
+关卡目标只支持服务端可证明的 `travel_arrival`（开放地点键）和 `exploration_reward`（开放模式、地点、物品
+及正数量）；探索地点必须与模式的地点一致。`actions` 给出当前公开命令及参数，不能替代运行时目标校验。
+
+开始时将上述叙事/规则与奖励一起冻结到 `mainline_runs.snapshot_json`。旅行目标只认开始后已抵达的
+`travel_sessions`；采集目标只认开始后已 `settled` 的 `exploration_sessions.result_json` 实得物品，不读玩家
+自报或背包净数量。成功领取在奖励事务中写入声明的 activity event 和下一关指引；目标未完成则零写入、
+不创建 claim operation，关卡保持 `running`。当前合同只接受 `retry.on_incomplete=keep_running`、零冷却，
+允许完成条件后用新请求立即重试。旧运行快照若没有 `objectives`，继续按旧合同领取，不从当前内容追加入场门槛。
+
+本合同只要求首两关通过完整叙事字段与引用验证，不代表其余主线记录已补完；不得以短 `desc` 伪装正文，
+也不得批量生成无消费者的目标。后续剧情关卡须逐段闭合真实地点/任务/战斗/奖励生产者后再开放。
+
+### 2.0.3 生产物资的采集来源
 
 物品可用 `gathering_sources` 登记已实现的采集/探索来源；每项只能提供稳定的
 `mode_key` 和 `reward_pool_key`，列表非空且模式不重复。来源必须使用现行探索消费者

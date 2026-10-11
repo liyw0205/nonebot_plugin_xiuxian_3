@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from mainline_fixtures import grant_spirit_field_prerequisites, mark_mainline_snapshot_legacy
 
 
 def _context(operation_id: str) -> CommandContext:
@@ -29,6 +30,7 @@ def test_mainline_first_clear_retry_and_operation_replay() -> None:
 
             started = await runtime.dispatch(_context("mainline-start-1"), "开始主线 1")
             assert started.code == "MAINLINE_STARTED"
+            mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.1")
             claimed = await runtime.dispatch(_context("mainline-claim-1"), "领取主线奖励 1")
             assert claimed.code == "MAINLINE_REWARD_CLAIMED"
             assert claimed.data["first_clear"] is True
@@ -44,6 +46,7 @@ def test_mainline_first_clear_retry_and_operation_replay() -> None:
             retry_start = await runtime.dispatch(_context("mainline-start-1-retry"), "开始主线 1")
             assert retry_start.code == "MAINLINE_STARTED"
             assert retry_start.data["first_clear"] is False
+            mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.1")
             retry_claim = await runtime.dispatch(_context("mainline-claim-1-retry"), "领取主线奖励 1")
             assert retry_claim.code == "MAINLINE_REWARD_CLAIMED"
             assert retry_claim.data["first_clear"] is False
@@ -77,19 +80,17 @@ def test_mainline_stage_prerequisites_and_reward_assets() -> None:
             )
             await runtime.dispatch(_context("create"), "开始修仙")
             await runtime.dispatch(_context("seek"), "寻仙问道")
-            await runtime.dispatch(_context("stage1-start"), "开始主线 初入玄天")
+            assert (await runtime.dispatch(_context("stage1-start"), "开始主线 初入玄天")).ok
+            mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.1")
             await runtime.dispatch(_context("stage1-claim"), "领取主线奖励 初入玄天")
 
             locked = await runtime.dispatch(_context("stage2-locked"), "开始主线 2")
             assert locked.code == "MAINLINE_REQUIREMENT_MISSING"
 
-            with runtime.repository._connect() as connection:
-                connection.execute(
-                    "UPDATE players SET realm_key = 'qi_sensing', realm_layer = 1 WHERE platform_user_id = ?",
-                    ("mainline-user",),
-                )
+            grant_spirit_field_prerequisites(runtime, "web", "mainline-user", layer=2)
             stage2 = await runtime.dispatch(_context("stage2-start"), "开始主线 2")
             assert stage2.code == "MAINLINE_STARTED"
+            mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.2")
             stage2_claim = await runtime.dispatch(_context("stage2-claim"), "领取主线奖励 2")
             assert stage2_claim.data["reward"]["item.herb.spirit_leaf"] == 2
 
@@ -130,13 +131,11 @@ def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None
             await runtime.dispatch(_context("create"), "开始修仙")
             await runtime.dispatch(_context("seek"), "寻仙问道")
             assert (await runtime.dispatch(_context("stage1-start"), "开始主线 1")).ok
+            mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.1")
             assert (await runtime.dispatch(_context("stage1-claim"), "领取主线奖励 1")).ok
-            with runtime.repository._connect() as connection:
-                connection.execute(
-                    "UPDATE players SET realm_key = 'qi_sensing', realm_layer = 3 WHERE platform_user_id = ?",
-                    ("mainline-user",),
-                )
+            grant_spirit_field_prerequisites(runtime, "web", "mainline-user", layer=3)
             assert (await runtime.dispatch(_context("stage2-start"), "开始主线 2")).ok
+            mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.2")
             assert (await runtime.dispatch(_context("stage2-claim"), "领取主线奖励 2")).ok
             assert (await runtime.dispatch(_context("stage3-start"), "开始主线 3")).ok
             assert (await runtime.dispatch(_context("stage3-claim"), "领取主线奖励 3")).ok
@@ -207,13 +206,11 @@ def test_mainline_town_commission_runs_through_qq_and_onebot_adapters() -> None:
                 assert (await dispatch("create", "开始修仙")).ok
                 assert (await dispatch("seek", "寻仙问道")).ok
                 assert (await dispatch("stage1-start", "开始主线 1")).ok
+                mark_mainline_snapshot_legacy(runtime, adapter, user, "chapter.1.stage.1")
                 assert (await dispatch("stage1-claim", "领取主线奖励 1")).ok
-                with runtime.repository._connect() as connection:
-                    connection.execute(
-                        "UPDATE players SET realm_key='qi_sensing', realm_layer=3 WHERE platform=? AND platform_user_id=?",
-                        (adapter, user),
-                    )
+                grant_spirit_field_prerequisites(runtime, adapter, user, layer=3)
                 assert (await dispatch("stage2-start", "开始主线 2")).ok
+                mark_mainline_snapshot_legacy(runtime, adapter, user, "chapter.1.stage.2")
                 assert (await dispatch("stage2-claim", "领取主线奖励 2")).ok
                 assert (await dispatch("stage3-start", "开始主线 3")).ok
                 assert (await dispatch("stage3-claim", "领取主线奖励 3")).ok

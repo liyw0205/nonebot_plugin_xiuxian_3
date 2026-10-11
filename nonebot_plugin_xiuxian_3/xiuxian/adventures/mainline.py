@@ -52,6 +52,12 @@ class MainlineStageDefinition:
     local_reputation_maximum: int | None = None
     lane: str | None = None
     lane_label: str | None = None
+    body: str = ""
+    objectives: tuple[Mapping[str, object], ...] = ()
+    actions: tuple[Mapping[str, str], ...] = ()
+    state_events: tuple[str, ...] = ()
+    next_stage_key: str | None = None
+    retry_message: str = ""
 
     @property
     def codex_flag(self) -> str:
@@ -96,6 +102,14 @@ MAINLINE_REWARD_PREFIXES = ("item.", "access.", "codex.")
 MAINLINE_NUMERIC_REWARD_KEYS = frozenset(
     {"spirit_stones", "local_reputation", "service_reputation"}
 )
+_VERTICAL_SLICE_STAGES = frozenset({"chapter.1.stage.1", "chapter.1.stage.2"})
+
+
+class MainlineObjectivesIncompleteError(RuntimeError):
+    def __init__(self, missing: tuple[str, ...], retry_message: str):
+        self.missing = missing
+        self.retry_message = retry_message
+        super().__init__("mainline objectives are incomplete")
 
 
 def _content(content: ContentBundle | None) -> ContentBundle:
@@ -106,6 +120,105 @@ def _string_tuple(value: object, field: str, key: str) -> tuple[str, ...]:
     if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
         raise ContentError(f"mainline {key} {field} must be a string list")
     return tuple(str(item).strip() for item in value)
+
+
+def _story_actions(value: object, key: str, *, required: bool) -> tuple[Mapping[str, str], ...]:
+    if value is None and not required:
+        return ()
+    if not isinstance(value, list) or not value:
+        raise ContentError(f"mainline {key} actions must be a non-empty list")
+    actions: list[Mapping[str, str]] = []
+    for index, action in enumerate(value):
+        if not isinstance(action, dict) or set(action) != {"command", "argument", "description"}:
+            raise ContentError(f"mainline {key} actions[{index}] has an invalid shape")
+        if any(not isinstance(action[field], str) or not action[field].strip() for field in action):
+            raise ContentError(f"mainline {key} actions[{index}] fields must be non-empty strings")
+        actions.append({field: action[field].strip() for field in ("command", "argument", "description")})
+    return tuple(actions)
+
+
+def _story_objectives(
+    value: object,
+    key: str,
+    bundle: ContentBundle | None,
+    *,
+    required: bool,
+) -> tuple[Mapping[str, object], ...]:
+    if value is None and not required:
+        return ()
+    if not isinstance(value, list) or not value:
+        raise ContentError(f"mainline {key} objectives must be a non-empty list")
+    objectives: list[Mapping[str, object]] = []
+    seen: set[str] = set()
+    for index, objective in enumerate(value):
+        if not isinstance(objective, dict):
+            raise ContentError(f"mainline {key} objectives[{index}] must be an object")
+        objective_key = objective.get("key")
+        kind = objective.get("type")
+        label = objective.get("label")
+        if not all(isinstance(item, str) and item.strip() for item in (objective_key, kind, label)):
+            raise ContentError(f"mainline {key} objectives[{index}] requires key, type and label")
+        if objective_key in seen:
+            raise ContentError(f"mainline {key} has duplicate objective {objective_key}")
+        seen.add(str(objective_key))
+        if kind == "travel_arrival":
+            if set(objective) != {"key", "type", "label", "destination_key"}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid travel shape")
+            destination = objective.get("destination_key")
+            if not isinstance(destination, str) or not destination.strip():
+                raise ContentError(f"mainline {key} objective {objective_key} requires destination_key")
+            if bundle is not None:
+                try:
+                    bundle.require("location", destination, include_locked=False)
+                except KeyError as exc:
+                    raise ContentError(f"mainline {key} objective references unknown location {destination}") from exc
+            normalized = {"key": str(objective_key), "type": kind, "label": label.strip(), "destination_key": destination}
+        elif kind == "exploration_reward":
+            if set(objective) != {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid exploration shape")
+            mode_key = objective.get("mode_key")
+            location_key = objective.get("location_key")
+            item_key = objective.get("item_key")
+            quantity = objective.get("quantity")
+            if any(not isinstance(item, str) or not item.strip() for item in (mode_key, location_key, item_key)):
+                raise ContentError(f"mainline {key} objective {objective_key} requires mode, location and item keys")
+            if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+                raise ContentError(f"mainline {key} objective {objective_key} quantity must be positive")
+            if bundle is not None:
+                try:
+                    mode = bundle.require("exploration_mode", mode_key, include_locked=False)
+                    bundle.require("location", location_key, include_locked=False)
+                    bundle.require("item", item_key, include_locked=False)
+                except KeyError as exc:
+                    raise ContentError(f"mainline {key} objective {objective_key} references unknown content") from exc
+                if mode.get("location_key") != location_key:
+                    raise ContentError(f"mainline {key} objective {objective_key} location differs from its mode")
+                pool_key = mode.get("reward_pool_key")
+                if not isinstance(pool_key, str) or not pool_key:
+                    raise ContentError(f"mainline {key} objective {objective_key} mode has no reward pool")
+                try:
+                    pool = bundle.require("reward", pool_key, include_locked=False)
+                except KeyError as exc:
+                    raise ContentError(f"mainline {key} objective {objective_key} has an unknown reward pool") from exc
+                outcomes = pool.get("outcomes")
+                if not isinstance(outcomes, list) or not any(
+                    isinstance(outcome, dict)
+                    and isinstance(outcome.get("rewards"), dict)
+                    and isinstance(outcome["rewards"].get(item_key), int)
+                    and not isinstance(outcome["rewards"][item_key], bool)
+                    and outcome["rewards"][item_key] >= quantity
+                    for outcome in outcomes
+                ):
+                    raise ContentError(f"mainline {key} objective {objective_key} item is not attainable")
+            normalized = {
+                "key": str(objective_key), "type": kind, "label": label.strip(),
+                "mode_key": mode_key, "location_key": location_key,
+                "item_key": item_key, "quantity": quantity,
+            }
+        else:
+            raise ContentError(f"mainline {key} objective {objective_key} has unsupported type {kind}")
+        objectives.append(normalized)
+    return tuple(objectives)
 
 
 def _reward_map(
@@ -186,6 +299,46 @@ def mainline_definitions(
         description = row.get("desc")
         if not isinstance(name, str) or not name.strip() or not isinstance(description, str) or not description.strip():
             raise ContentError(f"mainline {key} requires name and desc")
+        is_vertical_slice_stage = key in _VERTICAL_SLICE_STAGES
+        body = row.get("body", description)
+        if not isinstance(body, str) or not body.strip():
+            raise ContentError(f"mainline {key} body must be a non-empty string")
+        if is_vertical_slice_stage and len(body.strip()) < 80:
+            raise ContentError(f"mainline {key} body is too short to be a story stage")
+        objectives = _story_objectives(
+            row.get("objectives"), key, bundle, required=is_vertical_slice_stage
+        )
+        actions = _story_actions(row.get("actions"), key, required=is_vertical_slice_stage)
+        state_changes = row.get("state_changes")
+        if state_changes is None and not is_vertical_slice_stage:
+            state_events: tuple[str, ...] = ()
+        else:
+            if not isinstance(state_changes, dict) or set(state_changes) != {"activity_events"}:
+                raise ContentError(f"mainline {key} state_changes must declare activity_events")
+            state_events = _string_tuple(state_changes.get("activity_events"), "state_changes.activity_events", key)
+            if len(set(state_events)) != len(state_events):
+                raise ContentError(f"mainline {key} state_changes contains duplicate events")
+        next_stage_key = row.get("next_stage_key")
+        if next_stage_key is not None and (not isinstance(next_stage_key, str) or not next_stage_key.strip()):
+            raise ContentError(f"mainline {key} next_stage_key must be a non-empty string")
+        if is_vertical_slice_stage and not next_stage_key:
+            raise ContentError(f"mainline {key} requires next_stage_key")
+        retry = row.get("retry")
+        if retry is None and not is_vertical_slice_stage:
+            retry_message = ""
+        else:
+            if (
+                not isinstance(retry, dict)
+                or set(retry) != {"on_incomplete", "cooldown_seconds", "message"}
+                or retry.get("on_incomplete") != "keep_running"
+                or isinstance(retry.get("cooldown_seconds"), bool)
+                or not isinstance(retry.get("cooldown_seconds"), int)
+                or retry.get("cooldown_seconds") != 0
+                or not isinstance(retry.get("message"), str)
+                or not retry["message"].strip()
+            ):
+                raise ContentError(f"mainline {key} retry must preserve running state with zero cooldown")
+            retry_message = retry["message"].strip()
         prerequisites = _string_tuple(row.get("prerequisites", []), "prerequisites", key)
         alternatives = _string_tuple(row.get("alternative_prerequisites", []), "alternative_prerequisites", key)
         required_realm = row.get("required_realm")
@@ -237,6 +390,12 @@ def mainline_definitions(
                 reputation_key=reputation_key,
                 lane=lane.strip() if isinstance(lane, str) else None,
                 lane_label=lane_label.strip() if isinstance(lane_label, str) else None,
+                body=body.strip(),
+                objectives=objectives,
+                actions=actions,
+                state_events=state_events,
+                next_stage_key=next_stage_key.strip() if isinstance(next_stage_key, str) else None,
+                retry_message=retry_message,
             )
         )
     definitions.sort(key=lambda item: (item.chapter, item.stage, item.key))
@@ -244,6 +403,7 @@ def mainline_definitions(
         scope = f" for {story_key}" if story_key else ""
         raise ContentError(f"mainline content must contain at least one stage{scope}")
     keys = {item.key for item in definitions}
+    by_key = {item.key: item for item in definitions}
     aliases: set[str] = set()
     for definition in definitions:
         for prerequisite in definition.prerequisites:
@@ -255,6 +415,16 @@ def mainline_definitions(
             if alias in aliases:
                 raise ContentError(f"duplicate mainline alias {alias}")
             aliases.add(alias)
+        if definition.next_stage_key is not None:
+            next_stage = by_key.get(definition.next_stage_key)
+            if next_stage is None or next_stage.story_key != definition.story_key:
+                raise ContentError(f"mainline {definition.key} references unknown next stage {definition.next_stage_key}")
+            if definition.key in _VERTICAL_SLICE_STAGES and (
+                next_stage.chapter != definition.chapter or next_stage.stage != definition.stage + 1
+            ):
+                raise ContentError(f"mainline {definition.key} next stage is not consecutive")
+        if definition.key in _VERTICAL_SLICE_STAGES and not definition.state_events:
+            raise ContentError(f"mainline {definition.key} requires a state change")
     return tuple(definitions)
 
 

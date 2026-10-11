@@ -9,6 +9,20 @@
       "stage": 1,
       "name": "初入玄天",
       "desc": "完成寻仙问道，踏入玄天近郊。",
+      "body": "寻仙问道之后，青石镇外的山风第一次有了灵气的回响。镇口老修士把一枚旧木牌交到你手中：牌面没有门派印记，只刻着玄天二字。近郊不远，却是凡俗与修行真正相接的地方。沿石阶走出镇门，看看这片天地是否也在等你的回答。",
+      "objectives": [
+        {"key": "arrive_outskirts", "type": "travel_arrival", "label": "抵达玄天近郊", "destination_key": "xuantian.outskirts"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "启程后等待行程结束，再结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.1.stage.1"]},
+      "next_stage_key": "chapter.1.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "关卡会保留进行中，不扣奖励也不增加尝试次数；完成目标后可立即重领。"
+      },
       "status": "open",
       "aliases": ["初入玄天"],
       "reputation_key": "local.xuantian.new_town",
@@ -27,12 +41,34 @@
       "stage": 2,
       "name": "灵泉取叶",
       "desc": "沿近郊线索前往灵泉谷，取得第一片灵叶。",
+      "body": "近郊石壁上留着一道新鲜的水痕，沿它向山谷深入，便听见灵泉在雾气后缓缓涌动。旧木牌在泉边微微发热，像是在提醒你：灵气并非只供吐纳，也藏在一草一木的生长里。完成止血草引路后，去谷中采下一片灵叶，把这次发现带回自己的修行。",
+      "objectives": [
+        {
+          "key": "gather_spirit_leaf",
+          "type": "exploration_reward",
+          "label": "在灵泉采集结算中取得灵叶",
+          "mode_key": "explore.spring_gather",
+          "location_key": "xuantian.spirit_field",
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 1
+        }
+      ],
+      "actions": [
+        {"command": "前往", "argument": "灵泉谷", "description": "完成止血草引路并达到感气二层后启程。"},
+        {"command": "开始探索", "argument": "灵泉采集", "description": "行程结束后结算采集收获。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.1.stage.2"]},
+      "next_stage_key": "chapter.1.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "关卡会保留进行中，不扣奖励也不增加尝试次数；完成目标后可立即重领。"
+      },
       "status": "open",
       "aliases": ["灵泉取叶"],
-      "prerequisites": ["chapter.1.stage.1"],
-      "alternative_prerequisites": ["guide.gather_blood_grass"],
+      "prerequisites": ["chapter.1.stage.1", "guide.gather_blood_grass"],
       "required_realm": "qi_sensing",
-      "required_layer": 1,
+      "required_layer": 2,
       "first_clear_reward": {
         "access.xuantian.spirit_field": 1,
         "item.herb.spirit_leaf": 2

@@ -107,6 +107,7 @@ from ..adventures.mainline import (
     mainline_stage_status,
     resolve_mainline,
     MainlineStageDefinition,
+    MainlineObjectivesIncompleteError,
 )
 from ..adventures.rules import (
     bounty_definition,
@@ -1663,6 +1664,7 @@ class AdventuresRepositoryMixin:
                 else None
             )
             snapshot = {
+                "started_at": now_text,
                 "stage": str(row["stage"]),
                 "realm_key": str(row["realm_key"]),
                 "realm_layer": player_integer(row, "realm_layer"),
@@ -1675,6 +1677,12 @@ class AdventuresRepositoryMixin:
                     "stage": definition.stage,
                     "label": definition.label,
                     "description": definition.description,
+                    "body": definition.body,
+                    "objectives": [dict(item) for item in definition.objectives],
+                    "actions": [dict(item) for item in definition.actions],
+                    "state_events": list(definition.state_events),
+                    "next_stage_key": definition.next_stage_key,
+                    "retry_message": definition.retry_message,
                     "first_clear_reward": definition.first_clear_reward_map(),
                     "repeat_reward": definition.repeat_reward_map(),
                     "reputation_key": definition.reputation_key,
@@ -1729,6 +1737,9 @@ class AdventuresRepositoryMixin:
                 "first_clear": first_clear,
                 "label": definition.label,
                 "description": definition.description,
+                "body": definition.body,
+                "actions": [dict(item) for item in definition.actions],
+                "next_stage_key": definition.next_stage_key,
             }
             connection.execute(
                 """
@@ -1833,6 +1844,13 @@ class AdventuresRepositoryMixin:
             if frozen is None:
                 raise ValueError("mainline run snapshot is invalid")
             definition = frozen
+            missing_objectives = self._mainline_missing_objectives(
+                connection, int(row["id"]), run
+            )
+            if missing_objectives:
+                raise MainlineObjectivesIncompleteError(
+                    missing_objectives, definition.retry_message
+                )
             first_clear = not bool(run["first_clear_claimed"])
             reward = mainline_reward(definition, first_clear=first_clear, content=self.content)
             connection.execute(
@@ -1881,6 +1899,7 @@ class AdventuresRepositoryMixin:
                 "reward": actual_reward,
                 "first_clear": first_clear,
                 "label": definition.label,
+                "next_stage_key": definition.next_stage_key,
                 "source_operation_id": operation_id,
             }
             connection.execute(
@@ -1897,6 +1916,72 @@ class AdventuresRepositoryMixin:
             return self._mainline_claim_from_payload(payload)
 
     @staticmethod
+    def _mainline_missing_objectives(
+        connection: sqlite3.Connection,
+        player_id: int,
+        run: sqlite3.Row,
+    ) -> tuple[str, ...]:
+        try:
+            snapshot = json.loads(run["snapshot_json"] or "{}")
+            definition = snapshot.get("definition")
+            if not isinstance(definition, dict):
+                raise ValueError("mainline snapshot definition is missing")
+            objectives = definition.get("objectives", [])
+            if not isinstance(objectives, list):
+                raise ValueError("mainline snapshot objectives are invalid")
+            if not objectives:
+                return ()
+            started_at = snapshot.get("started_at")
+            if not isinstance(started_at, str) or not started_at:
+                return tuple(
+                    str(item.get("label", "剧情目标"))
+                    for item in objectives
+                    if isinstance(item, dict)
+                )
+            datetime.fromisoformat(started_at)
+        except (TypeError, json.JSONDecodeError, ValueError) as exc:
+            raise ValueError("mainline run snapshot is invalid") from exc
+
+        missing: list[str] = []
+        for objective in objectives:
+            if not isinstance(objective, dict) or not isinstance(objective.get("label"), str):
+                raise ValueError("mainline snapshot objective is invalid")
+            kind = objective.get("type")
+            if kind == "travel_arrival":
+                found = connection.execute(
+                    "SELECT 1 FROM travel_sessions WHERE player_id=? AND status='arrived' "
+                    "AND destination=? AND starts_at>=? LIMIT 1",
+                    (player_id, objective.get("destination_key"), started_at),
+                ).fetchone()
+            elif kind == "exploration_reward":
+                rows = connection.execute(
+                    "SELECT result_json FROM exploration_sessions WHERE player_id=? "
+                    "AND status='settled' AND mode_key=? AND location_key=? AND starts_at>=?",
+                    (
+                        player_id,
+                        objective.get("mode_key"),
+                        objective.get("location_key"),
+                        started_at,
+                    ),
+                ).fetchall()
+                found = None
+                for session in rows:
+                    try:
+                        result_json = json.loads(session["result_json"] or "{}")
+                        result = result_json.get("result")
+                    except (TypeError, json.JSONDecodeError):
+                        continue
+                    amount = result.get(objective.get("item_key")) if isinstance(result, dict) else None
+                    if isinstance(amount, int) and not isinstance(amount, bool) and amount >= int(objective.get("quantity", 0)):
+                        found = session
+                        break
+            else:
+                raise ValueError("mainline snapshot objective type is invalid")
+            if found is None:
+                missing.append(str(objective["label"]))
+        return tuple(missing)
+
+    @staticmethod
     def _mainline_definition_from_snapshot(
         run: sqlite3.Row,
         current: MainlineStageDefinition,
@@ -1909,6 +1994,12 @@ class AdventuresRepositoryMixin:
             first_clear = payload["first_clear_reward"]
             repeat = payload["repeat_reward"]
             reputation_maximum = payload["local_reputation_maximum"]
+            objectives = payload.get("objectives", [])
+            actions = payload.get("actions", [])
+            state_events = payload.get("state_events", [])
+            next_stage_key = payload.get("next_stage_key")
+            retry_message = payload.get("retry_message", "")
+            started_at = snapshot.get("started_at")
             def valid_reward(reward: object) -> bool:
                 if not isinstance(reward, dict) or not reward:
                     return False
@@ -1927,6 +2018,42 @@ class AdventuresRepositoryMixin:
                     else:
                         return False
                 return True
+            def valid_objective(objective: object) -> bool:
+                if not isinstance(objective, dict):
+                    return False
+                if not all(
+                    isinstance(objective.get(field), str) and objective[field].strip()
+                    for field in ("key", "type", "label")
+                ):
+                    return False
+                if objective["type"] == "travel_arrival":
+                    return (
+                        set(objective) == {"key", "type", "label", "destination_key"}
+                        and isinstance(objective["destination_key"], str)
+                        and bool(objective["destination_key"].strip())
+                    )
+                if objective["type"] == "exploration_reward":
+                    quantity = objective.get("quantity")
+                    return (
+                        set(objective)
+                        == {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}
+                        and all(
+                            isinstance(objective.get(field), str) and objective[field].strip()
+                            for field in ("mode_key", "location_key", "item_key")
+                        )
+                        and isinstance(quantity, int)
+                        and not isinstance(quantity, bool)
+                        and quantity > 0
+                    )
+                return False
+
+            def valid_action(action: object) -> bool:
+                return (
+                    isinstance(action, dict)
+                    and set(action) == {"command", "argument", "description"}
+                    and all(isinstance(action.get(field), str) and action[field].strip() for field in action)
+                )
+
             if (
                 payload.get("key") != current.key
                 or payload.get("story_key") != current.story_key
@@ -1934,6 +2061,17 @@ class AdventuresRepositoryMixin:
                 or payload.get("stage") != current.stage
                 or not isinstance(payload.get("label"), str)
                 or not isinstance(payload.get("description"), str)
+                or not isinstance(payload.get("body", payload.get("description")), str)
+                or not isinstance(objectives, list)
+                or not isinstance(actions, list)
+                or any(not valid_objective(item) for item in objectives)
+                or any(not valid_action(item) for item in actions)
+                or not isinstance(state_events, list)
+                or any(not isinstance(item, str) or not item for item in state_events)
+                or (next_stage_key is not None and not isinstance(next_stage_key, str))
+                or not isinstance(retry_message, str)
+                or (objectives and not retry_message.strip())
+                or (objectives and not isinstance(started_at, str))
                 or not valid_reward(first_clear)
                 or not valid_reward(repeat)
                 or (
@@ -1972,6 +2110,12 @@ class AdventuresRepositoryMixin:
                 aliases=current.aliases,
                 reputation_key=payload.get("reputation_key"),
                 local_reputation_maximum=reputation_maximum,
+                body=str(payload.get("body", payload["description"])),
+                objectives=tuple(dict(item) for item in objectives if isinstance(item, dict)),
+                actions=tuple(dict(item) for item in actions if isinstance(item, dict)),
+                state_events=tuple(state_events),
+                next_stage_key=next_stage_key,
+                retry_message=retry_message,
             )
         except (KeyError, TypeError, ValueError, json.JSONDecodeError):
             return None
@@ -1989,7 +2133,7 @@ class AdventuresRepositoryMixin:
         local_delta = 0
         service_delta = 0
         actual: dict[str, int | str] = {}
-        event_keys: list[str] = [
+        event_keys: list[str] = list(definition.state_events) or [
             f"{definition.story_key}:chapter.{definition.chapter}.stage.{definition.stage}"
         ]
         for key, raw_value in reward.items():
@@ -2092,6 +2236,11 @@ class AdventuresRepositoryMixin:
             first_clear=bool(payload.get("first_clear", True)),
             label=str(payload.get("label", "")),
             description=str(payload.get("description", "")),
+            body=str(payload.get("body", payload.get("description", ""))),
+            actions=tuple(
+                dict(item) for item in payload.get("actions", []) if isinstance(item, dict)
+            ),
+            next_stage_key=payload.get("next_stage_key"),
             already_completed=replay,
         )
 
@@ -2109,6 +2258,7 @@ class AdventuresRepositoryMixin:
             reward=dict(payload.get("reward", {})),
             first_clear=bool(payload.get("first_clear", True)),
             label=str(payload.get("label", "")),
+            next_stage_key=payload.get("next_stage_key"),
             source_operation_id=payload.get("source_operation_id"),
             already_completed=replay,
         )

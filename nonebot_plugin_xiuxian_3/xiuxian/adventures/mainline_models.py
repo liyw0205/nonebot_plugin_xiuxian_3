@@ -44,6 +44,9 @@ class MainlineStartRecord:
     first_clear: bool = True
     label: str = ""
     description: str = ""
+    body: str = ""
+    actions: tuple[dict[str, str], ...] = ()
+    next_stage_key: str | None = None
     starts_at: str | None = None
     ends_at: str | None = None
     already_completed: bool = False
@@ -60,6 +63,7 @@ class MainlineClaimRecord:
     reward: dict[str, int | str] = field(default_factory=dict)
     first_clear: bool = True
     label: str = ""
+    next_stage_key: str | None = None
     source_operation_id: str | None = None
     already_completed: bool = False
 
