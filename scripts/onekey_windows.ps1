@@ -214,15 +214,31 @@ function Download-ReleaseSource {
                 Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing -TimeoutSec 180
                 & tar -xzf $archive -C $extract
                 if ($LASTEXITCODE -ne 0) { throw "tar 解包失败" }
-                $project = Get-ChildItem $extract -Recurse -Filter pyproject.toml -File | Select-Object -First 1
-                if ($null -eq $project) { throw "资产缺少 pyproject.toml" }
+                $candidates = @($extract) + @(Get-ChildItem $extract -Directory | ForEach-Object { $_.FullName })
+                $projectRoot = $candidates | Where-Object {
+                    (Test-Path (Join-Path $_ "pyproject.toml") -PathType Leaf) -and
+                    (Test-Path (Join-Path $_ "scripts\install.sh") -PathType Leaf) -and
+                    (Test-Path (Join-Path $_ "nonebot_plugin_xiuxian_3\__init__.py") -PathType Leaf)
+                } | Select-Object -First 1
+                if (-not $projectRoot) { throw "资产缺少完整项目根目录" }
                 if ((Test-Path $Source) -and -not (Test-Path (Join-Path $Source ".xiuxian3-release"))) {
                     throw "源码目录已存在且不是 Release 管理目录：$Source；如需开发源码请使用 -SourceMode source"
                 }
-                if (Test-Path $Source) { Remove-Item -Recurse -Force $Source }
-                New-Item -ItemType Directory -Force -Path $Source | Out-Null
-                Copy-Item (Join-Path $project.Directory.FullName "*") $Source -Recurse -Force
-                Set-Content -Path (Join-Path $Source ".xiuxian3-release") -Value $url -Encoding UTF8
+                $staged = "$Source.new-$([guid]::NewGuid().ToString('N'))"
+                $previous = "$staged.previous"
+                New-Item -ItemType Directory -Force -Path $staged | Out-Null
+                try {
+                    Get-ChildItem $projectRoot -Force | Copy-Item -Destination $staged -Recurse -Force -ErrorAction Stop
+                    Set-Content -Path (Join-Path $staged ".xiuxian3-release") -Value $url -Encoding UTF8
+                    if (Test-Path $Source) { Move-Item $Source $previous -ErrorAction Stop }
+                    try { Move-Item $staged $Source -ErrorAction Stop } catch {
+                        if (Test-Path $previous) { Move-Item $previous $Source -ErrorAction Stop }
+                        throw
+                    }
+                    if (Test-Path $previous) { Remove-Item -Recurse -Force $previous }
+                } finally {
+                    if (Test-Path $staged) { Remove-Item -Recurse -Force $staged }
+                }
                 Write-Info "已准备 Release 源码：$Source"
                 return
             } catch {

@@ -11,6 +11,7 @@ WORKDIR /app
 COPY requirements.txt /tmp/xiuxian3-requirements.txt
 COPY nonebot_plugin_xiuxian_3 /app/src/plugins/nonebot_plugin_xiuxian_3
 COPY data /app/content-data
+COPY scripts/install_plugin_source.py scripts/seed_migrations.json /app/install-tools/
 COPY docker/pyproject.toml /app/pyproject.toml
 RUN python -m pip install --no-cache-dir -r /tmp/xiuxian3-requirements.txt \
     && nb --cwd /app --python "$(command -v python)" adapter install --no-restrict-version QQ \

@@ -520,7 +520,8 @@ def test_windows_control_update_requires_release_archive_without_pypi_fallback()
     assert "install_windows.ps1" not in update_branch
 
 
-def test_release_update_downloads_archive_and_preserves_host_state(tmp_path: Path) -> None:
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_release_update_downloads_archive_and_preserves_host_state(tmp_path: Path, wrapped: bool) -> None:
     target = tmp_path / "host"
     source = tmp_path / "release-cache"
     venv = tmp_path / "venv"
@@ -539,6 +540,10 @@ def test_release_update_downloads_archive_and_preserves_host_state(tmp_path: Pat
     release_root = tmp_path / "release-root"
     (release_root / "scripts").mkdir(parents=True)
     (release_root / "pyproject.toml").write_text("[project]\nname='fixture'\n", encoding="utf-8")
+    (release_root / "docker").mkdir()
+    (release_root / "docker/pyproject.toml").write_text("[project]\nname='decoy'\n", encoding="utf-8")
+    (release_root / "nonebot_plugin_xiuxian_3").mkdir()
+    (release_root / "nonebot_plugin_xiuxian_3/__init__.py").write_text("", encoding="utf-8")
     release_installer = release_root / "scripts" / "install.sh"
     release_installer.write_text(
         "#!/usr/bin/env bash\n"
@@ -563,7 +568,7 @@ def test_release_update_downloads_archive_and_preserves_host_state(tmp_path: Pat
     release_installer.chmod(0o755)
     release_archive = tmp_path / "fixture-project.tar.gz"
     with tarfile.open(release_archive, "w:gz") as bundle:
-        bundle.add(release_root, arcname=".")
+        bundle.add(release_root, arcname="project" if wrapped else ".")
 
     fake_bin.mkdir()
     fake_curl = fake_bin / "curl"
@@ -617,6 +622,24 @@ def test_release_update_downloads_archive_and_preserves_host_state(tmp_path: Pat
     assert (target / "data" / "profile.json").read_text(encoding="utf-8") == "keep-data\n"
     assert (target / "runtime" / "state.bin").read_text(encoding="utf-8") == "keep-runtime\n"
     assert (venv / "sentinel").read_text(encoding="utf-8") == "keep-venv\n"
+    assert (source / "docker/pyproject.toml").is_file()
+    assert (source / "nonebot_plugin_xiuxian_3/__init__.py").is_file()
+
+
+def test_all_installers_share_seed_migration_and_validation() -> None:
+    for name in ("install.sh", "install_windows.ps1"):
+        text = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+        assert "--data-source" in text and "--validate-after-install" in text
+        assert text.index("install_plugin_source.py") < text.index("pip uninstall")
+    entrypoint = (ROOT / "docker/entrypoint.sh").read_text(encoding="utf-8")
+    assert "--data-only" in entrypoint and "--validate-after-install" in entrypoint
+    assert "cp -R" not in entrypoint
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "scripts/seed_migrations.json" in dockerfile
+    windows = (ROOT / "scripts/onekey_windows.ps1").read_text(encoding="utf-8")
+    assert '"scripts\\install.sh"' in windows
+    assert '"nonebot_plugin_xiuxian_3\\__init__.py"' in windows
+    assert 'Get-ChildItem $extract -Recurse -Filter pyproject.toml' not in windows
 
 
 def test_release_asset_is_built_outside_checkout_root() -> None:

@@ -1,0 +1,30 @@
+{
+  "引导/引导.json": {
+    "old_sha256": {
+      "5a63404e134c2d1cd1165a9407ce467cb391ea024e681a6a0ed036e91a7af6c7": "42db275e70a60bbb5d268b7384d2eef44e6be80f:data/引导/引导.json"
+    },
+    "new_sha256": "ee7e3980a5ece605107cd35a59cb14d533b4cabcee305798b0440a313e12d459",
+    "new_commit": "9de693077677699def1ccb53150356b9ca4fee9c"
+  },
+  "技能/技能.json": {
+    "old_sha256": {
+      "cc54b5f7fc4c9cfd8fb1965dbd467a20292cb9a67671c42826fbde0d073b9163": "42db275e70a60bbb5d268b7384d2eef44e6be80f:data/技能/技能.json"
+    },
+    "new_sha256": "a18053142feb5a64ebf24c43eb5aadb492dfc0412333b3cd8dc2780dd0e545c4",
+    "new_commit": "3e009434e6e6ff26b65419cb13458298b9661293"
+  },
+  "道具/材料.json": {
+    "old_sha256": {
+      "a1d03eb055fe89b1a240e695589b40edaf1407202a0d5c5f09d722b6131d217e": "579c3ab277d90eafd9d267693be89e678b533282:data/道具/材料.json"
+    },
+    "new_sha256": "eaa2173340385e322c8f4f54339871869d9b42c0bf3b0009a3cbd5ac1f3a2a55",
+    "new_commit": "eaed7115257db5a67933e8bdf833c003319d940d"
+  },
+  "剧情/主线.json": {
+    "old_sha256": {
+      "bcaf8bb927740ed41d016382a81c0cbc61a18f096e4945c28a42e99407763580": "e61e67cf180c2e3b280a160da81cef50cd685b77:data/剧情/主线.json"
+    },
+    "new_sha256": "a74b70fffeee1f3eaa5b3d535572de7e3edbf8226e365723b3f58fe403483f9d",
+    "new_commit": "42d17725413667a3f72fcc604c163e33c63e59e9"
+  }
+}

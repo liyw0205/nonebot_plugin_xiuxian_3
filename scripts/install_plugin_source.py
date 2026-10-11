@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import tomllib
@@ -136,11 +138,15 @@ def _updated_pyproject(path: Path) -> str:
 
 
 def _atomic_write(path: Path, content: str) -> Path:
-    mode = stat.S_IMODE(path.stat().st_mode)
+    return _atomic_bytes(path, content.encode("utf-8"))
+
+
+def _atomic_bytes(path: Path, content: bytes) -> Path:
+    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.new-", dir=path.parent)
     temporary = Path(temporary_name)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as stream:
+        with os.fdopen(descriptor, "wb") as stream:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
@@ -158,55 +164,139 @@ def _remove(path: Path) -> None:
         shutil.rmtree(path)
 
 
-def install(source: Path, target: Path) -> None:
-    source = source.resolve()
+def _seed_plan(source: Path, target: Path) -> tuple[list[tuple[Path, bytes]], list[str]]:
+    manifest = json.loads(Path(__file__).with_name("seed_migrations.json").read_text(encoding="utf-8"))
+    changes: list[tuple[Path, bytes]] = []
+    custom: list[str] = []
+    for seed in sorted(source.rglob("*.json")):
+        relative = seed.relative_to(source)
+        destination = target / "data" / relative
+        if seed.is_symlink() or destination.is_symlink() or not destination.resolve().is_relative_to((target / "data").resolve()):
+            raise ValueError(f"种子路径不能指向 data 目录以外：{relative}")
+        new = seed.read_bytes()
+        json.loads(new)
+        if not destination.exists():
+            changes.append((relative, new))
+            continue
+        old = destination.read_bytes()
+        if old == new:
+            continue
+        rule = manifest.get(relative.as_posix())
+        if rule and hashlib.sha256(old).hexdigest() in rule["old_sha256"]:
+            if hashlib.sha256(new).hexdigest() != rule["new_sha256"]:
+                raise ValueError(f"官方种子迁移目标指纹不匹配：{relative}")
+            changes.append((relative, new))
+        else:
+            custom.append(relative.as_posix())
+    return changes, custom
+
+
+def install(
+    source: Path | None, target: Path, *, data_source: Path | None = None,
+    validate_after: bool = False,
+) -> None:
     target = target.resolve()
-    if not (source / "__init__.py").is_file():
+    source = source.resolve() if source is not None else None
+    if source is not None and not (source / "__init__.py").is_file():
         raise ValueError(f"插件源码缺少入口文件：{source / '__init__.py'}")
 
     pyproject = target / "pyproject.toml"
     if not pyproject.is_file():
         raise ValueError(f"宿主缺少 pyproject.toml：{pyproject}")
-    updated_pyproject = _updated_pyproject(pyproject)
+    updated_pyproject = _updated_pyproject(pyproject) if source is not None else None
+    changes, custom = _seed_plan(data_source.resolve(), target) if data_source else ([], [])
 
     plugin_parent = target / PLUGIN_DIR
     plugin_parent.mkdir(parents=True, exist_ok=True)
     plugin_target = plugin_parent / PLUGIN_NAME
-    staging = Path(tempfile.mkdtemp(prefix=f".{PLUGIN_NAME}.new-", dir=plugin_parent))
-    backup = plugin_parent / f".{PLUGIN_NAME}.old-{uuid.uuid4().hex}"
+    staging = Path(tempfile.mkdtemp(prefix=f".{PLUGIN_NAME}.new-", dir=plugin_parent)) if source else None
+    backup_root = (target / "data" if source is None else target) / ".xiuxian3/backups"
+    backup_root.mkdir(parents=True, exist_ok=True)
+    backup = backup_root / f"deploy-{uuid.uuid4().hex}"
+    backup.mkdir(mode=0o700)
+    shutil.copy2(pyproject, backup / "pyproject.toml")
+    for relative, _ in changes:
+        old = target / "data" / relative
+        if old.exists():
+            saved = backup / "data" / relative
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(old, saved)
+    journal = {"status": "pending", "data_files": [str(path) for path, _ in changes]}
+    journal_path = backup / "deployment.json"
+    journal_path.write_text(json.dumps(journal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"部署备份：{backup}", flush=True)
     pyproject_staging: Path | None = None
     moved_old = False
     installed_new = False
+    applied: list[Path] = []
     try:
-        shutil.copytree(
-            source,
-            staging,
-            dirs_exist_ok=True,
-            symlinks=True,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
-        )
-        pyproject_staging = _atomic_write(pyproject, updated_pyproject)
-        if plugin_target.exists() or plugin_target.is_symlink():
-            os.replace(plugin_target, backup)
-            moved_old = True
-        os.replace(staging, plugin_target)
-        installed_new = True
-        os.replace(pyproject_staging, pyproject)
-        pyproject_staging = None
+        if source is not None:
+            shutil.copytree(
+                source, staging, dirs_exist_ok=True, symlinks=True,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+            )
+            pyproject_staging = _atomic_write(pyproject, updated_pyproject)
+            if plugin_target.exists() or plugin_target.is_symlink():
+                os.replace(plugin_target, backup / PLUGIN_NAME)
+                moved_old = True
+            os.replace(staging, plugin_target)
+            installed_new = True
+            os.replace(pyproject_staging, pyproject)
+            pyproject_staging = None
+        for relative, new in changes:
+            destination = target / "data" / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            temporary = _atomic_bytes(destination, new)
+            os.replace(temporary, destination)
+            applied.append(relative)
+            print(f"官方种子写入：{relative}", flush=True)
+        if data_source is not None:
+            files = sorted(path for path in (target / "data").rglob("*.json") if not path.is_relative_to(backup_root))
+            if not files:
+                raise ValueError("data 目录没有 JSON 内容")
+            for path in files:
+                try:
+                    json.loads(path.read_bytes())
+                except (ValueError, UnicodeError) as error:
+                    raise ValueError(f"保留的 JSON 有语法冲突：{path.relative_to(target)}：{error}") from error
+            print(f"事务内已校验 {len(files)} 个 JSON 文件", flush=True)
+        if validate_after:
+            subprocess.run(
+                [sys.executable, str(Path(__file__).resolve()), "--target", str(target), "--validate"],
+                cwd=target, check=True,
+                env={**os.environ, "XIUXIAN3_DATA_DIR": str(target / "data"), "PYTHONDONTWRITEBYTECODE": "1"},
+            )
+        journal["status"] = "complete"
+        journal_path.write_text(json.dumps(journal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     except BaseException:
+        for relative in reversed(applied):
+            destination = target / "data" / relative
+            saved = backup / "data" / relative
+            if saved.exists():
+                shutil.copy2(saved, destination)
+            else:
+                destination.unlink(missing_ok=True)
         if installed_new:
             _remove(plugin_target)
-        if moved_old and (backup.exists() or backup.is_symlink()):
-            os.replace(backup, plugin_target)
+        if moved_old:
+            os.replace(backup / PLUGIN_NAME, plugin_target)
+        shutil.copy2(backup / "pyproject.toml", pyproject)
+        journal["status"] = "rolled_back"
+        journal_path.write_text(json.dumps(journal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print("部署失败，源码、TOML 和种子已回退；.env/SQLite/自定义数据未覆盖。", file=sys.stderr)
+        if custom:
+            print("保留的自定义或未知种子如与新版本冲突，须人工合并后重试：" + ", ".join(custom), file=sys.stderr)
         raise
     finally:
-        if staging.exists():
+        if staging is not None and staging.exists():
             _remove(staging)
         if pyproject_staging is not None:
             pyproject_staging.unlink(missing_ok=True)
-    if moved_old:
-        _remove(backup)
-    print(f"插件源码已部署至 {plugin_target}")
+    if source is not None:
+        print(f"插件源码已部署至 {plugin_target}")
+    if custom:
+        print("保留自定义/未知种子：" + ", ".join(custom))
+    print(f"种子更新 {len(changes)} 个；保留自定义/未知种子 {len(custom)} 个；备份保留在 {backup}")
 
 
 def validate(target: Path) -> None:
@@ -261,19 +351,27 @@ def main() -> int:
     parser.add_argument("--source", type=Path, help="xiu3 仓库中的 nonebot_plugin_xiuxian_3 目录")
     parser.add_argument("--target", type=Path, required=True, help="NoneBot 宿主目录")
     parser.add_argument("--validate", action="store_true", help="使用宿主 plugin_dirs 实际验载")
+    parser.add_argument("--data-source", type=Path, help="官方种子目录；仅迁移指纹表中的旧官方文件")
+    parser.add_argument("--data-only", action="store_true", help="Docker 仅迁移种子，不替换已有源码/TOML")
+    parser.add_argument("--validate-after-install", action="store_true", help="校验失败自动回退本次部署")
     args = parser.parse_args()
     if args.validate:
         validate(args.target)
     else:
-        if args.source is None:
+        if args.source is None and not args.data_only:
             parser.error("部署模式必须传入 --source")
-        install(args.source, args.target)
+        if args.data_only and args.data_source is None:
+            parser.error("--data-only 必须传入 --data-source")
+        install(
+            None if args.data_only else args.source, args.target,
+            data_source=args.data_source, validate_after=args.validate_after_install,
+        )
     return 0
 
 
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
+    except (OSError, ValueError, tomllib.TOMLDecodeError, subprocess.CalledProcessError) as error:
         print(f"[xiuxian3] 插件部署失败：{error}", file=sys.stderr)
         raise SystemExit(1)

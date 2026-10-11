@@ -263,7 +263,7 @@ release_urls() {
 }
 
 download_release_source() {
-    local work archive extract root url
+    local work archive extract root url candidate staged previous
     work=$(mktemp -d "${TMPDIR:-/tmp}/xiuxian3-release.XXXXXX")
     archive="$work/project.tar.gz"
     extract="$work/extract"
@@ -281,17 +281,33 @@ download_release_source() {
             log "资产不是有效的 project.tar.gz，尝试下一个地址" >&2
             continue
         fi
-        root=$(find "$extract" -mindepth 1 -maxdepth 3 -type f -name pyproject.toml -print -quit)
-        [ -n "$root" ] || { log "资产缺少 pyproject.toml，尝试下一个地址" >&2; continue; }
-        root=${root%/pyproject.toml}
+        root=""
+        for candidate in "$extract" "$extract"/*/; do
+            if [ -f "$candidate/pyproject.toml" ] && [ -f "$candidate/scripts/install.sh" ] \
+                && [ -f "$candidate/nonebot_plugin_xiuxian_3/__init__.py" ]; then
+                root=$candidate
+                break
+            fi
+        done
+        [ -n "$root" ] || { log "资产缺少完整项目根目录，尝试下一个地址" >&2; continue; }
         if [ -e "$SOURCE" ] && [ ! -f "$SOURCE/.xiuxian3-release" ]; then
             rm -rf "$work"
             fail "源码目录已存在且不是 Release 管理目录：$SOURCE；如需开发源码请使用 --source-mode source"
         fi
-        rm -rf "$SOURCE"
-        mkdir -p "$SOURCE"
-        cp -R "$root"/. "$SOURCE"/
-        printf '%s\n' "$url" > "$SOURCE/.xiuxian3-release"
+        staged=$(mktemp -d "$(dirname "$SOURCE")/.xiuxian3-release.new.XXXXXX")
+        if ! cp -R "$root"/. "$staged"/; then
+            rm -rf "$staged" "$work"
+            fail "Release 缓存复制失败；保留已有源码缓存"
+        fi
+        printf '%s\n' "$url" > "$staged/.xiuxian3-release"
+        previous="$staged.previous"
+        [ ! -e "$SOURCE" ] || mv "$SOURCE" "$previous"
+        if ! mv "$staged" "$SOURCE"; then
+            [ ! -e "$previous" ] || mv "$previous" "$SOURCE"
+            rm -rf "$staged" "$work"
+            fail "Release 缓存切换失败；已恢复原缓存"
+        fi
+        rm -rf "$previous"
         log "已准备 Release 源码：$SOURCE"
         rm -rf "$work"
         return 0

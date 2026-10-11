@@ -16,7 +16,7 @@ function Show-Usage {
   --run               安装并立即执行 nb run
   -h, --help          显示帮助
 
-脚本不会删除目标目录，不会覆盖已有宿主配置或 data\*.json。
+脚本保留宿主和用户数据；已知旧官方种子备份后迁移，自定义冲突报错并回退。
 "@
 }
 
@@ -229,10 +229,6 @@ try {
     Copy-IfMissing (Join-Path $Root "examples\nonebot\bot.py") (Join-Path $Target "bot.py")
     Copy-IfMissing (Join-Path $Root "examples\nonebot\pyproject.toml") (Join-Path $Target "pyproject.toml")
     Copy-IfMissing (Join-Path $Root "examples\nonebot\.env.example") (Join-Path $Target ".env")
-    Write-Host "[xiuxian3] 将插件源码部署到宿主 src/plugins"
-    & $VenvPython (Join-Path $Root "scripts\install_plugin_source.py") --source (Join-Path $Root "nonebot_plugin_xiuxian_3") --target $Target
-    if ($LASTEXITCODE -ne 0) { Stop-Install "部署宿主插件源码失败" }
-
     Write-Host "[xiuxian3] 从 requirements.txt 安装 nb-cli"
     Invoke-Retry { & $VenvPython -m pip install --upgrade --index-url $IndexUrl -r (Join-Path $Root "requirements.txt") } "nb-cli 安装"
     $env:PIP_INDEX_URL = $IndexUrl
@@ -258,16 +254,21 @@ try {
         } $Description
     }
 
-    & $VenvPython -c "import importlib.metadata; importlib.metadata.distribution('nonebot-plugin-xiuxian-3')" *> $null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "[xiuxian3] 移除旧的 venv 插件发行包，改由宿主 src/plugins 加载"
+    & $VenvPython -c "import importlib.metadata, nonebot, nonebot.adapters.qq, nonebot.adapters.onebot.v11; importlib.metadata.version('nb-cli')"
+    if ($LASTEXITCODE -ne 0) { Stop-Install "运行依赖校验失败" }
+    & $VenvNb --help *> $null
+    if ($LASTEXITCODE -ne 0) { Stop-Install "nb 命令未安装：$VenvNb" }
+    Write-Host "[xiuxian3] 事务部署源码与官方种子（失败自动回退）"
+    & $VenvPython (Join-Path $Root "scripts\install_plugin_source.py") --source (Join-Path $Root "nonebot_plugin_xiuxian_3") --target $Target --data-source (Join-Path $Root "data") --validate-after-install
+    if ($LASTEXITCODE -ne 0) { Stop-Install "部署失败；原源码与种子已回退，自定义冲突须人工合并" }
+    Push-Location $Target
+    try {
+        & $VenvPython -c "import importlib.metadata; importlib.metadata.distribution('nonebot-plugin-xiuxian-3')" *> $null
+        $HasOldDistribution = $LASTEXITCODE -eq 0
+    } finally { Pop-Location }
+    if ($HasOldDistribution) {
+        Write-Host "[xiuxian3] 源码验载成功后移除旧的 venv 插件发行包"
         Invoke-Retry { & $VenvPython -m pip uninstall --yes nonebot-plugin-xiuxian-3 } "移除旧插件发行包"
-    }
-
-    $DataRoot = Join-Path $Root "data"
-    Get-ChildItem $DataRoot -Recurse -File -Filter *.json | ForEach-Object {
-        $Relative = $_.FullName.Substring($DataRoot.Length).TrimStart("\", "/")
-        Copy-IfMissing $_.FullName (Join-Path (Join-Path $Target "data") $Relative)
     }
 
     New-Item -ItemType Directory -Force -Path (Join-Path $Target ".xiuxian3") | Out-Null
@@ -289,17 +290,8 @@ exit `$LASTEXITCODE
     Write-Host "[xiuxian3] 校验已安装包、NoneBot 入口和 JSON 内容"
     & $VenvPython -c "import importlib.metadata, nonebot, nonebot.adapters.qq, nonebot.adapters.onebot.v11; importlib.metadata.version('nb-cli')"
     if ($LASTEXITCODE -ne 0) { Stop-Install "插件导入校验失败" }
-    & $VenvPython (Join-Path $Root "scripts\install_plugin_source.py") --validate --target $Target
-    if ($LASTEXITCODE -ne 0) { Stop-Install "NoneBot 未从宿主 src/plugins 加载插件" }
     & $VenvNb --help *> $null
     if ($LASTEXITCODE -ne 0) { Stop-Install "nb 命令未安装：$VenvNb" }
-    $JsonFiles = Get-ChildItem (Join-Path $Target "data") -Recurse -File -Filter *.json
-    if ($JsonFiles.Count -eq 0) { Stop-Install "data 目录没有 JSON 内容" }
-    foreach ($JsonFile in $JsonFiles) {
-        Get-Content -Raw -Encoding UTF8 $JsonFile.FullName | ConvertFrom-Json | Out-Null
-    }
-    Write-Host "已校验 $($JsonFiles.Count) 个 JSON 文件"
-
     if ($Start) {
         Set-Location $Target
         Write-Host "[xiuxian3] 启动宿主：nb run"

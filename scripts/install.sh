@@ -40,7 +40,7 @@ usage() {
   --yes               确认 uninstall，不删除共享虚拟环境
   -h, --help          显示帮助
 
-脚本不会删除目标目录，不会覆盖已有 bot.py、pyproject.toml、.env 或 data/*.json。
+脚本保留宿主和用户数据；已知旧官方种子备份后迁移，自定义冲突报错并回退。
 EOF
 }
 
@@ -270,10 +270,6 @@ copy_if_missing() {
 copy_if_missing "$ROOT/examples/nonebot/bot.py" "$TARGET/bot.py"
 copy_if_missing "$ROOT/examples/nonebot/pyproject.toml" "$TARGET/pyproject.toml"
 copy_if_missing "$ROOT/examples/nonebot/.env.example" "$TARGET/.env"
-log "将插件源码部署到宿主 src/plugins"
-"$PYTHON" "$ROOT/scripts/install_plugin_source.py" \
-    --source "$ROOT/nonebot_plugin_xiuxian_3" --target "$TARGET"
-
 log "从 requirements.txt 安装 nb-cli"
 retry "$VENV_PY" -m pip install --upgrade --index-url "$INDEX_URL" -r "$ROOT/requirements.txt" \
     || fail "nb-cli 安装失败。保留的宿主目录和虚拟环境可以直接重试。"
@@ -298,16 +294,20 @@ install_nb_component driver "HTTPX"
 install_nb_component driver "websockets"
 install_nb_component driver "AIOHTTP"
 
-if "$VENV_PY" -c 'import importlib.metadata; importlib.metadata.distribution("nonebot-plugin-xiuxian-3")' >/dev/null 2>&1; then
-    log "移除旧的 venv 插件发行包，改由宿主 src/plugins 加载"
+log "校验依赖后，事务部署源码与官方种子（失败自动回退）"
+"$VENV_PY" -c 'import importlib.metadata; import nonebot; import nonebot.adapters.qq; import nonebot.adapters.onebot.v11; importlib.metadata.version("nb-cli")'
+"$VENV_NB" --help >/dev/null 2>&1 || fail "nb 命令未安装：$VENV_NB"
+(
+    cd "$TARGET"
+    "$VENV_PY" "$ROOT/scripts/install_plugin_source.py" \
+        --source "$ROOT/nonebot_plugin_xiuxian_3" --target "$TARGET" \
+        --data-source "$ROOT/data" --validate-after-install
+)
+if (cd "$TARGET" && "$VENV_PY" -c 'import importlib.metadata; importlib.metadata.distribution("nonebot-plugin-xiuxian-3")') >/dev/null 2>&1; then
+    log "源码验载成功后移除旧的 venv 插件发行包"
     retry "$VENV_PY" -m pip uninstall --yes nonebot-plugin-xiuxian-3 \
-        || fail "无法移除旧插件发行包；宿主源码已保留，请检查 venv 后重试。"
+        || fail "源码验载已成功，但旧发行包卸载失败；请检查 venv 后重试。"
 fi
-
-while IFS= read -r -d '' source; do
-    relative="${source#"$ROOT/data/"}"
-    copy_if_missing "$source" "$TARGET/data/$relative"
-done < <(find "$ROOT/data" -type f -name '*.json' -print0)
 
 mkdir -p "$TARGET/.xiuxian3"
 cp "$ROOT/scripts/control.sh" "$TARGET/.xiuxian3/control.sh"
@@ -343,27 +343,8 @@ fi
 
 log "校验已安装包、NoneBot 入口和 JSON 内容"
 "$VENV_PY" -c 'import importlib.metadata; import nonebot; import nonebot.adapters.qq; import nonebot.adapters.onebot.v11; importlib.metadata.version("nb-cli")'
-(
-    cd "$TARGET"
-    "$VENV_PY" "$ROOT/scripts/install_plugin_source.py" --target "$TARGET" --validate
-)
 "$VENV_NB" --help >/dev/null 2>&1 \
     || fail "nb 命令未安装：$VENV_NB"
-"$VENV_PY" - "$TARGET/data" <<'PY'
-import json
-import pathlib
-import sys
-
-root = pathlib.Path(sys.argv[1])
-files = sorted(root.rglob("*.json"))
-if not files:
-    raise SystemExit("data 目录没有 JSON 内容")
-for path in files:
-    with path.open(encoding="utf-8") as handle:
-        json.load(handle)
-print(f"已校验 {len(files)} 个 JSON 文件")
-PY
-
 if ((START)); then
     log "启动宿主：cd $TARGET && $VENV_NB run"
     cd "$TARGET"

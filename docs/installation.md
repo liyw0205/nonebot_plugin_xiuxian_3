@@ -183,7 +183,7 @@ Windows：
 & .\xiu3.ps1 uninstall --yes
 ```
 
-Release 管理安装的 `xiu3 update` 会从 latest Release 获取 `project.tar.gz` 并更新程序文件，保留宿主 `.env`、SQLite、`data/`、`runtime/`、用户 JSON 和 venv。停止宿主后再备份，更新完成后重新启动：
+Release 管理安装的 `xiu3 update` 会从 latest Release 获取 `project.tar.gz` 并更新程序文件，保留宿主 `.env`、SQLite、`runtime/`、用户 JSON 和 venv。仅指纹匹配的旧官方 JSON 种子在备份后迁移，缺失种子补齐；自定义/未知 JSON 不覆盖。停止宿主后再备份，更新完成后重新启动：
 
 ```bash
 xiu3 stop
@@ -191,6 +191,8 @@ cp -a "$HOME/xiu3" "$HOME/xiu3.backup"
 xiu3 update
 xiu3 start
 ```
+
+源码/TOML/种子备份在 `.xiuxian3/backups/deploy-*`。全部保留 JSON 的语法与严格 NoneBot 验载在部署事务内完成，失败自动恢复本次替换；自定义内容冲突须人工合并后重试，不能删除校验。依赖准备先于部署事务，依赖版本不自动回退。旧插件 pip 包仅在新源码成功加载后卸载。
 
 源码模式不支持 `xiu3 update`；该命令要求 Release 管理安装并从 latest Release 获取 `project.tar.gz`。
 
