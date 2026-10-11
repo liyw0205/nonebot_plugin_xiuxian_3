@@ -1,6 +1,6 @@
 # 当前开发状态
 
-本文是当前工作队列、运行状态、发布进度和验收证据的唯一入口。更新日期：2026-10-11。
+本文是当前工作队列、运行状态、发布进度和验收证据的唯一入口。更新日期：2026-10-12。
 产品范围与规则见[完整内容开发总表](content-development.md)和领域合同；工程规则见
 [开发指南](development-guide.md)，测试触发条件见[测试策略](testing.md)。
 不得从历史切片、JSON 已存在或测试夹具推断玩家已可执行。
@@ -77,29 +77,24 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
-本轮有限任务已完成：Release 根目录识别与共享安全种子迁移/回退，修复提交
-`4aa182c8e07defc686f4ddf3cd500e97ebe21603` 已推送 main；v0.1.5 已正式发布，指定宿主已从 Release 更新并重启。
-当前 `develop` 正在收口 `chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关：
-正文、人物/场景、可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、
-幂等消费者已落地。受影响主线短测沿用本轮 `19 passed`、`lastfailed={}` 证据；不重跑全量，
-不扩展 travel/world，不重开 M9，不扩 84 关、PvP、支付或跨服。待本轮提交审查后普通合入 `main`。
-用户明确授权仅本次发布/指定宿主部署；未改玩法、其他实例、共享 `/root/myenv` 或用户凭据，
-未发送 QQ 测试消息，未运行全量/压测。详细记录见[本轮部署报告](deployment-20261011-v0.1.5.md)。
+本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
+可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
+沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，
+不扩 84 关、PvP、支付或跨服。提交 `cdc24ca9e573831f75a0e01f418436de45eb65ba` 已同步
+`main`、`develop` 与 `origin`，主线 CI `38151296495` 成功。
 
-- main CI `38137693167`、v0.1.5 工作流 `38137940871` 均成功；quality 3.11/3.12、install-smoke、release 全通过。
-  API 确认 latest=v0.1.5，`project.tar.gz` 为 2356337 字节；实际下载 SHA-256 与 API digest 一致：
-  `17a540fb4f748b2d8a13b9ae50adbb8a69c2fdd68fe1510c458eb258663e0748`。旧 tag 未移动/删除。
-- `/root/xiu3-qq-test-20261011` 使用自身 `.venv`，Release 归档更新成功；自动迁移 4 个已证实官方 JSON，
-  另 2 个未知基线按明确授权人工补 4 个灵米产出/14 个缺失 desc。原件及 diff 保存在
-  `.xiuxian3/backups/pre-v0.1.5-20261011`，自动事务备份为 `deploy-2fd189f00307460689384a5a4ac08287`。
-- 启动前 `.env`、bot.py、SQLite/WAL/SHM 字节未变；原 data 56 文件仅授权 6 JSON 改动，其余 50 文件不变。
-  53 JSON 均可解析，SQLite integrity=ok；启动后 `.env` 仍字节相同，SQLite integrity=ok。
-  宿主材料来源校验为 12 材料/17 来源/9 模式/29 配方消费者，战斗引用校验为 55 敌人/14 遭遇池/27 候选，均通过。
-- 实际 bot.py 验载路径为 `/root/xiu3-qq-test-20261011/src/plugins/nonebot_plugin_xiuxian_3/__init__.py`，
-  1 matcher/1 handler，重复注册 0；handler 模块为 `src.plugins.nonebot_plugin_xiuxian_3.adapters.nonebot`，
-  宿主 venv 无 xiu3 pip 发行包。首次普通后台启动未保活；随后 nohup/setsid 启动管理器后已持续运行：
-  PID 3480402（nb）/3480409（bot.py），`127.0.0.1:18094` 监听，QQ READY、Uvicorn 与 application startup complete，
-  当前启动日志 ERROR/Traceback 均 0。实例保持运行，不为文档收口停止它。
+- v0.1.6 已正式发布，Release 工作流 `38151749011` 成功；API 已确认 `project.tar.gz`，大小 2361948 bytes，
+  SHA-256 为 `3f66fc3430ab4f722a7adb35e23f2aa5e4053aa98b3ceb8276c0fd25ce2d70e2`，旧 tag 未移动/删除。
+- `/root/xiu3-qq-test-20261011` 已用自身 `.venv` 从 v0.1.6 Release 更新；直连下载超时后使用安装器既有的
+  已验证 Release 代理地址完成下载，未使用源码 git pull。停机备份为 `.xiuxian3/backups/pre-v0.1.6-20261011`，
+  自动事务备份为 `deploy-0050b13f13ee43ba99d87871a6348b02`；53 个 JSON 事务内解析通过，仅确证官方
+  `剧情/主线.json` 更新，未知/自定义 `奖励/奖励.json` 与 `战斗/遭遇池.json` 保留。
+- `.env`、WAL/SHM、用户 data 均保留；SQLite 当前与备份均 `integrity_check=ok`，200 张表及全部表行数一致。
+  宿主 venv 从宿主目录检查无 `nonebot-plugin-xiuxian-3` 发行包。
+- 实际加载路径为 `/root/xiu3-qq-test-20261011/src/plugins/nonebot_plugin_xiuxian_3/__init__.py`，
+  1 matcher/1 handler、重复注册 0；当前 `nb` PID 3587177、bot PID 3587184，
+  `127.0.0.1:18094` 监听，QQ READY、Uvicorn/application startup complete，当前日志无 ERROR/Traceback。
+  本次未发送真实 QQ 消息、未重跑全量/压测，QQ READY 仅证明连接与启动，不代表真机富消息呈现或权限验收。
 
 - `b79e28b` 的 main CI `38135461297`、v0.1.4 工作流 `38135669957` 的 quality 3.11/3.12、
   install-smoke/release 均成功；API 已确认 Release 与 `project.tar.gz`，资产 SHA-256
