@@ -1,0 +1,179 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "world_region",
+  "records": [
+    {
+      "key": "region.xuantian.qingshi",
+      "name": "青石镇与东郊",
+      "desc": "玄天界的起步区域，连接城镇、药圃、林地与灵泉。",
+      "world": "玄天界",
+      "status": "open",
+      "location_keys": [
+        "xuantian.new_town",
+        "xuantian.outskirts",
+        "xuantian.herb_vale",
+        "xuantian.ironwood_grove",
+        "xuantian.basalt_pass",
+        "xuantian.spirit_field",
+        "xuantian.sect_gate",
+        "xuantian.array_hall"
+      ],
+      "connections": [
+        {"from": "xuantian.new_town", "to": "xuantian.outskirts", "duration_seconds": 30, "stamina": 2, "spirit_stone": 0},
+        {"from": "xuantian.outskirts", "to": "xuantian.new_town", "duration_seconds": 30, "stamina": 2, "spirit_stone": 0},
+        {"from": "xuantian.outskirts", "to": "xuantian.herb_vale", "duration_seconds": 60, "stamina": 3, "spirit_stone": 0},
+        {"from": "xuantian.herb_vale", "to": "xuantian.outskirts", "duration_seconds": 60, "stamina": 3, "spirit_stone": 0},
+        {"from": "xuantian.outskirts", "to": "xuantian.ironwood_grove", "duration_seconds": 90, "stamina": 4, "spirit_stone": 0},
+        {"from": "xuantian.ironwood_grove", "to": "xuantian.outskirts", "duration_seconds": 90, "stamina": 4, "spirit_stone": 0},
+        {"from": "xuantian.outskirts", "to": "xuantian.basalt_pass", "duration_seconds": 120, "stamina": 5, "spirit_stone": 0},
+        {"from": "xuantian.basalt_pass", "to": "xuantian.outskirts", "duration_seconds": 120, "stamina": 5, "spirit_stone": 0},
+        {"from": "xuantian.new_town", "to": "xuantian.spirit_field", "duration_seconds": 90, "stamina": 4, "spirit_stone": 0},
+        {"from": "xuantian.spirit_field", "to": "xuantian.new_town", "duration_seconds": 90, "stamina": 4, "spirit_stone": 0},
+        {"from": "xuantian.new_town", "to": "xuantian.sect_gate", "duration_seconds": 60, "stamina": 3, "spirit_stone": 0},
+        {"from": "xuantian.sect_gate", "to": "xuantian.new_town", "duration_seconds": 60, "stamina": 3, "spirit_stone": 0},
+        {"from": "xuantian.sect_gate", "to": "xuantian.array_hall", "duration_seconds": 60, "stamina": 3, "spirit_stone": 0},
+        {"from": "xuantian.array_hall", "to": "xuantian.sect_gate", "duration_seconds": 60, "stamina": 3, "spirit_stone": 0}
+      ]
+    },
+    {
+      "key": "region.xuantian.cloud_range",
+      "name": "云城与浮舟岭",
+      "desc": "玄天界中层的坊市、矿脉与云舟航线。",
+      "world": "玄天界",
+      "status": "open",
+      "location_keys": ["xuantian.cloud_city", "xuantian.cloud_mine", "xuantian.floating_boat", "cave.mist_grotto_2"],
+      "connections": [
+        {"from": "xuantian.new_town", "to": "xuantian.cloud_city", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}]},
+        {"from": "xuantian.cloud_city", "to": "xuantian.new_town", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}]},
+        {"from": "xuantian.cloud_city", "to": "xuantian.cloud_mine", "duration_seconds": 120, "stamina": 6, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 1}]},
+        {"from": "xuantian.cloud_mine", "to": "xuantian.cloud_city", "duration_seconds": 120, "stamina": 6, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 1}]},
+        {"from": "xuantian.cloud_city", "to": "xuantian.floating_boat", "duration_seconds": 60, "stamina": 0, "spirit_stone": 500, "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 1}]},
+        {"from": "xuantian.floating_boat", "to": "xuantian.cloud_city", "duration_seconds": 60, "stamina": 0, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 1}]},
+        {"from": "xuantian.floating_boat", "to": "cave.mist_grotto_2", "duration_seconds": 180, "stamina": 15, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}]},
+        {"from": "cave.mist_grotto_2", "to": "xuantian.floating_boat", "duration_seconds": 180, "stamina": 15, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}]}
+      ]
+    },
+    {
+      "key": "region.cave.mist_grotto",
+      "name": "雾隐洞天",
+      "desc": "由入口与两层历练区域组成的玄天洞天。",
+      "world": "洞天",
+      "status": "open",
+      "location_keys": ["cave.mist_grotto", "cave.mist_grotto_2", "cave.ancient_domain"],
+      "connections": [
+        {"from": "xuantian.spirit_field", "to": "cave.mist_grotto", "duration_seconds": 120, "stamina": 5, "spirit_stone": 10, "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 4}, {"type": "item", "item_key": "item.cave_pass_basic", "quantity": 1}]},
+        {"from": "cave.mist_grotto", "to": "xuantian.spirit_field", "duration_seconds": 120, "stamina": 5, "spirit_stone": 0},
+        {"from": "cave.mist_grotto", "to": "cave.mist_grotto_2", "duration_seconds": 180, "stamina": 15, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}, {"type": "item", "item_key": "item.cave_pass_advanced", "quantity": 1}]},
+        {"from": "cave.mist_grotto_2", "to": "cave.mist_grotto", "duration_seconds": 180, "stamina": 15, "spirit_stone": 0},
+        {"from": "cave.mist_grotto_2", "to": "cave.ancient_domain", "duration_seconds": 300, "stamina": 20, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}]},
+        {"from": "cave.ancient_domain", "to": "cave.mist_grotto_2", "duration_seconds": 300, "stamina": 20, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}]}
+      ]
+    },
+    {
+      "key": "region.demon.abyss",
+      "name": "魔界深渊边境",
+      "desc": "从深渊门到集市与废墟的魔界边境区域。",
+      "world": "魔界",
+      "status": "open",
+      "location_keys": ["demon.abyss_gate", "demon.fallen_ruins", "demon.abyss_market", "demon.abyss_depths"],
+      "connections": [
+        {"from": "xuantian.floating_boat", "to": "demon.abyss_gate", "duration_seconds": 120, "stamina": 10, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 1}]},
+        {"from": "demon.abyss_gate", "to": "xuantian.floating_boat", "duration_seconds": 120, "stamina": 10, "spirit_stone": 0},
+        {"from": "demon.abyss_gate", "to": "demon.fallen_ruins", "duration_seconds": 480, "stamina": 20, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}]},
+        {"from": "demon.fallen_ruins", "to": "demon.abyss_gate", "duration_seconds": 480, "stamina": 20, "spirit_stone": 0},
+        {"from": "demon.abyss_gate", "to": "demon.abyss_market", "duration_seconds": 300, "stamina": 12, "spirit_stone": 500, "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}, {"type": "faction_reputation", "faction": "demon", "minimum": 200}]},
+        {"from": "demon.abyss_market", "to": "demon.abyss_gate", "duration_seconds": 300, "stamina": 12, "spirit_stone": 0},
+        {"from": "demon.fallen_ruins", "to": "demon.abyss_depths", "duration_seconds": 600, "stamina": 25, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}]},
+        {"from": "demon.abyss_depths", "to": "demon.fallen_ruins", "duration_seconds": 600, "stamina": 25, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}]}
+      ]
+    },
+    {
+      "key": "region.beast.ten_thousand_hills",
+      "name": "万兽山与祖灵湖",
+      "desc": "妖界的山地栖地、贸易口与祖灵湖。",
+      "world": "妖界",
+      "status": "open",
+      "location_keys": ["beast.ten_thousand_hills", "beast.three_realms_trade_port", "beast.ancestral_lake"],
+      "connections": [
+        {"from": "xuantian.floating_boat", "to": "beast.ten_thousand_hills", "duration_seconds": 300, "stamina": 12, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}, {"type": "faction_reputation", "faction": "beast", "minimum": 200}]},
+        {"from": "beast.ten_thousand_hills", "to": "xuantian.floating_boat", "duration_seconds": 300, "stamina": 12, "spirit_stone": 0},
+        {"from": "beast.ten_thousand_hills", "to": "beast.three_realms_trade_port", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0},
+        {"from": "beast.three_realms_trade_port", "to": "beast.ten_thousand_hills", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0},
+        {"from": "beast.ten_thousand_hills", "to": "beast.ancestral_lake", "duration_seconds": 600, "stamina": 25, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "faction_reputation", "faction": "beast", "minimum": 3000}]},
+        {"from": "beast.ancestral_lake", "to": "beast.ten_thousand_hills", "duration_seconds": 600, "stamina": 25, "spirit_stone": 0}
+      ]
+    },
+    {
+      "key": "region.xuantian.domain_front",
+      "name": "三界边境",
+      "desc": "领域前线、战线与界隙的公开历练区域。",
+      "world": "三界",
+      "status": "open",
+      "location_keys": ["xuantian.domain_front", "xuantian.war_front", "cave.boundary_realm"],
+      "connections": [
+        {"from": "xuantian.new_town", "to": "xuantian.domain_front", "duration_seconds": 300, "stamina": 20, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}]},
+        {"from": "xuantian.domain_front", "to": "xuantian.new_town", "duration_seconds": 300, "stamina": 20, "spirit_stone": 0},
+        {"from": "xuantian.new_town", "to": "xuantian.war_front", "duration_seconds": 300, "stamina": 15, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}]},
+        {"from": "xuantian.war_front", "to": "xuantian.new_town", "duration_seconds": 300, "stamina": 15, "spirit_stone": 0},
+        {"from": "xuantian.war_front", "to": "cave.boundary_realm", "duration_seconds": 600, "stamina": 30, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}]},
+        {"from": "cave.boundary_realm", "to": "xuantian.war_front", "duration_seconds": 600, "stamina": 30, "spirit_stone": 0}
+      ]
+    },
+    {
+      "key": "region.void.archive",
+      "name": "虚空档案航道",
+      "desc": "连接虚空门户、航道、档案遗迹与时序福地的探索区域。",
+      "world": "虚空",
+      "status": "open",
+      "location_keys": ["void.portal", "void.first_route", "void.archive_ruins", "cave.time_garden"],
+      "connections": [
+        {"from": "cave.boundary_realm", "to": "void.portal", "duration_seconds": 300, "stamina": 10, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}]},
+        {"from": "void.portal", "to": "cave.boundary_realm", "duration_seconds": 300, "stamina": 10, "spirit_stone": 0},
+        {"from": "void.portal", "to": "void.first_route", "duration_seconds": 300, "stamina": 12, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}]},
+        {"from": "void.first_route", "to": "void.portal", "duration_seconds": 300, "stamina": 12, "spirit_stone": 0},
+        {"from": "void.first_route", "to": "void.archive_ruins", "duration_seconds": 600, "stamina": 20, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}]},
+        {"from": "void.archive_ruins", "to": "void.first_route", "duration_seconds": 600, "stamina": 20, "spirit_stone": 0},
+        {"from": "void.archive_ruins", "to": "cave.time_garden", "duration_seconds": 900, "stamina": 25, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 5}]},
+        {"from": "cave.time_garden", "to": "void.archive_ruins", "duration_seconds": 900, "stamina": 25, "spirit_stone": 0}
+      ]
+    },
+    {
+      "key": "region.dao.origin",
+      "name": "道源门",
+      "desc": "合道后开放的道统服务与道源门。",
+      "world": "终局",
+      "status": "open",
+      "location_keys": ["dao_service", "dao.origin_gate"],
+      "connections": [
+        {"from": "void.archive_ruins", "to": "dao.origin_gate", "duration_seconds": 3600, "stamina": 20, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "dao_union", "min_layer": 6}, {"type": "item", "item_key": "item.dao_fruit_fragment", "quantity": 2}]},
+        {"from": "dao.origin_gate", "to": "void.archive_ruins", "duration_seconds": 3600, "stamina": 20, "spirit_stone": 0},
+        {"from": "dao.origin_gate", "to": "dao_service", "duration_seconds": 1800, "stamina": 10, "spirit_stone": 0},
+        {"from": "dao_service", "to": "dao.origin_gate", "duration_seconds": 1800, "stamina": 10, "spirit_stone": 0}
+      ]
+    },
+    {
+      "key": "region.tribulation.sky",
+      "name": "天劫台",
+      "desc": "渡劫修士准备并承受天劫的终局地点。",
+      "world": "终局",
+      "status": "open",
+      "location_keys": ["tribulation.sky_terrace"],
+      "connections": [
+        {"from": "dao.origin_gate", "to": "tribulation.sky_terrace", "duration_seconds": 1800, "stamina": 0, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}, {"type": "item", "item_key": "item.tribulation_token", "quantity": 1}]},
+        {"from": "tribulation.sky_terrace", "to": "dao.origin_gate", "duration_seconds": 1800, "stamina": 0, "spirit_stone": 0}
+      ]
+    },
+    {
+      "key": "region.ascension.endings",
+      "name": "飞升与留界",
+      "desc": "渡劫结局各自对应的归宿地点，不是可自由进出的跨服地图。",
+      "world": "终局",
+      "status": "active",
+      "location_keys": ["ascension.heaven_path", "ascension.left_world_hall"],
+      "connections": [
+        {"from": "tribulation.sky_terrace", "to": "ascension.heaven_path", "duration_seconds": 5400, "stamina": 0, "spirit_stone": 0, "requirements": [{"type": "endgame_status", "value": "ascension_ready"}]},
+        {"from": "ascension.heaven_path", "to": "tribulation.sky_terrace", "duration_seconds": 5400, "stamina": 0, "spirit_stone": 0, "requirements": [{"type": "endgame_status", "value": "ascension_ready"}]}
+      ]
+    }
+  ]
+}

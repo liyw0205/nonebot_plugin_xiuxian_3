@@ -56,11 +56,16 @@ class ContentBundle:
                     raise ContentError(f"duplicate content key {kind}:{row['key']}")
                 records[identity] = copy.deepcopy(row)
 
-        return cls(
+        bundle = cls(
             root=root,
             manifest=copy.deepcopy(manifest),
             _records=records,
         )
+        if any(kind == "world_region" for kind, _ in records):
+            from .world_content import validate_world_content
+
+            validate_world_content(bundle)
+        return bundle
 
     @classmethod
     def load_optional(cls, data_dir: str | Path) -> "ContentBundle | None":

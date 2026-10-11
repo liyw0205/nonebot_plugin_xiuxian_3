@@ -4,21 +4,25 @@ param(
     [string]$Target = (Join-Path $HOME "xiu3"),
     [string]$Mirror = "",
     [string]$MirrorUrl = "",
-    [string]$Source = (Join-Path $HOME ".local\share\xiuxian3\source")
+    [string]$Source = (Join-Path $HOME ".local\share\xiuxian3\source"),
+    [ValidateSet("auto", "release", "source")]
+    [string]$SourceMode = "auto"
 )
 
 $ErrorActionPreference = "Stop"
 $Repository = "https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
+$ReleaseArchive = "https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
+$ReleaseMirrors = @(
+    "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz",
+    "https://ghfast.top/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz",
+    "https://ghproxy.vip/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz",
+    "https://gh-proxy.org/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
+)
 $AcceleratedRepositories = @(
     [PSCustomObject]@{
         Name = "gh-proxy.com"
         Repository = "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
         Probe = "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
-    },
-    [PSCustomObject]@{
-        Name = "ghproxy.net"
-        Repository = "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
-        Probe = "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
     },
     [PSCustomObject]@{
         Name = "ghfast.top"
@@ -127,6 +131,15 @@ function Get-FastestProxyRepository {
 }
 
 function Update-Source {
+    if ($SourceMode -eq "release" -or (-not (Test-Path (Join-Path $PSScriptRoot "..\pyproject.toml")))) {
+        Download-ReleaseSource
+        return
+    }
+    $localRoot = (Resolve-Path (Join-Path $PSScriptRoot ".." )).Path
+    if (Test-Path (Join-Path $localRoot "pyproject.toml")) {
+        $script:Source = $localRoot
+        return
+    }
     if (Test-Path (Join-Path $Source ".git")) {
         if ($Action -eq "update") {
             $dirty = & git -C $Source status --porcelain
@@ -167,6 +180,55 @@ function Update-Source {
         }
     }
     if ($LASTEXITCODE -ne 0) { throw "仓库下载失败；请更换下载方式或使用 -MirrorUrl。" }
+}
+
+function Get-ReleaseUrls {
+    switch ($Mirror) {
+        "direct" { return @($ReleaseArchive) }
+        "accelerated" { return @($ReleaseMirrors + $ReleaseArchive) }
+        "custom" {
+            if (-not $MirrorUrl) { throw "custom 模式需要 -MirrorUrl" }
+            return @($MirrorUrl)
+        }
+        default { return @($ReleaseMirrors + $ReleaseArchive) }
+    }
+}
+
+function Download-ReleaseSource {
+    $work = Join-Path ([IO.Path]::GetTempPath()) ("xiuxian3-release-" + [guid]::NewGuid().ToString("N"))
+    $archive = Join-Path $work "project.tar.gz"
+    $extract = Join-Path $work "extract"
+    New-Item -ItemType Directory -Force -Path $extract | Out-Null
+    try {
+        foreach ($url in (Get-ReleaseUrls)) {
+            Write-Info "下载 Release 资产：$url"
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing -TimeoutSec 180
+                & tar -xzf $archive -C $extract
+                if ($LASTEXITCODE -ne 0) { throw "tar 解包失败" }
+                $project = Get-ChildItem $extract -Recurse -Filter pyproject.toml -File | Select-Object -First 1
+                if ($null -eq $project) { throw "资产缺少 pyproject.toml" }
+                if ((Test-Path $Source) -and -not (Test-Path (Join-Path $Source ".xiuxian3-release"))) {
+                    throw "源码目录已存在且不是 Release 管理目录：$Source；如需开发源码请使用 -SourceMode source"
+                }
+                if (Test-Path $Source) { Remove-Item -Recurse -Force $Source }
+                New-Item -ItemType Directory -Force -Path $Source | Out-Null
+                Copy-Item (Join-Path $project.Directory.FullName "*") $Source -Recurse -Force
+                Set-Content -Path (Join-Path $Source ".xiuxian3-release") -Value $url -Encoding UTF8
+                Write-Info "已准备 Release 源码：$Source"
+                return
+            } catch {
+                Write-Warning "Release 下载失败：$($_.Exception.Message)；尝试下一个地址"
+                if (Test-Path $extract) {
+                    Remove-Item -Recurse -Force $extract
+                    New-Item -ItemType Directory -Force -Path $extract | Out-Null
+                }
+            }
+        }
+        throw "无法获取有效的 project.tar.gz；代理失败后直连也不可用，请稍后重试或使用 -SourceMode source。"
+    } finally {
+        if (Test-Path $work) { Remove-Item -Recurse -Force $work }
+    }
 }
 
 try {

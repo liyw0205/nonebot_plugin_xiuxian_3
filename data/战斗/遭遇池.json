@@ -1,0 +1,20 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "encounter_pool",
+  "records": [
+    {"key": "encounter.xuantian.outskirts", "name": "近郊常见遭遇", "desc": "近郊草坡间出没的常见小兽。", "status": "active", "candidates": [{"enemy_key": "enemy.wood_rat", "weight": 70}, {"enemy_key": "enemy.iron_boar", "weight": 30}]},
+    {"key": "encounter.xuantian.ironwood", "name": "铁木林遭遇", "desc": "铁木林中守护林材与山径的野兽。", "status": "active", "candidates": [{"enemy_key": "enemy.wood_rat", "weight": 45}, {"enemy_key": "enemy.iron_boar", "weight": 45}, {"enemy_key": "enemy.ironwood_weasel", "weight": 10}]},
+    {"key": "encounter.xuantian.basalt_pass", "name": "玄武岩径遭遇", "desc": "玄武岩径的掘兽与守径阵偶。", "status": "active", "candidates": [{"enemy_key": "enemy.basalt_mole", "weight": 65}, {"enemy_key": "enemy.array_golem", "weight": 35}]},
+    {"key": "encounter.cave.mist_grotto", "name": "洞天一层遭遇", "desc": "雾隐洞天一层的守卫与雾灵。", "status": "active", "candidates": [{"enemy_key": "enemy.mist_guardian", "weight": 70}, {"enemy_key": "enemy.mist_wisp", "weight": 30}]},
+    {"key": "encounter.cloud_mine", "name": "云铁矿区遭遇", "desc": "云铁矿脉中的矿兽与残魂。", "status": "active", "candidates": [{"enemy_key": "enemy.cloud_beast", "weight": 75}, {"enemy_key": "enemy.cloud_miner_ghost", "weight": 25}]},
+    {"key": "encounter.cave.mist_grotto_2", "name": "洞天二层遭遇", "desc": "雾隐洞天二层的精英巡守。", "status": "active", "candidates": [{"enemy_key": "enemy.mist_elite", "weight": 60}, {"enemy_key": "enemy.cave_depth_stalker", "weight": 40}]},
+    {"key": "encounter.demon.fallen_ruins", "name": "堕落遗迹遭遇", "desc": "堕落遗迹残门附近的巡行者与缚魂卫。", "status": "active", "candidates": [{"enemy_key": "enemy.demon_ruins_scout", "weight": 70}, {"enemy_key": "enemy.demon_ruins_warden", "weight": 30}]},
+    {"key": "encounter.beast.ten_thousand_hills", "name": "万兽山遭遇", "desc": "万兽山外围的守山兽与潜猎兽。", "status": "active", "candidates": [{"enemy_key": "enemy.beast_guardian", "weight": 65}, {"enemy_key": "enemy.beast_stalker", "weight": 35}]},
+    {"key": "encounter.beast.ancestral_lake", "name": "祖灵湖遭遇", "desc": "祖灵湖畔凝聚的灵影与镇守者。", "status": "active", "candidates": [{"enemy_key": "enemy.ancestral_spirit", "weight": 75}, {"enemy_key": "enemy.lake_warden", "weight": 25}]},
+    {"key": "encounter.boundary_rift", "name": "界隙遭遇", "desc": "界隙边缘巡守三界盟约的修士。", "status": "active", "candidates": [{"enemy_key": "enemy.boundary_watcher", "weight": 70}, {"enemy_key": "enemy.cross_realm_sentinel", "weight": 30}]},
+    {"key": "encounter.void.first_route", "name": "虚空航道遭遇", "desc": "虚空航道中回荡的规则回声。", "status": "active", "candidates": [{"enemy_key": "enemy.void_route_echo", "weight": 60}, {"enemy_key": "enemy.archive_keeper", "weight": 40}]},
+    {"key": "encounter.void.archive_ruins", "name": "档案遗迹遭遇", "desc": "档案遗迹中守护旧律的残影。", "status": "active", "candidates": [{"enemy_key": "enemy.void_ruins_sentinel", "weight": 65}, {"enemy_key": "enemy.archive_keeper", "weight": 35}]},
+    {"key": "encounter.dao.origin_gate", "name": "道源门试炼遭遇", "desc": "道源门前检验道心的镇关人。", "status": "active", "candidates": [{"enemy_key": "enemy.dao_gatekeeper", "weight": 100}]},
+    {"key": "encounter.tribulation.sky_terrace", "name": "天劫回音遭遇", "desc": "渡劫台上凝成的天劫回音。", "status": "active", "candidates": [{"enemy_key": "enemy.tribulation_heaven", "weight": 100}]}
+  ]
+}

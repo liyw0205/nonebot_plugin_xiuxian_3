@@ -135,6 +135,12 @@ resume_process() {
 
 update() {
     if [ -n "$SOURCE_ROOT" ] && [ -x "$SOURCE_ROOT/scripts/install.sh" ]; then
+        if [ -f "$SOURCE_ROOT/.xiuxian3-release" ] && [ -x "$SOURCE_ROOT/scripts/onekey.sh" ]; then
+            # Release installs refresh the immutable source cache from the
+            # latest project.tar.gz before reinstalling the preserved host.
+            exec "$SOURCE_ROOT/scripts/onekey.sh" update "$TARGET" \
+                --source "$SOURCE_ROOT" --source-mode release --venv "$VENV"
+        fi
         if [ -d "$SOURCE_ROOT/.git" ]; then
             [ -z "$(git -C "$SOURCE_ROOT" status --porcelain)" ] || {
                 printf '[xiu3] 源码目录有未提交改动，先提交或备份后再更新：%s\n' "$SOURCE_ROOT" >&2

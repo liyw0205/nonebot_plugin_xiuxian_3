@@ -474,13 +474,13 @@
     },
     {
       "name": "灵泉采集奖励池",
-      "desc": "沿灵泉谷采得灵叶与清冽泉水，也有机会寻到阵砂。",
+      "desc": "沿灵泉谷采得灵叶、清冽泉水和田边灵米，也有机会寻到阵砂。",
       "pool_type": "weighted",
       "outcomes": [
-        {"weight": 3600, "rewards": {"item.herb.spirit_leaf": 1, "item.spirit_water": 1}},
-        {"weight": 2400, "rewards": {"item.herb.spirit_leaf": 1, "item.mat.array_sand": 1, "item.spirit_water": 1}},
-        {"weight": 2400, "rewards": {"item.herb.spirit_leaf": 2, "item.spirit_water": 1}},
-        {"weight": 1600, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 1, "item.spirit_water": 1}}
+        {"weight": 3600, "rewards": {"item.herb.spirit_leaf": 1, "item.spirit_water": 1, "item.food.coarse_spirit_rice": 1}},
+        {"weight": 2400, "rewards": {"item.herb.spirit_leaf": 1, "item.mat.array_sand": 1, "item.spirit_water": 1, "item.food.coarse_spirit_rice": 1}},
+        {"weight": 2400, "rewards": {"item.herb.spirit_leaf": 2, "item.spirit_water": 1, "item.food.coarse_spirit_rice": 1}},
+        {"weight": 1600, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 1, "item.spirit_water": 1, "item.food.coarse_spirit_rice": 1}}
       ],
       "key": "reward_pool.exploration.spring_gather",
       "status": "active"
@@ -1420,6 +1420,78 @@
       ],
       "status": "active",
       "key": "reward.event.archive.fragment.gamma"
+    },
+    {
+      "name": "早期野兽掉落",
+      "desc": "林地与近郊常见野兽的材料掉落池。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.herb.blood_grass": 1, "spirit_stones": 8}},
+        {"weight": 3, "rewards": {"item.ore.ironstone": 1, "spirit_stones": 12}},
+        {"weight": 2, "rewards": {"item.mat.wood": 2, "spirit_stones": 14}}
+      ],
+      "key": "reward_pool.enemy.early",
+      "status": "active"
+    },
+    {
+      "name": "洞天守卫掉落",
+      "desc": "洞天妖兽留下的雾隐核心与阵材。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.material.mist_core": 1, "spirit_stones": 40}},
+        {"weight": 3, "rewards": {"item.mat.array_sand": 2, "spirit_stones": 55}},
+        {"weight": 2, "rewards": {"item.material.mist_core": 2, "spirit_stones": 65}}
+      ],
+      "key": "reward_pool.enemy.mist",
+      "status": "active"
+    },
+    {
+      "name": "云铁矿区守卫掉落",
+      "desc": "矿区生灵与残魂留下的云铁及矿材。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.material.cloud_iron": 1, "spirit_stones": 75}},
+        {"weight": 3, "rewards": {"item.ore.ironstone": 3, "spirit_stones": 90}},
+        {"weight": 2, "rewards": {"item.material.cloud_iron": 2, "spirit_stones": 110}}
+      ],
+      "key": "reward_pool.enemy.cloud_mine",
+      "status": "active"
+    },
+    {
+      "name": "三界精英掉落",
+      "desc": "三界高阶遭遇的稀有材料池。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.demon_core": 1, "spirit_stones": 130}},
+        {"weight": 3, "rewards": {"item.beast_blood": 1, "spirit_stones": 160}},
+        {"weight": 2, "rewards": {"item.domain_core_fragment": 1, "spirit_stones": 190}}
+      ],
+      "key": "reward_pool.enemy.three_realms",
+      "status": "active"
+    },
+    {
+      "name": "虚空遭遇掉落",
+      "desc": "虚空守卫与航道异象掉落的锚、晶体与档案碎片。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.void_anchor": 1, "item.archive_fragment.alpha": 1}},
+        {"weight": 3, "rewards": {"item.void_crystal": 1, "item.archive_fragment.beta": 1}},
+        {"weight": 2, "rewards": {"item.void_archive": 1, "item.archive_fragment.gamma": 1}}
+      ],
+      "key": "reward_pool.enemy.void",
+      "status": "active"
+    },
+    {
+      "name": "道源终局掉落",
+      "desc": "终局道源守卫留下的道果材料。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.dao_fruit_fragment": 2, "spirit_stones": 500}},
+        {"weight": 3, "rewards": {"item.dao_fruit_fragment": 3, "spirit_stones": 700}},
+        {"weight": 2, "rewards": {"item.dao_fruit_fragment": 4, "spirit_stones": 900}}
+      ],
+      "key": "reward_pool.enemy.dao_origin",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

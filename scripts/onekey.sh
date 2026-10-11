@@ -3,16 +3,21 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 REPOSITORY="https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
+RELEASE_ARCHIVE="https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
+RELEASE_MIRRORS=(
+    "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
+    "https://ghfast.top/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
+    "https://ghproxy.vip/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
+    "https://gh-proxy.org/https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
+)
 ACCELERATED_REPOSITORIES=(
     "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
-    "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
     "https://ghfast.top/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
     "https://ghproxy.vip/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
     "https://gh-proxy.org/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
 )
 ACCELERATED_PROBES=(
     "https://gh-proxy.com/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
-    "https://ghproxy.net/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
     "https://ghfast.top/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
     "https://ghproxy.vip/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
     "https://gh-proxy.org/https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git/info/refs?service=git-upload-pack"
@@ -24,6 +29,7 @@ SOURCE="${XIUXIAN3_SOURCE_DIR:-$HOME/.local/share/xiuxian3/source}"
 VENV="${VENV_PATH:-$HOME/myenv}"
 MIRROR=""
 MIRROR_URL=""
+SOURCE_MODE="${XIUXIAN3_SOURCE_MODE:-auto}"
 INDEX_URL="${PIP_INDEX_URL:-$TUNA_INDEX}"
 YES=0
 
@@ -39,7 +45,8 @@ usage() {
   --source PATH       插件源码目录（默认 $HOME/.local/share/xiuxian3/source）
   --venv PATH         Python 虚拟环境（默认 $HOME/myenv）
   --mirror MODE       direct、accelerated 或 custom
-  --mirror-url URL    自定义 Git 仓库克隆地址
+  --mirror-url URL    自定义 Release 归档 URL（source 模式为 Git 地址）
+  --source-mode MODE  auto、release 或 source；默认本地源码、远程 Release
   --index-url URL     pip 镜像（默认清华源）
   --yes               确认卸载宿主目录及其中的数据
   -h, --help          显示帮助
@@ -55,7 +62,7 @@ fi
 
 while (($#)); do
     case "$1" in
-        --target|--source|--venv|--mirror|--mirror-url|--index-url)
+        --target|--source|--venv|--mirror|--mirror-url|--index-url|--source-mode)
             (($# >= 2)) || fail "$1 需要一个值"
             key=$1
             value=$2
@@ -66,6 +73,7 @@ while (($#)); do
                 --mirror) MIRROR=$value ;;
                 --mirror-url) MIRROR_URL=$value ;;
                 --index-url) INDEX_URL=$value ;;
+                --source-mode) SOURCE_MODE=$value ;;
             esac
             shift 2
             ;;
@@ -225,22 +233,58 @@ select_fastest_proxy() {
     printf '%s\n' "$best_url"
 }
 
-ensure_source() {
-    local script_path=${BASH_SOURCE[0]}
-    local local_root=""
-    if [[ "$script_path" != /dev/* && -f "$script_path" ]]; then
-        local_root="$(cd "$(dirname "$script_path")/.." && pwd -P)"
-        [ -f "$local_root/pyproject.toml" ] || local_root=""
-    fi
-    if [ -n "$local_root" ]; then
-        SOURCE=$local_root
-        return
-    fi
+release_urls() {
+    case "$MIRROR" in
+        direct) printf '%s\n' "$RELEASE_ARCHIVE" ;;
+        accelerated|"") printf '%s\n' "${RELEASE_MIRRORS[@]}"; printf '%s\n' "$RELEASE_ARCHIVE" ;;
+        custom) [ -n "$MIRROR_URL" ] || fail "custom 模式需要 --mirror-url"; printf '%s\n' "$MIRROR_URL" ;;
+        *) fail "不支持的仓库下载方式：$MIRROR" ;;
+    esac
+}
 
+download_release_source() {
+    local work archive extract root url
+    work=$(mktemp -d "${TMPDIR:-/tmp}/xiuxian3-release.XXXXXX")
+    archive="$work/project.tar.gz"
+    extract="$work/extract"
+    mkdir -p "$extract"
+    while IFS= read -r url; do
+        log "下载 Release 资产：$url"
+        if ! curl --fail --location --retry 2 --connect-timeout 8 --max-time 180 \
+            --proto '=https' --proto-redir '=https' "$url" -o "$archive"; then
+            log "下载失败，尝试下一个地址" >&2
+            continue
+        fi
+        rm -rf "$extract"
+        mkdir -p "$extract"
+        if ! tar -xzf "$archive" -C "$extract" 2>/dev/null; then
+            log "资产不是有效的 project.tar.gz，尝试下一个地址" >&2
+            continue
+        fi
+        root=$(find "$extract" -mindepth 1 -maxdepth 3 -type f -name pyproject.toml -print -quit)
+        [ -n "$root" ] || { log "资产缺少 pyproject.toml，尝试下一个地址" >&2; continue; }
+        root=${root%/pyproject.toml}
+        if [ -e "$SOURCE" ] && [ ! -f "$SOURCE/.xiuxian3-release" ]; then
+            rm -rf "$work"
+            fail "源码目录已存在且不是 Release 管理目录：$SOURCE；如需开发源码请使用 --source-mode source"
+        fi
+        rm -rf "$SOURCE"
+        mkdir -p "$SOURCE"
+        cp -R "$root"/. "$SOURCE"/
+        printf '%s\n' "$url" > "$SOURCE/.xiuxian3-release"
+        log "已准备 Release 源码：$SOURCE"
+        rm -rf "$work"
+        return 0
+    done < <(release_urls)
+    rm -rf "$work"
+    fail "无法获取有效的 project.tar.gz；代理失败后直连也不可用，请稍后重试或使用 --source-mode source。"
+}
+
+ensure_git_source() {
     if [ -d "$SOURCE/.git" ]; then
         if [ "$ACTION" = update ]; then
             [ -z "$(git -C "$SOURCE" status --porcelain)" ] || fail "源码目录有未提交改动：$SOURCE"
-            log "更新插件源码：$SOURCE"
+            log "更新开发源码：$SOURCE"
             git -C "$SOURCE" fetch --prune origin
             git -C "$SOURCE" pull --ff-only origin main
         fi
@@ -257,13 +301,13 @@ ensure_source() {
         *) fail "不支持的仓库下载方式：$MIRROR" ;;
     esac
     mkdir -p "$(dirname "$SOURCE")"
-    log "从 $url 获取插件源码"
+    log "从 $url 获取开发源码"
     if ! git clone --depth 1 --branch main "$url" "$SOURCE"; then
         if [ "$MIRROR" = accelerated ] && [ "$url" != "$REPOSITORY" ]; then
             rm -rf "$SOURCE"
             for fallback_url in "${ACCELERATED_REPOSITORIES[@]}"; do
                 [ "$fallback_url" != "$url" ] || continue
-                log "所选代理克隆失败，尝试代理组中的下一个地址：$fallback_url"
+                log "代理克隆失败，尝试下一个地址：$fallback_url"
                 if git clone --depth 1 --branch main "$fallback_url" "$SOURCE"; then
                     url=$fallback_url
                     break
@@ -279,6 +323,29 @@ ensure_source() {
             fail "仓库下载失败；可更换 --mirror accelerated 或 --mirror-url。"
         fi
     fi
+}
+
+ensure_source() {
+    local script_path=${BASH_SOURCE[0]}
+    local local_root=""
+    if [[ "$script_path" != /dev/* && -f "$script_path" ]]; then
+        local_root="$(cd "$(dirname "$script_path")/.." && pwd -P)"
+        [ -f "$local_root/pyproject.toml" ] || local_root=""
+    fi
+    case "$SOURCE_MODE" in auto|source|release) ;;
+        *) fail "不支持的源码模式：$SOURCE_MODE（可选 auto、release、source）" ;;
+    esac
+    if [ "$SOURCE_MODE" != release ] && [ -n "$local_root" ]; then
+        SOURCE=$local_root
+        return
+    fi
+
+    if [ "$SOURCE_MODE" = source ]; then
+        ensure_git_source
+        return
+    fi
+    mkdir -p "$(dirname "$SOURCE")"
+    download_release_source
 }
 
 install_system_tools

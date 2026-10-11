@@ -92,6 +92,10 @@ switch ($Action) {
         Write-Host "[xiu3] resumed pid=$processId"
     }
     "update" {
+        if ($SourceRoot -and (Test-Path (Join-Path $SourceRoot ".xiuxian3-release")) -and (Test-Path (Join-Path $SourceRoot "scripts\onekey_windows.ps1"))) {
+            & (Join-Path $SourceRoot "scripts\onekey_windows.ps1") update $Target -Source $SourceRoot -SourceMode release -Mirror direct
+            exit $LASTEXITCODE
+        }
         if ($SourceRoot -and (Test-Path (Join-Path $SourceRoot "scripts\install_windows.ps1"))) {
             if (Test-Path (Join-Path $SourceRoot ".git")) {
                 $dirty = & git -C $SourceRoot status --porcelain

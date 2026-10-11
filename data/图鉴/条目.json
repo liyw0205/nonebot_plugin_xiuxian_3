@@ -1681,6 +1681,69 @@
       "desc": "完成道源主线后，后来者续写道路的见闻收入图鉴。",
       "category": "story",
       "status": "active"
+    },
+    {
+      "key": "codex.place.herb_vale",
+      "name": "百草坡",
+      "desc": "首次抵达后登记此处可公开采集的草木与浅坡路径。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.ironwood_grove",
+      "name": "铁木林",
+      "desc": "首次抵达后登记林地资源与小型野兽踪迹。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.basalt_pass",
+      "name": "玄武岩径",
+      "desc": "首次抵达后登记山坡矿材与阵砂采集点。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.cloud_mine",
+      "name": "云铁矿区",
+      "desc": "首次抵达后登记矿脉、许可与工具要求。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.fallen_ruins",
+      "name": "堕落遗迹",
+      "desc": "首次抵达后登记魔界边境旧战遗址。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.dao_origin_gate",
+      "name": "道源门",
+      "desc": "完成公开道源行程后登记门户、道果材料门槛与当日试炼。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.sky_terrace",
+      "name": "天劫台",
+      "desc": "抵达终局试炼地点后登记凭证与境界要求。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.heaven_path",
+      "name": "飞升路",
+      "desc": "完成飞升结局后记录天路见闻。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.left_world_hall",
+      "name": "留界殿",
+      "desc": "完成留界结局后记录道统归处。",
+      "category": "place",
+      "status": "active"
     }
   ]
 }
