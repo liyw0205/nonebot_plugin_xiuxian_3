@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from ..content import ContentBundle
+from ..content import ContentBundle, bundled_content
 from .cloud_rules import BEAST_INTRO_FLAG
 
 
@@ -226,14 +226,104 @@ ALIASES = {
 }
 
 
-def resolve_destination(value: str) -> str | None:
+def _map_source_locations(destination: str, content: ContentBundle) -> tuple[str, ...]:
+    """Read incoming map edges so travel has one source of truth."""
+
+    sources: list[str] = []
+    for region in content.list("world_region", include_locked=True):
+        for connection in region.get("connections", []):
+            if isinstance(connection, dict) and connection.get("to") == destination:
+                source = connection.get("from")
+                if isinstance(source, str) and source not in sources:
+                    sources.append(source)
+    return tuple(sources)
+
+
+def _location_requirements(destination: str, content: ContentBundle) -> tuple[str | None, int, str | None, int]:
+    location = content.get("location", destination, include_locked=True)
+    if location is None:
+        return None, 0, None, 0
+    required_realm: str | None = None
+    required_layer = 0
+    required_faction: str | None = None
+    required_faction_reputation = 0
+    for requirement in location.get("requirements", []):
+        if not isinstance(requirement, dict):
+            continue
+        kind = requirement.get("type")
+        if kind == "realm" and isinstance(requirement.get("realm_key"), str):
+            required_realm = requirement["realm_key"]
+            required_layer = int(requirement.get("min_layer", 0))
+        elif kind == "faction_reputation" and isinstance(requirement.get("faction"), str):
+            required_faction = requirement["faction"]
+            required_faction_reputation = int(requirement.get("minimum", requirement.get("min", 0)))
+    return required_realm, required_layer, required_faction, required_faction_reputation
+
+
+def _content_destination(destination: str, content: ContentBundle) -> DestinationDefinition | None:
+    base = DESTINATIONS.get(destination)
+    location = content.get("location", destination, include_locked=True)
+    if location is None:
+        return None
+    if base is None:
+        base = DestinationDefinition(
+            key=destination,
+            label=str(location.get("name") or destination),
+            duration_seconds=0,
+            stamina_cost=0,
+            currency_cost=0,
+        )
+    travel = location.get("travel", {})
+    if not isinstance(travel, dict):
+        travel = {}
+    required_realm, required_layer, required_faction, required_faction_reputation = _location_requirements(
+        destination, content
+    )
+    # JSON controls mutable travel/content values.  Keep specialized endgame
+    # gates from the existing contract when a location uses a story-only gate.
+    requirements = location.get("requirements", [])
+    for requirement in requirements if isinstance(requirements, list) else []:
+        if isinstance(requirement, dict) and requirement.get("type") == "intro_flag":
+            if isinstance(requirement.get("value"), str):
+                base = replace(base, required_intro_flag=requirement["value"])
+        if isinstance(requirement, dict) and requirement.get("type") == "endgame_status":
+            if isinstance(requirement.get("value"), str):
+                base = replace(base, required_endgame_status=requirement["value"])
+    return replace(
+        base,
+        label=str(location.get("name") or base.label),
+        duration_seconds=int(travel.get("duration_seconds", base.duration_seconds)),
+        stamina_cost=int(travel.get("stamina", base.stamina_cost)),
+        currency_cost=int(travel.get("spirit_stone", base.currency_cost)),
+        required_realm=required_realm if required_realm is not None else base.required_realm,
+        required_layer=required_layer if required_realm is not None else base.required_layer,
+        pass_key=travel.get("item_key", base.pass_key),
+        pass_quantity=int(travel.get("item_quantity", base.pass_quantity)),
+        source_locations=_map_source_locations(destination, content) or base.source_locations,
+        required_faction=required_faction or base.required_faction,
+        required_faction_reputation=(
+            required_faction_reputation if required_faction is not None else base.required_faction_reputation
+        ),
+    )
+
+
+def resolve_destination(value: str, content: ContentBundle | None = None) -> str | None:
     normalized = value.strip()
-    if normalized in DESTINATIONS:
+    bundle = content or bundled_content()
+    if bundle.has("location", normalized, include_locked=True):
         return normalized
+    for location in bundle.list("location", include_locked=True):
+        if normalized == location.get("name") or normalized in location.get("aliases", []):
+            return str(location["key"])
     return ALIASES.get(normalized)
 
 
-def destination_definition(destination: str) -> DestinationDefinition:
+def destination_definition(destination: str, content: ContentBundle | None = None) -> DestinationDefinition:
+    if content is not None:
+        resolved = _content_destination(destination, content)
+        if resolved is None:
+            raise ValueError(f"destination is not registered in content: {destination}")
+        return resolved
     try:
         return DESTINATIONS[destination]
     except KeyError as exc:

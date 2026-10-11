@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from combat_fixtures import BALANCED_QUALIFICATION
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -61,6 +61,7 @@ async def _prepare_player(runtime, adapter: str, user: str) -> None:
             "WHERE platform=? AND platform_user_id=?",
             (json.dumps(BALANCED_QUALIFICATION), "{}", adapter, user),
         )
+    equip_damage_weapon(runtime, adapter, user, 50_000)
 
 
 async def _send(runtime, adapter: str, user: str, operation_id: str, command: str):

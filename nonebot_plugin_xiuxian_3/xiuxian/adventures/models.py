@@ -31,6 +31,7 @@ class BountyBoardRecord:
     player: PlayerView
     business_date: str
     offers: tuple[BountyOfferView, ...]
+    refresh_seed: str = ""
 
 
 @dataclass(frozen=True, slots=True)

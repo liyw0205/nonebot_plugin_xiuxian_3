@@ -54,11 +54,10 @@ class ExplorationApplication:
             .replace("~", "\\~")
         )
 
-    @staticmethod
-    def _mode(args: tuple[str, ...]) -> str | None:
+    def _mode(self, args: tuple[str, ...]) -> str | None:
         if len(args) != 1:
             return None
-        return resolve_exploration_mode(args[0])
+        return resolve_exploration_mode(args[0], self.repository.content)
 
     @staticmethod
     def _location_text(location_key: str) -> str:
@@ -74,7 +73,7 @@ class ExplorationApplication:
             return CommandResult(
                 False,
                 "INVALID_EXPLORATION_MODE",
-                "请使用 `开始探索 近郊采集`、`开始探索 短历练`、`开始探索 灵泉采集`、`开始探索 雾隐洞天探索`、`开始探索 云铁矿区采集`、`开始探索 洞天二层探索`、`开始探索 云舟试炼`、`开始探索 魔界堕落遗迹探索`、`开始探索 万兽山狩猎` 或 `开始探索 祖灵湖探索`。",
+                "请发送 `开始探索 探索名称`，名称可从当前已开放的探索模式中选择。",
                 context.request_id,
             )
         operation_id = self._operation_id(context, "exploration.start")
@@ -111,7 +110,7 @@ class ExplorationApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = exploration_definition(record.mode_key)
+        definition = exploration_definition(record.mode_key, self.repository.content)
         return CommandResult(
             True,
             "EXPLORATION_STARTED",
@@ -178,7 +177,7 @@ class ExplorationApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = exploration_definition(record.mode_key)
+        definition = exploration_definition(record.mode_key, self.repository.content)
         if record.status == "combat_pending":
             return CommandResult(
                 False,

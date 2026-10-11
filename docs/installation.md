@@ -1,30 +1,30 @@
 # 安装、配置与更新
 
-本文及安装教程适用于 [work/m9-content-data 版本](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/tree/work/m9-content-data)。默认 `main` 的源码与该版本不同，请按下方命令选择对应分支。
+本文及安装教程适用于仓库 `main` 分支；`main` 是公开安装、更新和使用入口。
 
-以下步骤使用上述分支中的安装脚本。要求 Python 3.11+；宿主由 NoneBot 的 `nb run` 启动，插件不单独监听业务端口。
+以下步骤使用 `main` 中的安装脚本。要求 Python 3.11+；宿主由 NoneBot 的 `nb run` 启动，插件不单独监听业务端口。
 
 ## 一键安装
 
-当前可用入口是 `work/m9-content-data` checkout 的源码模式；安装器默认创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境。
+安装器默认创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境。
 
-### Linux（当前推荐）
+### Linux
 
 需要先安装 Git 和 curl（Debian/Ubuntu 可用 `sudo apt install git curl`）。
 
 ```bash
-git clone --branch work/m9-content-data --single-branch \
+git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
 ```
 
-### Release（发布后使用）
+### GitHub Release
 
-GitHub Release 发布 `project.tar.gz` 后，可通过同一分支的远程脚本安装。脚本优先尝试 Release 代理地址，失败后回退 GitHub 直连；当前 `latest` API 返回 404；当前请使用上方源码安装步骤。
+版本化 Release 由 `main` 上的版本 tag 构建，资产名为 `project.tar.gz`。远程引导脚本从 `main` 获取；Release 模式要求对应的 GitHub Release 资产已经发布。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/work/m9-content-data/scripts/onekey.sh \
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
 ```
 
@@ -40,14 +40,14 @@ curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/w
 --source-mode auto|release|source
 ```
 
-发布资产存在后普通用户可选择 `release`；当前 checkout 使用 `source`。代理组由脚本维护，任何代理失败都会继续尝试并最终回退 GitHub 直连。不要把未验证的加速域名写入命令。
+源码安装使用 `source`；已发布版本可使用 `release`。代理下载失败时脚本会继续尝试并最终回退 GitHub 直连。
 
 ### Termux
 
 ```bash
 pkg update -y
 pkg install -y git curl
-git clone --branch work/m9-content-data --single-branch \
+git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
@@ -61,7 +61,7 @@ termux-wake-lock
 先确保 Git 可用；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
 
 ```powershell
-git clone --branch work/m9-content-data --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
+git clone --branch main --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 Set-Location xiuxian3-src
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode source -Mirror direct
 ```
@@ -70,10 +70,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1
 
 ### Docker
 
-先取得 `work/m9-content-data`，再使用仓库包含的 `Dockerfile`、`docker-compose.yml` 和 `docker/env.example`：
+先取得 `main`，再使用仓库包含的 `Dockerfile`、`docker-compose.yml` 和 `docker/env.example`：
 
 ```bash
-git clone --branch work/m9-content-data --single-branch \
+git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 cp -n docker/env.example docker/.env
@@ -89,23 +89,23 @@ Compose 将宿主的 `./data` 挂载到容器 `/app/data`，将 `./runtime` 挂�
 源码模式必须显式使用 checkout，不会下载 Release：
 
 ```bash
-git clone --branch work/m9-content-data --single-branch \
+git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
 ```
 
-当前分支的源码更新不要使用 `xiu3 update`：控制脚本默认跟踪 `origin main`。请先停止宿主并备份，再明确拉取当前分支并重新安装：
+源码 checkout 应保持在 `main`。更新前先停止宿主并备份，再拉取 `main` 并重新安装：
 
 ```bash
 /path/to/nonebot-host/xiu3 stop
 cp -a /path/to/nonebot-host /path/to/nonebot-host.backup
-git -C /path/to/xiuxian3-src pull --ff-only origin work/m9-content-data
+git -C /path/to/xiuxian3-src pull --ff-only origin main
 bash /path/to/xiuxian3-src/scripts/install.sh update /path/to/nonebot-host --venv /path/to/venv
 /path/to/nonebot-host/xiu3 start
 ```
 
-更新前先保存本地源码修改；`git pull --ff-only` 不会强制覆盖分支。Release 宿主才使用 `xiu3 update` 重新获取 Release 资产。
+更新前先保存本地源码修改。Release 安装通过 `xiu3 update` 重新获取 `main` 版本 tag 对应的 Release 资产。
 
 ## 已有宿主手动安装
 
@@ -119,7 +119,7 @@ bash scripts/install.sh install /path/to/nonebot-host --venv /path/to/venv
 
 ### 不使用安装脚本
 
-已取得对应分支源码且安装了 Python 3.11+ 时，可在仓库根目录执行以下步骤。Linux/Termux 示例：
+已取得 `main` 源码且安装了 Python 3.11+ 时，可在仓库根目录执行以下步骤。Linux/Termux 示例：
 
 ```bash
 XIUXIAN3_SRC="$PWD"
@@ -201,7 +201,7 @@ Windows：
 & .\xiu3.ps1 uninstall --yes
 ```
 
-Release 宿主的 `update` 会重新获取 `project.tar.gz`，保留宿主 `.env`、SQLite、`data/`、`runtime/` 和用户 JSON。当前源码 checkout 不要使用 `xiu3 update`，请按上文明确拉取 `work/m9-content-data` 后执行 `scripts/install.sh update`。停止宿主后再备份，更新完成后重新启动：
+Release 安装的 `update` 会重新获取 `project.tar.gz`，保留宿主 `.env`、SQLite、`data/`、`runtime/` 和用户 JSON。源码 checkout 拉取 `main` 后执行 `scripts/install.sh update`。停止宿主后再备份，更新完成后重新启动：
 
 ```bash
 xiu3 stop
@@ -210,7 +210,7 @@ xiu3 update
 xiu3 start
 ```
 
-正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/operations.md#1-配置层级) 控制，未配置时沿用默认富消息能力；配置存在但未列出当前 AppID 时使用纯文本。
+正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md#1-配置层级) 控制，未配置时沿用默认富消息能力；配置存在但未列出当前 AppID 时使用纯文本。
 
 ## 排错
 
@@ -223,9 +223,9 @@ tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
 
 - Python 版本或 venv 不可用：安装 Python 3.11+ 及 venv 模块。
 - 端口冲突：修改宿主 `.env` 的 `PORT` 后重启。
-- 适配器/驱动缺失：在同一 venv 重新运行 `scripts/install.sh update`；Release 宿主可使用 `xiu3 update`。
+- 适配器/驱动缺失：在同一 venv 重新运行 `scripts/install.sh update`；Release 安装可使用 `xiu3 update`。
 - QQ 无消息：检查 `QQ_BOTS`、开放平台事件权限和 QQ 适配器版本。
 - OneBot 无消息：检查 NapCat 的反向 WebSocket URL、端口、防火墙和连接日志。
-- Release 下载失败：先重试，再使用 `--mirror direct`；需要源码时显式使用 `--source-mode source`。
+- Release 下载失败：先重试，再使用 `--mirror direct`；也可 checkout `main` 并使用 `--source-mode source`。
 
 常用命令和玩法流程见 [玩家使用指南](usage.md)；发布资产规则见 [发布分发](release-distribution.md)。

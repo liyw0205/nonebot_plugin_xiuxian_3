@@ -81,11 +81,10 @@ class WorldApplication:
             .replace("~", "\\~")
         )
 
-    @staticmethod
-    def _destination(args: tuple[str, ...]) -> str | None:
+    def _destination(self, args: tuple[str, ...]) -> str | None:
         if len(args) != 1:
             return None
-        return resolve_destination(args[0])
+        return resolve_destination(args[0], self.repository.content)
 
     async def preview_travel(self, context: CommandContext) -> CommandResult:
         destination = self._destination(context.command_args)
@@ -105,7 +104,7 @@ class WorldApplication:
             return CommandResult(False, "LOCATION_NOT_FOUND", "暂时没有这个地点。", context.request_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
-        definition = destination_definition(destination)
+        definition = destination_definition(destination, self.repository.content)
         missing_labels = tuple(
             item.replace("qi_gathering", "聚气")
             .replace("qi_sensing", "感气")
@@ -156,7 +155,7 @@ class WorldApplication:
         destination = destination or (self._destination(context.command_args) or "")
         if not destination:
             return CommandResult(False, "INVALID_DESTINATION", "请使用 `前往 雾隐洞天`。", context.request_id)
-        resolved = resolve_destination(destination)
+        resolved = resolve_destination(destination, self.repository.content)
         if resolved is None:
             return CommandResult(False, "LOCATION_NOT_FOUND", "暂时没有这个地点。", context.request_id)
         operation_id = self._operation_id(context, "world.start_travel")
@@ -178,7 +177,7 @@ class WorldApplication:
         except EventNotActiveError:
             return CommandResult(False, "EVENT_NOT_ACTIVE", "魔界战线当前未开放行路。", context.request_id, operation_id)
         except FactionReputationInsufficientError:
-            required_faction = destination_definition(resolved).required_faction
+            required_faction = destination_definition(resolved, self.repository.content).required_faction
             faction_label = {"demon": "魔界", "beast": "妖界"}.get(required_faction, "对应阵营")
             return CommandResult(
                 False,
@@ -249,7 +248,7 @@ class WorldApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = destination_definition(record.destination)
+        definition = destination_definition(record.destination, self.repository.content)
         return CommandResult(
             True,
             "TRAVEL_STARTED",
@@ -293,7 +292,7 @@ class WorldApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = destination_definition(record.destination)
+        definition = destination_definition(record.destination, self.repository.content)
         return CommandResult(
             True,
             "TRAVEL_COMPLETED",

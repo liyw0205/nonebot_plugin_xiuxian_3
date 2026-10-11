@@ -9,7 +9,7 @@ from ..content import ContentBundle, ContentError, bundled_content
 from ..player.path_rules import subprofession_records
 from ..rewards.rules import local_reputation_maximum, reward_pool_outcomes
 from ..specials.dispatch_rules import resolve_dispatch
-from ..utils.randomness import deterministic_weighted_choice
+from ..utils.randomness import deterministic_integer, deterministic_weighted_choice
 
 
 _DEFAULT_CONTENT = bundled_content()
@@ -450,16 +450,48 @@ def choose_bounty(
     )
 
 
+def bounty_refresh_seed(player_id: int, business_date: str) -> str:
+    """Return the stable daily board seed used to freeze a player's refresh."""
+
+    if isinstance(player_id, bool) or not isinstance(player_id, int) or player_id <= 0:
+        raise ValueError("bounty refresh player id must be a positive integer")
+    if not isinstance(business_date, str) or not business_date:
+        raise ValueError("bounty refresh business date must be a non-empty string")
+    return f"bounty-refresh:{player_id}:{business_date}"
+
+
+def refresh_bounty_candidates(
+    candidates: tuple[BountyDefinition, ...] | list[BountyDefinition],
+    *,
+    seed: str,
+) -> tuple[BountyDefinition, ...]:
+    """Return all eligible candidates in a stable, daily-randomized order."""
+
+    if not isinstance(seed, str) or not seed:
+        raise ValueError("bounty refresh seed must be a non-empty string")
+    return tuple(
+        sorted(
+            candidates,
+            key=lambda definition: (
+                deterministic_integer(f"{seed}:{definition.key}", 2**63),
+                definition.key,
+            ),
+        )
+    )
+
+
 __all__ = [
     "DEFINITIONS",
     "BountyDefinition",
     "bounty_definition",
     "bounty_definitions",
     "bounty_reward_labels",
+    "bounty_refresh_seed",
     "choose_bounty",
     "default_content_bundle",
     "meets_realm",
     "realm_rank",
     "resolve_bounty",
     "reward_map",
+    "refresh_bounty_candidates",
 ]

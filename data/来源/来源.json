@@ -1,0 +1,161 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "source",
+  "records": [
+    {
+      "key": "source.item.herb.blood_grass",
+      "name": "止血草来源",
+      "desc": "近郊与百草坡采集、灵圃看护和公开悬赏均可取得。",
+      "asset_keys": ["item.herb.blood_grass"],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.herb_vale"},
+        {"operation": "livelihood.settle", "reference": "reward_pool.idle.herb_watch"},
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.herb_supply"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.herb.spirit_leaf",
+      "name": "灵叶来源",
+      "desc": "灵泉采集、百草坡与灵圃看护提供公开取得路径。",
+      "asset_keys": ["item.herb.spirit_leaf"],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.spring_gather"},
+        {"operation": "livelihood.settle", "reference": "reward_pool.idle.herb_watch"},
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.herb_supply"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.common_materials",
+      "name": "基础材料来源",
+      "desc": "铁木林、玄武岩径和作坊生活路线提供木材、铁石与阵砂。",
+      "asset_keys": ["item.mat.wood", "item.ore.ironstone", "item.mat.array_sand"],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.ironwood"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.basalt_pass"},
+        {"operation": "livelihood.settle", "reference": "reward_pool.idle.workshop_care"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.mist_core",
+      "name": "雾隐核心来源",
+      "desc": "雾隐洞天探索与守卫遭遇掉落。",
+      "asset_keys": ["item.material.mist_core"],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.mist_grotto"},
+        {"operation": "battle.claim", "reference": "reward_pool.enemy.mist"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.cloud_iron",
+      "name": "云铁来源",
+      "desc": "云铁矿区采集、矿区守卫掉落和云城公开悬赏。",
+      "asset_keys": ["item.material.cloud_iron"],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.cloud_mine"},
+        {"operation": "battle.claim", "reference": "reward_pool.enemy.cloud_mine"},
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.cloud_mine"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.three_realms_materials",
+      "name": "三界材料来源",
+      "desc": "魔界、妖界与祖灵湖探索及公开遭遇提供高阶材料。",
+      "asset_keys": ["item.demon_core", "item.beast_blood", "item.ancestral_blood", "item.domain_core_fragment"],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.demon_abyss"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.beast_hunt"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.ancestral_lake"},
+        {"operation": "battle.claim", "reference": "reward_pool.enemy.three_realms"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.void_materials",
+      "name": "虚空材料来源",
+      "desc": "虚空航道、档案遗迹及其遭遇提供锚、晶体和档案碎片。",
+      "asset_keys": ["item.void_anchor", "item.void_crystal", "item.void_archive", "item.archive_fragment.alpha", "item.archive_fragment.beta", "item.archive_fragment.gamma"],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.void_route"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.void_archive"},
+        {"operation": "battle.claim", "reference": "reward_pool.enemy.void"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.endgame_materials",
+      "name": "终局材料来源",
+      "desc": "道源与天劫专用流程负责结算道果、护符和凭证；通用探索不重复开放。",
+      "asset_keys": ["item.dao_fruit_fragment", "item.tribulation_guard", "item.tribulation_token", "item.ascension_certificate"],
+      "channels": [
+        {"operation": "adventure.dao_origin.settle", "reference": "reward_pool.exploration.dao_origin"},
+        {"operation": "adventure.tribulation.settle", "reference": "reward_pool.exploration.tribulation_echo"},
+        {"operation": "battle.claim", "reference": "reward_pool.enemy.dao_origin"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.manuals",
+      "name": "功法来源",
+      "desc": "基础功法由引导与首采集奖励取得，其余功法由符合境界的悬赏奖池公开抽取。",
+      "asset_keys": ["item.manual.basic_qi", "item.manual.sunrise_breath", "item.manual.cycle_qi", "item.manual.purple_mansion", "item.manual.cave_mystery", "item.manual.nascent_spirit_return", "item.manual.heaven_observation", "item.manual.void_journey", "item.manual.dao_union_mysteries", "item.manual.transcendence_tribulation"],
+      "channels": [
+        {"operation": "quest.claim", "reference": "reward.quest.first_cultivation"},
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.elite_hunt"},
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.void_anchoring"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.companion.wood_rat",
+      "name": "木鼠来源",
+      "desc": "完成玄天主线引导后取得，不伪造活动事件来源。",
+      "asset_keys": ["beast.wood_rat"],
+      "channels": [{"operation": "quest.claim", "reference": "story.mainline.xuantian:chapter.1.stage.1"}],
+      "status": "active"
+    },
+    {
+      "key": "source.companion.iron_rat",
+      "name": "铁背鼠来源",
+      "desc": "由木鼠达到蜕变条件并支付公开材料后获得。",
+      "asset_keys": ["beast.iron_rat"],
+      "channels": [{"operation": "companion.evolution", "reference": "beast.evolution.wood_rat_1"}],
+      "status": "active"
+    },
+    {
+      "key": "source.companion.bamboo_deer",
+      "name": "竹鹿来源",
+      "desc": "玄天主线引导提供的灵骑，后续运输由鞍具配方扩展。",
+      "asset_keys": ["mount.bamboo_deer"],
+      "channels": [{"operation": "quest.claim", "reference": "story.mainline.xuantian:chapter.1.stage.1"}],
+      "status": "active"
+    },
+    {
+      "key": "source.companion.gear",
+      "name": "灵兽具装来源",
+      "desc": "小型灵兽行囊和竹鹿鞍具均由公开生产配方制作。",
+      "asset_keys": ["beast.gear.sack_small", "mount.tack.bamboo_saddle"],
+      "channels": [
+        {"operation": "production.settle", "reference": "recipe.companion.sack_small"},
+        {"operation": "production.settle", "reference": "recipe.companion.bamboo_saddle"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.equipment.quality_bounty",
+      "name": "装备来源",
+      "desc": "基础至高阶装备由按境界与道途过滤的悬赏品质奖池公开抽取；未声明来源的未来效果仍锁定。",
+      "asset_selector": {"kind": "item", "item_types": ["weapon", "armor", "accessory"], "status": "active"},
+      "channels": [
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.cloud_mine"},
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.elite_hunt"},
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.void_anchoring"}
+      ],
+      "status": "active"
+    }
+  ]
+}

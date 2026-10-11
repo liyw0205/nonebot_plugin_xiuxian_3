@@ -181,7 +181,7 @@ class CombatRepositoryMixin:
 
         from ..exploration.rules import exploration_enemy_key
 
-        enemy_key = exploration_enemy_key(mode_key)
+        enemy_key = exploration_enemy_key(mode_key, self.content)
         if enemy_key is None:
             raise BattleRequirementError("exploration mode has no battle encounter")
         await self.initialize()

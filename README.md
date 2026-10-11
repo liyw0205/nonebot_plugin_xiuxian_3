@@ -1,6 +1,6 @@
 # NoneBot 修仙 3
 
-本文及安装教程适用于 [work/m9-content-data 版本](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/tree/work/m9-content-data)。默认 `main` 的源码与该版本不同，请按下方命令选择对应分支。
+本文及安装教程适用于仓库 `main` 分支；`main` 是公开安装、更新和使用入口。
 
 `nonebot_plugin_xiuxian_3` 是一个面向 NoneBot 2 的文字修仙游戏插件。玩家从凡人开始，选择道途，修炼突破，探索三界，完成悬赏与主线，并把获得的材料用于生产、经济、灵兽和装备成长。角色进度保存在 SQLite，玩法内容由 `data/` 下的 JSON 内容包提供。
 
@@ -30,25 +30,25 @@
 
 ## 安装
 
-当前安装方式是先获取 `work/m9-content-data` 后使用源码模式；该分支包含本文对应的安装脚本。安装器会创建 `$HOME/xiu3` 和 `$HOME/myenv`，检查 Python 3.11+、Git、curl、venv 与编译工具，安装 QQ、OneBot V11、FastAPI、HTTPX、websockets 和 AIOHTTP。
+安装器会创建 `$HOME/xiu3` 和 `$HOME/myenv`，检查 Python 3.11+、Git、curl、venv 与编译工具，安装 QQ、OneBot V11、FastAPI、HTTPX、websockets 和 AIOHTTP。
 
-### Linux 一键安装（当前推荐）
+### Linux 一键安装
 
 需要先安装 Git 和 curl（Debian/Ubuntu 可用 `sudo apt install git curl`）。
 
 ```bash
-git clone --branch work/m9-content-data --single-branch \
+git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
 ```
 
-### Release 安装（发布后使用）
+### GitHub Release 安装
 
-GitHub Release 发布 `project.tar.gz` 后，可直接使用同一分支上的引导脚本。脚本优先尝试 Release 代理地址，失败后回退 GitHub 直连；当前 `latest` 尚未提供时不要使用此路径。
+版本化 Release 由 `main` 上的版本 tag 构建，资产名为 `project.tar.gz`。远程引导脚本从 `main` 获取；Release 模式要求对应的 GitHub Release 资产已经发布。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/work/m9-content-data/scripts/onekey.sh \
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
 ```
 
@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/w
 ```bash
 pkg update -y
 pkg install -y git curl
-git clone --branch work/m9-content-data --single-branch \
+git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
@@ -71,17 +71,17 @@ termux-wake-lock
 先确保 Git 可用；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
 
 ```powershell
-git clone --branch work/m9-content-data --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
+git clone --branch main --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 Set-Location xiuxian3-src
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode source -Mirror direct
 ```
 
 ### Docker
 
-Docker 方式先取得包含脚本和配置的分支，再使用仓库内的 `Dockerfile` 和 `docker-compose.yml`：
+Docker 方式先取得 `main`，再使用仓库内的 `Dockerfile` 和 `docker-compose.yml`：
 
 ```bash
-git clone --branch work/m9-content-data --single-branch \
+git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 cp -n docker/env.example docker/.env
@@ -97,7 +97,7 @@ docker compose logs -f xiuxian3
 适合已经运行 NoneBot 的用户。先取得包含脚本的 checkout，再让安装器写入已有宿主；它只补缺失文件，不覆盖已有 `bot.py`、`pyproject.toml`、`.env` 或 `data/*.json`：
 
 ```bash
-git clone --branch work/m9-content-data --single-branch \
+git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/install.sh install /path/to/nonebot-host --venv /path/to/venv
@@ -110,17 +110,17 @@ bash scripts/onekey.sh install --source-mode source --mirror direct \
   --target /path/to/nonebot-host --source "$PWD" --venv /path/to/venv
 ```
 
-源码模式不会下载 Release；当前 `work/m9-content-data` checkout 更新时不要使用 `xiu3 update`，控制脚本默认拉取 `origin main`。请先停止宿主并备份，再执行：
+源码模式不会下载 Release。源码 checkout 应保持在 `main`；请先停止宿主并备份，再拉取更新：
 
 ```bash
 /path/to/nonebot-host/xiu3 stop
 cp -a /path/to/nonebot-host /path/to/nonebot-host.backup
-git -C /path/to/xiuxian3-src pull --ff-only origin work/m9-content-data
+git -C /path/to/xiuxian3-src pull --ff-only origin main
 bash /path/to/xiuxian3-src/scripts/install.sh update /path/to/nonebot-host --venv /path/to/venv
 /path/to/nonebot-host/xiu3 start
 ```
 
-源码更新前应保存本地修改，使用 `git pull --ff-only` 保留分支边界。Release 宿主才使用 `xiu3 update` 重新获取 Release 资产。
+源码更新前应保存本地修改。Release 安装通过 `xiu3 update` 重新获取 `main` 版本 tag 对应的 Release 资产。
 
 ## 配置
 
@@ -208,13 +208,13 @@ tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
 - [玩家使用指南](docs/usage.md)
 - [安装与更新](docs/installation.md)
 - [发布与分发](docs/release-distribution.md)
-- [开发与架构文档](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/index.md)
-- [适配器说明](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/extensions/adapters/README.md)
-- [运行与安全](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/operations.md)
+- [开发与架构文档](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/index.md)
+- [适配器说明](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/extensions/adapters/README.md)
+- [运行与安全](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md)
 - `data/`：JSON 内容定义；安装器只补宿主中缺失的内容文件
 - 正常宿主的 PID 和运行日志：`.xiuxian3/nb.pid`、`.xiuxian3/nb.log`
 - `runtime/`：Docker 额外挂载的运行状态目录
-- [QQ 能力配置](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/work/m9-content-data/docs/operations.md#1-配置层级)：`XIUXIAN3_QQ_CAPABILITIES` 控制 Markdown/键盘与纯文本降级
+- [QQ 能力配置](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md#1-配置层级)：`XIUXIAN3_QQ_CAPABILITIES` 控制 Markdown/键盘与纯文本降级
 
 ## 许可证
 

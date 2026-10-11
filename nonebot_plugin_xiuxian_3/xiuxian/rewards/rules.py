@@ -256,6 +256,9 @@ def _normalize_reward_pool_map(
             "spirit_stones",
             "currency.spirit_stone",
             "service_reputation",
+            # Bounty pools resolve this placeholder to the offer's
+            # reputation location when the offer is frozen.
+            "local_reputation",
         }:
             if validation_key.startswith("faction_reputation."):
                 if not validation_key.removeprefix("faction_reputation."):

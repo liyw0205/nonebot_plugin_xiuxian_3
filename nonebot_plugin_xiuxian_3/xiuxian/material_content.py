@@ -50,7 +50,9 @@ def validate_material_content(bundle: ContentBundle) -> dict[str, int]:
                 raise ContentError(f"material {key} has duplicate gathering mode {mode_key}")
             seen.add(mode_key)
             try:
-                mode = exploration_definition(mode_key)
+                mode = exploration_definition(mode_key, bundle)
+            except ContentError:
+                raise
             except ValueError as exc:
                 raise ContentError(f"material {key} references unavailable mode {mode_key}") from exc
             if not bundle.has("location", mode.location_key, include_locked=False):
@@ -62,7 +64,7 @@ def validate_material_content(bundle: ContentBundle) -> dict[str, int]:
             if not bundle.has("reward", pool_key, include_locked=False):
                 raise ContentError(f"material {key} references unavailable reward pool {pool_key}")
             _labels(bundle.require("reward", pool_key), f"material {key} reward pool {pool_key}")
-            if exploration_reward_pool(mode_key) != pool_key:
+            if exploration_reward_pool(mode_key, bundle) != pool_key:
                 raise ContentError(f"material {key} reward pool is not consumed by {mode_key}")
             if not any(rewards.get(key, 0) > 0 for _, rewards in reward_pool_outcomes(pool_key, bundle)):
                 raise ContentError(f"material {key} is not produced by {pool_key}")

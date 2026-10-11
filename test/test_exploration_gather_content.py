@@ -419,6 +419,7 @@ def test_gather_outskirts_encounter_rewards_follow_battle_result_on_both_adapter
                         expected_inventory = dict(rewards)
                         if outcome == "won":
                             expected_inventory["item.herb.blood_grass"] += 2
+                            expected_inventory["item.manual.sunrise_breath"] = 1
                         with sqlite3.connect(runtime.settings.database_path) as connection:
                             codex_after_settle = connection.execute(
                                 "SELECT * FROM codex_entries WHERE player_id="

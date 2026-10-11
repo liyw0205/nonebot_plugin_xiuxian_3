@@ -994,6 +994,7 @@ def test_random_bounty_freezes_choice_evidence_and_previews_selected_reward() ->
                         row["bounty_key"] for row in board.data["offers"]
                         if row["status"] == "available"
                     }
+                    assert board.data["refresh_seed"].startswith("bounty-refresh:")
                     operation_id = f"{adapter}:bounty-random-accept"
                     accepted = await runtime.adapters.dispatch(
                         adapter,
@@ -1014,6 +1015,7 @@ def test_random_bounty_freezes_choice_evidence_and_previews_selected_reward() ->
                         ).fetchone()[0]
                     snapshot = json.loads(snapshot_json)
                     selection = snapshot["selection"]
+                    assert selection["refresh_seed"] == board.data["refresh_seed"]
                     assert isinstance(selection["bounty_choice_seed"], str)
                     assert selection["bounty_choice_seed"] != operation_id
                     assert selection["reward_seed"] != selection["bounty_choice_seed"]

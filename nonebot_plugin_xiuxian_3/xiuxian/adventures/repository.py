@@ -112,9 +112,11 @@ from ..adventures.rules import (
     bounty_definition,
     bounty_definitions,
     bounty_reward_labels,
+    bounty_refresh_seed,
     choose_bounty,
     default_content_bundle,
     meets_realm as bounty_meets_realm,
+    refresh_bounty_candidates,
     reward_map,
 )
 from ..utils.equipment import create_equipment_instances, equipment_instance_template
@@ -353,6 +355,10 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         )
     ):
         raise ValueError("bounty snapshot selection evidence is invalid")
+    if "refresh_seed" in selection and (
+        not isinstance(selection["refresh_seed"], str) or not selection["refresh_seed"]
+    ):
+        raise ValueError("bounty snapshot refresh seed is invalid")
     candidate_keys = [item["bounty_key"] for item in selection["candidate_weights"]]
     if (
         len(set(candidate_keys)) != len(candidate_keys)
@@ -413,6 +419,7 @@ class AdventuresRepositoryMixin:
         business_date = now.date().isoformat()
         with self._connect() as connection:
             row = self._require_player(connection, platform, platform_user_id, writable=False)
+            refresh_seed = bounty_refresh_seed(int(row["id"]), business_date)
             accepted = connection.execute(
                 """SELECT * FROM bounty_offers
                    WHERE player_id = ? AND business_date = ?
@@ -528,6 +535,7 @@ class AdventuresRepositoryMixin:
                 player=self._row_to_player(row),
                 business_date=business_date,
                 offers=tuple(offers),
+                refresh_seed=refresh_seed,
             )
 
     def _bounty_player_eligible(
@@ -717,6 +725,7 @@ class AdventuresRepositoryMixin:
             )
             bounty_choice_seed: str | None = None
             candidate_weights: list[dict[str, Any]] = []
+            refresh_seed = bounty_refresh_seed(int(row["id"]), business_date)
             if bounty_key is None:
                 eligible = [
                     definition
@@ -734,6 +743,9 @@ class AdventuresRepositoryMixin:
                         raise BountyDailyLimitError("daily bounty limit reached")
                     raise BountyRequirementError("no eligible bounty candidates")
                 bounty_choice_seed = uuid4().hex
+                candidates = list(
+                    refresh_bounty_candidates(candidates, seed=refresh_seed)
+                )
                 candidate_weights = [
                     {"bounty_key": item.key, "weight": item.weight}
                     for item in candidates
@@ -840,6 +852,7 @@ class AdventuresRepositoryMixin:
                 "selection": {
                     "reward_seed": selection_seed,
                     "bounty_choice_seed": bounty_choice_seed,
+                    "refresh_seed": refresh_seed,
                     "candidate_weights": candidate_weights,
                     "path_key": str(row["path_key"]) if row["path_key"] else None,
                     "realm_key": str(row["realm_key"]),
