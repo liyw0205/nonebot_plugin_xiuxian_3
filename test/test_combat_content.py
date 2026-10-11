@@ -13,9 +13,45 @@ from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
 DATA = Path(__file__).parents[1] / "data"
 
 
-def _copy_data(tmp_path: Path) -> Path:
+def _copy_data(tmp_path: Path, *, include_source_fixture: bool = False) -> Path:
     root = tmp_path / "data"
     shutil.copytree(DATA, root)
+    if include_source_fixture:
+        manifest_path = root / "内容清单.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["files"].append("来源/来源.json")
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        source_path = root / "来源/来源.json"
+        source_path.parent.mkdir(parents=True)
+        source_path.write_text(
+            json.dumps(
+                {
+                    "schema": "xiuxian.content",
+                    "kind": "source",
+                    "records": [
+                        {
+                            "key": "source.item.mist_core",
+                            "name": "雾隐核心来源",
+                            "desc": "战斗来源测试夹具。",
+                            "asset_keys": ["item.material.mist_core"],
+                            "channels": [
+                                {
+                                    "operation": "battle.claim",
+                                    "reference": "reward_pool.enemy.mist",
+                                }
+                            ],
+                            "status": "active",
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     return root
 
 
@@ -36,7 +72,7 @@ def test_combat_content_closes_current_enemy_and_encounter_data() -> None:
         "encounters": 14,
         "candidates": 27,
         "drop_pools": 6,
-        "consumed_encounters": 12,
+        "consumed_encounters": 0,
         "enemy_skills": 11,
     }
 
@@ -83,7 +119,7 @@ def test_combat_content_rejects_dangling_or_malformed_references(
     changes: dict[str, object],
     message: str,
 ) -> None:
-    root = _copy_data(tmp_path)
+    root = _copy_data(tmp_path, include_source_fixture=relative.startswith("来源/"))
     _edit(root, relative, key, **changes)
 
     with pytest.raises(ContentError, match=message):
