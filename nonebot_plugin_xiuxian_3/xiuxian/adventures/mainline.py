@@ -102,7 +102,14 @@ MAINLINE_REWARD_PREFIXES = ("item.", "access.", "codex.")
 MAINLINE_NUMERIC_REWARD_KEYS = frozenset(
     {"spirit_stones", "local_reputation", "service_reputation"}
 )
-_VERTICAL_SLICE_STAGES = frozenset({"chapter.1.stage.1", "chapter.1.stage.2"})
+_VERTICAL_SLICE_STAGES = frozenset(
+    {
+        "chapter.1.stage.1",
+        "chapter.1.stage.2",
+        "chapter.1.stage.3",
+        "chapter.2.stage.1",
+    }
+)
 
 
 class MainlineObjectivesIncompleteError(RuntimeError):
@@ -214,6 +221,47 @@ def _story_objectives(
                 "key": str(objective_key), "type": kind, "label": label.strip(),
                 "mode_key": mode_key, "location_key": location_key,
                 "item_key": item_key, "quantity": quantity,
+            }
+        elif kind == "exploration_battle_victory":
+            if set(objective) != {"key", "type", "label", "mode_key", "location_key"}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid battle shape")
+            mode_key = objective.get("mode_key")
+            location_key = objective.get("location_key")
+            if any(not isinstance(item, str) or not item.strip() for item in (mode_key, location_key)):
+                raise ContentError(f"mainline {key} objective {objective_key} requires mode and location keys")
+            if bundle is not None:
+                try:
+                    mode = bundle.require("exploration_mode", mode_key, include_locked=False)
+                    bundle.require("location", location_key, include_locked=False)
+                    if mode.get("location_key") != location_key:
+                        raise ContentError(f"mainline {key} objective {objective_key} location differs from its mode")
+                    if (
+                        isinstance(mode.get("battle_chance_bp"), bool)
+                        or not isinstance(mode.get("battle_chance_bp"), int)
+                        or mode["battle_chance_bp"] <= 0
+                        or not mode.get("enemy_pool_key")
+                    ):
+                        raise ContentError(f"mainline {key} objective {objective_key} mode has no battle encounter")
+                    bundle.require("encounter_pool", str(mode["enemy_pool_key"]), include_locked=False)
+                except KeyError as exc:
+                    raise ContentError(f"mainline {key} objective {objective_key} references unknown content") from exc
+            normalized = {
+                "key": str(objective_key), "type": kind, "label": label.strip(),
+                "mode_key": mode_key, "location_key": location_key,
+            }
+        elif kind == "commission_delivery":
+            if set(objective) != {"key", "type", "label", "commission_key"}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid commission shape")
+            commission_key = objective.get("commission_key")
+            if not isinstance(commission_key, str) or not commission_key.strip():
+                raise ContentError(f"mainline {key} objective {objective_key} requires commission_key")
+            if bundle is not None:
+                commission = bundle.get("livelihood", commission_key, include_locked=False)
+                if commission is None or commission.get("record_type") != "commission":
+                    raise ContentError(f"mainline {key} objective {objective_key} references unknown commission")
+            normalized = {
+                "key": str(objective_key), "type": kind, "label": label.strip(),
+                "commission_key": commission_key,
             }
         else:
             raise ContentError(f"mainline {key} objective {objective_key} has unsupported type {kind}")
@@ -419,10 +467,11 @@ def mainline_definitions(
             next_stage = by_key.get(definition.next_stage_key)
             if next_stage is None or next_stage.story_key != definition.story_key:
                 raise ContentError(f"mainline {definition.key} references unknown next stage {definition.next_stage_key}")
-            if definition.key in _VERTICAL_SLICE_STAGES and (
-                next_stage.chapter != definition.chapter or next_stage.stage != definition.stage + 1
-            ):
-                raise ContentError(f"mainline {definition.key} next stage is not consecutive")
+            if definition.key in _VERTICAL_SLICE_STAGES:
+                current_order = (definition.chapter, definition.stage)
+                next_order = (next_stage.chapter, next_stage.stage)
+                if next_order <= current_order:
+                    raise ContentError(f"mainline {definition.key} next stage is not consecutive")
         if definition.key in _VERTICAL_SLICE_STAGES and not definition.state_events:
             raise ContentError(f"mainline {definition.key} requires a state change")
     return tuple(definitions)

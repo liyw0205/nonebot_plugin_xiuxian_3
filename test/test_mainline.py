@@ -101,6 +101,7 @@ def test_mainline_stage_prerequisites_and_reward_assets() -> None:
                 )
             stage3 = await runtime.dispatch(_context("stage3-start"), "开始主线 3")
             assert stage3.code == "MAINLINE_STARTED"
+            mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.3")
             stage3_claim = await runtime.dispatch(_context("stage3-claim"), "领取主线奖励 3")
             assert stage3_claim.data["reward"]["title_key"] == "title.mist_watcher"
 
@@ -138,6 +139,7 @@ def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None
             mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.2")
             assert (await runtime.dispatch(_context("stage2-claim"), "领取主线奖励 2")).ok
             assert (await runtime.dispatch(_context("stage3-start"), "开始主线 3")).ok
+            mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.3")
             assert (await runtime.dispatch(_context("stage3-claim"), "领取主线奖励 3")).ok
 
             locked = await runtime.dispatch(_context("before-commission"), "开始主线 城镇委托")
@@ -213,6 +215,7 @@ def test_mainline_town_commission_runs_through_qq_and_onebot_adapters() -> None:
                 mark_mainline_snapshot_legacy(runtime, adapter, user, "chapter.1.stage.2")
                 assert (await dispatch("stage2-claim", "领取主线奖励 2")).ok
                 assert (await dispatch("stage3-start", "开始主线 3")).ok
+                mark_mainline_snapshot_legacy(runtime, adapter, user, "chapter.1.stage.3")
                 assert (await dispatch("stage3-claim", "领取主线奖励 3")).ok
                 assert (await dispatch("list", "城镇委托")).code == "COMMISSION_LIST"
                 assert (await dispatch("accept", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"

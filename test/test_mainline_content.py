@@ -36,8 +36,7 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                 grant_spirit_field_prerequisites(runtime, adapter, user, layer=3)
                 for number in (2, 3):
                     assert (await send(f"start-{number}", f"开始主线 {number}")).ok
-                    if number == 2:
-                        mark_mainline_snapshot_legacy(runtime, adapter, user, f"chapter.1.stage.{number}")
+                    mark_mainline_snapshot_legacy(runtime, adapter, user, f"chapter.1.stage.{number}")
                     assert (await send(f"claim-{number}", f"领取主线奖励 {number}")).ok
                 assert (await send("commission-list", "城镇委托")).code == "COMMISSION_LIST"
                 assert (await send("commission-accept", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"

@@ -82,6 +82,27 @@
       "stage": 3,
       "name": "雾中守门",
       "desc": "在雾隐入口完成守门试炼，取得秘境线索。",
+      "body": "灵泉谷的水声在身后渐远，雾气却沿着山脊压了下来。洞天守门人没有拦你，只把一盏将熄的引路灯放在石阶中央：灯火若被雾灵吹灭，便说明你的脚步还不足以守住这道门。你必须在雾隐洞天一层走完一次公开探索，迎住守卫或雾灵的试探，并从自动战斗的结果里证明自己没有把危险留给后来者。战胜后，守门人会把秘境线索刻进你的行囊；若战败，灯火仍在原处，等你恢复后再次试门。",
+      "objectives": [
+        {
+          "key": "mist_gate_battle",
+          "type": "exploration_battle_victory",
+          "label": "在雾隐洞天探索中赢得一场自动遭遇战",
+          "mode_key": "explore.mist_grotto",
+          "location_key": "cave.mist_grotto"
+        }
+      ],
+      "actions": [
+        {"command": "前往", "argument": "雾隐洞天一层", "description": "达到气府境四层并持有雾隐洞天一层凭证后启程。"},
+        {"command": "开始探索", "argument": "雾隐洞天探索", "description": "完成自动遭遇战并结算探索，战胜守卫或雾灵才算守门成功。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.1.stage.3"]},
+      "next_stage_key": "chapter.2.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "探索战败或尚未结算时关卡保持进行中，不扣主线奖励；恢复后可再次探索，只有胜利遭遇才推进。"
+      },
       "status": "open",
       "aliases": ["雾中守门"],
       "prerequisites": ["chapter.1.stage.2"],
@@ -100,6 +121,26 @@
       "stage": 1,
       "name": "城镇委托",
       "desc": "完成一项常驻经营委托，开启玄天商路。",
+      "body": "雾隐线索带你回到青石镇，药铺掌柜正守着一批迟迟未到的止血草。镇里的商路不靠一句承诺运转：先把委托接进自己的委托簿，再从公开采集或已有库存备齐三株止血草，最后在订单仍有效时交付。掌柜会把这次交货记入镇务账册，商路因此向你开放；材料不足或订单过期不会吞掉物品，补齐后仍可接当天的其他委托重试。",
+      "objectives": [
+        {
+          "key": "town_herb_supply",
+          "type": "commission_delivery",
+          "label": "在主线开始后交付止血草供应委托",
+          "commission_key": "town_commission.herb_supply"
+        }
+      ],
+      "actions": [
+        {"command": "查看委托", "argument": "城镇委托", "description": "先查看当日公开订单，再接取止血草供应。"},
+        {"command": "交付委托", "argument": "止血草供应", "description": "接取订单后交付三株止血草，结算事务会同时写入名望与信誉。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.2.stage.1"]},
+      "next_stage_key": "chapter.2.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "委托材料不足或订单过期时保留主线进行中，不发放商路奖励；接取并交付新的公开订单后可再次结算。"
+      },
       "status": "open",
       "aliases": ["城镇委托"],
       "reputation_key": "local.xuantian.new_town",

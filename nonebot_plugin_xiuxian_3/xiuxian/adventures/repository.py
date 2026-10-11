@@ -1975,6 +1975,26 @@ class AdventuresRepositoryMixin:
                     if isinstance(amount, int) and not isinstance(amount, bool) and amount >= int(objective.get("quantity", 0)):
                         found = session
                         break
+            elif kind == "exploration_battle_victory":
+                found = connection.execute(
+                    "SELECT 1 FROM exploration_sessions "
+                    "WHERE player_id=? AND status='settled' AND mode_key=? AND location_key=? "
+                    "AND starts_at>=? AND json_extract(result_json, '$.battle_outcome')='won' LIMIT 1",
+                    (
+                        player_id,
+                        objective.get("mode_key"),
+                        objective.get("location_key"),
+                        started_at,
+                    ),
+                ).fetchone()
+            elif kind == "commission_delivery":
+                found = connection.execute(
+                    "SELECT 1 FROM town_commission_claims AS claims "
+                    "JOIN town_commissions AS commissions ON commissions.commission_id=claims.commission_id "
+                    "WHERE claims.player_id=? AND claims.status='delivered' "
+                    "AND commissions.commission_key=? LIMIT 1",
+                    (player_id, objective.get("commission_key")),
+                ).fetchone()
             else:
                 raise ValueError("mainline snapshot objective type is invalid")
             if found is None:
@@ -2044,6 +2064,20 @@ class AdventuresRepositoryMixin:
                         and isinstance(quantity, int)
                         and not isinstance(quantity, bool)
                         and quantity > 0
+                    )
+                if objective["type"] == "exploration_battle_victory":
+                    return (
+                        set(objective) == {"key", "type", "label", "mode_key", "location_key"}
+                        and all(
+                            isinstance(objective.get(field), str) and objective[field].strip()
+                            for field in ("mode_key", "location_key")
+                        )
+                    )
+                if objective["type"] == "commission_delivery":
+                    return (
+                        set(objective) == {"key", "type", "label", "commission_key"}
+                        and isinstance(objective["commission_key"], str)
+                        and bool(objective["commission_key"].strip())
                     )
                 return False
 
