@@ -8,18 +8,20 @@ ENV PYTHONUNBUFFERED=1 \
     XIUXIAN3_DATA_DIR=/app/data
 
 WORKDIR /app
-COPY . /opt/xiuxian3
+COPY requirements.txt /tmp/xiuxian3-requirements.txt
+COPY nonebot_plugin_xiuxian_3 /app/src/plugins/nonebot_plugin_xiuxian_3
+COPY data /app/content-data
 COPY docker/pyproject.toml /app/pyproject.toml
-RUN python -m pip install --no-cache-dir -r /opt/xiuxian3/requirements.txt \
+RUN python -m pip install --no-cache-dir -r /tmp/xiuxian3-requirements.txt \
     && nb --cwd /app --python "$(command -v python)" adapter install --no-restrict-version QQ \
     && nb --cwd /app --python "$(command -v python)" adapter install --no-restrict-version "OneBot V11" \
     && nb --cwd /app --python "$(command -v python)" driver install FastAPI \
     && nb --cwd /app --python "$(command -v python)" driver install HTTPX \
     && nb --cwd /app --python "$(command -v python)" driver install websockets \
     && nb --cwd /app --python "$(command -v python)" driver install AIOHTTP \
-    && python -m pip install --no-cache-dir --no-deps /opt/xiuxian3 \
     && mkdir -p /app/data /app/runtime \
-    && cp -R /opt/xiuxian3/data/. /app/data/
+    && cp -R /app/content-data/. /app/data/ \
+    && rm -f /tmp/xiuxian3-requirements.txt
 
 COPY docker/bot.py /app/bot.py
 COPY docker/entrypoint.sh /entrypoint.sh

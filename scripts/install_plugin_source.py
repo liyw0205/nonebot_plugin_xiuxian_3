@@ -224,14 +224,36 @@ def validate(target: Path) -> None:
     sys.path.insert(0, str(target))
     sys.dont_write_bytecode = True
     import nonebot
+    from nonebot.matcher import matchers as registered_matchers
     from nonebot.plugin import load_all_plugins
 
     nonebot.init()
     plugins = load_all_plugins([], plugin_dirs)
     expected_module = "src.plugins.nonebot_plugin_xiuxian_3"
-    if not any(plugin.module_name == expected_module for plugin in plugins):
+    loaded = [plugin for plugin in plugins if plugin.module_name == expected_module]
+    if len(loaded) != 1:
         raise ValueError(f"NoneBot 未从 {plugin_path} 加载插件")
-    print(f"NoneBot 已加载 {expected_module}")
+    plugin = loaded[0]
+    module_file = Path(plugin.module.__file__).resolve() if plugin.module.__file__ else None
+    if module_file is None or plugin_path.resolve() not in module_file.parents:
+        raise ValueError(f"插件模块路径不在宿主 src/plugins：{module_file}")
+    if not plugin.matcher:
+        raise ValueError("插件已加载但没有注册 matcher")
+    if any(not matcher.handlers for matcher in plugin.matcher):
+        raise ValueError("插件 matcher 没有注册 handler")
+    registered = [
+        matcher
+        for group in registered_matchers.values()
+        for matcher in group
+        if matcher.plugin is plugin
+    ]
+    if len(registered) != len(plugin.matcher) or set(registered) != plugin.matcher:
+        raise ValueError("插件 matcher 注册不一致或重复")
+    handlers = sum(len(matcher.handlers) for matcher in plugin.matcher)
+    print(
+        f"NoneBot 已加载 {expected_module} "
+        f"module_file={module_file} matchers={len(plugin.matcher)} handlers={handlers}"
+    )
 
 
 def main() -> int:

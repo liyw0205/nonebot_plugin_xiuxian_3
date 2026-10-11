@@ -10,6 +10,8 @@ import tomllib
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -131,8 +133,9 @@ def test_nonebot_host_template_has_cli_managed_adapter_configuration() -> None:
     assert host["tool"]["nonebot"]["plugins"]["@local"] == []
     docker_host = tomllib.loads((ROOT / "docker/pyproject.toml").read_text(encoding="utf-8"))
     assert docker_host["project"]["dependencies"] == []
+    assert docker_host["tool"]["nonebot"]["plugin_dirs"] == ["src/plugins"]
     assert docker_host["tool"]["nonebot"]["adapters"]["@local"] == []
-    assert docker_host["tool"]["nonebot"]["plugins"]["@local"] == ["nonebot_plugin_xiuxian_3"]
+    assert docker_host["tool"]["nonebot"]["plugins"]["@local"] == []
 
 
 def test_host_plugin_source_is_replaced_and_loaded_from_plugin_dirs(tmp_path: Path) -> None:
@@ -140,7 +143,8 @@ def test_host_plugin_source_is_replaced_and_loaded_from_plugin_dirs(tmp_path: Pa
     source = tmp_path / "source" / "nonebot_plugin_xiuxian_3"
     source.mkdir(parents=True)
     (source / "__init__.py").write_text(
-        "from nonebot import on\n\nprobe = on('message')\n", encoding="utf-8"
+        "from nonebot import on\n\nprobe = on('message')\n"
+        "@probe.handle()\nasync def handle():\n    pass\n", encoding="utf-8"
     )
     (source / "current.py").write_text("version = 'new'\n", encoding="utf-8")
 
@@ -228,6 +232,87 @@ def test_xiu3_source_loads_from_managed_host_directory(tmp_path: Path) -> None:
     )
     assert "NoneBot 已加载 src.plugins.nonebot_plugin_xiuxian_3" in result.stdout
     assert not list((target / "src/plugins/nonebot_plugin_xiuxian_3").rglob("__pycache__"))
+
+
+def test_docker_source_layout_loads_in_runtime_subprocess(tmp_path: Path) -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    entrypoint = (ROOT / "docker/entrypoint.sh").read_text(encoding="utf-8")
+    assert "COPY nonebot_plugin_xiuxian_3 /app/src/plugins/nonebot_plugin_xiuxian_3" in dockerfile
+    assert "pip install --no-cache-dir --no-deps /opt/xiuxian3" not in dockerfile
+    assert "/opt/xiuxian3" not in dockerfile
+    assert "/app/content-data" in dockerfile and "/app/content-data" in entrypoint
+
+    target = tmp_path / "docker-root"
+    target.mkdir()
+    shutil.copyfile(ROOT / "docker/pyproject.toml", target / "pyproject.toml")
+    shutil.copytree(ROOT / "data", target / "data")
+    shutil.copytree(
+        ROOT / "nonebot_plugin_xiuxian_3",
+        target / "src/plugins/nonebot_plugin_xiuxian_3",
+    )
+
+    probe = (
+        "import importlib.metadata as metadata\n"
+        "from pathlib import Path\n"
+        "import nonebot\n"
+        "from nonebot.matcher import matchers\n"
+        "nonebot.init()\n"
+        "nonebot.load_from_toml('pyproject.toml')\n"
+        "plugins = [p for p in nonebot.get_loaded_plugins() "
+        "if p.module_name.endswith('nonebot_plugin_xiuxian_3')]\n"
+        "assert len(plugins) == 1\n"
+        "plugin = plugins[0]\n"
+        "expected = Path('src/plugins/nonebot_plugin_xiuxian_3/__init__.py').resolve()\n"
+        "assert Path(plugin.module.__file__).resolve() == expected\n"
+        "registered = [m for group in matchers.values() for m in group if m.plugin is plugin]\n"
+        "assert len(registered) == len(plugin.matcher) == 1\n"
+        "assert set(registered) == plugin.matcher\n"
+        "assert all(m.handlers for m in registered)\n"
+        "assert tuple(plugin.module.matchers) == tuple(registered)\n"
+        "assert 'nonebot-plugin-xiuxian-3' not in "
+        "{d.metadata['Name'].lower().replace('_', '-') for d in metadata.distributions()}\n"
+        "print(f'module_file={expected} matchers={len(registered)} "
+        "handlers={sum(len(m.handlers) for m in registered)}')\n"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            probe,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=target,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        timeout=60,
+    )
+    assert f"module_file={(target / 'src/plugins/nonebot_plugin_xiuxian_3/__init__.py').resolve()}" in result.stdout
+    assert "matchers=1 handlers=1" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("source_text", "error"),
+    [
+        ("# No matcher registered\n", "没有注册 matcher"),
+        ("from nonebot import on\nprobe = on('message')\n", "没有注册 handler"),
+    ],
+)
+def test_source_validation_rejects_inert_plugins(tmp_path: Path, source_text: str, error: str) -> None:
+    target = tmp_path / "host"
+    plugin = target / "src/plugins/nonebot_plugin_xiuxian_3"
+    plugin.mkdir(parents=True)
+    (plugin / "__init__.py").write_text(source_text, encoding="utf-8")
+    shutil.copyfile(ROOT / "docker/pyproject.toml", target / "pyproject.toml")
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/install_plugin_source.py"),
+         "--validate", "--target", str(target)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 1
+    assert error in result.stderr
 
 
 def test_managed_installers_copy_plugin_source_instead_of_pip_installing_it() -> None:
