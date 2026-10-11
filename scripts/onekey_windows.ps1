@@ -157,15 +157,7 @@ function Update-Source {
         return
     }
     if (Test-Path (Join-Path $Source ".git")) {
-        if ($Action -eq "update") {
-            $dirty = & git -C $Source status --porcelain
-            if ($dirty) { throw "源码目录有未提交改动：$Source" }
-            Write-Info "更新插件源码：$Source"
-            & git -C $Source fetch --prune origin
-            if ($LASTEXITCODE -ne 0) { throw "Git fetch 失败" }
-            & git -C $Source pull --ff-only origin main
-            if ($LASTEXITCODE -ne 0) { throw "Git fast-forward 更新失败" }
-        }
+        if ($Action -eq "update") { Write-Info "源码模式使用当前 checkout；onekey 不会自动 fetch/pull。" }
         return
     }
     if (Test-Path $Source) { throw "源码路径已存在但不是 Git 仓库：$Source" }

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import shlex
+import tarfile
 import tomllib
 from tempfile import TemporaryDirectory
 from pathlib import Path
@@ -188,6 +190,159 @@ def test_qq_login_helper_is_installed_and_documented() -> None:
     assert "scripts/qq_login.py" in shell_installer
     assert "scripts\\qq_login.py" in windows_installer
     assert "qq_login.py" in control and "qq_login.py" in windows_control
+
+
+def test_source_update_uses_current_checkout_without_git_fetch_or_pull(tmp_path: Path) -> None:
+    target = tmp_path / "host"
+    source = tmp_path / "source"
+    fake_bin = tmp_path / "bin"
+    target.mkdir()
+    (source / "scripts").mkdir(parents=True)
+    (source / ".git").mkdir()
+    installer = source / "scripts" / "install.sh"
+    installer.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$INSTALL_ARGS\"\n", encoding="utf-8")
+    installer.chmod(0o755)
+    fake_bin.mkdir()
+    git_log = tmp_path / "git.log"
+    fake_git = fake_bin / "git"
+    fake_git.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$GIT_LOG\"\n", encoding="utf-8")
+    fake_git.chmod(0o755)
+    install_args = tmp_path / "install-args"
+    environment = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "GIT_LOG": str(git_log),
+        "INSTALL_ARGS": str(install_args),
+    }
+
+    result = subprocess.run(
+        [
+            "bash", str(ROOT / "scripts/control.sh"), "update",
+            "--target", str(target), "--source", str(source),
+            "--source-mode", "source", "--venv", str(tmp_path / "venv"),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert "不会自动 fetch/pull" in result.stdout
+    assert not git_log.exists()
+    args = install_args.read_text(encoding="utf-8")
+    assert "update" in args and "--source-mode" in args and "source" in args
+
+
+def test_release_update_downloads_archive_and_preserves_host_state(tmp_path: Path) -> None:
+    target = tmp_path / "host"
+    source = tmp_path / "release-cache"
+    venv = tmp_path / "venv"
+    fake_bin = tmp_path / "bin"
+    target.mkdir()
+    source.mkdir()
+    (source / ".xiuxian3-release").write_text("old release\n", encoding="utf-8")
+    (target / ".env").write_text("keep-env\n", encoding="utf-8")
+    (target / "data").mkdir()
+    (target / "data" / "profile.json").write_text("keep-data\n", encoding="utf-8")
+    (target / "runtime").mkdir()
+    (target / "runtime" / "state.bin").write_text("keep-runtime\n", encoding="utf-8")
+    venv.mkdir()
+    (venv / "sentinel").write_text("keep-venv\n", encoding="utf-8")
+
+    release_root = tmp_path / "release-root"
+    (release_root / "scripts").mkdir(parents=True)
+    (release_root / "pyproject.toml").write_text("[project]\nname='fixture'\n", encoding="utf-8")
+    release_installer = release_root / "scripts" / "install.sh"
+    release_installer.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "target= venv= source_mode=\n"
+        "while (($#)); do\n"
+        "  case $1 in\n"
+        "    --target) target=$2; shift 2 ;;\n"
+        "    --venv) venv=$2; shift 2 ;;\n"
+        "    --source-mode) source_mode=$2; shift 2 ;;\n"
+        "    *) shift ;;\n"
+        "  esac\n"
+        "done\n"
+        "test \"$source_mode\" = source\n"
+        "test \"$(cat \"$target/.env\")\" = keep-env\n"
+        "test \"$(cat \"$target/data/profile.json\")\" = keep-data\n"
+        "test \"$(cat \"$target/runtime/state.bin\")\" = keep-runtime\n"
+        "test \"$(cat \"$venv/sentinel\")\" = keep-venv\n"
+        ": > \"$UPDATE_MARKER\"\n",
+        encoding="utf-8",
+    )
+    release_installer.chmod(0o755)
+    release_archive = tmp_path / "fixture-project.tar.gz"
+    with tarfile.open(release_archive, "w:gz") as bundle:
+        bundle.add(release_root, arcname=".")
+
+    fake_bin.mkdir()
+    fake_curl = fake_bin / "curl"
+    fake_curl.write_text(
+        "#!/bin/sh\n"
+        "output= url=\n"
+        "while [ $# -gt 0 ]; do\n"
+        "  if [ \"$1\" = -o ]; then shift; output=$1; else url=$1; fi\n"
+        "  shift\n"
+        "done\n"
+        "printf '%s\\n' \"$url\" > \"$CURL_URL\"\n"
+        "cp \"$XIUXIAN3_TEST_RELEASE_ARCHIVE\" \"$output\"\n",
+        encoding="utf-8",
+    )
+    fake_curl.chmod(0o755)
+    fake_git = fake_bin / "git"
+    fake_git.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$GIT_LOG\"\n", encoding="utf-8")
+    fake_git.chmod(0o755)
+    update_marker = tmp_path / "installer-ran"
+    curl_url = tmp_path / "curl-url"
+    git_log = tmp_path / "git.log"
+    environment = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "TMPDIR": str(tmp_path),
+        "XIUXIAN3_TEST_RELEASE_ARCHIVE": str(release_archive),
+        "UPDATE_MARKER": str(update_marker),
+        "CURL_URL": str(curl_url),
+        "GIT_LOG": str(git_log),
+    }
+
+    subprocess.run(
+        [
+            "bash", str(ROOT / "scripts/onekey.sh"), "update",
+            "--target", str(target), "--source", str(source),
+            "--source-mode", "release", "--mirror", "direct", "--venv", str(venv),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert update_marker.is_file()
+    assert curl_url.read_text(encoding="utf-8").strip() == (
+        "https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
+    )
+    assert not git_log.exists()
+    assert (source / ".xiuxian3-release").read_text(encoding="utf-8").strip().endswith("project.tar.gz")
+    assert (target / ".env").read_text(encoding="utf-8") == "keep-env\n"
+    assert (target / "data" / "profile.json").read_text(encoding="utf-8") == "keep-data\n"
+    assert (target / "runtime" / "state.bin").read_text(encoding="utf-8") == "keep-runtime\n"
+    assert (venv / "sentinel").read_text(encoding="utf-8") == "keep-venv\n"
+
+
+def test_windows_update_paths_do_not_run_git_fetch_or_pull() -> None:
+    windows_control = (ROOT / "scripts/control_windows.ps1").read_text(encoding="utf-8")
+    update_branch = windows_control.split('    "update" {', 1)[1].split('    "uninstall" {', 1)[0]
+    assert "& git -C $SourceRoot fetch" not in update_branch
+    assert "& git -C $SourceRoot pull" not in update_branch
+    assert "onekey_windows.ps1" in update_branch
+
+    windows_bootstrap = (ROOT / "scripts/onekey_windows.ps1").read_text(encoding="utf-8")
+    source_update = windows_bootstrap.split("function Update-Source {", 1)[1].split("function Get-ReleaseUrls", 1)[0]
+    assert "& git -C $Source fetch" not in source_update
+    assert "& git -C $Source pull" not in source_update
 
 
 def test_accelerated_bootstraps_benchmark_a_proxy_group() -> None:

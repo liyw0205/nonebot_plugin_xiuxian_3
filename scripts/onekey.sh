@@ -302,12 +302,7 @@ download_release_source() {
 
 ensure_git_source() {
     if [ -d "$SOURCE/.git" ]; then
-        if [ "$ACTION" = update ]; then
-            [ -z "$(git -C "$SOURCE" status --porcelain)" ] || fail "源码目录有未提交改动：$SOURCE"
-            log "更新开发源码：$SOURCE"
-            git -C "$SOURCE" fetch --prune origin
-            git -C "$SOURCE" pull --ff-only origin main
-        fi
+        [ "$ACTION" != update ] || log "源码模式使用当前 checkout；onekey 不会自动 fetch/pull。"
         return
     fi
     [ ! -e "$SOURCE" ] || fail "源码路径已存在但不是 Git 仓库：$SOURCE"
@@ -373,7 +368,7 @@ ensure_source
 [ -x "$SOURCE/scripts/install.sh" ] || fail "源码目录缺少 scripts/install.sh：$SOURCE"
 
 args=("$SOURCE/scripts/install.sh" "$ACTION" --target "$TARGET" --source "$SOURCE" \
-    --source-mode "$SOURCE_MODE" --mirror "$MIRROR" --venv "$VENV" --index-url "$INDEX_URL")
+    --source-mode source --mirror "$MIRROR" --venv "$VENV" --index-url "$INDEX_URL")
 [ -n "$MIRROR_URL" ] && args+=(--mirror-url "$MIRROR_URL")
 [ "$YES" = 0 ] || args+=(--yes)
 exec bash "${args[@]}"

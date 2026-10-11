@@ -95,7 +95,7 @@ cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
 ```
 
-源码 checkout 应保持在 `main`。更新前先停止宿主并备份，再拉取 `main` 并重新安装：
+源码 checkout 应保持在 `main`。源码模式下管理命令使用当前 checkout，不自动执行 Git 更新；需要更新源码时，先停止宿主并备份，再由操作者同步 `main` checkout，最后重新安装：
 
 ```bash
 /path/to/nonebot-host/xiu3 stop
@@ -105,7 +105,7 @@ bash /path/to/xiuxian3-src/scripts/install.sh update /path/to/nonebot-host --ven
 /path/to/nonebot-host/xiu3 start
 ```
 
-更新前先保存本地源码修改。Release 安装通过 `xiu3 update` 重新获取 `main` 版本 tag 对应的 Release 资产。
+更新前先保存本地源码修改。Release 安装通过 `xiu3 update` 重新下载最新 `project.tar.gz`；该更新路径不执行 `git fetch/pull`。
 
 ## 已有宿主手动安装
 
@@ -198,7 +198,7 @@ Windows：
 & .\xiu3.ps1 uninstall --yes
 ```
 
-Release 安装的 `update` 会重新获取 `project.tar.gz`，保留宿主 `.env`、SQLite、`data/`、`runtime/` 和用户 JSON。源码 checkout 拉取 `main` 后执行 `scripts/install.sh update`。停止宿主后再备份，更新完成后重新启动：
+Release 安装的 `update` 会重新获取 `project.tar.gz`，保留宿主 `.env`、SQLite、`data/`、`runtime/` 和用户 JSON，也不替换 venv。源码 checkout 由操作者自行同步后执行 `scripts/install.sh update`。停止宿主后再备份，更新完成后重新启动：
 
 ```bash
 xiu3 stop

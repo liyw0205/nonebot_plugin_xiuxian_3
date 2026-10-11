@@ -151,14 +151,7 @@ switch ($Action) {
         }
         if ($SourceMode -notin @("auto", "source")) { throw "不支持的更新源码模式：$SourceMode" }
         if ($SourceRoot -and (Test-Path (Join-Path $SourceRoot "scripts\install_windows.ps1"))) {
-            if (Test-Path (Join-Path $SourceRoot ".git")) {
-                $dirty = & git -C $SourceRoot status --porcelain
-                if ($dirty) { throw "源码目录有未提交改动，先提交或备份后再更新：$SourceRoot" }
-                & git -C $SourceRoot fetch --prune origin
-                if ($LASTEXITCODE -ne 0) { throw "Git fetch 失败" }
-                & git -C $SourceRoot pull --ff-only origin main
-                if ($LASTEXITCODE -ne 0) { throw "Git fast-forward 更新失败" }
-            }
+            Write-Host "[xiu3] 源码模式使用当前 checkout；不会自动 fetch/pull。请先自行同步源码，再运行更新。"
             & (Join-Path $SourceRoot "scripts\install_windows.ps1") update --target $Target --source $SourceRoot --source-mode source --mirror $Mirror --venv $Venv
         } else {
             $VenvPython = Join-Path $Venv "Scripts\python.exe"

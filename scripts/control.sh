@@ -209,14 +209,7 @@ update() {
             printf '[xiu3] 不支持的更新源码模式：%s\n' "$SOURCE_MODE" >&2
             return 2
         }
-        if [ -d "$SOURCE_ROOT/.git" ]; then
-            [ -z "$(git -C "$SOURCE_ROOT" status --porcelain)" ] || {
-                printf '[xiu3] 源码目录有未提交改动，先提交或备份后再更新：%s\n' "$SOURCE_ROOT" >&2
-                return 1
-            }
-            git -C "$SOURCE_ROOT" fetch --prune origin
-            git -C "$SOURCE_ROOT" pull --ff-only origin main
-        fi
+        printf '[xiu3] 源码模式使用当前 checkout；不会自动 fetch/pull。请先自行同步源码，再运行更新。\n'
         exec "$SOURCE_ROOT/scripts/install.sh" update --target "$TARGET" --source "$SOURCE_ROOT" \
             --source-mode source --mirror "$MIRROR" --venv "$VENV"
     fi

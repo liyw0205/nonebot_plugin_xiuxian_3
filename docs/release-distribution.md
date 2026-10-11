@@ -2,7 +2,7 @@
 
 `main` 是公开源码、安装和更新的唯一入口。版本化 Release 必须从 `main` 上的稳定版本 tag 构建。
 
-源码安装显式 checkout `main` 并使用 `--source-mode source`；Release 安装使用 `main` 上的远程引导脚本和该版本 tag 对应的资产。两者都使用同一套宿主模板和数据保护规则。
+源码安装显式 checkout `main` 并使用 `--source-mode source`；Release 安装使用 `main` 上的远程引导脚本和最新正式 Release 资产。两者都使用同一套宿主模板和数据保护规则。
 
 ## Tag 与资产
 
@@ -16,9 +16,9 @@
 1. 默认尝试代理包装的 `latest/download/project.tar.gz` 地址。
 2. 代理下载失败、返回非成功状态或归档校验失败时，直接请求 GitHub 的同一 Release URL。
 3. 直连也失败时停止并保留已有宿主、`.env`、SQLite、`data/` 和 `runtime/`；不会偷偷把 Release 安装切换成未标记的源码。
-4. 源码模式必须显式传入 `--source-mode source`；更新时先 `git -C <src> pull --ff-only origin main`，再执行 `bash <src>/scripts/install.sh update <host> --venv <venv>`。
+4. 源码模式必须显式传入 `--source-mode source`。Release 管理目录执行 `xiu3 update` 时重新下载 `latest/download/project.tar.gz`，更新脚本本身不执行 `git fetch/pull`。源码模式使用当前 checkout；如需更新源码，操作者先自行同步 checkout，再执行 `bash <src>/scripts/install.sh update <host> --venv <venv>`。
 
-代理地址由安装脚本维护；代理下载或归档校验失败时会回退到 GitHub Release 直连，不会静默切换到源码安装。
+代理地址由安装脚本维护；代理下载或归档校验失败时会回退到 GitHub Release 直连，不会静默切换到源码安装。Release 更新只替换独立源码缓存，不覆盖宿主、`.env`、SQLite、`data/`、`runtime/` 或 venv。
 
 ## 数据保护
 
