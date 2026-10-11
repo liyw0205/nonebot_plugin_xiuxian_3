@@ -4,29 +4,36 @@
 
 以下步骤使用 `main` 中的安装脚本。要求 Python 3.11+；宿主由 NoneBot 的 `nb run` 启动，插件不单独监听业务端口。
 
+Linux/Termux 的 Release 一键安装可直接运行 `main` 上的 raw 脚本，不需要先 clone 仓库。
+
 ## 一键安装
 
 安装器默认创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境。
 
-### Linux
+### Linux 一键 Release 安装
 
-需要先安装 Git 和 curl（Debian/Ubuntu 可用 `sudo apt install git curl`）。
-
-```bash
-git clone --branch main --single-branch \
-  https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
-cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode release --mirror direct
-```
-
-### GitHub Release
-
-版本化 Release 从 `main` 上的版本 tag 生成，归档资产名为 `project.tar.gz`。Release 安装和更新使用 GitHub 官方 `latest/download/project.tar.gz` 地址；源码安装则显式 checkout `main`。
+先准备 curl（Debian/Ubuntu 可用 `sudo apt install curl`）。安装器会补齐 Git、Python 和所需构建工具。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
 ```
+
+### Termux 一键 Release 安装
+
+```bash
+pkg update -y
+pkg install -y curl
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
+  | bash -s -- install --source-mode release --mirror accelerated
+termux-wake-lock
+```
+
+安装器会使用 `pkg` 补齐 Python、Git、curl 和 clang。使用 `proot-distro` 时在容器内单独创建虚拟环境，不要复用 Termux 的 venv。
+
+### Release 下载与参数
+
+版本化 Release 从 `main` 上的版本 tag 生成，归档资产名为 `project.tar.gz`。Release 安装和更新使用 GitHub 官方 `latest/download/project.tar.gz` 地址；源码安装则显式 checkout `main`。
 
 常用参数：
 
@@ -42,23 +49,9 @@ curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/m
 
 源码安装使用 `source`，Release 安装使用 `release`。代理下载失败时脚本会继续尝试并最终回退 GitHub 直连。
 
-### Termux
+### Windows（手动获取脚本）
 
-```bash
-pkg update -y
-pkg install -y git curl
-git clone --branch main --single-branch \
-  https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
-cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode release --mirror direct
-termux-wake-lock
-```
-
-安装器会使用 `pkg` 补齐 Python、Git、curl 和 clang。使用 `proot-distro` 时在容器内单独创建虚拟环境，不要复用 Termux 的 venv。
-
-### Windows
-
-先确保 Git 可用；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
+Windows 示例通过 clone `main` 手动获取 PowerShell 安装脚本；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
 
 ```powershell
 git clone --branch main --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
@@ -68,9 +61,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1
 
 脚本会检查 Python 3.11+ 和 Git，缺少时尝试使用 `winget`；也可以先手动安装后再运行。
 
-### Docker
+### Docker（手动获取部署文件）
 
-先取得 `main`，再使用仓库包含的 `Dockerfile`、`docker-compose.yml` 和 `docker/env.example`：
+先从 `main` 获取仓库中的 `Dockerfile`、`docker-compose.yml` 和 `docker/env.example`；此处 clone 是为了取得部署文件：
 
 ```bash
 git clone --branch main --single-branch \
@@ -84,9 +77,9 @@ docker compose logs -f xiuxian3
 
 Compose 将宿主的 `./data` 挂载到容器 `/app/data`，将 `./runtime` 挂载到 `/app/runtime`。QQ 凭据只写入 `docker/.env`。
 
-## 源码模式
+## 手动获取脚本或源码安装
 
-源码模式必须显式使用 checkout，不会下载 Release：
+需要手动获取脚本或进行源码安装时，再 clone `main`。这不是 Linux/Termux Release 一键安装的前置步骤。源码模式必须显式使用 checkout，不会下载 Release：
 
 ```bash
 git clone --branch main --single-branch \

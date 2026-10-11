@@ -30,36 +30,43 @@
 
 安装器会创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境，安装 NoneBot CLI、QQ、OneBot V11 适配器及 FastAPI、HTTPX、websockets、AIOHTTP 驱动。Release 管理安装从 latest Release 获取程序文件；更新时保留宿主已有的 `.env`、数据库和 JSON 文件。
 
-### Linux 一键安装
+### Linux 一键 Release 安装
 
-先准备 Git 和 curl；Debian/Ubuntu 可执行 `sudo apt install git curl`。
+只需先准备 curl；Debian/Ubuntu 可执行 `sudo apt install curl`。Release 一键安装不需要先 clone 仓库。
 
 ```bash
-git clone --branch main --single-branch \
-  https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
-cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode release --mirror direct
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
+  | bash -s -- install --source-mode release --mirror accelerated
 ```
 
 安装完成后编辑 `$HOME/xiu3/.env`，再执行 `xiu3 start`。无法写入公共命令目录时，使用 `$HOME/xiu3/xiu3`。
 
-### Termux
+### Termux 一键 Release 安装
 
 ```bash
 pkg update -y
-pkg install -y git curl
-git clone --branch main --single-branch \
-  https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
-cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode release --mirror direct
+pkg install -y curl
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
+  | bash -s -- install --source-mode release --mirror accelerated
 termux-wake-lock
 ```
 
-不要混用 Termux 与 `proot-distro` 的 Python/虚拟环境；在容器内重新执行安装器。
+安装器会补齐 Python、Git、curl 和 clang。不要混用 Termux 与 `proot-distro` 的 Python/虚拟环境；在容器内重新执行安装器。
 
-### Windows
+### 手动获取脚本或源码安装
 
-先确保 Git 可用；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
+以下 clone 仅用于手动获取脚本或显式进行源码安装，不是上面的 Release 一键安装前置。源码模式适合本地开发；`xiu3 update` 仅支持 Release 管理安装。
+
+```bash
+git clone --branch main --single-branch \
+  https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
+cd xiuxian3-src
+bash scripts/onekey.sh install --source-mode source --mirror direct
+```
+
+### Windows（手动获取脚本）
+
+Windows 示例先 clone `main` 获取 PowerShell 安装脚本；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
 
 ```powershell
 git clone --branch main --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
@@ -67,7 +74,9 @@ Set-Location xiuxian3-src
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode release -Mirror direct
 ```
 
-### Docker
+### Docker（手动获取部署文件）
+
+Docker Compose 文件需要从 `main` 获取；以下 clone 是为了取得这些部署文件。
 
 ```bash
 git clone --branch main --single-branch \

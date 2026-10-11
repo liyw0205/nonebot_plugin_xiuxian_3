@@ -132,13 +132,27 @@ def test_nonebot_host_template_has_cli_managed_adapter_configuration() -> None:
     assert docker_host["tool"]["nonebot"]["plugins"]["@local"] == ["nonebot_plugin_xiuxian_3"]
 
 
-def test_user_install_guides_start_with_supported_source_checkout() -> None:
+def test_user_install_guides_prefer_raw_release_and_label_manual_checkout() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     installation = (ROOT / "docs/installation.md").read_text(encoding="utf-8")
-    assert "git clone --branch " in readme
-    assert "bash scripts/onekey.sh install --source-mode source" in readme
-    assert "git clone --branch " in installation
-    assert "--source-mode source" in installation
+    raw_installer = (
+        "https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh"
+    )
+    for guide in (readme, installation):
+        linux = guide.split("### Linux 一键 Release 安装\n", 1)[1].split("\n### ", 1)[0]
+        termux = guide.split("### Termux 一键 Release 安装\n", 1)[1].split("\n### ", 1)[0]
+        for section in (linux, termux):
+            assert raw_installer in section
+            assert "--source-mode release" in section
+            assert "git clone" not in section
+
+    assert "Release 一键安装不需要先 clone 仓库" in readme
+    assert "不需要先 clone 仓库" in installation
+    readme_manual = readme.split("### 手动获取脚本或源码安装\n", 1)[1].split("\n### ", 1)[0]
+    install_manual = installation.split("## 手动获取脚本或源码安装\n", 1)[1].split("\n## ", 1)[0]
+    for section in (readme_manual, install_manual):
+        assert "git clone --branch main" in section
+        assert "--source-mode source" in section
     assert "requirements.txt" in installation
     assert "--mirror accelerated" in installation
     assert "$HOME/xiu3" in readme
