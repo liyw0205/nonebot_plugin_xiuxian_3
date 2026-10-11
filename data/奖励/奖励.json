@@ -1492,18 +1492,6 @@
       ],
       "key": "reward_pool.enemy.dao_origin",
       "status": "active"
-    },
-    {
-      "name": "天劫遭遇掉落",
-      "desc": "天劫试炼中的护持材料与道果残片。",
-      "pool_type": "weighted",
-      "outcomes": [
-        {"weight": 5, "rewards": {"item.tribulation_guard": 1, "spirit_stones": 500}},
-        {"weight": 3, "rewards": {"item.dao_fruit_fragment": 2, "spirit_stones": 700}},
-        {"weight": 2, "rewards": {"item.tribulation_guard": 2, "spirit_stones": 900}}
-      ],
-      "key": "reward_pool.enemy.tribulation",
-      "status": "active"
     }
   ],
   "schema": "xiuxian.content"
