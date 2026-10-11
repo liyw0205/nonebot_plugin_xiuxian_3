@@ -13,9 +13,12 @@ M7 有限清单已完成、审查并推送，业务提交为 `579c3ab`，独立�
 M8 玩家交互切片已完成并普通推送 main，业务提交 `f4f4388`，29 项聚焦验证与独立远端核验通过。
 M9 数据与受影响消费者已合入 main（`9be1cae`），CI 已通过，不重新执行 M9。
 主线首两关真实切片已推送 `42d1772`；Docker 宿主源码加载修复已推送 `b79e28b`，v0.1.4 已发布。
-当前有限任务是修复 Release 根目录识别、共享安全种子迁移和失败回退，聚焦验证后提交推送 main，
-发布新版本（不移动旧 tag），仅迁移并重启 `/root/xiu3-qq-test-20261011`。
+Release 根目录识别、共享安全种子迁移和失败回退已完成并推送 `4aa182c`，v0.1.5 已发布，
+quality 3.11/3.12、install-smoke/release 全部成功。指定宿主 `/root/xiu3-qq-test-20261011`
+已从 Release 更新并重启，源码位于 src/plugins，1 matcher/1 handler、无 xiu3 pip 包，QQ READY。
+仅此宿主的两个未知基线 JSON 按用户授权备份后最小人工合并，未伪造官方指纹。
 本次发布与此宿主部署由用户明确授权，不代表其他环境投产或 QQ 消息呈现验收。
+当前无自动下一开发项，等待新目标；最终证据见 current 与独立部署报告，不重开 M9/旧 goal。
 M7 仅完成旧范围来源/引用修补，不作为 M9 内容完整证明。
 本地内容沿用现行规则与已记录依赖；保留 loader → 公开取得 → application/repository → 玩法消费链、
 快照、事务、幂等和恢复语义，不把未来 locked 内容或外部条件混入本地完成声明。
@@ -27,7 +30,7 @@ QQ 回复按 AppID 能力使用 Markdown 或纯文本；M8 接通普通 handler 
 适配器来源以实际运行时为准：xiu3 通过外部 pip/NoneBot CLI 使用 QQ 与 OneBot，仓内没有
 SDK vendor；兄弟 `nonebot_plugin_xiuxian_2` 的 vendor 只可在明确授权后作为 patch source。
 固定 SHA、候选补丁、魔改冲突和短合同见 `docs/adapter-upstream-review.md`；未核实补丁不得合并。
-当前任务只普通提交推送 main、等待 CI、发布新 tag/Release 和指定宿主迁移；不向 QQ 发送测试消息。
+本轮已完成普通推送 main、新 tag/Release 和指定宿主迁移；未向 QQ 发送测试消息。
 
 ## 工作边界
 
