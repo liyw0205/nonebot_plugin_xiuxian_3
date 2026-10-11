@@ -270,6 +270,9 @@ copy_if_missing() {
 copy_if_missing "$ROOT/examples/nonebot/bot.py" "$TARGET/bot.py"
 copy_if_missing "$ROOT/examples/nonebot/pyproject.toml" "$TARGET/pyproject.toml"
 copy_if_missing "$ROOT/examples/nonebot/.env.example" "$TARGET/.env"
+log "将插件源码部署到宿主 src/plugins"
+"$PYTHON" "$ROOT/scripts/install_plugin_source.py" \
+    --source "$ROOT/nonebot_plugin_xiuxian_3" --target "$TARGET"
 
 log "从 requirements.txt 安装 nb-cli"
 retry "$VENV_PY" -m pip install --upgrade --index-url "$INDEX_URL" -r "$ROOT/requirements.txt" \
@@ -295,11 +298,11 @@ install_nb_component driver "HTTPX"
 install_nb_component driver "websockets"
 install_nb_component driver "AIOHTTP"
 
-log "安装修仙插件本身，不重复解析 CLI 已安装的运行依赖"
-project_pip_args=(--no-build-isolation --no-deps --index-url "$INDEX_URL")
-if [ "$ACTION" = update ]; then project_pip_args=(--upgrade "${project_pip_args[@]}"); fi
-retry "$VENV_PY" -m pip install "${project_pip_args[@]}" "$ROOT" \
-    || fail "修仙插件安装失败。保留的宿主目录和虚拟环境可以直接重试。"
+if "$VENV_PY" -c 'import importlib.metadata; importlib.metadata.distribution("nonebot-plugin-xiuxian-3")' >/dev/null 2>&1; then
+    log "移除旧的 venv 插件发行包，改由宿主 src/plugins 加载"
+    retry "$VENV_PY" -m pip uninstall --yes nonebot-plugin-xiuxian-3 \
+        || fail "无法移除旧插件发行包；宿主源码已保留，请检查 venv 后重试。"
+fi
 
 while IFS= read -r -d '' source; do
     relative="${source#"$ROOT/data/"}"
@@ -339,7 +342,11 @@ else
 fi
 
 log "校验已安装包、NoneBot 入口和 JSON 内容"
-"$VENV_PY" -c 'import importlib.metadata; import nonebot; import nonebot.adapters.qq; import nonebot.adapters.onebot.v11; import nonebot_plugin_xiuxian_3; importlib.metadata.version("nb-cli")'
+"$VENV_PY" -c 'import importlib.metadata; import nonebot; import nonebot.adapters.qq; import nonebot.adapters.onebot.v11; importlib.metadata.version("nb-cli")'
+(
+    cd "$TARGET"
+    "$VENV_PY" "$ROOT/scripts/install_plugin_source.py" --target "$TARGET" --validate
+)
 "$VENV_NB" --help >/dev/null 2>&1 \
     || fail "nb 命令未安装：$VENV_NB"
 "$VENV_PY" - "$TARGET/data" <<'PY'

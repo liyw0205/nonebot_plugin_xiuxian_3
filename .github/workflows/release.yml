@@ -32,7 +32,7 @@ jobs:
       - name: Run focused quality tests
         run: python -m pytest -q test/test_installation_docs.py
       - name: Compile Python sources
-        run: python -m compileall -q nonebot_plugin_xiuxian_3 examples docker
+        run: python -m compileall -q nonebot_plugin_xiuxian_3 examples docker scripts/install_plugin_source.py
       - name: Check shell entrypoints
         run: bash -n scripts/onekey.sh scripts/install.sh scripts/install_termux.sh scripts/control.sh
 
@@ -54,7 +54,9 @@ jobs:
           test -x "$RUNNER_TEMP/xiu3/xiu3"
           test -f "$RUNNER_TEMP/xiu3/.env"
           test -f "$RUNNER_TEMP/xiu3/data/内容清单.json"
-          "$HOME/myenv/bin/python" -c 'import nonebot_plugin_xiuxian_3'
+          test -f "$RUNNER_TEMP/xiu3/src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
+          "$HOME/myenv/bin/python" scripts/install_plugin_source.py --validate --target "$RUNNER_TEMP/xiu3"
+          "$HOME/myenv/bin/python" -c 'import importlib.metadata as m; assert "nonebot-plugin-xiuxian-3" not in {d.metadata["Name"].lower().replace("_", "-") for d in m.distributions()}'
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

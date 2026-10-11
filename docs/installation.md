@@ -98,7 +98,7 @@ bash scripts/onekey.sh install --source-mode source --mirror direct
 bash scripts/onekey.sh install --source-mode release --mirror direct --target /path/to/nonebot-host --source /path/to/xiuxian3-release-cache --venv /path/to/venv
 ```
 
-该脚本会从 Release 获取程序文件，在指定 venv 中安装 `requirements.txt`、QQ/OneBot 适配器、FastAPI/HTTPX/websockets/AIOHTTP 和插件本身，并只复制宿主中缺失的 `bot.py`、`pyproject.toml`、`.env` 与 `data/*.json`。已有宿主的配置、代码和数据不会覆盖。宿主必须包含可由 `nb run` 加载的 `bot.py` 和 `pyproject.toml`。
+该脚本会从 Release 获取程序文件，在指定 venv 中安装 `requirements.txt`、QQ/OneBot 适配器及 FastAPI/HTTPX/websockets/AIOHTTP 依赖；插件源码会原子替换到宿主 `src/plugins/nonebot_plugin_xiuxian_3`，并配置 `plugin_dirs = ["src/plugins"]`。插件本身不会安装到 venv。脚本只复制宿主中缺失的 `bot.py`、`pyproject.toml`、`.env` 与 `data/*.json`；已有宿主配置、入口和数据不会覆盖。宿主必须包含可由 `nb run` 加载的 `bot.py` 和 `pyproject.toml`。
 
 ### 不使用安装脚本
 
@@ -114,16 +114,18 @@ mkdir -p "$XIUXIAN3_HOST"
 cp -n examples/nonebot/bot.py examples/nonebot/pyproject.toml "$XIUXIAN3_HOST/"
 if [ ! -f "$XIUXIAN3_HOST/.env" ]; then cp examples/nonebot/.env.example "$XIUXIAN3_HOST/.env"; fi
 cp -Rn data "$XIUXIAN3_HOST/"
+"$XIUXIAN3_ENV/bin/python" scripts/install_plugin_source.py \
+  --source "$XIUXIAN3_SRC/nonebot_plugin_xiuxian_3" --target "$XIUXIAN3_HOST"
 "$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" adapter install --no-restrict-version QQ
 "$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" adapter install --no-restrict-version "OneBot V11"
 "$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" driver install FastAPI
 "$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" driver install HTTPX
 "$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" driver install websockets
 "$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" --python "$XIUXIAN3_ENV/bin/python" driver install AIOHTTP
-"$XIUXIAN3_ENV/bin/python" -m pip install --no-deps "$XIUXIAN3_SRC"
+"$XIUXIAN3_ENV/bin/python" scripts/install_plugin_source.py --validate --target "$XIUXIAN3_HOST"
 ```
 
-填写宿主 `.env` 后执行 `"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" run`。此方式不生成 `xiu3` 管理命令；已有宿主需要在其启动入口注册适配器并在 `pyproject.toml` 加载插件，不能覆盖原入口。
+填写宿主 `.env` 后执行 `"$XIUXIAN3_ENV/bin/nb" --cwd "$XIUXIAN3_HOST" run`。此方式不生成 `xiu3` 管理命令；已有宿主需要在其启动入口注册适配器，脚本会保留其它 `pyproject.toml` 配置并加入本地插件目录，不会覆盖原入口。
 
 ## 最小配置
 

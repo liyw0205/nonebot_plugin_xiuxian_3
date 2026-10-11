@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
+from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError, bundled_content
 from nonebot_plugin_xiuxian_3.xiuxian.player.rules import realm_display_name
 from nonebot_plugin_xiuxian_3.xiuxian.progression.rules import _content_thresholds, formal_realms, next_layer_threshold
 
@@ -59,6 +59,19 @@ def test_runtime_content_uses_normalized_records() -> None:
             "qi_sensing", "qi_gathering", "foundation", "golden_core", "nascent_soul",
             "soul_transformation", "void_refining", "dao_union", "tribulation",
         }
+
+
+def test_bundled_content_prefers_host_working_directory_data(tmp_path: Path, monkeypatch) -> None:
+    host_data = tmp_path / "data"
+    shutil.copytree(Path(__file__).parents[1] / "data", host_data)
+    monkeypatch.chdir(tmp_path)
+
+    assert bundled_content().root == host_data.resolve()
+
+    configured_data = tmp_path / "custom-data"
+    shutil.copytree(host_data, configured_data)
+    monkeypatch.setenv("XIUXIAN3_DATA_DIR", str(configured_data))
+    assert bundled_content().root == configured_data.resolve()
 
 
 def test_content_files_keep_business_fields_only() -> None:

@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import subprocess
 import shlex
+import shutil
+import sys
 import tarfile
 import tomllib
 from tempfile import TemporaryDirectory
@@ -124,12 +126,131 @@ def test_requirements_leave_cli_version_to_the_environment() -> None:
 def test_nonebot_host_template_has_cli_managed_adapter_configuration() -> None:
     host = tomllib.loads((ROOT / "examples/nonebot/pyproject.toml").read_text(encoding="utf-8"))
     assert host["project"]["dependencies"] == []
+    assert host["tool"]["nonebot"]["plugin_dirs"] == ["src/plugins"]
     assert host["tool"]["nonebot"]["adapters"]["@local"] == []
-    assert host["tool"]["nonebot"]["plugins"]["@local"] == ["nonebot_plugin_xiuxian_3"]
+    assert host["tool"]["nonebot"]["plugins"]["@local"] == []
     docker_host = tomllib.loads((ROOT / "docker/pyproject.toml").read_text(encoding="utf-8"))
     assert docker_host["project"]["dependencies"] == []
     assert docker_host["tool"]["nonebot"]["adapters"]["@local"] == []
     assert docker_host["tool"]["nonebot"]["plugins"]["@local"] == ["nonebot_plugin_xiuxian_3"]
+
+
+def test_host_plugin_source_is_replaced_and_loaded_from_plugin_dirs(tmp_path: Path) -> None:
+    helper = ROOT / "scripts/install_plugin_source.py"
+    source = tmp_path / "source" / "nonebot_plugin_xiuxian_3"
+    source.mkdir(parents=True)
+    (source / "__init__.py").write_text(
+        "from nonebot import on\n\nprobe = on('message')\n", encoding="utf-8"
+    )
+    (source / "current.py").write_text("version = 'new'\n", encoding="utf-8")
+
+    target = tmp_path / "host"
+    plugin = target / "src/plugins/nonebot_plugin_xiuxian_3"
+    plugin.mkdir(parents=True)
+    (plugin / "stale.py").write_text("version = 'old'\n", encoding="utf-8")
+    (target / "data").mkdir()
+    (target / "data/profile.json").write_text('{"keep": true}\n', encoding="utf-8")
+    (target / ".env").write_text("keep=1\n", encoding="utf-8")
+    (target / "pyproject.toml").write_text(
+        '[project]\nname = "existing-host"\n\n'
+        '[tool.nonebot]\nplugin_dirs = [\n  "custom/plugins",\n]\n'
+        'builtin_plugins = []\n\n'
+        '[tool.nonebot.adapters]\n"@local" = ["existing-adapter"]\n\n'
+        '[tool.nonebot.plugins]\n"@local" = [\n'
+        '  "nonebot_plugin_xiuxian_3",\n  "other_plugin",\n]\n',
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [sys.executable, str(helper), "--source", str(source), "--target", str(target)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    config = tomllib.loads((target / "pyproject.toml").read_text(encoding="utf-8"))
+    assert config["tool"]["nonebot"]["plugin_dirs"] == ["custom/plugins", "src/plugins"]
+    assert config["tool"]["nonebot"]["plugins"]["@local"] == ["other_plugin"]
+    assert config["tool"]["nonebot"]["adapters"]["@local"] == ["existing-adapter"]
+    assert (plugin / "current.py").is_file()
+    assert not (plugin / "stale.py").exists()
+    assert (target / ".env").read_text(encoding="utf-8") == "keep=1\n"
+    assert (target / "data/profile.json").read_text(encoding="utf-8") == '{"keep": true}\n'
+
+    loaded = subprocess.run(
+        [sys.executable, str(helper), "--validate", "--target", str(target)],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=target,
+    )
+    assert "src.plugins.nonebot_plugin_xiuxian_3" in loaded.stdout
+    assert not list((target / "src/plugins").glob(".nonebot_plugin_xiuxian_3.*"))
+
+    broken_source = tmp_path / "broken-source"
+    broken_source.mkdir()
+    previous_pyproject = (target / "pyproject.toml").read_bytes()
+    failed = subprocess.run(
+        [sys.executable, str(helper), "--source", str(broken_source), "--target", str(target)],
+        capture_output=True,
+        text=True,
+    )
+    assert failed.returncode == 1
+    assert (plugin / "current.py").is_file()
+    assert (target / "pyproject.toml").read_bytes() == previous_pyproject
+
+
+def test_xiu3_source_loads_from_managed_host_directory(tmp_path: Path) -> None:
+    helper = ROOT / "scripts/install_plugin_source.py"
+    target = tmp_path / "host"
+    target.mkdir()
+    shutil.copyfile(ROOT / "examples/nonebot/pyproject.toml", target / "pyproject.toml")
+    shutil.copytree(ROOT / "data", target / "data")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(helper),
+            "--source",
+            str(ROOT / "nonebot_plugin_xiuxian_3"),
+            "--target",
+            str(target),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = subprocess.run(
+        [sys.executable, str(helper), "--validate", "--target", str(target)],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=target,
+    )
+    assert "NoneBot 已加载 src.plugins.nonebot_plugin_xiuxian_3" in result.stdout
+    assert not list((target / "src/plugins/nonebot_plugin_xiuxian_3").rglob("__pycache__"))
+
+
+def test_managed_installers_copy_plugin_source_instead_of_pip_installing_it() -> None:
+    linux = (ROOT / "scripts/install.sh").read_text(encoding="utf-8")
+    windows = (ROOT / "scripts/install_windows.ps1").read_text(encoding="utf-8")
+    termux = (ROOT / "scripts/install_termux.sh").read_text(encoding="utf-8")
+    installation = (ROOT / "docs/installation.md").read_text(encoding="utf-8")
+
+    assert "install_plugin_source.py" in linux
+    assert 'pip install "${project_pip_args[@]}" "$ROOT"' not in linux
+    assert "install_plugin_source.py" in windows
+    assert "pip install @ProjectPipArgs $Root" not in windows
+    assert 'exec bash "$ROOT/scripts/onekey.sh" "$@"' in termux
+    assert "--source \"$XIUXIAN3_SRC/nonebot_plugin_xiuxian_3\"" in installation
+    assert 'pip install --no-deps "$XIUXIAN3_SRC"' not in installation
+
+
+def test_release_install_smoke_checks_plugin_source_loading() -> None:
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    smoke = workflow.split("      - name: Verify isolated runtime and preserved files\n", 1)[1]
+    assert 'src/plugins/nonebot_plugin_xiuxian_3/__init__.py' in smoke
+    assert "scripts/install_plugin_source.py --validate" in smoke
+    assert '"nonebot-plugin-xiuxian-3" not in' in smoke
 
 
 def test_user_install_guides_prefer_raw_release_and_label_manual_checkout() -> None:

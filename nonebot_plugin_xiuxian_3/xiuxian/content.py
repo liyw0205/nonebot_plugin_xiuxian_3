@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -149,14 +150,18 @@ def _safe_child(root: Path, relative_path: str) -> Path:
 
 
 def bundled_content(data_dir: str | Path | None = None) -> ContentBundle:
-    """Load the packaged content, or the source-tree data while developing."""
+    """Load host, package, or source-tree content in runtime priority order."""
 
     if data_dir is not None:
         return ContentBundle.load(data_dir)
 
+    configured_data = os.getenv("XIUXIAN3_DATA_DIR")
     package_data = Path(__file__).resolve().parents[1] / "data"
+    host_data = Path.cwd() / "data"
     source_data = Path(__file__).resolve().parents[2] / "data"
-    for root in (package_data, source_data):
+    candidates = ([Path(configured_data).expanduser()] if configured_data else [])
+    candidates.extend((host_data, package_data, source_data))
+    for root in candidates:
         if (root / "内容清单.json").is_file():
             return ContentBundle.load(root)
     raise FileNotFoundError(

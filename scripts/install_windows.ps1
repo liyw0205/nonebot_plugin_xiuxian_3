@@ -229,6 +229,9 @@ try {
     Copy-IfMissing (Join-Path $Root "examples\nonebot\bot.py") (Join-Path $Target "bot.py")
     Copy-IfMissing (Join-Path $Root "examples\nonebot\pyproject.toml") (Join-Path $Target "pyproject.toml")
     Copy-IfMissing (Join-Path $Root "examples\nonebot\.env.example") (Join-Path $Target ".env")
+    Write-Host "[xiuxian3] 将插件源码部署到宿主 src/plugins"
+    & $VenvPython (Join-Path $Root "scripts\install_plugin_source.py") --source (Join-Path $Root "nonebot_plugin_xiuxian_3") --target $Target
+    if ($LASTEXITCODE -ne 0) { Stop-Install "部署宿主插件源码失败" }
 
     Write-Host "[xiuxian3] 从 requirements.txt 安装 nb-cli"
     Invoke-Retry { & $VenvPython -m pip install --upgrade --index-url $IndexUrl -r (Join-Path $Root "requirements.txt") } "nb-cli 安装"
@@ -255,10 +258,11 @@ try {
         } $Description
     }
 
-    Write-Host "[xiuxian3] 安装修仙插件本身，不重复解析 CLI 已安装的运行依赖"
-    $ProjectPipArgs = @("--no-build-isolation", "--no-deps", "--index-url", $IndexUrl)
-    if ($Action -eq "update") { $ProjectPipArgs = @("--upgrade") + $ProjectPipArgs }
-    Invoke-Retry { & $VenvPython -m pip install @ProjectPipArgs $Root } "插件安装"
+    & $VenvPython -c "import importlib.metadata; importlib.metadata.distribution('nonebot-plugin-xiuxian-3')" *> $null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[xiuxian3] 移除旧的 venv 插件发行包，改由宿主 src/plugins 加载"
+        Invoke-Retry { & $VenvPython -m pip uninstall --yes nonebot-plugin-xiuxian-3 } "移除旧插件发行包"
+    }
 
     $DataRoot = Join-Path $Root "data"
     Get-ChildItem $DataRoot -Recurse -File -Filter *.json | ForEach-Object {
@@ -283,8 +287,10 @@ exit `$LASTEXITCODE
     }
 
     Write-Host "[xiuxian3] 校验已安装包、NoneBot 入口和 JSON 内容"
-    & $VenvPython -c "import importlib.metadata, nonebot, nonebot.adapters.qq, nonebot.adapters.onebot.v11, nonebot_plugin_xiuxian_3; importlib.metadata.version('nb-cli')"
+    & $VenvPython -c "import importlib.metadata, nonebot, nonebot.adapters.qq, nonebot.adapters.onebot.v11; importlib.metadata.version('nb-cli')"
     if ($LASTEXITCODE -ne 0) { Stop-Install "插件导入校验失败" }
+    & $VenvPython (Join-Path $Root "scripts\install_plugin_source.py") --validate --target $Target
+    if ($LASTEXITCODE -ne 0) { Stop-Install "NoneBot 未从宿主 src/plugins 加载插件" }
     & $VenvNb --help *> $null
     if ($LASTEXITCODE -ne 0) { Stop-Install "nb 命令未安装：$VenvNb" }
     $JsonFiles = Get-ChildItem (Join-Path $Target "data") -Recurse -File -Filter *.json

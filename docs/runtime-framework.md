@@ -302,11 +302,11 @@ Clock。
 - `adapters/message/onebot.py`：OneBot V11 普通消息与合并转发消息；Markdown/蓝字/按键统一降级为纯文本。
 - `adapters/message/router.py`：按 bot/event 类型选择发送器；`adapters/messaging.py` 仅保留兼容导出。
 
-宿主运行依赖通过 `nb adapter install` 和 `nb driver install` 管理；插件包使用普通 wheel 安装，避免
-editable finder 绕过 NoneBot 的插件注册流程。OneBot/QQ
-角色命令共用一个 matcher，按平台事件归一化，不会重复注册命令。
-NoneBot 项目通过 `nonebot.load_plugin("nonebot_plugin_xiuxian_3")` 加载插件包；
-普通 Python 导入不会自动注册 matcher。
+宿主运行依赖通过 `nb adapter install` 和 `nb driver install` 管理。脚本托管的宿主将插件源码部署到
+`src/plugins/nonebot_plugin_xiuxian_3`，并在 `pyproject.toml` 配置
+`plugin_dirs = ["src/plugins"]`；NoneBot 扫描该目录并以
+`src.plugins.nonebot_plugin_xiuxian_3` 加载，不把插件 wheel 安装进 venv。OneBot/QQ
+角色命令共用一个 matcher，按平台事件归一化，不会重复注册命令。普通 Python 导入不会自动注册 matcher。
 
 消息投递按适配器使用专用函数：
 
