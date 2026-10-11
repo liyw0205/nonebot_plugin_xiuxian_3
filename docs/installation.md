@@ -21,7 +21,7 @@ bash scripts/onekey.sh install --source-mode source --mirror direct
 
 ### GitHub Release
 
-版本化 Release 由 `main` 上的版本 tag 构建，资产名为 `project.tar.gz`。远程引导脚本从 `main` 获取；Release 模式要求对应的 GitHub Release 资产已经发布。
+版本化 Release 从 `main` 上的版本 tag 生成，归档资产名为 `project.tar.gz`。Release 安装和更新使用 GitHub 官方 `latest/download/project.tar.gz` 地址；源码安装则显式 checkout `main`。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/m
 --source-mode auto|release|source
 ```
 
-源码安装使用 `source`；已发布版本可使用 `release`。代理下载失败时脚本会继续尝试并最终回退 GitHub 直连。
+源码安装使用 `source`，Release 安装使用 `release`。代理下载失败时脚本会继续尝试并最终回退 GitHub 直连。
 
 ### Termux
 
@@ -166,11 +166,7 @@ QQ_BOTS=[]
 QQ_BOTS='[{"id":"APP_ID","token":"APP_TOKEN","secret":"APP_SECRET","use_websocket":true,"intent":{"c2c_group_at_messages":true,"direct_message":true}}]'
 ```
 
-OneBot 反向 WebSocket 两端使用同一个随机令牌：
-
-```dotenv
-ONEBOT_V11_ACCESS_TOKEN=replace-with-your-random-token
-```
+`ONEBOT_V11_ACCESS_TOKEN` 仅在启用反向 WebSocket 鉴权时可选配置；不启用鉴权时省略该变量。启用后，宿主 `.env` 与 OneBot/NapCat 客户端的访问令牌必须一致。
 
 `xiu3 login`（Windows 为 `& .\xiu3.ps1 login`）是可选的 QQ 官方 bot 绑定辅助，实际调用 QQ 的绑定页面和接口并把结果安全写回 `.env`；它不是 OneBot/NapCat 扫码登录。Markdown 和自定义键盘需要对应的平台权限。
 
@@ -189,7 +185,8 @@ ws://服务器地址:8080/onebot/v11/ws
 Linux/Termux：
 
 ```text
-xiu3 start|stop|restart|status|pause|resume|update|login|uninstall --yes
+xiu3 install|update|uninstall|start|stop|restart|status|logs|login
+xiu3 logs --lines 100
 ```
 
 Windows：

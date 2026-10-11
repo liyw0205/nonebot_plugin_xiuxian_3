@@ -32,13 +32,15 @@ MIRROR_URL=""
 SOURCE_MODE="${XIUXIAN3_SOURCE_MODE:-auto}"
 INDEX_URL="${PIP_INDEX_URL:-$TUNA_INDEX}"
 YES=0
+LOG_LINES=80
+LOGIN_ARGS=()
 
 log() { printf '[xiuxian3] %s\n' "$*"; }
 fail() { printf '[xiuxian3] 错误：%s\n' "$*" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
-用法：onekey.sh <install|update|uninstall> [目标宿主目录] [选项]
+用法：onekey.sh <install|update|uninstall|start|stop|restart|status|logs|login> [选项]
 
 选项：
   --target PATH       宿主目录（默认 $HOME/xiu3）
@@ -47,6 +49,7 @@ usage() {
   --mirror MODE       direct、accelerated 或 custom
   --mirror-url URL    自定义 Release 归档 URL（source 模式为 Git 地址）
   --source-mode MODE  auto、release 或 source；默认本地源码、远程 Release
+  --lines N           logs 显示最近 N 行（默认 80）
   --index-url URL     pip 镜像（默认清华源）
   --yes               确认卸载宿主目录及其中的数据
   -h, --help          显示帮助
@@ -55,14 +58,14 @@ usage() {
 EOF
 }
 
-if (($#)) && [[ "$1" =~ ^(install|update|uninstall)$ ]]; then
+if (($#)) && [[ "$1" =~ ^(install|update|uninstall|start|stop|restart|status|logs|login)$ ]]; then
     ACTION=$1
     shift
 fi
 
 while (($#)); do
     case "$1" in
-        --target|--source|--venv|--mirror|--mirror-url|--index-url|--source-mode)
+        --target|--source|--venv|--mirror|--mirror-url|--index-url|--source-mode|--lines)
             (($# >= 2)) || fail "$1 需要一个值"
             key=$1
             value=$2
@@ -74,10 +77,16 @@ while (($#)); do
                 --mirror-url) MIRROR_URL=$value ;;
                 --index-url) INDEX_URL=$value ;;
                 --source-mode) SOURCE_MODE=$value ;;
+                --lines) LOG_LINES=$value ;;
             esac
             shift 2
             ;;
         --yes) YES=1; shift ;;
+        --timeout|--interval)
+            (($# >= 2)) || fail "$1 需要一个值"
+            LOGIN_ARGS+=("$1" "$2")
+            shift 2
+            ;;
         -h|--help) usage; exit 0 ;;
         -*) fail "未知选项：$1" ;;
         *)
@@ -88,6 +97,8 @@ while (($#)); do
     esac
 done
 
+[[ "$LOG_LINES" =~ ^[1-9][0-9]*$ ]] || fail "--lines 必须是正整数"
+
 TARGET="$(mkdir -p "$(dirname "$TARGET")" && cd "$(dirname "$TARGET")" && pwd -P)/$(basename "$TARGET")"
 SOURCE="$(mkdir -p "$(dirname "$SOURCE")" && cd "$(dirname "$SOURCE")" && pwd -P)/$(basename "$SOURCE")"
 
@@ -95,6 +106,15 @@ if [ "$ACTION" = uninstall ]; then
     [ "$YES" = 1 ] || fail "卸载会删除宿主目录和 SQLite 数据；确认备份后添加 --yes。"
     [ -x "$TARGET/xiu3" ] || fail "没有找到控制命令：$TARGET/xiu3"
     exec "$TARGET/xiu3" uninstall --yes
+fi
+if [[ "$ACTION" =~ ^(start|stop|restart|status|logs|login)$ ]]; then
+    [ -x "$TARGET/xiu3" ] || fail "没有找到宿主管理命令：$TARGET/xiu3；请先执行 install。"
+    control_args=("$ACTION" --target "$TARGET" --source "$SOURCE" --source-mode "$SOURCE_MODE" --mirror "$MIRROR" --venv "$VENV")
+    [ -n "$MIRROR_URL" ] && control_args+=(--mirror-url "$MIRROR_URL")
+    [ "$ACTION" != logs ] || control_args+=(--lines "$LOG_LINES")
+    [ "$YES" = 0 ] || control_args+=(--yes)
+    control_args+=("${LOGIN_ARGS[@]}")
+    exec "$TARGET/xiu3" "${control_args[@]}"
 fi
 if [ "$ACTION" = update ] && [ ! -d "$TARGET" ]; then
     fail "更新目标不存在：$TARGET；请先执行 install。"
@@ -352,6 +372,8 @@ install_system_tools
 ensure_source
 [ -x "$SOURCE/scripts/install.sh" ] || fail "源码目录缺少 scripts/install.sh：$SOURCE"
 
-args=("$SOURCE/scripts/install.sh" "$ACTION" "$TARGET" --venv "$VENV" --index-url "$INDEX_URL")
+args=("$SOURCE/scripts/install.sh" "$ACTION" --target "$TARGET" --source "$SOURCE" \
+    --source-mode "$SOURCE_MODE" --mirror "$MIRROR" --venv "$VENV" --index-url "$INDEX_URL")
+[ -n "$MIRROR_URL" ] && args+=(--mirror-url "$MIRROR_URL")
 [ "$YES" = 0 ] || args+=(--yes)
 exec bash "${args[@]}"

@@ -113,7 +113,6 @@ COMMAND_START=["/"]
 SUPERUSERS=[]
 QQ_BOTS=[]
 # XIUXIAN3_DATA_DIR=./data
-# ONEBOT_V11_ACCESS_TOKEN=replace-with-your-random-token
 ```
 
 ### QQ 官方机器人
@@ -134,11 +133,7 @@ OneBot/NapCat 在自己的客户端完成登录和扫码，NoneBot 提供反向 
 ws://服务器地址:8080/onebot/v11/ws
 ```
 
-宿主与 OneBot 两端使用同一个 `ONEBOT_V11_ACCESS_TOKEN`：
-
-```dotenv
-ONEBOT_V11_ACCESS_TOKEN=replace-with-your-random-token
-```
+`ONEBOT_V11_ACCESS_TOKEN` 仅在启用反向 WebSocket 鉴权时配置；不启用鉴权时省略该变量。启用后，宿主 `.env` 与 OneBot/NapCat 客户端的访问令牌必须一致。
 
 Docker Compose 同一网络内使用 `ws://xiuxian3:8080/onebot/v11/ws`。只使用 OneBot 时保持 `QQ_BOTS=[]`，不要把 OneBot 登录信息写进 `QQ_BOTS`。
 
@@ -153,12 +148,14 @@ xiu3 pause
 xiu3 resume
 xiu3 restart
 xiu3 stop
+xiu3 logs --lines 100
 xiu3 update
 xiu3 login
 xiu3 uninstall --yes
 ```
 
 `uninstall --yes` 会删除宿主目录及其中的 SQLite 数据，不会删除共享虚拟环境；执行前先备份。
+安装与更新也可使用 `install`、`update`，并通过 `--target`、`--source`、`--source-mode`、`--mirror`、`--venv` 指定宿主、源码来源、下载方式和虚拟环境。
 
 ## 更新、备份与排错
 
@@ -186,7 +183,6 @@ tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
 
 - [玩家使用指南](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/usage.md)
 - [安装与配置](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/installation.md)
-- [文档总索引](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/index.md)
 - [运行与安全](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md)
 - [适配器说明](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/extensions/adapters/README.md)
 - [QQ 能力配置](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md#1-配置层级)

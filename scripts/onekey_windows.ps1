@@ -1,15 +1,31 @@
 param(
-    [ValidateSet("install", "update", "uninstall")]
+    [ValidateSet("install", "update", "uninstall", "start", "stop", "restart", "status", "logs", "login")]
     [string]$Action = "install",
     [string]$Target = (Join-Path $HOME "xiu3"),
+    [string]$Venv = (Join-Path $HOME "myenv"),
     [string]$Mirror = "",
     [string]$MirrorUrl = "",
     [string]$Source = (Join-Path $HOME ".local\share\xiuxian3\source"),
     [ValidateSet("auto", "release", "source")]
-    [string]$SourceMode = "auto"
+    [string]$SourceMode = "auto",
+    [int]$Lines = 80,
+    [int]$Timeout = 300,
+    [double]$Interval = 2,
+    [switch]$Yes,
+    [switch]$Help
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Help -or $args -contains "--help" -or $args -contains "-h") {
+    @"
+用法：onekey_windows.ps1 <install|update|uninstall|start|stop|restart|status|logs|login> [参数]
+
+参数：-Target、-Source、-SourceMode auto|release|source、-Mirror direct|accelerated|custom、-Venv
+日志参数：-Lines；QQ 官方授权参数：-Timeout、-Interval
+"@ | Write-Output
+    exit 0
+}
 $Repository = "https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git"
 $ReleaseArchive = "https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/latest/download/project.tar.gz"
 $ReleaseMirrors = @(
@@ -232,9 +248,24 @@ function Download-ReleaseSource {
 }
 
 try {
-    $Target = [IO.Path]::GetFullPath($Target)
-    $Source = [IO.Path]::GetFullPath($Source)
+$Target = [IO.Path]::GetFullPath($Target)
+$Source = [IO.Path]::GetFullPath($Source)
+    $Venv = [IO.Path]::GetFullPath($Venv)
     if ($Mirror -and $Mirror -notin @("direct", "accelerated", "custom")) { throw "不支持的仓库下载方式：$Mirror" }
+    if ($Lines -lt 1) { throw "-Lines 必须是正整数" }
+    if ($Timeout -lt 1 -or $Interval -le 0) { throw "-Timeout 和 -Interval 必须为正数" }
+    if ($Action -in @("start", "stop", "restart", "status", "logs", "login")) {
+        $control = Join-Path $Target "xiu3.ps1"
+        if (-not (Test-Path $control)) { throw "没有找到控制命令：$control；请先执行 install。" }
+        $ControlArgs = @($Action, "--target", $Target, "--source", $Source, "--source-mode", $SourceMode,
+            "--mirror", $(if ($Mirror) { $Mirror } else { "direct" }), "--venv", $Venv)
+        if ($MirrorUrl) { $ControlArgs += @("--mirror-url", $MirrorUrl) }
+        if ($Action -eq "logs") { $ControlArgs += @("--lines", "$Lines") }
+        if ($Action -eq "login") { $ControlArgs += @("--timeout", "$Timeout", "--interval", "$Interval") }
+        if ($Yes) { $ControlArgs += "--yes" }
+        & $control @ControlArgs
+        exit $LASTEXITCODE
+    }
     if ($Action -eq "uninstall") {
         $control = Join-Path $Target "xiu3.ps1"
         if (-not (Test-Path $control)) { throw "没有找到控制命令：$control" }
@@ -247,7 +278,7 @@ try {
     Update-Source
     $installer = Join-Path $Source "scripts\install_windows.ps1"
     if (-not (Test-Path $installer)) { throw "源码目录缺少 scripts\install_windows.ps1：$Source" }
-    & $installer $Action $Target --venv (Join-Path $HOME "myenv") --index-url $IndexUrl
+    & $installer $Action --target $Target --source $Source --source-mode source --mirror direct --venv $Venv --index-url $IndexUrl
     if ($LASTEXITCODE -ne 0) { throw "平台安装器失败，退出码 $LASTEXITCODE" }
 } catch {
     Write-Error "[xiuxian3] 安装失败：$($_.Exception.Message)"

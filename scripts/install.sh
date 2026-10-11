@@ -5,24 +5,34 @@ IFS=$'\n\t'
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 ACTION=install
 TARGET=""
+SOURCE="$ROOT"
+SOURCE_MODE=source
+MIRROR=direct
+MIRROR_URL=""
 VENV="${VENV_PATH:-$HOME/myenv}"
 PYTHON="${PYTHON_BIN:-}"
 INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 START=0
 YES=0
+LOGIN_ARGS=()
 
 usage() {
     cat <<'EOF'
-用法：scripts/install.sh <命令> [目标宿主目录] [选项]
+用法：scripts/install.sh <命令> [选项]
 
 命令：
   install              安装或修复宿主（默认命令）
   update               更新插件依赖和缺少的内容文件
   uninstall            卸载宿主目录（必须额外传 --yes）
-  start|pause|resume|stop|restart|status|login
+  start|stop|restart|status|logs|login
                        控制安装后由 xiu3 管理的 nb run 进程
 
 选项：
+  --target PATH       宿主目录（默认项目目录下的 xiu3）
+  --source PATH       插件源码目录（默认当前 checkout）
+  --source-mode MODE  auto、release 或 source
+  --mirror MODE       direct、accelerated 或 custom
+  --mirror-url URL    自定义 Release 归档或 Git 仓库地址
   --python PATH       指定系统 Python（默认 python3）
   --venv PATH         指定虚拟环境（默认 $HOME/myenv）
   --index-url URL     指定 pip 镜像，只影响本次安装
@@ -48,7 +58,7 @@ on_error() {
 trap on_error ERR
 
 case "${1:-}" in
-    install|update|uninstall|start|pause|resume|stop|restart|status|login)
+    install|update|uninstall|start|pause|resume|stop|restart|status|logs|login)
         ACTION=$1
         shift
         ;;
@@ -56,6 +66,31 @@ esac
 
 while (($#)); do
     case "$1" in
+        --target)
+            (($# >= 2)) || fail "--target 需要一个路径"
+            TARGET=$2
+            shift 2
+            ;;
+        --source)
+            (($# >= 2)) || fail "--source 需要一个路径"
+            SOURCE=$2
+            shift 2
+            ;;
+        --source-mode)
+            (($# >= 2)) || fail "--source-mode 需要一个值"
+            SOURCE_MODE=$2
+            shift 2
+            ;;
+        --mirror)
+            (($# >= 2)) || fail "--mirror 需要一个值"
+            MIRROR=$2
+            shift 2
+            ;;
+        --mirror-url)
+            (($# >= 2)) || fail "--mirror-url 需要一个 URL"
+            MIRROR_URL=$2
+            shift 2
+            ;;
         --python)
             (($# >= 2)) || fail "--python 需要一个路径"
             PYTHON=$2
@@ -80,6 +115,11 @@ while (($#)); do
             YES=1
             shift
             ;;
+        --timeout|--interval)
+            (($# >= 2)) || fail "$1 需要一个值"
+            LOGIN_ARGS+=("$1" "$2")
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -96,12 +136,51 @@ while (($#)); do
 done
 
 TARGET="${TARGET:-$ROOT/xiu3}"
+if [ -d "$SOURCE" ]; then
+    SOURCE="$(cd "$SOURCE" && pwd -P)"
+else
+    mkdir -p "$(dirname "$SOURCE")"
+    SOURCE="$(cd "$(dirname "$SOURCE")" && pwd -P)/$(basename "$SOURCE")"
+fi
+case "$SOURCE_MODE" in auto|release|source) ;; *) fail "不支持的源码模式：$SOURCE_MODE" ;; esac
+case "$MIRROR" in direct|accelerated|custom) ;; *) fail "不支持的镜像模式：$MIRROR" ;; esac
+
+control_action=0
+case "$ACTION" in start|stop|restart|status|logs|login|uninstall|pause|resume) control_action=1 ;; esac
+if ((control_action)); then
+    TARGET="$(cd "$TARGET" 2>/dev/null && pwd -P)" || fail "找不到宿主目录：$TARGET"
+else
+    mkdir -p "$(dirname "$TARGET")"
+    TARGET="$(cd "$(dirname "$TARGET")" && pwd -P)/$(basename "$TARGET")"
+fi
+VENV="$(mkdir -p "$(dirname "$VENV")" && cd "$(dirname "$VENV")" && pwd -P)/$(basename "$VENV")"
+
+if ((control_action)); then
+    control_args=("$ACTION" --target "$TARGET" --source "$SOURCE" --source-mode "$SOURCE_MODE" --mirror "$MIRROR" --venv "$VENV")
+    [ -n "$MIRROR_URL" ] && control_args+=(--mirror-url "$MIRROR_URL")
+    ((YES)) && control_args+=(--yes)
+    control_args+=("${LOGIN_ARGS[@]}")
+    exec "$ROOT/scripts/control.sh" "${control_args[@]}"
+fi
+
 if [ "$ACTION" = update ] && [ ! -d "$TARGET" ]; then
     fail "更新目标不存在：$TARGET；请先执行 install。"
 fi
 mkdir -p "$TARGET"
-TARGET="$(cd "$TARGET" && pwd -P)"
-VENV="$(mkdir -p "$(dirname "$VENV")" && cd "$(dirname "$VENV")" && pwd -P)/$(basename "$VENV")"
+
+if [[ "$SOURCE_MODE" == release ]]; then
+    release_args=("$ACTION" --target "$TARGET" --source "$SOURCE" --source-mode release --mirror "$MIRROR" --venv "$VENV")
+    [ -n "$MIRROR_URL" ] && release_args+=(--mirror-url "$MIRROR_URL")
+    ((YES)) && release_args+=(--yes)
+    exec "$ROOT/scripts/onekey.sh" "${release_args[@]}"
+fi
+
+if [ "$SOURCE" != "$ROOT" ]; then
+    [ -f "$SOURCE/scripts/install.sh" ] && [ -f "$SOURCE/pyproject.toml" ] || fail "--source 不是有效的 xiu3 checkout：$SOURCE"
+    rerun_args=("$ACTION" --target "$TARGET" --source "$SOURCE" --source-mode source --mirror "$MIRROR" --venv "$VENV" --index-url "$INDEX_URL")
+    ((YES)) && rerun_args+=(--yes)
+    exec bash "$SOURCE/scripts/install.sh" "${rerun_args[@]}"
+fi
 
 if [ -z "$PYTHON" ]; then
     for candidate in python3.13 python3.12 python3.11 python3 python; do
@@ -112,12 +191,6 @@ if [ -z "$PYTHON" ]; then
         fi
     done
     PYTHON="${PYTHON:-python3}"
-fi
-
-if [[ "$ACTION" != install && "$ACTION" != update ]]; then
-    control_args=()
-    ((YES)) && control_args+=(--yes)
-    exec "$ROOT/scripts/control.sh" "$TARGET" "$VENV" "$ROOT" "$ACTION" "${control_args[@]}"
 fi
 
 [ -f "$ROOT/pyproject.toml" ] || fail "找不到项目 pyproject.toml：$ROOT"
@@ -248,7 +321,7 @@ write_control_launcher() {
 #!/usr/bin/env bash
 action="\${1:-status}"
 if ((\$#)); then shift; fi
-exec "$TARGET/.xiuxian3/control.sh" $target_q $venv_q $root_q "\$action" "\$@"
+exec "$TARGET/.xiuxian3/control.sh" "\$action" --target $target_q --venv $venv_q --source $root_q "\$@"
 EOF
     chmod +x "$launcher"
 }
@@ -295,8 +368,8 @@ cat <<EOF
 安装完成。
 宿主目录：$TARGET
 虚拟环境：$VENV
-控制命令：$CONTROL_COMMAND start|pause|resume|stop|restart|status|update|login|uninstall
+控制命令：$CONTROL_COMMAND install|update|uninstall|start|stop|restart|status|logs|login
 宿主内命令：$CONTROL_BIN start
 更新命令：$CONTROL_COMMAND update
-QQ 扫码：$CONTROL_COMMAND login
+QQ 官方绑定：$CONTROL_COMMAND login
 EOF

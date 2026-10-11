@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..content import ContentBundle, bundled_content
 from ..repository import (
     CultivationBusyError,
     LocationRequiredError,
@@ -35,8 +36,16 @@ from ..utils.text import command_link
 class IntroApplication:
     """Coordinates onboarding writes without exposing persistence details."""
 
-    def __init__(self, repository: SQLitePlayerRepository):
+    def __init__(self, repository: SQLitePlayerRepository, content: ContentBundle | None = None):
         self.repository = repository
+        self.content = content or bundled_content()
+
+    def world_intro_text(self) -> str:
+        definition = self.content.get("guide", GUIDE_READ_WORLD, include_locked=False)
+        body = definition.get("content") if definition else None
+        if not isinstance(body, str) or not body.strip():
+            raise ValueError("guide.read_world requires non-empty content")
+        return body.strip()
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -121,6 +130,9 @@ class IntroApplication:
             )
         elif guide_key == GUIDE_READ_WORLD:
             message = (
+                "## 修仙世界\n\n"
+                f"{self.world_intro_text()}\n\n"
+                "---\n\n"
                 "## 世界说明已阅\n\n"
                 f"**{self._display_name(player)}**，你已了解玄天界、魔界、妖界与洞天福地。\n\n"
                 f"- **引导进度**：{self._guide_progress(player)}\n\n"

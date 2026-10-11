@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import subprocess
+import shlex
 import tomllib
+from tempfile import TemporaryDirectory
 from pathlib import Path
 
 
@@ -25,6 +27,83 @@ def test_shell_installers_parse_and_expose_help() -> None:
     )
     assert "--mirror MODE" in result.stdout
     assert "--index-url URL" in result.stdout
+
+
+def test_install_and_control_entrypoints_share_commands_and_paths() -> None:
+    expected_commands = ("install", "update", "uninstall", "start", "stop", "restart", "status", "logs", "login")
+    expected_options = ("--source-mode", "--source", "--mirror", "--target", "--venv")
+    for script in ("onekey.sh", "install.sh", "control.sh"):
+        result = subprocess.run(
+            ["bash", str(ROOT / "scripts" / script), "--help"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        for command in expected_commands:
+            assert command in result.stdout, (script, command)
+        for option in expected_options:
+            assert option in result.stdout, (script, option)
+    windows_scripts = ("onekey_windows.ps1", "install_windows.ps1", "control_windows.ps1")
+    for script in windows_scripts:
+        text = (ROOT / "scripts" / script).read_text(encoding="utf-8")
+        for command in expected_commands:
+            assert f'"{command}"' in text, (script, command)
+        for option in expected_options:
+            assert option in text, (script, option)
+
+
+def test_onekey_control_routing_logs_and_official_qq_login() -> None:
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        target = root / "host"
+        target.mkdir()
+        launcher = target / "xiu3"
+        launcher.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n", encoding="utf-8")
+        launcher.chmod(0o755)
+        routed = subprocess.run(
+            [
+                "bash", str(ROOT / "scripts" / "onekey.sh"), "status",
+                "--target", str(target), "--source", str(root / "source"),
+                "--source-mode", "source", "--mirror", "direct", "--venv", str(root / "venv"),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        routed_args = routed.stdout.splitlines()
+        assert routed_args[0] == "status"
+        assert shlex.join(routed_args).find("--target") >= 0
+        assert str(target) in routed_args
+        assert "--source-mode" in routed_args and "source" in routed_args
+
+        state = target / ".xiuxian3"
+        state.mkdir()
+        (state / "nb.log").write_text("one\ntwo\nthree\n", encoding="utf-8")
+        logs = subprocess.run(
+            ["bash", str(ROOT / "scripts" / "control.sh"), "logs", "--target", str(target),
+             "--source", str(ROOT), "--venv", str(root / "venv"), "--lines", "2"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert logs.stdout.splitlines() == ["two", "three"]
+
+        venv = root / "venv"
+        (venv / "bin").mkdir(parents=True)
+        python = venv / "bin" / "python"
+        python.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n", encoding="utf-8")
+        python.chmod(0o755)
+        (state / "qq_login.py").write_text("# helper stub\n", encoding="utf-8")
+        login = subprocess.run(
+            ["bash", str(ROOT / "scripts" / "control.sh"), "login", "--target", str(target),
+             "--source", str(ROOT), "--venv", str(venv), "--timeout", "5", "--interval", "0.1"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert "qq_login.py" in login.stdout
+        assert "--timeout\n5\n--interval\n0.1" in login.stdout
+        assert "QQ 配置已更新" in login.stdout
 
 
 def test_requirements_leave_cli_version_to_the_environment() -> None:
@@ -94,6 +173,8 @@ def test_readme_documents_adapter_configuration_and_connection_urls() -> None:
     assert "ws://服务器地址:8080/onebot/v11/ws" in readme
     assert "ws://xiuxian3:8080/onebot/v11/ws" in readme
     assert "ONEBOT_V11_WS_URLS" not in readme
+    assert "replace-with-your-random-token" not in readme
+    assert "ONEBOT_V11_ACCESS_TOKEN" not in (ROOT / "docs/installation.md").read_text(encoding="utf-8") or "仅在启用" in (ROOT / "docs/installation.md").read_text(encoding="utf-8")
 
 
 def test_qq_login_helper_is_installed_and_documented() -> None:

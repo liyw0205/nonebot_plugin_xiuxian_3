@@ -39,7 +39,7 @@ class PlayerApplication:
     def __init__(self, repository: SQLitePlayerRepository, content: ContentBundle | None = None):
         self.repository = repository
         self.content = content
-        self.intro = IntroApplication(repository)
+        self.intro = IntroApplication(repository, content)
         self.cultivation = CultivationApplication(repository, content)
 
     @staticmethod
@@ -230,7 +230,9 @@ class PlayerApplication:
                 "- **初始物资**：启程所需物资已收入囊中\n\n"
                 "**六项资质**\n\n"
                 + self._qualification_text(player.qualification)
-                + "\n\n接下来先读世界说明，开启凡人引导。"
+                + "\n\n### 修仙世界\n\n"
+                + self.intro.world_intro_text()
+                + "\n\n接下来完成世界说明阅读，再开启凡人引导。"
             )
             code = "SEEKING_STARTED"
         else:

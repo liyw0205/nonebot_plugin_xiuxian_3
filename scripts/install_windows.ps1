@@ -2,11 +2,16 @@ $ErrorActionPreference = "Stop"
 
 function Show-Usage {
     @"
-用法：scripts\install_windows.ps1 [目标宿主目录] [选项]
+用法：scripts\install_windows.ps1 <install|update|uninstall|start|stop|restart|status|logs|login> [选项]
 
 选项：
+  --target PATH       宿主目录
+  --source PATH       插件源码目录
+  --source-mode MODE auto、release 或 source
+  --mirror MODE      direct、accelerated 或 custom
+  --mirror-url URL   自定义 Release 归档或 Git 地址
+  --venv PATH         Python 虚拟环境
   --python PATH       指定系统 Python（默认使用 py -3）
-  --venv PATH         指定虚拟环境（默认 `$HOME\myenv）
   --index-url URL     指定 pip 镜像，只影响本次安装
   --run               安装并立即执行 nb run
   -h, --help          显示帮助
@@ -39,11 +44,15 @@ try {
     $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
     $Action = "install"
     $Arguments = @($args)
-    if ($Arguments.Count -gt 0 -and $Arguments[0] -in @("install", "update", "uninstall", "start", "pause", "resume", "stop", "restart", "status", "login")) {
+    if ($Arguments.Count -gt 0 -and $Arguments[0] -in @("install", "update", "uninstall", "start", "pause", "resume", "stop", "restart", "status", "logs", "login")) {
         $Action = $Arguments[0]
         $Arguments = if ($Arguments.Count -gt 1) { $Arguments[1..($Arguments.Count - 1)] } else { @() }
     }
     $Target = $null
+    $Source = $null
+    $SourceMode = "source"
+    $Mirror = "direct"
+    $MirrorUrl = ""
     $SystemPython = if ($env:PYTHON_BIN) { $env:PYTHON_BIN } else { "py" }
     $SystemPythonArgs = if ([IO.Path]::GetFileNameWithoutExtension($SystemPython) -ieq "py") { @("-3") } else { @() }
     $CustomSystemPython = [bool]$env:PYTHON_BIN
@@ -54,6 +63,30 @@ try {
 
     for ($i = 0; $i -lt $Arguments.Count; $i++) {
         switch ($Arguments[$i]) {
+            "--target" {
+                if ($i + 1 -ge $Arguments.Count) { Stop-Install "--target 需要一个路径" }
+                $Target = $Arguments[++$i]
+            }
+            "--source" {
+                if ($i + 1 -ge $Arguments.Count) { Stop-Install "--source 需要一个路径" }
+                $Source = $Arguments[++$i]
+            }
+            "--source-mode" {
+                if ($i + 1 -ge $Arguments.Count) { Stop-Install "--source-mode 需要一个值" }
+                $SourceMode = $Arguments[++$i]
+            }
+            "--mirror" {
+                if ($i + 1 -ge $Arguments.Count) { Stop-Install "--mirror 需要一个值" }
+                $Mirror = $Arguments[++$i]
+            }
+            "--mirror-url" {
+                if ($i + 1 -ge $Arguments.Count) { Stop-Install "--mirror-url 需要一个 URL" }
+                $MirrorUrl = $Arguments[++$i]
+            }
+            "--venv" {
+                if ($i + 1 -ge $Arguments.Count) { Stop-Install "--venv 需要一个路径" }
+                $Venv = $Arguments[++$i]
+            }
             "--python" {
                 if ($i + 1 -ge $Arguments.Count) { Stop-Install "--python 需要一个路径" }
                 $SystemPython = $Arguments[++$i]
@@ -80,18 +113,40 @@ try {
         }
     }
 
-    if ($null -eq $Target) { $Target = Join-Path $Root "xiu3" }
+    if (-not $Source) { $Source = $Root }
+    $Source = [IO.Path]::GetFullPath($Source)
+    if ($SourceMode -notin @("auto", "release", "source")) { Stop-Install "不支持的源码模式：$SourceMode" }
+    if ($Mirror -notin @("direct", "accelerated", "custom")) { Stop-Install "不支持的镜像模式：$Mirror" }
+    if ($null -eq $Target) { $Target = Join-Path $HOME "xiu3" }
     $Target = [IO.Path]::GetFullPath($Target)
     $Venv = [IO.Path]::GetFullPath($Venv)
+
+    if ($Action -in @("start", "stop", "restart", "status", "logs", "login", "uninstall", "pause", "resume")) {
+        if (-not (Test-Path $Target)) { Stop-Install "找不到宿主目录：$Target" }
+        $Control = Join-Path $Target ".xiuxian3\control_windows.ps1"
+        if (-not (Test-Path $Control)) { Stop-Install "未找到控制脚本，请先执行 install：$Target" }
+        $ControlArgs = @($Action, "--target", $Target, "--venv", $Venv, "--source", $Source,
+            "--source-mode", $SourceMode, "--mirror", $Mirror)
+        if ($MirrorUrl) { $ControlArgs += @("--mirror-url", $MirrorUrl) }
+        if ($Yes) { $ControlArgs += "--yes" }
+        & $Control @ControlArgs
+        exit $LASTEXITCODE
+    }
+
+    if ($SourceMode -eq "release") {
+        $Bootstrap = Join-Path $Root "scripts\onekey_windows.ps1"
+        if (-not (Test-Path $Bootstrap)) { Stop-Install "找不到 Release 安装器：$Bootstrap" }
+        & $Bootstrap $Action -Target $Target -Source $Source -SourceMode release -Mirror $Mirror -MirrorUrl $MirrorUrl -Venv $Venv
+        exit $LASTEXITCODE
+    }
+
+    if ($Source -ne $Root) {
+        $Root = $Source
+        if (-not (Test-Path (Join-Path $Root "pyproject.toml"))) { Stop-Install "--source 不是有效的 xiu3 checkout：$Root" }
+    }
     if ($Action -eq "update" -and -not (Test-Path $Target)) { Stop-Install "更新目标不存在：$Target" }
     New-Item -ItemType Directory -Force -Path $Target, (Join-Path $Target "data") | Out-Null
 
-    if ($Action -notin @("install", "update")) {
-        $Control = Join-Path $Target ".xiuxian3\control_windows.ps1"
-        if (-not (Test-Path $Control)) { Stop-Install "未找到控制脚本，请先执行 install：$Target" }
-        if ($Yes) { & $Control $Target $Venv $Root $Action -Yes } else { & $Control $Target $Venv $Root $Action }
-        exit $LASTEXITCODE
-    }
     if (-not (Get-Command git -ErrorAction SilentlyContinue) -and (Get-Command winget -ErrorAction SilentlyContinue)) {
         Write-Host "[xiuxian3] 通过 winget 安装 Git"
         & winget install --id Git.Git --exact --silent --accept-package-agreements --accept-source-agreements
@@ -250,7 +305,7 @@ exit `$LASTEXITCODE
     Write-Host "安装完成。"
     Write-Host "宿主目录：$Target"
     Write-Host "虚拟环境：$Venv"
-    Write-Host "控制命令：Set-Location '$Target'; & '.\xiu3.ps1' start|pause|resume|stop|restart|status|update|uninstall --yes"
+    Write-Host "控制命令：Set-Location '$Target'; & '.\xiu3.ps1' install|update|uninstall|start|stop|restart|status|logs|login"
 } catch {
     Write-Error "[xiuxian3] 安装失败：$($_.Exception.Message)"
     Write-Error "保留当前目录后重试；网络问题可设置 PIP_INDEX_URL 或传入 --index-url。"

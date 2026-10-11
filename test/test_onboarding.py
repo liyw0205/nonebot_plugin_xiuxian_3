@@ -7,6 +7,7 @@ import shutil
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
+from nonebot_plugin_xiuxian_3.adapters.messaging import markdown_to_text
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
@@ -28,6 +29,11 @@ def test_mortal_intro_and_first_path_flow() -> None:
             assert (await runtime.dispatch(_context(user, "create"), "开始修仙")).ok
             seeking = await runtime.dispatch(_context(user, "seek"), "寻仙问道")
             assert seeking.code == "SEEKING_STARTED"
+            world_text = json.loads(
+                (Path(__file__).parents[1] / "data" / "引导" / "引导.json").read_text(encoding="utf-8")
+            )["records"][0]["content"]
+            assert world_text in seeking.message
+            assert "玄天界以灵脉贯通山川" in markdown_to_text(seeking.message)
             assert seeking.data["stamina"] == 30
             assert seeking.data["energy"] == 30
             assert seeking.data["inventory"]["item.herb.blood_grass"] == 3
@@ -37,6 +43,9 @@ def test_mortal_intro_and_first_path_flow() -> None:
 
             read = await runtime.dispatch(_context(user, "read"), "完成引导 阅读")
             assert read.code == "INTRO_COMPLETED"
+            assert world_text in read.message
+            assert "修仙世界" in markdown_to_text(read.message)
+            assert read.message.index(world_text) < read.message.index("世界说明已阅")
             assert read.data["intro_flags"] == ("guide.read_world",)
 
             at_town = await runtime.dispatch(_context(user, "gather-town"), "完成引导 采集")
