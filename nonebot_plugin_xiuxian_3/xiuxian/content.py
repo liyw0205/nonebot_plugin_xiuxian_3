@@ -97,6 +97,18 @@ class ContentBundle:
     def has(self, kind: str, key: str, *, include_locked: bool = True) -> bool:
         return self.get(kind, key, include_locked=include_locked) is not None
 
+    def sources_for(self, asset_key: str, *, include_locked: bool = False) -> list[dict[str, Any]]:
+        """Return public source declarations for an item or companion key."""
+
+        if not isinstance(asset_key, str) or not asset_key.strip():
+            raise ValueError("asset_key must be a non-empty string")
+        matches: list[dict[str, Any]] = []
+        for row in self.list("source", include_locked=include_locked):
+            assets = row.get("asset_keys", [])
+            if isinstance(assets, list) and asset_key in assets:
+                matches.append(row)
+        return matches
+
     def label(self, kind: str, key: str, *, fallback: str | None = None) -> str:
         """Return the user-facing name for a stable content key.
 

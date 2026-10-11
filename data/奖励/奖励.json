@@ -1422,6 +1422,129 @@
       "key": "reward.event.archive.fragment.gamma"
     },
     {
+      "name": "百草坡采集所得",
+      "desc": "采集止血草与灵叶，数量按本次草木收获结果结算。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 3, "rewards": {"item.herb.blood_grass": 2}},
+        {"weight": 4, "rewards": {"item.herb.blood_grass": 3}},
+        {"weight": 2, "rewards": {"item.herb.blood_grass": 2, "item.herb.spirit_leaf": 1}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 3, "item.herb.spirit_leaf": 2}}
+      ],
+      "key": "reward_pool.exploration.herb_vale",
+      "status": "active"
+    },
+    {
+      "name": "铁木林采集所得",
+      "desc": "木材与铁石为主，偶尔找到灵叶或树脂。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 4, "rewards": {"item.mat.wood": 3, "item.ore.ironstone": 1}},
+        {"weight": 3, "rewards": {"item.mat.wood": 2, "item.ore.ironstone": 2}},
+        {"weight": 2, "rewards": {"item.mat.wood": 2, "item.herb.spirit_leaf": 1}},
+        {"weight": 1, "rewards": {"item.mat.wood": 4, "item.ore.ironstone": 2}}
+      ],
+      "key": "reward_pool.exploration.ironwood",
+      "status": "active"
+    },
+    {
+      "name": "铁木林历练所得",
+      "desc": "击退林间小兽后取得少量灵石与常用材料。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"spirit_stones": 18, "item.ore.ironstone": 1}},
+        {"weight": 3, "rewards": {"spirit_stones": 24, "item.mat.wood": 2}},
+        {"weight": 2, "rewards": {"spirit_stones": 30, "item.herb.blood_grass": 2}}
+      ],
+      "key": "reward_pool.exploration.trial_ironwood",
+      "status": "active"
+    },
+    {
+      "name": "玄武岩径采集所得",
+      "desc": "采得铁石与阵砂，结果随矿层和山砂分布变化。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 4, "rewards": {"item.ore.ironstone": 2, "item.mat.array_sand": 1}},
+        {"weight": 3, "rewards": {"item.ore.ironstone": 3}},
+        {"weight": 2, "rewards": {"item.mat.array_sand": 2}},
+        {"weight": 1, "rewards": {"item.ore.ironstone": 2, "item.mat.array_sand": 2}}
+      ],
+      "key": "reward_pool.exploration.basalt_pass",
+      "status": "active"
+    },
+    {
+      "name": "玄武岩径历练所得",
+      "desc": "击退守矿妖兽与阵纹傀儡后取得阵材和灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"spirit_stones": 45, "item.mat.array_sand": 1}},
+        {"weight": 3, "rewards": {"spirit_stones": 60, "item.ore.ironstone": 2}},
+        {"weight": 2, "rewards": {"spirit_stones": 80, "item.mat.array_sand": 2}}
+      ],
+      "key": "reward_pool.exploration.trial_basalt_pass",
+      "status": "active"
+    },
+    {
+      "name": "界隙巡查所得",
+      "desc": "边境巡查所得以灵石、雾隐核心与领域材料为主。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"spirit_stones": 120, "item.material.mist_core": 1}},
+        {"weight": 3, "rewards": {"spirit_stones": 150, "item.domain_core_fragment": 1}},
+        {"weight": 2, "rewards": {"spirit_stones": 180, "item.material.mist_core": 2}}
+      ],
+      "key": "reward_pool.exploration.boundary_rift",
+      "status": "active"
+    },
+    {
+      "name": "虚空航道历练所得",
+      "desc": "航道探索可得虚空功勋、虚空锚或档案碎片。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"spirit_stones": 220, "item.void_anchor": 1}},
+        {"weight": 3, "rewards": {"spirit_stones": 260, "item.archive_fragment.alpha": 1}},
+        {"weight": 2, "rewards": {"spirit_stones": 300, "item.void_crystal": 1}}
+      ],
+      "key": "reward_pool.exploration.void_route",
+      "status": "active"
+    },
+    {
+      "name": "档案遗迹搜寻所得",
+      "desc": "搜寻结果在档案碎片、虚空晶与档案实体之间变化。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.archive_fragment.beta": 1, "spirit_stones": 250}},
+        {"weight": 3, "rewards": {"item.archive_fragment.gamma": 1, "spirit_stones": 300}},
+        {"weight": 2, "rewards": {"item.void_archive": 1, "item.void_crystal": 1}}
+      ],
+      "key": "reward_pool.exploration.void_archive",
+      "status": "active"
+    },
+    {
+      "name": "道源门试炼所得",
+      "desc": "道源门完成试炼后所得道果碎片与灵石，领取结果被冻结。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.dao_fruit_fragment": 2, "spirit_stones": 600}},
+        {"weight": 3, "rewards": {"item.dao_fruit_fragment": 3, "spirit_stones": 800}},
+        {"weight": 2, "rewards": {"item.dao_fruit_fragment": 4, "spirit_stones": 1000}}
+      ],
+      "key": "reward_pool.exploration.dao_origin",
+      "status": "active"
+    },
+    {
+      "name": "天劫回音所得",
+      "desc": "通过天劫回音后所得少量护持材料，不替代试炼结算凭证。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.tribulation_guard": 1, "spirit_stones": 500}},
+        {"weight": 3, "rewards": {"item.dao_fruit_fragment": 2, "spirit_stones": 650}},
+        {"weight": 2, "rewards": {"item.tribulation_guard": 2, "spirit_stones": 800}}
+      ],
+      "key": "reward_pool.exploration.tribulation_echo",
+      "status": "active"
+    },
+    {
       "name": "早期野兽掉落",
       "desc": "林地与近郊常见野兽的材料掉落池。",
       "pool_type": "weighted",

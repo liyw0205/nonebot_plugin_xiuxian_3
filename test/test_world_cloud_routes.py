@@ -375,9 +375,17 @@ def test_locked_locations_reject_travel_without_writes_on_both_adapters() -> Non
         with TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"
             shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            locations_path = data_dir / "地图" / "地点.json"
+            locations = json.loads(locations_path.read_text(encoding="utf-8"))
+            for location in locations["records"]:
+                if location["key"] in {"xuantian.array_hall", "void.portal"}:
+                    location["status"] = "locked"
+            locations_path.write_text(
+                json.dumps(locations, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
             runtime = create_runtime(data_dir=data_dir)
             destinations = (
-                ("array", "阵堂", "qi_gathering", "xuantian.cloud_city"),
+                ("array", "阵堂", "qi_gathering", "xuantian.sect_gate"),
                 ("void", "虚空门户", "soul_transformation", "cave.boundary_realm"),
             )
             for adapter in ("qq.official", "onebot.v11"):
@@ -433,7 +441,7 @@ def test_travel_operation_replays_before_current_location_status_check() -> None
 
             runtime = create_runtime(data_dir=data_dir)
             destinations = (
-                ("array", "阵堂", "qi_gathering", "xuantian.cloud_city"),
+                ("array", "阵堂", "qi_gathering", "xuantian.sect_gate"),
                 ("void", "虚空门户", "soul_transformation", "cave.boundary_realm"),
             )
             operations: list[tuple[str, str, str]] = []

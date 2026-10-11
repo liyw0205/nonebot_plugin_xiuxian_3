@@ -305,7 +305,7 @@ class ExplorationRepositoryMixin:
         raise RepositoryBusyError("database remained locked") from last_error
 
     def _start_exploration_once(self, platform: str, platform_user_id: str, mode_key: str, operation_id: str) -> ExplorationStartRecord:
-        definition = exploration_definition(mode_key)
+        definition = exploration_definition(mode_key, self.content)
         operation_name = "exploration.start"
         request_payload = {
             "platform": platform,
@@ -464,7 +464,7 @@ class ExplorationRepositoryMixin:
                 "bloodline_stability_after": bloodline_stability_after,
                 "cross_realm_penalty_bp": cross_realm_penalty_bp,
                 "random_pool": definition.random_pool,
-                "reward_pool_key": exploration_reward_pool(definition.key),
+                "reward_pool_key": exploration_reward_pool(definition.key, self.content),
                 "random_seed": operation_id,
                 "battle_chance_bp": battle_chance_bp,
                 "base_battle_chance_bp": definition.battle_chance_bp,
@@ -488,7 +488,7 @@ class ExplorationRepositoryMixin:
             snapshot["exploration_discovery_bp"] = exploration_discovery_weight_bp(
                 snapshot["constitution_effect"], companion_snapshots
             )
-            reward_pool_key = exploration_reward_pool(definition.key)
+            reward_pool_key = exploration_reward_pool(definition.key, self.content)
             if reward_pool_key is not None:
                 snapshot["frozen_result"] = settlement_result(
                     definition.key,
@@ -786,7 +786,7 @@ class ExplorationRepositoryMixin:
             ):
                 raise RewardContentError("exploration start operation does not match its snapshot")
 
-            expected_enemy_key = exploration_enemy_key(str(session["mode_key"]))
+            expected_enemy_key = exploration_enemy_key(str(session["mode_key"]), self.content)
             expected_battle_start_id = f"exploration.battle:{exploration_id}"
             expected_battle_resolve_id = f"battle.resolve:{battle_id}"
             battle_snapshot = self._strict_exploration_object(
@@ -807,7 +807,6 @@ class ExplorationRepositoryMixin:
                 or battle_player.get("player_id") != str(row["player_id"])
                 or not isinstance(battle_enemy, dict)
                 or battle_enemy.get("key") != expected_enemy_key
-                or str(battle["reward_status"]) != "none"
             ):
                 raise RewardContentError("settled battle does not belong to this exploration")
 
@@ -852,10 +851,14 @@ class ExplorationRepositoryMixin:
             battle_reward = self._strict_exploration_reward(
                 battle_result.get("reward", {}), "exploration battle reward"
             )
+            expected_battle_reward_status = (
+                "pending" if battle_outcome == "won" and battle_reward else "none"
+            )
             if (
                 resolve_payload.get("battle_id") != battle_id
                 or resolve_payload.get("status") != "settled"
                 or resolve_payload.get("outcome") != battle_outcome
+                or str(battle["reward_status"]) != expected_battle_reward_status
                 or resolve_payload.get("reward_status") != battle["reward_status"]
                 or battle_result.get("reward_status") != battle["reward_status"]
                 or self._strict_exploration_reward(
@@ -864,6 +867,15 @@ class ExplorationRepositoryMixin:
                 != battle_reward
             ):
                 raise RewardContentError("exploration battle resolution does not match its ledger")
+
+            if battle_outcome == "won" and battle_reward:
+                consumed = connection.execute(
+                    "UPDATE battle_sessions SET reward_status='none', updated_at=? "
+                    "WHERE battle_id=? AND status='settled' AND reward_status='pending'",
+                    (now_text, battle_id),
+                )
+                if consumed.rowcount != 1:
+                    raise RewardContentError("exploration battle reward was already consumed")
 
             result = frozen_result if battle_outcome == "won" else failure_result
             soul_power_loss = 0
@@ -1120,7 +1132,7 @@ class ExplorationRepositoryMixin:
                     and constitution_effect.get("type") == "drop_weight_bp"
                     else 0
                 )
-                reward_pool_key = exploration_reward_pool(str(session["mode_key"]))
+                reward_pool_key = exploration_reward_pool(str(session["mode_key"]), self.content)
                 if reward_pool_key is not None:
                     frozen_result = snapshot.get("frozen_result")
                     if not isinstance(frozen_result, dict):

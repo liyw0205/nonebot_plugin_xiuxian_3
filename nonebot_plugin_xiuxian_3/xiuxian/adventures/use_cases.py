@@ -163,7 +163,11 @@ class AdventuresApplication:
             "BOUNTY_BOARD",
             "\n".join(lines),
             context.request_id,
-            data={"business_date": record.business_date, "offers": offer_data},
+            data={
+                "business_date": record.business_date,
+                "refresh_seed": record.refresh_seed,
+                "offers": offer_data,
+            },
         )
 
     async def accept_bounty(self, context: CommandContext) -> CommandResult:

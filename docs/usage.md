@@ -1,6 +1,6 @@
 # 玩家使用指南
 
-本文及安装教程适用于 [work/m9-content-data 版本](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/tree/work/m9-content-data)。默认 `main` 的源码与该版本不同，请按下方命令选择对应分支。
+本文适用于从仓库 `main` 分支安装的版本。
 
 命令前缀由宿主的 `COMMAND_START` 决定，下面的示例省略前缀。QQ 群聊通常还需要 @机器人；QQ 可点击蓝字，OneBot 会收到等价纯文本。
 

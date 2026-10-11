@@ -7,15 +7,17 @@ import hashlib
 from typing import Any
 
 from ..companions.rules import companion_exploration_discovery_bp
-from ..content import ContentBundle
+from ..content import ContentBundle, ContentError, bundled_content
 from ..rewards.rules import (
     RewardContentError,
     reward_pool_battle_failure_rewards,
     reward_pool_map,
+    reward_pool_outcomes,
     reward_pool_uses_item_weight_bonus,
 )
 from ..utils.assets import inventory_amount
 from ..utils.player import split_player_rewards
+from ..utils.randomness import deterministic_weighted_choice
 from .models import ExplorationDefinition
 
 
@@ -34,214 +36,216 @@ CLOUD_MINE_ACCESS_ITEMS = frozenset({
     "item.tool.mining_pickaxe",
     "item.tool.mining_pickaxe_t2",
 })
+def _content(content: ContentBundle | None = None) -> ContentBundle:
+    return content or bundled_content()
+
+
+def _definitions(content: ContentBundle | None = None) -> dict[str, ExplorationDefinition]:
+    bundle = _content(content)
+    definitions: dict[str, ExplorationDefinition] = {}
+    for row in bundle.list("exploration_mode", include_locked=False):
+        key = row.get("key")
+        required_realm = row.get("required_realm")
+        required_layer = row.get("required_layer")
+        if not isinstance(key, str) or not key.startswith("explore."):
+            raise ContentError(f"exploration mode has invalid key: {key!r}")
+        for field in ("name", "desc", "location_key", "random_pool", "reward_pool_key"):
+            if not isinstance(row.get(field), str) or not row[field].strip():
+                raise ContentError(f"exploration mode {key} requires {field}")
+        aliases = row.get("aliases", [])
+        if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
+            raise ContentError(f"exploration mode {key} aliases must be non-empty strings")
+        if not isinstance(required_realm, str) or not bundle.has("realm", required_realm, include_locked=False):
+            raise ContentError(f"exploration mode {key} references an unavailable realm")
+        if not isinstance(required_layer, int) or isinstance(required_layer, bool) or required_layer < 0:
+            raise ContentError(f"exploration mode {key} has invalid required_layer")
+        if not bundle.has("location", row["location_key"], include_locked=False):
+            raise ContentError(f"exploration mode {key} references an unavailable location")
+        if not bundle.has("reward", row["reward_pool_key"], include_locked=False):
+            raise ContentError(f"exploration mode {key} references an unavailable reward pool")
+        access_any = row.get("access_any", [])
+        if not isinstance(access_any, list) or any(not isinstance(item, dict) for item in access_any):
+            raise ContentError(f"exploration mode {key} access_any must be a list of objects")
+        for access in access_any:
+            access_type = access.get("type")
+            if access_type == "item":
+                item_key = access.get("item_key")
+                quantity = access.get("quantity")
+                if not isinstance(item_key, str) or not bundle.has("item", item_key, include_locked=False):
+                    raise ContentError(f"exploration mode {key} references an unavailable access item")
+                if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+                    raise ContentError(f"exploration mode {key} access item quantity must be positive")
+            elif access_type in {"subprofession", "intro_flag"}:
+                if not isinstance(access.get("value"), str) or not access["value"].strip():
+                    raise ContentError(f"exploration mode {key} access value must be non-empty")
+            else:
+                raise ContentError(f"exploration mode {key} has unsupported access type")
+        enemy_pool_key = row.get("enemy_pool_key")
+        if enemy_pool_key is not None:
+            if not isinstance(enemy_pool_key, str) or not enemy_pool_key.strip():
+                raise ContentError(f"exploration mode {key} has invalid enemy_pool_key")
+            pool = bundle.get("encounter_pool", enemy_pool_key, include_locked=False)
+            if pool is None or not isinstance(pool.get("candidates"), list) or not pool["candidates"]:
+                raise ContentError(f"exploration mode {key} references an empty encounter pool")
+        definitions[key] = ExplorationDefinition(
+            key=key,
+            label=row["name"].strip(),
+            location_key=row["location_key"],
+            duration_seconds=_positive_int(row, "duration_seconds", key),
+            stamina_cost=_positive_int(row, "stamina_cost", key, allow_zero=True),
+            required_realm=required_realm,
+            required_layer=required_layer,
+            daily_limit=_positive_int(row, "daily_limit", key),
+            random_pool=row["random_pool"],
+            battle_chance_bp=_bounded_int(row, "battle_chance_bp", key),
+            energy_cost=_positive_int(row, "energy_cost", key, allow_zero=True),
+        )
+    return definitions
+
+
+def _positive_int(row: dict[str, Any], field: str, key: str, *, allow_zero: bool = False) -> int:
+    value = row.get(field)
+    if isinstance(value, bool) or not isinstance(value, int) or value < (0 if allow_zero else 1):
+        raise ContentError(f"exploration mode {key} has invalid {field}")
+    return value
+
+
+def _bounded_int(row: dict[str, Any], field: str, key: str) -> int:
+    value = _positive_int(row, field, key, allow_zero=True)
+    if value > 10000:
+        raise ContentError(f"exploration mode {key} has invalid {field}")
+    return value
+
+
+def _aliases(content: ContentBundle | None = None) -> dict[str, str]:
+    result: dict[str, str] = {}
+    bundle = _content(content)
+    for row in bundle.list("exploration_mode", include_locked=False):
+        key = row["key"]
+        for alias in [row["name"], *row.get("aliases", [])]:
+            if not isinstance(alias, str) or not alias.strip():
+                raise ContentError(f"exploration mode {key} has invalid alias")
+            previous = result.setdefault(alias, key)
+            if previous != key:
+                raise ContentError(f"ambiguous exploration alias: {alias}")
+    return result
+
+
+DEFINITIONS = _definitions()
+ALIASES = _aliases()
 BATTLE_ENEMY_BY_MODE = {
-    "explore.gather_outskirts": "enemy.wood_rat",
-    # Short training is available at qi-sensing L2; the L3 iron boar remains
-    # reserved for later named encounters.
-    "explore.trial_outskirts": "enemy.wood_rat",
-    "explore.mist_grotto": "enemy.mist_guardian",
-    "explore.cloud_mine": "enemy.cloud_beast",
-    "explore.mist_grotto_2": "enemy.mist_elite",
-    "explore.demon_abyss": "enemy.demon_ruins_scout",
-    "explore.beast_hunt": "enemy.beast_guardian",
-    "explore.ancestral_lake": "enemy.ancestral_spirit",
+    key: next(iter(_content().require("encounter_pool", row["enemy_pool_key"])["candidates"]), {}).get("enemy_key")
+    for key, row in ((row["key"], row) for row in _content().list("exploration_mode", include_locked=False))
+    if row.get("enemy_pool_key")
 }
-
 EXPLORATION_REWARD_POOLS = {
-    "explore.gather_outskirts": "reward_pool.exploration.gather_outskirts",
-    "explore.trial_outskirts": "reward_pool.exploration.trial_outskirts",
-    "explore.spring_gather": "reward_pool.exploration.spring_gather",
-    "explore.mist_grotto": "reward_pool.exploration.mist_grotto",
-    "explore.cloud_mine": "reward_pool.exploration.cloud_mine",
-    "explore.mist_grotto_2": "reward_pool.exploration.mist_grotto_2",
-    "explore.cloud_boat_trial": "reward_pool.exploration.cloud_boat_trial",
-    "explore.beast_hunt": "reward_pool.exploration.beast_hunt",
-    "explore.demon_threshold": "reward_pool.exploration.demon_threshold",
-    "explore.demon_abyss": "reward_pool.exploration.demon_abyss",
-    "explore.ancestral_lake": "reward_pool.exploration.ancestral_lake",
-}
-
-DEFINITIONS = {
-    "explore.gather_outskirts": ExplorationDefinition(
-        key="explore.gather_outskirts",
-        label="近郊采集",
-        location_key="xuantian.outskirts",
-        duration_seconds=30,
-        stamina_cost=3,
-        required_realm="mortal",
-        required_layer=0,
-        daily_limit=12,
-        random_pool="gather.outskirts",
-        battle_chance_bp=1000,
-    ),
-    "explore.trial_outskirts": ExplorationDefinition(
-        key="explore.trial_outskirts",
-        label="近郊短历练",
-        location_key="xuantian.outskirts",
-        duration_seconds=60,
-        stamina_cost=5,
-        required_realm="qi_sensing",
-        required_layer=2,
-        daily_limit=8,
-        random_pool="trial.outskirts",
-        battle_chance_bp=2000,
-    ),
-    "explore.spring_gather": ExplorationDefinition(
-        key="explore.spring_gather",
-        label="灵泉采集",
-        location_key="xuantian.spirit_field",
-        duration_seconds=90,
-        stamina_cost=6,
-        required_realm="qi_sensing",
-        required_layer=2,
-        daily_limit=6,
-        random_pool="gather.spirit_field",
-        battle_chance_bp=0,
-    ),
-    "explore.mist_grotto": ExplorationDefinition(
-        key="explore.mist_grotto",
-        label="雾隐洞天探索",
-        location_key="cave.mist_grotto",
-        duration_seconds=5 * 60,
-        stamina_cost=10,
-        required_realm="qi_gathering",
-        required_layer=4,
-        daily_limit=2,
-        random_pool="cave.mist_grotto",
-        battle_chance_bp=2500,
-    ),
-    "explore.cloud_mine": ExplorationDefinition(
-        key="explore.cloud_mine",
-        label="云铁矿区采集",
-        location_key="xuantian.cloud_mine",
-        duration_seconds=2 * 60,
-        stamina_cost=8,
-        required_realm="foundation",
-        required_layer=1,
-        daily_limit=6,
-        random_pool="gather.cloud_mine",
-        battle_chance_bp=3000,
-        energy_cost=2,
-    ),
-    "explore.mist_grotto_2": ExplorationDefinition(
-        key="explore.mist_grotto_2",
-        label="雾隐洞天二层探索",
-        location_key="cave.mist_grotto_2",
-        duration_seconds=10 * 60,
-        stamina_cost=15,
-        required_realm="golden_core",
-        required_layer=1,
-        daily_limit=2,
-        random_pool="cave.mist_grotto_2",
-        battle_chance_bp=4000,
-    ),
-    "explore.cloud_boat_trial": ExplorationDefinition(
-        key="explore.cloud_boat_trial",
-        label="云舟试炼",
-        location_key="xuantian.floating_boat",
-        duration_seconds=5 * 60,
-        stamina_cost=12,
-        required_realm="golden_core",
-        required_layer=1,
-        daily_limit=3,
-        random_pool="trial.cloud_boat",
-        battle_chance_bp=0,
-    ),
-    "explore.demon_threshold": ExplorationDefinition(
-        key="explore.demon_threshold",
-        label="深渊门备材",
-        location_key="demon.abyss_gate",
-        duration_seconds=4 * 60,
-        stamina_cost=8,
-        required_realm="golden_core",
-        required_layer=9,
-        daily_limit=6,
-        random_pool="gather.demon_threshold",
-        battle_chance_bp=0,
-        energy_cost=2,
-    ),
-    "explore.demon_abyss": ExplorationDefinition(
-        key="explore.demon_abyss",
-        label="魔界堕落遗迹探索",
-        location_key="demon.fallen_ruins",
-        duration_seconds=15 * 60,
-        stamina_cost=20,
-        required_realm="nascent_soul",
-        required_layer=1,
-        daily_limit=2,
-        random_pool="loot.demon.abyss",
-        battle_chance_bp=10000,
-    ),
-    "explore.beast_hunt": ExplorationDefinition(
-        key="explore.beast_hunt",
-        label="万兽山狩猎",
-        location_key="beast.ten_thousand_hills",
-        duration_seconds=15 * 60,
-        stamina_cost=20,
-        required_realm="nascent_soul",
-        required_layer=1,
-        daily_limit=2,
-        random_pool="loot.beast.hills",
-        battle_chance_bp=10000,
-    ),
-    "explore.ancestral_lake": ExplorationDefinition(
-        key="explore.ancestral_lake",
-        label="祖灵湖探索",
-        location_key="beast.ancestral_lake",
-        duration_seconds=20 * 60,
-        stamina_cost=25,
-        required_realm="soul_transformation",
-        required_layer=1,
-        daily_limit=2,
-        random_pool="event.ancestral_lake",
-        battle_chance_bp=3500,
-    ),
-}
-
-ALIASES = {
-    "近郊采集": "explore.gather_outskirts",
-    "采集": "explore.gather_outskirts",
-    "短历练": "explore.trial_outskirts",
-    "近郊历练": "explore.trial_outskirts",
-    "灵泉采集": "explore.spring_gather",
-    "雾隐洞天探索": "explore.mist_grotto",
-    "洞天探索": "explore.mist_grotto",
-    "云铁矿区采集": "explore.cloud_mine",
-    "云铁采集": "explore.cloud_mine",
-    "洞天二层探索": "explore.mist_grotto_2",
-    "云舟试炼": "explore.cloud_boat_trial",
-    "云舟历练": "explore.cloud_boat_trial",
-    "深渊门备材": "explore.demon_threshold",
-    "深渊门采集": "explore.demon_threshold",
-    "魔界堕落遗迹探索": "explore.demon_abyss",
-    "堕落遗迹探索": "explore.demon_abyss",
-    "万兽山狩猎": "explore.beast_hunt",
-    "妖界万兽山探索": "explore.beast_hunt",
-    "祖灵湖探索": "explore.ancestral_lake",
-    "祖灵湖": "explore.ancestral_lake",
+    row["key"]: row["reward_pool_key"]
+    for row in _content().list("exploration_mode", include_locked=False)
 }
 
 
-def resolve_exploration_mode(value: str) -> str | None:
+def resolve_exploration_mode(value: str, content: ContentBundle | None = None) -> str | None:
     normalized = value.strip()
-    if normalized in DEFINITIONS:
+    definitions = _definitions(content) if content is not None else DEFINITIONS
+    aliases = _aliases(content) if content is not None else ALIASES
+    if normalized in definitions:
         return normalized
-    return ALIASES.get(normalized)
+    return aliases.get(normalized)
 
 
-def exploration_definition(mode_key: str) -> ExplorationDefinition:
+def exploration_definition(mode_key: str, content: ContentBundle | None = None) -> ExplorationDefinition:
     try:
-        return DEFINITIONS[mode_key]
+        return (_definitions(content) if content is not None else DEFINITIONS)[mode_key]
     except KeyError as exc:
         raise ValueError(f"unsupported exploration mode: {mode_key}") from exc
 
 
-def exploration_enemy_key(mode_key: str) -> str | None:
-    return BATTLE_ENEMY_BY_MODE.get(mode_key)
+def exploration_enemy_key(mode_key: str, content: ContentBundle | None = None) -> str | None:
+    bundle = _content(content)
+    row = bundle.get("exploration_mode", mode_key, include_locked=False)
+    if row is None or not row.get("enemy_pool_key"):
+        return None
+    pool = bundle.require("encounter_pool", str(row["enemy_pool_key"]), include_locked=False)
+    candidates = pool.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        raise ContentError(f"encounter pool {row['enemy_pool_key']} has no candidates")
+    enemy_key = candidates[0].get("enemy_key") if isinstance(candidates[0], dict) else None
+    if not isinstance(enemy_key, str) or not bundle.has("enemy", enemy_key, include_locked=False):
+        raise ContentError(f"encounter pool {row['enemy_pool_key']} has an invalid enemy")
+    return enemy_key
 
 
-def exploration_reward_pool(mode_key: str) -> str | None:
-    return EXPLORATION_REWARD_POOLS.get(mode_key)
+def exploration_encounter_selection(
+    mode_key: str,
+    *,
+    seed: str,
+    realm_key: str,
+    realm_layer: int,
+    content: ContentBundle | None = None,
+) -> tuple[str | None, list[dict[str, Any]]]:
+    """Choose and return a weighted encounter candidate list eligible to the actor."""
+
+    if not isinstance(seed, str) or not seed:
+        raise ValueError("exploration encounter seed must be a non-empty string")
+    if isinstance(realm_layer, bool) or not isinstance(realm_layer, int) or realm_layer < 0:
+        raise ValueError("exploration encounter realm layer must be non-negative")
+    bundle = _content(content)
+    mode = bundle.get("exploration_mode", mode_key, include_locked=False)
+    if mode is None or not mode.get("enemy_pool_key"):
+        return None, []
+    pool = bundle.require("encounter_pool", str(mode["enemy_pool_key"]), include_locked=False)
+    candidates = pool.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        raise ContentError(f"encounter pool {pool['key']} has no candidates")
+    rank_row = bundle.get("realm", realm_key, include_locked=False)
+    if rank_row is None or isinstance(rank_row.get("rank"), bool) or not isinstance(rank_row.get("rank"), int):
+        raise ContentError(f"exploration encounter has unavailable realm {realm_key}")
+    player_rank = int(rank_row["rank"])
+    eligible: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            raise ContentError(f"encounter pool {pool['key']} has a malformed candidate")
+        enemy_key = candidate.get("enemy_key")
+        weight = candidate.get("weight")
+        if (
+            not isinstance(enemy_key, str)
+            or not enemy_key
+            or isinstance(weight, bool)
+            or not isinstance(weight, int)
+            or weight <= 0
+        ):
+            raise ContentError(f"encounter pool {pool['key']} has an invalid candidate")
+        enemy = bundle.require("enemy", enemy_key, include_locked=False)
+        requirement = next(
+            (
+                item for item in enemy.get("requirements", [])
+                if isinstance(item, dict) and item.get("type", "realm") == "realm"
+            ),
+            None,
+        )
+        if requirement is not None:
+            required_realm = requirement.get("realm_key")
+            required_layer = requirement.get("min_layer", 1)
+            required = bundle.get("realm", required_realm, include_locked=False) if isinstance(required_realm, str) else None
+            if (
+                required is None
+                or isinstance(required_layer, bool)
+                or not isinstance(required_layer, int)
+                or (player_rank, realm_layer) < (int(required.get("rank", -1)), required_layer)
+            ):
+                continue
+        eligible.append({"enemy_key": enemy_key, "weight": weight})
+    if not eligible:
+        raise ContentError(f"encounter pool {pool['key']} has no candidates for {realm_key}:{realm_layer}")
+    selected = deterministic_weighted_choice(
+        tuple((item["weight"], item["enemy_key"]) for item in eligible), seed
+    )
+    return selected, eligible
+
+
+def exploration_reward_pool(mode_key: str, content: ContentBundle | None = None) -> str | None:
+    row = _content(content).get("exploration_mode", mode_key, include_locked=False)
+    return str(row["reward_pool_key"]) if row is not None else None
 
 
 def has_cloud_mine_access(*, subprofession_key: str | None, inventory: dict[str, int], intro_flags: set[str]) -> bool:
@@ -288,7 +292,7 @@ def settlement_result(
     drop_weight_bp: int = 0,
     content: ContentBundle | None = None,
 ) -> dict[str, int]:
-    reward_pool_key = exploration_reward_pool(mode_key)
+    reward_pool_key = exploration_reward_pool(mode_key, content)
     if reward_pool_key is not None:
         uses_item_weight_bonus = reward_pool_uses_item_weight_bonus(reward_pool_key, content)
         result = reward_pool_map(
@@ -329,7 +333,7 @@ def settlement_failure_result(
     *,
     content: ContentBundle | None = None,
 ) -> dict[str, int]:
-    reward_pool_key = exploration_reward_pool(mode_key)
+    reward_pool_key = exploration_reward_pool(mode_key, content)
     if reward_pool_key is None:
         return {}
     result = reward_pool_battle_failure_rewards(reward_pool_key, content)
@@ -350,6 +354,7 @@ __all__ = [
     "exploration_definition",
     "exploration_discovery_weight_bp",
     "exploration_enemy_key",
+    "exploration_encounter_selection",
     "exploration_reward_pool",
     "EXPLORATION_REWARD_POOLS",
     "has_cloud_mine_access",

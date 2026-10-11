@@ -385,7 +385,7 @@ class TravelRepositoryMixin:
         player = await self.get_player(platform=platform, platform_user_id=platform_user_id)
         if player is None:
             raise PlayerNotFoundError("player does not exist")
-        definition = destination_definition(destination)
+        definition = destination_definition(destination, self.content)
         missing: list[str] = []
         if not destination_location_is_open(destination, self.content):
             missing.append("此地尚未开放")
@@ -516,7 +516,7 @@ class TravelRepositoryMixin:
         raise RepositoryBusyError("database remained locked") from last_error
 
     def _start_travel_once(self, platform: str, platform_user_id: str, destination: str, operation_id: str) -> TravelStartRecord:
-        definition = destination_definition(destination)
+        definition = destination_definition(destination, self.content)
         operation_name = "world.start_travel"
         request_payload = {
             "platform": platform,
