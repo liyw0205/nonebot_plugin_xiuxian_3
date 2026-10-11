@@ -149,29 +149,7 @@ switch ($Action) {
             & (Join-Path $SourceRoot "scripts\onekey_windows.ps1") update -Target $Target -Source $SourceRoot -SourceMode release -Mirror $Mirror -MirrorUrl $MirrorUrl -Venv $Venv
             exit $LASTEXITCODE
         }
-        if ($SourceMode -notin @("auto", "source")) { throw "不支持的更新源码模式：$SourceMode" }
-        if ($SourceRoot -and (Test-Path (Join-Path $SourceRoot "scripts\install_windows.ps1"))) {
-            Write-Host "[xiu3] 源码模式使用当前 checkout；不会自动 fetch/pull。请先自行同步源码，再运行更新。"
-            & (Join-Path $SourceRoot "scripts\install_windows.ps1") update --target $Target --source $SourceRoot --source-mode source --mirror $Mirror --venv $Venv
-        } else {
-            $VenvPython = Join-Path $Venv "Scripts\python.exe"
-            $Components = @(
-                @{ Group = "adapter"; Name = "QQ" },
-                @{ Group = "adapter"; Name = "OneBot V11" },
-                @{ Group = "driver"; Name = "FastAPI" },
-                @{ Group = "driver"; Name = "HTTPX" },
-                @{ Group = "driver"; Name = "websockets" },
-                @{ Group = "driver"; Name = "AIOHTTP" }
-            )
-            foreach ($Component in $Components) {
-                $Description = "nb $($Component.Group) update $($Component.Name)"
-                Invoke-Retry {
-                    & $Nb --cwd $Target --python $VenvPython $Component.Group update $Component.Name
-                } $Description
-            }
-            & $VenvPython -m pip install --upgrade --no-deps nonebot_plugin_xiuxian_3
-            if ($LASTEXITCODE -ne 0) { throw "插件更新失败" }
-        }
+        throw "xiu3 update 只支持 Release 管理安装；需要可用的 Release 源码目录以下载 latest project.tar.gz。"
     }
     "uninstall" {
         if (-not $Yes) { throw "卸载会删除宿主目录及 SQLite 数据；请执行 xiu3 uninstall --yes" }

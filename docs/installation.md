@@ -95,7 +95,7 @@ cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
 ```
 
-源码模式使用当前 checkout，`xiu3 update` 只重新应用当前源码，不会自动同步新提交。该模式用于首次源码安装或本地开发；日常 Release 更新请使用 Release 管理安装。
+源码模式仅用于首次源码安装或本地开发；`xiu3 update` 只支持 Release 管理安装，需要可用的 Release 源码目录来获取归档。
 
 ## 已有宿主手动安装
 
@@ -197,7 +197,7 @@ xiu3 update
 xiu3 start
 ```
 
-源码模式的 `xiu3 update` 使用当前 checkout，不自动同步源码；不把 Git 操作作为用户升级步骤。
+源码模式不支持 `xiu3 update`；该命令要求 Release 管理安装并从 latest Release 获取 `project.tar.gz`。
 
 正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md#1-配置层级) 控制，未配置时沿用默认富消息能力；配置存在但未列出当前 AppID 时使用纯文本。
 

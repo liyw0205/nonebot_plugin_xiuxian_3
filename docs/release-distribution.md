@@ -18,7 +18,7 @@ Release 管理宿主的日常更新顺序是停止、备份、执行 `xiu3 updat
 1. 默认尝试代理包装的 `latest/download/project.tar.gz` 地址。
 2. 代理下载失败、返回非成功状态或归档校验失败时，直接请求 GitHub 的同一 Release URL。
 3. 直连也失败时停止并保留已有宿主、`.env`、SQLite、`data/` 和 `runtime/`；不会偷偷把 Release 安装切换成未标记的源码。
-4. 源码模式必须显式传入 `--source-mode source`。Release 管理目录执行 `xiu3 update` 时重新下载 `latest/download/project.tar.gz`，更新脚本本身不执行 `git fetch/pull`。源码模式使用当前 checkout，不自动同步源码；它适用于首次源码安装或本地开发，不属于 Release 管理更新流程。
+4. 源码模式必须显式传入 `--source-mode source`，仅用于首次源码安装或本地开发。`xiu3 update` 只接受 Release 管理安装，并重新下载 `latest/download/project.tar.gz`；缺少 Release 管理源码时直接失败，不使用 Python 包索引更新插件。
 
 代理地址由安装脚本维护；代理下载或归档校验失败时会回退到 GitHub Release 直连，不会静默切换到源码安装。Release 更新只替换独立源码缓存，不覆盖宿主、`.env`、SQLite、`data/`、`runtime/` 或 venv。
 

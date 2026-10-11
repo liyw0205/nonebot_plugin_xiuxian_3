@@ -192,7 +192,7 @@ def test_qq_login_helper_is_installed_and_documented() -> None:
     assert "qq_login.py" in control and "qq_login.py" in windows_control
 
 
-def test_source_update_uses_current_checkout_without_git_fetch_or_pull(tmp_path: Path) -> None:
+def test_source_mode_control_update_requires_release_archive(tmp_path: Path) -> None:
     target = tmp_path / "host"
     source = tmp_path / "source"
     fake_bin = tmp_path / "bin"
@@ -221,16 +221,83 @@ def test_source_update_uses_current_checkout_without_git_fetch_or_pull(tmp_path:
             "--target", str(target), "--source", str(source),
             "--source-mode", "source", "--venv", str(tmp_path / "venv"),
         ],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         env=environment,
     )
 
-    assert "不会自动 fetch/pull" in result.stdout
+    assert result.returncode == 2
+    assert "只支持 Release 管理安装" in result.stderr
     assert not git_log.exists()
-    args = install_args.read_text(encoding="utf-8")
-    assert "update" in args and "--source-mode" in args and "source" in args
+    assert not install_args.exists()
+
+
+def test_control_update_without_release_source_does_not_use_package_index(tmp_path: Path) -> None:
+    target = tmp_path / "host"
+    venv = tmp_path / "venv"
+    (venv / "bin").mkdir(parents=True)
+    target.mkdir()
+    command_log = tmp_path / "package-commands.log"
+    python = venv / "bin" / "python"
+    python.write_text("#!/bin/sh\nprintf 'python %s\\n' \"$*\" >> \"$COMMAND_LOG\"\n", encoding="utf-8")
+    python.chmod(0o755)
+    nb = venv / "bin" / "nb"
+    nb.write_text("#!/bin/sh\nprintf 'nb %s\\n' \"$*\" >> \"$COMMAND_LOG\"\n", encoding="utf-8")
+    nb.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/control.sh"), "update", "--target", str(target), "--venv", str(venv)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "COMMAND_LOG": str(command_log)},
+    )
+
+    assert result.returncode == 2
+    assert "Release 管理安装" in result.stderr
+    assert not command_log.exists()
+    assert "nonebot_plugin_xiuxian_3" not in (ROOT / "scripts/control.sh").read_text(encoding="utf-8")
+
+
+def test_control_release_update_routes_to_archive_installer(tmp_path: Path) -> None:
+    target = tmp_path / "host"
+    source = tmp_path / "release-source"
+    (source / "scripts").mkdir(parents=True)
+    target.mkdir()
+    (source / ".xiuxian3-release").write_text("release archive\n", encoding="utf-8")
+    one_key_args = tmp_path / "onekey-args"
+    one_key = source / "scripts" / "onekey.sh"
+    one_key.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$ONEKEY_ARGS\"\n", encoding="utf-8")
+    one_key.chmod(0o755)
+
+    result = subprocess.run(
+        [
+            "bash", str(ROOT / "scripts/control.sh"), "update",
+            "--target", str(target), "--source", str(source),
+            "--source-mode", "auto", "--venv", str(tmp_path / "venv"),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "ONEKEY_ARGS": str(one_key_args)},
+    )
+
+    args = one_key_args.read_text(encoding="utf-8").splitlines()
+    assert args[0] == "update"
+    assert args[args.index("--source-mode") + 1] == "release"
+    assert args[args.index("--source") + 1] == str(source)
+
+
+def test_windows_control_update_requires_release_archive_without_pypi_fallback() -> None:
+    windows_control = (ROOT / "scripts/control_windows.ps1").read_text(encoding="utf-8")
+    update_branch = windows_control.split('    "update" {', 1)[1].split('    "uninstall" {', 1)[0]
+
+    assert "onekey_windows.ps1" in update_branch
+    assert "latest project.tar.gz" in update_branch
+    assert "pip install" not in update_branch
+    assert "nonebot_plugin_xiuxian_3" not in update_branch
+    assert "install_windows.ps1" not in update_branch
 
 
 def test_release_update_downloads_archive_and_preserves_host_state(tmp_path: Path) -> None:
@@ -367,7 +434,8 @@ def test_user_update_docs_use_release_managed_update_flow() -> None:
     assert "xiu3 update" in distribution
     assert "--source-mode release" in readme
     assert "--source-mode release" in installation
-    assert "不自动同步源码" in installation
+    assert "`xiu3 update` 只支持 Release 管理安装" in readme
+    assert "`xiu3 update` 只支持 Release 管理安装" in installation
     assert "--source-mode source" in installation
     assert "git -C " not in installation
     assert "scripts/install.sh update" not in installation

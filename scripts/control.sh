@@ -197,37 +197,16 @@ resume_process() {
 }
 
 update() {
-    if [ -n "$SOURCE_ROOT" ] && [ -x "$SOURCE_ROOT/scripts/install.sh" ]; then
-        if { [ "$SOURCE_MODE" = release ] || { [ "$SOURCE_MODE" = auto ] && [ -f "$SOURCE_ROOT/.xiuxian3-release" ]; }; } && [ -x "$SOURCE_ROOT/scripts/onekey.sh" ]; then
-            # Release installs refresh the immutable source cache from the
-            # latest project.tar.gz before reinstalling the preserved host.
-            local -a update_args=(update --target "$TARGET" --source "$SOURCE_ROOT" --source-mode release --mirror "$MIRROR" --venv "$VENV")
-            [ -n "$MIRROR_URL" ] && update_args+=(--mirror-url "$MIRROR_URL")
-            exec "$SOURCE_ROOT/scripts/onekey.sh" "${update_args[@]}"
-        fi
-        [[ "$SOURCE_MODE" == auto || "$SOURCE_MODE" == source ]] || {
-            printf '[xiu3] 不支持的更新源码模式：%s\n' "$SOURCE_MODE" >&2
-            return 2
-        }
-        printf '[xiu3] 源码模式使用当前 checkout；不会自动 fetch/pull。请先自行同步源码，再运行更新。\n'
-        exec "$SOURCE_ROOT/scripts/install.sh" update --target "$TARGET" --source "$SOURCE_ROOT" \
-            --source-mode source --mirror "$MIRROR" --venv "$VENV"
+    if [ -n "$SOURCE_ROOT" ] \
+        && [ -x "$SOURCE_ROOT/scripts/onekey.sh" ] \
+        && { [ "$SOURCE_MODE" = release ] || { [ "$SOURCE_MODE" = auto ] && [ -f "$SOURCE_ROOT/.xiuxian3-release" ]; }; }; then
+        # Release installs refresh the managed source cache from the archive.
+        local -a update_args=(update --target "$TARGET" --source "$SOURCE_ROOT" --source-mode release --mirror "$MIRROR" --venv "$VENV")
+        [ -n "$MIRROR_URL" ] && update_args+=(--mirror-url "$MIRROR_URL")
+        exec "$SOURCE_ROOT/scripts/onekey.sh" "${update_args[@]}"
     fi
-    printf '[xiu3] 未找到源码目录，尝试从 Python 包索引更新。\n'
-    local python="$VENV/bin/python"
-    local nb="$VENV/bin/nb"
-    local group name
-    for component in \
-        'adapter|QQ' \
-        'adapter|OneBot V11' \
-        'driver|FastAPI' \
-        'driver|HTTPX' \
-        'driver|websockets' \
-        'driver|AIOHTTP'; do
-        IFS='|' read -r group name <<< "$component"
-        "$nb" --cwd "$TARGET" --python "$python" "$group" update "$name"
-    done
-    "$python" -m pip install --upgrade --no-deps nonebot_plugin_xiuxian_3
+    printf '[xiu3] xiu3 update 只支持 Release 管理安装；需要可用的 Release 源码目录以下载 latest project.tar.gz。\n' >&2
+    return 2
 }
 
 uninstall() {
