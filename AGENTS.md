@@ -18,7 +18,10 @@ quality 3.11/3.12、install-smoke/release 全部成功。指定宿主 `/root/xiu
 已从 Release 更新并重启，源码位于 src/plugins，1 matcher/1 handler、无 xiu3 pip 包，QQ READY。
 仅此宿主的两个未知基线 JSON 按用户授权备份后最小人工合并，未伪造官方指纹。
 本次发布与此宿主部署由用户明确授权，不代表其他环境投产或 QQ 消息呈现验收。
-当前无自动下一开发项，等待新目标；最终证据见 current 与独立部署报告，不重开 M9/旧 goal。
+`main` 是安装/Release 分支，`develop` 是唯一活动开发分支；旧 `work/*`、`docs/*` 分支和
+worktree 仅作历史保留，不删除、不盲合。M9 已结束并合入 main，不重开 M9/旧 goal。
+当前有限任务在 develop 完成 `chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关，
+先补正文/人物/场景/目标/来源/奖励/后续/重试数据，再接现有战斗、委托、快照、事务和幂等消费者。
 M7 仅完成旧范围来源/引用修补，不作为 M9 内容完整证明。
 本地内容沿用现行规则与已记录依赖；保留 loader → 公开取得 → application/repository → 玩法消费链、
 快照、事务、幂等和恢复语义，不把未来 locked 内容或外部条件混入本地完成声明。
@@ -37,7 +40,7 @@ SDK vendor；兄弟 `nonebot_plugin_xiuxian_2` 的 vendor 只可在明确授权�
 本次 runtime/验载仅使用指定实例自己的 `.venv/bin/python`，不修改或使用共享 `/root/myenv`。
 聚焦回归串行且资源有界；不全量、不压测，不重复已完成玩法长链；Docker 不做实机全测。
 真实失败先诊断并在有限当前范围最小修复；不得 skip/ignore、删除行为断言或降低阈值求通过。
-M9 与首段剧情已完成；当前授权不扩大玩法范围、不 force、不改写历史或移动旧 tag。
+M9 与首段剧情已完成；当前仅推进上述两关，不扩 84 关、不扩 PvP/支付/跨服，不 force、不改写历史或移动旧 tag。
 后续官方 data 变更须维护 `scripts/seed_migrations.json`：旧/新 SHA-256 与 Git provenance，
 仅迁移确证旧官方文件，保留自定义/未知 JSON；语法/严格验载失败自动回退，见发布分发文档。
 按明确文件清单 stage，不纳入用户数据、运行库、密钥、日志或缓存；保护既有改动。
