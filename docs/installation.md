@@ -16,7 +16,7 @@
 git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode source --mirror direct
+bash scripts/onekey.sh install --source-mode release --mirror direct
 ```
 
 ### GitHub Release
@@ -50,7 +50,7 @@ pkg install -y git curl
 git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode source --mirror direct
+bash scripts/onekey.sh install --source-mode release --mirror direct
 termux-wake-lock
 ```
 
@@ -63,7 +63,7 @@ termux-wake-lock
 ```powershell
 git clone --branch main --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 Set-Location xiuxian3-src
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode source -Mirror direct
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode release -Mirror direct
 ```
 
 脚本会检查 Python 3.11+ 和 Git，缺少时尝试使用 `winget`；也可以先手动安装后再运行。
@@ -95,27 +95,17 @@ cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
 ```
 
-源码 checkout 应保持在 `main`。源码模式下管理命令使用当前 checkout，不自动执行 Git 更新；需要更新源码时，先停止宿主并备份，再由操作者同步 `main` checkout，最后重新安装：
-
-```bash
-/path/to/nonebot-host/xiu3 stop
-cp -a /path/to/nonebot-host /path/to/nonebot-host.backup
-git -C /path/to/xiuxian3-src pull --ff-only origin main
-bash /path/to/xiuxian3-src/scripts/install.sh update /path/to/nonebot-host --venv /path/to/venv
-/path/to/nonebot-host/xiu3 start
-```
-
-更新前先保存本地源码修改。Release 安装通过 `xiu3 update` 重新下载最新 `project.tar.gz`；该更新路径不执行 `git fetch/pull`。
+源码模式使用当前 checkout，`xiu3 update` 只重新应用当前源码，不会自动同步新提交。该模式用于首次源码安装或本地开发；日常 Release 更新请使用 Release 管理安装。
 
 ## 已有宿主手动安装
 
-从包含脚本的 checkout 执行：
+从包含脚本的 checkout 首次安装 Release 管理宿主：
 
 ```bash
-bash scripts/install.sh install /path/to/nonebot-host --venv /path/to/venv
+bash scripts/onekey.sh install --source-mode release --mirror direct --target /path/to/nonebot-host --source /path/to/xiuxian3-release-cache --venv /path/to/venv
 ```
 
-该脚本会在指定 venv 中安装 `requirements.txt`、QQ/OneBot 适配器、FastAPI/HTTPX/websockets/AIOHTTP 和插件本身，并只复制宿主中缺失的 `bot.py`、`pyproject.toml`、`.env` 与 `data/*.json`。已有宿主的配置、代码和数据不会覆盖。宿主必须包含可由 `nb run` 加载的 `bot.py` 和 `pyproject.toml`。
+该脚本会从 Release 获取程序文件，在指定 venv 中安装 `requirements.txt`、QQ/OneBot 适配器、FastAPI/HTTPX/websockets/AIOHTTP 和插件本身，并只复制宿主中缺失的 `bot.py`、`pyproject.toml`、`.env` 与 `data/*.json`。已有宿主的配置、代码和数据不会覆盖。宿主必须包含可由 `nb run` 加载的 `bot.py` 和 `pyproject.toml`。
 
 ### 不使用安装脚本
 
@@ -198,7 +188,7 @@ Windows：
 & .\xiu3.ps1 uninstall --yes
 ```
 
-Release 安装的 `update` 会重新获取 `project.tar.gz`，保留宿主 `.env`、SQLite、`data/`、`runtime/` 和用户 JSON，也不替换 venv。源码 checkout 由操作者自行同步后执行 `scripts/install.sh update`。停止宿主后再备份，更新完成后重新启动：
+Release 管理安装的 `xiu3 update` 会从 latest Release 获取 `project.tar.gz` 并更新程序文件，保留宿主 `.env`、SQLite、`data/`、`runtime/`、用户 JSON 和 venv。停止宿主后再备份，更新完成后重新启动：
 
 ```bash
 xiu3 stop
@@ -206,6 +196,8 @@ cp -a "$HOME/xiu3" "$HOME/xiu3.backup"
 xiu3 update
 xiu3 start
 ```
+
+源码模式的 `xiu3 update` 使用当前 checkout，不自动同步源码；不把 Git 操作作为用户升级步骤。
 
 正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md#1-配置层级) 控制，未配置时沿用默认富消息能力；配置存在但未列出当前 AppID 时使用纯文本。
 
@@ -220,7 +212,7 @@ tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
 
 - Python 版本或 venv 不可用：安装 Python 3.11+ 及 venv 模块。
 - 端口冲突：修改宿主 `.env` 的 `PORT` 后重启。
-- 适配器/驱动缺失：在同一 venv 重新运行 `scripts/install.sh update`；Release 安装可使用 `xiu3 update`。
+- 适配器/驱动缺失：Release 管理安装执行 `xiu3 update`；源码模式使用当前 checkout 重新运行安装流程。
 - QQ 无消息：检查 `QQ_BOTS`、开放平台事件权限和 QQ 适配器版本。
 - OneBot 无消息：检查 NapCat 的反向 WebSocket URL、端口、防火墙和连接日志。
 - Release 下载失败：先重试，再使用 `--mirror direct`；也可 checkout `main` 并使用 `--source-mode source`。

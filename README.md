@@ -28,7 +28,7 @@
 
 ## 安装
 
-安装器会创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境，安装 NoneBot CLI、QQ、OneBot V11 适配器及 FastAPI、HTTPX、websockets、AIOHTTP 驱动。源码安装会保留宿主已有的 `.env`、数据库和 JSON 文件。
+安装器会创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境，安装 NoneBot CLI、QQ、OneBot V11 适配器及 FastAPI、HTTPX、websockets、AIOHTTP 驱动。Release 管理安装从 latest Release 获取程序文件；更新时保留宿主已有的 `.env`、数据库和 JSON 文件。
 
 ### Linux 一键安装
 
@@ -38,7 +38,7 @@
 git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode source --mirror direct
+bash scripts/onekey.sh install --source-mode release --mirror direct
 ```
 
 安装完成后编辑 `$HOME/xiu3/.env`，再执行 `xiu3 start`。无法写入公共命令目录时，使用 `$HOME/xiu3/xiu3`。
@@ -51,7 +51,7 @@ pkg install -y git curl
 git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode source --mirror direct
+bash scripts/onekey.sh install --source-mode release --mirror direct
 termux-wake-lock
 ```
 
@@ -64,7 +64,7 @@ termux-wake-lock
 ```powershell
 git clone --branch main --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 Set-Location xiuxian3-src
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode source -Mirror direct
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode release -Mirror direct
 ```
 
 ### Docker
@@ -83,16 +83,19 @@ Docker 将 `./data` 挂载为内容和 SQLite 目录，将 `./runtime` 挂载为
 
 ### 已有 NoneBot 宿主
 
-适合已经有 NoneBot 项目的用户。先获取 main 源码，再补齐宿主依赖；脚本不会覆盖已有 `bot.py`、`pyproject.toml`、`.env` 或 `data/*.json`。
+适合已经有 NoneBot 项目的用户。先获取 main 中的安装脚本，再由 Release 补齐宿主依赖；脚本不会覆盖已有 `bot.py`、`pyproject.toml`、`.env` 或 `data/*.json`。
 
 ```bash
 git clone --branch main --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
-bash scripts/install.sh install /path/to/nonebot-host --venv /path/to/venv
+bash scripts/onekey.sh install --source-mode release --mirror direct \
+  --target /path/to/nonebot-host \
+  --source /path/to/xiuxian3-release-cache \
+  --venv /path/to/venv
 ```
 
-宿主需要能够使用 `nb run`，并允许安装 QQ/OneBot 适配器和驱动。源码开发时显式指定源码目录：
+宿主需要能够使用 `nb run`，并允许安装 QQ/OneBot 适配器和驱动。首次从源码安装或本地开发时，显式指定源码目录：
 
 ```bash
 bash scripts/onekey.sh install --source-mode source --mirror direct \
@@ -159,7 +162,7 @@ xiu3 uninstall --yes
 
 ## 更新、备份与排错
 
-源码宿主的更新跟踪 `origin main`。先停止宿主，再备份，更新后重新启动：
+以下流程适用于 Release 管理安装。先停止宿主，再备份；`xiu3 update` 从 latest Release 下载 `project.tar.gz` 并更新程序文件，保留宿主配置、SQLite、`data/`、`runtime/` 和 venv；完成后重新启动：
 
 ```bash
 xiu3 stop
@@ -168,7 +171,7 @@ xiu3 update
 xiu3 start
 ```
 
-`xiu3 update` 会在源码目录执行 `git fetch`、`git pull --ff-only origin main`，再运行安装脚本更新依赖和缺失内容；有未提交源码改动时会拒绝更新。不要在宿主运行时复制数据库。
+源码模式使用当前 checkout，`xiu3 update` 不会自动同步源码；该模式用于首次源码安装或本地开发，不属于 Release 管理更新流程。不要在宿主运行时复制数据库。
 
 查看状态和正常宿主日志：
 

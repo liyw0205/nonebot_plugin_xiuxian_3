@@ -346,6 +346,33 @@ def test_release_asset_is_built_outside_checkout_root() -> None:
     assert '"$RUNNER_TEMP/project.tar.gz" --verify-tag' in publish_step
 
 
+def test_user_update_docs_use_release_managed_update_flow() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    installation = (ROOT / "docs/installation.md").read_text(encoding="utf-8")
+    distribution = (ROOT / "docs/release-distribution.md").read_text(encoding="utf-8")
+    readme_update = readme.split("## 更新、备份与排错\n", 1)[1].split("## 文档与数据\n", 1)[0]
+    installation_update = installation.split("## 控制、更新与备份\n", 1)[1].split("## 排错\n", 1)[0]
+
+    for section in (readme_update, installation_update):
+        flow = section.split("```bash\n", 1)[1].split("```", 1)[0]
+        commands = ("xiu3 stop", "cp -a", "xiu3 update", "xiu3 start")
+        positions = [flow.index(command) for command in commands]
+        assert positions == sorted(positions)
+        assert "git fetch" not in section
+        assert "git pull" not in section
+        assert "latest Release" in section
+        assert "project.tar.gz" in section
+
+    assert "latest/download/project.tar.gz" in distribution
+    assert "xiu3 update" in distribution
+    assert "--source-mode release" in readme
+    assert "--source-mode release" in installation
+    assert "不自动同步源码" in installation
+    assert "--source-mode source" in installation
+    assert "git -C " not in installation
+    assert "scripts/install.sh update" not in installation
+
+
 def test_windows_update_paths_do_not_run_git_fetch_or_pull() -> None:
     windows_control = (ROOT / "scripts/control_windows.ps1").read_text(encoding="utf-8")
     update_branch = windows_control.split('    "update" {', 1)[1].split('    "uninstall" {', 1)[0]
