@@ -28,7 +28,7 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       - name: Install quality dependencies
-        run: python -m pip install -r requirements.txt "pytest>=8,<10"
+        run: python -m pip install -r requirements.txt "pytest>=8,<10" "nonebot2[fastapi]>=2.4"
       - name: Run focused quality tests
         run: python -m pytest -q test/test_installation_docs.py
       - name: Compile Python sources
