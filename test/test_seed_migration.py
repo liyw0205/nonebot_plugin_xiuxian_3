@@ -13,20 +13,27 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "bcaf8bb927740ed41d016382a81c0cbc61a18f096e4945c28a42e99407763580"
+OLD_SHA = "a74b70fffeee1f3eaa5b3d535572de7e3edbf8226e365723b3f58fe403483f9d"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the recorded 42d1772 content delta; pin the resulting git blob.
+    # Reverse only the current two-stage content delta; pin the v0.1.5 blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
-    text = re.sub(r'^      "body":.*?(?=^      "status":)', "", text, count=2, flags=re.M | re.S)
-    text = text.replace(
-        '      "prerequisites": ["chapter.1.stage.1", "guide.gather_blood_grass"],',
-        '      "prerequisites": ["chapter.1.stage.1"],\n'
-        '      "alternative_prerequisites": ["guide.gather_blood_grass"],',
-        1,
-    )
-    text = text.replace('      "required_layer": 2,', '      "required_layer": 1,', 1)
+    for key in ("chapter.1.stage.3", "chapter.2.stage.1"):
+        start = text.index(f'      "key": "{key}"')
+        end = text.index("\n    },", start)
+        section = text[start:end]
+        for pattern in (
+            r'^      "body":[^\n]*\n',
+            r'^      "objectives": \[\n.*?^      \],\n',
+            r'^      "actions": \[\n.*?^      \],\n',
+            r'^      "state_changes":[^\n]*\n',
+            r'^      "next_stage_key":[^\n]*\n',
+            r'^      "retry": \{\n.*?^      \},\n',
+        ):
+            section, count = re.subn(pattern, "", section, count=1, flags=re.M | re.S)
+            assert count == 1
+        text = text[:start] + section + text[end:]
     blob = text.encode("utf-8")
     assert hashlib.sha256(blob).hexdigest() == OLD_SHA
     return blob
