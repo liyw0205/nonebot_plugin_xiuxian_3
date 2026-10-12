@@ -96,6 +96,18 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
   `127.0.0.1:18094` 监听，QQ READY、Uvicorn/application startup complete，当前日志无 ERROR/Traceback。
   本次未发送真实 QQ 消息、未重跑全量/压测，QQ READY 仅证明连接与启动，不代表真机富消息呈现或权限验收。
 
+- 主线委托历史交付过滤修复已由 `57fcb3480db66304d4a7be2767e04059a8a0e3df` 推送并快进到
+  `main`/`develop`；`adventures/repository.py` 现在要求 `commission_delivery` 的
+  `delivered_at >= snapshot.started_at`。旧交付与开始后的新交付回归覆盖，主线聚焦测试 `17 passed`
+  （未重跑全量/压测）；main CI `38187242470` 成功。
+- `v0.1.7` 已在该 SHA 上发布，未移动或删除 `v0.1.6`；Release `project.tar.gz` 下载 HTTP 200、
+  归档事务校验通过。`/root/xiu3-qq-test-20261011` 已停机备份后用自身 `.venv` 从 Release 更新，
+  备份为 `.xiuxian3/backups/pre-v0.1.7-20261012-082857`，53 个 JSON 保留、种子更新 0、SQLite
+  `integrity_check=ok`、`.env` 保留。实际加载路径为
+  `src/plugins/nonebot_plugin_xiuxian_3/__init__.py`，验载输出 `matchers=1 handlers=1`，无
+  `nonebot-plugin-xiuxian-3` 发行包；当前 PID `3807948`/子进程 `3807956`、端口 `18094`，日志有
+  QQ `EventType.READY`、Uvicorn startup 且无 `ERROR/Traceback`。本次未发送真实 QQ 消息。
+
 - `b79e28b` 的 main CI `38135461297`、v0.1.4 工作流 `38135669957` 的 quality 3.11/3.12、
   install-smoke/release 均成功；API 已确认 Release 与 `project.tar.gz`，资产 SHA-256
   `80f81655146bb727bbcc2adce0654b9d188219f84af1b8add7da659b12f5c97e`。
