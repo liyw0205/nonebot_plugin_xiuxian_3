@@ -13,13 +13,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "6dc2f89a64164342c76a9c517bb0670a403640cd2687356ff6a6d522d283ca77"
+OLD_SHA = "0fdbd50bb733ba252a1a427b0a5a2ff2482edc99a14d2d8641f7cf7b2035f2e0"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the current chapter.2.stage.2 content delta; pin the v0.1.7 blob.
+    # Reverse only the current chapter.2.stage.3 content delta; pin the cloud-city stage.2 blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
-    for key in ("chapter.2.stage.2",):
+    for key in ("chapter.2.stage.3",):
         start = text.index(f'      "key": "{key}"')
         end = text.index("\n    },", start)
         section = text[start:end]
@@ -33,14 +33,6 @@ def old_official_mainline() -> bytes:
         ):
             section, count = re.subn(pattern, "", section, count=1, flags=re.M | re.S)
             assert count == 1
-        section, count = re.subn(
-            r'^      "required_realm": "golden_core",\n',
-            '      "required_realm": "foundation",\n',
-            section,
-            count=1,
-            flags=re.M,
-        )
-        assert count == 1
         text = text[:start] + section + text[end:]
     blob = text.encode("utf-8")
     assert hashlib.sha256(blob).hexdigest() == OLD_SHA
