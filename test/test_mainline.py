@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from mainline_fixtures import grant_spirit_field_prerequisites, mark_mainline_snapshot_legacy
+from mainline_fixtures import (
+    grant_blood_grass,
+    grant_spirit_field_prerequisites,
+    mark_mainline_snapshot_legacy,
+)
 
 
 def _context(operation_id: str) -> CommandContext:
@@ -125,9 +129,10 @@ def test_mainline_stage_prerequisites_and_reward_assets() -> None:
 def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
+            now = [datetime(2026, 9, 22, tzinfo=timezone.utc)]
             runtime = create_runtime(
                 data_dir=data_dir,
-                clock=lambda: datetime(2026, 9, 22, tzinfo=timezone.utc),
+                clock=lambda: now[0],
             )
             await runtime.dispatch(_context("create"), "开始修仙")
             await runtime.dispatch(_context("seek"), "寻仙问道")
@@ -154,9 +159,13 @@ def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None
                 _context("commission-deliver"), "交付委托 止血草供应"
             )
             assert delivered.code == "COMMISSION_DELIVERED"
-
             started = await runtime.dispatch(_context("stage4-start"), "开始主线 城镇委托")
             assert started.code == "MAINLINE_STARTED"
+            now[0] += timedelta(days=1)
+            grant_blood_grass(runtime, "web", "mainline-user")
+            assert (await runtime.dispatch(_context("commission-list-next"), "城镇委托")).code == "COMMISSION_LIST"
+            assert (await runtime.dispatch(_context("commission-accept-next"), "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
+            assert (await runtime.dispatch(_context("commission-deliver-next"), "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
             claimed = await runtime.dispatch(_context("stage4-claim"), "领取主线奖励 城镇委托")
             assert claimed.code == "MAINLINE_REWARD_CLAIMED"
             assert claimed.data["first_clear"] is True
@@ -176,12 +185,122 @@ def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None
                     "SELECT COUNT(*) AS count FROM town_commission_claims WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?) AND status = 'delivered'",
                     ("mainline-user",),
                 ).fetchone()
-                assert int(delivered_evidence["count"]) == 1
+                assert int(delivered_evidence["count"]) == 2
                 reputation = connection.execute(
                     "SELECT service_reputation FROM player_reputations WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
                     ("mainline-user",),
                 ).fetchone()
-                assert int(reputation["service_reputation"]) == 6
+                assert int(reputation["service_reputation"]) == 7
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_mainline_commission_delivery_must_follow_stage_start() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(
+                data_dir=data_dir,
+                clock=lambda: datetime(2026, 9, 22, tzinfo=timezone.utc),
+            )
+            await runtime.dispatch(_context("create"), "开始修仙")
+            await runtime.dispatch(_context("seek"), "寻仙问道")
+            assert (await runtime.dispatch(_context("stage-start"), "开始主线 1")).ok
+
+            started_at = "2026-09-22T00:00:00+00:00"
+            old_delivery = "2026-09-21T23:59:59+00:00"
+            new_delivery = "2026-09-22T00:00:01+00:00"
+            with runtime.repository._connect() as connection:
+                player = connection.execute(
+                    "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                    ("web", "mainline-user"),
+                ).fetchone()
+                assert player is not None
+                player_id = int(player["id"])
+                commission_key = "town_commission.herb_supply"
+                connection.execute(
+                    """
+                    INSERT INTO town_commissions(
+                        commission_id, commission_key, business_date, status,
+                        stock_total, stock_remaining, starts_at, expires_at,
+                        snapshot_json, created_at, updated_at
+                    ) VALUES (?, ?, ?, 'published', ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "mainline-time-regression",
+                        commission_key,
+                        "2026-09-21",
+                        1,
+                        0,
+                        "2026-09-21T00:00:00+00:00",
+                        "2026-09-23T00:00:00+00:00",
+                        "{}",
+                        old_delivery,
+                        old_delivery,
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO town_commission_claims(
+                        claim_id, commission_id, player_id, business_date, status,
+                        accept_operation_id, deliver_operation_id, accepted_at,
+                        delivered_at, result_json, snapshot_json, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "mainline-time-regression-claim",
+                        "mainline-time-regression",
+                        player_id,
+                        "2026-09-21",
+                        "mainline-time-regression-accept",
+                        "mainline-time-regression-deliver",
+                        old_delivery,
+                        old_delivery,
+                        "{}",
+                        "{}",
+                        old_delivery,
+                        old_delivery,
+                    ),
+                )
+                run_row = connection.execute(
+                    "SELECT * FROM mainline_runs WHERE player_id=? AND stage_key=?",
+                    (player_id, "chapter.1.stage.1"),
+                ).fetchone()
+                assert run_row is not None
+                snapshot = json.loads(run_row["snapshot_json"])
+                snapshot["started_at"] = started_at
+                snapshot["definition"]["objectives"] = [
+                    {
+                        "key": "deliver-herb",
+                        "type": "commission_delivery",
+                        "label": "交付止血草供应委托",
+                        "commission_key": commission_key,
+                    }
+                ]
+                connection.execute(
+                    "UPDATE mainline_runs SET snapshot_json=? WHERE id=?",
+                    (json.dumps(snapshot, ensure_ascii=False, sort_keys=True), run_row["id"]),
+                )
+                run_row = connection.execute(
+                    "SELECT * FROM mainline_runs WHERE id=?", (run_row["id"],)
+                ).fetchone()
+                assert run_row is not None
+                missing_before = runtime.repository._mainline_missing_objectives(
+                    connection, player_id, run_row
+                )
+                assert missing_before == ("交付止血草供应委托",)
+
+                connection.execute(
+                    "UPDATE town_commission_claims SET delivered_at=?, updated_at=? WHERE claim_id=?",
+                    (new_delivery, new_delivery, "mainline-time-regression-claim"),
+                )
+                run_row = connection.execute(
+                    "SELECT * FROM mainline_runs WHERE id=?", (run_row["id"],)
+                ).fetchone()
+                assert run_row is not None
+                assert runtime.repository._mainline_missing_objectives(
+                    connection, player_id, run_row
+                ) == ()
             await runtime.close()
 
     asyncio.run(run())
@@ -190,9 +309,10 @@ def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None
 def test_mainline_town_commission_runs_through_qq_and_onebot_adapters() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
+            now = [datetime(2026, 9, 22, tzinfo=timezone.utc)]
             runtime = create_runtime(
                 data_dir=data_dir,
-                clock=lambda: datetime(2026, 9, 22, tzinfo=timezone.utc),
+                clock=lambda: now[0],
             )
             for adapter, user in (("qq.official", "mainline-qq"), ("onebot.v11", "mainline-onebot")):
                 def context(operation_id: str) -> CommandContext:
@@ -222,6 +342,11 @@ def test_mainline_town_commission_runs_through_qq_and_onebot_adapters() -> None:
                 assert (await dispatch("deliver", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
                 claimed = await dispatch("stage4-start", "开始主线 城镇委托")
                 assert claimed.code == "MAINLINE_STARTED"
+                now[0] += timedelta(days=1)
+                grant_blood_grass(runtime, adapter, user)
+                assert (await dispatch("list-next", "城镇委托")).code == "COMMISSION_LIST"
+                assert (await dispatch("accept-next", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
+                assert (await dispatch("deliver-next", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
                 reward = await dispatch("stage4-claim", "领取主线奖励 城镇委托")
                 assert reward.code == "MAINLINE_REWARD_CLAIMED"
                 assert reward.data["reward"]["service_reputation"] == 5

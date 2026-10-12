@@ -41,3 +41,19 @@ def grant_spirit_field_prerequisites(runtime, adapter: str, user: str, *, layer:
             "WHERE platform=? AND platform_user_id=?",
             (layer, json.dumps(intro, ensure_ascii=False), adapter, user),
         )
+
+
+def grant_blood_grass(runtime, adapter: str, user: str, quantity: int = 3) -> None:
+    with runtime.repository._connect() as connection:
+        row = connection.execute(
+            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+            (adapter, user),
+        ).fetchone()
+        inventory = json.loads(row["inventory_json"] or "{}")
+        inventory["item.herb.blood_grass"] = max(
+            int(inventory.get("item.herb.blood_grass", 0)), quantity
+        )
+        connection.execute(
+            "UPDATE players SET inventory_json=? WHERE platform=? AND platform_user_id=?",
+            (json.dumps(inventory, ensure_ascii=False, sort_keys=True), adapter, user),
+        )

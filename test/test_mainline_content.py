@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -11,7 +11,11 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from mainline_fixtures import grant_spirit_field_prerequisites, mark_mainline_snapshot_legacy
+from mainline_fixtures import (
+    grant_blood_grass,
+    grant_spirit_field_prerequisites,
+    mark_mainline_snapshot_legacy,
+)
 
 
 def _context(adapter: str, user: str, operation_id: str) -> CommandContext:
@@ -20,9 +24,9 @@ def _context(adapter: str, user: str, operation_id: str) -> CommandContext:
 
 def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
     async def run() -> None:
-        now = datetime(2026, 9, 22, tzinfo=timezone.utc)
+        now = [datetime(2026, 9, 22, tzinfo=timezone.utc)]
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir, clock=lambda: now)
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: now[0])
             for adapter, user in (("qq.official", "chapter2-qq"), ("onebot.v11", "chapter2-onebot")):
                 async def send(operation_id: str, command: str):
                     return await runtime.adapters.dispatch(adapter, _context(adapter, user, operation_id), command)
@@ -42,6 +46,11 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                 assert (await send("commission-accept", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
                 assert (await send("commission-deliver", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
                 assert (await send("town-start", "开始主线 城镇委托")).ok
+                now[0] += timedelta(days=1)
+                grant_blood_grass(runtime, adapter, user)
+                assert (await send("commission-list-next", "城镇委托")).code == "COMMISSION_LIST"
+                assert (await send("commission-accept-next", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
+                assert (await send("commission-deliver-next", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
                 assert (await send("town-claim", "领取主线奖励 城镇委托")).ok
 
                 with runtime.repository._connect() as connection:

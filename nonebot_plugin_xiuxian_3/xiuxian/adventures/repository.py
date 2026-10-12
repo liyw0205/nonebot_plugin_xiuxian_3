@@ -1992,8 +1992,8 @@ class AdventuresRepositoryMixin:
                     "SELECT 1 FROM town_commission_claims AS claims "
                     "JOIN town_commissions AS commissions ON commissions.commission_id=claims.commission_id "
                     "WHERE claims.player_id=? AND claims.status='delivered' "
-                    "AND commissions.commission_key=? LIMIT 1",
-                    (player_id, objective.get("commission_key")),
+                    "AND commissions.commission_key=? AND claims.delivered_at>=? LIMIT 1",
+                    (player_id, objective.get("commission_key"), started_at),
                 ).fetchone()
             else:
                 raise ValueError("mainline snapshot objective type is invalid")
