@@ -55,17 +55,21 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
 
                 with runtime.repository._connect() as connection:
                     connection.execute(
-                        "UPDATE players SET realm_key='foundation', realm_layer=6 WHERE platform=? AND platform_user_id=?",
-                        (adapter, user),
-                    )
-                for alias in ("云城初见", "商会听潮", "云铁入山", "矿兽试锋"):
-                    assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
-                    assert (await send(f"claim-{alias}", f"领取主线奖励 {alias}")).ok
-                with runtime.repository._connect() as connection:
-                    connection.execute(
                         "UPDATE players SET realm_key='golden_core', realm_layer=6 WHERE platform=? AND platform_user_id=?",
                         (adapter, user),
                     )
+                assert (await send("start-云城初见", "开始主线 云城初见")).ok
+                early = await send("claim-云城初见-early", "领取主线奖励 云城初见")
+                assert early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                assert (await send("cloud-travel-start", "前往 云城")).code == "TRAVEL_STARTED"
+                now[0] += timedelta(minutes=4)
+                assert (await send("cloud-travel-settle", "结算移动")).code == "TRAVEL_COMPLETED"
+                cloud_claim = await send("claim-云城初见", "领取主线奖励 云城初见")
+                assert cloud_claim.code == "MAINLINE_REWARD_CLAIMED"
+                assert cloud_claim.data["next_stage_key"] == "chapter.2.stage.3"
+                for alias in ("商会听潮", "云铁入山", "矿兽试锋"):
+                    assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
+                    assert (await send(f"claim-{alias}", f"领取主线奖励 {alias}")).ok
                 for alias in ("云舟试航", "阵堂初会", "阵纹试炼", "玄天新章"):
                     assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
                     claimed = await send(f"claim-{alias}", f"领取主线奖励 {alias}")
