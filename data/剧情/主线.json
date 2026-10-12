@@ -192,6 +192,20 @@
       "stage": 3,
       "name": "商会听潮",
       "desc": "在云城商会核对货单，听见云舟将启的消息。",
+      "body": "云城商会的掌柜翻着新开的商路账册，在末页压了一张航讯：云舟渡口重启，循潮水航路可往洞天深处。听潮不是听一句传闻——商会只把航讯交给亲到过渡口的人。备好五百灵石与脚力，从云城动身，等行程结算、站在渡口的石阶上听见云舟解缆的潮声，商路才算真正把你记进常客名册。灵石不足或行程未结算时航讯不销，凑齐后再走一趟即可。",
+      "objectives": [
+        {"key": "arrive_floating_boat", "type": "travel_arrival", "label": "在主线开始后抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云舟渡口", "description": "从云城启程，行程需五百灵石渡资，等待结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.2.stage.3"]},
+      "next_stage_key": "chapter.3.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "渡资不足或行程尚未结算时关卡保持进行中，不扣主线奖励；备齐灵石重新启程并结算移动后可再次领取。"
+      },
       "status": "open",
       "aliases": ["商会听潮"],
       "prerequisites": ["chapter.2.stage.2"],
