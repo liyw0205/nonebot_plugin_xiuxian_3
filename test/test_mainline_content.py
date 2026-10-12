@@ -67,7 +67,21 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                 cloud_claim = await send("claim-云城初见", "领取主线奖励 云城初见")
                 assert cloud_claim.code == "MAINLINE_REWARD_CLAIMED"
                 assert cloud_claim.data["next_stage_key"] == "chapter.2.stage.3"
-                for alias in ("商会听潮", "云铁入山", "矿兽试锋"):
+                assert (await send("start-商会听潮", "开始主线 商会听潮")).ok
+                tide_early = await send("claim-商会听潮-early", "领取主线奖励 商会听潮")
+                assert tide_early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE players SET spirit_stones = spirit_stones + 600 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                assert (await send("boat-travel-start", "前往 云舟渡口")).code == "TRAVEL_STARTED"
+                now[0] += timedelta(minutes=2)
+                assert (await send("boat-travel-settle", "结算移动")).code == "TRAVEL_COMPLETED"
+                tide_claim = await send("claim-商会听潮", "领取主线奖励 商会听潮")
+                assert tide_claim.code == "MAINLINE_REWARD_CLAIMED"
+                assert tide_claim.data["next_stage_key"] == "chapter.3.stage.1"
+                for alias in ("云铁入山", "矿兽试锋"):
                     assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
                     assert (await send(f"claim-{alias}", f"领取主线奖励 {alias}")).ok
                 for alias in ("云舟试航", "阵堂初会", "阵纹试炼", "玄天新章"):

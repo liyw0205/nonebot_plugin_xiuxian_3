@@ -83,12 +83,16 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 快照/事务/幂等语义，阶段列入内容化校验集合。关卡境界要求由旧的 `foundation` L1
 对齐为可达路线实际要求的 `golden_core` L1：区域通路、地点 JSON 与 travel 校验
 都以结丹一层为云城门槛，story 声明与可达性不静默放宽世界准入。
-`chapter.2.stage.3` 商会听潮保持题录，是下一个待内容化关卡。
-`mainline.py` 数据改动为 `fd73925`；官方 `剧情/主线.json` 旧新版 SHA-256 与
-Git provenance 已登记 `scripts/seed_migrations.json`，聚焦组
-`test_mainline.py`、`test_mainline_content.py`、`test_mainline_vertical_slice.py`、
-`test_seed_migration.py` 共 27 passed（迁移测试覆盖旧官方 blob 升级、重复升级
-幂等、用户自定义保留与回退），未重跑全量/压测。
+`chapter.2.stage.3` 商会听潮内容化切片已随后在 `develop` 完成：正文、`travel_arrival`
+目标（结算后的公开抵达 `xuantian.floating_boat`，含五百灵石渡资的既有行程成本）、
+行动、首通状态事件、`next_stage_key` 指向 `chapter.3.stage.1` 与失败重试规则均已
+落地，境界门槛保持既有 `foundation` L1，与渡口路线要求一致；`chapter.3.stage.1`
+云铁入山保持题录，是下一个待内容化关卡。
+数据改动为 `fd73925`（stage.2）与 `b6ffef2`（stage.3）；官方 `剧情/主线.json`
+各版 SHA-256 与 Git provenance 已登记 `scripts/seed_migrations.json`，聚焦组
+`test_mainline.py`、`test_mainline_content.py`、`test_mainline_vertical_slice.py`
+20 passed，`test_seed_migration.py` 7 passed（迁移测试覆盖旧官方 blob 升级、
+重复升级幂等、用户自定义保留与回退），未重跑全量/压测。
 
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
